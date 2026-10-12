@@ -1,8 +1,8 @@
 import ReliabilityBarChartD3 from '@/components/reliability/ui/BarChartD3';
 import { mountWithProviders } from '../support/test-utils';
 import { createMockReliabilityData } from '../support/mock-data';
-import { Model } from '@/lib/data-mappings';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { Model } from '@/lib/catalog/data-mappings';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('ReliabilityBarChartD3', () => {
   it('tracks retry and requests reliability data again', () => {

@@ -1,11 +1,11 @@
 'use client';
 
-import { useFeatureGate } from '@/lib/use-feature-gate';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { track } from '@/lib/analytics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { track } from '@/lib/analytics/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,17 +18,17 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
 import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
   getOverlayLineLabel,
-} from '@/lib/inference-labels';
-import { getChartWatermark, Sequence } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
+} from '@/lib/benchmarks/inference-labels';
+import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -47,7 +47,7 @@ import {
   getShapeKeyForPrecision,
   HIT_AREA_RADIUS,
   logTickFormat,
-} from '@/lib/chart-rendering';
+} from '@/lib/charts/chart-rendering';
 import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import {
   attachOverlayXMarkerHandlers,
@@ -58,8 +58,8 @@ import {
   overlayRooflineDasharray,
   overlayRunColor,
   overlayRunIndex,
-} from '@/lib/overlay-run-style';
-import type { ParetoDirection } from '@/lib/chart-utils';
+} from '@/lib/charts/overlay-run-style';
+import type { ParetoDirection } from '@/lib/charts/chart-utils';
 import {
   chartFrontier,
   upperPowerEnvelope,
@@ -85,7 +85,7 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isMeasuredEnergyConfigKey,

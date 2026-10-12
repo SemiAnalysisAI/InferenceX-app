@@ -1,8 +1,8 @@
-import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import { getGpuSpecs, type TcoBasis } from '@/lib/catalog/constants';
 /**
  * @file utils.ts
  * @description Inference-specific utility functions for filtering chart data.
- * For Pareto front calculations, see @/lib/chart-utils
+ * For Pareto front calculations, see @/lib/charts/chart-utils
  */
 
 import chartDefinitions from '@/components/inference/metric-registry';
@@ -10,7 +10,7 @@ import {
   resolveXAxisField,
   type FixedSequenceStatistic,
 } from '@/components/inference/utils/resolveXAxisField';
-import { remapInferencePoint } from '@/lib/chart-utils';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
 import type {

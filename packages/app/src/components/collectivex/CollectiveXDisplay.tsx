@@ -23,8 +23,8 @@ import {
   useDeleteCollectiveXRun,
 } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';

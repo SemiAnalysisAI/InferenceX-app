@@ -26,7 +26,7 @@ import type {
 } from '@/components/inference/types';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import type { TcoBasis } from '@/lib/constants';
+import type { TcoBasis } from '@/lib/catalog/constants';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
@@ -34,7 +34,7 @@ import {
   Percentile,
   PERCENTILE_OPTIONS,
   Sequence,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
@@ -73,11 +73,17 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 
 import { X_AXIS_MODES, type XAxisMode } from '@/components/inference/hooks/chart-data-core';
 import { POWER_TIER_ORDER } from '@/components/inference/utils/quickFilters';
-import { cachedJson } from '@/lib/api-cache';
-import { getCachedBenchmarks, getCachedBenchmarksForRun } from '@/lib/benchmark-query-cache.server';
+import { cachedJson } from '@/lib/cache/api-cache';
+import {
+  getCachedBenchmarks,
+  getCachedBenchmarksForRun,
+} from '@/lib/benchmarks/benchmark-query-cache.server';
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
-import { loadFixture } from '@/lib/test-fixtures';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 
 import {

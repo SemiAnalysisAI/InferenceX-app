@@ -23,7 +23,7 @@ database is a durable cache of GitHub Actions, populated by the API routes thems
 
 ## How it works
 
-`packages/app/src/lib/collectivex-lazy-ingest.ts` exposes three `ensure*` functions the
+`packages/app/src/lib/collectivex/collectivex-lazy-ingest.ts` exposes three `ensure*` functions the
 routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
 
 - `ensureLatestCollectiveXRun` — walk GitHub's completed sweep runs newest-first; stop at

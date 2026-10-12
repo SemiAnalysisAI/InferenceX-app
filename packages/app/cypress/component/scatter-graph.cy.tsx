@@ -1,10 +1,7 @@
 import { useReducer, useState } from 'react';
-import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
+import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
-import {
-  overlaySelectionReducer,
-  UnofficialRunContext,
-} from '@/components/unofficial-run-provider';
+import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
@@ -18,8 +15,8 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
-import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
+import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { buildExclusion, resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();

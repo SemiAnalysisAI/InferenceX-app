@@ -6,7 +6,7 @@ import {
   type TraceHistogramMap,
 } from '@semianalysisai/inferencex-db/queries/trace-histograms';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

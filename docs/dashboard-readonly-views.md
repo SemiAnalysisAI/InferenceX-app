@@ -16,6 +16,18 @@ continuation stays on the newsletter and is not included in these feeds.
 Use the existing inference, first-token, and cache-reuse view contracts for live
 data; do not interpret the historical article figures as current API results.
 
+## Standalone ubenchX pages
+
+`/ubenchx` (Beta) is linked from the header navigation and redirects to `/ubenchx/mem-bw`.
+Each test page (`/ubenchx/mem-bw`, `/ubenchx/sm-l2-distance`, `/ubenchx/tpc-skyline`, plus `/zh` siblings) shares a
+header whose Microbenchmark selector navigates between tests; it maps to the view's `test`
+parameter rather than adding a new one. They are not
+dashboard tabs, so they have no `DASHBOARD_API_COVERAGE` entry. Their data is published
+by the `ubenchx` view (`GET /api/v1/views/ubenchx?test=<test>&gpu=<gpu|all>`), which
+runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylineRun` as the pages. The mem-bw
+Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
+already includes all three metrics, so it adds no query parameter.
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.
@@ -43,6 +55,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                                                                                                                                               |
 | `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
+| `ubenchx`                       | `gpu`, `test`                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
@@ -80,6 +93,10 @@ locally generated assets do not become public API data. Feedback is sensitive.
 OperatorX is feature-gated in navigation and uses page-owned
 `/api/v1/operatorx/*` routes; it has no published `/api/v1/views/operatorx`
 contract.
+The Agentic Workload Explorer is feature-gated in navigation and reads a frozen,
+anonymized ProxyTrace snapshot from a separate database through page-owned
+`/api/v1/agentic-workload-explorer/*` routes (catalogued as `page-bff`); it has
+no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
 Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
@@ -271,6 +288,10 @@ GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取
 存储的有效平均值、窗口内所绘曲线的最大值，以及 GPU 数 × 注册表 TDP。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
+Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面专属的
+`/api/v1/agentic-workload-explorer/*` 接口（在路由目录中归类为 `page-bff`）
+从独立数据库读取冻结的匿名 ProxyTrace 快照；目前没有发布
+`/api/v1/views/agentic-workload-explorer` 契约。
 
 日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式下都使用日期对比图，
 并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
@@ -307,3 +328,14 @@ JSON。散点图的前沿点表（`i_frontier` 开启且为实测功耗
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。
+
+### CollectiveX kernel qualification / Kernel 验证情况
+
+The CollectiveX view also returns `knownSupport` and `knownSupportFootnotes` from
+the same curated source as the website, independently of selected runs. Status
+values are `works`, `broken`, and `na`; read each note to distinguish unavailable
+combinations from pending qualification. Footnotes contain both `en` and `zh`.
+
+CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网站共用人工维护
+的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
+不可用与待验证的配置。注释同时包含 `en` 和 `zh`。

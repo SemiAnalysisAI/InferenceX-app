@@ -2,13 +2,13 @@ import type { CSSProperties } from 'react';
 
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import type { FrameworkReleases, LatestImageRow } from '@/lib/api';
+import type { FrameworkReleases, LatestImageRow } from '@/lib/api/api';
 import {
   Model,
   Sequence,
   getModelCategory,
   getSequenceCategoryForModel,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 
 const MODEL_VALUES = new Set<string>(Object.values(Model));
 const SEQUENCE_VALUES = new Set<string>(Object.values(Sequence));

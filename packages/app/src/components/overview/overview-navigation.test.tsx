@@ -4,8 +4,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
-import type { OverviewPageData, OverviewTier } from '@/lib/overview-data';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import type { OverviewPageData, OverviewTier } from '@/lib/overview/overview-data';
 
 /** One stable stub, not a fresh spy per render: a per-render spy makes
  *  `expect(push).not.toHaveBeenCalled()` unfalsifiable. */

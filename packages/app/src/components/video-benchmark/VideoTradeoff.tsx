@@ -9,9 +9,9 @@ import { Heading } from '@/components/ui/heading';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml } from '@/lib/utils';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
+import { track } from '@/lib/analytics/analytics';
 import VideoSelect from './VideoSelect';
 import { SERVER_TIMING_COPY } from './server-timing';
 import {

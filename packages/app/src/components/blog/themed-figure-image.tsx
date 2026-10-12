@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 
 const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=document.documentElement.classList.contains('light'),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
 

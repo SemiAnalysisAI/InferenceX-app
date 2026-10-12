@@ -7,7 +7,7 @@ import {
   PRECISION_OPTIONS,
   Sequence,
   SEQUENCE_OPTIONS,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 
 export interface CalculatorUrlSeed {
   model?: Model;

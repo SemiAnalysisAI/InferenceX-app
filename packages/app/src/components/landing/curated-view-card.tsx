@@ -3,8 +3,8 @@
 import { ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type { FavoritePreset } from '@/components/favorites/favorite-presets';
 
 export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {

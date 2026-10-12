@@ -8,8 +8,8 @@ import {
   modelRoutePath,
   pathWithSearchParams,
   resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
+} from '@/lib/routing/model-routes';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 /**
  * `/historical/<model>` — the Historical Trends tab seeded to a specific

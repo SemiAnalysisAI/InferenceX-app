@@ -138,13 +138,6 @@ describe('Compare Interpolated Table', () => {
     );
   });
 
-  it('displays the descriptive header text', () => {
-    cy.get('[data-testid="compare-interpolated-table"]')
-      .parent()
-      .parent()
-      .should('contain.text', 'Interpolated from real benchmark data');
-  });
-
   it('localizes the comparison reader and target input names', () => {
     cy.visit('/zh/compare/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"]')

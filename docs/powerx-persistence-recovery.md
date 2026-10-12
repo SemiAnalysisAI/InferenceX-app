@@ -12,9 +12,9 @@ Check the target migration ledger and apply pending migrations before running wr
 bun run admin:db:migrate --yes
 ```
 
-PowerX requires `016_gpu_metrics.sql`. CI ingest workflows migrate
-automatically; manual backfill does not. Migrate before deploying an app build that
-reads these tables; until 016 exists, its telemetry reads fail.
+PowerX requires `016_gpu_metrics.sql`. Apply it by hand against the reviewed target
+before merging or deploying an app build that reads these tables; no PowerX workflow
+applies it for you. Until 016 exists, its telemetry reads fail.
 
 ## Repair a run
 

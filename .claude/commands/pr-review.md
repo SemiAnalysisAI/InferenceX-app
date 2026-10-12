@@ -32,7 +32,7 @@ b. **Bug scan** — Shallow scan of the diff for obvious bugs. Read `docs/pitfal
 c. **Historical context** — Read git blame and history of modified code to identify bugs in light of that context.
 d. **Prior PR comments** — Read previous PRs that touched these files. Check for comments that may also apply here.
 e. **Code comment compliance** — Read code comments in modified files. Verify changes comply with any guidance in the comments.
-f. **Testing + analytics** — Check that the PR meets CLAUDE.md requirements: new utility functions have colocated unit tests, new UI features have E2E tests, bug fixes have regression tests, new interactive elements use `track()` from `@/lib/analytics`. Flag missing tests.
+f. **Testing + analytics** — Check that the PR meets CLAUDE.md requirements: new utility functions have colocated unit tests, new UI features have E2E tests, bug fixes have regression tests, new interactive elements use `track()` from `@/lib/analytics/analytics`. Flag missing tests.
 
 ## Step 5: Score
 

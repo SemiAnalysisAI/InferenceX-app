@@ -1,6 +1,6 @@
 'use client';
 
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import { BarChart3, Table2 } from 'lucide-react';
 import Link from 'next/link';
@@ -20,7 +20,7 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
-} from '@/components/official-preview-notice';
+} from '@/components/ui/official-preview-notice';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
@@ -33,19 +33,19 @@ import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header
 import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { track } from '@/lib/analytics';
-import { exportToCsv } from '@/lib/csv-export';
-import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
+import { track } from '@/lib/analytics/analytics';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
 import {
   getModelLabel,
   getSequenceLabel,
   Sequence,
   type Model,
   type Percentile,
-} from '@/lib/data-mappings';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import { buildFleetSchedule, formatCompact } from './fleet';
 import FleetLifecycleChart, {

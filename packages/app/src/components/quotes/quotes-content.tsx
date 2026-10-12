@@ -5,9 +5,9 @@ import { Fragment } from 'react';
 import { Card } from '@/components/ui/card';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES, orgAnchorId } from './quotes-data';

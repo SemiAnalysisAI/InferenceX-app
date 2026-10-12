@@ -14,7 +14,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-rubin-banner-dismissed',
+    'inferencex-rubin-minimax-m3-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -48,8 +48,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin Agentic Inference Performance')
-      .and('contain.text', '67x Faster than Blackwell Ultra')
+      .and('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
+      .and('contain.text', 'Early vLLM results for MiniMax M3 on NVIDIA Rubin')
       .and('contain.text', 'View results');
     // Banner + header-nav badges, plus the three still-new landing ledger
     // rows — the shared pill must render at the same
@@ -102,8 +102,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin 智能体推理性能')
-      .and('contain.text', '速度达 Blackwell Ultra 的 67 倍')
+      .and('contain.text', 'Rubin vLLM MiniMax M3 预览版现已上线')
+      .and('contain.text', 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果')
       .and('contain.text', '查看结果');
   });
 
@@ -116,8 +116,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin Agentic Inference Performance')
-      .and('contain.text', '67x Faster than Blackwell Ultra');
+      .and('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
+      .and('contain.text', 'Early vLLM results for MiniMax M3 on NVIDIA Rubin');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
@@ -133,7 +133,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
       .first()
-      .should('contain.text', 'Rubin Agentic Inference Performance')
+      .should('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
       .and('have.css', 'white-space', 'normal')
       .should(($title) => {
         expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
@@ -176,7 +176,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-minimax-m3-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -186,10 +186,10 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/inference/deepseek-v4');
+      .and('have.attr', 'href', '/inference/minimax-m3');
     cy.get('[data-testid="launch-banner"]').click();
 
-    cy.location('pathname').should('eq', '/inference/deepseek-v4');
+    cy.location('pathname').should('eq', '/inference/minimax-m3');
 
     // Body click must not write the dismissal key — the banner should still
     // render after returning home and reloading the landing page.
@@ -197,7 +197,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-minimax-m3-banner-dismissed')).to.eq(null);
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -373,7 +373,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

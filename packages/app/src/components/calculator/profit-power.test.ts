@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { modelSystemPower } from '@/lib/modeled-system-power';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
 import { estimateProfitByPower, modeledPowerAtTarget } from './profit-power';

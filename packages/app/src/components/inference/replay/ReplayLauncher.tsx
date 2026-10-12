@@ -6,7 +6,7 @@ import { forwardRef, useImperativeHandle, useState } from 'react';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // Keep this in sync with REPLAY_HEIGHT + padding/header/controls in ReplayPanel
 // so the dialog doesn't resize as the panel transitions through its loading states.

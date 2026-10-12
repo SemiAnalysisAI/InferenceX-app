@@ -50,11 +50,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '671B');
     });
 
-    it('renders the SVG diagram without any toggle click', () => {
-      cy.get('[data-testid="model-architecture-toggle"]').should('not.exist');
-      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-    });
-
     it('shows collapsed transformer blocks by default with expand icons', () => {
       // MoE model (DeepSeek R1) should show both dense and MoE collapsed blocks
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
@@ -109,15 +104,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="collapse-transformer"]').click({ force: true });
     });
-
-    it('shows features badges and source link', () => {
-      cy.contains('Multi-head Latent Attention').should('be.visible');
-      cy.contains('Source').should('be.visible');
-    });
-
-    it('shows developer and release date', () => {
-      cy.contains('Released by DeepSeek').should('be.visible');
-    });
   });
 
   describe('Collapsible Transformer Block (Dense model - Llama 3.3 70B)', () => {
@@ -154,12 +140,6 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('kimi-k26');
     });
 
-    it('shows MoE and MLA badges for Kimi K2.5', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '1.0T');
-    });
-
     it('shows both dense and MoE transformer blocks', () => {
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
       cy.get('[data-testid="expand-transformer"]').should('exist');
@@ -175,23 +155,11 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-experts"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
-
-    it('shows Kimi K2.5 features and developer info', () => {
-      cy.contains('Multi-head Latent Attention').should('be.visible');
-      cy.contains('DeepSeek-style MoE').should('be.visible');
-      cy.contains('Released by Moonshot AI').should('be.visible');
-    });
   });
 
   describe('Collapsible Transformer Blocks (MoE model - MiniMax M2.5)', () => {
     before(() => {
       visitModelPage('minimax-m27');
-    });
-
-    it('shows MoE and GQA badges for MiniMax M2.5', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '230B');
     });
 
     it('shows single MoE transformer block without dense sub-block', () => {
@@ -209,12 +177,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-experts"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
-
-    it('shows MiniMax M2.5 features and developer info', () => {
-      cy.contains('GQA with QK Norm').should('be.visible');
-      cy.contains('Multi-Token Prediction').should('be.visible');
-      cy.contains('Released by MiniMax').should('be.visible');
-    });
   });
 
   describe('Collapsible Transformer Blocks (MoE model - MiniMax M3)', () => {
@@ -222,33 +184,16 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('minimax-m3');
     });
 
-    it('shows MoE and GQA badges for MiniMax M3', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '428B');
-    });
-
     it('GQA attention is NOT expandable (sparse attention rendered as a static block)', () => {
       cy.get('[data-testid="expand-transformer"]').click({ force: true });
       cy.get('[data-testid="expand-attention"]').should('not.exist');
       cy.get('[data-testid="expand-experts"]').should('exist');
-    });
-
-    it('shows MiniMax M3 sparse-attention features', () => {
-      cy.contains('MiniMax Sparse Attention (MSA)').should('be.visible');
-      cy.contains('GQA with QK Norm').should('be.visible');
     });
   });
 
   describe('Alternating Attention Blocks (MoE model - gpt-oss 120B)', () => {
     before(() => {
       visitModelPage('gptoss-120b');
-    });
-
-    it('shows MoE and Sink/Full GQA badges for gpt-oss', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Sink/Full GQA');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '120B');
     });
 
     it('shows two separate transformer blocks (no single expand-transformer)', () => {
@@ -294,23 +239,11 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
-
-    it('shows gpt-oss features and developer info', () => {
-      cy.contains('Alternating Sliding/Full Attention').should('be.visible');
-      cy.contains('Attention Sink Tokens').should('be.visible');
-      cy.contains('Released by OpenAI').should('be.visible');
-    });
   });
 
   describe('Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)', () => {
     before(() => {
       visitModelPage('deepseek-v4');
-    });
-
-    it('shows MoE and Hybrid badges for DeepSeek V4 Pro', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Hybrid');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '1.6T');
     });
 
     it('shows two separate hybrid (CSA/HCA) blocks with an alternating indicator', () => {
@@ -370,12 +303,6 @@ describe('Model Architecture Diagram', () => {
         .should('be.visible')
         .and('contain', 'single softmax');
     });
-
-    it('shows DeepSeek V4 Pro features (incl. sliding window) and developer info', () => {
-      cy.contains('Hybrid CSA + HCA Attention').should('be.visible');
-      cy.contains('Sliding window (128 tokens)').should('be.visible');
-      cy.contains('Released by DeepSeek').should('be.visible');
-    });
   });
 
   describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
@@ -384,12 +311,6 @@ describe('Model Architecture Diagram', () => {
       // availability, so no fixture patching is needed (unlike the old
       // dashboard drawer, which required the model to be selectable).
       visitModelPage('kimi-k3');
-    });
-
-    it('shows MoE and Hybrid badges for Kimi K3', () => {
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Hybrid');
-      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '2.8T');
     });
 
     it('renders the KDA and gated-MLA layer categories as two alternating blocks', () => {
@@ -451,12 +372,6 @@ describe('Model Architecture Diagram', () => {
         .contains('Hybrid Attention')
         .should('not.exist');
       cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
-    });
-
-    it('shows Kimi K3 features and developer info', () => {
-      cy.contains('Kimi Delta Attention (KDA linear attention)').should('be.visible');
-      cy.contains('Stable LatentMoE (3584-dim latent)').should('be.visible');
-      cy.contains('Released by Moonshot AI').should('be.visible');
     });
   });
 

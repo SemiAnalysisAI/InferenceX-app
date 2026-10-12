@@ -1,4 +1,4 @@
-import { AutumnLeaves } from '@/components/autumn-leaves';
+import { AutumnLeaves } from '@/components/effects/autumn-leaves';
 
 describe('Autumn leaf gutter regression', () => {
   afterEach(() => {

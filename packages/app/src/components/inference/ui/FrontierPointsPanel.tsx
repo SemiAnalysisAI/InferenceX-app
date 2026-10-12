@@ -5,10 +5,10 @@ import { useMemo } from 'react';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { exportToCsv } from '@/lib/csv-export';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type { InferenceData } from '../types';
 import { FRONTIER_EXPORT_HEADERS, frontierExportRow } from '../utils/frontier-points';
 import { runAttemptFromUrl, runIdFromUrl } from '../utils/powerTimeline';

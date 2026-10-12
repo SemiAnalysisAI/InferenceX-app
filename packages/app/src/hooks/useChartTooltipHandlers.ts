@@ -5,6 +5,7 @@ import {
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '@/lib/d3-chart/layers/scatter-points';
+import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
 import { useStickyTooltip } from './useStickyTooltip';
 
 import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
@@ -244,9 +245,15 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         return { curX, curY };
       };
 
+      installTouchInputTracking();
+
       selection
-        .on('mouseenter', function (_event, d) {
+        .on('mouseenter', function (event, d) {
           if (isPinned()) return;
+          // Taps go straight to the click handler below. Showing the hover
+          // tooltip here would make iOS Safari swallow the click, so the
+          // tooltip would never pin and its actions would be unreachable.
+          if (isTouchCompatMouseEvent(event)) return;
 
           // Apply custom hover state if provided
           if (config.onHoverStart) {
@@ -286,6 +293,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         })
         .on('mousemove', (event) => {
           if (isPinned()) return;
+          if (isTouchCompatMouseEvent(event)) return;
 
           const geometry = getTooltipContainerGeometry(containerElement);
           const mx = event.clientX - geometry.bounds.left;

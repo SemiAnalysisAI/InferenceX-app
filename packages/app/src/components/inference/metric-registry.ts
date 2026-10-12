@@ -1,5 +1,5 @@
 import type { ChartDefinition } from './types';
-import type { TokenMetricType } from '@/lib/supplemental-benchmarks';
+import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
@@ -392,7 +392,7 @@ export const METRIC_REGISTRY = {
     titleZh: '每芯片实测平均功耗时间线',
     polarity: 'lower',
   },
-  // Power boundaries beyond GPU-measured telemetry (`lib/power-basis.ts`).
+  // Power boundaries beyond GPU-measured telemetry (`lib/power/power-basis.ts`).
   // Each boundary publishes W per allocated GPU and J per output token; the
   // Boundary select in the Measured controls resolves to these keys, so the
   // metric key alone carries the boundary in share links. Keys deliberately
@@ -432,7 +432,7 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
     polarity: 'lower',
   },
-  // Names follow POWER_BASIS_LABELS (lib/power-basis.ts) so the Table, export
+  // Names follow POWER_BASIS_LABELS (lib/power/power-basis.ts) so the Table, export
   // titles and API docs read the same as the Boundary select: All in Provisioned
   // / 整体预配功耗 and All in Measured / 整体实测功耗.
   utilityModeledWatts: {

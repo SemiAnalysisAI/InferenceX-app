@@ -3,8 +3,8 @@
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
-import { useLocale } from '@/lib/use-locale';
-import { OFFICIAL_HOSTNAME } from '@/lib/unofficial-domain';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { OFFICIAL_HOSTNAME } from '@/lib/runtime/unofficial-domain';
 
 const STRINGS = {
   en: {

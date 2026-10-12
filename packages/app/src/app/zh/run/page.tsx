@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import type { RunPageEntry } from '@/lib/run-pages';
-import { runPageHeadingZh } from '@/lib/run-pages-zh';
-import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
+import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import type { RunPageEntry } from '@/lib/live-seo/run-pages';
+import { runPageHeadingZh } from '@/lib/live-seo/run-pages-zh';
+import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 

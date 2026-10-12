@@ -4,11 +4,11 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { processOverlayChartData } from '@/components/inference/utils';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildReplayTimeline } from '@/components/inference/replay/buildReplayTimeline';
 
 const mocks = vi.hoisted(() => ({

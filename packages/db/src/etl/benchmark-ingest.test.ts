@@ -41,7 +41,7 @@ describe('benchmarkPointIngestKey', () => {
   });
 });
 
-function fakeTransactionSql(linkedId: number | null) {
+function fakeTransactionSql(linkedId: number | null, storedFileNames: string[] = []) {
   const calls: { text: string; values: unknown[] }[] = [];
   const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join('');
@@ -50,6 +50,9 @@ function fakeTransactionSql(linkedId: number | null) {
       return Promise.resolve([{ id: 42, server_log_id: linkedId }]);
     }
     if (text.includes('insert into server_logs')) return Promise.resolve([{ id: 99 }]);
+    if (text.includes('select file_name from server_log_files')) {
+      return Promise.resolve(storedFileNames.map((file_name) => ({ file_name })));
+    }
     return Promise.resolve([]);
   }) as any;
   tag.array = (value: unknown) => value;
@@ -157,6 +160,34 @@ describe('insertServerLogFiles', () => {
       2,
     );
     expect(calls.some((call) => call.text.includes('files_complete = true'))).toBe(true);
+  });
+
+  it('skips filenames an existing bundle already stores without reading them', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-ingest-test-'));
+    const serverPath = path.join(root, 'server.log');
+    const routerPath = path.join(root, 'router.log');
+    fs.writeFileSync(serverPath, 'server');
+    fs.writeFileSync(routerPath, 'router');
+    try {
+      const { sql, calls } = fakeTransactionSql(7, ['stored.log']);
+      // stored.log has no file on disk, so reading it would throw.
+      await insertServerLogFilePaths(
+        sql,
+        [42],
+        [
+          { fileName: 'stored.log', path: path.join(root, 'missing.log') },
+          { fileName: 'router.log', path: routerPath },
+          { fileName: 'server.log', path: serverPath },
+        ],
+      );
+
+      const childNames = calls
+        .filter((call) => call.text.includes('insert into server_log_files'))
+        .map((call) => call.values[1]);
+      expect(childNames).toEqual(['router.log']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('reads archived file paths lazily and removes null bytes', async () => {

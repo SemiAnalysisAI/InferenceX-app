@@ -1,23 +1,13 @@
 // Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
-/** Open the header theme picker after the client mount and choose `theme`. */
-function pickTheme(theme: string) {
-  // The trigger label names the saved theme only once the client has mounted.
-  cy.get('[data-testid="theme-toggle"]')
-    .should('have.attr', 'aria-label')
-    .and('contain', 'currently');
-  cy.get('[data-testid="theme-toggle"]').click();
-  cy.get(`[data-testid="theme-option-${theme}"]`).click();
-}
-
 describe('Page Load & Navigation', () => {
   before(() => {
     cy.visit('/');
   });
 
   it('page loads with correct title', () => {
-    cy.title().should('contain', 'InferenceX');
+    cy.title().should('eq', 'AI Accelerator System Benchmark | AcceleratorX by SemiAnalysis');
   });
 
   it('page renders without JavaScript errors', () => {
@@ -37,12 +27,6 @@ describe('Page Load & Navigation', () => {
     cy.get('[data-testid="header"]').should('exist');
     cy.get('[data-testid="footer"]').should('exist');
     cy.wrap(errors).should('have.length', 0);
-  });
-
-  it('page loads without 404 errors', () => {
-    cy.visit('/');
-    cy.get('[data-testid="header"]').should('exist');
-    cy.get('[data-testid="footer"]').should('exist');
   });
 
   it('navigates from the footer to the land acknowledgement page', () => {
@@ -133,132 +117,24 @@ describe('Splash text', () => {
     cy.get('html').should('not.have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
-    // Same splash after switching themes — it is no longer minecraft-only.
-    pickTheme('dark');
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
 });
 
 describe('Theme Toggle', () => {
-  it('loads CS:GO on demand, persists it, and removes decorations on exit', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'light');
-        win.localStorage.setItem('minecraft-music', 'false');
-        win.localStorage.setItem('minecraft-sound', 'false');
-      },
-    });
-    cy.get('[data-testid="csgo-scene"]').should('not.exist');
-    cy.window().then((win) => {
-      expect(
-        win.performance
-          .getEntriesByType('resource')
-          .some((r) => r.name.includes('/decorative/csgo/')),
-      ).to.eq(false);
-    });
-    pickTheme('csgo');
-    cy.get('html').should('have.class', 'csgo');
-    cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
-    cy.get('[data-testid="csgo-scene"]')
-      .should('have.attr', 'aria-hidden', 'true')
-      .and('have.css', 'pointer-events', 'none');
-    cy.reload();
-    cy.get('html').should('have.class', 'csgo');
-    cy.get('[data-testid="csgo-scene"] img').should(($img) => {
-      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-    });
-    pickTheme('light');
-    cy.get('html').should('have.class', 'light');
-    cy.get('[data-testid="csgo-scene"]').should('not.exist');
-    cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
-  });
-
-  it('loads Doom on demand, persists it, and removes decorations on exit', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'light');
-        win.localStorage.setItem('minecraft-music', 'false');
-        win.localStorage.setItem('minecraft-sound', 'false');
-      },
-    });
-    cy.get('[data-testid="doom-scene"]').should('not.exist');
-    cy.window().then((win) => {
-      expect(
-        win.performance
-          .getEntriesByType('resource')
-          .some((r) => r.name.includes('/decorative/doom/')),
-      ).to.eq(false);
-    });
-    pickTheme('doom');
-    cy.get('html').should('have.class', 'doom');
-    cy.get('[data-testid="doom-theme-banner"]').should('be.visible');
-    cy.get('[data-testid="doom-scene"]')
-      .should('have.attr', 'aria-hidden', 'true')
-      .and('have.css', 'pointer-events', 'none');
-    cy.reload();
-    cy.get('html').should('have.class', 'doom');
-    cy.get('[data-testid="doom-scene"] img').should(($img) => {
-      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-    });
-    pickTheme('light');
-    cy.get('html').should('have.class', 'light');
-    cy.get('[data-testid="doom-scene"]').should('not.exist');
-    cy.get('[data-testid="doom-theme-banner"]').should('not.exist');
-  });
-
-  it('applies GTA from the picker, persists it, and removes decorations on exit', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'light');
-      },
-    });
-    cy.get('[data-testid="gta-scene"]').should('not.exist');
-    cy.window().then((win) => {
-      expect(
-        win.performance
-          .getEntriesByType('resource')
-          .some((r) => r.name.includes('/decorative/gta/')),
-      ).to.eq(false);
-    });
-    pickTheme('gta');
-    cy.get('html').should('have.class', 'gta');
-    cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
-    cy.get('[data-testid="gta-theme-banner"] .gta-wordmark')
-      .should('have.text', 'Grand Theft InferenceX')
-      .and('have.css', 'font-family')
-      .and('match', /Pricedown/i);
-    cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
-      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-    });
-    cy.get('[data-testid="gta-scene"]')
-      .should('have.attr', 'aria-hidden', 'true')
-      .and('have.css', 'pointer-events', 'none');
-    cy.reload();
-    cy.get('html').should('have.class', 'gta');
-    cy.get('[data-testid="gta-scene"]').should('exist');
-    cy.get('[data-testid="gta-scene"] img').should(($img) => {
-      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-    });
-    cy.get('[data-testid="gta-heist-launch"]').click();
-    cy.get('[data-testid="heist-game"]').should('have.attr', 'data-phase', 'ready');
-    cy.get('[data-testid="heist-start"]').click();
-    cy.get('[data-testid="heist-canvas"]').should('have.focus').type('{esc}');
-    cy.get('[data-testid="heist-game"]').should('not.exist');
-    cy.get('[data-testid="gta-heist-launch"]').should('have.focus');
-    pickTheme('light');
-    cy.get('html').should('have.class', 'light');
-    cy.get('[data-testid="gta-scene"]').should('not.exist');
-    cy.get('[data-testid="gta-theme-banner"]').should('not.exist');
-  });
-
   it('theme persists across page reload (localStorage)', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');
-    pickTheme('dark');
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

@@ -32,14 +32,33 @@ import {
   type RayHit,
 } from './mc-physics';
 import { CHUNK, chunkKey, DIRS, HEIGHT, SEA, World } from './mc-world';
+import { Endgame } from './mc-endgame';
+import type { Dimension } from './mc-dimensions';
 
 export const TPS = 20;
 export const DAY = 24000;
 export type GameMode = 'survival' | 'creative';
 export type Difficulty = 'peaceful' | 'easy' | 'normal' | 'hard';
-export type MobKind = 'zombie' | 'creeper' | 'skeleton' | 'pig' | 'cow' | 'sheep' | 'chicken';
+export type MobKind =
+  | 'zombie'
+  | 'creeper'
+  | 'skeleton'
+  | 'pig'
+  | 'cow'
+  | 'sheep'
+  | 'chicken'
+  | 'enderman'
+  | 'blaze'
+  | 'dragon'
+  | 'crystal';
 export type EntityKind = MobKind | 'item' | 'tnt' | 'falling' | 'arrow';
-export const HOSTILE: ReadonlySet<EntityKind> = new Set(['zombie', 'creeper', 'skeleton']);
+export const HOSTILE: ReadonlySet<EntityKind> = new Set([
+  'zombie',
+  'creeper',
+  'skeleton',
+  'enderman',
+  'blaze',
+]);
 
 export interface Entity extends Body {
   id: number;
@@ -80,6 +99,8 @@ export interface Entity extends Body {
   block?: number;
   blockMeta?: number;
   owner?: 'player' | 'mob';
+  fireball?: boolean;
+  shooter?: 'blaze' | 'dragon';
 }
 
 export interface Player extends Body {
@@ -151,7 +172,8 @@ export type GameEvent =
   | { type: 'hurt' }
   | { type: 'message'; text: string }
   | { type: 'open'; screen: Screen }
-  | { type: 'death' };
+  | { type: 'death' }
+  | { type: 'ending' };
 
 export type Screen =
   | { kind: 'inventory' }
@@ -205,6 +227,10 @@ const STEP_SOUND: Record<SoundGroup, SoundKey> = {
 };
 
 const MOB_STATS: Record<MobKind, { w: number; h: number; health: number; speed: number }> = {
+  enderman: { w: 0.6, h: 2.9, health: 40, speed: 0.28 },
+  blaze: { w: 0.6, h: 1.8, health: 20, speed: 0.2 },
+  dragon: { w: 8, h: 4, health: 200, speed: 0.4 },
+  crystal: { w: 2, h: 2, health: 1, speed: 0 },
   zombie: { w: 0.6, h: 1.95, health: 20, speed: 0.23 },
   skeleton: { w: 0.6, h: 1.99, health: 20, speed: 0.25 },
   creeper: { w: 0.6, h: 1.7, health: 20, speed: 0.25 },
@@ -222,6 +248,10 @@ const SAY: Partial<Record<MobKind, SoundKey>> = {
   chicken: 'mob/chicken/say',
 };
 const HURT: Record<MobKind, SoundKey> = {
+  enderman: 'damage/hit',
+  blaze: 'damage/hit',
+  dragon: 'damage/hit',
+  crystal: 'random/glass',
   zombie: 'mob/zombie/hurt',
   skeleton: 'damage/hit',
   creeper: 'mob/creeper/say',
@@ -238,7 +268,7 @@ const DEATH: Partial<Record<MobKind, SoundKey>> = {
 
 /** Blast resistance used by explosions (original values / 5 are folded in). */
 function resistance(id: number) {
-  if (id === B.bedrock) return 1e9;
+  if (BLOCKS[id]?.hardness < 0) return 1e9;
   if (id === B.obsidian) return 1200;
   if (isLiquid(id)) return 100;
   const def = BLOCKS[id];
@@ -268,8 +298,20 @@ export function daylight(time: number) {
 
 const DROP_SPREAD = 0.1;
 
+export interface DimensionState {
+  world: World;
+  entities: Entity[];
+  furnaces: Map<string, Furnace>;
+  chests: Map<string, (Stack | null)[]>;
+  animalChunks: Set<number>;
+}
+
 export class Game {
-  readonly world: World;
+  world: World;
+  dimension: Dimension = 'overworld';
+  worldEpoch = 0;
+  readonly dimensions = new Map<Dimension, DimensionState>();
+  readonly endgame = new Endgame(this);
   readonly options: GameOptions;
   readonly seedNumber: number;
   mode: GameMode;
@@ -284,11 +326,11 @@ export class Game {
   craftGrid: (Stack | null)[] = emptySlots(9);
   craftSize: 2 | 3 = 2;
   screen: Screen | null = null;
-  readonly entities: Entity[] = [];
-  readonly furnaces = new Map<string, Furnace>();
-  readonly chests = new Map<string, (Stack | null)[]>();
+  entities: Entity[] = [];
+  furnaces = new Map<string, Furnace>();
+  chests = new Map<string, (Stack | null)[]>();
   readonly events: GameEvent[] = [];
-  readonly animalChunks = new Set<number>();
+  animalChunks = new Set<number>();
   /** Block currently targeted and its break progress (0..1). */
   target: RayHit | null = null;
   targetEntity: Entity | null = null;
@@ -369,6 +411,26 @@ export class Game {
     };
   }
 
+  dimensionState(): DimensionState {
+    return {
+      world: this.world,
+      entities: this.entities,
+      furnaces: this.furnaces,
+      chests: this.chests,
+      animalChunks: this.animalChunks,
+    };
+  }
+
+  resetDimension() {
+    this.worldEpoch++;
+    this.pendingChecks.clear();
+    this.world.onNeighborChange = (x, y, z) => this.pendingChecks.add(`${x},${y},${z}`);
+    this.target = null;
+    this.targetEntity = null;
+    this.breakKey = '';
+    this.breakProgress = 0;
+  }
+
   /** Land spawn near the origin, avoiding oceans. */
   findSpawn() {
     const t = this.world.terrain;
@@ -397,22 +459,28 @@ export class Game {
     const start = now();
     const pcx = Math.floor(this.player.x / CHUNK);
     const pcz = Math.floor(this.player.z / CHUNK);
-    // Generate two rings beyond the render distance and light one, so meshed chunks have lit neighbours.
+    // Meshing and lighting each need a full 3×3 neighbourhood, including diagonals.
+    // A circular radius + 2 omits corner dependencies and stalls small view distances.
     const r = this.renderDistance + 2;
+    const needed = (cx: number, cz: number, padding: number) => {
+      const dx = Math.max(0, Math.abs(cx - pcx) - padding);
+      const dz = Math.max(0, Math.abs(cz - pcz) - padding);
+      return dx * dx + dz * dz <= this.renderDistance * this.renderDistance + 1;
+    };
     const order: [number, number, number][] = [];
     for (let dz = -r; dz <= r; dz++)
       for (let dx = -r; dx <= r; dx++) order.push([dx * dx + dz * dz, pcx + dx, pcz + dz]);
     order.sort((a, b) => a[0] - b[0]);
-    for (const [d2, cx, cz] of order) {
-      if (d2 > r * r) continue;
+    for (const [, cx, cz] of order) {
+      if (!needed(cx, cz, 2)) continue;
       if (now() - start > budgetMs) return false;
       if (!this.world.chunks.has(chunkKey(cx, cz))) {
         this.world.ensureChunk(cx, cz);
         this.spawnAnimals(cx, cz);
       }
     }
-    for (const [d2, cx, cz] of order) {
-      if (d2 > (r - 1) * (r - 1)) continue;
+    for (const [, cx, cz] of order) {
+      if (!needed(cx, cz, 1)) continue;
       const c = this.world.chunks.get(chunkKey(cx, cz));
       if (!c || c.lit) continue;
       if (!this.world.neighborsReady(cx, cz)) continue;
@@ -434,6 +502,7 @@ export class Game {
   }
 
   private spawnAnimals(cx: number, cz: number) {
+    if (this.dimension !== 'overworld') return;
     const key = chunkKey(cx, cz);
     if (this.animalChunks.has(key)) return;
     this.animalChunks.add(key);
@@ -483,6 +552,7 @@ export class Game {
     this.tickPlayer();
     this.tickEntities();
     if (this.ticks % 20 === 0) this.spawnHostiles();
+    this.endgame.tick();
   }
 
   get dayTime() {
@@ -819,6 +889,8 @@ export class Game {
 
   respawn() {
     const p = this.player;
+    if (this.dimension !== 'overworld')
+      this.endgame.travel('overworld', [p.spawnX, p.spawnY, p.spawnZ]);
     Object.assign(p, {
       x: p.spawnX,
       y: p.spawnY,
@@ -903,7 +975,7 @@ export class Game {
     }
     if (input.use && this.useCooldown === 0) {
       this.use();
-      this.useCooldown = 4;
+      this.useCooldown = this.held?.id === 'bow' ? 15 : 4;
     }
     if (!input.use) this.useCooldown = 0;
   }
@@ -944,7 +1016,7 @@ export class Game {
     const w = this.world;
     const id = w.getBlock(x, y, z);
     const meta = w.getMeta(x, y, z);
-    if (id === B.air || (id === B.bedrock && this.mode !== 'creative')) return;
+    if (id === B.air || (BLOCKS[id].hardness < 0 && this.mode !== 'creative')) return;
     const def = BLOCKS[id];
     this.events.push({ type: 'break', x, y, z, id });
     this.sound(DIG_SOUND[def.sound], x + 0.5, y + 0.5, z + 0.5, 1, 0.8 + this.random() * 0.2);
@@ -1117,6 +1189,8 @@ export class Game {
     kz: number,
     source: 'player' | 'mob' | 'explosion' | 'fire' | 'fall',
   ) {
+    if (this.endgame.hurt(e, amount, source)) return;
+    if (e.kind === 'blaze' && source === 'fire') return;
     if (e.kind === 'item' || e.kind === 'falling' || e.kind === 'tnt' || e.kind === 'arrow') {
       if (source === 'explosion' && e.kind === 'item') e.removed = true;
       return;
@@ -1147,6 +1221,14 @@ export class Game {
     const n = (min: number, max: number) => min + Math.floor(r() * (max - min + 1));
     const cooked = e.fire > 0;
     switch (e.kind) {
+      case 'enderman': {
+        drops.push({ id: 'ender_pearl', count: n(0, 1) });
+        break;
+      }
+      case 'blaze': {
+        drops.push({ id: 'blaze_rod', count: n(0, 1) });
+        break;
+      }
       case 'zombie': {
         drops.push({ id: 'rotten_flesh', count: n(0, 2) });
         if (r() < 0.025) drops.push({ id: 'iron_ingot', count: 1 });
@@ -1195,6 +1277,7 @@ export class Game {
     const w = this.world;
     const held = this.held;
     const heldId = held?.id;
+    if (this.endgame.use()) return;
     // Entities.
     const te = this.targetEntity;
     if (te) {
@@ -1309,7 +1392,8 @@ export class Game {
     const existing = w.getBlock(tx, ty, tz);
     if (existing !== B.air && !BLOCKS[existing].replaceable) return;
     if (held.id === 'water_bucket' || held.id === 'lava_bucket') {
-      w.setBlock(tx, ty, tz, held.id === 'water_bucket' ? B.water : B.lava, 0);
+      if (held.id !== 'water_bucket' || this.dimension !== 'nether')
+        w.setBlock(tx, ty, tz, held.id === 'water_bucket' ? B.water : B.lava, 0);
       if (this.mode !== 'creative') this.inventory[this.selected] = { id: 'bucket', count: 1 };
       this.sound('liquid/splash', tx, ty, tz, 0.4);
       p.swing = 6;
@@ -2328,6 +2412,7 @@ export class Game {
       for (const e of this.entities) if (HOSTILE.has(e.kind)) e.removed = true;
       return;
     }
+    if (this.dimension !== 'overworld') return;
     const p = this.player;
     let hostile = 0;
     for (const e of this.entities) if (HOSTILE.has(e.kind) && !e.removed) hostile++;
@@ -2366,6 +2451,7 @@ export class Game {
       e.pz = e.z;
       e.pyaw = e.yaw;
       e.age++;
+      if (this.endgame.tickEntity(e)) continue;
       if (!this.world.chunkAt(Math.floor(e.x), Math.floor(e.z))?.lit) continue;
       const dx = e.x - p.x;
       const dz = e.z - p.z;
@@ -2507,12 +2593,48 @@ export class Game {
       return;
     }
     e.yaw = Math.atan2(-e.vx, -e.vz);
+    if (e.owner === 'player') {
+      const speed = Math.hypot(e.vx, e.vy, e.vz);
+      const wall = raycast(
+        this.world,
+        e.x,
+        e.y,
+        e.z,
+        e.vx / speed,
+        e.vy / speed,
+        e.vz / speed,
+        speed,
+      );
+      let best: Entity | undefined;
+      let limit = wall?.distance ?? speed;
+      for (const target of this.entities) {
+        if (
+          target === e ||
+          target.removed ||
+          target.deathTime ||
+          target.kind === 'arrow' ||
+          target.kind === 'item'
+        )
+          continue;
+        const d = rayEntity(e.x, e.y, e.z, e.vx / speed, e.vy / speed, e.vz / speed, target);
+        if (d !== null && d <= limit) {
+          best = target;
+          limit = d;
+        }
+      }
+      if (best) {
+        this.hurtEntity(best, Math.max(2, Math.ceil(speed * 2)), 0, 0, 'player');
+        e.removed = true;
+        return;
+      }
+    }
     move(this.world, e, e.vx, e.vy, e.vz);
-    e.vy -= 0.05;
+    if (!e.fireball) e.vy -= 0.05;
     e.vx *= 0.99;
     e.vz *= 0.99;
     const box = bodyBox(p);
     if (
+      e.owner !== 'player' &&
       e.x > box.x0 - 0.1 &&
       e.x < box.x1 + 0.1 &&
       e.z > box.z0 - 0.1 &&
@@ -2522,11 +2644,18 @@ export class Game {
     ) {
       const speed = Math.hypot(e.vx, e.vy, e.vz);
       this.hurtPlayer(
-        Math.ceil(speed * 2),
-        `${this.t('was shot by Skeleton', '被骷髅射杀了')} by mob`,
+        e.fireball ? 5 : Math.ceil(speed * 2),
+        `${
+          e.fireball
+            ? e.shooter === 'dragon'
+              ? this.t('was burned by Ender Dragon', '被末影龙烧死了')
+              : this.t('was burned by Blaze', '被烈焰人烧死了')
+            : this.t('was shot by Skeleton', '被骷髅射杀了')
+        } by mob`,
         e.vx * 0.3,
         e.vz * 0.3,
       );
+      if (e.fireball && this.mode !== 'creative') p.fire = Math.max(p.fire, 60);
       e.removed = true;
     }
     if (e.age > 1200) e.removed = true;
@@ -2611,7 +2740,7 @@ export class Game {
           const n = dist || 1;
           this.hurtPlayer(
             3,
-            `${this.t('was slain by Zombie', '被僵尸杀死了')} by mob`,
+            `${kind === 'enderman' ? this.t('was slain by Enderman', '被末影人杀死了') : this.t('was slain by Zombie', '被僵尸杀死了')} by mob`,
             dx / n,
             dz / n,
           );

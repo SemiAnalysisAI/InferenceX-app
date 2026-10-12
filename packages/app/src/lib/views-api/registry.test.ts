@@ -1,5 +1,5 @@
-import { apiOperations, buildOpenApiDocument } from '@/lib/api-documentation';
-import { DASHBOARD_ROUTE_KEYS } from '@/lib/dashboard-routes';
+import { apiOperations, buildOpenApiDocument } from '@/lib/api/api-documentation';
+import { DASHBOARD_ROUTE_KEYS } from '@/lib/routing/dashboard-routes';
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';

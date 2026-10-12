@@ -6,9 +6,9 @@ import {
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
-} from '@/lib/video-storage';
+} from '@/lib/video/video-storage';
 
-vi.mock('@/lib/video-storage', () => ({
+vi.mock('@/lib/video/video-storage', () => ({
   videoStorageEnabled: vi.fn(() => false),
   storedArtifacts: vi.fn(() => Promise.resolve([])),
   readStoredArtifact: vi.fn(),

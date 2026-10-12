@@ -3,9 +3,9 @@
 import { useReducer, type Dispatch, type SetStateAction } from 'react';
 
 import { Button } from '@/components/ui/button';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 const DISPLAY_DATE_FORMATTERS: Record<Locale, Intl.DateTimeFormat> = {
   en: new Intl.DateTimeFormat('en-US', {

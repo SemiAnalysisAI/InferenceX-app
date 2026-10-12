@@ -8,10 +8,10 @@ import {
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
 
-import { track } from '@/lib/analytics';
-import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/data-mappings';
-import type { SubmissionSummaryRow } from '@/lib/submissions-types';
-import { getFrameworkLabel } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { MODEL_PREFIX_MAPPING, getModelLabel } from '@/lib/catalog/data-mappings';
+import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
+import { getFrameworkLabel } from '@/lib/shared/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { InfoHelp } from '@/components/ui/option-info';
@@ -22,8 +22,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   buildInferenceCompareUrl,

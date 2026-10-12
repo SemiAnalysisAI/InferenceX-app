@@ -1,5 +1,5 @@
 import SubmissionsTable from '@/components/submissions/SubmissionsTable';
-import type { SubmissionSummaryRow } from '@/lib/submissions-types';
+import type { SubmissionSummaryRow } from '@/lib/submissions/submissions-types';
 
 const baseRow: Omit<SubmissionSummaryRow, 'spec_method' | 'hardware' | 'date'> = {
   model: 'dsr1',

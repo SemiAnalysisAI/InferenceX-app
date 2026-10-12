@@ -6,17 +6,21 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
-import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor } from '@/lib/compare-ssr';
-import { formatModelListZh } from '@/lib/compare-ssr-zh';
-import { type Model } from '@/lib/data-mappings';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
+import {
+  type ComparePair,
+  COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare/compare-slug';
+import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
+import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
+import { type Model } from '@/lib/catalog/data-mappings';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 export const dynamic = 'force-dynamic';
 

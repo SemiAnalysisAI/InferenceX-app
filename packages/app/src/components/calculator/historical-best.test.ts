@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   bestSoFarProgression,

@@ -1,6 +1,7 @@
 // oxlint-disable-next-line max-classes-per-file -- Terrain and World share private generation constants.
 import { B, BLOCKS, emission, isLiquid } from './mc-blocks';
 import { hash3, rng, Simplex } from './mc-noise';
+import { dimensionBlocks, type Dimension } from './mc-dimensions';
 
 export const CHUNK = 16;
 export const HEIGHT = 128;
@@ -169,6 +170,7 @@ export interface FluidUpdate {
 }
 
 export class World {
+  readonly dimension: Dimension;
   readonly seed: number;
   readonly terrain: Terrain;
   readonly chunks = new Map<number, Chunk>();
@@ -181,7 +183,8 @@ export class World {
   /** Hook for game-level reactions to neighbour changes (falling sand, plant support). */
   onNeighborChange?: (x: number, y: number, z: number) => void;
 
-  constructor(seed: number) {
+  constructor(seed: number, dimension: Dimension = 'overworld') {
+    this.dimension = dimension;
     this.seed = seed >>> 0;
     this.terrain = new Terrain(this.seed);
   }
@@ -194,7 +197,7 @@ export class World {
   }
 
   getBlock(x: number, y: number, z: number): number {
-    if (y < 0) return B.bedrock;
+    if (y < 0) return this.dimension === 'end' ? B.air : B.bedrock;
     if (y >= HEIGHT) return B.air;
     const c = this.chunkAt(x, z);
     return c ? c.blocks[blockIndex(x & 15, y, z & 15)] : B.air;
@@ -262,6 +265,19 @@ export class World {
   generate(cx: number, cz: number): Chunk {
     const blocks = new Uint8Array(VOLUME);
     const meta = new Uint8Array(VOLUME);
+    if (this.dimension !== 'overworld') {
+      dimensionBlocks(this.dimension, this.seed, cx, cz, blocks);
+      return {
+        cx,
+        cz,
+        blocks,
+        meta,
+        light: new Uint8Array(VOLUME),
+        lit: false,
+        dirty: true,
+        edits: new Map(),
+      };
+    }
     const t = this.terrain;
     const x0 = cx * CHUNK;
     const z0 = cz * CHUNK;
@@ -433,6 +449,7 @@ export class World {
       }
     }
 
+    dimensionBlocks('overworld', this.seed, cx, cz, blocks);
     return {
       cx,
       cz,
@@ -566,7 +583,8 @@ export class World {
       for (let lz = 0; lz < 16; lz++)
         for (let lx = 0; lx < 16; lx++) {
           const ri = y * SLICE + (lz + PAD) * RW + lx + PAD;
-          chunk.light[blockIndex(lx, y, lz)] = (sky[ri] << 4) | blk[ri];
+          chunk.light[blockIndex(lx, y, lz)] =
+            (Math.max(sky[ri], this.dimension === 'nether' ? 11 : 0) << 4) | blk[ri];
         }
     chunk.lit = true;
     chunk.dirty = true;

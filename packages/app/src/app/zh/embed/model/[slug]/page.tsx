@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import EmbedModelPage, { type EmbedSearchParams } from '@/components/embed/EmbedModelPage';
-import { getCompareModelBySlug } from '@/lib/compare-slug';
+import { getCompareModelBySlug } from '@/lib/compare/compare-slug';
 
 interface Props {
   params: Promise<{ slug: string }>;

@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import { ServerLogViewer } from '@/components/inference/agentic-point/server-log-viewer';
-import { track } from '@/lib/analytics';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

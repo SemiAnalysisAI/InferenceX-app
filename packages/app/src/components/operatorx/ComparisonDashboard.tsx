@@ -3,7 +3,7 @@
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -16,8 +16,8 @@ import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { replaceClientSearch } from '@/lib/client-navigation';
-import { generateVendorColors } from '@/lib/dynamic-colors';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';

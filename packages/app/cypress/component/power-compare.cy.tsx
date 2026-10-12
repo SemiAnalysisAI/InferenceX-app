@@ -3,8 +3,8 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import type { InferenceData } from '@/components/inference/types';
 import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
-import { Precision } from '@/lib/data-mappings';
-import { overlayRunColor } from '@/lib/overlay-run-style';
+import { Precision } from '@/lib/catalog/data-mappings';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 import {
   createMockChartDefinition,

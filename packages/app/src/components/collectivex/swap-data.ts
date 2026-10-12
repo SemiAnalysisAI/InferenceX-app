@@ -1,4 +1,4 @@
-import { GPU_SPECS } from '@/lib/gpu-specs';
+import { GPU_SPECS } from '@/lib/catalog/gpu-specs';
 import type {
   CollectiveXDataset,
   CollectiveXPercentile,

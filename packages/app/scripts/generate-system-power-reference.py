@@ -238,7 +238,7 @@ def main():
         type=Path,
         default=Path(os.environ.get("INFERENCEX_REPO", REPO_ROOT.parent / "InferenceX")),
     )
-    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "packages/app/src/lib")
+    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "packages/app/src/lib/power")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as workdir:
         tree = load_upstream(args.inferencex.resolve(), workdir)

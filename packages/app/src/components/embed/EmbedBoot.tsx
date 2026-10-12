@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 
-import { embedBootScript, embedThemeFromHeaders } from '@/lib/embed';
+import { embedBootScript, embedThemeFromHeaders } from '@/lib/embed/embed';
 
 /**
  * Server component rendered by the embed layouts. It reads the theme/skin the

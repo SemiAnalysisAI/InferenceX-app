@@ -1,5 +1,5 @@
-import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
-import type { Locale } from '@/lib/i18n';
+import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXTelemetryLink } from './agentx-telemetry-link';
 

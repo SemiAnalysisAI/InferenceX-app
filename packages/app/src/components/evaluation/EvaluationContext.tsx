@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 import {
@@ -19,8 +19,8 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+} from '@/providers/GlobalFilterContext';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import {
   resolveAvailableSelection,
@@ -29,8 +29,8 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import type { EvalRow } from '@/lib/api';
-import type { Model } from '@/lib/data-mappings';
+import type { EvalRow } from '@/lib/api/api';
+import type { Model } from '@/lib/catalog/data-mappings';
 
 import {
   aggregateEvaluationChartRows,

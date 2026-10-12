@@ -2,8 +2,8 @@
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 
-import { track } from '@/lib/analytics';
-import { isZhPathname } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { isZhPathname } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {

@@ -22,12 +22,12 @@ import {
   parseComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate, type RunScope } from '@/components/inference/utils/runEnumeration';
-import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { type Percentile, Sequence } from '@/lib/data-mappings';
-import { getDisplayLabel } from '@/lib/utils';
+import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api/api';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
+import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
+import { type Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import { interpolateForGPU } from './interpolation';
 import type { ProfitEstimatorRow } from './profit-estimator';

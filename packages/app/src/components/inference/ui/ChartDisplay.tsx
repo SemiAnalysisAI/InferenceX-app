@@ -1,6 +1,6 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
@@ -13,8 +13,8 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { AIR_COOLED_SYSTEM_PUE, SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
-import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
+import { AIR_COOLED_SYSTEM_PUE, SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power/power-basis';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -27,7 +27,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -58,17 +58,17 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
-import { exportToCsv } from '@/lib/csv-export';
-import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
-import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
-import { getDisplayLabel, getFrameworkLabel } from '@/lib/utils';
-import { supportsChartTokenMetric } from '@/lib/supplemental-benchmarks';
+import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/charts/chart-utils';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
+import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/benchmarks/known-issues';
+import { getDisplayLabel, getFrameworkLabel } from '@/lib/shared/utils';
+import { supportsChartTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
   useUnofficialRun,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import {
   type Model,
   type Precision,
@@ -77,7 +77,7 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
   sequenceKind,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
@@ -90,9 +90,9 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { useLocale } from '@/lib/use-locale';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
@@ -139,7 +139,7 @@ const STRINGS = {
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    // Boundary disclosures for the derived power axes (lib/power-basis.ts).
+    // Boundary disclosures for the derived power axes (lib/power/power-basis.ts).
     // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
       'gpu-provisioned':

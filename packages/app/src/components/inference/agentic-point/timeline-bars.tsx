@@ -3,7 +3,7 @@
 import { memo } from 'react';
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   CHART_WIDTH,

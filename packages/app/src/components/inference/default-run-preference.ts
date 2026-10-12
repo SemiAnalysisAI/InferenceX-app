@@ -1,6 +1,6 @@
-import type { BenchmarkRow } from '@/lib/api';
-import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 /** Default inference snapshot. Disable when a newer VR baseline is approved. */
 export const VR_DEFAULT_RUN = {

@@ -5,9 +5,9 @@ import { useMemo } from 'react';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { useStableValue } from '@/hooks/useStableValue';
-import { Percentile, type Model, type Sequence } from '@/lib/data-mappings';
+import { Percentile, type Model, type Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   bestSoFarProgression,

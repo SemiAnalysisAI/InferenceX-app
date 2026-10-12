@@ -3,8 +3,8 @@
 import { useCallback } from 'react';
 
 import { useClientSearchParams } from '@/hooks/useClientSearch';
-import { track } from '@/lib/analytics';
-import { replaceClientSearch } from '@/lib/client-navigation';
+import { track } from '@/lib/analytics/analytics';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 const DETAIL_VIEWS = ['point', 'timeline', 'power', 'aggregates', 'logs'] as const;
 export type DetailView = (typeof DETAIL_VIEWS)[number];

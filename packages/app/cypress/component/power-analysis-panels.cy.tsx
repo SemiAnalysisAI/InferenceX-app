@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
-import { writeUrlParams } from '@/lib/url-state';
+import { writeUrlParams } from '@/lib/routing/url-state';
 
 import { createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';

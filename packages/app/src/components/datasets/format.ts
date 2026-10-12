@@ -1,4 +1,4 @@
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 function localeTag(locale: Locale): 'en-US' | 'zh-CN' {
   return locale === 'zh' ? 'zh-CN' : 'en-US';

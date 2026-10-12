@@ -1,7 +1,10 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import type { SubmissionSummaryRow, SubmissionVolumeRow } from '@/lib/submissions-types';
+import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import type {
+  SubmissionSummaryRow,
+  SubmissionVolumeRow,
+} from '@/lib/submissions/submissions-types';
 
 /** Get vendor name for a hardware key. */
 export function getVendor(hardware: string): string {

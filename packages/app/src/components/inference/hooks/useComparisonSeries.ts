@@ -10,9 +10,12 @@ import {
   resolveComparisonEntries,
 } from '@/components/inference/utils/comparisonEntry';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { getModelSortIndex } from '@/lib/constants';
-import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
-import { isDarkTheme } from '@/lib/themes';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import {
+  generateGpuDateColors,
+  generateHighContrastGpuDateColors,
+} from '@/lib/charts/dynamic-colors';
+import { isDarkTheme } from '@/lib/themes/themes';
 
 /** One (comparison entry, chip config) series of the date comparison view. */
 export interface ComparisonSeries {

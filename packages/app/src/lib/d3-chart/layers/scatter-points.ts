@@ -7,7 +7,7 @@ import {
   getShapeKeyForPrecision,
   applyNormalState,
   normalStateAttrs,
-} from '@/lib/chart-rendering';
+} from '@/lib/charts/chart-rendering';
 
 import type { ContinuousScale } from '../types';
 import { setAttrIfChanged, setStyleIfChanged, setTextIfChanged } from '../chart-update';

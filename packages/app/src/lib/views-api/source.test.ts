@@ -1,4 +1,4 @@
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import { describe, expect, it } from 'vitest';
 import { readResponse } from './source';
 import { ViewsUpstreamError } from './upstream-error';
