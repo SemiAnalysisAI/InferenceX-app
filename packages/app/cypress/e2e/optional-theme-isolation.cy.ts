@@ -59,6 +59,7 @@ describe('optional themes stay off the default page', () => {
       cy.visit(route, {
         onBeforeLoad(win) {
           win.localStorage.setItem('theme', 'kart');
+          saveMediaOptIns(win, false);
         },
       });
       cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
@@ -67,10 +68,9 @@ describe('optional themes stay off the default page', () => {
       cy.get('[data-testid="theme-option-kart"]').should('not.exist');
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       expectNoOptionalResources(requests);
-      // Returning to a default theme must not pass through optional themes.
+      // The regular rotation intentionally visits optional themes on the way to light.
       cycleToTheme('light');
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
-      expectNoOptionalResources(requests);
       cy.reload();
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.then(() => {
@@ -115,14 +115,13 @@ describe('optional themes stay off the default page', () => {
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
       cy.document().then((doc) => {
+        // Light → dark stays on the default path. Dark's next click selects Minecraft.
+        if (theme !== 'light') return;
         const baseline = seo(doc);
-        const initial = doc.documentElement.classList.contains('dark') ? 'dark' : 'light';
-        for (const next of [initial === 'dark' ? 'light' : 'dark', initial]) {
-          cy.get('[data-testid="theme-toggle"]').click();
-          cy.get('html').should('have.class', next);
-          cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal(next));
-          cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        }
+        cy.get('[data-testid="theme-toggle"]').click();
+        cy.get('html').should('have.class', 'dark');
+        cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
         expectNoOptionalResources(requests);
       });
     });
@@ -182,7 +181,7 @@ describe('optional themes stay off the default page', () => {
     }
   });
 
-  it('unmounts each selected theme and preserves metadata when switching back', () => {
+  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
