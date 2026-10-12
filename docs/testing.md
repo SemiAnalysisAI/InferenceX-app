@@ -1,7 +1,7 @@
 # Testing
 
 The [October 2026 E2E audit](testing/e2e-usefulness-audit-2026-10.md) records
-per-test usefulness rankings, the 25% standalone-case reduction, and the
+per-test usefulness rankings, the 25% runtime-case reduction, and the
 validated browser-specific timing refresh procedure.
 
 ## Structure

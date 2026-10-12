@@ -104,3 +104,36 @@ does not push commits or silently rewrite the repository.
 This JSON is a historical audit snapshot, not a permanent cap on suite size.
 New regression tests should be added when they establish behavior not already
 covered by a cheaper or stronger test.
+
+## Measured result
+
+The [post-change measurement run](https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/38310601763)
+passed all 20 shards and the timing validator. It recorded 747 E2E cases in
+each browser, plus 477 component cases across 47 specs. Chrome and Firefox
+registered identical E2E manifests, and every initially score-4/5 case was
+present. All 249 retired identities were absent; the retained CSV menu case
+was renamed to describe its stronger, five-route download contract.
+
+The committed timing files are observations from that run, not estimates
+derived from the old baseline. The shard loads below are the installed
+scheduler's predictions using those new measurements, excluding job setup,
+application build, and other runner overhead.
+
+| Suite            | Specs | Shards | Predicted shortest–longest shard | Longest above lower bound |
+| ---------------- | ----: | -----: | -------------------------------: | ------------------------: |
+| E2E Chrome       |    72 |      8 |                  72.003–72.836 s |                    0.512% |
+| E2E Firefox      |    72 |      8 |                  88.488–88.972 s |                    0.234% |
+| Component Chrome |    47 |      4 |                  35.560–35.697 s |                    0.253% |
+
+Summed E2E spec execution time was 579.721 seconds in Chrome and 710.114 seconds
+in Firefox, versus 1,401.405 and 1,293.090 seconds in the baseline run. Those
+are one-run observations, not a controlled performance benchmark or a promise
+of equivalent whole-workflow savings.
+
+Ten independent incremental rechecks reported no remaining blockers.
+Earlier findings were fixed rather than waived: date-sensitive fixture
+selection, metric-specific attribution, replay readiness, a JSON-named route
+directory in the source fingerprint, and browser-visible content coverage in
+that fingerprint. Full browser execution additionally exposed the replay
+control's offscreen position; the retained scenario now scrolls explicitly
+before asserting visibility, without forced clicks or conditional skipping.
