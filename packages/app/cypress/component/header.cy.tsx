@@ -242,6 +242,19 @@ describe('Header', () => {
     }
   });
 
+  it('fits a 320px phone that shows a classic 15px scrollbar (305px content width)', () => {
+    cy.viewport(305, 700);
+    cy.get('[data-testid="header"]').then(($header) => {
+      const header = $header[0];
+      expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
+    });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth, 'document scrollWidth').to.be.at.most(
+        doc.documentElement.clientWidth,
+      );
+    });
+  });
+
   it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {
     cy.clock();
     cy.viewport(375, 812);
