@@ -10,9 +10,10 @@ export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.Plugi
   ) => unknown)[] = [];
   // Cypress keeps only the last handler for an event. Compose the plugin's
   // after:run handler so recording raw observations cannot disable its output.
-  const splitOn = ((event: string, handler: (...args: never[]) => unknown) => {
+  const splitOn = ((...args: unknown[]) => {
+    const [event, handler] = args;
     if (event === 'after:run') afterRun.push(handler as (typeof afterRun)[number]);
-    else on(event as 'task', handler as never);
+    else Reflect.apply(on, undefined, args);
   }) as Cypress.PluginEvents;
   cypressSplit(splitOn, config);
   on('after:run', async (results) => {
@@ -39,13 +40,10 @@ export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.Plugi
         ),
       durations: results.runs.map((run) => ({
         spec: run.spec.relative.replaceAll('\\', '/'),
-        duration: run.stats.wallClockDuration,
+        duration: run.stats.duration ?? 0,
         tests: run.tests.map((test) => ({
           title: test.title,
-          duration: test.attempts.reduce(
-            (sum, attempt) => sum + (attempt.wallClockDuration ?? 0),
-            0,
-          ),
+          duration: test.duration,
           attempts: test.attempts.length,
         })),
       })),
