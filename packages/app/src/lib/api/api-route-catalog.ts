@@ -1149,7 +1149,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/app/api/gpu-metrics/github-telemetry.ts',
-    sourceSha256: '9bec68ab3e54f5c6e56d78ce370ab79d36ad949b847f511cf334be1579544b0b',
+    sourceSha256: '62090f68b09824ff6f28e06f2d533680e5879a29bd770fe4732f5e4502789856',
     reviewArea: {
       en: 'Live PowerX gpu_metrics artifact selection, download bounds, per-artifact failure isolation and CSV context timezone normalization.',
       zh: 'PowerX 实时 gpu_metrics 产物选择、下载限制、单产物故障隔离及 CSV context 时区规范化。',
