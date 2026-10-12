@@ -1,3 +1,4 @@
+import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -798,5 +799,72 @@ describe('VR default date preference', () => {
     );
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_LATEST_FIXTURE_DATE);
+  });
+});
+
+describe('Staged Pareto deep links', () => {
+  it('renders only the requested run line when that run is also selected as the latest run', () => {
+    const runId = '9100001';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
+    const stagedRows = b300Rows(runUrl).map((row, index) => ({
+      ...row,
+      id: 980000 + index,
+      workflow_run_id: 42,
+    }));
+    const otherRows = b300Rows(null, 'b200');
+    cy.intercept('GET', '/api/v1/availability*', { body: [stagedRows[0], otherRows[0]] });
+    cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+      if (request.query['exactRun'] === 'true' && request.query['runId'] === runId) {
+        request.alias = 'stagedSnapshot';
+        request.reply({ body: stagedRows });
+      } else {
+        // The main chart includes other hardware and cannot stand in for the
+        // requested snapshot, even if the workflow picker selects the same run.
+        request.reply({ body: [...otherRows, ...stagedRows] });
+      }
+    });
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: {
+        runs: [
+          {
+            github_run_id: Number(runId),
+            run_attempt: 1,
+            name: 'Staged sweep',
+            conclusion: 'success',
+            html_url: runUrl,
+            created_at: `${stagedRows[0]!.date}T12:00:00Z`,
+            date: stagedRows[0]!.date,
+          },
+        ],
+        changelogs: [],
+        configs: [],
+        runConfigs: [],
+      },
+    });
+    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    const [link] = buildStagedChartLinks(runId, [stagedRows[0]!]);
+    const url = new URL(link!.url);
+    cy.visit(`${url.pathname}${url.search}`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.wait('@stagedSnapshot');
+    cy.get('[data-testid="gpu-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .should(($points) => {
+        expect($points.length).to.be.greaterThan(0);
+        for (const element of $points) {
+          const point = (
+            element as unknown as { __data__: { date: string; hwKey: string; run_url: string } }
+          ).__data__;
+          expect(point.date).to.equal(`${stagedRows[0]!.date}~r${runId}`);
+          expect(point.hwKey).to.equal('b300_sglang');
+          expect(point.run_url).to.equal(runUrl);
+        }
+      });
+    cy.get('[data-testid="gpu-graph"]').first().find('.roofline-path').should('have.length', 1);
   });
 });

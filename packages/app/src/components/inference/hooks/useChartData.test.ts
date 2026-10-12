@@ -338,15 +338,14 @@ describe('buildComparisonDates', () => {
     expect(result).toEqual(['2026-02-01']);
   });
 
-  it('keeps other same-day runs but excludes the selected main run', () => {
+  it('keeps every exact-run series, including the currently selected main run', () => {
     const result = buildComparisonDates(
       ['h100'],
       ['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200'],
       { startDate: '', endDate: '' },
       '2026-03-01',
-      '300',
     );
-    expect(result).toEqual(['2026-03-01~r301', '2026-02-01~r200']);
+    expect(result).toEqual(['2026-03-01~r301', '2026-03-01~r300', '2026-02-01~r200']);
   });
 
   it('deduplicates dates appearing in both range and explicit list', () => {
