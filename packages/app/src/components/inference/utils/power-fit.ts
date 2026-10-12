@@ -1,6 +1,6 @@
 import type { InferenceData } from '../types';
-import { getGpuSpecs } from '@/lib/constants';
-import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
+import { getGpuSpecs } from '@/lib/catalog/constants';
+import { isPositive, powerBasisNormalization } from '@/lib/power/power-basis';
 import {
   equalServiceSourceKey,
   getEqualServiceSources,

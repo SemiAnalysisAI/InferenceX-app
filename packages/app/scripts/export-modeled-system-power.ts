@@ -5,9 +5,9 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import type { BenchmarkRow } from '../src/lib/api';
-import { isNvl72Hardware, modelSystemPower } from '../src/lib/modeled-system-power';
-import profileData from '../src/lib/system-power-model.profiles.json';
+import type { BenchmarkRow } from '../src/lib/api/api';
+import { isNvl72Hardware, modelSystemPower } from '../src/lib/power/modeled-system-power';
+import profileData from '../src/lib/power/system-power-model.profiles.json';
 
 interface PowerAudit {
   power_valid: boolean;
@@ -383,7 +383,7 @@ export function flatRows(
     raw_topology_and_metrics: row.benchmark,
     app_revision: metadata.app_revision,
     input_sha256: metadata.input_sha256,
-    profile_sha256: hashes['packages/app/src/lib/system-power-model.profiles.json'],
+    profile_sha256: hashes['packages/app/src/lib/power/system-power-model.profiles.json'],
     generated_at: metadata.generated_at,
   }));
 }
@@ -404,9 +404,9 @@ async function main() {
   const root = resolve(import.meta.dirname, '../../..');
   const codePaths = [
     'packages/app/scripts/export-modeled-system-power.ts',
-    'packages/app/src/lib/modeled-system-power.ts',
-    'packages/app/src/lib/system-power-model.ts',
-    'packages/app/src/lib/system-power-model.profiles.json',
+    'packages/app/src/lib/power/modeled-system-power.ts',
+    'packages/app/src/lib/power/system-power-model.ts',
+    'packages/app/src/lib/power/system-power-model.profiles.json',
   ];
   const hashes: Record<string, string> = {};
   for (const path of codePaths)

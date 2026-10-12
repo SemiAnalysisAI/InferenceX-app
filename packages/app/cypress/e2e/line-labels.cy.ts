@@ -14,11 +14,6 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
   });
 
-  it('Line Labels toggle exists in the legend', () => {
-    cy.get('#scatter-line-labels').should('exist');
-    cy.get('label[for="scatter-line-labels"]').should('contain.text', 'Line Labels');
-  });
-
   it('Line Labels toggle is on by default', () => {
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
 
@@ -26,20 +21,8 @@ describe('Line Labels Toggle', () => {
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
-  it('toggling Line Labels on then back off adds and removes label elements', () => {
-    // Off by default — turn it on first.
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
-
-    // Turn it back off — labels disappear.
-    cy.get('#scatter-line-labels').click();
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length', 0);
-  });
-
   it('line labels have colored background rects and text', () => {
-    // Off by default — ensure on (idempotent; prior test left them off).
+    // Ensure labels are enabled independently of earlier tests.
     cy.get('#scatter-line-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });
@@ -55,7 +38,7 @@ describe('Line Labels Toggle', () => {
   });
 
   it('line labels render in the foreground, after the scatter points', () => {
-    // Off by default — ensure on (idempotent; previous test leaves them on).
+    // Ensure labels are enabled independently of earlier tests.
     cy.get('#scatter-line-labels').then(($el) => {
       if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
     });

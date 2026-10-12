@@ -4,10 +4,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const track = vi.fn();
-vi.mock('@/lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: (...args: unknown[]) => track(...args) }));
 
 let locale: 'en' | 'zh' = 'en';
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => locale }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
 
 import { PromoVideo } from '@/components/about/promo-video';
 

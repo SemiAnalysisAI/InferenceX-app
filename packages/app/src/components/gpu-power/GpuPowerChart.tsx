@@ -7,7 +7,7 @@ import { buildTelemetryData, type ParsedPoint } from './chart-data';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
   estimateSampleIntervalMs,

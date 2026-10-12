@@ -14,7 +14,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   searchServerLogs: mockSearchServerLogs,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
 }));
 

@@ -16,7 +16,7 @@ import {
   readZipEntries,
   type GithubArtifact,
   type GithubWorkflowRun,
-} from '@/lib/github-artifacts';
+} from '@/lib/github/github-artifacts';
 
 import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
 

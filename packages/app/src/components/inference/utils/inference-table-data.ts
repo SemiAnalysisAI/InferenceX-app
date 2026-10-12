@@ -1,7 +1,7 @@
 import type { AggDataEntry, InferenceData, YAxisMetricKey } from '@/components/inference/types';
-import { remapInferencePoint } from '@/lib/chart-utils';
-import type { Locale } from '@/lib/i18n';
-import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import type { Locale } from '@/lib/i18n/i18n';
+import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
 
 /** Table candidates keep GPU measurements even when the all-in model cannot run. */
 export function allInMeasuredTableData(

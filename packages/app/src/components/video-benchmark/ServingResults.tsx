@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import VideoSelect from './VideoSelect';
 import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
 import {

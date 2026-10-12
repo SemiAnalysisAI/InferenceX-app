@@ -14,9 +14,9 @@ import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { ShareButton } from '@/components/ui/share-button';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 
 // Keep these metric-key groups in sync with chart-utils/chart configs when new source-backed
 // metrics are added; this helper owns which caption notes and caveats appear for each family.

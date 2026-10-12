@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ReliabilityRow } from '@/lib/api';
+import type { ReliabilityRow } from '@/lib/api/api';
 
 import { aggregateByDateRange } from './ReliabilityContext';
 

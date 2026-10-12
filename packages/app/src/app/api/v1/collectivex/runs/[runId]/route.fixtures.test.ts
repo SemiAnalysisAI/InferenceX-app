@@ -21,19 +21,19 @@ vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
   getCollectiveXRun: vi.fn(),
 }));
 
-vi.mock('@/lib/collectivex-lazy-ingest', () => ({
+vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
   collectiveXSweepErrorStatus: vi.fn(),
   ensureCollectiveXRun: vi.fn(),
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
   cachedJson: (data: unknown) => Response.json(data),
   collectiveXCacheTag: () => 'collectivex',
   purgeCollectiveX: vi.fn(),
 }));
 
-vi.mock('@/lib/test-fixtures', () => ({
+vi.mock('@/lib/testing/test-fixtures', () => ({
   loadFixture: mockLoadFixture,
 }));
 

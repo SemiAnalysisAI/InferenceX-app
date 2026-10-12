@@ -17,10 +17,10 @@ import {
 } from '@/components/calculator/profit-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { cachedJson } from '@/lib/api-cache';
-import { getGpuSpecs } from '@/lib/constants';
-import { getOpenRouterModelId, Sequence, type Model } from '@/lib/data-mappings';
-import { POWER_BASIS_LABELS } from '@/lib/power-basis';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { getGpuSpecs } from '@/lib/catalog/constants';
+import { getOpenRouterModelId, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { POWER_BASIS_LABELS } from '@/lib/power/power-basis';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
 import {

@@ -2,13 +2,13 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import { modelSystemPower, type SystemPowerEstimate } from '@/lib/modeled-system-power';
-import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
+import { modelSystemPower, type SystemPowerEstimate } from '@/lib/power/modeled-system-power';
+import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
-} from '@/lib/system-power-model';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+} from '@/lib/power/system-power-model';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   getPointLabel,
   generateTooltipContent,

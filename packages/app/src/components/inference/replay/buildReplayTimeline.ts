@@ -1,6 +1,6 @@
-import type { BenchmarkRow } from '@/lib/api';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { createChartDataPoint, getHardwareKey } from '@/lib/chart-utils';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { createChartDataPoint, getHardwareKey } from '@/lib/charts/chart-utils';
 
 import type {
   AggDataEntry,
@@ -9,7 +9,7 @@ import type {
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { agenticSpecDecodingKeySuffix } from '@/components/inference/utils/point-identity';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
 import type { PerStepValue } from './interpolateAtTime';
 

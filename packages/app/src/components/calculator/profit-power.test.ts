@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { modelSystemPower } from '@/lib/modeled-system-power';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import {
   gb300AggregateRow,
   gb300DisaggRow,
   upstreamRackWattsPerGpu,
-} from '@/lib/nvl72-power.fixture';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+} from '@/lib/power/nvl72-power.fixture';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
 import {

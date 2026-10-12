@@ -5,9 +5,9 @@ import { useMemo } from 'react';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
-import { exportToCsv } from '@/lib/csv-export';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml } from '@/lib/utils';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
   getRolePoints,

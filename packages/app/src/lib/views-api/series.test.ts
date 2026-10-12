@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 import { buildInferenceSeries, type InferenceSeriesOptions } from './series';
 

@@ -1,14 +1,14 @@
 import type React from 'react';
 import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import type { HardwareEntry } from '@/lib/constants';
-import type { Model, Sequence } from '@/lib/data-mappings';
-import type { PowerTier } from '@/lib/power-tier';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import type { HardwareEntry } from '@/lib/catalog/constants';
+import type { Model, Sequence } from '@/lib/catalog/data-mappings';
+import type { PowerTier } from '@/lib/power/power-tier';
+import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
 import type { XAxisMode } from './hooks/chart-data-core';
-import type { PowerBasis } from '@/lib/power-basis';
+import type { PowerBasis } from '@/lib/power/power-basis';
 
 export type { WorkerPower };
 
@@ -373,7 +373,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
   // W per allocated GPU plus J per successful output token, normalized by every
   // allocated GPU (prefill + decode for disaggregation). Emitted only when the
-  // value is finite and positive; see lib/power-basis.ts and
+  // value is finite and positive; see lib/power/power-basis.ts and
   // docs/data-transforms.md "Power boundaries".
   /** B2 W/GPU: HW_REGISTRY tdp. */
   gpuProvisionedWatts?: { y: number; roof: boolean };
@@ -413,7 +413,7 @@ export type PowerBasisFieldKey =
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken';
 
-export type { PowerBasis } from '@/lib/power-basis';
+export type { PowerBasis } from '@/lib/power/power-basis';
 
 /** Why a chart-ready point was intentionally excluded from the visible plot. */
 export type ChartClipReason = 'cost' | 'latency';
@@ -648,7 +648,7 @@ export interface QuickFilters {
   frameworks: string[];
   deployment: DeploymentMode[];
   spec: SpecMode[];
-  /** Measured-power certification tiers (see `@/lib/power-tier`). */
+  /** Measured-power certification tiers (see `@/lib/power/power-tier`). */
   power: PowerTier[];
   /** Exact allocation and parallelism identities; absent means no constraint. */
   topologies?: string[];

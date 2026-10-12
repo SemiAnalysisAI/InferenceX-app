@@ -1,6 +1,6 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/data-mappings';
+import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -38,18 +38,21 @@ import {
 } from '@/components/inference/metric-registry';
 import type { YAxisMetricKey } from '@/components/inference/types';
 import { pointDeploymentMode, pointVendor } from '@/components/inference/utils/quickFilters';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   getCachedAgenticBenchmarkHistory,
   getCachedBenchmarkHistory,
-} from '@/lib/benchmark-query-cache.server';
-import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { getHardwareKey } from '@/lib/chart-utils';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
-import { frameworkFamily } from '@/lib/framework-family';
-import { loadFixture } from '@/lib/test-fixtures';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import { hardwareLegendLabel } from '@/lib/views-api/legend';

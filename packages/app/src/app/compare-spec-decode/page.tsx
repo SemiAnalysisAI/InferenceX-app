@@ -8,22 +8,22 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
-} from '@/lib/compare-variant-availability';
-import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { formatModelList } from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-variant-availability';
+import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
+import { formatModelList } from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   precisionDisplayLabel,
   specMethodDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 
 export const dynamic = 'force-dynamic';
 

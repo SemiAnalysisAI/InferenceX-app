@@ -1,5 +1,8 @@
 # Architecture Decisions
 
+See [App Source Organization](./source-organization.md) for component/provider
+ownership, library domains, and conventions for preserving module boundaries.
+
 ## Client-First, API-Passthrough
 
 API routes return raw DB rows with zero transformation, validation, or filtering. All presentation logic lives in the frontend. This isn't laziness — it's intentional:
@@ -28,7 +31,7 @@ Because the selector commit uses `History.prototype.pushState` rather than Next'
 ## Route-Based Dashboard Navigation
 
 Every dashboard surface is a real Next.js route. The data-only registry in
-`packages/app/src/lib/dashboard-routes.ts` owns canonical paths, navigation groups,
+`packages/app/src/lib/routing/dashboard-routes.ts` owns canonical paths, navigation groups,
 indexability, provider capabilities, locale mirroring, and share-parameter scopes.
 `TabNav` renders links from that registry, so browser back/forward uses ordinary
 navigation and a newly added route cannot silently disappear from the sitemap or
@@ -40,7 +43,7 @@ long-lived single-page tab tree. Each route mounts only the providers it consume
 ### Per-Model Tab Routes
 
 `/calculator/<model>` and `/historical/<model>` (plus `/zh` siblings) give every
-dashboard model an indexable URL. `packages/app/src/lib/model-routes.ts` derives
+dashboard model an indexable URL. `packages/app/src/lib/routing/model-routes.ts` derives
 the slugs from the compare-page model registry (one slug vocabulary site-wide)
 and stays a thin layer on top of `dashboard-routes.ts`, whose prefix matching
 already resolves the child paths — it is not a second route registry.
@@ -94,7 +97,7 @@ API route responses are cached at two layers before hitting the CDN.
 | Local (unstable_cache) | Next.js in-process | ~2 MB default      | Small payloads (availability, workflow-info, etc.) |
 | Blob storage           | Vercel Blob        | No practical limit | Large payloads that exceed the 2 MB threshold      |
 
-`cachedQuery()` in `src/lib/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). Blob keys encode canonical typed arguments as `{keyPrefix}:v2:{base64url}`; keys that would exceed the pathname limit use `{keyPrefix}:v2:sha256:{digest}` instead. `blob-cache.ts` stores that key beneath `BLOB_CACHE_PREFIX` with a `.json` suffix.
+`cachedQuery()` in `src/lib/cache/api-cache.ts` wraps both tiers. Pass `{ blobOnly: true }` for payloads known to be large (e.g. `/api/v1/benchmarks`, which returns full benchmark rows for a model). Blob keys encode canonical typed arguments as `{keyPrefix}:v2:{base64url}`; keys that would exceed the pathname limit use `{keyPrefix}:v2:sha256:{digest}` instead. `blob-cache.ts` stores that key beneath `BLOB_CACHE_PREFIX` with a `.json` suffix.
 
 `cachedDerivedData()` is the tagged, `unstable_cache`-only wrapper for compact server payloads. Overview caches its fully assembled selector response. Compare caches one pair-filtered, full-shape hydration row set per model/GPU pair, then recomputes the inexpensive sequence/precision table transform per request; nesting a selector cache around the pair cache would bypass Next.js incremental caching. Raw public benchmark responses keep their existing Blob-backed contract.
 

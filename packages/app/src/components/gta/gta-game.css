@@ -265,6 +265,25 @@
   background: #0d1818ed;
   padding: 1rem;
   font-size: 0.85rem;
+  z-index: 8;
+  max-height: calc(100% - 14rem);
+  overflow-y: auto;
+}
+.gta-map-panel label,
+.gta-map-panel select {
+  display: block;
+  width: 100%;
+}
+.gta-map-panel select {
+  min-height: 42px;
+  background: #142522;
+  color: #fff;
+  border: 1px solid #77877c;
+  margin: 0.4rem 0;
+}
+.gta-tour-actions {
+  display: flex;
+  gap: 0.4rem;
 }
 .gta-map-panel p {
   margin: 0.5rem 0;
@@ -316,6 +335,9 @@
   }
   .gta-objective span {
     display: none;
+  }
+  .gta-objective .gta-warning {
+    display: block;
   }
   .gta-tools {
     top: 4.8rem;
@@ -407,4 +429,26 @@
   .gta-tools {
     grid-template-columns: repeat(2, auto);
   }
+}
+.gta-location {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px #000;
+}
+.gta-location b {
+  color: #ffe08a;
+}
+.gta-game .gta-tools button[aria-pressed='true'] {
+  background: #4b6542;
+  border-color: #c8e29f;
+}
+.gta-map-panel canvas {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  margin: 0.5rem 0;
+  border: 1px solid #77877c;
 }

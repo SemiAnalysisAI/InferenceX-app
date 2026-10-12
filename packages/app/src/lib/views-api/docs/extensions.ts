@@ -1,6 +1,11 @@
-import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
-import { text } from '@/lib/api-documentation-helpers';
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiResponse,
+  ApiSchema,
+} from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
@@ -338,6 +343,14 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON object mapping video point IDs to {hourly,source,date} strings; hourly is nonnegative USD/deployment-hour.',
     'JSON 对象，将视频数据点 ID 映射为 {hourly,source,date} 字符串；hourly 为非负 USD/deployment-hour。',
   ],
+  gpu: [
+    'GPU key, e.g. "H100 SXM"; default first available GPU. "all" returns every GPU.',
+    'GPU 键，如 "H100 SXM"；默认首个可用 GPU。设为 "all" 返回全部 GPU。',
+  ],
+  test: [
+    'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, or all (default). Determines which benchmark data is returned.',
+    'ubenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline 或 all（默认），决定返回哪种基准测试数据。',
+  ],
   view: ['Video results (default) or tradeoff.', '视频 results（默认）或 tradeoff。'],
 };
 
@@ -402,7 +415,15 @@ const NEW_VIEWS = {
   collectivex: [
     'CollectiveX EP, KV and swap views',
     'CollectiveX EP、KV 与 swap 视图',
-    { runs: objects, ep: object, kv: object, swap: object, options: object },
+    {
+      runs: objects,
+      ep: object,
+      kv: object,
+      swap: object,
+      options: object,
+      knownSupport: object,
+      knownSupportFootnotes: object,
+    },
   ],
   submissions: [
     'Submission table and weekly volume',
@@ -439,6 +460,11 @@ const NEW_VIEWS = {
       evidence: { type: ['object', 'null'], additionalProperties: true },
       discovery: object,
     },
+  ],
+  ubenchx: [
+    'ubenchX microbenchmarks (mem-bw, sm-l2-distance, and tpc-skyline)',
+    'ubenchX 微基准测试（mem-bw、sm-l2-distance 和 tpc-skyline）',
+    { gpus: objects, tests: strings, memBw: object, smL2Distance: object, tpcSkyline: object },
   ],
 } as const;
 

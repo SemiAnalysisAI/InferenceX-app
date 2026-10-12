@@ -28,9 +28,9 @@
  * chip's best config achieves, and precision is part of the config.
  */
 
-import type { BenchmarkRow } from '@/lib/api';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
-import { Percentile, type Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { Percentile, type Sequence } from '@/lib/catalog/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
 import { buildGpuGroups, type GroupMeta } from './throughput-data';

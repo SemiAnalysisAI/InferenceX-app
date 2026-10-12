@@ -1,4 +1,4 @@
-import type { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/catalog/data-mappings';
 
 /**
  * Represents a single eval data point for the chart

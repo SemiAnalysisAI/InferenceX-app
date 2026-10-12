@@ -28,11 +28,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { track } from '@/lib/analytics';
-import { Sequence } from '@/lib/data-mappings';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 
 import {

@@ -3,11 +3,11 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/url-state', () => ({
+vi.mock('@/lib/routing/url-state', () => ({
   buildShareUrl: () => 'https://inferencex.semianalysis.com/?g_model=dsr1#inference',
 }));
 
-vi.mock('@/lib/analytics', () => ({
+vi.mock('@/lib/analytics/analytics', () => ({
   track: vi.fn(),
 }));
 

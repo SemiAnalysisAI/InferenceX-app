@@ -3,8 +3,12 @@ import { notFound, permanentRedirect } from 'next/navigation';
 
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
-import { modelRoutePath, pathWithSearchParams, resolveModelRouteSlug } from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
+import {
+  modelRoutePath,
+  pathWithSearchParams,
+  resolveModelRouteSlug,
+} from '@/lib/routing/model-routes';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 /**
  * `/calculator/<model>` — the Throughput & TCO calculator seeded to a specific

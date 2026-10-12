@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
+import { UnofficialRunProvider } from '@/providers/unofficial-run-provider';
 
 interface ComparePageLayoutProps {
   children: ReactNode;

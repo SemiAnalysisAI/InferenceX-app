@@ -3,7 +3,7 @@
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 function Tabs({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Root>) {
   return (
@@ -26,7 +26,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
 }
 
 // Active/inactive recipe mirrors the top-of-page section nav
-// (data-testid="chart-section-tabs" in src/components/tab-nav.tsx: tabLinkClass +
+// (data-testid="chart-section-tabs" in src/components/dashboard/tab-nav.tsx: tabLinkClass +
 // currentTabClass) so the two tab rows read as the same flat underline-strip
 // component: accent text + accent border-b-2 underline when active, muted text
 // with no background fill when inactive, and a faint border highlight on hover.

@@ -5,9 +5,13 @@ import {
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
 
-import { type Precision, MODEL_PREFIX_MAPPING, getPrecisionLabel } from '@/lib/data-mappings';
-import { getHardwareConfig } from '@/lib/constants';
-import { getDisplayLabel } from '@/lib/utils';
+import {
+  type Precision,
+  MODEL_PREFIX_MAPPING,
+  getPrecisionLabel,
+} from '@/lib/catalog/data-mappings';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 const CHANGELOG_FRAMEWORK_KEYS = [
   ...Object.keys(FW_REGISTRY),

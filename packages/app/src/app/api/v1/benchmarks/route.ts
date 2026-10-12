@@ -5,17 +5,20 @@ import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { cachedJson } from '@/lib/api-cache';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import {
   getCachedBenchmarks,
   getCachedBenchmarksForRun,
   getCachedCalculatorBenchmarks,
-} from '@/lib/benchmark-query-cache.server';
-import { filterByPowerValidity, parsePowerValidityFilter } from '@/lib/benchmark-power-validity';
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
-import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
-import { loadFixture } from '@/lib/test-fixtures';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import {
+  filterByPowerValidity,
+  parsePowerValidityFilter,
+} from '@/lib/benchmarks/benchmark-power-validity';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
+import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-metadata';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 

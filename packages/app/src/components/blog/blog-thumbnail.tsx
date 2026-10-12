@@ -4,9 +4,9 @@ import type { CSSProperties } from 'react';
 
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { Badge } from '@/components/ui/badge';
-import type { PostThumbnail } from '@/lib/blog';
-import { optimizedThumbnailSrc, THUMBNAIL_WIDTHS } from '@/lib/blog-thumbnail-src';
-import { cn } from '@/lib/utils';
+import type { PostThumbnail } from '@/lib/blog/blog';
+import { optimizedThumbnailSrc, THUMBNAIL_WIDTHS } from '@/lib/blog/blog-thumbnail-src';
+import { cn } from '@/lib/shared/utils';
 
 export interface BlogThumbnailProps {
   /** Per-theme figure paths from `getPostThumbnail`; null renders the text-free tile. */

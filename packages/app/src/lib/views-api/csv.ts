@@ -1,5 +1,5 @@
-import { cachedText } from '@/lib/api-cache';
-import { escapeCsvCell } from '@/lib/csv-export';
+import { cachedText } from '@/lib/cache/api-cache';
+import { escapeCsvCell } from '@/lib/export/csv-export';
 
 /**
  * Minimal RFC 4180 CSV serialization for views-API alternate representations.

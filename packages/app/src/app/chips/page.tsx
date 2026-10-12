@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ChipsIndexContent } from '@/components/chips/chip-page-sections';
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AI Chips for LLM Inference: Specs, Pricing & Benchmarks';

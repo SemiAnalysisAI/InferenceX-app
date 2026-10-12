@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import type { GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type { InferenceData } from '../types';
 import {
   allGpuPool,

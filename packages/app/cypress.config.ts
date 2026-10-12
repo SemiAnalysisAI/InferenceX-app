@@ -25,8 +25,8 @@ export default defineConfig({
       // Force reduced motion so e2e clicks always land on settled elements.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium' && browser.name !== 'electron') {
-          // CI has no physical GPU. Exercise the real WebGL game with ANGLE's
-          // software renderer instead of accepting its unsupported-WebGL fallback.
+          // The retained isolation checks activate optional WebGL backgrounds.
+          // Use software rendering on GPU-less CI runners.
           launchOptions.args.push(
             '--force-prefers-reduced-motion',
             '--use-angle=swiftshader',
@@ -48,13 +48,7 @@ export default defineConfig({
   },
   component: {
     setupNodeEvents(on, config) {
-      on('before:browser:launch', (browser, launchOptions) => {
-        if (browser.family === 'chromium' && browser.name !== 'electron') {
-          // Component games need the same GPU-less WebGL setup as e2e.
-          launchOptions.args.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader');
-        }
-        return launchOptions;
-      });
+      cypressSplit(on, config);
       return config;
     },
     devServer: {

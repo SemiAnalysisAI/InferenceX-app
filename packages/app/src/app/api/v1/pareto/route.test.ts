@@ -4,11 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
 vi.mock('../benchmarks/route', () => ({ GET: raw }));
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
 }));
 import { GET } from './route';
-import { PUBLIC_API_ERRORS } from '@/lib/public-api-errors';
+import { PUBLIC_API_ERRORS } from '@/lib/api/public-api-errors';
 
 const query =
   'model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=x&yMetric=y&xDirection=max&yDirection=max';

@@ -1,4 +1,4 @@
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 export type CalculatorMode = 'interactivity_to_throughput' | 'throughput_to_interactivity';
 

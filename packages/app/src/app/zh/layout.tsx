@@ -1,5 +1,5 @@
-import { SetDocumentLang } from '@/components/set-document-lang';
-import { ZH_LANG_TAG } from '@/lib/i18n';
+import { SetDocumentLang } from '@/components/zh/set-document-lang';
+import { ZH_LANG_TAG } from '@/lib/i18n/i18n';
 
 /**
  * Simplified Chinese page tree. Every page under /zh is a hand-authored

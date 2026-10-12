@@ -9,8 +9,8 @@ import {
   selectVolumeRows,
   submissionRowKey,
 } from '@/components/submissions/submissions-utils';
-import { cachedJson } from '@/lib/api-cache';
-import type { SubmissionsResponse } from '@/lib/submissions-types';
+import { cachedJson } from '@/lib/cache/api-cache';
+import type { SubmissionsResponse } from '@/lib/submissions/submissions-types';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseBoolParam,

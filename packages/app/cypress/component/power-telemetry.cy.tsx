@@ -9,7 +9,7 @@ import {
 } from '@/components/gpu-power/telemetry-smoothing';
 import { PowerTelemetryView } from '@/components/inference/agentic-point/power-telemetry-view';
 import type { GpuMetricsPointPayload, GpuMetricSeries } from '@/hooks/api/use-gpu-metrics-point';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 const ID = 206887;
 const endpoint = `/api/v1/gpu-metrics-point?id=${ID}`;

@@ -8,25 +8,25 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { languageAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-scenario-route';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import {
   AGENTIC_SCENARIO_INTRO,
   getCachedBenchmarks,
   KNOWN_SEQUENCES,
   pickString,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
   precisionDisplayLabel,
   specMethodDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 import {
   buildVariantBreadcrumbJsonLd,
   buildVariantJsonLd,
@@ -36,7 +36,7 @@ import {
   summarizeVariantSide,
   variantCompareNarrative,
   type VariantCompareSide,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 
 import CompareSpecDecodePageClient from './page-client';
 

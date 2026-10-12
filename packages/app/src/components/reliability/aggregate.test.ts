@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ReliabilityRow } from '@/lib/api';
+import type { ReliabilityRow } from '@/lib/api/api';
 
 import { aggregateByDateRange, DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from './aggregate';
 

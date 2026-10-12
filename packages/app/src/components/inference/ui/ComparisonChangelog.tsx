@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronUp, FileText, Lock, Minus, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
@@ -15,11 +15,11 @@ import {
 } from '@/components/inference/utils/changelogFormatters';
 import { makeRunComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
-import { getHardwareConfig } from '@/lib/constants';
-import { Sequence, type Sequence as SequenceType } from '@/lib/data-mappings';
-import { getDisplayLabel, updateRepoUrl } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { Sequence, type Sequence as SequenceType } from '@/lib/catalog/data-mappings';
+import { getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const COMPARISON_CHANGELOG_STRINGS = {
   en: {

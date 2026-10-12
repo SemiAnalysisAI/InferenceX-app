@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
 const subscribers = new Set<() => void>();
 let listening = false;

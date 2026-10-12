@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchWorkflowInfo } from '@/lib/api';
+import { fetchWorkflowInfo } from '@/lib/api/api';
 
 export function workflowInfoQueryOptions(
   date: string,

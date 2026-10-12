@@ -1,7 +1,7 @@
 import type { ArrayBufferTarget as ArrayBufferTargetType, Muxer as MuxerType } from 'mp4-muxer';
 
-import { getExportFooterText } from '@/lib/export-footer';
-import { hasDarkTheme } from '@/lib/themes';
+import { getExportFooterText } from '@/lib/export/export-footer';
+import { hasDarkTheme } from '@/lib/themes/themes';
 
 export type Mp4ExportStage = 'init' | 'render' | 'encode' | 'flush' | 'mux';
 

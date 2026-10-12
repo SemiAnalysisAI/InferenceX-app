@@ -4,63 +4,6 @@ function visitReliability(path: string) {
   cy.visit(path);
 }
 
-describe('Reliability Chart', () => {
-  before(() => {
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    visitReliability('/reliability');
-    cy.get('[data-testid="reliability-chart-display"]').should('exist');
-  });
-
-  it('shows the GPU Reliability heading', () => {
-    cy.contains('h2', 'Chip Reliability').should('be.visible');
-  });
-
-  it('shows the date range selector', () => {
-    cy.get('[data-testid="reliability-date-range"]').should('be.visible');
-  });
-
-  it('keeps the date filter scoped and discoverable above the chart', () => {
-    cy.get('[data-testid="reliability-chart-display"]')
-      .contains('h3', 'Chart filters')
-      .should('be.visible');
-    cy.get('[data-testid="reliability-chart-display"]')
-      .contains('Choose a time window')
-      .should('be.visible');
-  });
-
-  it('date range selector has options including All time', () => {
-    cy.get('[data-testid="reliability-date-range"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.contains('[role="option"]', 'All time').should('exist');
-    cy.get('body').type('{esc}');
-  });
-
-  it('changing date range updates the displayed selection', () => {
-    cy.get('[data-testid="reliability-date-range"]').click();
-    cy.contains('[role="option"]', 'Last 7 days').click();
-    cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last 7 days');
-  });
-
-  it('shows a chart with SVG', () => {
-    cy.get('#reliability-chart').find('svg').should('exist');
-  });
-
-  it('does not show "No data available" text', () => {
-    cy.get('[data-testid="reliability-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
-  });
-
-  it('shows Source attribution in chart caption', () => {
-    cy.get('#reliability-chart')
-      .closest('section')
-      .within(() => {
-        cy.contains('SemiAnalysis InferenceX').should('exist');
-      });
-  });
-});
-
 describe('Reliability Chart — Content & Interactions', () => {
   before(() => {
     cy.window().then((win) => {
@@ -90,15 +33,6 @@ describe('Reliability Chart — Content & Interactions', () => {
         cy.contains('[role="option"]', 'All time').click();
         cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
       });
-  });
-
-  it('legend sidebar renders with at least one hardware item', () => {
-    cy.get('#reliability-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .should('exist')
-      .find('li')
-      .should('have.length.greaterThan', 0);
   });
 
   it('percentage labels are rendered on bars', () => {

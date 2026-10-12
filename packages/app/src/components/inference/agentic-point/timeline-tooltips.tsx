@@ -5,7 +5,7 @@ import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 import { formatDuration, formatTickLabel } from './timeline-format';
 import { cursorStatsAt, type SortedRequestTimes } from './timeline-cursor-stats';
 import { requestSourceLabel, shortenWid, type RequestTimelineRow } from './timeline-rows';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const TOOLTIP_STRINGS = {
   en: {

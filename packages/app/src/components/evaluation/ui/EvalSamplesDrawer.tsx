@@ -7,10 +7,10 @@ import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
-import { track } from '@/lib/analytics';
-import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
-import { buildShareUrl } from '@/lib/url-state';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api/api';
+import { buildShareUrl } from '@/lib/routing/url-state';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const PAGE_SIZE = 50;
 

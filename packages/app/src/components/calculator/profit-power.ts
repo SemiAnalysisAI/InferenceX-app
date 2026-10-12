@@ -1,4 +1,4 @@
-import { modelSystemPower, type SystemPowerUnit } from '@/lib/modeled-system-power';
+import { modelSystemPower, type SystemPowerUnit } from '@/lib/power/modeled-system-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 
 import {

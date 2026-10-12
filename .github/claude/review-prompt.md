@@ -81,13 +81,13 @@ Severity levels:
 
 ## 💡 NON-BLOCKING: Named analytics events
 
-PostHog autocapture tracks all interactions automatically. Named `track()` calls from `@/lib/analytics` provide cleaner event names for funnels and dashboards.
+PostHog autocapture tracks all interactions automatically. Named `track()` calls from `@/lib/analytics/analytics` provide cleaner event names for funnels and dashboards.
 
 **When reviewing a PR diff, if new interactive elements are added WITHOUT a named `track()` call, leave a non-blocking suggestion:**
 
 💡 **Suggestion**: Consider adding a named `track()` call for this interactive element.
 **Why**: Autocapture will record this interaction, but a named event (e.g., `inference_model_selected`) is easier to use in funnels and dashboards.
-**Convention**: `import { track } from '@/lib/analytics'` — event names follow `[section]_[action]` (e.g., `calculator_bar_selected`, `tab_changed`).
+**Convention**: `import { track } from '@/lib/analytics/analytics'` — event names follow `[section]_[action]` (e.g., `calculator_bar_selected`, `tab_changed`).
 
 **Important**: Only flag NEW or MODIFIED interactive elements in the PR diff. Do NOT flag existing code that was not changed in this PR.
 
@@ -126,6 +126,8 @@ When reviewing a PR diff, check if new code was added WITHOUT corresponding test
 - Bug fixes → should have a regression test
 
 **If new code is added WITHOUT tests, this is a 🔴 BLOCKING issue.**
+
+**Exception: easter egg themes and games.** They are just for fun and have no feature tests. Do not flag missing feature tests on them, and flag newly added easter egg feature tests for removal. Retain and maintain only `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`, which protect normal pages, embeds, resource loading, and SEO. Do not expand them into gameplay or visual-fidelity coverage. See `docs/testing.md#easter-egg-themes-and-games`.
 
 Use `mcp__github_inline_comment__create_inline_comment` to leave an inline comment with:
 

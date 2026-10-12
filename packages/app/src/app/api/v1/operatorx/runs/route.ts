@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
+import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
 import { errorMessage, errorStatus, listRuns, sourceName } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';

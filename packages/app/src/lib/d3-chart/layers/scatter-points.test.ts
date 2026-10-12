@@ -7,7 +7,7 @@ import {
   getShapeConfig,
   normalStateAttrs,
   type ShapeKey,
-} from '@/lib/chart-rendering';
+} from '@/lib/charts/chart-rendering';
 
 import {
   computeTooltipPosition,

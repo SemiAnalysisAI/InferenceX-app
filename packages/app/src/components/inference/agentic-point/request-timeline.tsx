@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 
 import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-request-timeline';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { sliceTimelineByPhase } from './phase-slice';
 import { TimelineBars } from './timeline-bars';

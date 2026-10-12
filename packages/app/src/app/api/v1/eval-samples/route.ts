@@ -6,9 +6,9 @@ import {
   getEvalSamples,
 } from '@semianalysisai/inferencex-db/queries/eval-samples';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { extractDemonstrations } from '@/lib/eval-sample-utils';
-import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { extractDemonstrations } from '@/lib/evaluation/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/evaluation/eval-sample-params';
 
 export const dynamic = 'force-dynamic';
 

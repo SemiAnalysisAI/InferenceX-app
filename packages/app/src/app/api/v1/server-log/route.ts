@@ -4,8 +4,8 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getServerLog, getServerLogChunk } from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 
 export const dynamic = 'force-dynamic';
 

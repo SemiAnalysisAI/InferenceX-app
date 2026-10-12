@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import {

@@ -593,7 +593,7 @@ describe('Agentic point request metric time series', () => {
               body: { id: 206885, query: 'recovered', matches: [], truncated: false },
             },
       );
-    });
+    }).as('retryServerLogSearch');
     // Distinct URL: the previous test visits this same logs view, and with
     // testIsolation off a same-URL visit does not reliably reload, so these
     // failing intercepts would never be exercised.
@@ -632,6 +632,7 @@ describe('Agentic point request metric time series', () => {
       failSearch = false;
     });
     cy.get('[data-testid="server-log-search-query-error"]').contains('button', '重试').click();
+    cy.wait('@retryServerLogSearch');
     cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
     cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
     cy.then(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));

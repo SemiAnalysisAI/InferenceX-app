@@ -5,7 +5,7 @@ import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
-import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
+import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
 import {
   allInMeasuredTableData,
   allInMeasuredUnavailableReason,

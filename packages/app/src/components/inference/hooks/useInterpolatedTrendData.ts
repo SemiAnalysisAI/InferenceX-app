@@ -10,8 +10,8 @@ import type {
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
-import { Sequence, type Model } from '@/lib/data-mappings';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 
 import {
   buildTrendLines,

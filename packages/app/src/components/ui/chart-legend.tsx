@@ -3,9 +3,9 @@
 import { ChevronDown, ChevronRight, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { filterAndSortLegendItems } from '@/lib/legend-utils';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { filterAndSortLegendItems } from '@/lib/charts/legend-utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from './atom-engine-footnote';
 import ChartLegendItem, { type CommonLegendItemProps } from './chart-legend-item';

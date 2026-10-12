@@ -35,8 +35,8 @@ import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-me
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
 import { availableOverlaySources } from './overlay-sources';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

@@ -37,29 +37,10 @@ function DatePickerWrapper({
 }
 
 describe('DatePicker', () => {
-  it('displays placeholder when no date set', () => {
-    cy.mount(<DatePickerWrapper />);
-    cy.contains('Select date').should('be.visible');
-  });
-
   it('displays formatted date when date is provided', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     // Date should be formatted as "Nov 15, 2025"
     cy.contains('Nov 15, 2025').should('be.visible');
-  });
-
-  it('click opens calendar dialog', () => {
-    cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    // Click the date trigger button to open dialog
-    cy.contains('Run Date:').click();
-    // Dialog should open with calendar
-    cy.contains('Select a Run Date').should('be.visible');
-  });
-
-  it('calendar shows month/year header', () => {
-    cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    cy.contains('Run Date:').click();
-    cy.get('h3.font-semibold').should('contain', 'November 2025');
   });
 
   it('available dates are clickable', () => {

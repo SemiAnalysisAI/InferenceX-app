@@ -1,13 +1,18 @@
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
-import type { BenchmarkRow } from '@/lib/api';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/cache-pricing';
-import { getHardwareKey } from '@/lib/chart-utils';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
-import { Percentile, Sequence } from '@/lib/data-mappings';
-import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  getHardwareConfig,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 
 import {
   getCostField,
@@ -35,7 +40,10 @@ export {
   sign,
 };
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
 /** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
 const computeGpuCost = (costPerHour: number, tps: number) =>
   costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;

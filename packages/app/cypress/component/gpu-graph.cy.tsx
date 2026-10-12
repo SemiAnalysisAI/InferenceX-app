@@ -4,7 +4,7 @@ import type { ChartDefinition, InferenceData } from '@/components/inference/type
 import {
   UnofficialRunContext,
   type UnofficialRunContextType,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import { useState, type ReactElement } from 'react';
 import { mountWithProviders } from '../support/test-utils';
 import {
@@ -14,9 +14,9 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Precision, Sequence } from '@/lib/data-mappings';
-import { overlayRooflineDasharray, overlayRunColor } from '@/lib/overlay-run-style';
-import { computeToggle } from '@/lib/toggle-set';
+import { Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { overlayRooflineDasharray, overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { computeToggle } from '@/lib/shared/toggle-set';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 

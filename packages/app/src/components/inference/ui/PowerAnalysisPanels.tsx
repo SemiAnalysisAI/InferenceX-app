@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
   equalServiceSourceKey,
