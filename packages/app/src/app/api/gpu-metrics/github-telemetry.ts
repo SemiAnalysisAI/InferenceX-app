@@ -15,7 +15,7 @@ import {
   normalizeGithubRunInfo,
   type GithubArtifact,
   type GithubWorkflowRun,
-} from '@/lib/github-artifacts';
+} from '@/lib/github/github-artifacts';
 
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
 /** Parallel artifact downloads; GitHub's zip redirects are latency-bound, not CPU-bound. */

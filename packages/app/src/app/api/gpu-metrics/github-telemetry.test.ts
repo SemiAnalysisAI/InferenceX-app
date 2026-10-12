@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type * as GithubArtifacts from '@/lib/github-artifacts';
+import type * as GithubArtifacts from '@/lib/github/github-artifacts';
 
 const { download, readRun, listArtifacts } = vi.hoisted(() => ({
   download: vi.fn(),
@@ -9,7 +9,7 @@ const { download, readRun, listArtifacts } = vi.hoisted(() => ({
   listArtifacts: vi.fn(),
 }));
 
-vi.mock('@/lib/github-artifacts', async (importOriginal) => ({
+vi.mock('@/lib/github/github-artifacts', async (importOriginal) => ({
   ...(await importOriginal<typeof GithubArtifacts>()),
   downloadGithubArtifact: download,
   fetchGithubWorkflowRun: readRun,
