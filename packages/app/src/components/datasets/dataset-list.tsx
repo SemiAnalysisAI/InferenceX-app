@@ -4,8 +4,8 @@ import Link from 'next/link';
 
 import { Card } from '@/components/ui/card';
 import { useDatasets, type DatasetRecord } from '@/hooks/api/use-datasets';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, localeNumber, perConversation } from './format';
 

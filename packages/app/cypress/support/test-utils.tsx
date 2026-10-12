@@ -10,11 +10,11 @@ import {
   GlobalFilterRunContext,
   GlobalFilterSelectionContext,
   GlobalFilterWorkflowContext,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import {
   UnofficialRunContext,
   type UnofficialRunContextType,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 
 import type { EvaluationChartContextType } from '@/components/evaluation/types';
 import type { ReliabilityChartContextType } from '@/components/reliability/types';

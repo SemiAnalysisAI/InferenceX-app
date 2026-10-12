@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
   vi.hoisted(() => ({
@@ -23,7 +23,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getBenchmarksForRun: mockGetBenchmarksForRun,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedDerivedData: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (data: unknown) => Response.json(data),

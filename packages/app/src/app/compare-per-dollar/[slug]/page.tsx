@@ -8,20 +8,20 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { languageAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-scenario-route';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
   compareModelDisplayLabel,
   parseCompareSlug,
-} from '@/lib/compare-slug';
-import { getGpuSpecs } from '@/lib/constants';
+} from '@/lib/compare/compare-slug';
+import { getGpuSpecs } from '@/lib/catalog/constants';
 import {
   AGENTIC_SCENARIO_INTRO,
   buildBreadcrumbJsonLd,
@@ -31,11 +31,11 @@ import {
   KNOWN_PRECISIONS,
   KNOWN_SEQUENCES,
   pickString,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
-} from '@/lib/compare-page-data.server';
+} from '@/lib/compare/compare-page-data.server';
 
 import ComparePerDollarPageClient from './page-client';
 

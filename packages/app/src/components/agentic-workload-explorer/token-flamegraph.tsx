@@ -17,8 +17,8 @@ import {
 } from '@/lib/agentic-workload-explorer/stat-rows';
 import { buildHashMetrics, type HashSourceRow } from '@/lib/agentic-workload-explorer/hash-metrics';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const COLORS = {
   input: '#0ea5e9', // sky-500

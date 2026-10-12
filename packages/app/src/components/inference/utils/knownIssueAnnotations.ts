@@ -8,7 +8,7 @@
 
 import * as d3 from 'd3';
 
-import type { KnownConfigIssue } from '@/lib/known-issues';
+import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';

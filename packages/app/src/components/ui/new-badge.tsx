@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 export function NewBadge({ children, className, ...props }: ComponentPropsWithoutRef<'span'>) {
   return (

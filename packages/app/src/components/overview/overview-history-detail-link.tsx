@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 export function OverviewHistoryDetailLink({
   href,

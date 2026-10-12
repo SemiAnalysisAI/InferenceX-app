@@ -8,7 +8,7 @@ import { NextRequest } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));

@@ -6,11 +6,11 @@ import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/constants';
-import { type Sequence, Percentile, type Model } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
-import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 
 import {
   getCostField,

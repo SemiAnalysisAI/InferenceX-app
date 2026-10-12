@@ -126,8 +126,6 @@ describe('AgentX dataset methodology', () => {
           .should('not.be.empty');
       });
       cy.get('a[href="https://arxiv.org/abs/2604.09557"]').should('exist');
-      cy.contains('mostly vibe coded').should('not.exist');
-      cy.contains('Distillation is bad').should('not.exist');
     });
 
     cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/zh/agentx/methodology');

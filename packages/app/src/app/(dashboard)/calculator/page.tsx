@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
-import { tabMetadata } from '@/lib/tab-meta';
+import { tabMetadata } from '@/lib/routing/tab-meta';
 
 export const metadata: Metadata = tabMetadata('calculator');
 

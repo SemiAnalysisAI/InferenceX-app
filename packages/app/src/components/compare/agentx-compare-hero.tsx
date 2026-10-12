@@ -7,7 +7,7 @@ import {
   agentxDashboardHref,
   FEATURED_AGENTX_MODELS,
   isNewAgentxModel,
-} from '@/lib/compare-agentx';
+} from '@/lib/compare/compare-agentx';
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 

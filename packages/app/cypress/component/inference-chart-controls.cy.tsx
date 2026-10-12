@@ -1,7 +1,7 @@
 import 'cypress-axe';
 import { useState } from 'react';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import { chartDefinitions } from '@/components/inference/metric-registry';

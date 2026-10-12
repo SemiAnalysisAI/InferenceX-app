@@ -16,8 +16,8 @@ import {
 } from '@/lib/agentic-workload-explorer/format';
 import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
 import {

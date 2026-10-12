@@ -29,8 +29,8 @@ import {
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 // ── i18n ────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
   mockPurgeCollectiveX: vi.fn(),
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,

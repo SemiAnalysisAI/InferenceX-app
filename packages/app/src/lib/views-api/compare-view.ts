@@ -1,7 +1,7 @@
 /**
  * Pure projection for GET /api/v1/views/compare.
  *
- * All interpolation math lives in `lib/compare-ssr.ts` /
+ * All interpolation math lives in `lib/compare/compare-ssr.ts` /
  * `components/calculator/interpolation.ts` (the /compare page pipeline); this
  * module only reshapes those results into the documented public view:
  * per-tier cells without the bulky `nearestPoints` evidence arrays, a signed
@@ -9,7 +9,7 @@
  */
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { InterpolatedResult } from '@/components/calculator/types';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 import {
   buildGpuDataPoints,
   computeCompareImageRows,
@@ -18,7 +18,7 @@ import {
   KNOWN_PRECISIONS,
   type CompareStat,
   type SsrInterpolatedRow,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 export const COMPARE_VARIANTS = ['default', 'per-dollar', 'precision', 'spec-decode'] as const;
 export type CompareVariant = (typeof COMPARE_VARIANTS)[number];
 

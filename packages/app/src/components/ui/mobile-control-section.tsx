@@ -1,7 +1,7 @@
 import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { track } from '@/lib/analytics';
+import { cn } from '@/lib/shared/utils';
+import { track } from '@/lib/analytics/analytics';
 
 const subscribeToHydration = () => () => {};
 const clientSnapshot = () => true;

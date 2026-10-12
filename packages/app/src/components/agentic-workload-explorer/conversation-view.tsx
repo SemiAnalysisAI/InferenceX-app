@@ -15,8 +15,8 @@ import {
 import { buildRequestRuns, type RequestRun } from '@/lib/agentic-workload-explorer/subagent-runs';
 import { type ContentBlock } from '@/lib/agentic-workload-explorer/subagent';
 import { normalizeDashboardTrace } from '@semianalysisai/inferencex-db/proxytrace/shared/adapters';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 interface RequestData {
   id: string;

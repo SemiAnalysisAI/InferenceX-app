@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 type SortKey = 'model' | 'totalCount' | 'errorCount' | 'errorRate' | 'severity';
 type SortDirection = 'ascending' | 'descending';

@@ -5,11 +5,11 @@ import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics';
-import { replaceRouterPathname } from '@/lib/client-navigation';
-import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare-agentx';
-import { inferenceModelRouteForSelection } from '@/lib/inference-model-slug';
-import { useFeatureGate } from '@/lib/use-feature-gate';
+import { track } from '@/lib/analytics/analytics';
+import { replaceRouterPathname } from '@/lib/routing/client-navigation';
+import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
+import { inferenceModelRouteForSelection } from '@/lib/routing/inference-model-slug';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import {
   useInferenceActions,
@@ -66,9 +66,14 @@ import {
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
+import {
+  showsTcoBasisSelector,
+  Sequence,
+  type Model,
+  type Percentile,
+} from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 const STRINGS = {
   en: {

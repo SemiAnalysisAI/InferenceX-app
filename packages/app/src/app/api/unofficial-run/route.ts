@@ -12,8 +12,8 @@ import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracke
 import {
   localArtifactPreviewEnabled,
   readLocalArtifactPreview,
-} from '@/lib/local-artifact-preview';
-import type { BenchmarkRow, EvalRow } from '@/lib/api';
+} from '@/lib/github/local-artifact-preview';
+import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import {
   downloadGithubArtifact,
   extractZipEntries,
@@ -24,7 +24,7 @@ import {
   normalizeGithubRunInfo,
   type GithubArtifact,
   type GithubWorkflowRun,
-} from '@/lib/github-artifacts';
+} from '@/lib/github/github-artifacts';
 
 /**
  * Batch size for downloading per-config `bmk_*` artifacts. Big agentic sweeps

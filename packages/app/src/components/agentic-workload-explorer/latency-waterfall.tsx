@@ -3,8 +3,8 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { formatDuration } from '@/lib/agentic-workload-explorer/format';
 import { type StatRow } from '@/lib/agentic-workload-explorer/stat-rows';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const COLORS = {
   prefill: '#0ea5e9', // sky-500

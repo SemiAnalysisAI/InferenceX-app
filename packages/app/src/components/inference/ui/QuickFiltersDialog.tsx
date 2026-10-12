@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OptionInfo } from '@/components/ui/option-info';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
-import type { PowerTier } from '@/lib/power-tier';
+import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 
 import {
@@ -22,10 +22,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { track } from '@/lib/analytics';
-import { Sequence } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { Label } from '@/components/ui/label';
 
 const STRINGS = {

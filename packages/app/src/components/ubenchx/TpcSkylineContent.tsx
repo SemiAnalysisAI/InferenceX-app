@@ -1,6 +1,6 @@
 'use client';
 
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
 import { transformTpcSkylineRun } from './tpc-skyline-transform';

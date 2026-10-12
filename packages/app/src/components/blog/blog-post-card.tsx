@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { BlogThumbnail } from '@/components/blog/blog-thumbnail';
 import { Badge } from '@/components/ui/badge';
 import { Heading } from '@/components/ui/heading';
-import { track } from '@/lib/analytics';
-import type { PostThumbnail } from '@/lib/blog';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { PostThumbnail } from '@/lib/blog/blog';
+import { cn } from '@/lib/shared/utils';
 
 export interface BlogPostCardProps {
   slug: string;

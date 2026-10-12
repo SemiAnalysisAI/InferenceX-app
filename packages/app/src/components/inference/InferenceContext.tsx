@@ -13,9 +13,9 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
-import type { BenchmarkRow } from '@/lib/api';
-import { track } from '@/lib/analytics';
-import { EngineComparisonConfirmation } from '@/components/engine-comparison-confirmation';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { track } from '@/lib/analytics/analytics';
+import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import {
   needsEngineComparisonConsent,
   supportsEngineComparisonConsent,
@@ -34,9 +34,9 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
-} from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { useFeatureGate } from '@/lib/use-feature-gate';
+} from '@/providers/GlobalFilterContext';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import type {
   InferenceActionsContextType,
   InferenceData,
@@ -64,32 +64,32 @@ import {
 import { useUrlState } from '@/hooks/useUrlState';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { frameworkFamily } from '@/lib/framework-family';
+import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
   MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
-} from '@/components/engine-comparison-conflict-toast';
+} from '@/components/inference/ui/engine-comparison-conflict-toast';
 import {
   effectiveLegendItems,
   exclusionResolutionFamilies,
   resolveExclusionGroups,
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
-} from '@/lib/exclusion';
-import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
+} from '@/lib/benchmarks/exclusion';
+import { filterRunsByModel, getDisplayLabel } from '@/lib/shared/utils';
 import {
   isAgenticOnlyXAxisMode,
   useChartData,

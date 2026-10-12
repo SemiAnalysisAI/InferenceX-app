@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { APP_THEMES } from './themes';
+import { APP_THEMES } from './themes/themes';
 
 const src = path.resolve(import.meta.dirname, '..');
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
@@ -128,7 +128,7 @@ describe('optional theme import boundary', () => {
           queue.push({ file: resolved, chain: [...chain, path.relative(src, resolved)] });
       }
     }
-    expect(seen.has(path.join(src, 'components/easter-egg-theme-lazy.tsx'))).toBe(true);
+    expect(seen.has(path.join(src, 'components/effects/easter-egg-theme-lazy.tsx'))).toBe(true);
     expect(seen.has(path.join(src, 'app/globals.css'))).toBe(true);
     expect(violations, 'Move these imports behind an explicit theme/game activation gate').toEqual(
       [],

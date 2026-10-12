@@ -1,12 +1,12 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -19,10 +19,10 @@ import type {
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
-import { getChartWatermark } from '@/lib/data-mappings';
-import type { Locale } from '@/lib/i18n';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import type { Locale } from '@/lib/i18n/i18n';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
 
 import type {
   BarMetric,
@@ -487,7 +487,7 @@ export default function ThroughputBarChart({
   const locale = useLocale();
 
   // Color resolution: unofficial-run overlay bars take the run's palette color
-  // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
+  // (so they match the banner + legend swatch — see lib/charts/overlay-run-style.ts);
   // official bars prefer the dynamic colorResolver, falling back to static config.
   const resolveBarColor = useCallback(
     (datum: InterpolatedResult) =>

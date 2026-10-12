@@ -5,7 +5,7 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 ## Provider Ownership
 
 `DashboardShell` resolves provider capabilities from
-`packages/app/src/lib/dashboard-routes.ts`:
+`packages/app/src/lib/routing/dashboard-routes.ts`:
 
 ```
 QueryProvider
@@ -35,7 +35,7 @@ tests rather than adding pathname conditionals in the shell.
 
 ### GlobalFilterProvider
 
-File: `packages/app/src/components/GlobalFilterContext.tsx`
+File: `packages/app/src/providers/GlobalFilterContext.tsx`
 
 **Requested selection state** (user or URL intent):
 
@@ -280,7 +280,7 @@ How the GPU-across-time comparison works in the inference tab:
 
 ## URL State Synchronization
 
-Source files: `packages/app/src/lib/url-state.ts`, `packages/app/src/hooks/useUrlState.ts`, `packages/app/src/hooks/useChartContext.ts` (`useUrlStateSync`).
+Source files: `packages/app/src/lib/routing/url-state.ts`, `packages/app/src/hooks/useUrlState.ts`, `packages/app/src/hooks/useChartContext.ts` (`useUrlStateSync`).
 
 ### Prefix convention
 
@@ -360,8 +360,8 @@ registry and carries the canonical `unofficialruns` value from the live URL.
 ### Parameter registry
 
 `UrlStateKey`, `URL_STATE_KEYS`, and `PARAM_DEFAULTS` in
-`packages/app/src/lib/url-state.ts` are the exhaustive parameter source of truth.
+`packages/app/src/lib/routing/url-state.ts` are the exhaustive parameter source of truth.
 Dashboard scope membership is declared by `shareParamScopes` in
-`packages/app/src/lib/dashboard-routes.ts`. Tests enforce completeness and route-specific
+`packages/app/src/lib/routing/dashboard-routes.ts`. Tests enforce completeness and route-specific
 share behavior, so this document deliberately does not duplicate a manually maintained
 parameter table.

@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-import { track } from '@/lib/analytics';
-import { navigateInApp } from '@/lib/client-navigation';
+import { track } from '@/lib/analytics/analytics';
+import { navigateInApp } from '@/lib/routing/client-navigation';
 
 interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link> {
   analyticsEvent:

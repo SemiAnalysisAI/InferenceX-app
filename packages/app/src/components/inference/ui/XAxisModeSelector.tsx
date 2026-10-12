@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useInferenceActions, useInferenceDisplay, useInferenceFilters } from '../InferenceContext';
-import { Sequence } from '@/lib/data-mappings';
-import { track } from '@/lib/analytics';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { track } from '@/lib/analytics/analytics';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { X_AXIS_EXPLANATIONS, type XAxisKind } from '../axis-metric-explanations';
 import { isAgenticOnlyXAxisMode, type XAxisMode } from '../hooks/useChartData';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { NormalizedInteractivityHelpLink } from './NormalizedInteractivityHelpLink';
 
 const X_AXIS_OPTIONS: { value: XAxisMode; kind: XAxisKind; label: string; labelZh: string }[] = [

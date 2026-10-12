@@ -8,8 +8,8 @@ import {
   formatBlogDate,
   getAllPosts,
   getTopTags,
-} from '@/lib/blog';
-import { type Locale, localePath } from '@/lib/i18n';
+} from '@/lib/blog/blog';
+import { type Locale, localePath } from '@/lib/i18n/i18n';
 
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
 import { BlogFeaturedPost } from './blog-featured-post';

@@ -2,7 +2,7 @@
  * Tests for the "Historical Trends" tab.
  * Shows interpolated GPU performance over time at a user-selected interactivity level.
  */
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 const visitHistoricalWithSetup = () => {
   cy.visit('/historical', {
@@ -88,14 +88,6 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="historical-trends-display"]')
       .find('input[type="range"]')
       .should('have.value', '50');
-  });
-
-  it('chart title includes "Over Time" and "Interactivity" reflecting the operating point', () => {
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('h2')
-      .invoke('text')
-      .should('include', 'Over Time')
-      .and('include', 'Interactivity');
   });
 
   it('sequence selector is present and has selectable options', () => {

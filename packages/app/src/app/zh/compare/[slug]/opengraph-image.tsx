@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
-import { renderCompareOg } from '@/lib/compare-og';
-import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare-slug';
+import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
+import { renderCompareOg } from '@/lib/compare/compare-og';
+import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare/compare-slug';
 
 export const alt = '芯片推理基准测试对比';
 export const size = { width: 1200, height: 630 };

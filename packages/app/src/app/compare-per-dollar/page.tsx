@@ -8,15 +8,19 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
+import {
+  type ComparePair,
+  COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare/compare-slug';
+import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 

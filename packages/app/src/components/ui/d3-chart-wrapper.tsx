@@ -4,8 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const DEFAULT_CHART_INSTRUCTIONS = {
   en: 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',

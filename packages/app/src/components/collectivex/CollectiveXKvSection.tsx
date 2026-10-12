@@ -10,8 +10,8 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXKvChart } from './CollectiveXKvChart';
 import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';

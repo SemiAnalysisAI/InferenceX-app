@@ -6,8 +6,8 @@ import { FAQ_ITEMS } from '@/components/about/faq-data';
 import { AgentXFaq } from '@/components/about/agentx-faq';
 import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS);

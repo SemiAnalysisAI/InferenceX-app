@@ -6,7 +6,7 @@ on:
       package_version:
         description: 'Exact published package version to check'
         required: true
-        default: '1.0.0'
+        default: '1.1.0'
         type: string
   schedule:
     - cron: '23 9 * * *'
@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      CHECK_PACKAGE_VERSION: ${{ inputs.package_version || '1.0.0' }}
+      CHECK_PACKAGE_VERSION: ${{ inputs.package_version || '1.1.0' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

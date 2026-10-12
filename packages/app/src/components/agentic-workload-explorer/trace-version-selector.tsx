@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/select';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 import { useTraceVersion } from '@/hooks/agentic-workload-explorer/use-trace-version';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

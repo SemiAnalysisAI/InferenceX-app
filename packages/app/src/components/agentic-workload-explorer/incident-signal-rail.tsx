@@ -5,8 +5,8 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 type Severity = 'nominal' | 'watch' | 'elevated' | 'critical';
 

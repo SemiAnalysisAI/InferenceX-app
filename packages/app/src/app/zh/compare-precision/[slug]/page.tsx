@@ -8,31 +8,31 @@ import {
   SUPPORTERS_LINE_ZH,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
-import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare-ssr-zh';
+import { JsonLd } from '@/components/seo/json-ld';
+import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare/compare-ssr-zh';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-scenario-route';
+import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare/compare-ssr';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 import {
   computeVariantCompareTableData,
   dateRangeForVariantPair,
   pickVariantPairDefaults,
   summarizeVariantSide,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 import {
   buildVariantBreadcrumbJsonLdZh,
   buildVariantJsonLdZh,
   variantCompareNarrativeZh,
-} from '@/lib/compare-variant-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-variant-ssr-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 import ComparePrecisionPageClient from '../../../compare-precision/[slug]/page-client';
 

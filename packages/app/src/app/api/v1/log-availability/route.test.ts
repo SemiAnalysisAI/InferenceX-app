@@ -9,7 +9,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: mockGetDb })
 vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
   getServerLogAvailability: mockGetServerLogAvailability,
 }));
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (data: unknown) => Response.json(data),
 }));

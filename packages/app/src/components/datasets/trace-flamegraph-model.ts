@@ -5,7 +5,7 @@
  */
 
 import type { StructureNode } from '@/hooks/api/use-datasets';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 // Kept distinct from token-segment colors. A row can carry multiple rails when
 // it overlaps different requests during different parts of its lifetime.

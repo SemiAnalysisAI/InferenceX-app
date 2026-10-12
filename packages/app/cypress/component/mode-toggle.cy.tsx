@@ -1,7 +1,7 @@
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { ThemeProvider } from '@/components/ui/theme-provider';
-import { APP_THEMES } from '@/lib/themes';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { APP_THEMES } from '@/lib/themes/themes';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('ModeToggle', () => {
   beforeEach(() => {

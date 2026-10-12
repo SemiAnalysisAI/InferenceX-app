@@ -2,8 +2,8 @@
 
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import {
   DEFAULT_REUSE_DAYS,
   parseReuseDays,

@@ -4,8 +4,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { Model, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { buildReplayTimeline } from '@/components/inference/replay/buildReplayTimeline';
 

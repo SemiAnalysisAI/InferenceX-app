@@ -3,11 +3,11 @@
 import { Check, Copy, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ShareLinkedInButton, ShareTwitterButton } from '@/components/share-buttons';
-import { track } from '@/lib/analytics';
-import { buildShareUrl } from '@/lib/url-state';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { ShareLinkedInButton, ShareTwitterButton } from '@/components/ui/share-buttons';
+import { track } from '@/lib/analytics/analytics';
+import { buildShareUrl } from '@/lib/routing/url-state';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { Button } from './button';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';

@@ -1,13 +1,13 @@
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
-import { getPointHardwareConfig } from '@/lib/inference-labels';
-import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
-import { agenticDetailHref } from '@/lib/agentic-detail-link';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { frameworkFamily } from '@/lib/framework-family';
-import type { Locale } from '@/lib/i18n';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { chipCounts } from '@/lib/chip-counts';
-import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
+import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import type { Locale } from '@/lib/i18n/i18n';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { chipCounts } from '@/lib/benchmarks/chip-counts';
+import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {

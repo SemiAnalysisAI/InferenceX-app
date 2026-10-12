@@ -12,7 +12,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -27,7 +27,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
 import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
@@ -66,9 +66,9 @@ import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { exportToCsv } from '@/lib/csv-export';
+import { track } from '@/lib/analytics/analytics';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
   getOpenRouterModelId,
@@ -76,11 +76,11 @@ import {
   Percentile,
   Sequence,
   type Model,
-} from '@/lib/data-mappings';
-import { modelRoutesForTab, type ModelRouteTab } from '@/lib/model-routes';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   applyCacheHitMode,

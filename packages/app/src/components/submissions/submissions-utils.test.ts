@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import type { SubmissionVolumeRow, SubmissionSummaryRow } from '@/lib/submissions-types';
+import type {
+  SubmissionVolumeRow,
+  SubmissionSummaryRow,
+} from '@/lib/submissions/submissions-types';
 
 import {
   buildInferenceCompareUrl,

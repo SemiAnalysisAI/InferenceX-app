@@ -5,13 +5,13 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
-import { enAlternates } from '@/lib/i18n';
-import { inferenceModelMeta } from '@/lib/inference-model-meta';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
 import {
   getInferenceModelBySlug,
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
-} from '@/lib/inference-model-slug';
+} from '@/lib/routing/inference-model-slug';
 
 /**
  * `/inference/<model>` — an indexable path form of `/inference?g_model=<model>`.

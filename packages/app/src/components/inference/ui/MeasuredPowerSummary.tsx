@@ -1,7 +1,7 @@
 'use client';
 
 import type { InferenceData } from '@/components/inference/types';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 export interface PowerTierCounts {
   certified: number;

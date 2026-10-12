@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { Card } from '@/components/ui/card';
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const REGIONAL_ACKNOWLEDGEMENTS = [

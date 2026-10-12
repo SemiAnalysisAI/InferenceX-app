@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
-import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/public-api-errors';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/api/public-api-errors';
 
 /**
  * Shared GET-handler factories for the agentic benchmark routes, which all

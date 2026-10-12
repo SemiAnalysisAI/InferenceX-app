@@ -33,9 +33,9 @@ import {
   PREV_DAY_LABEL,
   SNAPSHOT_NOW_MS,
 } from '@/lib/agentic-workload-explorer/snapshot';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 // ── i18n ────────────────────────────────────────────────────────────────
 

@@ -14,7 +14,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
   getAvailabilityData: mockGetAvailabilityData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (data: unknown) => Response.json(data),
 }));

@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
-import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
-import { getAllChipRouteSlugs } from '@/lib/chip-pages';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { zhPath } from '@/lib/i18n';
-import { getModelPageSlugs } from '@/lib/model-pages';
+import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { zhPath } from '@/lib/i18n/i18n';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 import {
   defaultRouteModel,
   MODEL_ROUTE_TABS,
   MODEL_ROUTES,
   modelRoutePath,
   modelRoutesForTab,
-} from '@/lib/model-routes';
+} from '@/lib/routing/model-routes';
 const mocks = vi.hoisted(() => ({
   fixturesMode: false,
   getDb: vi.fn(() => ({})),
@@ -28,22 +28,22 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
   listDatasets: mocks.listDatasets,
 }));
-vi.mock('@/lib/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
-vi.mock('@/lib/blog', () => ({ getAllPosts: () => [] }));
-vi.mock('@/lib/compare-availability', () => ({
+vi.mock('@/lib/agentx/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
+vi.mock('@/lib/blog/blog', () => ({ getAllPosts: () => [] }));
+vi.mock('@/lib/compare/compare-availability', () => ({
   getAllComparableCompareSlugs: () => Promise.resolve([]),
 }));
-vi.mock('@/lib/compare-variant-availability', () => ({
+vi.mock('@/lib/compare/compare-variant-availability', () => ({
   getAllComparablePrecisionSlugs: () => Promise.resolve([]),
   getAllComparableSpecDecodeSlugs: () => Promise.resolve([]),
 }));
-vi.mock('@/lib/glossary', () => ({ getAllGlossaryEntries: () => [] }));
-vi.mock('@/lib/run-rankings-data.server', () => ({
+vi.mock('@/lib/content/glossary', () => ({ getAllGlossaryEntries: () => [] }));
+vi.mock('@/lib/live-seo/run-rankings-data.server', () => ({
   getAvailableRunEntries: () => Promise.resolve([]),
 }));
 
-import { getAllRankingPageEntries } from '@/lib/rankings';
-import { getAllWhitepapers } from '@/lib/whitepapers';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
+import { getAllWhitepapers } from '@/lib/content/whitepapers';
 
 import sitemap from './sitemap';
 

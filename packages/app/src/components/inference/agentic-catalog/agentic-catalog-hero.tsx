@@ -1,7 +1,7 @@
 import { Card } from '@/components/ui/card';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
-import type { Locale } from '@/lib/i18n';
+import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogLink } from './agentic-catalog-link';
 

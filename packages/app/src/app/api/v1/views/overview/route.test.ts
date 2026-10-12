@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
@@ -12,11 +12,11 @@ const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted((
   ),
 }));
 
-vi.mock('@/lib/overview-data.server', () => ({
+vi.mock('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));

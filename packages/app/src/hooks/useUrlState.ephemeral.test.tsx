@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/model/test-model',
 }));
 
-vi.mock('@/lib/url-state', () => ({
+vi.mock('@/lib/routing/url-state', () => ({
   readUrlParams: mocks.readUrlParams,
   refreshUrlParamsOnNavigation: mocks.refreshUrlParamsOnNavigation,
   writeUrlParams: mocks.writeUrlParams,

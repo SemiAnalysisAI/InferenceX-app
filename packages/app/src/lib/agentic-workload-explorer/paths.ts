@@ -1,4 +1,4 @@
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 /** English route prefix of the Agentic Workload Explorer pages. */
 export const EXPLORER_BASE_PATH = '/agentic-workload-explorer';

@@ -4,10 +4,10 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
-import type { EvalRow } from '@/lib/api';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getFrameworkLabel } from '@/lib/utils';
+import type { EvalRow } from '@/lib/api/api';
+import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { getFrameworkLabel } from '@/lib/shared/utils';
 
 interface EvalLabelParams {
   dp?: number;

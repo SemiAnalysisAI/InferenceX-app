@@ -4,7 +4,7 @@ import type {
   ComparisonView,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 
-import { escapeHtml } from '@/lib/utils';
+import { escapeHtml } from '@/lib/shared/utils';
 
 /**
  * A slice is a set of cases that differ only in their size axis (GEMM M, MoE tokens):

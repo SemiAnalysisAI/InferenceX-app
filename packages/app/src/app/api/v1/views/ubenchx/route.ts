@@ -4,7 +4,7 @@ import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
 import { transformTpcSkylineRun } from '@/components/ubenchx/tpc-skyline-transform';
 import { UBENCHX_RUNS } from '@/components/ubenchx/ubenchx-data';
 import { transformUbenchxRun } from '@/components/ubenchx/ubenchx-transform';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import { parseEnumParam, validateParams as validateViewParams } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';

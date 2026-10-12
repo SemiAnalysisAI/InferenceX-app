@@ -143,3 +143,14 @@ Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。
+
+### CollectiveX kernel qualification / Kernel 验证情况
+
+The CollectiveX view also returns `knownSupport` and `knownSupportFootnotes` from
+the same curated source as the website, independently of selected runs. Status
+values are `works`, `broken`, and `na`; read each note to distinguish unavailable
+combinations from pending qualification. Footnotes contain both `en` and `zh`.
+
+CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网站共用人工维护
+的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
+不可用与待验证的配置。注释同时包含 `en` 和 `zh`。

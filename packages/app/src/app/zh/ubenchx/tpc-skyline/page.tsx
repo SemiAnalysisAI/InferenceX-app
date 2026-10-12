@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
 import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX：TPC Skyline';

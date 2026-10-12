@@ -6,16 +6,16 @@ import {
   type GlossaryBrowserEntry,
   type GlossaryBrowserLabels,
 } from '@/components/glossary/glossary-browser';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { getAllPosts } from '@/lib/blog';
-import { GLOSSARY_CATEGORIES } from '@/lib/glossary';
+import { getAllPosts } from '@/lib/blog/blog';
+import { GLOSSARY_CATEGORIES } from '@/lib/content/glossary';
 import {
   GLOSSARY_CATEGORY_LABELS_ZH,
   compareZhGlossaryEntries,
   getAllZhGlossaryEntries,
-} from '@/lib/glossary-zh';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/content/glossary-zh';
+import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const title = 'AI 推理术语表';

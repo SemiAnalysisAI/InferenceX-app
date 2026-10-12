@@ -41,13 +41,16 @@ import {
 } from '@/components/inference/utils/quickFilters';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import { benchmarkQueryOptions, useBenchmarks } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { remapInferencePoint } from '@/lib/chart-utils';
-import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/constants';
-import { Sequence, type Model } from '@/lib/data-mappings';
-import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+} from '@/lib/benchmarks/benchmark-run-selection';
+import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 
 export {

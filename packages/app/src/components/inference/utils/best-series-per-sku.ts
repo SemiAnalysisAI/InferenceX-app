@@ -1,6 +1,6 @@
 import { hermiteInterpolate, monotoneSlopes } from '@/components/calculator/interpolation';
 import type { InferenceData } from '@/components/inference/types';
-import { isFrontierEligible, paretoFrontForDirection } from '@/lib/chart-utils';
+import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 

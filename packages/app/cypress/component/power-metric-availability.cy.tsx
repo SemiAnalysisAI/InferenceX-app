@@ -6,7 +6,7 @@ import {
 } from '@/components/inference/ui/PowerMetricAvailability';
 import { createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
-import { Precision, Model, Sequence } from '@/lib/data-mappings';
+import { Precision, Model, Sequence } from '@/lib/catalog/data-mappings';
 
 const source = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123/attempts/2';
 const base = { model: Model.Qwen3_5, precision: Precision.FP8, run_url: source };

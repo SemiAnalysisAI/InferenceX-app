@@ -1,6 +1,11 @@
-import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
-import { text } from '@/lib/api-documentation-helpers';
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiResponse,
+  ApiSchema,
+} from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
@@ -406,7 +411,15 @@ const NEW_VIEWS = {
   collectivex: [
     'CollectiveX EP, KV and swap views',
     'CollectiveX EP、KV 与 swap 视图',
-    { runs: objects, ep: object, kv: object, swap: object, options: object },
+    {
+      runs: objects,
+      ep: object,
+      kv: object,
+      swap: object,
+      options: object,
+      knownSupport: object,
+      knownSupportFootnotes: object,
+    },
   ],
   submissions: [
     'Submission table and weekly volume',

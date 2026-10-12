@@ -1,0 +1,427 @@
+import { type ClassValue, clsx } from 'clsx';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
+
+import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from '../catalog/constants';
+
+// Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
+// built-in tracking scale (tighter…widest), so without this, e.g.
+// cn('tracking-eyebrow', 'tracking-tight') would keep both classes.
+// (text-2xs/text-3xs need no config: t-shirt sizes are recognized as font sizes.)
+const twMerge = extendTailwindMerge({
+  extend: {
+    theme: {
+      tracking: ['eyebrow', 'eyebrow-wide', 'heading'],
+    },
+  },
+});
+
+/**
+ * Combines Tailwind CSS classes and other class values into a single string.
+ * This utility helps in conditionally applying classes and merging them efficiently,
+ * especially when dealing with Tailwind's utility-first approach.
+ *
+ * @param inputs - A rest parameter of `ClassValue` types, which can be strings,
+ *                 arrays of strings, or objects where keys are class names and
+ *                 values are booleans.
+ * @returns A single string containing merged and optimized CSS class names.
+ */
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+/**
+ * Updates GitHub repo URLs from the old InferenceMAX/InferenceMAX repo
+ * to the new SemiAnalysisAI/InferenceX repo.
+ * Used for runtime fixing of URLs in loaded data.
+ *
+ * @param url - The URL to update
+ * @returns The updated URL
+ */
+export function updateRepoUrl(url: string): string {
+  return url.replaceAll(
+    /https?:\/\/github\.com\/InferenceMAX\/InferenceMAX\//gu,
+    'https://github.com/SemiAnalysisAI/InferenceX/',
+  );
+}
+
+/**
+ * Escape a string for interpolation into an HTML string.
+ *
+ * D3 tooltips are built as HTML strings and injected with `.html()`, so any
+ * value that did not originate in this codebase must be escaped on the way in.
+ * The motivating case is unofficial-run branch names: they come from the GitHub
+ * API for whatever run id the user pastes into `?unofficialrun=`, and git
+ * permits `<` and `>` in a branch name.
+ *
+ * @param value - Untrusted text to interpolate into markup
+ * @returns The text with HTML-significant characters escaped
+ */
+export function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/**
+ * Formats a number for display - returns plain string for numbers < 10000,
+ * and formatted number with commas for larger numbers.
+ *
+ * @param tickItem - The number to format
+ * @returns Formatted number as string
+ */
+export function formatNumber(tickItem: number) {
+  if (tickItem < 10000) {
+    return tickItem.toString();
+  }
+  return new Intl.NumberFormat('en-US').format(tickItem);
+}
+
+/**
+ * Calculate both cost-per-million and tokens-per-dollar values from a user-provided hourly cost.
+ * GPUs with prefixes (TRT, MTP) will inherit values from their base parent
+ */
+export function calculateCostsForGpus(
+  data: InferenceData[],
+  userCosts: Record<string, number | undefined>,
+): InferenceData[] {
+  const result = data.map((item) => {
+    const baseGpuKey = item.hwKey.toString().split('_')[0];
+    let userCostPerHour = userCosts[baseGpuKey];
+    // Check if the GPU has a direct user cost value
+
+    // If not, check if it's a prefixed GPU that should inherit from its base
+    if (userCostPerHour === undefined && item.hwKey !== baseGpuKey) {
+      userCostPerHour = userCosts[baseGpuKey];
+    }
+    if (userCostPerHour !== undefined) {
+      const tputPerGpu = item.tpPerGpu.y;
+      const millionTokensPerHour = (tputPerGpu * 3600) / 1_000_000;
+      const costPerMillion = millionTokensPerHour > 0 ? userCostPerHour / millionTokensPerHour : 0;
+      const tokensPerDollar = userCostPerHour > 0 ? (tputPerGpu * 3600) / userCostPerHour : 0;
+      const costRounded = parseFloat(costPerMillion.toFixed(3));
+      const tokensRounded = parseFloat(tokensPerDollar.toFixed(3));
+
+      return {
+        ...item,
+        y: costRounded,
+        costUser: {
+          y: costRounded,
+          roof: false,
+        },
+        tokensPerDollarUser: {
+          y: tokensRounded,
+          roof: false, // Always false for user-calculated values
+        },
+      };
+    }
+    return item;
+  });
+
+  return result;
+}
+
+/**
+ * Calculate power for each GPU using the formula
+ */
+export function calculatePowerForGpus(
+  data: InferenceData[],
+  userPowers: Record<string, number | undefined>,
+): InferenceData[] {
+  const result = data.map((item) => {
+    const baseGpuKey = item.hwKey.toString().split('_')[0];
+    let userPowerPerHour = userPowers[baseGpuKey];
+    // Check if the GPU has a direct user cost value
+
+    // If not, check if it's a prefixed GPU that should inherit from its base
+    if (userPowerPerHour === undefined && item.hwKey !== baseGpuKey) {
+      userPowerPerHour = userPowers[baseGpuKey];
+    }
+    const basePower = getGpuSpecs(baseGpuKey).power;
+    // Legacy custom-power scaling needs a registered baseline. Leave metrics
+    // absent for unregistered hardware instead of dividing by zero.
+    if (!(basePower > 0) || !item.tpPerMw) return item;
+    if (userPowerPerHour !== undefined) {
+      const powerRounded = parseFloat(((item.tpPerMw.y / basePower) * userPowerPerHour).toFixed(3));
+
+      // Return the data with powerUser property and updated y value
+      return {
+        ...item,
+        y: powerRounded, // Update the main y value for chart rendering
+        powerUser: {
+          y: powerRounded,
+          roof: false, // Always false for user-calculated values
+        },
+      };
+    }
+    return item;
+  });
+
+  return result;
+}
+export function getFrameworkLabel(framework: string) {
+  return (
+    FRAMEWORK_LABELS[framework] ??
+    framework
+      .split('-')
+      .map((word) => word.toUpperCase())
+      .join(' ')
+  );
+}
+
+export function getHardwareLabel(entry: AggDataEntry) {
+  const baseHw = entry.hw.split('-')[0];
+  let suffixes = [];
+  if (entry.framework) {
+    suffixes.push(entry.framework);
+  }
+  if (entry.mtp === 'on') {
+    suffixes.push('mtp');
+  }
+  if (entry['spec_decoding'] && entry['spec_decoding'] !== 'none') {
+    suffixes.push(entry['spec_decoding']);
+  }
+  suffixes = [...new Set(suffixes)];
+  return (
+    baseHw.toUpperCase() +
+    (suffixes.length > 0
+      ? ` (${suffixes.map((suffix) => getFrameworkLabel(suffix as string)).join(', ')})`
+      : '')
+  );
+}
+
+/**
+ * Combines a hardware config's label and suffix into a display string.
+ * Used by frontend consumers to show full GPU names (e.g., "MI355X (ATOM)").
+ */
+export function getDisplayLabel(config: { label: string; suffix?: string }): string {
+  return config.suffix ? `${config.label} ${config.suffix}` : config.label;
+}
+
+/**
+ * Computes missing output cost and tokens-per-dollar fields for historical data points.
+ * This handles backwards compatibility with historical data that doesn't have these fields.
+ *
+ * If outputTputPerGpu is not available, falls back to using the total throughput ratio.
+ */
+export function computeOutputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
+  return data.map((item) => {
+    if (
+      item.costhOutput &&
+      item.costrOutput &&
+      item.outputTokensPerDollarH &&
+      item.outputTokensPerDollarR
+    ) {
+      return item;
+    }
+
+    // Compute output cost fields from existing data
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
+
+    // Get output throughput - either from outputTputPerGpu or estimate from total throughput
+    // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
+    const outputTputPerGpu = item.outputTputPerGpu?.y ?? item.tpPerGpu.y * 0.875;
+    const outputTokensPerHour = outputTputPerGpu * 3600;
+    const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
+    const costhOutput =
+      millionOutputTokensPerHour > 0 ? specs.costh / millionOutputTokensPerHour : 0;
+    const costrOutput =
+      millionOutputTokensPerHour > 0 ? specs.costr / millionOutputTokensPerHour : 0;
+
+    return {
+      ...item,
+      costhOutput: item.costhOutput ?? {
+        y: parseFloat(costhOutput.toFixed(3)),
+        roof: false,
+      },
+      costrOutput: item.costrOutput ?? {
+        y: parseFloat(costrOutput.toFixed(3)),
+        roof: false,
+      },
+      outputTokensPerDollarH: item.outputTokensPerDollarH ?? {
+        y: specs.costh > 0 ? outputTokensPerHour / specs.costh : 0,
+        roof: false,
+      },
+      outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
+        y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
+        roof: false,
+      },
+    };
+  });
+}
+
+/**
+ * Computes missing input cost and tokens-per-dollar fields at runtime.
+ * This handles backwards compatibility with historical data that doesn't have these fields.
+ *
+ * If inputTputPerGpu is not available, falls back to using a portion of total throughput.
+ */
+/**
+ * Filters availableRuns to only include runs with changelog entries
+ * relevant to the selected model, precision(s), and GPU config(s).
+ *
+ * Changelog config-keys have format: {modelPrefix}-{precision}-{gpu}-{framework}[-{mtp}]
+ * where modelPrefix is one of the keys from MODEL_PREFIX_MAPPING (e.g. 'gptoss', 'dsr1'),
+ * precision is a lowercase value (e.g. 'fp8', 'fp4'), and gpu+framework+mtp map to hwKeys
+ * (e.g. hwKey 'mi355x_mori-sglang_mtp' → config suffix 'mi355x-mori-sglang-mtp').
+ *
+ * @param availableRuns - All runs for the selected date
+ * @param modelPrefixes - Model prefix strings from MODEL_PREFIX_MAPPING for the selected model
+ * @param selectedPrecisions - Optional list of selected precision values (e.g. ['fp8']). When
+ *   provided and non-empty, only entries whose config-key precision segment matches are kept.
+ * @param selectedGPUs - Optional list of hwKeys (e.g. ['mi355x_mori-sglang_mtp']). When
+ *   provided and non-empty, only entries whose config-key GPU+framework suffix matches are kept.
+ * @returns Filtered runs with relevant changelog entries, or null if none match
+ */
+export function filterRunsByModel(
+  availableRuns: Record<string, RunInfo> | null,
+  modelPrefixes: string[],
+  selectedPrecisions?: string[],
+  selectedGPUs?: string[],
+): Record<string, RunInfo> | null {
+  if (!availableRuns || modelPrefixes.length === 0) return availableRuns;
+
+  const filterByPrecision = selectedPrecisions && selectedPrecisions.length > 0;
+  const filterByGpu = selectedGPUs && selectedGPUs.length > 0;
+  // Convert hwKey format (underscores as separators) to config-key format (all dashes)
+  // e.g. 'mi355x_mori-sglang_mtp' → 'mi355x-mori-sglang-mtp'
+  const gpuConfigSuffixes = filterByGpu
+    ? new Set(selectedGPUs!.map((gpu) => gpu.replaceAll('_', '-')))
+    : null;
+
+  const filtered: Record<string, RunInfo> = {};
+  for (const [runId, runInfo] of Object.entries(availableRuns)) {
+    if (!runInfo.changelog) continue;
+
+    const relevantEntries = runInfo.changelog.entries.filter((entry) =>
+      entry.config_keys.some((key: string) => {
+        const parts = key.split('-');
+        const gpuSuffix = parts.slice(2).join('-');
+        return (
+          modelPrefixes.includes(parts[0]) &&
+          (!filterByPrecision || selectedPrecisions!.includes(parts[1])) &&
+          (!gpuConfigSuffixes || gpuConfigSuffixes.has(gpuSuffix))
+        );
+      }),
+    );
+
+    if (relevantEntries.length > 0) {
+      filtered[runId] = {
+        ...runInfo,
+        changelog: {
+          ...runInfo.changelog,
+          entries: relevantEntries,
+        },
+      };
+    }
+  }
+
+  if (Object.keys(filtered).length > 0) return filtered;
+
+  // No changelog matches — return all runs without changelogs so the run
+  // selector still renders (e.g. Llama has runs but no changelog entries).
+  const fallback: Record<string, RunInfo> = {};
+  for (const [runId, runInfo] of Object.entries(availableRuns)) {
+    fallback[runId] = { ...runInfo, changelog: undefined };
+  }
+  return Object.keys(fallback).length > 0 ? fallback : null;
+}
+
+/**
+ * Computes missing energy fields (jTotal, jOutput, jInput) at runtime.
+ * This handles backwards compatibility with historical data that doesn't have these fields.
+ *
+ * The calculation is: J/token = W/GPU / tok/s/gpu
+ * where W/GPU = power_kW * 1000 (convert kW to watts)
+ * Since Watt = Joule/second: W / (tok/s) = J/tok
+ */
+export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
+  return data.map((item) => {
+    // If energy fields already exist, return as-is
+    if (item.jTotal) {
+      return item;
+    }
+
+    const specs = getGpuSpecs(item.hwKey);
+    const hardwarePower = specs.power; // in kW
+    if (!(hardwarePower > 0)) return item;
+
+    const tputPerGpu = item.tpPerGpu.y;
+    const outputTputPerGpu = item.outputTputPerGpu?.y;
+    const inputTputPerGpu = item.inputTputPerGpu?.y;
+
+    // J/token = W / (tok/s) = (kW * 1000) / (tok/s)
+    const jTotal = hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0;
+
+    const result: InferenceData = {
+      ...item,
+      jTotal: { y: jTotal, roof: false },
+    };
+
+    if (outputTputPerGpu) {
+      result.jOutput = {
+        y: hardwarePower && outputTputPerGpu ? (hardwarePower * 1000) / outputTputPerGpu : 0,
+        roof: false,
+      };
+    }
+
+    if (inputTputPerGpu) {
+      result.jInput = {
+        y: hardwarePower && inputTputPerGpu ? (hardwarePower * 1000) / inputTputPerGpu : 0,
+        roof: false,
+      };
+    }
+
+    return result;
+  });
+}
+
+export function computeInputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
+  return data.map((item) => {
+    if (item.costhi && item.costri && item.inputTokensPerDollarH && item.inputTokensPerDollarR) {
+      return item;
+    }
+
+    // Compute input cost fields from existing data
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
+
+    // Get input throughput - either from inputTputPerGpu or estimate from total throughput
+    // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
+    const inputTputPerGpu = item.inputTputPerGpu?.y ?? item.tpPerGpu.y * 0.125;
+    const inputTokensPerHour = inputTputPerGpu * 3600;
+    const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
+    const costhi = millionInputTokensPerHour > 0 ? specs.costh / millionInputTokensPerHour : 0;
+    const costri = millionInputTokensPerHour > 0 ? specs.costr / millionInputTokensPerHour : 0;
+
+    return {
+      ...item,
+      costhi: item.costhi ?? {
+        y: parseFloat(costhi.toFixed(3)),
+        roof: false,
+      },
+      costri: item.costri ?? {
+        y: parseFloat(costri.toFixed(3)),
+        roof: false,
+      },
+      inputTokensPerDollarH: item.inputTokensPerDollarH ?? {
+        y: specs.costh > 0 ? inputTokensPerHour / specs.costh : 0,
+        roof: false,
+      },
+      inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
+        y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
+        roof: false,
+      },
+    };
+  });
+}

@@ -5,8 +5,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 /**
  * Tracked interactive elements for the whitepaper pages. All events use the

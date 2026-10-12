@@ -23,8 +23,8 @@ import type {
   ClientCache,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {

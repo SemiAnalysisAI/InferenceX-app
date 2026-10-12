@@ -6,7 +6,7 @@ import { SectionNav } from '@/components/agentic-workload-explorer/section-nav';
 import { SnapshotStamp } from '@/components/agentic-workload-explorer/snapshot-stamp';
 import { TraceVersionSelector } from '@/components/agentic-workload-explorer/trace-version-selector';
 import { Heading } from '@/components/ui/heading';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

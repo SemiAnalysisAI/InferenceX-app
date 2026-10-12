@@ -10,7 +10,7 @@ import {
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // ── i18n ────────────────────────────────────────────────────────
 

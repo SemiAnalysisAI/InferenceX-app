@@ -15,8 +15,8 @@ import {
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 import { formatSnapshotTime, LAST_DAY_LABEL } from '@/lib/agentic-workload-explorer/snapshot';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

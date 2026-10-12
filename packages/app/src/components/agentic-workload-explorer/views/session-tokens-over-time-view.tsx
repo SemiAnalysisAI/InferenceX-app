@@ -14,8 +14,8 @@ import { TokensOverTimeChart } from '@/components/agentic-workload-explorer/toke
 import { ContextTrajectoriesChart } from '@/components/agentic-workload-explorer/context-trajectories-chart';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

@@ -3,9 +3,9 @@
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { SM_L2_RUNS } from './sm-l2-data';
 import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';

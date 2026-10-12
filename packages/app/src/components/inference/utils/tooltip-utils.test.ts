@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   getPointLabel,
   generateTooltipContent,

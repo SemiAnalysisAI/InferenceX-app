@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   AGE_MAX_RED_DAYS,

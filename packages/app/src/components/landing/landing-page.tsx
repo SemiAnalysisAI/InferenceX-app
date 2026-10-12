@@ -2,15 +2,15 @@ import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
-import { IntroSection } from '@/components/intro-section';
+import { IntroSection } from '@/components/landing/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { CountUp } from '@/components/motion/count-up';
 import { Reveal } from '@/components/motion/reveal';
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {

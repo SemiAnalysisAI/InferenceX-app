@@ -11,7 +11,7 @@ import {
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { getFastModeMultiplier } from '@semianalysisai/inferencex-db/proxytrace/shared/pricing';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // ── i18n ────────────────────────────────────────────────────────
 

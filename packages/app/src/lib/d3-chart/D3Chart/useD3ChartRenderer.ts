@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { getDomainAwareChartWatermark } from '@/lib/unofficial-domain';
+import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 
 import {
   computeTooltipPosition,
