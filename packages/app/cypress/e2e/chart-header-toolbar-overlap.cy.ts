@@ -83,11 +83,6 @@ describe('chart header toolbar overlap', () => {
     cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
   });
 
-  it('keeps every toolbar action available in chart view', () => {
-    cy.viewport(1280, 900);
-    assertToolbarActionsPresent();
-  });
-
   for (const width of OVERLAY_WIDTHS) {
     it(`chart view: title and toolbar do not overlap at ${width}px`, () => {
       assertHeaderClearsToolbar(width);

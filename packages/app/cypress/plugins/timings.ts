@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import cypressSplit from 'cypress-split';
 
 import type { TimingObservation } from '../../src/lib/testing/cypress-timing-data';
+import { cypressSourceFingerprint } from '../../src/lib/testing/cypress-source-fingerprint';
 
 export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.PluginConfigOptions) {
   const afterRun: ((
@@ -28,6 +29,7 @@ export function setupTimingSplit(on: Cypress.PluginEvents, config: Cypress.Plugi
       revision: process.env.GITHUB_SHA ?? 'local',
       runId: process.env.GITHUB_RUN_ID ?? 'local',
       runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? '1',
+      sourceHash: cypressSourceFingerprint(config.projectRoot),
       shard: Number(process.env.SPLIT_INDEX1 ?? 1),
       shards: Number(process.env.SPLIT ?? 1),
       passed:

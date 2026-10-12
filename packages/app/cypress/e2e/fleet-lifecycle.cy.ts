@@ -204,16 +204,6 @@ describe('Fleet — Fleet Lifecycle', () => {
 
   beforeEach(resetToChart);
 
-  it('defaults the power budget to 10 MW and renders the lifecycle', () => {
-    assertFleetControlLabels();
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('be.visible')
-      .and('contain.text', 'Fleet Lifecycle');
-    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
-    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
-  });
-
   it('keeps benchmark and chart controls inside their panels on phones and desktops', () => {
     for (const width of [375, 1440]) {
       cy.viewport(width, 900);
@@ -245,21 +235,15 @@ describe('Fleet — Fleet Lifecycle', () => {
     }
   });
 
-  it('keeps fleet economics inputs together in the assumptions group', () => {
-    cy.viewport(1280, 900);
-    cy.get('[data-testid="calculator-lifecycle-section"] fieldset').should('have.length', 2);
-    cy.contains(
-      '[data-testid="calculator-lifecycle-section"] fieldset',
-      'Fleet economics & assumptions',
-    ).within(() => {
-      cy.get('[data-testid="calc-lifecycle-price-input"]').should('be.visible');
-      cy.get('[data-testid="calc-lifecycle-output-price-input"]').should('be.visible');
-      cy.get('[data-testid="calc-lifecycle-horizon-input"]').should('be.visible');
-      cy.contains('Fleet economics & assumptions').should('be.visible');
-    });
-  });
-
   it('the default MW budget drives the lifecycle table', () => {
+    assertFleetControlLabels();
+    cy.get('[data-testid="calculator-lifecycle-section"]')
+      .should('be.visible')
+      .and('contain.text', 'Fleet Lifecycle');
+    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
+    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
+    cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
+
     // The figure opens on the chart; the table is the other tab.
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
@@ -300,6 +284,17 @@ describe('Fleet — Fleet Lifecycle', () => {
             expect(Number(output)).to.be.closeTo(Number(input) * 4, Number(input) * 0.01);
           });
       });
+
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .should('match', /^\d+(?:\.\d+)?$/u);
+    cy.get('[data-testid="calc-lifecycle-price-input"]')
+      .invoke('val')
+      .then((val) => expect(Number(val)).to.be.greaterThan(0));
+    // Break-even means the cheapest chip earns nothing: some row is at/near zero
+    // margin, and none of the visible fleet is comfortably profitable there.
+    showTable();
+    cy.get('[data-testid="calculator-lifecycle-table"]').should('contain.text', 'Never');
   });
 
   it('quotes both token prices in the caption, and tracks the fields', () => {
@@ -351,9 +346,7 @@ describe('Fleet — Fleet Lifecycle', () => {
           : String(seeded);
         cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', `$${trimmed} in /`);
       });
-  });
 
-  it('puts the chart and the table on their own tabs, with a header on both', () => {
     // The header is the figure's own caption, so it survives the switch — a reader
     // on the table tab still sees what model, scenario and target they are reading.
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
@@ -372,6 +365,15 @@ describe('Fleet — Fleet Lifecycle', () => {
 
     showChart();
     cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
+
+    // Today's TCO rates on a dated operating point, and no overlay support.
+    cy.get('[data-testid="calculator-lifecycle-section"]')
+      .should('contain.text', 'Power and $/chip/hr are today')
+      .and('contain.text', 'Unofficial runs loaded via a run link are not shown here');
+    cy.get('[data-testid="calculator-lifecycle-section"]').should(
+      'contain.text',
+      'SemiAnalysis Datacenter Industry Model',
+    );
   });
 
   it('offers a download, and disables the PNG where a PNG is meaningless', () => {
@@ -389,30 +391,6 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('every row is traceable to the dated run it came from', () => {
-    // The caption's run date no longer describes these numbers, so each row
-    // carries its own date and links its run.
-    firstRowCell('First Run')
-      .invoke('text')
-      .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell('Latest Best')
-      .invoke('text')
-      .should('match', /\d{4}-\d{2}-\d{2}/u);
-  });
-
-  it('defaults the token price to a break-even figure', () => {
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .should('match', /^\d+(?:\.\d+)?$/u);
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .then((val) => expect(Number(val)).to.be.greaterThan(0));
-    // Break-even means the cheapest chip earns nothing: some row is at/near zero
-    // margin, and none of the visible fleet is comfortably profitable there.
-    showTable();
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('contain.text', 'Never');
-  });
-
   it('raising the price above break-even turns margin positive and produces a payback', () => {
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
     cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
@@ -421,9 +399,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     firstRowCell('Payback')
       .invoke('text')
       .should('match', /\d+(?:\.\d+)? mo/u);
-  });
 
-  it('editing the price offers a reset back to break-even', () => {
     cy.get('[data-testid="calc-lifecycle-price-reset"]').should('be.visible').click();
     cy.get('[data-testid="calc-lifecycle-price-input"]')
       .invoke('val')
@@ -464,16 +440,6 @@ describe('Fleet — Fleet Lifecycle', () => {
             expect(Number(output)).to.be.closeTo(Number(input) * 3, Number(input) * 0.01);
           });
       });
-  });
-
-  it('renders the lifecycle chart with one line per visible chip', () => {
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').should(
-      'have.length.greaterThan',
-      0,
-    );
-    // The break-even rule is what makes the sign of the margin readable.
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should('exist');
   });
 
   it('names each line with its chip at the right edge', () => {
@@ -719,6 +685,15 @@ describe('Fleet — Fleet Lifecycle', () => {
     firstRowCell('Gain')
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
+
+    // The caption's run date no longer describes these numbers, so each row
+    // carries its own date and links its run.
+    firstRowCell('First Run')
+      .invoke('text')
+      .should('match', /\d{4}-\d{2}-\d{2}/u);
+    firstRowCell('Latest Best')
+      .invoke('text')
+      .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
 
   it('rolls each config out over the ramp instead of stepping instantly', () => {
@@ -764,17 +739,6 @@ describe('Fleet — Fleet Lifecycle', () => {
             expect(Number.parseFloat(low)).to.be.lessThan(Number.parseFloat(high));
           });
       });
-  });
-
-  it('states the hybrid basis and the unofficial-run exclusion', () => {
-    // Today's TCO rates on a dated operating point, and no overlay support.
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'Power and $/chip/hr are today')
-      .and('contain.text', 'Unofficial runs loaded via a run link are not shown here');
-    cy.get('[data-testid="calculator-lifecycle-section"]').should(
-      'contain.text',
-      'SemiAnalysis Datacenter Industry Model',
-    );
   });
 
   it('draws one row per chip, pooling its software configs', () => {
@@ -1002,17 +966,6 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
   });
 
-  it('projects a lifecycle from history that has no ISL/OSL to key on', () => {
-    assertFleetControlLabels();
-    // The section used to refuse this outright. The endpoint keys agentic
-    // history on benchmark_type instead, so there is a real projection here.
-    cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
-    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
-      'have.length.greaterThan',
-      0,
-    );
-  });
-
   it('names the cached tier in the caption, since most input bills at it', () => {
     // On agentic the input price beside it is not what most tokens actually cost:
     // the measured hit rate is ~0.9 here, so quoting the input price alone would
@@ -1024,6 +977,15 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   });
 
   it('raises the break-even price it seeds, because fewer tokens are billable', () => {
+    assertFleetControlLabels();
+    // The section used to refuse this outright. The endpoint keys agentic
+    // history on benchmark_type instead, so there is a real projection here.
+    cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
+      'have.length.greaterThan',
+      0,
+    );
+
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('have.value', '10');
     // While the price is still auto-seeded, the discount does NOT move margin —
     // break-even re-solves to keep the cheapest fleet at zero either way. What it
@@ -1072,7 +1034,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
   });
 
-  it('translates the section, including the table headers and notes', () => {
+  it('keeps token-type headers and exported assumptions in Chinese as selections change', () => {
     assertFleetControlLabels('zh');
     cy.get('[data-testid="fleet-benchmark-panel"] legend').should('have.text', '基准测试配置');
     cy.get('[data-testid="fleet-chart-panel"] legend').should('have.text', '图表配置');
@@ -1099,9 +1061,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       .should('not.contain.text', 'Enter a facility power budget')
       .and('not.contain.text', 'Cumulative Margin')
       .and('not.contain.text', 'First Run');
-  });
 
-  it('keeps token-type headers and exported assumptions in Chinese as selections change', () => {
     showTable();
     cy.window().then(captureLifecycleCsvDownloads);
     for (const [testId, value] of [

@@ -1,5 +1,9 @@
 # Testing
 
+The [October 2026 E2E audit](testing/e2e-usefulness-audit-2026-10.md) records
+per-test usefulness rankings, the 25% standalone-case reduction, and the
+validated browser-specific timing refresh procedure.
+
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
@@ -47,23 +51,18 @@ The local `bun run test:e2e` command is a curated smoke suite across the core pa
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus eight integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
-`packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. When deleting specs, remove only their entries and preserve the remaining observed timings. Regenerate the baseline from an observed full integration run when specs are added or materially rebalanced; do not invent durations.
+`packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
+and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome
+component baseline. Their unit guard requires one positive duration for every
+current spec and rejects removed entries.
 
-With an `E2E_FIXTURES=1` app server running on port 3000, run this from the repository root:
-
-```bash
-E2E_FIXTURES=1 \
-  SPLIT=1 \
-  SPLIT_INDEX1=1 \
-  SPLIT_FILE=timings.json \
-  SPLIT_OUTPUT_FILE=timings.json \
-  SPLIT_SUMMARY=false \
-  bun run --cwd packages/app test:e2e:integration
-```
-
-`SPLIT=1` intentionally runs every spec in one chunk so one process records the complete baseline. CI uses `SPLIT=8` for integration shards and `SPLIT=4` for component shards, only for parallel execution, and writes each shard's timing output to a throwaway file.
-
-`packages/app/component-timings.json` is the matching baseline for component specs, guarded the same way. Component durations include each spec's webpack bundling, so they track wall time rather than only test time. Regenerate it with the same `SPLIT=1` variables, `SPLIT_FILE=component-timings.json` and `SPLIT_OUTPUT_FILE=component-timings.json`, and `bun run --cwd packages/app test:e2e:component`; no app server is needed.
+CI uploads raw per-shard, per-test observations and validates the complete
+20-shard matrix before publishing `cypress-timing-baselines`. Refresh all
+three baselines with the [documented artifact procedure](testing/e2e-usefulness-audit-2026-10.md#timing-evidence-and-sharding).
+Do not invent timings or treat the plugin's merged output as a fresh full
+measurement. Spec durations are Cypress's reported execution durations, not
+whole-job wall time; checkout, dependency installation, and application build
+time are not included.
 
 `E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
 

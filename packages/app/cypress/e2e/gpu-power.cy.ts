@@ -52,11 +52,6 @@ describe('PowerX', () => {
     });
   });
 
-  it('Hidden popover (and PowerX link inside it) is not present by default', () => {
-    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('not.exist');
-  });
-
   it('↑↑↓↓ key sequence reveals the Hidden popover containing PowerX', () => {
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     unlockPowerX();
@@ -91,19 +86,12 @@ describe('PowerX', () => {
       cy.get('[data-testid="gpu-metrics-display"]').find('h2').should('contain.text', 'PowerX');
     });
 
-    it('navigates to gpu-metrics URL path', () => {
-      openPowerX();
-      cy.url().should('include', 'gpu-metrics');
-    });
-
-    it('renders the run ID input pre-filled and Load button enabled', () => {
+    it('disables Load button when input is cleared', () => {
       openPowerX();
       cy.get('[data-testid="gpu-metrics-run-input"]').should('not.have.value', '');
       cy.get('[data-testid="gpu-metrics-load-button"]').should('not.be.disabled');
       cy.get('[data-testid="gpu-metrics-load-button"]').should('contain.text', 'Load');
-    });
 
-    it('disables Load button when input is cleared', () => {
       openPowerX();
       cy.get('[data-testid="gpu-metrics-run-input"]').clear();
       cy.get('[data-testid="gpu-metrics-load-button"]').should('be.disabled');

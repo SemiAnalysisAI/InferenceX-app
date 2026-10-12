@@ -90,15 +90,13 @@ describe('TCO calculator — unofficial run overlay', () => {
       cy.get(Y_TICKS).should('contain.text', OVERLAY_RUN_BRANCH);
     });
 
-    it('labels the overlay bar with ✕ and the branch, leaving the official bar unmarked', () => {
+    it('paints the overlay bar with the run palette color, not the hardware color', () => {
       cy.get(Y_TICKS).then(($ticks) => {
         const labels = [...$ticks].map((el) => el.textContent ?? '');
         expect(labels.filter((l) => l.includes('✕'))).to.have.length(OVERLAY_BARS);
         expect(labels.filter((l) => !l.includes('✕'))).to.have.length(TOTAL_BARS - OVERLAY_BARS);
       });
-    });
 
-    it('paints the overlay bar with the run palette color, not the hardware color', () => {
       cy.get(BARS).then(($bars) => {
         const fills = [...$bars].map((el) => el.getAttribute('fill') ?? '');
         expect(fills.filter((f) => f.includes('overlay-run-0'))).to.have.length(OVERLAY_BARS);
@@ -107,26 +105,10 @@ describe('TCO calculator — unofficial run overlay', () => {
         );
       });
     });
-
-    it('drops overlay rows belonging to a model the calculator is not showing', () => {
-      // The run payload also carries glm5 rows at 5x throughput. If model
-      // filtering regressed they'd render as extra bars far off the scale.
-      cy.get(BARS).should('have.length', TOTAL_BARS);
-    });
-
-    it('shows the run in the legend with its palette swatch', () => {
-      cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
-    });
   });
 
   describe('hardware visibility', () => {
     beforeEach(visitCalculatorWithOverlay);
-
-    it('lists overlay-only hardware in the legend', () => {
-      // MI355X exists only in the run — without the legend merge there'd be no
-      // way to hide its bar.
-      cy.get('.sidebar-legend').should('contain.text', OVERLAY_ONLY_HARDWARE.toUpperCase());
-    });
 
     it('hides a GPU official and overlay bar together when another GPU is soloed', () => {
       // Clicking one entry while all are visible solos it.

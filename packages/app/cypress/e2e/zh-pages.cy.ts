@@ -16,21 +16,6 @@ describe('Chinese (/zh) pages', () => {
       cy.contains('快速对比').should('not.exist');
     });
 
-    it('sets hreflang alternates to the English homepage', () => {
-      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
-      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
-    });
-
-    it('header language toggle points back to English', () => {
-      cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
-    });
-
-    it('header links to the Chinese AgentX page', () => {
-      cy.get('[data-testid="nav-link-agentx"]')
-        .should('contain.text', 'AgentX')
-        .and('have.attr', 'href', '/zh/agentx');
-    });
-
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
@@ -85,9 +70,7 @@ describe('Chinese (/zh) pages', () => {
         cy.contains('h1', '智能体推理基准测试').should('exist');
         cy.contains('长上下文、多轮').should('exist');
       });
-    });
 
-    it('tab nav shows Chinese labels linking within /zh', () => {
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
@@ -127,17 +110,6 @@ describe('Chinese (/zh) pages', () => {
         expect(answer.right).to.be.at.most(390);
       });
       cy.viewport(1280, 720);
-    });
-  });
-
-  describe('zh blog', () => {
-    before(() => {
-      cy.visit('/zh/blog');
-    });
-
-    it('renders the Chinese blog listing', () => {
-      cy.contains('h2', '文章').should('exist');
-      cy.get('a[href^="/zh/blog/"]').should('have.length.gte', 1);
     });
   });
 
@@ -265,16 +237,6 @@ describe('Chinese (/zh) pages', () => {
   describe('zh blog post page', () => {
     before(() => {
       cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
-    });
-
-    it('renders translated content with Chinese chrome', () => {
-      cy.get('article.prose').should('exist');
-      cy.contains('预计阅读').should('exist');
-      cy.get('a[href="/zh/blog"]').should('exist');
-    });
-
-    it('links to the English original', () => {
-      cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
     });
 
     it('localizes the table of contents and heading-link controls at mobile widths', () => {

@@ -225,17 +225,6 @@ describe('Agentic point coach mark', () => {
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
   });
 
-  it('is dismissable from the keyboard', () => {
-    visitAgenticChart();
-    cy.get(COACH_MARK).should('be.visible');
-
-    cy.get('body').type('{esc}');
-    cy.get(COACH_MARK).should('not.exist');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem(STORAGE_KEY)).to.eq('1');
-    });
-  });
-
   it('never anchors to an unofficial-run overlay marker', () => {
     // Overlay runs have no stored trace, so their tooltip offers no
     // "View charts" link — anchoring there would teach a dead end.
@@ -264,15 +253,6 @@ describe('Agentic point coach mark', () => {
     });
   });
 
-  it('does not appear on the agentic detail page it links to', () => {
-    cy.visit('/inference/agentic/206885', {
-      onBeforeLoad: freshCoachMarkState,
-      failOnStatusCode: false,
-    });
-    cy.wait(2000);
-    cy.get(COACH_MARK).should('not.exist');
-  });
-
   it('renders Simplified Chinese copy on /zh', () => {
     visitAgenticChart('/zh/inference?i_seq=agentic-traces');
 
@@ -285,5 +265,11 @@ describe('Agentic point coach mark', () => {
       'aria-label',
       '关闭提示',
     );
+
+    cy.get('body').type('{esc}');
+    cy.get(COACH_MARK).should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(STORAGE_KEY)).to.eq('1');
+    });
   });
 });

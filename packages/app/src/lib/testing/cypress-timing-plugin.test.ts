@@ -11,6 +11,9 @@ vi.mock('cypress-split', () => ({
     on('before:run', () => {});
   },
 }));
+vi.mock('./cypress-source-fingerprint', () => ({
+  cypressSourceFingerprint: () => 'current-source',
+}));
 
 import { setupTimingSplit } from '../../../cypress/plugins/timings';
 
@@ -77,6 +80,7 @@ describe('Cypress timing event integration', () => {
       revision: 'revision',
       runId: 'run',
       runAttempt: '2',
+      sourceHash: 'current-source',
       shards: 8,
       shard: 3,
       passed: true,

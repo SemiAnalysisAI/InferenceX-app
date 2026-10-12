@@ -6,8 +6,10 @@ import {
   timingBalance,
   type TimingObservation,
 } from '../src/lib/testing/cypress-timing-data';
+import { cypressSourceFingerprint } from '../src/lib/testing/cypress-source-fingerprint';
 
 const app = resolve(import.meta.dirname, '..');
+const sourceHash = cypressSourceFingerprint(app);
 const input = process.argv[2];
 if (!input) throw new Error('Usage: bun scripts/refresh-cypress-timings.ts <artifact-directory>');
 const observations = globSync('**/*.json', { cwd: resolve(input) }).map(
@@ -36,9 +38,15 @@ const baselines = groups.map((group) => {
   const baseline = mergeTimingObservations(
     observations.filter(({ kind, browser }) => kind === group.kind && browser === group.browser),
     specs,
-    group,
+    { ...group, sourceHash },
   );
-  return { group, baseline, balance: timingBalance(baseline.durations, group.shards) };
+  const balance = timingBalance(baseline.durations, group.shards);
+  if (balance.overheadAboveLowerBound > 0.1) {
+    throw new Error(
+      `${group.kind}/${group.browser} packing is more than 10% above its lower bound`,
+    );
+  }
+  return { group, baseline, balance };
 });
 for (const { group, baseline } of baselines) {
   writeFileSync(resolve(app, group.output), `${JSON.stringify(baseline, null, 2)}\n`);

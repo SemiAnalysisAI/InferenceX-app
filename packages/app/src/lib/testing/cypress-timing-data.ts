@@ -13,6 +13,7 @@ export interface TimingObservation {
   revision: string;
   runId: string;
   runAttempt: string;
+  sourceHash: string;
   shard: number;
   shards: number;
   passed: boolean;
@@ -35,11 +36,11 @@ export function validateTimings(durations: SpecTiming[], specs: string[]): void 
 export function mergeTimingObservations(
   observations: TimingObservation[],
   specs: string[],
-  expected: Pick<TimingObservation, 'kind' | 'browser' | 'shards'>,
+  expected: Pick<TimingObservation, 'kind' | 'browser' | 'shards' | 'sourceHash'>,
 ) {
   if (observations.length !== expected.shards) throw new Error('Incomplete shard set');
   const first = observations[0];
-  if (!first?.revision || !first.runId || !first.runAttempt) {
+  if (!first?.revision || !first.runId || !first.runAttempt || !expected.sourceHash) {
     throw new Error('Missing timing provenance');
   }
   const seen = new Set<number>();
@@ -52,7 +53,8 @@ export function mergeTimingObservations(
       observation.shards !== expected.shards ||
       observation.revision !== first.revision ||
       observation.runId !== first.runId ||
-      observation.runAttempt !== first.runAttempt
+      observation.runAttempt !== first.runAttempt ||
+      observation.sourceHash !== expected.sourceHash
     ) {
       throw new Error('Failed, incompatible, or mixed-run timing observations');
     }
@@ -71,7 +73,7 @@ export function mergeTimingObservations(
       for (const test of tests) {
         const title = JSON.stringify(test.title);
         if (
-          !test.title.length ||
+          test.title.length === 0 ||
           !test.title.every((part) => typeof part === 'string' && part.length > 0) ||
           titles.has(title) ||
           !Number.isFinite(test.duration) ||
@@ -95,6 +97,7 @@ export function mergeTimingObservations(
       browser: first.browser,
       kind: first.kind,
       shards: first.shards,
+      sourceHash: first.sourceHash,
     },
     durations: durations.sort((a, b) => a.spec.localeCompare(b.spec)),
   };

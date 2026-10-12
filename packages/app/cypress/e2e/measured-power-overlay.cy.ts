@@ -52,9 +52,7 @@ describe('Measured power on unofficial-run overlay', () => {
     // (overlay points typically render as triangles). Existence is enough —
     // visual correctness is reviewed in the screenshot.
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
-  });
 
-  it('switches to Measured Joules per Output Token without errors', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
       .scrollIntoView()

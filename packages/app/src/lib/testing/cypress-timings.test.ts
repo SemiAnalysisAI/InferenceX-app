@@ -55,12 +55,18 @@ const observation = (shard: number, spec: string, duration: number): TimingObser
   revision: 'abc',
   runId: '123',
   runAttempt: '1',
+  sourceHash: 'current-source',
   shard,
   shards: 2,
   passed: true,
   durations: [{ spec, duration, tests: [{ title: ['suite', spec], duration: 1, attempts: 1 }] }],
 });
-const expected = { kind: 'e2e', browser: 'chrome', shards: 2 } as const;
+const expected = {
+  kind: 'e2e',
+  browser: 'chrome',
+  shards: 2,
+  sourceHash: 'current-source',
+} as const;
 
 describe('observed timing refresh', () => {
   it('merges every measured spec with per-test observations and provenance', () => {
@@ -89,6 +95,7 @@ describe('observed timing refresh', () => {
     ['mixed revisions', { revision: 'def' }],
     ['mixed runs', { runId: '456' }],
     ['mixed attempts', { runAttempt: '2' }],
+    ['outdated source tree', { sourceHash: 'old-source' }],
     ['wrong shard count', { shards: 3 }],
     ['duplicate shard', { shard: 1 }],
     ['out-of-range shard', { shard: 3 }],

@@ -126,6 +126,13 @@ describe('CollectiveX neutral run view', () => {
         'href',
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
       );
+
+    installRuns();
+    installRun();
+    openCollectiveX();
+    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
+    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 
   it('keeps loading bounded discovery batches until every run is listed', () => {
@@ -154,13 +161,6 @@ describe('CollectiveX neutral run view', () => {
     cy.then(() => expect(requests).to.be.gte(2));
   });
 
-  it('renders the default decode round-trip chart for the EP8 scale-up series', () => {
-    cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'Round trip (measured) · decode · p99')
-      .and('contain.text', 'deepep-v2');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
-
   it('only exposes dimensions that vary in the current matrix', () => {
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
@@ -173,6 +173,11 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('selects the EP16 series through the identity controls', () => {
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', 'Round trip (measured) · decode · p99')
+      .and('contain.text', 'deepep-v2');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP16').click();
 
@@ -180,17 +185,6 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'mori')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
-
-  it('places the chart filters before the explorer chart', () => {
-    cy.get('[data-testid="collectivex-chart-filters"]').should('be.visible');
-    cy.get('[data-testid="collectivex-chart-filters"]').then(($filters) => {
-      cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
-        expect(
-          $filters[0].compareDocumentPosition($chart[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).to.be.greaterThan(0);
-      });
-    });
   });
 
   it('renders an nccl-ep backend series end to end', () => {
@@ -211,9 +205,7 @@ describe('CollectiveX neutral run view', () => {
     cy.contains('[role="option"]', 'Payload bandwidth').click();
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'Payload bandwidth');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
 
-  it('labels the activation-data rate footnote with the selected metric', () => {
     cy.get('[data-testid="collectivex-y-axis-select"]').click();
     cy.contains('[role="option"]', 'Activation-data rate').click();
     cy.get('[data-testid="collectivex-main-chart"]')
@@ -531,9 +523,7 @@ describe('CollectiveX neutral run view', () => {
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"] [data-testid="collectivex-known-na"]',
     ).should('exist');
     cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
-  });
 
-  it('keeps the known-support matrix visible with no runs selected', () => {
     cy.get(`[data-testid="collectivex-run-visible-${dataset.run.run_id}"]`).uncheck();
     cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
     cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
@@ -1035,15 +1025,6 @@ describe('CollectiveX kv-transfer card', () => {
       .should('contain.text', '分页行按随机块表')
       .and('contain.text', '个用例 · 已测')
       .and('contain.text', '批大小');
-  });
-
-  it('renders no kv card and no KV suite badge for an EP-only run', () => {
-    installRuns();
-    installRun();
-    openCollectiveX();
-    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
-    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
-    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 });
 
