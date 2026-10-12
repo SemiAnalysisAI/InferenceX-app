@@ -68,7 +68,7 @@ describe('Inference Replay', () => {
 
   it('advances the date overlay and scrubber when Play is pressed', () => {
     // The committed fixture has multiple dates; loading cannot count as a pass.
-    cy.get('[data-testid="replay-play-pause"]').should('be.visible');
+    cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
     // Rewind first: earlier tests in this file (and failed retry attempts —
     // testIsolation is off) leave the playhead wherever they stopped, and a
     // playhead at the end would turn Play into a restart-from-zero whose
