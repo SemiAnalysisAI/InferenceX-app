@@ -93,19 +93,16 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's low-latency kernel asserts on AMD CU counts (kNumMaxTopK+1 exceeds the warp-group budget) — an upstream kernel limitation, not an integration gap.",
     zh: 'UCCL 低延迟 Kernel 在 AMD 的 CU 数量下触发断言（kNumMaxTopK+1 超出 warp 组预算），为上游 Kernel 限制而非集成问题。',
   },
+  // B300 throughput EP16 verification confirmed by the maintainer on 2026-10-13.
   // Qualification source: InferenceX 20c8fba9, collectivex/README.md (2026-10-13).
   // https://github.com/SemiAnalysisAI/InferenceX/blob/20c8fba9eabd41f7e0b49aada0d1c147a180e7fc/collectivex/README.md
   'nccl-v02-gin': {
-    en: 'NCCL EP v0.2 fixes the v0.1 cross-node GIN failure. Throughput EP16 has been revalidated on B200, H100 and H200; GB200/GB300 use MNNVL. Qualification is BF16 only.',
-    zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
+    en: 'NCCL EP v0.2 fixes the v0.1 cross-node GIN failure. Throughput EP16 has been revalidated on B200, B300, H100 and H200; GB200/GB300 use MNNVL. Qualification is BF16 only.',
+    zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、B300、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
   },
   'nccl-v02-ll': {
     en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 enabled on B200/GB200/GB300. The full decode ladder is restored; qualification is BF16 only.',
     zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试梯度已恢复；当前仅验证 BF16。',
-  },
-  'nccl-b300-revalidation': {
-    en: 'NCCL EP v0.2 removes the previous GIN blocker and enables throughput EP16 on B300, but this pool still awaits revalidation; it is not yet marked qualified.',
-    zh: 'NCCL EP v0.2 已消除此前的 GIN 阻碍，并在 B300 上启用吞吐量 EP16，但该集群仍待复验，暂不标记为已验证可用。',
   },
   'nccl-ll-ep16-not-enabled': {
     en: 'NCCL EP low-latency EP16 is not enabled on this pool; it is enabled on B200/GB200/GB300 with v0.2.',
@@ -184,7 +181,7 @@ const NORMAL: KnownMatrix = {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(works, na('nccl-b300-revalidation')),
+    'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
   gb200: {

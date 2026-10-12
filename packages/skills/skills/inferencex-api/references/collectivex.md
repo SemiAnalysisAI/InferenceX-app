@@ -238,10 +238,10 @@ returned snapshots and state that no new benchmarks were run.
 `ep8`/`ep16`, each with `status` and optional `note`) and `knownSupportFootnotes`
 (note id → English `en` and Chinese `zh` text), shared with the website. These are
 curated fleet qualifications, independent of selected runs, not new measurements.
-Read the notes: NCCL EP v0.2 fixes the old GIN and low-latency fence blockers, but
-B300 throughput EP16 still awaits revalidation. NCCL EP qualification is BF16 only.
+Read the notes: NCCL EP v0.2 fixes the old GIN and low-latency fence blockers.
+B300 throughput EP16 is verified too. NCCL EP qualification is BF16 only.
 
 此接口的 `knownSupport` 与网站共用支持矩阵，`knownSupportFootnotes` 提供中英文注释。
 这些是人工维护的集群验证结论，不受所选运行影响，也不代表新增测量结果。
-NCCL EP v0.2 已修复旧版 GIN 和低延迟栅栏问题，但 B300 吞吐量 EP16 仍待复验；
+NCCL EP v0.2 已修复旧版 GIN 和低延迟栅栏问题，B300 吞吐量 EP16 也已验证通过；
 NCCL EP 当前仅验证 BF16。
