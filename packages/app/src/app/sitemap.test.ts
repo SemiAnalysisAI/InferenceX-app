@@ -48,6 +48,17 @@ import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import sitemap from './sitemap';
 
 describe('sitemap locale parity', () => {
+  it('includes the shareable AgentX quickstart in both languages', async () => {
+    const entries = await sitemap();
+    for (const path of ['/agentx/quickstart', '/zh/agentx/quickstart']) {
+      const entry = entries.find((item) => item.url === `${SITE_URL}${path}`);
+      expect(entry?.alternates?.languages).toMatchObject({
+        en: `${SITE_URL}/agentx/quickstart`,
+        'zh-CN': `${SITE_URL}/zh/agentx/quickstart`,
+      });
+    }
+  });
+
   beforeEach(() => {
     mocks.fixturesMode = false;
     vi.clearAllMocks();
