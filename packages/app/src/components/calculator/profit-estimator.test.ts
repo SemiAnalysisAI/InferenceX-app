@@ -393,9 +393,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4 Pro on 35 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
-    expect(defaults.interactivity).toBe(24);
+    expect(defaults.interactivity).toBe(35);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',

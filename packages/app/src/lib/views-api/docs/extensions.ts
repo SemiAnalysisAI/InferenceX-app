@@ -63,8 +63,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',

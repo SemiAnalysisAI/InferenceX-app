@@ -1137,15 +1137,19 @@ and the two can be collapsed into one once both are on master.
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
   H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
   GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on 20%; Kimi K3
-  opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user,
-  the speed DeepSeek's own API serves at, DeepSeek's peak-hour list price for
+  opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 35 tok/s/user,
+  an editable operating assumption chosen on 2026-10-13 using the early-October
+  [OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
+  as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
+  These unweighted P50 summaries are not a measured P90-equivalent target.
+  It retains DeepSeek's peak-hour list price for
   `deepseek-v4-pro-0813` ($1.32 input / $0.044 cached / $3.96 output per M tok;
   the off-peak rate is half that, and the OpenRouter aggregate sits below both),
-  and a 0% model license fee, since the weights ship under the MIT license. At 24
-  tok/s/user the B200, B300, and MI355X agentic curves are priced; the
-  GB200, GB300, and H200 curves bottom out above it (their lowest measured
-  points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
-  a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,
+  and a 0% model license fee, since the weights ship under the MIT license.
+  Curves that do not bracket the selected target remain unpriced.
+  Both profit views, their English/Chinese pages, and their read-only APIs
+  share this default; explicit user targets remain unchanged.
+  DeepSeek V4.1 Flash opens on 125 tok/s/user,
   the speed DeepSeek's own API serves the Flash tier at, DeepSeek's peak-hour
   list price for `deepseek-flash` ($0.30 input / $0.006 cached / $1.20 output
   per M tok; off-peak is half that), and a 0% model license fee, since the

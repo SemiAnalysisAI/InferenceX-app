@@ -54,6 +54,17 @@ https://inferencex.semianalysis.com/api/v1/views/first-token?model=DeepSeek-V4-P
 https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek-V4-Pro&priceSource=custom&inputPrice=1&cachedInputPrice=0.1&outputPrice=1
 ```
 
+## Profit estimator defaults
+
+Both profit views default DeepSeek V4 Pro to `target=35` tok/s/user when
+`target` is omitted, matching the English and Chinese dashboards. Explicit
+targets still override the default; list pricing and the 0% model license fee
+are unchanged. The 2026-10-13 choice uses the early-October
+[OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
+as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
+Treat 35 as an editable operating assumption, not a traffic-weighted mean or
+an OpenRouter P90-equivalent measurement.
+
 ## Staged-run Pareto links
 
 A `/stage-results` response contains one chart link per ingested model, workload,
