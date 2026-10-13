@@ -129,12 +129,10 @@ describe('Dataset distribution percentiles', () => {
     }
   });
 
-  it('shows median and mean model requests per conversation', () => {
+  it('summarizes subagents per trace instead of charting group counts', () => {
     cy.contains('dt', 'Median requests / convo').next('dd').should('have.text', '12');
     cy.contains('dt', 'Mean requests / convo').next('dd').should('have.text', '14.6');
-  });
 
-  it('summarizes subagents per trace instead of charting group counts', () => {
     cy.contains('dt', 'Median subagents / trace').next('dd').should('have.text', '3');
     cy.contains('dt', 'Mean subagents / trace').next('dd').should('have.text', '4.8');
     cy.contains('Subagent groups per conversation').should('not.exist');

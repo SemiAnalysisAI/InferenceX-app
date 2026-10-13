@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { configSegmentLabel, parallelismLabel } from './parallelism-label';
 
 describe('configSegmentLabel', () => {
+  it('labels weight-data parallelism separately from tensor and expert parallelism', () => {
+    expect(configSegmentLabel(1, 1, false, 1, 1, 1, undefined, 8)).toBe('DWDP8');
+    expect(configSegmentLabel(1, 1, false, 1, 1, 1, undefined, 1)).toBe('TP1');
+  });
   it('collapses symmetric tp===ep to TEP / DEP by dp-attention', () => {
     expect(configSegmentLabel(8, 8, false)).toBe('TEP8');
     expect(configSegmentLabel(8, 8, true)).toBe('DEP8');
@@ -45,6 +49,23 @@ describe('configSegmentLabel', () => {
 });
 
 describe('parallelismLabel', () => {
+  it('labels each DWDP group once and preserves the decode topology', () => {
+    expect(
+      parallelismLabel({
+        tp: 24,
+        disagg: true,
+        isMultinode: true,
+        prefillTp: 1,
+        prefillEp: 1,
+        prefillDwdp: 8,
+        prefillNumWorkers: 2,
+        decodeTp: 8,
+        decodeEp: 8,
+        decodeDpAttention: true,
+        decodeNumWorkers: 1,
+      }),
+    ).toBe('2xDWDP8+1xDEP8');
+  });
   it('falls back to bare tp when no ep data', () => {
     expect(parallelismLabel({ tp: 8 })).toBe('8');
   });

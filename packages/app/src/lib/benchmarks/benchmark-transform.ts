@@ -305,6 +305,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     prefill_dcp_size: m.prefill_dcp_size ?? m.dcp_size,
     decode_dcp_size: m.decode_dcp_size ?? m.dcp_size,
     prefill_pcp_size: m.prefill_pcp_size ?? m.pcp_size,
+    prefill_dwdp_size: m.prefill_dwdp_size,
     decode_pcp_size: m.decode_pcp_size ?? m.pcp_size,
     decode_dp_attention: row.disagg ? row.decode_dp_attention : aggregateDpAttention,
     decode_num_workers: row.decode_num_workers,

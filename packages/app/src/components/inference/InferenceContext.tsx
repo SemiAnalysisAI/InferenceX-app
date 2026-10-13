@@ -777,7 +777,6 @@ export function InferenceProvider({
     selectedPercentile,
     compareGpuPair ?? null,
     benchmarkRunId,
-    effectiveSelectedRunId ? String(effectiveSelectedRunId) : undefined,
     selectedXAxisMode,
     asOfRunId,
     dataQuickFilters,

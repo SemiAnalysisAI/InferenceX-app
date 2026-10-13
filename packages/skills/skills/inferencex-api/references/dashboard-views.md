@@ -46,6 +46,42 @@ https://inferencex.semianalysis.com/api/v1/views/first-token?model=DeepSeek-V4-P
 https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek-V4-Pro&priceSource=custom&inputPrice=1&cachedInputPrice=0.1&outputPrice=1
 ```
 
+## Staged-run Pareto links
+
+A `/stage-results` response contains one chart link per ingested model, workload,
+precision and hardware/framework line. Follow its complete query string: the
+run date alone does not identify that line. Dashboard links combine
+`i_dates=YYYY-MM-DD~rRUN_ID` with `i_gpus`, `g_model`, `i_seq` and `i_prec`.
+`RUN_ID` is the GitHub Actions run ID, not an internal `workflow_run_id`.
+Agentic lines may combine speculative methods and parallelism settings; do not
+split those points into separate lines merely because their recipes differ.
+
+For the corresponding read-only `inference` view, retain the link's deployment
+origin and translate its selectors as follows:
+
+| Chart parameter         | Inference view parameter |
+| ----------------------- | ------------------------ |
+| `g_model`               | `model`                  |
+| `i_seq`                 | `sequence`               |
+| `i_prec`                | `precisions`             |
+| `i_gpus`                | `gpus`                   |
+| `i_dates`               | `dates`                  |
+| `i_metric=y_tpPerGpu`   | `metric=tpPerGpu`        |
+| `i_xmode=interactivity` | `xmode=interactivity`    |
+
+Use `optimal=true&best=false` to retain the selected line's Pareto points.
+Read the `comparisons` item whose `entry` equals the requested
+`YYYY-MM-DD~rRUN_ID`; the response's top-level `series` has its own primary selection.
+Alternatively, use `runId=RUN_ID` with the same model/workload/precision/hardware
+selectors to request that exact snapshot in the top-level `series`.
+
+A run-qualified comparison stays present even when `runId` selects that same
+run as the primary series. Each comparison is independently evaluated; it is not
+replaced with a date-wide merged curve. An append-only run's snapshot can include
+carried-forward points, whose producer identity must remain intact. Do not move
+a staging link to production and assume that its unpublished run is available
+there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
+
 ## View selection
 
 All paths below are relative to `/api/v1/views/`. The maintained exhaustive

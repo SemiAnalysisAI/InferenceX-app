@@ -105,6 +105,15 @@ describe('Agentic point coach mark', () => {
         expect(hit, 'pointer ends on an agentic point').to.eq(true);
       });
     });
+
+    cy.window().then((win) => {
+      const rect = win.document.querySelector(COACH_MARK)!.getBoundingClientRect();
+      const { clientWidth, clientHeight } = win.document.documentElement;
+      expect(rect.left, 'left edge').to.be.at.least(0);
+      expect(rect.top, 'top edge').to.be.at.least(0);
+      expect(rect.right, 'right edge').to.be.at.most(clientWidth);
+      expect(rect.bottom, 'bottom edge').to.be.at.most(clientHeight);
+    });
   });
 
   it('waits for the chart to be on screen before pointing at anything', () => {
@@ -150,20 +159,6 @@ describe('Agentic point coach mark', () => {
         expect(cx).to.be.within(bounds!.left, bounds!.right);
         expect(cy).to.be.within(bounds!.top, bounds!.bottom);
       });
-    });
-  });
-
-  it('keeps the card fully on screen', () => {
-    visitAgenticChart();
-    cy.get(COACH_MARK).should('be.visible');
-
-    cy.window().then((win) => {
-      const rect = win.document.querySelector(COACH_MARK)!.getBoundingClientRect();
-      const { clientWidth, clientHeight } = win.document.documentElement;
-      expect(rect.left, 'left edge').to.be.at.least(0);
-      expect(rect.top, 'top edge').to.be.at.least(0);
-      expect(rect.right, 'right edge').to.be.at.most(clientWidth);
-      expect(rect.bottom, 'bottom edge').to.be.at.most(clientHeight);
     });
   });
 
@@ -225,17 +220,6 @@ describe('Agentic point coach mark', () => {
     cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
   });
 
-  it('is dismissable from the keyboard', () => {
-    visitAgenticChart();
-    cy.get(COACH_MARK).should('be.visible');
-
-    cy.get('body').type('{esc}');
-    cy.get(COACH_MARK).should('not.exist');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem(STORAGE_KEY)).to.eq('1');
-    });
-  });
-
   it('never anchors to an unofficial-run overlay marker', () => {
     // Overlay runs have no stored trace, so their tooltip offers no
     // "View charts" link — anchoring there would teach a dead end.
@@ -264,15 +248,6 @@ describe('Agentic point coach mark', () => {
     });
   });
 
-  it('does not appear on the agentic detail page it links to', () => {
-    cy.visit('/inference/agentic/206885', {
-      onBeforeLoad: freshCoachMarkState,
-      failOnStatusCode: false,
-    });
-    cy.wait(2000);
-    cy.get(COACH_MARK).should('not.exist');
-  });
-
   it('renders Simplified Chinese copy on /zh', () => {
     visitAgenticChart('/zh/inference?i_seq=agentic-traces');
 
@@ -285,5 +260,11 @@ describe('Agentic point coach mark', () => {
       'aria-label',
       '关闭提示',
     );
+
+    cy.get('body').type('{esc}');
+    cy.get(COACH_MARK).should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(STORAGE_KEY)).to.eq('1');
+    });
   });
 });

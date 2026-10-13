@@ -242,6 +242,19 @@ describe('Header', () => {
     }
   });
 
+  it('fits a 320px phone that shows a classic 15px scrollbar (305px content width)', () => {
+    cy.viewport(305, 700);
+    cy.get('[data-testid="header"]').then(($header) => {
+      const header = $header[0];
+      expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
+    });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth, 'document scrollWidth').to.be.at.most(
+        doc.documentElement.clientWidth,
+      );
+    });
+  });
+
   it('pushes the mobile Overview link exactly once — no timer-based re-push', () => {
     cy.clock();
     cy.viewport(375, 812);
@@ -300,6 +313,7 @@ describe('Header', () => {
         const bounds = $header[0].getBoundingClientRect();
         const selectors = [
           '[data-testid="header-brand"]',
+          '[data-testid="site-search-toggle"]',
           '[data-testid="language-toggle"]',
           '[data-testid="theme-toggle"]',
           '[data-testid="mobile-menu-toggle"]',
@@ -322,7 +336,11 @@ describe('Header', () => {
     });
 
     it('gives the icon controls a 44px touch target in both dimensions', () => {
-      ['[data-testid="theme-toggle"]', '[data-testid="mobile-menu-toggle"]'].forEach((selector) => {
+      [
+        '[data-testid="site-search-toggle"]',
+        '[data-testid="theme-toggle"]',
+        '[data-testid="mobile-menu-toggle"]',
+      ].forEach((selector) => {
         rectOf(selector).then((rect) => {
           expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
           expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);

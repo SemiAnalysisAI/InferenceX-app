@@ -1227,7 +1227,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '006c535b98a0b13944d20b9216a3b6ec9c46ab27d79da4bf1fd95fda7bac28f5',
+    sourceSha256: '0031111e01a00602cc207c8fd6d6727c2040697c78c1adb52fc2a2cef461a618',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1464,7 +1464,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-siblings.ts',
-    sourceSha256: '07d3d1bf93820091d1014b14bf954555edcec422c05e575ad87142f9845e4156',
+    sourceSha256: 'b17ad7a59249ac9ff6e5d80125f6dcbbedbe976fa937ab6d622919c65b7f351d',
     reviewArea: {
       en: 'Benchmark sibling SKU metadata and sibling navigation row shape.',
       zh: '基准同组 SKU 元数据和同组导航行结构。',

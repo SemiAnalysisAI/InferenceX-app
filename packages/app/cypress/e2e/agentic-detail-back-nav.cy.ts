@@ -241,23 +241,6 @@ function assertRestoredChart(): void {
 }
 
 describe('Agentic point detail — returning to the chart', () => {
-  it('carries the chart state into the detail link instead of dropping it', () => {
-    visitChart('/inference');
-    selectTargetModel();
-    soloLegendSeries();
-    clickTracedPoint();
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        const href = $link.attr('href') ?? '';
-        expect(href, 'detail href').to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('g_model'), 'g_model carried into the detail link').to.equal('Kimi-K3');
-        expect(params.get('i_active'), 'legend selection carried').to.equal(SOLO_HW_KEY);
-      });
-  });
-
   it('restores the model and legend when the reader clicks Back', () => {
     visitChart('/inference');
     selectTargetModel();

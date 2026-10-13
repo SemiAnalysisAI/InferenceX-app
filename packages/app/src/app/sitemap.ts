@@ -143,6 +143,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.5,
       }),
     ),
+    ...localizedPair('/agentx/quickstart', {
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
     ...localizedPair('/agentx/methodology', {
       lastModified: now,
       changeFrequency: 'monthly',

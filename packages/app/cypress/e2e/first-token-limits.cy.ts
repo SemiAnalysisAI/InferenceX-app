@@ -55,7 +55,7 @@ describe('First-Token Limits', () => {
       cy.get('[data-testid="first-token-figure"]').should('exist');
     });
 
-    it('labels the controls and reads the cap ladder from the URL', () => {
+    it('picks the cheapest row that clears the interactivity floor, not the cheapest row', () => {
       cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT Caps');
       cy.get('[data-testid="first-token-caps"]').should('have.value', '0.1,2');
       cy.get('label[for="first-token-min-interactivity"]').should(
@@ -70,9 +70,7 @@ describe('First-Token Limits', () => {
       cy.get(X_TICKS).should('have.length', 2);
       cy.get(X_TICKS).first().should('have.text', '≤0.1s');
       cy.get(X_TICKS).last().should('have.text', '≤2s');
-    });
 
-    it('draws one bar per vendor under a cap the rows clear, and marks the cap they do not', () => {
       cy.get(BARS).should('have.length', 1);
       cy.get(BARS).should('have.attr', 'data-series', 'vendor:NVIDIA');
       cy.get(BARS).should('have.attr', 'data-hw', 'b300_sglang');
@@ -81,9 +79,7 @@ describe('First-Token Limits', () => {
         const labels = [...$texts].map((el) => el.textContent ?? '');
         expect(labels).to.deep.equal(['', 'B300 only']);
       });
-    });
 
-    it('picks the cheapest row that clears the interactivity floor, not the cheapest row', () => {
       // At the 35 tok/s floor the 48-concurrency row (10.6 tok/s) is out, so the
       // winner is the next-highest-throughput row: concurrency 8.
       expect(concurrenciesAtOrAbove(35)).to.deep.equal([8, 2, 1]);
@@ -183,9 +179,7 @@ describe('First-Token Limits', () => {
       cy.get(EMPTY_MARKS).should('have.length', 2);
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_ONLY_HARDWARE.toUpperCase());
-    });
 
-    it('lists the run under the branch name in the table with the official rows above', () => {
       cy.get('[data-testid="first-token-table"] tbody tr').should('have.length', 2);
       cy.get('[data-testid="first-token-table"] tbody').should('contain.text', OVERLAY_RUN_BRANCH);
     });

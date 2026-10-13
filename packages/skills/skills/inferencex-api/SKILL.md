@@ -5,6 +5,11 @@ description: 'Legacy inferencex-api entry and shared workflow guide. Use when ex
 
 # InferenceX API
 
+For DWDP prefill runs, `metrics.prefill_dwdp_size` is the number of ranks per
+weight-sharing group, `prefill_tp` stays 1, and `prefill_num_workers` counts
+groups. Do not interpret the group width as TP or EP. Sibling rows expose the
+same width as nullable `prefill_dwdp_size`; missing or 1 means disabled.
+
 Shared instructions for the `inferencex` entry and the legacy `inferencex-api` name.
 Resolve all paths below from this guide's directory, including for personal installs.
 

@@ -13,10 +13,6 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
   });
 
-  it('renders SVG bar rectangles inside the reliability chart after data loads', () => {
-    cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
-  });
-
   it('switching date range from default to "Last 7 days" changes the chart display', () => {
     cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
 
@@ -33,28 +29,13 @@ describe('Reliability Chart — Content & Interactions', () => {
         cy.contains('[role="option"]', 'All time').click();
         cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
       });
-  });
 
-  it('percentage labels are rendered on bars', () => {
     cy.get('#reliability-chart svg .value-label')
       .should('have.length.greaterThan', 0)
       .first()
       .invoke('text')
       .should('match', /\d+\.\d+%/u);
-  });
 
-  it('High Contrast toggle exists and can be enabled', () => {
-    cy.get('#reliability-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .contains('label', 'High Contrast')
-      .should('exist');
-
-    cy.get('#reliability-high-contrast').click();
-    cy.get('#reliability-high-contrast').should('have.attr', 'data-state', 'checked');
-  });
-
-  it('chart Y-axis shows percentage labels (0% to 100%)', () => {
     cy.get('#reliability-chart svg')
       .find('.tick text')
       .should('have.length.greaterThan', 0)

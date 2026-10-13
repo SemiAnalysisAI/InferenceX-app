@@ -336,9 +336,7 @@ describe('API documentation', () => {
     cy.get('[data-testid="footer-link-api"]')
       .should('have.attr', 'href', '/zh/api')
       .and('have.text', 'API 文档');
-  });
 
-  it('keeps wide schemas locally scrollable without overflowing the Chinese mobile page', () => {
     cy.viewport(375, 844);
     cy.visit('/zh/api');
 

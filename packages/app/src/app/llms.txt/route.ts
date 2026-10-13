@@ -19,6 +19,7 @@ export async function GET() {
     '',
     `- [Dashboard](${SITE_URL})`,
     `- [AgentX](${SITE_URL}/agentx)`,
+    `- [Benchmark your own chips with AgentX](${SITE_URL}/agentx/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
     `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
     `- [Whitepapers](${SITE_URL}/whitepaper)`,

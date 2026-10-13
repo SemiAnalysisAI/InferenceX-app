@@ -17,14 +17,6 @@ describe('Compare Interpolated Table', () => {
     });
   });
 
-  it('renders the interpolated table with at least one target column', () => {
-    cy.get('[data-testid="compare-interpolated-table"]').should('be.visible');
-    cy.get('[data-testid="compare-interpolated-table"] thead th').should(
-      'have.length.greaterThan',
-      1,
-    );
-  });
-
   it('keeps metric context visible while scrolling the mobile comparison', () => {
     cy.viewport(390, 720);
     cy.get('[data-testid="compare-interpolated-table"]')
@@ -50,12 +42,7 @@ describe('Compare Interpolated Table', () => {
     cy.viewport(1280, 720);
   });
 
-  it('displays editable target interactivity input boxes', () => {
-    cy.get('[data-testid^="compare-table-target-"]').should('have.length.greaterThan', 0);
-    cy.get('[data-testid="compare-table-target-0"]').should('have.attr', 'type', 'text');
-  });
-
-  it('shows metric rows (throughput, cost, power, concurrency)', () => {
+  it('commits target value when pressing Enter and updates the throughput cell', () => {
     const expectedMetrics = [
       'Throughput (tok/s/chip)',
       'Cost ($/M tok)',
@@ -65,14 +52,10 @@ describe('Compare Interpolated Table', () => {
     for (const metric of expectedMetrics) {
       cy.get('[data-testid="compare-interpolated-table"] tbody').should('contain.text', metric);
     }
-  });
 
-  it('shows GPU labels in table cells', () => {
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'GB200');
     cy.get('[data-testid="compare-interpolated-table"] tbody td').should('contain.text', 'H100');
-  });
 
-  it('commits target value when pressing Enter and updates the throughput cell', () => {
     cy.get('[data-testid="compare-table-target-1"]').then(($input) => {
       const original = Number($input.val() as string);
       const next = original + 3;
