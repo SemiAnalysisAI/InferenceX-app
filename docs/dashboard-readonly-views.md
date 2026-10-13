@@ -7,6 +7,15 @@ registry.test.ts, including hidden and feature-gated routes.
 
 ## Static editorial content
 
+`/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and
+About FAQ entry points, document running the external `agentx-harness` CLI.
+They add no benchmark data, selectors, calculations, or server-side execution.
+Copy buttons are presentation-only; no API/OpenAPI contract
+changes are needed. `/llms.txt` discovers the guide, and the existing
+`packages/skills/skills/inferencex-api/references/agentx.md` cookbook documents the
+same pinned command and routing flags. Running the harness does not submit or
+publish results through the read-only API.
+
 `/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling
 reproduce the public GLM-5.3 newsletter article, with the September 28, 2026
 benchmark snapshot and original figures. They add no data selectors, calculations,
