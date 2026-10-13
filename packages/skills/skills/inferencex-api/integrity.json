@@ -2,7 +2,7 @@
   "schema_version": 1,
   "package_version": "1.1.0",
   "files": {
-    "SKILL.md": "6ae01d7a64a361035229df6d7f83460ed62faae2b437c64ec3bb4685ec435f7e",
+    "SKILL.md": "33ffe849af2845be90798ace8c9aa713fb873ac4fe4eec185f2ef5272f3397d0",
     "references/agentx.md": "99bb37242fe26c37095a44253783791ea2651b2e7a80fc6534dea6c6bae244cc",
     "references/chart-templates.md": "aed6854627142019a4a5df4a2d07523b1a64e5814dd2bbdcc74ee18beb083912",
     "references/cli-contract.md": "fa44faa38d889b4fbdee5ba42752b47758ee3706fab150513bd4e6db87a86cb0",
