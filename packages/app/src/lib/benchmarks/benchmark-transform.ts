@@ -327,6 +327,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     server_external_cache_hit_rate: m.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+    server_cache_pricing_eligible: m.server_cache_pricing_eligible,
+    server_cache_validity_code: m.server_cache_validity_code,
     num_requests_total: m.num_requests_total,
     num_requests_successful: m.num_requests_successful,
     total_prompt_tokens: m.total_prompt_tokens,

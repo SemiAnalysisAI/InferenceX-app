@@ -245,7 +245,8 @@ export type ProfitEstimatorSkipReason =
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'
-  | 'no-token-mix';
+  | 'no-token-mix'
+  | 'invalid-cache-observation';
 
 export interface ProfitEstimatorSkipped {
   hwKey: string;
@@ -291,7 +292,15 @@ export interface ProfitEstimatorSpecs {
 export function estimateSkuProfit(
   result: Pick<
     InterpolatedResult,
-    'hwKey' | 'resultKey' | 'precision' | 'value' | 'inputTokenShare' | 'cacheHitRate' | 'clamped'
+    | 'hwKey'
+    | 'resultKey'
+    | 'precision'
+    | 'value'
+    | 'inputTokenShare'
+    | 'cacheHitRate'
+    | 'cacheHitRateUnavailable'
+    | 'cacheHitRateSource'
+    | 'clamped'
   > & { date?: string },
   specs: ProfitEstimatorSpecs,
   pricing: TokenRevenuePricing,
@@ -308,6 +317,10 @@ export function estimateSkuProfit(
   const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
   if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
+  // Only a rate swapped in by an explicit theoretical mode may price an invalid actual observation.
+  if (result.cacheHitRateUnavailable && result.cacheHitRateSource !== 'theoretical') {
+    return { ...base, reason: 'invalid-cache-observation' };
+  }
 
   const revenuePerGpuHour = tokenRevenueFromRatesPerGpuHour(
     result.value,
@@ -428,7 +441,15 @@ export function applyCacheHitMode<
   if (mode === 'actual') return results as T[];
   return results.map((r) =>
     typeof r.theoreticalCacheHitRate === 'number'
-      ? { ...r, cacheHitRate: r.theoreticalCacheHitRate }
+      ? {
+          ...r,
+          cacheHitRate: r.theoreticalCacheHitRate,
+          ...(Number.isFinite(r.theoreticalCacheHitRate) &&
+          r.theoreticalCacheHitRate >= 0 &&
+          r.theoreticalCacheHitRate <= 1
+            ? { cacheHitRateSource: 'theoretical' as const }
+            : {}),
+        }
       : r,
   );
 }

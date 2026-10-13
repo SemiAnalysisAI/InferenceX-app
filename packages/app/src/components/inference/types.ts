@@ -235,6 +235,10 @@ export interface AggDataEntry {
   server_cpu_cache_hit_rate?: number;
   /** Infinite-cache theoretical hit rate (0..1) computed from trace. */
   theoretical_cache_hit_rate?: number;
+  /** 1 when the producer marked the cache rates a complete actual observation, else 0. */
+  server_cache_pricing_eligible?: number;
+  /** Producer validity status code; see CACHE_VALIDITY_REASONS. */
+  server_cache_validity_code?: number;
   /** Total requests attempted during the window. */
   num_requests_total?: number;
   /** Requests that completed successfully. */

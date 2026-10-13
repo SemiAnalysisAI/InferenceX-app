@@ -27,7 +27,7 @@ import {
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import { actualCacheRateUnavailable, pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import {
   buildDerivedChartFields,
   getHardwareKey,
@@ -85,6 +85,11 @@ export function rowToLightweightPoint(
     server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
+    framework: entry.framework,
+    disagg: entry.disagg,
+    run_url: entry.run_url,
+    server_cache_pricing_eligible: entry.server_cache_pricing_eligible,
+    server_cache_validity_code: entry.server_cache_validity_code,
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics, tcoBasis),
   } as InferenceData;
 
@@ -238,6 +243,7 @@ export function interpolateMetricAtInteractivity(
     };
     const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
     const inputShares = sorted.map(inputTokenShareForRevenue);
+    if (sorted.some((p) => actualCacheRateUnavailable(p) !== null)) return null;
     const cacheHitRates = sorted.map(pricingCacheHitRate);
     const inputShare = inputShares.every((share): share is number => share !== null)
       ? interpolateBounded(inputShares)

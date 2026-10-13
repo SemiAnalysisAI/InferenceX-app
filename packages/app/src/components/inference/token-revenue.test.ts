@@ -241,3 +241,41 @@ describe('GB300 cache hit-rate fallback', () => {
     );
   });
 });
+
+const atomPoint = (fields: Record<string, unknown>) =>
+  ({
+    framework: 'atom-disagg',
+    disagg: true,
+    run_url: 'https://github.com/x/y/actions/runs/1/attempts/1',
+    tput_per_gpu: 10_000,
+    input_tput_per_gpu: 7_500,
+    output_tput_per_gpu: 2_500,
+    ...fields,
+  }) as unknown as InferenceData;
+
+describe('ATOM actual-pricing guard on inference points', () => {
+  const pricing = { inputPerMillion: 1, cachedInputPerMillion: 0.1, outputPerMillion: 1 };
+
+  it('returns no revenue rather than zero-hit revenue for an invalid observation', () => {
+    const eligibleNoRates = atomPoint({
+      server_cache_pricing_eligible: 1,
+      server_cache_validity_code: 1,
+    });
+    expect(tokenRevenuePerGpuHour(eligibleNoRates, pricing)).toBeNull();
+    const complete = atomPoint({ server_gpu_cache_hit_rate: 0.6, server_cpu_cache_hit_rate: 0.1 });
+    expect(tokenRevenuePerGpuHour(complete, pricing)).toBeCloseTo(18.99, 10);
+  });
+
+  it('never uses the doubled ATOM P/D prompt_total as a token mix', () => {
+    const inconsistent = {
+      input_tput_per_gpu: 10,
+      output_tput_per_gpu: 10,
+      total_prompt_tokens: 2,
+      total_generation_tokens: 1,
+    };
+    expect(inputTokenShareForRevenue(atomPoint(inconsistent))).toBeNull();
+    expect(
+      inputTokenShareForRevenue(atomPoint({ ...inconsistent, framework: 'vllm' })),
+    ).toBeCloseTo(2 / 3, 12);
+  });
+});

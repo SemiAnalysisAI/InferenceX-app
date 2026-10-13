@@ -44,6 +44,8 @@ export interface GPUDataPoint {
    * absence is what makes cached-input billing a no-op outside agentic traces.
    */
   cacheHitRate?: number;
+  /** Reason code when the actual cache rate must not be priced. */
+  cacheHitRateUnavailable?: string;
   /**
    * Infinite-cache theoretical hit rate (0..1) computed from the trace itself,
    * representing the maximum reuse potential of the workload with unbounded
@@ -100,6 +102,10 @@ export interface InterpolatedResult {
    * fixed-sequence frontier). See {@link GPUDataPoint.cacheHitRate}.
    */
   cacheHitRate?: number;
+  /** Reason code when the actual cache rate must not be priced. */
+  cacheHitRateUnavailable?: string;
+  /** Set by an explicit theoretical cache-hit mode that swapped in a valid rate. */
+  cacheHitRateSource?: 'theoretical';
   /**
    * Infinite-cache theoretical hit rate at that operating point, or undefined
    * when the frontier did not carry a theoretical rate on every point.

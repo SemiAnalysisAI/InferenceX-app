@@ -1636,3 +1636,38 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.offloadMode).toBe('on');
   });
 });
+
+const atomCacheValidity = (status: string, eligible: unknown) => ({
+  schema: 'atom-cache-validity/1',
+  status,
+  pricing_eligible: eligible,
+});
+
+describe('ATOM cache validity through mapBenchmarkRow', () => {
+  const run = 36734492117;
+  const atomRow = (cacheValidity?: unknown) => {
+    const base = makeV3AgenticRow({ framework: 'atom-disagg' });
+    const serverMetrics = { ...base.server_metrics, cache: { gpu_cache_hit_rate: 0.95207 } };
+    if (cacheValidity !== undefined) serverMetrics.cache_validity = cacheValidity;
+    return { ...base, server_metrics: serverMetrics };
+  };
+
+  it.each([
+    ['an eligible block', atomCacheValidity('VALID_COMPLETE', true), 1, 1],
+    ['an ineligible block', atomCacheValidity('REQUEST_SCOPE_UNRESOLVED', false), 0, 14],
+    ['an unknown block', { status: 'VALID_COMPLETE' }, 0, 99],
+  ])('keeps %s in the stored metrics', (_, block, eligible, code) => {
+    const result = mapBenchmarkRow(atomRow(block), createSkipTracker(), null, run);
+    expect(result).not.toBeNull();
+    expect(result!.metrics.server_cache_pricing_eligible).toBe(eligible);
+    expect(result!.metrics.server_cache_validity_code).toBe(code);
+    expect(result!.metrics.server_gpu_cache_hit_rate).toBe(0.95207);
+  });
+
+  it('stores no validity for a legacy re-import, so it cannot inherit eligibility', () => {
+    const result = mapBenchmarkRow(atomRow(), createSkipTracker(), null, run);
+    expect(result).not.toBeNull();
+    expect('server_cache_pricing_eligible' in result!.metrics).toBe(false);
+    expect('server_cache_validity_code' in result!.metrics).toBe(false);
+  });
+});

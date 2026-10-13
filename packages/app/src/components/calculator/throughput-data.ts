@@ -3,7 +3,7 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import { actualCacheRateUnavailable, pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 import {
   DEFAULT_TCO_BASIS,
@@ -152,6 +152,16 @@ function inputTokenShare(row: BenchmarkRow, inputTput: number, outputTput: numbe
   if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
     return isl / (isl + osl);
   }
+  // ATOM P/D prompt_total sums the prefill and decode prompt counters (decode re-counts each
+  // prompt), so it is not a token mix; use the client cohort's own input/output rates.
+  if (row.framework?.toLowerCase().startsWith('atom') && row.disagg) {
+    const clientIn = row.metrics.input_tput_tps;
+    const clientOut = row.metrics.output_tput_tps;
+    if (typeof clientIn === 'number' && typeof clientOut === 'number' && clientIn + clientOut > 0) {
+      return clientIn / (clientIn + clientOut);
+    }
+    return null;
+  }
   const prompt = row.metrics.total_prompt_tokens;
   const generated = row.metrics.total_generation_tokens;
   if (typeof prompt === 'number' && typeof generated === 'number' && prompt + generated > 0) {
@@ -221,6 +231,11 @@ export function buildGpuGroups<M extends GroupMeta>(
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
     const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const cacheUnavailable = actualCacheRateUnavailable({
+      ...m,
+      framework: row.framework,
+      run_url: row.run_url,
+    });
     const theoreticalRate =
       typeof m.theoretical_cache_hit_rate === 'number' &&
       Number.isFinite(m.theoretical_cache_hit_rate)
@@ -252,7 +267,11 @@ export function buildGpuGroups<M extends GroupMeta>(
       throughput: tput,
       outputThroughput: outputTput,
       inputThroughput: inputTput,
-      ...(cacheHitRate === null ? {} : { cacheHitRate }),
+      ...(cacheUnavailable === null
+        ? cacheHitRate === null
+          ? {}
+          : { cacheHitRate }
+        : { cacheHitRateUnavailable: cacheUnavailable }),
       ...(theoreticalRate === null ? {} : { theoreticalCacheHitRate: theoreticalRate }),
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,

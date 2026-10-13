@@ -531,3 +531,45 @@ describe('applyCacheHitMode', () => {
     expect(theoreticalRow.revenue).toBeLessThan(actualRow.revenue);
   });
 });
+
+describe('explicit theoretical pricing of an invalid actual observation', () => {
+  const pricing = { inputPerMillion: 1, cachedInputPerMillion: 0.1, outputPerMillion: 1 };
+  const specs = { powerKwPerGpu: 2, costPerGpuHour: 10 };
+  const assumptions = { utilizationPct: 60, labCutPct: 30, basis: 'chip-hour' as const };
+  const invalid = {
+    hwKey: 'mi355x_atom',
+    resultKey: 'mi355x_atom',
+    value: 10_000,
+    inputTokenShare: 0.75,
+    clamped: false,
+    cacheHitRateUnavailable: 'REQUEST_SCOPE_UNRESOLVED',
+    theoreticalCacheHitRate: 0.96797,
+  };
+
+  it('is skipped in actual mode even when a number is present', () => {
+    const estimate = estimateSkuProfit(
+      { ...invalid, cacheHitRate: 0.95 },
+      specs,
+      pricing,
+      assumptions,
+    );
+    expect(estimate).toMatchObject({ reason: 'invalid-cache-observation' });
+  });
+
+  it('is priced only after the explicit theoretical mode swaps in a valid rate', () => {
+    const [theoretical] = applyCacheHitMode([invalid], 'theoretical');
+    expect(theoretical).toMatchObject({ cacheHitRate: 0.96797, cacheHitRateSource: 'theoretical' });
+    expect(estimateSkuProfit(theoretical, specs, pricing, assumptions)).toHaveProperty('revenue');
+  });
+
+  it('is not authorised by a non-finite theoretical rate', () => {
+    const [swapped] = applyCacheHitMode(
+      [{ ...invalid, theoreticalCacheHitRate: Number.NaN }],
+      'theoretical',
+    );
+    expect(swapped).not.toHaveProperty('cacheHitRateSource');
+    expect(estimateSkuProfit(swapped, specs, pricing, assumptions)).toMatchObject({
+      reason: 'invalid-cache-observation',
+    });
+  });
+});

@@ -113,6 +113,60 @@ function flattenStatBlock(block: unknown, suffix: string, out: Record<string, nu
  *   derive-from-itl invariant still overwrites it, keeping one definition
  *   across all harness versions.
  */
+/**
+ * Producer `server_metrics.cache_validity.status` as a numeric code, because metric columns are
+ * numeric. The app decodes it with `CACHE_VALIDITY_REASONS` (lib/calculator/cache-pricing.ts).
+ */
+const CACHE_VALIDITY_CODES: Record<string, number> = {
+  VALID_COMPLETE: 1,
+  VALID_ZERO: 2,
+  PARTIAL_COMPONENT: 10,
+  MISSING_OBSERVATION: 11,
+  ROLE_OR_COVERAGE_UNRESOLVED: 12,
+  WINDOW_UNRESOLVED: 13,
+  REQUEST_SCOPE_UNRESOLVED: 14,
+  INVALID_COUNTER: 15,
+};
+
+const CACHE_VALIDITY_SCHEMA = 'atom-cache-validity/1';
+const PRICING_STATUSES: ReadonlySet<string> = new Set(['VALID_COMPLETE', 'VALID_ZERO']);
+/** Code for a validity block whose `pricing_eligible` contradicts its status. */
+export const CACHE_VALIDITY_CONFLICT = 98;
+/** Code for a malformed validity block or an unknown schema or status. */
+export const CACHE_VALIDITY_UNKNOWN = 99;
+
+export interface CacheValidityColumns {
+  server_cache_pricing_eligible: number;
+  server_cache_validity_code: number;
+}
+
+/**
+ * Numeric columns for a producer `cache_validity` block. Absent or null (legacy rows, non-ATOM
+ * adapters) yields none. A present block that is not a well-formed known schema, or whose flag
+ * contradicts its status, is recorded as not eligible.
+ */
+const notEligible = (code: number): CacheValidityColumns => ({
+  server_cache_pricing_eligible: 0,
+  server_cache_validity_code: code,
+});
+
+export function cacheValidityColumns(value: unknown): CacheValidityColumns | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) return notEligible(CACHE_VALIDITY_UNKNOWN);
+  if (!('schema' in value) || !('status' in value) || !('pricing_eligible' in value)) {
+    return notEligible(CACHE_VALIDITY_UNKNOWN);
+  }
+  const { schema, status, pricing_eligible: eligible } = value;
+  if (schema !== CACHE_VALIDITY_SCHEMA || typeof status !== 'string') {
+    return notEligible(CACHE_VALIDITY_UNKNOWN);
+  }
+  const code = CACHE_VALIDITY_CODES[status];
+  if (code === undefined || typeof eligible !== 'boolean')
+    return notEligible(CACHE_VALIDITY_UNKNOWN);
+  if (eligible !== PRICING_STATUSES.has(status)) return notEligible(CACHE_VALIDITY_CONFLICT);
+  return { server_cache_pricing_eligible: eligible ? 1 : 0, server_cache_validity_code: code };
+}
+
 export function flattenAgenticAggRow(row: Record<string, any>): Record<string, any> {
   const rm = row.request_metrics;
   if (!rm || typeof rm !== 'object' || Array.isArray(rm)) return row;
@@ -135,5 +189,7 @@ export function flattenAgenticAggRow(row: Record<string, any>): Record<string, a
     if (n !== undefined) flat[key] = n;
   }
 
+  const validity = cacheValidityColumns(atPath(row, ['server_metrics', 'cache_validity']));
+  if (validity) Object.assign(flat, validity);
   return { ...row, ...flat };
 }

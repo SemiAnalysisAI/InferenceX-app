@@ -80,6 +80,9 @@ export const POWER_METRIC_KEYS = [
  * carry median/mean/p99/std for latency only.
  */
 export const METRIC_KEYS = new Set([
+  // ATOM cache-rate validity (agentic-v3-flatten cacheValidityColumns)
+  'server_cache_pricing_eligible',
+  'server_cache_validity_code',
   'dp',
   // throughput (tokens/sec/GPU)
   'tput_per_gpu',

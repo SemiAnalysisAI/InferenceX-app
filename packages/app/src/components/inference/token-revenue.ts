@@ -1,6 +1,7 @@
 import type { InferenceData, TokenRevenuePricing } from './types';
 import {
   DEFAULT_CACHED_INPUT_PRICE_RATIO,
+  actualCacheRateUnavailable,
   pricingCacheHitRate,
 } from '@/lib/calculator/cache-pricing';
 
@@ -52,6 +53,8 @@ export function inputTokenShareForRevenue(point: InferenceData): number | null {
     return isl / (isl + osl);
   }
 
+  // ATOM P/D prompt_total sums prefill and decode prompt counters; it is not a token mix.
+  if (point.framework?.toLowerCase().startsWith('atom') && point.disagg) return null;
   const prompt = point.total_prompt_tokens;
   const generation = point.total_generation_tokens;
   if (typeof prompt === 'number' && typeof generation === 'number' && prompt + generation > 0) {
@@ -96,6 +99,7 @@ export function tokenRevenuePerGpuHour(
   point: InferenceData,
   pricing: TokenRevenuePricing,
 ): number | null {
+  if (actualCacheRateUnavailable(point) !== null) return null;
   const total = point.tput_per_gpu ?? 0;
   const cacheHitRate = pricingCacheHitRate(point);
   const inputShare = inputTokenShareForRevenue(point);

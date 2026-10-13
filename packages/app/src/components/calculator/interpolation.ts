@@ -390,6 +390,7 @@ export function interpolateForGPU(
       inputTpPerMw: sorted[0].inputTpPerMw,
       outputTpPerMw: sorted[0].outputTpPerMw,
       cacheHitRate: sorted[0].cacheHitRate,
+      cacheHitRateUnavailable: sorted[0].cacheHitRateUnavailable,
       theoreticalCacheHitRate: sorted[0].theoreticalCacheHitRate,
       inputTokenShare: sorted[0].inputTokenShare,
       concurrency: sorted[0].concurrency,
@@ -453,6 +454,10 @@ export function interpolateForGPU(
   // would invent a dip in the cached fraction, so the whole sweep opts out and
   // its input tokens bill at full price. That avoids inventing a cache curve,
   // but overstates revenue and margin if the missing point actually had hits.
+  // An invalid actual cache rate on a frontier point leaves the curve's rate unknown: the
+  // all-or-nothing spline below cannot exclude it, so it must not be priced as zero reuse.
+  const unavailableAnchor = sorted.find((p) => p.cacheHitRateUnavailable);
+  const cacheHitRateUnavailable = unavailableAnchor?.cacheHitRateUnavailable;
   const cacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
     ? buildMetric((p) => p.cacheHitRate!)
     : undefined;
@@ -495,6 +500,7 @@ export function interpolateForGPU(
     inputTpPerMw,
     outputTpPerMw,
     cacheHitRate,
+    cacheHitRateUnavailable,
     theoreticalCacheHitRate,
     inputTokenShare,
     concurrency,
