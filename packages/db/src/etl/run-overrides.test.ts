@@ -596,6 +596,15 @@ describe('isRunAttemptPurged', () => {
     },
   );
 
+  it('purges every attempt of run 35855544139 without CPU KV cache hit rates, leaving neighboring runs intact', () => {
+    expect(PURGED_RUNS.has(35855544139)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(35855544139, attempt)).toBe(true);
+    }
+    expect(isRunAttemptPurged(35855544138, 1)).toBe(false);
+    expect(isRunAttemptPurged(35855544140, 1)).toBe(false);
+  });
+
   it('purges every attempt of MI355X DSV4 ATOM disagg LMCache AgentX run 36734492117 without CPU KV cache hit rates', () => {
     expect(PURGED_RUNS.has(36734492117)).toBe(true);
     for (const attempt of [undefined, 1, 2, 99]) {
