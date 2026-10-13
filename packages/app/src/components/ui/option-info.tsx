@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEventHandler,
@@ -77,10 +78,20 @@ export function InfoHelp({
   const locale = useLocale();
   const titleId = useId();
   const [open, setOpen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>();
   const hoverOpenedRef = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    // Exclude the scrollbar without measuring the popover whose size we change.
+    const updateWidth = () => setViewportWidth(document.documentElement.clientWidth);
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [open]);
 
   const cancelClose = () => clearTimeout(closeTimerRef.current);
   useEffect(() => () => clearTimeout(closeTimerRef.current), []);
@@ -154,6 +165,11 @@ export function InfoHelp({
       </PopoverTrigger>
       <PopoverContent
         ref={contentRef}
+        style={
+          viewportWidth === undefined
+            ? undefined
+            : { maxWidth: `calc(${viewportWidth}px - 1.5rem)` }
+        }
         side="bottom"
         align={align}
         collisionPadding={12}

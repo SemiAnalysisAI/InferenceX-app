@@ -88,7 +88,9 @@ describe('Current InferenceX Image localized routes', () => {
       .and(($content) => {
         const rect = $content[0].getBoundingClientRect();
         expect(rect.left, 'help stays inside the phone viewport').to.be.at.least(0);
-        expect(rect.right, 'help stays inside the phone viewport').to.be.at.most(390);
+        expect(rect.right, 'help stays inside the phone viewport').to.be.at.most(
+          $content[0].ownerDocument.documentElement.clientWidth,
+        );
       });
 
     cy.viewport(1440, 900);
