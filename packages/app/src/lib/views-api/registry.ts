@@ -64,6 +64,7 @@ export const VIEW_QUERY_PARAMS = {
   compare: ['format', 'gpus', 'model', 'scenario', 'slug', 'tiers', 'variant'],
   'current-inferencex-image': [
     'asOf',
+    'includeHistory',
     'frameworks',
     'hardware',
     'model',

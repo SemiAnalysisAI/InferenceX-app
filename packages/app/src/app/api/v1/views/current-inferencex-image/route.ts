@@ -1,7 +1,13 @@
 import { GET as releases } from '@/app/api/v1/framework-releases/route';
 import { GET as images } from '@/app/api/v1/latest-images/route';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getImageAgeObservations } from '@semianalysisai/inferencex-db/queries/latest-images';
 import {
-  baseFramework,
+  imageAgeHistory,
+  imageAgeSummary,
+  matchesImageFilters,
+} from '@/components/latest-image/image-age';
+import {
   daysSince,
   getActualLatestTag,
   imageRowDisplayModel,
@@ -13,7 +19,7 @@ import {
   sequenceOptionsForModel,
 } from '@/components/latest-image/latest-image-utils';
 import type { FrameworkReleases, LatestImageRow } from '@/lib/api/api';
-import { cachedJson } from '@/lib/cache/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseDateParam,
@@ -26,6 +32,11 @@ import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
+const readHistory = cachedQuery(
+  (asOf: string) => getImageAgeObservations(getDb(), asOf),
+  'image-age-observations-v1',
+  { blobOnly: true },
+);
 export function GET(request: NextRequest) {
   return runViewsRoute('current-inferencex-image', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['current-inferencex-image']);
@@ -38,10 +49,13 @@ export function GET(request: NextRequest) {
       s.get('nodeType'),
       'nodeType',
       ['all', 'single', 'disagg'],
-      'single',
+      'all',
     );
     const frameworks = parseFreeListParam(s.get('frameworks'));
     const asOf = parseDateParam(s.get('asOf'), 'asOf') ?? new Date().toISOString().slice(0, 10);
+    const includeHistory =
+      parseEnumParam(s.get('includeHistory'), 'includeHistory', ['true', 'false'], 'false') ===
+      'true';
     const [raw, releaseData] = await Promise.all([
       readResponse<LatestImageRow[]>(await images()),
       readResponse<FrameworkReleases>(await releases()),
@@ -54,18 +68,10 @@ export function GET(request: NextRequest) {
         : (active.map(imageRowDisplayModel).find((name) => name.toLowerCase() === requestedModel) ??
           resolveModelParam(requestedModel).displayName);
     const sequences = sequenceOptionsForModel(active, model);
-    const sequence = resolveSelectedSequence(sequences, s.get('sequence') ?? '8k/1k');
+    const sequence = resolveSelectedSequence(sequences, s.get('sequence') ?? 'agentic-traces');
+    const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence };
     const rows = active
-      .filter(
-        (row) =>
-          (model === 'all' || imageRowDisplayModel(row) === model) &&
-          (precision === 'all' || row.precision === precision) &&
-          imageRowSequence(row) === sequence &&
-          (spec === 'all' || row.spec_method === spec) &&
-          (hardware === 'all' || row.hardware === hardware) &&
-          (nodeType === 'all' || (nodeType === 'disagg' ? row.disagg : !row.disagg)) &&
-          (frameworks.length === 0 || frameworks.includes(baseFramework(row.framework))),
-      )
+      .filter((row) => matchesImageFilters(row, filters))
       .toSorted((a, b) => a.date.localeCompare(b.date))
       .map((row) => {
         const ageDays = daysSince(row.date, new Date(`${asOf}T00:00:00Z`));
@@ -80,13 +86,29 @@ export function GET(request: NextRequest) {
           staleAgentx: isStaleAgentx(row.benchmark_type, ageDays),
         };
       });
+    const observations = includeHistory ? await readHistory(asOf) : [];
+    const history = includeHistory
+      ? imageAgeHistory(
+          observations.filter((row) => matchesImageFilters(row, filters)),
+          asOf,
+        )
+      : undefined;
     return cachedJson({
       apiVersion: 'v1',
       view: 'current-inferencex-image',
-      params: { model, precision, spec, hardware, nodeType, frameworks, sequence, asOf },
+      params: { ...filters, asOf, includeHistory },
       options: { sequences },
       rows,
       releases: releaseData,
+      ageSummary: imageAgeSummary(rows, asOf),
+      ...(history ? { ageHistory: history } : {}),
+      ageMethodology: {
+        percentile: 'nearest-rank',
+        unit: 'days',
+        basis: 'last-successful-image-bearing-submission',
+        cohort: 'currently-active-models-and-scenarios',
+        historyDays: 90,
+      },
     });
   });
 }
