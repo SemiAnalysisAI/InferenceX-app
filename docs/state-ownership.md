@@ -108,6 +108,15 @@ This domain owns inference-only selection state. GPU selections and comparison d
 do not belong in global filter state because evaluation and reliability do not use
 them.
 
+Manual legend selections and explicit Best per SKU overrides are model-local.
+Choosing a different model in the model selector restores that model's default
+Best per SKU mode and does not use
+the previous model's sticky engine preference. Changes to axes within the same
+model preserve a manual selection. Initial share-link selections and explicit
+favorite presets retain their existing restoration paths. Compare History GPU
+and date selections, axis settings, and locked embed filters are unchanged. This navigation reset
+does not change the stateless read-only inference API's ranking or parameters.
+
 **`useInferenceDisplay`**
 
 Axis and presentation state:
