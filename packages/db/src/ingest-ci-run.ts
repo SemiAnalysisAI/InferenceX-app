@@ -76,6 +76,7 @@ import {
   TraceReplayWorkerPool,
 } from './etl/trace-replay-worker-pool';
 import { AsyncSemaphore } from './etl/async-semaphore';
+import { withTransientDbRetry } from './etl/db-retry';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
@@ -659,7 +660,9 @@ async function main(): Promise<void> {
                 console.log(
                   `    server_logs ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
                 );
-                await insertServerLogFiles(sql, insertedIds, logFiles);
+                await withTransientDbRetry(`server_logs for ${configKey}`, () =>
+                  insertServerLogFiles(sql, insertedIds, logFiles),
+                );
                 console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
                 tracker.recordDbError(`server_logs for ${configKey}`, error);
@@ -729,9 +732,11 @@ async function main(): Promise<void> {
                             `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
                         );
                         const linked = await traceUploadLimiter.run(() =>
-                          persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
-                            progressLabel: suffix,
-                          }),
+                          withTransientDbRetry(`trace_replay for ${suffix}`, () =>
+                            persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
+                              progressLabel: suffix,
+                            }),
+                          ),
                         );
                         totalTraceReplayLinked += linked;
                         console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);
