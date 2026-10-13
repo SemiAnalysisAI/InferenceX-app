@@ -83,7 +83,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: '57af57766c20c31d5b445fe5b3dda34b83f6147457e7d14eb5ecfab8318eae20',
+    sourceSha256: 'ab8fd78bd66368f13c6f72c63419e7eb83f479b6d39a8efaee2b1a24f32a0fb9',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -812,7 +812,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-latest-images',
-    sourceSha256: '71ad43e3caa358b27cc58fbc0adf4a110886790916b3cc1892905908db055b99',
+    sourceSha256: 'd856b33932b440c24b78094dc6a71be070ff7ef0876d8115263514ccab6aa35f',
   },
   {
     source: 'src/app/api/v1/log-availability/route.ts',
@@ -1255,7 +1255,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '04b833c0dbf1bfdc767aba5d7132b46c4ce9dd64134e3d1b7859b85053330e29',
+    sourceSha256: '4c13f8ffd2eb4d991400401493d5cc7aaeb58de632e99b413c29cc44052e7322',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1469,7 +1469,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '98659d61fdfb73d955fd84ead82deaa51076b792ad73b0c111af4d7e512749f5',
+    sourceSha256: '8ae98eaa877d09b724837d6936aa324fce9c203d71b6e0fd94d4971b5b24d628',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',

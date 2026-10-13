@@ -11,6 +11,16 @@ import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
 const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
+const imageAgePoint: ApiSchema = {
+  type: 'object',
+  properties: {
+    date: { type: 'string', format: 'date' },
+    p90AgeDays: { type: ['integer', 'null'], minimum: 0 },
+    configurationCount: { type: 'integer', minimum: 0 },
+  },
+  required: ['date', 'p90AgeDays', 'configurationCount'],
+  additionalProperties: false,
+};
 
 /** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
@@ -154,6 +164,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Reference date YYYY-MM-DD for reproducible rolling reliability or image-age calculations.',
     '用于复现滚动可靠性或镜像日期差计算的参考日期 YYYY-MM-DD。',
   ],
+  includeHistory: [
+    'true or false (default). Include 90 daily UTC image-age points ending on asOf, with nearest-rank p90AgeDays and configurationCount. Uses successful image-bearing submissions, an older seed per configuration, and current model/scenario retirement rules. Missing p90 is null; no future observations are backfilled. All image filters apply. This is submission age, not container build age.',
+    'true 或 false（默认）。返回截至 asOf 的 90 个 UTC 日期点，包含最近秩法计算的 p90AgeDays 和 configurationCount。使用带镜像的成功提交、每个配置在窗口前的最近记录，以及当前的模型和场景停用规则。无数据时 p90 为 null，不用未来记录向前回填。所有镜像筛选条件均适用。此指标是提交年龄，不是镜像构建年龄。',
+  ],
   runs: [
     'Ordered comma-separated run IDs, at most eight. Omit for newest measured run; empty value selects none.',
     '按顺序排列的运行 ID，以逗号分隔，最多八个。省略时选择最新有实测数据的运行；空值表示不选。',
@@ -294,8 +308,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '镜像视图硬件键，去除首尾空白、不区分大小写，默认 all。',
   ],
   nodeType: [
-    'Image deployment: single (default), disagg or all.',
-    '镜像部署类型：single（默认）、disagg 或 all。',
+    'Image deployment: all (default), single or disagg.',
+    '镜像部署类型：all（默认）、single 或 disagg。',
   ],
   frameworks: [
     'Comma-separated framework-family keys; omitted selection includes all.',
@@ -351,10 +365,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
 };
 
 export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
-  const note = PARAMETER_NOTES[name] ?? [
-    `${name} selector for ${view}; resolved value is returned in params.`,
-    `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
-  ];
+  const note: readonly [string, string] =
+    view === 'current-inferencex-image' && name === 'sequence'
+      ? ([
+          'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
+          '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
+        ] as const)
+      : (PARAMETER_NOTES[name] ?? [
+          `${name} selector for ${view}; resolved value is returned in params.`,
+          `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
+        ]);
   return {
     name,
     location: 'query',
@@ -429,7 +449,14 @@ const NEW_VIEWS = {
   'current-inferencex-image': [
     'Current serving images',
     '当前推理镜像',
-    { rows: objects, options: object },
+    {
+      rows: objects,
+      options: object,
+      releases: object,
+      ageSummary: imageAgePoint,
+      ageHistory: { type: 'array', items: imageAgePoint },
+      ageMethodology: object,
+    },
   ],
   'gpu-metrics': [
     'Live GPU metrics and statistics',
@@ -467,16 +494,20 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
         `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
-            : view === 'gpu-metrics'
-              ? ' Live artifact reads are no-store; statistics use all chips and unsampled values, while chart rows respect selected GPU indices.'
-              : ''
+            : view === 'current-inferencex-image'
+              ? ' ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from successful image-bearing submissions with the current active catalog. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age.'
+              : view === 'gpu-metrics'
+                ? ' Live artifact reads are no-store; statistics use all chips and unsampled values, while chart rows respect selected GPU indices.'
+                : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
-            : view === 'gpu-metrics'
-              ? ' 实时产物读取不缓存；统计量使用所有芯片的未降采样值，图表行则按芯片索引筛选。'
-              : ''
+            : view === 'current-inferencex-image'
+              ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于带镜像的成功提交和当前有效模型目录重建 90 个每日 ageHistory 点。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。'
+              : view === 'gpu-metrics'
+                ? ' 实时产物读取不缓存；统计量使用所有芯片的未降采样值，图表行则按芯片索引筛选。'
+                : ''
         }`,
       ),
       audience: 'public',

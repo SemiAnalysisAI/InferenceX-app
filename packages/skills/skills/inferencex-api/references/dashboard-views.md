@@ -133,6 +133,28 @@ which controls belong together.
 
 ## Interpretation and maintenance
 
+### Image submission age
+
+`/api/v1/views/current-inferencex-image?includeHistory=true` adds `ageHistory`:
+90 daily UTC points ending on `asOf` (today by default), each containing `date`,
+`p90AgeDays` and `configurationCount`. `ageSummary` is always returned for the
+current filtered image rows. All existing model, sequence, hardware, precision,
+speculation, node-type and framework filters apply to both.
+The default scenario is `agentic-traces` (Agentic) and the default `nodeType` is
+`all`, including non-disaggregated and disaggregated configurations. A model
+without Agentic observations falls back to its first available active scenario.
+
+P90 uses nearest rank, one vote per displayed configuration, measured in whole
+days since its latest successful image-bearing submission. Reusing the same
+image tag in a new submission resets age. This is not the container's build age.
+History carries older observations into the window, includes configurations
+only from their first submission, and excludes future observations. Empty days
+have `p90AgeDays: null`, not zero. Today's model/scenario retirement rules apply
+throughout the historical window; historical retirement states are not stored.
+The current table uses the latest benchmark snapshot, whereas history uses
+successful image-bearing submission events. The chart's hover and keyboard
+inspection are presentation-only and introduce no extra selectors.
+
 OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API.

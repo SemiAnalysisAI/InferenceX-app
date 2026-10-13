@@ -24,6 +24,8 @@ import { track } from '@/lib/analytics/analytics';
 import { Sequence, getSequenceLabel } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getFrameworkLabel } from '@/lib/shared/utils';
+import { ImageAgeChart } from './image-age-chart';
+import { imageAgeSummary, matchesImageFilters, type ImageFilters } from './image-age';
 import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,
@@ -33,7 +35,6 @@ import {
   getActualLatestTag,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
-  imageRowSequence,
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
@@ -202,12 +203,10 @@ export function CurrentImageContent() {
 
   const [selectedModel, setSelectedModel] = useState<string>('all');
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
-  // 8K/1K is the fixed-sequence scenario still swept across models; 1K/1K and
-  // 1K/8K are retired, so they never reach the dropdown.
-  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.EightK_OneK);
+  const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.AgenticTraces);
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
-  const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('single');
+  const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('all');
   // Empty array = no framework filter (matches every row); any non-empty array
   // limits the table to rows whose base framework is in the set.
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
@@ -232,39 +231,34 @@ export function CurrentImageContent() {
   // page's read-only display (no need to tick every minute).
   const today = useMemo(() => new Date(), []);
 
+  const imageFilters = useMemo<ImageFilters>(
+    () => ({
+      model: selectedModel,
+      precision: selectedPrecision,
+      sequence: effectiveSequence,
+      spec: selectedSpecMethod,
+      hardware: selectedHardware,
+      nodeType: selectedNodeType,
+      frameworks: selectedFrameworks,
+    }),
+    [
+      selectedModel,
+      selectedPrecision,
+      effectiveSequence,
+      selectedSpecMethod,
+      selectedHardware,
+      selectedNodeType,
+      selectedFrameworks,
+    ],
+  );
+
   const filtered = useMemo(() => {
     if (!activeRows) return [];
-    const rows = activeRows.filter((row) => {
-      if (selectedModel !== 'all' && imageRowDisplayModel(row) !== selectedModel) return false;
-      if (selectedPrecision !== 'all' && row.precision !== selectedPrecision) return false;
-      if (imageRowSequence(row) !== effectiveSequence) return false;
-      if (selectedSpecMethod !== 'all' && row.spec_method !== selectedSpecMethod) return false;
-      if (selectedHardware !== 'all' && row.hardware !== selectedHardware) return false;
-      if (selectedNodeType !== 'all') {
-        const disagg = row.disagg;
-        if (selectedNodeType === 'single' && disagg) return false;
-        if (selectedNodeType === 'disagg' && !disagg) return false;
-      }
-      if (
-        selectedFrameworks.length > 0 &&
-        !selectedFrameworks.includes(baseFramework(row.framework))
-      )
-        return false;
-      return true;
-    });
+    const rows = activeRows.filter((row) => matchesImageFilters(row, imageFilters));
     // Sort oldest-image first so the most stale entries surface at the top —
     // users primarily care about "what hasn't been refreshed in a while".
     return rows.toSorted((a, b) => a.date.localeCompare(b.date));
-  }, [
-    activeRows,
-    selectedModel,
-    selectedPrecision,
-    effectiveSequence,
-    selectedSpecMethod,
-    selectedHardware,
-    selectedNodeType,
-    selectedFrameworks,
-  ]);
+  }, [activeRows, imageFilters]);
 
   return (
     <div className="w-full min-w-0">
@@ -516,6 +510,14 @@ export function CurrentImageContent() {
             </ControlPanel>
           </div>
         </TooltipProvider>
+      )}
+
+      {data && (
+        <ImageAgeChart
+          filters={imageFilters}
+          summary={imageAgeSummary(filtered, today.toISOString().slice(0, 10))}
+          locale={locale}
+        />
       )}
 
       {activeRows && filtered.length === 0 && (
