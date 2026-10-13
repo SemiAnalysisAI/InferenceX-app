@@ -5,6 +5,7 @@ import {
   type OperatingState,
   type PowerComponentBreakdown,
   sum_watts,
+  validate_instance,
   ValidationError,
 } from '../../../../base';
 import { B300_BOARD_BASELINE } from '../../profiles';
@@ -30,6 +31,7 @@ export class B300HGXBoard extends NVIDIA8WayHGXBoard {
     ...fields
   }: B300HGXBoardFields = {}) {
     if (gpu_tdp_w !== 1200) throw new ValidationError('Input should be 1200');
+    validate_instance(nic, ConnectX8NICCard);
     super({
       gpu_tdp_w,
       // Derived from the switches and NIC state unless supplied.

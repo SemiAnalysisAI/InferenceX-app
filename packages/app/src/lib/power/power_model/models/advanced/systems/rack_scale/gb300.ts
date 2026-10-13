@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /** GB300 NVL72 and its endpoint-based external fabric allocation. */
 
+import { validate_instance } from '../../../../base';
 import { NetworkGroup } from '../../networking/base';
 import { Generic512TEthernetSwitch } from '../../networking/ethernet_512t';
 import { GB300ComputeTray } from './compute_tray';
@@ -24,6 +25,6 @@ export class GB300NVL72RackScaleSystem extends RackScaleSystem {
     compute_tray = new GB300ComputeTray(),
     ...rest
   }: Partial<RackScaleSystemFields> = {}) {
-    super({ compute_tray, ...rest });
+    super({ compute_tray: validate_instance(compute_tray, GB300ComputeTray), ...rest });
   }
 }

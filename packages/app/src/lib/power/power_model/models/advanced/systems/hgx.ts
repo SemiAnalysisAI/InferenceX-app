@@ -7,8 +7,10 @@ import {
   type JsonObject,
   OperatingState,
   PowerComponentBreakdown,
+  type Provenance,
   sum_watts,
   validate_count,
+  validate_instance,
   ValidationError,
   ValueError,
   WorkloadState,
@@ -66,6 +68,7 @@ export interface HGXSystemChassisFields {
   ubb: UniversalBaseBoard;
   psu: PSUEfficiencyModel;
   fan_policy?: HGXFanPolicy;
+  provenance?: Provenance;
 }
 
 type ChassisDefaults = Partial<HGXSystemChassisFields>;
@@ -94,8 +97,9 @@ export abstract class HGXSystemChassis extends GPUSystem {
     ubb,
     psu,
     fan_policy = new HGXFanPolicy(),
+    provenance,
   }: HGXSystemChassisFields) {
-    super({ gpu_count });
+    super({ gpu_count, provenance });
     this.components = components;
     this.nvme_count = validate_count(nvme_count);
     this.ubb = ubb;
@@ -260,7 +264,7 @@ export class MI300HGXSystemChassis extends HGXSystemChassis {
     ubb = new MI300UBB(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, MI300UBB), ...rest });
   }
 }
 
@@ -275,7 +279,7 @@ export class MI325HGXSystemChassis extends HGXSystemChassis {
     ubb = new MI325UBB(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, MI325UBB), ...rest });
   }
 }
 
@@ -290,7 +294,7 @@ export class MI355HGXSystemChassis extends HGXSystemChassis {
     ubb = new MI355UBB(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, MI355UBB), ...rest });
   }
 }
 
@@ -306,7 +310,7 @@ export class HopperHGXSystemChassis extends HGXSystemChassis {
     ubb = new HopperHGXBoard(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, HopperHGXBoard), ...rest });
   }
 }
 
@@ -321,7 +325,7 @@ export class B200HGXSystemChassis extends HGXSystemChassis {
     ubb = new B200HGXBoard(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, B200HGXBoard), ...rest });
   }
 }
 
@@ -338,7 +342,7 @@ export class B300HGXSystemChassis extends HGXSystemChassis {
     ubb = new B300HGXBoard(),
     ...rest
   }: ChassisDefaults = {}) {
-    super({ psu, ubb, ...rest });
+    super({ psu, ubb: validate_instance(ubb, B300HGXBoard), ...rest });
     if (this.components.some((group) => group.component instanceof PCIeSwitch)) {
       throw new ValidationError('B300 has no chassis-level PCIe switches');
     }

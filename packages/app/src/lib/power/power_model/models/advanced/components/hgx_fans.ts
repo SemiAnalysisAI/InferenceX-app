@@ -5,6 +5,7 @@
 import {
   type Details,
   FrozenModel,
+  model_validator,
   Provenance,
   sum_watts,
   validate_count,
@@ -190,7 +191,7 @@ export class NormalizedHGXFanPower extends FanPower {
     this.gpu_count = validate_count(gpu_count);
     this.design_non_gpu_power_w = validate_watts(design_non_gpu_power_w);
     this.policy = policy;
-    validate_watts(this.electrical_nameplate_w);
+    model_validator(() => validate_watts(this.electrical_nameplate_w));
   }
 
   get full_cooling_load_w(): number {

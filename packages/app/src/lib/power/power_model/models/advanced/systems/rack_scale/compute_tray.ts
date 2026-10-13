@@ -8,6 +8,7 @@ import {
   PowerComponentBreakdown,
   Provenance,
   sum_watts,
+  validate_instance,
   ValidationError,
 } from '../../../../base';
 import type { BiancaBoard } from '../../components/bianca/bianca';
@@ -129,7 +130,7 @@ export class GB200ComputeTray extends ComputeTray {
   static override readonly optic_type: SystemSideTransceiverType = SystemSide400GTransceiver;
 
   constructor({ board = new GB200BiancaBoard(), ...rest }: Partial<ComputeTrayFields> = {}) {
-    super({ board, ...rest });
+    super({ board: validate_instance(board, GB200BiancaBoard), ...rest });
   }
 }
 
@@ -139,6 +140,6 @@ export class GB300ComputeTray extends ComputeTray {
   static override readonly optic_type: SystemSideTransceiverType = SystemSide800GTransceiver;
 
   constructor({ board = new GB300BiancaBoard(), ...rest }: Partial<ComputeTrayFields> = {}) {
-    super({ board, ...rest });
+    super({ board: validate_instance(board, GB300BiancaBoard), ...rest });
   }
 }

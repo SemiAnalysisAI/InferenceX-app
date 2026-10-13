@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
+/* oxlint-disable unicorn/prefer-bigint-literals -- bigint literals need a compile target above ES2018 */
 /** Shared inputs, auditable results, and the per-GPU estimation contract. */
 // Port of power_model/src/power_model/base.py at the revision in manifest.ts.
 
@@ -67,6 +68,32 @@ export function validate_count(value: number): number {
   if (!Number.isSafeInteger(value)) throw new ValidationError('Input should be a valid integer');
   if (!(value > 0)) throw new ValidationError('Input should be greater than 0');
   return value;
+}
+
+/** A model class the port can check at runtime, like pydantic's `isinstance` on a field. */
+type ModelType<T> = (abstract new (...args: never[]) => T) & { readonly typeName: string };
+
+/**
+ * pydantic's `model_type` rejection: a field typed as one model class rejects every
+ * other class, including a structurally identical sibling such as another NIC card.
+ */
+export function validate_instance<T>(value: unknown, type: ModelType<T>): T {
+  if (!(value instanceof type)) {
+    throw new ValidationError(`Input should be a valid dictionary or instance of ${type.typeName}`);
+  }
+  return value;
+}
+
+/** Run an after-validator: pydantic reports a ValueError raised inside one as a ValidationError. */
+export function model_validator<T>(validate: () => T): T {
+  try {
+    return validate();
+  } catch (error) {
+    if (error instanceof ValueError && !(error instanceof ValidationError)) {
+      throw new ValidationError(error.message);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -157,20 +184,73 @@ export function isclose(a: number, b: number, rel_tol: number, abs_tol: number):
   return diff <= Math.abs(rel_tol * b) || diff <= Math.abs(rel_tol * a) || diff <= abs_tol;
 }
 
-const strip = (text: string) => (text.includes('.') ? text.replace(/\.?0+$/, '') : text);
+const MANTISSA_BITS = BigInt(52);
+const IMPLICIT_BIT = BigInt(1) << MANTISSA_BITS;
 
-/** Python's `format(value, 'g')`: six significant digits, trailing zeros removed. */
+/** The exact decimal digits of a finite non-zero |value| and the power of ten of its first digit. */
+function exact_decimal(value: number): { digits: string; exponent: number } {
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, Math.abs(value));
+  const bits = view.getBigUint64(0);
+  const biased = Number(bits >> MANTISSA_BITS);
+  const fraction = bits & (IMPLICIT_BIT - BigInt(1));
+  const mantissa = biased === 0 ? fraction : fraction | IMPLICIT_BIT;
+  const power = (biased === 0 ? 1 : biased) - 1075;
+  // mantissa * 2^power; a negative power is mantissa * 5^-power over 10^-power.
+  const scaled = power >= 0 ? mantissa << BigInt(power) : mantissa * BigInt(5) ** BigInt(-power);
+  const text = scaled.toString();
+  return { digits: text.replace(/0+$/u, ''), exponent: text.length - 1 + Math.min(power, 0) };
+}
+
+/** Keep `precision` significant digits, rounding an exact tie to even like CPython's `%g`. */
+function round_digits(digits: string, exponent: number, precision: number) {
+  if (digits.length <= precision) return { digits, exponent };
+  const kept = digits.slice(0, precision);
+  const tail = digits.slice(precision);
+  const odd = Number(kept[precision - 1]) % 2 === 1;
+  const up = tail[0] > '5' || (tail[0] === '5' && (tail.length > 1 || odd));
+  if (!up) return { digits: kept.replace(/0+$/u, ''), exponent };
+  const rounded = (BigInt(kept) + BigInt(1)).toString();
+  return {
+    digits: rounded.slice(0, precision).replace(/0+$/u, ''),
+    exponent: rounded.length > precision ? exponent + 1 : exponent,
+  };
+}
+
+/** Python's `format(value, 'g')`: six significant digits, ties to even, trailing zeros removed. */
 export function formatG(value: number): string {
   if (Number.isNaN(value)) return 'nan';
   if (!Number.isFinite(value)) return value > 0 ? 'inf' : '-inf';
   if (value === 0) return Object.is(value, -0) ? '-0' : '0';
-  const [mantissa, exponentText] = value.toExponential(5).split('e');
-  const exponent = Number(exponentText);
+  const exact = exact_decimal(value);
+  const { digits, exponent } = round_digits(exact.digits, exact.exponent, 6);
+  const sign = value < 0 ? '-' : '';
   if (exponent < -4 || exponent >= 6) {
-    const sign = exponent < 0 ? '-' : '+';
-    return `${strip(mantissa)}e${sign}${String(Math.abs(exponent)).padStart(2, '0')}`;
+    const mantissa = digits.length > 1 ? `${digits[0]}.${digits.slice(1)}` : digits;
+    const exponentSign = exponent < 0 ? '-' : '+';
+    return `${sign}${mantissa}e${exponentSign}${String(Math.abs(exponent)).padStart(2, '0')}`;
   }
-  return strip(value.toFixed(5 - exponent));
+  if (exponent < 0) return `${sign}0.${'0'.repeat(-exponent - 1)}${digits}`;
+  const integer = digits.slice(0, exponent + 1).padEnd(exponent + 1, '0');
+  const fractional = digits.slice(exponent + 1);
+  return `${sign}${integer}${fractional ? `.${fractional}` : ''}`;
+}
+
+/** Python's `repr()` of a str, as an enum's "is not a valid" message quotes the input. */
+export function py_repr(text: string): string {
+  const quote = text.includes("'") && !text.includes('"') ? '"' : "'";
+  let out = quote;
+  for (const char of text) {
+    const code = char.codePointAt(0) as number;
+    if (char === '\\') out += String.raw`\\`;
+    else if (char === quote) out += `\\${quote}`;
+    else if (char === '\n') out += String.raw`\n`;
+    else if (char === '\r') out += String.raw`\r`;
+    else if (char === '\t') out += String.raw`\t`;
+    else if (code < 32 || code === 127) out += `\\x${code.toString(16).padStart(2, '0')}`;
+    else out += char;
+  }
+  return out + quote;
 }
 
 /** Convert a model value into the JSON pydantic's `model_dump(mode="json")` produces. */
@@ -221,7 +301,7 @@ export function parse_workload(value: unknown): WorkloadState {
     throw new ValidationError('workload_state must be a supported workload name');
   }
   if (!WORKLOAD_STATES.includes(value)) {
-    throw new ValidationError(`'${value}' is not a valid WorkloadState`);
+    throw new ValidationError(`${py_repr(value)} is not a valid WorkloadState`);
   }
   return value as WorkloadState;
 }
@@ -265,6 +345,7 @@ export class OperatingState extends FrozenModel {
 export const DEFAULT_OPERATING_STATE = new OperatingState();
 
 export type ProvenanceKind = 'input' | 'assumed' | 'measured' | 'estimated';
+const PROVENANCE_KINDS: readonly string[] = ['input', 'assumed', 'measured', 'estimated'];
 
 export interface ProvenanceFields {
   profile_id: string;
@@ -291,6 +372,9 @@ export class Provenance extends FrozenModel {
       if (typeof fields[key] !== 'string' || fields[key].length === 0) {
         throw new ValidationError('String should have at least 1 character');
       }
+    }
+    if (!PROVENANCE_KINDS.includes(fields.kind)) {
+      throw new ValidationError("Input should be 'input', 'assumed', 'measured' or 'estimated'");
     }
     this.profile_id = fields.profile_id;
     this.version = fields.version;
@@ -361,7 +445,12 @@ export class PowerComponentBreakdown extends FrozenModel {
     this.configuration = configuration;
     if (
       children.length > 0 &&
-      !isclose(power_w, sum_watts(children.map((child) => child.power_w)), 1e-12, 1e-9)
+      !isclose(
+        power_w,
+        model_validator(() => sum_watts(children.map((child) => child.power_w))),
+        1e-12,
+        1e-9,
+      )
     ) {
       throw new ValidationError('Parent power must equal the sum of child power');
     }
@@ -398,7 +487,7 @@ export class PowerComponentBreakdown extends FrozenModel {
 
   /** The `details` pairs as a lookup, like Python's `dict(component.details)`. */
   detail(key: string): DetailValue | undefined {
-    return this.details.find(([name]) => name === key)?.[1];
+    return this.details.findLast(([name]) => name === key)?.[1];
   }
 
   protected fields() {

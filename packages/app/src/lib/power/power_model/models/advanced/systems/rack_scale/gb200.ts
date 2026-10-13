@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /** GB200 NVL72 and its endpoint-based external fabric allocation. */
 
+import { validate_instance } from '../../../../base';
 import { NetworkGroup } from '../../networking/base';
 import { QM9700NDRInfiniBandSwitch } from '../../networking/qm9700';
 import { GB200ComputeTray } from './compute_tray';
@@ -24,6 +25,6 @@ export class GB200NVL72RackScaleSystem extends RackScaleSystem {
     compute_tray = new GB200ComputeTray(),
     ...rest
   }: Partial<RackScaleSystemFields> = {}) {
-    super({ compute_tray, ...rest });
+    super({ compute_tray: validate_instance(compute_tray, GB200ComputeTray), ...rest });
   }
 }

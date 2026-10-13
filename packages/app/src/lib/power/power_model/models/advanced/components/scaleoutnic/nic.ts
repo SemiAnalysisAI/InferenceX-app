@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /** NIC capacity metadata and fixed active/idle electrical power. */
 
-import { type Details, type OperatingState, ValidationError } from '../../../../base';
+import { type Details, type OperatingState, py_repr, ValidationError } from '../../../../base';
 import { GenericComponent, type GenericComponentFields } from '../base';
 
 // oxlint-disable-next-line no-redeclare -- a value-and-type pair, like the Python Literal
@@ -31,7 +31,7 @@ export abstract class ScaleOutNICCard extends GenericComponent {
       throw new ValidationError("NIC state must be 'active' or 'idle'");
     }
     if (state !== NICState.ACTIVE && state !== NICState.IDLE) {
-      throw new ValidationError(`'${state}' is not a valid NICState`);
+      throw new ValidationError(`${py_repr(state)} is not a valid NICState`);
     }
     this.state = state;
   }
