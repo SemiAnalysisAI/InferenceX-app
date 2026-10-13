@@ -28,6 +28,13 @@ describe('ubenchX hub and test routes', () => {
 
   it('switches to sm-l2-distance with the test selector', () => {
     cy.visit('/ubenchx/mem-bw', dismissModal);
+    cy.contains('ubenchX').should('be.visible');
+    cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/ubenchx/mem-bw');
+
     cy.get('[data-testid="ubenchx-test-select"]').click();
     cy.contains('[role="option"]', 'SM-SM L2 Latency Difference').click();
     cy.url().should('include', '/ubenchx/sm-l2-distance');
@@ -77,27 +84,14 @@ describe('ubenchX hub and test routes', () => {
     );
   });
 
-  it('renders the mem-bw page directly with noindex', () => {
-    cy.visit('/ubenchx/mem-bw', dismissModal);
-    cy.contains('ubenchX').should('be.visible');
-    cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
-    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
-    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
-      .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx/mem-bw');
-  });
-
-  it('renders the sm-l2-distance page directly with noindex', () => {
+  it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
     cy.visit('/ubenchx/sm-l2-distance', dismissModal);
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
       .should('include', '/zh/ubenchx/sm-l2-distance');
-  });
 
-  it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
-    cy.visit('/ubenchx/sm-l2-distance', dismissModal);
     cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
     cy.get('@overlay').click(520, 120, { force: true });
     cy.get('[data-testid="sm-l2-tooltip"]')
@@ -118,10 +112,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
       .should('include', '/ubenchx/mem-bw');
-  });
 
-  it('renders the Chinese mem-bw page', () => {
-    cy.visit('/zh/ubenchx/mem-bw', dismissModal);
     cy.contains('h2', 'HBM 带宽').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');

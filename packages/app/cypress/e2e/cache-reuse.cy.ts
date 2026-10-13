@@ -57,15 +57,7 @@ describe('Prefix Cache Reuse', () => {
         .should('contain.text', 'HBM cache')
         .and('contain.text', 'Host cache')
         .and('contain.text', 'Not reused');
-    });
 
-    it('takes the host tier from the CPU-offload rate and leaves the external rate out', () => {
-      firstRowCell('HBM').should('have.text', '80.0%');
-      firstRowCell('Host').should('have.text', '5.0%');
-      firstRowCell('Not reused').should('have.text', '15.0%');
-    });
-
-    it('labels the configuration control and shows the plotted config', () => {
       cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
       cy.get('[data-testid="cache-reuse-config-selector"]')
@@ -75,6 +67,12 @@ describe('Prefix Cache Reuse', () => {
             .should('contain.text', config.trim())
             .and('contain.text', 'Source: SemiAnalysis InferenceX');
         });
+    });
+
+    it('takes the host tier from the CPU-offload rate and leaves the external rate out', () => {
+      firstRowCell('HBM').should('have.text', '80.0%');
+      firstRowCell('Host').should('have.text', '5.0%');
+      firstRowCell('Not reused').should('have.text', '15.0%');
     });
   });
 
@@ -152,9 +150,7 @@ describe('Prefix Cache Reuse', () => {
         .and('include', 'overlay-run-0');
       cy.get(`${BARS}[data-series="official"]`).first().should('have.attr', 'stroke', 'none');
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
-    });
 
-    it('lists the run under its branch in the table', () => {
       cy.get('[data-testid="cache-reuse-table"] tbody tr').should(
         'have.length',
         REAL_CONFIGS.length * 2,

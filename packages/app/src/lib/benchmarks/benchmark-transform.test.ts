@@ -172,6 +172,20 @@ describe('rowToAggDataEntry', () => {
     expect(entry.decode_pcp_size).toBe(1);
   });
 
+  it('preserves DWDP width without rewriting tensor parallelism', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        disagg: true,
+        prefill_tp: 1,
+        prefill_num_workers: 2,
+        metrics: { prefill_dwdp_size: 8 },
+      }),
+    );
+    expect(entry.prefill_dwdp_size).toBe(8);
+    expect(entry.prefill_tp).toBe(1);
+    expect(rowToAggDataEntry(makeRow()).prefill_dwdp_size).toBeUndefined();
+  });
+
   it('mirrors aggregate artifact DCP and PCP widths into both topology roles', () => {
     const entry = rowToAggDataEntry(
       makeRow({

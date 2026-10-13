@@ -40,7 +40,7 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('deepseek-r1');
     });
 
-    it('inline architecture header renders with MoE badges', () => {
+    it('expands dense transformer block on click', () => {
       cy.get('[data-testid="model-architecture-inline"]').should(
         'contain.text',
         'Model Architecture',
@@ -48,22 +48,16 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MoE');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '671B');
-    });
 
-    it('shows collapsed transformer blocks by default with expand icons', () => {
       // MoE model (DeepSeek R1) should show both dense and MoE collapsed blocks
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
       cy.get('[data-testid="expand-transformer"]').should('exist');
-    });
 
-    it('expands dense transformer block on click', () => {
       cy.get('[data-testid="expand-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="collapse-denseTransformer"]').should('exist');
       // Main transformer should still be collapsed
       cy.get('[data-testid="expand-transformer"]').should('exist');
-    });
 
-    it('collapses expanded dense transformer block', () => {
       // Already expanded from previous test
       cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
@@ -74,21 +68,15 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="collapse-transformer"]').should('exist');
       // Dense block should still be collapsed
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
-    });
 
-    it('expanded MoE transformer block shows expert grid (not attention expand for MLA)', () => {
       // MLA attention should NOT be expandable
       cy.get('[data-testid="expand-attention"]').should('not.exist');
       // Expert grid should be expandable
       cy.get('[data-testid="expand-experts"]').should('exist');
-    });
 
-    it('expert grid can be expanded to show SwiGLU details', () => {
       cy.get('[data-testid="expand-experts"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-    });
 
-    it('collapses expanded MoE transformer block', () => {
       cy.get('[data-testid="collapse-transformer"]').click({ force: true });
       cy.get('[data-testid="expand-transformer"]').should('exist');
     });
@@ -111,25 +99,19 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('llama-3-3-70b');
     });
 
-    it('shows single transformer block without dense sub-block', () => {
+    it('expanded transformer block contains expandable attention and FFN', () => {
       cy.get('[data-testid="expand-transformer"]').should('exist');
       cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
-    });
 
-    it('expanded transformer block contains expandable attention and FFN', () => {
       cy.get('[data-testid="expand-transformer"]').click({ force: true });
 
       cy.get('[data-testid="expand-attention"]').should('exist');
       cy.get('[data-testid="expand-ffn"]').should('exist');
-    });
 
-    it('nested expansion works: expand transformer then expand attention', () => {
       // Transformer already expanded from previous test
       cy.get('[data-testid="expand-attention"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-    });
 
-    it('shows Dense badge and GQA badge', () => {
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'Dense');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'GQA');
     });
@@ -140,18 +122,14 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('kimi-k26');
     });
 
-    it('shows both dense and MoE transformer blocks', () => {
+    it('MLA attention is NOT expandable in MoE block', () => {
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
       cy.get('[data-testid="expand-transformer"]').should('exist');
-    });
 
-    it('MLA attention is NOT expandable in MoE block', () => {
       cy.get('[data-testid="expand-transformer"]').click({ force: true });
       cy.get('[data-testid="expand-attention"]').should('not.exist');
       cy.get('[data-testid="expand-experts"]').should('exist');
-    });
 
-    it('expert grid can be expanded to show SwiGLU details', () => {
       cy.get('[data-testid="expand-experts"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
@@ -162,18 +140,14 @@ describe('Model Architecture Diagram', () => {
       visitModelPage('minimax-m27');
     });
 
-    it('shows single MoE transformer block without dense sub-block', () => {
+    it('GQA attention is NOT expandable despite being GQA type', () => {
       cy.get('[data-testid="expand-transformer"]').should('exist');
       cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
-    });
 
-    it('GQA attention is NOT expandable despite being GQA type', () => {
       cy.get('[data-testid="expand-transformer"]').click({ force: true });
       cy.get('[data-testid="expand-attention"]').should('not.exist');
       cy.get('[data-testid="expand-experts"]').should('exist');
-    });
 
-    it('expert grid can be expanded to show SwiGLU details', () => {
       cy.get('[data-testid="expand-experts"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
@@ -203,9 +177,7 @@ describe('Model Architecture Diagram', () => {
       // No single "expand-transformer" block (replaced by two alternating blocks)
       cy.get('[data-testid="expand-transformer"]').should('not.exist');
       cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
-    });
 
-    it('shows alternating indicator between the two blocks', () => {
       cy.get('[data-testid="alternating-indicator"]').should('exist');
     });
 
@@ -216,26 +188,18 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
       // Second block should remain collapsed
       cy.get('[data-testid="expand-altBlock1"]').should('exist');
-    });
 
-    it('second block expands to show Causal Grouped Query Attention internals', () => {
       cy.get('[data-testid="expand-altBlock1"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock1"]').should('exist');
       // Expert grid should be expandable within the block
       cy.get('[data-testid="expand-altExperts1"]').should('exist');
-    });
 
-    it('both blocks are expanded simultaneously', () => {
       // Both were expanded in previous tests
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
       cy.get('[data-testid="collapse-altBlock1"]').should('exist');
-    });
 
-    it('AlternatingSinkGQA attention is NOT expandable within blocks', () => {
       cy.get('[data-testid="expand-attention"]').should('not.exist');
-    });
 
-    it('expert grid can be expanded to show SwiGLU details', () => {
       cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
@@ -283,9 +247,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain', 'single softmax');
       // Expert grid still expandable within the block
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
-    });
 
-    it('expert grid can be expanded to show SwiGLU details', () => {
       cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
     });
@@ -520,13 +482,11 @@ describe('Model Architecture Diagram', () => {
       });
     });
 
-    it('renders the changelog header collapsed inside the embed', () => {
+    it('can still be expanded manually', () => {
       cy.contains('button', 'Config Changelog', { timeout: 20000 })
         .should('be.visible')
         .and('have.attr', 'aria-expanded', 'false');
-    });
 
-    it('can still be expanded manually', () => {
       cy.contains('button', 'Config Changelog').click();
       cy.contains('button', 'Config Changelog').should('have.attr', 'aria-expanded', 'true');
     });

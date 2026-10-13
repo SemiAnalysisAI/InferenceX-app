@@ -1,7 +1,7 @@
 import createBundler from '@bahmutov/cypress-esbuild-preprocessor';
 import { defineConfig } from 'cypress';
-import cypressSplit from 'cypress-split';
 import path from 'path';
+import { setupTimingSplit } from './cypress/plugins/timings';
 
 export default defineConfig({
   allowCypressEnv: false,
@@ -42,13 +42,13 @@ export default defineConfig({
           alias: { '@': path.resolve(__dirname, 'src') },
         }),
       );
-      cypressSplit(on, config);
+      setupTimingSplit(on, config);
       return config;
     },
   },
   component: {
     setupNodeEvents(on, config) {
-      cypressSplit(on, config);
+      setupTimingSplit(on, config);
       return config;
     },
     devServer: {

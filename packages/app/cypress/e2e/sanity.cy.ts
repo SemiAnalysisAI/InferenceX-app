@@ -2,14 +2,6 @@
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
 describe('Page Load & Navigation', () => {
-  before(() => {
-    cy.visit('/');
-  });
-
-  it('page loads with correct title', () => {
-    cy.title().should('eq', 'AI Accelerator System Benchmark | AcceleratorX by SemiAnalysis');
-  });
-
   it('page renders without JavaScript errors', () => {
     const errors: string[] = [];
     const knownBrowserErrors = ['navigator.storage.persisted'];
@@ -27,6 +19,8 @@ describe('Page Load & Navigation', () => {
     cy.get('[data-testid="header"]').should('exist');
     cy.get('[data-testid="footer"]').should('exist');
     cy.wrap(errors).should('have.length', 0);
+
+    cy.title().should('eq', 'AI Accelerator System Benchmark | AcceleratorX by SemiAnalysis');
   });
 
   it('navigates from the footer to the land acknowledgement page', () => {
@@ -60,6 +54,17 @@ describe('Page Load & Navigation', () => {
       },
     });
 
+    cy.get('[data-testid^="faq-copy-link-"]')
+      .should('have.length', 15)
+      .each(($button) => {
+        cy.wrap($button)
+          .should('be.visible')
+          .and('have.text', '')
+          .and('have.attr', 'title', 'Copy link')
+          .find('svg.lucide-link')
+          .should('be.visible');
+      });
+
     cy.get('#faq-normalized-interactivity')
       .should('be.visible')
       .within(() => {
@@ -85,21 +90,6 @@ describe('Page Load & Navigation', () => {
       `${Cypress.config('baseUrl')}/about#faq-normalized-interactivity`,
     );
     cy.location('hash').should('eq', '#faq-normalized-interactivity');
-  });
-
-  it('shows a copy-link button for every FAQ question', () => {
-    cy.visit('/about');
-
-    cy.get('[data-testid^="faq-copy-link-"]')
-      .should('have.length', 15)
-      .each(($button) => {
-        cy.wrap($button)
-          .should('be.visible')
-          .and('have.text', '')
-          .and('have.attr', 'title', 'Copy link')
-          .find('svg.lucide-link')
-          .should('be.visible');
-      });
   });
 });
 

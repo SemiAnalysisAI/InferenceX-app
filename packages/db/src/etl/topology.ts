@@ -41,6 +41,8 @@ export function resolveConfigTopology(
     topologyMarker === false &&
     parseOptionalBool(src.disagg) === false;
   const gpuCount = (tp: number, ep: number, prefix = '') => {
+    const dwdp = physicalChipCount(src[`${prefix}dwdp_size`]);
+    if (dwdp && dwdp > 1) return tp * dwdp;
     if (
       (topologyMarker !== undefined && sharedEpDevices && (prefix || src.num_gpus === undefined)) ||
       (!prefix && v3Aggregate)

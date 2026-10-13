@@ -99,9 +99,6 @@ export function useChartData(
    * configs that the selected run did not produce.
    */
   selectedRunId?: string,
-  /** Selected main run id, including non-contested runs, used only to avoid
-   * fetching the primary run again as a same-day comparison overlay. */
-  comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
   selectedXAxisMode?: XAxisMode,
@@ -211,15 +208,8 @@ export function useChartData(
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
-    () =>
-      buildComparisonDates(
-        selectedGPUs,
-        selectedDates,
-        selectedDateRange,
-        selectedRunDate,
-        comparisonMainRunId,
-      ),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, comparisonMainRunId],
+    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
   );
 
   // Each comparison entry is either a plain date (latest run that day, exact-date

@@ -7,6 +7,15 @@ registry.test.ts, including hidden and feature-gated routes.
 
 ## Static editorial content
 
+`/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and
+About FAQ entry points, document running the external `agentx-harness` CLI.
+They add no benchmark data, selectors, calculations, or server-side execution.
+Copy buttons are presentation-only; no API/OpenAPI contract
+changes are needed. `/llms.txt` discovers the guide, and the existing
+`packages/skills/skills/inferencex-api/references/agentx.md` cookbook documents the
+same pinned command and routing flags. Running the harness does not submit or
+publish results through the read-only API.
+
 `/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling
 reproduce the public GLM-5.3 newsletter article, with the September 28, 2026
 benchmark snapshot and original figures. They add no data selectors, calculations,
@@ -27,6 +36,16 @@ by the `ubenchx` view (`GET /api/v1/views/ubenchx?test=<test>&gpu=<gpu|all>`), w
 runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylineRun` as the pages. The mem-bw
 Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
 already includes all three metrics, so it adds no query parameter.
+
+The profit estimators' responsive control grouping and widths are presentation-only.
+They do not change selectors, URL parameters, calculations, or returned data, so
+the existing profit view API and `inferencex-skills` contracts are unchanged.
+
+## Site search exclusion
+
+The header site search is presentation-only navigation over public page text. It has no
+data selector, filter, unit or calculation and calls no `/api/v1` route, so it needs no view
+API or skills entry. See [Site Search](./site-search.md).
 
 ## Exact query-key inventory
 
@@ -250,6 +269,31 @@ The scatter chart's Frontier points table (shown with `i_frontier` on a measured
 power metric) lists the drawn cross-platform frontier with each point's run and
 attempt, and exports it as CSV. The views API has no global-frontier parameter, so
 that table remains dashboard-only.
+
+## Staged-run chart link coverage
+
+The staging callback's links select existing inference controls: `g_model`,
+`i_seq`, `i_prec`, `i_gpus`, and the run-qualified
+`i_dates=YYYY-MM-DD~rRUN_ID`, with throughput/interactivity axes. Their read-only
+counterparts are the existing `/api/v1/views/inference` `model`, `sequence`,
+`precisions`, `gpus`, `dates`, `metric=tpPerGpu` and `xmode=interactivity`
+parameters. `optimal=true&best=false` returns the selected line's Pareto points.
+The `comparisons[].entry` field identifies the requested exact logical snapshot;
+primary `runId` can instead select that snapshot as the main result.
+
+The API already preserves every run-qualified comparison, including one matching
+its primary `runId`: `comparisonSelections` parses entries independently of the
+main run, and the inference handler fetches and projects every comparison scope.
+The frontend correction removes its same-run fetch suppression, bringing it back
+into agreement with that existing contract. No endpoint, query key, response
+shape or calculation changes. The API source digest is refreshed because the
+shared chart-data module changed; the existing OpenAPI exact-run description
+continues to apply.
+
+Line-label visibility (`i_linelabel`) and the callback's descriptive link text are
+presentation-only. Staging ingestion and its callback remain privileged mutations,
+so they do not gain public API endpoints. The companion skill reference documents
+selector translation and preserving the staging deployment origin.
 
 ## Verification scope
 

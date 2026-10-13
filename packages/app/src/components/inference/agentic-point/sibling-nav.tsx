@@ -108,6 +108,7 @@ export function chipLabel(s: BenchmarkSibling): string {
     prefillPp: s.prefill_pp ?? undefined,
     prefillDcp: s.prefill_dcp_size ?? undefined,
     prefillPcp: s.prefill_pcp_size ?? undefined,
+    prefillDwdp: s.prefill_dwdp_size ?? undefined,
     prefillDpAttention: s.prefill_dp_attention,
     prefillNumWorkers: s.prefill_num_workers,
     decodeTp: s.decode_tp,
@@ -168,7 +169,7 @@ const SORT_VALUES: SortMode[] = ['default', 'conc', 'parallelism', 'tput', 'requ
 // of one parallelism lands together, ordered by concurrency within.
 const parallelRank = (
   s: BenchmarkSibling,
-): [number, number, number, number, number, number, number] => {
+): [number, number, number, number, number, number, number, number] => {
   const usePrefill = !s.disagg && s.decode_tp <= 0 && s.prefill_tp > 0;
   return [
     usePrefill ? s.prefill_ep : s.decode_ep,
@@ -176,6 +177,7 @@ const parallelRank = (
     (usePrefill ? s.prefill_pp : s.decode_pp) ?? 1,
     (usePrefill ? s.prefill_dcp_size : s.decode_dcp_size) ?? 1,
     (usePrefill ? s.prefill_pcp_size : s.decode_pcp_size) ?? 1,
+    s.prefill_dwdp_size ?? 1,
     (usePrefill ? s.prefill_dp_attention : s.decode_dp_attention) ? 1 : 0,
     s.disagg ? 1 : 0,
   ];

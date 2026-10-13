@@ -104,6 +104,7 @@ export const getPointLabel = (d: InferenceData): string => {
     prefillPp: d.prefill_pp,
     prefillDcp: d.prefill_dcp_size,
     prefillPcp: d.prefill_pcp_size,
+    prefillDwdp: d.prefill_dwdp_size,
     prefillDpAttention: asBool(d.prefill_dp_attention),
     prefillNumWorkers: d.prefill_num_workers,
     decodeTp: d.decode_tp,
@@ -716,10 +717,11 @@ const PARALLELISM_STRINGS = {
   },
 } as const;
 
-const contextParallelismParts = (dcp?: number, pcp?: number): string => {
+const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): string => {
   const parts: string[] = [];
   if (dcp !== undefined && dcp > 1) parts.push(`DCP: ${dcp}`);
   if (pcp !== undefined && pcp > 1) parts.push(`PCP: ${pcp}`);
+  if (dwdp !== undefined && Number.isInteger(dwdp) && dwdp > 1) parts.push(`DWDP: ${dwdp}`);
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
@@ -736,7 +738,8 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   if (
     (d.ep === null || d.ep === undefined) &&
-    (d.prefill_ep === null || d.prefill_ep === undefined)
+    (d.prefill_ep === null || d.prefill_ep === undefined) &&
+    !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
     return (
       tooltipLine(t.deployment, deployment) +
@@ -757,7 +760,11 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
-    const prefillContext = contextParallelismParts(d.prefill_dcp_size, d.prefill_pcp_size);
+    const prefillContext = contextParallelismParts(
+      d.prefill_dcp_size,
+      d.prefill_pcp_size,
+      d.prefill_dwdp_size,
+    );
     const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
     return `
       ${tooltipLine(t.deployment, deployment)}
@@ -772,6 +779,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   return `
     ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
+    ${d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? tooltipLine('DWDP', d.prefill_dwdp_size) + tooltipLine(t.workers, d.prefill_num_workers ?? 1) : ''}
     ${d.dp === undefined ? '' : tooltipLine(t.dataParallelism, d.dp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
     ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}

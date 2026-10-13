@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { AgentXMethodologyLink } from './agentx-methodology-link';
 import { AgentXOptimizationsCallout } from './agentx-optimizations-callout';
 import { AgentXTelemetryCallout } from './agentx-telemetry-callout';
+import { AgentXQuickstartCallout } from './agentx-quickstart';
 
 type Locale = 'en' | 'zh';
 
@@ -196,6 +197,8 @@ export function AgentXMethodology({ locale }: { locale: Locale }) {
       </header>
 
       <div className="space-y-8 px-5 py-6 sm:px-6">
+        <AgentXQuickstartCallout locale={locale} />
+
         <AgentXOptimizationsCallout locale={locale} />
 
         <AgentXTelemetryCallout locale={locale} />

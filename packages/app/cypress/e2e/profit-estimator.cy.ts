@@ -492,9 +492,7 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="footer-link-fleet"]')
       .should('have.attr', 'href', '/fleet')
       .and('contain.text', 'Fleet Lifecycle');
-  });
 
-  it('stacks TCO first and labels every bar with its revenue', () => {
     chart()
       .find('rect.bar-tco')
       .its('length')
@@ -547,6 +545,11 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('[data-testid="profit-utilization-input"]').clear().type('60').blur();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
+
+    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('clamps utilization and the license fee to 0–100 on blur', () => {
@@ -560,13 +563,6 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('30').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
-  });
-
-  it('retypes the target interactivity and rewrites the heading', () => {
-    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('uses the SKU legend as the bar filter', () => {
@@ -1492,7 +1488,7 @@ describe('Profit Estimator — responsive control panels', () => {
   beforeEach(stubOpenRouter);
 
   for (const route of ['/profit-estimator', '/profit-estimator-per-gigawatt']) {
-    for (const width of [375, 1440]) {
+    for (const width of [375, 768, 1280, 1440]) {
       it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
         cy.viewport(width, 1000);
         cy.visit(route, { onBeforeLoad: suppressNudges });
@@ -1501,6 +1497,33 @@ describe('Profit Estimator — responsive control panels', () => {
           cy.get('legend').should('have.text', 'Benchmark Config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '45');
+        });
+        cy.get('[data-testid="profit-controls"]').should(($controls) => {
+          const bounds = (selector: string) => $controls.find(selector)[0]!.getBoundingClientRect();
+          const model = bounds('#profit-model');
+          const target = bounds('#profit-target');
+          const cache = bounds('#profit-cache-hit');
+          const pricing = bounds('#profit-price-source');
+          if (width >= 768) {
+            expect(Math.abs(model.bottom - target.bottom), 'model/target aligned').to.be.lessThan(
+              2,
+            );
+            expect(Math.abs(target.bottom - cache.bottom), 'target/cache aligned').to.be.lessThan(
+              2,
+            );
+            expect(target.left, 'target beside model').to.be.greaterThan(model.right);
+            expect(cache.left, 'cache beside target').to.be.greaterThan(target.right);
+          } else {
+            expect(target.top, 'target below model').to.be.greaterThan(model.bottom);
+            expect(cache.top, 'cache below target').to.be.greaterThan(target.bottom);
+          }
+          if (width >= 1280) {
+            expect(Math.abs(cache.bottom - pricing.bottom), 'pricing aligned').to.be.lessThan(2);
+            expect(pricing.left, 'pricing beside benchmark').to.be.greaterThan(cache.right);
+          }
+          const history = bounds('[data-testid="profit-history-panel"]');
+          const chip = bounds('#profit-history-gpu');
+          expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
           cy.get('legend').should('have.text', 'Pricing Config');
@@ -1533,8 +1556,12 @@ describe('Profit Estimator — responsive control panels', () => {
             .find('[data-testid="profit-pricing-panel"]')[0]!
             .getBoundingClientRect();
           if (width >= 1280) {
-            expect(Math.abs(benchmark.top - pricing.top), 'aligned panel tops').to.be.lessThan(2);
-            expect(pricing.left - benchmark.right, 'space between panels').to.be.at.least(15);
+            expect(pricing.top - benchmark.bottom, 'custom prices on a full row').to.be.at.least(
+              15,
+            );
+            expect(Math.abs(benchmark.width - pricing.width), 'full-width pricing').to.be.lessThan(
+              2,
+            );
           } else {
             expect(pricing.top - benchmark.bottom, 'stacked panels').to.be.at.least(15);
           }
@@ -1552,6 +1579,22 @@ describe('Profit Estimator — responsive control panels', () => {
         });
         cy.get('#profit-utilization').clear().type('50').blur();
         cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+        cy.get('#profit-price-source').click();
+        cy.contains('[role="option"]', 'Moonshot list price').click();
+        cy.get('[data-testid="profit-custom-prices"]').should('not.exist');
+        pickChip('GB300');
+        cy.get('[data-testid="profit-history-date-range"]').should('be.visible');
+        cy.get('[data-testid="profit-history-panel"]').should(($panel) => {
+          const chip = $panel.find('#profit-history-gpu')[0]!.getBoundingClientRect();
+          const dates = $panel
+            .find('[data-testid="profit-history-date-range"]')[0]!
+            .getBoundingClientRect();
+          if (width >= 768) {
+            expect(dates.left, 'date range beside chip').to.be.greaterThan(chip.right);
+          } else {
+            expect(dates.top, 'date range below chip').to.be.greaterThan(chip.bottom);
+          }
+        });
       });
     }
   }

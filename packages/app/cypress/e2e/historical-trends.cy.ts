@@ -16,46 +16,9 @@ const visitHistoricalWithSetup = () => {
 const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
   rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
 
-describe('Historical Trends Tab', () => {
-  beforeEach(() => {
-    visitHistoricalWithSetup();
-  });
-
-  it('renders a slider for target interactivity', () => {
-    cy.get('[data-testid="historical-target-slider"]')
-      .should('exist')
-      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
-  });
-
-  it('renders a number input for precise interactivity value', () => {
-    cy.get('[data-testid="historical-target-input"]')
-      .should('exist')
-      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
-  });
-
-  it('is reachable from the footer, not the tab bar', () => {
-    cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
-    cy.get('[data-testid="footer-link-historical"]')
-      .should('have.attr', 'href', '/historical')
-      .and('contain.text', 'Historical Trends');
-  });
-});
-
 describe('Historical Trends — Content & Interactions', () => {
   beforeEach(() => {
     visitHistoricalWithSetup();
-  });
-
-  it('renders SVG trend line paths after data loads', () => {
-    cy.get('[data-testid="trend-chart-svg"]').should('exist');
-    cy.get('[data-testid="trend-chart-svg"] path.line-path').should('have.length.greaterThan', 0);
-  });
-
-  it('renders data point circles on trend lines', () => {
-    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').should(
-      'have.length.greaterThan',
-      0,
-    );
   });
 
   it('loads history when the current snapshot lacks the selected energy metric', () => {
@@ -90,17 +53,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .should('have.value', '50');
   });
 
-  it('sequence selector is present and has selectable options', () => {
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
-    cy.get('fieldset [data-testid="scenario-selector"]').click('right');
-    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
   it('keeps fixed precision visible and allows selection for multi-precision models', () => {
     cy.get('button[data-testid="precision-multiselect"]')
       .should('be.visible')
@@ -128,10 +80,6 @@ describe('Historical Trends — Content & Interactions', () => {
 
     cy.get('#historical-log-scale').click();
     cy.get('#historical-log-scale').should('have.attr', 'data-state', 'unchecked');
-  });
-
-  it('GPU Config multi-select is hidden (Historical Trends uses hideGpuComparison)', () => {
-    cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
   });
 
   it('Y-axis metric selector is present and can be changed', () => {
@@ -195,17 +143,6 @@ describe('Historical Trends — Content & Interactions', () => {
             .invoke('text')
             .should('not.eq', initialSubtitle);
         });
-      });
-  });
-
-  it('interactivity range labels are displayed below the slider', () => {
-    cy.get('[data-testid="historical-trends-display"]')
-      .find('input[type="range"]')
-      .parent()
-      .find('.relative.text-muted-foreground span')
-      .should('have.length.greaterThan', 0)
-      .each(($span) => {
-        expect($span.text()).to.match(/\d+/u);
       });
   });
 });

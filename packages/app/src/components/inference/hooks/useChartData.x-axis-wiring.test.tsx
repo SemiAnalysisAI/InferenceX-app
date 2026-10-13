@@ -137,7 +137,6 @@ function Probe({
     'p90',
     null,
     undefined,
-    undefined,
     mode,
     undefined,
     undefined,

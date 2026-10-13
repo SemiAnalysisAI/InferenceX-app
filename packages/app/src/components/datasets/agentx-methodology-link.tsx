@@ -7,6 +7,7 @@ import { track } from '@/lib/analytics/analytics';
 interface AgentXMethodologyLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;
   analyticsEvent:
+    | 'agentx_quickstart_opened'
     | 'agentx_methodology_opened'
     | 'agentx_methodology_returned'
     | 'agentx_methodology_figure_opened'

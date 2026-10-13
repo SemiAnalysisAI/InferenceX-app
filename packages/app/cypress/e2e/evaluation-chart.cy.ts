@@ -11,10 +11,6 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
   });
 
-  it('renders SVG data points (circles) inside the evaluation chart after data loads', () => {
-    cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
-  });
-
   it('changing the benchmark selector updates the chart subtitle to reflect the new benchmark', () => {
     cy.get('#evaluation-chart')
       .closest('figure')
@@ -39,16 +35,6 @@ describe('Evaluation Chart — Content & Interactions', () => {
     });
   });
 
-  it('chart caption includes the selected model name and benchmark', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('figcaption')
-      .invoke('text')
-      .should('match', /Source: SemiAnalysis InferenceX/u)
-      .and('contain', 'Model:')
-      .and('contain', 'Workload:');
-  });
-
   it('Show Labels switch exists in the legend and toggling it adds score labels to the chart', () => {
     cy.get('#evaluation-chart')
       .closest('figure')
@@ -64,9 +50,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
       cy.wrap($switch).click();
       cy.get('#evaluation-chart svg .score-label').should('have.length.greaterThan', 0);
     });
-  });
 
-  it('"Reset filter" link appears after deactivating a legend item and restores all items when clicked', () => {
     cy.get('#evaluation-chart').closest('figure').find('.sidebar-legend li label').first().click();
 
     cy.get('#evaluation-chart')

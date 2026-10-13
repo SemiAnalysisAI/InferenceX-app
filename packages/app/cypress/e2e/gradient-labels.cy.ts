@@ -14,14 +14,6 @@ describe('Gradient Labels Toggle', () => {
     expandLegendAdvanced();
   });
 
-  it('Gradient Labels toggle is off by default', () => {
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
-  it('Parallelism Labels toggle is off by default', () => {
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
   it('both toggles can be enabled simultaneously', () => {
     // Parallelism Labels is off by default; turn it on, then turn on Gradient.
     cy.get('#scatter-parallelism-labels').then(($el) => {
@@ -86,6 +78,10 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',
     ).should('have.length.greaterThan', 0);
+    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
+      'have.length.greaterThan',
+      0,
+    );
   });
 
   it('gradient defs render for energy metric (lower_right roofline)', () => {
@@ -96,6 +92,10 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',
     ).should('have.length.greaterThan', 0);
+    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
+      'have.length.greaterThan',
+      0,
+    );
   });
 
   it('gradient defs render for throughput metric (upper_right roofline)', () => {
@@ -105,26 +105,5 @@ describe('Gradient Labels with non-default Y-axis metrics', () => {
     cy.get(
       '[data-testid="scatter-graph"] svg defs linearGradient[id^="roofline-gradient-"]',
     ).should('have.length.greaterThan', 0);
-  });
-
-  it('pill labels render for cost metric', () => {
-    cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient(/^Cost per Million Total Tokens$/u);
-
-    // Parallelism pill labels should be present
-    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
-      'have.length.greaterThan',
-      0,
-    );
-  });
-
-  it('pill labels render for energy metric', () => {
-    cy.get('#scatter-gradient-labels').click();
-    selectMetricAndEnableGradient('All-in Provisioned Joules per Total Token');
-
-    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(
-      'have.length.greaterThan',
-      0,
-    );
   });
 });

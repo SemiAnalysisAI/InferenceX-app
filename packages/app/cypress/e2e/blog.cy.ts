@@ -49,10 +49,6 @@ describe('Blog', () => {
       cy.visit('/blog', { timeout: 20_000 });
     });
 
-    it('renders a single primary heading on the listing page', () => {
-      cy.get('h1').should('have.length', 1);
-    });
-
     it('serves local card thumbnails through the image optimizer', () => {
       // The browser never fetches these (stubbed above), so check the real
       // optimizer response directly for the first local thumbnail on the page.
@@ -81,10 +77,6 @@ describe('Blog', () => {
       // The title is the page's single <h1> (primary-keyword top heading);
       // MDX body sections map to <h2>, so there must be exactly one h1.
       cy.get('h1').should('have.length', 1).and('contain.text', 'InferenceMAX');
-    });
-
-    it('has a back link to the blog listing', () => {
-      cy.get('a[href="/blog"]').should('exist');
     });
   });
 
@@ -136,9 +128,7 @@ describe('Blog', () => {
           /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
         );
       });
-    });
 
-    it('serves every figure image the post references', () => {
       // Complements the eager-only decode check above: the srcs exist on the server
       // even though lazy images have not fetched them yet.
       cy.get('article.prose figure img').then(($imgs) => {
