@@ -1421,7 +1421,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-siblings.ts',
-    sourceSha256: '07d3d1bf93820091d1014b14bf954555edcec422c05e575ad87142f9845e4156',
+    sourceSha256: 'b17ad7a59249ac9ff6e5d80125f6dcbbedbe976fa937ab6d622919c65b7f351d',
     reviewArea: {
       en: 'Benchmark sibling SKU metadata and sibling navigation row shape.',
       zh: '基准同组 SKU 元数据和同组导航行结构。',

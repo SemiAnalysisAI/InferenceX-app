@@ -2250,6 +2250,7 @@ export const apiOperations: readonly ApiOperation[] = [
               prefill_pp: null,
               prefill_dcp_size: 8,
               prefill_pcp_size: 1,
+              prefill_dwdp_size: null,
               prefill_dp_attention: false,
               prefill_num_workers: 1,
               num_prefill_gpu: 0,
@@ -3012,6 +3013,16 @@ const overview = {
     },
   ],
   schemaNotes: [
+    {
+      id: 'dwdp',
+      title: text('DWDP prefill topology', 'DWDP 预填充拓扑'),
+      description: text(
+        'Optional metrics.prefill_dwdp_size records ranks per distributed weight-data parallel prefill group. prefill_tp stays 1; prefill_num_workers counts groups. Two groups of size 8 use 16 prefill chips. Sibling rows expose nullable prefill_dwdp_size. Missing or 1 means DWDP is disabled.',
+        '可选字段 metrics.prefill_dwdp_size 记录每个分布式权重数据并行预填充组的 rank 数。prefill_tp 保持为 1，prefill_num_workers 统计组数。两个大小为 8 的组使用 16 颗预填充芯片。同组导航行提供可空字段 prefill_dwdp_size。缺失或为 1 表示未启用 DWDP。',
+      ),
+      shape: 'BenchmarkRows',
+      example: { prefill_tp: 1, prefill_num_workers: 2, metrics: { prefill_dwdp_size: 8 } },
+    },
     {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),
