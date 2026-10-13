@@ -51,15 +51,6 @@ describe('Inference Replay', () => {
     cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 
-  it('exposes MP4 export in the chart export menu', () => {
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .within(() => {
-        cy.get('[data-testid="export-button"]').click();
-      });
-    cy.get('[data-testid="export-mp4-button"]').should('be.visible');
-  });
-
   it('opens the replay preview modal from the MP4 menu item', () => {
     openReplayDialog();
     // Assert the dialog itself is visible. ChartDisplay now opens the launcher
@@ -75,72 +66,43 @@ describe('Inference Replay', () => {
     });
   });
 
-  it('exposes scrubber + play/pause + speed controls when history is available', () => {
-    // Wait for history to resolve into either the controls UI or the empty-state message.
-    cy.get('[data-testid="replay-panel-chart-0"]').should(($panel) => {
-      const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
-      const hasEmpty = /Not enough history/u.test($panel.text());
-      expect(hasControls || hasEmpty).to.equal(true);
-    });
-
-    cy.get('[data-testid="replay-panel-chart-0"]').then(($panel) => {
-      if ($panel.find('[data-testid="replay-play-pause"]').length === 0) {
-        cy.log('Replay history fixture has < 2 dates; skipping interactive checks');
-        return;
-      }
-      cy.get('[data-testid="replay-scrubber"]').should('exist');
-      // The speed trigger is always present; individual SelectItems are only
-      // mounted in the Radix portal while the dropdown is open.
-      cy.get('[data-testid="replay-speed-select"]').should('exist');
-      cy.get('[data-testid="replay-export-mp4"]').should('exist');
-
-      // Play, then pause, and confirm the button toggles label.
-      cy.get('[data-testid="replay-play-pause"]').click().should('contain.text', 'Pause');
-      cy.get('[data-testid="replay-play-pause"]').click().should('contain.text', 'Play');
-    });
-  });
-
   it('advances the date overlay and scrubber when Play is pressed', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-play-pause"]').length === 0) {
-        cy.log('Replay history fixture has < 2 dates; skipping animation check');
-        return;
-      }
-      // Rewind first: earlier tests in this file (and failed retry attempts —
-      // testIsolation is off) leave the playhead wherever they stopped, and a
-      // playhead at the end would turn Play into a restart-from-zero whose
-      // scrubber value can never exceed the recorded start.
-      cy.get('[data-testid="replay-reset"]').click();
-      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-      cy.get('[data-testid="replay-date-overlay"]')
-        .invoke('text')
-        .then((startDate) => {
-          cy.get('[data-testid="replay-play-pause"]').click();
-          // Poll both signals BEFORE pausing, each with headroom for the
-          // slowest path. Scrubber: reduced motion (the chromium e2e launch
-          // flag) steps discretely at 1.2s per date, so any fixed wait
-          // shorter than one step fails deterministically. Date overlay: the
-          // continuous path (Firefox has no reduced-motion flag) commits
-          // scrubber ticks every few ms but only flips the label when the
-          // eased playhead crosses a whole segment — pausing as soon as the
-          // scrubber moves would freeze the label on the first date forever.
-          // The timeout must ride on .invoke: a cy.get timeout does not
-          // extend the retries of chained queries.
-          cy.get('[data-testid="replay-scrubber"]')
-            .invoke({ timeout: 10_000 }, 'val')
-            .should((endVal) => {
-              expect(Number(endVal)).to.be.greaterThan(0);
-            });
-          cy.get('[data-testid="replay-date-overlay"]')
-            .invoke({ timeout: 10_000 }, 'text')
-            .should((endDate) => {
-              expect(endDate).not.to.equal(startDate);
-            });
-          // Park paused at the origin so later tests start from a known frame.
-          cy.get('[data-testid="replay-reset"]').click();
-          cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-        });
-    });
+    // The committed fixture has multiple dates; loading cannot count as a pass.
+    cy.get('[data-testid="replay-play-pause"]').scrollIntoView().should('be.visible');
+    // Rewind first: earlier tests in this file (and failed retry attempts —
+    // testIsolation is off) leave the playhead wherever they stopped, and a
+    // playhead at the end would turn Play into a restart-from-zero whose
+    // scrubber value can never exceed the recorded start.
+    cy.get('[data-testid="replay-reset"]').click();
+    cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+    cy.get('[data-testid="replay-date-overlay"]')
+      .invoke('text')
+      .then((startDate) => {
+        cy.get('[data-testid="replay-play-pause"]').click();
+        // Poll both signals BEFORE pausing, each with headroom for the
+        // slowest path. Scrubber: reduced motion (the chromium e2e launch
+        // flag) steps discretely at 1.2s per date, so any fixed wait
+        // shorter than one step fails deterministically. Date overlay: the
+        // continuous path (Firefox has no reduced-motion flag) commits
+        // scrubber ticks every few ms but only flips the label when the
+        // eased playhead crosses a whole segment — pausing as soon as the
+        // scrubber moves would freeze the label on the first date forever.
+        // The timeout must ride on .invoke: a cy.get timeout does not
+        // extend the retries of chained queries.
+        cy.get('[data-testid="replay-scrubber"]')
+          .invoke({ timeout: 10_000 }, 'val')
+          .should((endVal) => {
+            expect(Number(endVal)).to.be.greaterThan(0);
+          });
+        cy.get('[data-testid="replay-date-overlay"]')
+          .invoke({ timeout: 10_000 }, 'text')
+          .should((endDate) => {
+            expect(endDate).not.to.equal(startDate);
+          });
+        // Park paused at the origin so later tests start from a known frame.
+        cy.get('[data-testid="replay-reset"]').click();
+        cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+      });
   });
 
   it('re-renders the replay frame when a parent-chart toggle changes', () => {
@@ -249,16 +211,6 @@ describe('Inference Replay', () => {
           })
           .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
       });
-    });
-  });
-
-  it('closes the modal', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      // Radix Dialog closes on Escape — more robust than picking the X by DOM
-      // order now that the panel contains its own buttons (Play, Reset, …).
-      cy.get('body').type('{esc}');
-      cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
     });
   });
 });

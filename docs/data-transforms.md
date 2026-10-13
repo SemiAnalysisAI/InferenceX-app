@@ -4,6 +4,21 @@ Explains the full chain from raw API response to chart-ready scatter points. Goa
 
 ## Type Hierarchy
 
+### DWDP topology
+
+`metrics.prefill_dwdp_size` records the ranks in one distributed weight-data
+parallel prefill group. The producer keeps `prefill_tp=1` and counts groups in
+`prefill_num_workers`. Two groups of size 8 use 16 prefill GPUs; the fallback ETL
+count includes the group width without treating DWDP as TP or EP. Explicit
+physical GPU counts remain authoritative.
+
+The field is retained in the metrics map (no database migration), copied to chart
+points, and exposed as nullable `prefill_dwdp_size` on sibling rows. Labels render
+`2xDWDP8+1xDEP8`, and tooltips show the prefill DWDP width. Missing or default
+widths preserve legacy labels. This metadata does not enable runtime DWDP.
+
+The producer contract follows NVIDIA's [DWDP implementation notes](https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/main/docs/source/blogs/tech_blog/blog19_DWDP_Distributed_Weight_Data_Parallelism_for_High_Performance_LLM_Inference_on_NVL72.md).
+
 ```
 BenchmarkRow   (lib/api/api.ts)
     |

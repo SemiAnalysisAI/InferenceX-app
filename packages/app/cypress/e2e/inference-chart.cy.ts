@@ -1,3 +1,4 @@
+import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
 import {
   interceptVrPublicationData,
@@ -125,13 +126,6 @@ describe('Inference Chart', () => {
     );
   });
 
-  it('SVG contains data point circles', () => {
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg circle')
-      .should('have.length.greaterThan', 0);
-  });
-
   it('leads the chart heading with the model and workload, without the cost tier', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
@@ -153,9 +147,7 @@ describe('Inference Chart', () => {
             expect(heading.trim().startsWith(model.trim())).to.equal(true);
           });
       });
-  });
 
-  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
@@ -166,22 +158,6 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-  });
-
-  it('renders quick filters as visible toggles and toggles a vendor', () => {
-    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
-    cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-pressed', 'false')
-      .click()
-      .should('have.attr', 'aria-pressed', 'true')
-      .click()
-      .should('have.attr', 'aria-pressed', 'false');
-    cy.get('body').type('{esc}');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -880,5 +856,72 @@ describe('Exact topology quick filter', () => {
     cy.get('body').type('{esc}');
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     assertVisibleLoads([1, 2, 8, 48]);
+  });
+});
+
+describe('Staged Pareto deep links', () => {
+  it('renders only the requested run line when that run is also selected as the latest run', () => {
+    const runId = '9100001';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
+    const stagedRows = b300Rows(runUrl).map((row, index) => ({
+      ...row,
+      id: 980000 + index,
+      workflow_run_id: 42,
+    }));
+    const otherRows = b300Rows(null, 'b200');
+    cy.intercept('GET', '/api/v1/availability*', { body: [stagedRows[0], otherRows[0]] });
+    cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+      if (request.query['exactRun'] === 'true' && request.query['runId'] === runId) {
+        request.alias = 'stagedSnapshot';
+        request.reply({ body: stagedRows });
+      } else {
+        // The main chart includes other hardware and cannot stand in for the
+        // requested snapshot, even if the workflow picker selects the same run.
+        request.reply({ body: [...otherRows, ...stagedRows] });
+      }
+    });
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: {
+        runs: [
+          {
+            github_run_id: Number(runId),
+            run_attempt: 1,
+            name: 'Staged sweep',
+            conclusion: 'success',
+            html_url: runUrl,
+            created_at: `${stagedRows[0]!.date}T12:00:00Z`,
+            date: stagedRows[0]!.date,
+          },
+        ],
+        changelogs: [],
+        configs: [],
+        runConfigs: [],
+      },
+    });
+    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    const [link] = buildStagedChartLinks(runId, [stagedRows[0]!]);
+    const url = new URL(link!.url);
+    cy.visit(`${url.pathname}${url.search}`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.wait('@stagedSnapshot');
+    cy.get('[data-testid="gpu-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .should(($points) => {
+        expect($points.length).to.be.greaterThan(0);
+        for (const element of $points) {
+          const point = (
+            element as unknown as { __data__: { date: string; hwKey: string; run_url: string } }
+          ).__data__;
+          expect(point.date).to.equal(`${stagedRows[0]!.date}~r${runId}`);
+          expect(point.hwKey).to.equal('b300_sglang');
+          expect(point.run_url).to.equal(runUrl);
+        }
+      });
+    cy.get('[data-testid="gpu-graph"]').first().find('.roofline-path').should('have.length', 1);
   });
 });

@@ -1232,7 +1232,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '0f17fdf5d059b560e6a46eb4addbbb440e151e2d0e8f0fc072e43fd63bf10b30',
+    sourceSha256: 'a2968b195179c6da79ea09d9f8c22614ca939bf746e0dc1f5f82c3a526449ced',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1326,7 +1326,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: 'bbc22add2173ef1b75e76f3a99ad43c88656580b217c61c0e11128789280e282',
+    sourceSha256: 'e2b95516a6ebb16c312c711b540cc7ffff52ab184238bb5b2f40b6155b69d126',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1563,7 +1563,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-siblings.ts',
-    sourceSha256: '07d3d1bf93820091d1014b14bf954555edcec422c05e575ad87142f9845e4156',
+    sourceSha256: 'b17ad7a59249ac9ff6e5d80125f6dcbbedbe976fa937ab6d622919c65b7f351d',
     reviewArea: {
       en: 'Benchmark sibling SKU metadata and sibling navigation row shape.',
       zh: '基准同组 SKU 元数据和同组导航行结构。',

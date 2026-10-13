@@ -22,6 +22,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { GitHubStars } from './GithubStars';
 import { InferenceXWordmark } from './inferencex-wordmark';
+import { SiteSearchButton } from './site-search-button';
 
 const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
@@ -195,7 +196,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
       className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
     >
       <div className="container mx-auto px-4 lg:px-8">
-        <div className="flex h-14 items-center gap-6">
+        <div className="flex h-14 items-center gap-2 sm:gap-6">
           {/* Brand */}
           <Link
             href={isZh ? '/zh' : '/'}
@@ -253,11 +254,13 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             ))}
           </nav>
 
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-2">
+          {/* Right side. Tighter gaps below `sm` keep five 44px touch targets
+              (search, language, theme, menu) inside a 320px header. */}
+          <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
+            <SiteSearchButton />
             <LanguageToggle pathname={pathname} router={router} />
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}

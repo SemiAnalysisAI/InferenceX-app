@@ -441,3 +441,18 @@ the metric alone and the Measured controls show a hint, so the link's intent sur
 detour through another setting. Which comparison rows a reader hid from the legend is
 `ScatterGraph` component state (`hiddenPowerVariants`), never shared — see
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
+
+### Staged-result chart links
+
+The staging workflow reads the successfully ingested run's model, workload,
+precision and hardware scopes and reports one `chart-links` entry (`label`, `url`)
+per visible Pareto line to InferenceX. The links use the same model and hardware
+identity helpers as the chart, and combine `i_gpus` with the exact-run
+`i_dates=YYYY-MM-DD~rRUN_ID` selection. A date entry alone does not enable GPU
+comparison, so it cannot select the staged line.
+
+Run-qualified entries always fetch their exact logical snapshot, even when the
+main run picker selected that run. The base query can carry other runs forward
+and stamps its points with a plain date; reusing it would lose the run-qualified
+series key. This leaves ordinary date comparisons and unofficial-run overlays
+unchanged.

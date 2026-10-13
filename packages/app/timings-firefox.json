@@ -1,0 +1,6281 @@
+{
+  "provenance": {
+    "revision": "45d351673d0dd2a833a8fc2c155cdf802d197801",
+    "runId": "38310601763",
+    "runAttempt": "1",
+    "browser": "firefox",
+    "kind": "e2e",
+    "shards": 8,
+    "sourceHash": "02748fec4ce92fd7be2ab8a2192e6909034c9370edd3a2a0b5b887f437813129"
+  },
+  "durations": [
+    {
+      "spec": "cypress/e2e/agentic-catalog.cy.ts",
+      "duration": 646,
+      "tests": [
+        {
+          "title": [
+            "AgentX telemetry catalog",
+            "lists configurations grouped by model, each opening a point-detail page"
+          ],
+          "duration": 316,
+          "attempts": 1
+        },
+        {
+          "title": ["AgentX telemetry catalog", "ships the Simplified Chinese catalog"],
+          "duration": 319,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentic-detail-back-nav.cy.ts",
+      "duration": 5420,
+      "tests": [
+        {
+          "title": [
+            "Agentic point detail — returning to the chart",
+            "restores the model and legend when the reader clicks Back"
+          ],
+          "duration": 1545,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point detail — returning to the chart",
+            "restores the model and legend through the \"Inference chart\" link"
+          ],
+          "duration": 1557,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point detail — returning to the chart",
+            "keeps a Chinese reader on /zh for the whole round trip"
+          ],
+          "duration": 1287,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point detail — returning to the chart",
+            "does not drop the unofficialruns overlay param on the round trip"
+          ],
+          "duration": 987,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentic-point-coach-mark.cy.ts",
+      "duration": 16820,
+      "tests": [
+        {
+          "title": [
+            "Agentic point coach mark",
+            "points at a real, visible agentic point on the first visit"
+          ],
+          "duration": 2248,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point coach mark",
+            "waits for the chart to be on screen before pointing at anything"
+          ],
+          "duration": 3667,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point coach mark",
+            "targets the clipped plot area, not the axis gutters"
+          ],
+          "duration": 912,
+          "attempts": 1
+        },
+        {
+          "title": ["Agentic point coach mark", "follows its point when the chart is zoomed"],
+          "duration": 980,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point coach mark",
+            "dismisses from the close button and stays gone after reload"
+          ],
+          "duration": 3689,
+          "attempts": 1
+        },
+        {
+          "title": ["Agentic point coach mark", "dismisses when the user actually clicks a point"],
+          "duration": 2215,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point coach mark",
+            "never anchors to an unofficial-run overlay marker"
+          ],
+          "duration": 1474,
+          "attempts": 1
+        },
+        {
+          "title": ["Agentic point coach mark", "renders Simplified Chinese copy on /zh"],
+          "duration": 1523,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentic-point-time-series.cy.ts",
+      "duration": 24961,
+      "tests": [
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "opens the stored server log and loads it incrementally"
+          ],
+          "duration": 2354,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "keeps loaded log text visible when a later chunk fails"
+          ],
+          "duration": 1961,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "renders rolling P90 interactivity and TTFT by default using profiling requests only"
+          ],
+          "duration": 402,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "switches ISL and OSL cards from distributions to in-flight averages"
+          ],
+          "duration": 469,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "switches the TTFT chart to E2E request latency over time"
+          ],
+          "duration": 448,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "switches each chart independently from P90 to P75"
+          ],
+          "duration": 457,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "switches the request activity card from queue depth to cumulative completions"
+          ],
+          "duration": 399,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "shows total idle time on the request timeline (time-boundary phase slice, consistent with the charts)"
+          ],
+          "duration": 431,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "restores the request timeline view after browser Back from a dataset route"
+          ],
+          "duration": 658,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "renders the log viewer in Simplified Chinese"
+          ],
+          "duration": 766,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "retries the failed log-file inventory, initial content, and search queries independently"
+          ],
+          "duration": 4682,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "renders the complete Chinese detail, mobile, metadata, and timeline click path"
+          ],
+          "duration": 987,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "keeps request-chart, aggregate, and timeline failures distinct and retryable"
+          ],
+          "duration": 4262,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point request metric time series",
+            "retries trace metadata and the missing SKU navigator with their own queries"
+          ],
+          "duration": 1881,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic request timeline virtualization",
+            "keeps row labels and SVG request bars bounded to the viewport"
+          ],
+          "duration": 375,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point orchestrator metric sources",
+            "switches every server chart to an orchestrator-normalized worker"
+          ],
+          "duration": 781,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point orchestrator metric sources",
+            "toggles input and decode independently while keeping one visible"
+          ],
+          "duration": 1031,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point orchestrator metric sources",
+            "retries only the selected server-metrics source query"
+          ],
+          "duration": 2036,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic point per-engine KV overlay",
+            "draws one legend entry per engine and leaves named engines unprefixed"
+          ],
+          "duration": 387,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentic-quick-filters.cy.ts",
+      "duration": 1939,
+      "tests": [
+        {
+          "title": [
+            "Agentic Quick Filters",
+            "opens from the legend, omits spec decoding, and filters the rendered agentic points"
+          ],
+          "duration": 1922,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentic-workload-explorer.cy.ts",
+      "duration": 2998,
+      "tests": [
+        {
+          "title": [
+            "Agentic Workload Explorer",
+            "renders the overview inside the dashboard shell and navigates to sessions"
+          ],
+          "duration": 806,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic Workload Explorer",
+            "renders shared D3 layers and supports shared zoom, reset and expansion"
+          ],
+          "duration": 1608,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Agentic Workload Explorer",
+            "keeps the shared version selector keyboard-accessible on Chinese mobile pages"
+          ],
+          "duration": 560,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentx-dataset-click-path.cy.ts",
+      "duration": 2271,
+      "tests": [
+        {
+          "title": [
+            "AgentX dataset click journey",
+            "clicks from the English landing page through dataset and conversation detail"
+          ],
+          "duration": 1231,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset click journey",
+            "clicks from the Chinese landing page through dataset and conversation detail"
+          ],
+          "duration": 1023,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentx-optimizations.cy.ts",
+      "duration": 7511,
+      "tests": [
+        {
+          "title": [
+            "AgentX optimizations",
+            "links from /agentx to the optimizations index and to each project"
+          ],
+          "duration": 837,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX optimizations",
+            "publishes the index with the ecosystem primer, every project, and sourced PRs"
+          ],
+          "duration": 698,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX optimizations",
+            "renders a project page with its measurements, figures, and PR links"
+          ],
+          "duration": 609,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX optimizations",
+            "renders the index and representative projects at 1440px and 390px in both locales"
+          ],
+          "duration": 4098,
+          "attempts": 1
+        },
+        {
+          "title": ["AgentX optimizations", "returns 404 for a project that does not exist"],
+          "duration": 111,
+          "attempts": 1
+        },
+        {
+          "title": ["AgentX optimizations", "ships the Simplified Chinese index and project pages"],
+          "duration": 1066,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/agentx-telemetry.cy.ts",
+      "duration": 16082,
+      "tests": [
+        {
+          "title": [
+            "AgentX telemetry tutorial — English page",
+            "renders the article, every section, and every figure"
+          ],
+          "duration": 800,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — English page",
+            "links back to /agentx and out to the agentic results"
+          ],
+          "duration": 423,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — Chinese page",
+            "renders translated copy and keeps the same section anchors"
+          ],
+          "duration": 376,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — entry point on /agentx",
+            "shows the callout and navigates to the tutorial"
+          ],
+          "duration": 454,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — entry point on /agentx",
+            "shows the Chinese callout on /zh/agentx"
+          ],
+          "duration": 563,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — responsive locale routes",
+            "renders the full telemetry surface at 1440px and 375px in both locales"
+          ],
+          "duration": 731,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
+            "is the only card in the corner — dashboard nudges stay off this route"
+          ],
+          "duration": 2995,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
+            "opens the tutorial from its primary action"
+          ],
+          "duration": 2933,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX telemetry tutorial — popup on the agentic point-detail page",
+            "stays dismissed across a reload"
+          ],
+          "duration": 6710,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/ai-chart.cy.ts",
+      "duration": 12441,
+      "tests": [
+        {
+          "title": [
+            "AI chart workspace",
+            "explains setup, prefills an editable example, and retains each provider key separately"
+          ],
+          "duration": 2356,
+          "attempts": 1
+        },
+        {
+          "title": ["AI chart workspace", "keeps the en workspace labeled and contained on mobile"],
+          "duration": 234,
+          "attempts": 1
+        },
+        {
+          "title": ["AI chart workspace", "keeps the zh workspace labeled and contained on mobile"],
+          "duration": 270,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart metric semantics",
+            "excludes unavailable zero cost when selecting the top configuration"
+          ],
+          "duration": 1520,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart metric semantics",
+            "renders lower measured power farther from the radar center"
+          ],
+          "duration": 1429,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart metric semantics",
+            "keeps a missing middle metric as a line gap instead of a zero-valued dot"
+          ],
+          "duration": 1466,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart Chinese workflow",
+            "requests Chinese presentation copy and renders the returned chart and summary"
+          ],
+          "duration": 1405,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart Chinese workflow",
+            "keeps interactive scatter and line charts exposed as accessible groups"
+          ],
+          "duration": 1160,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart Chinese workflow",
+            "shows a localized empty state for one unmatched chart in a multi-chart result"
+          ],
+          "duration": 1063,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AI chart Chinese workflow",
+            "does not expose a provider error body or API key on the Chinese route"
+          ],
+          "duration": 1434,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/api-documentation.cy.ts",
+      "duration": 7037,
+      "tests": [
+        {
+          "title": [
+            "API documentation",
+            "exposes Pareto boundaries without promoting legacy fixtures or chart share params"
+          ],
+          "duration": 1667,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "API documentation",
+            "guides /api visitors from a pinned public install to a traceable export"
+          ],
+          "duration": 1203,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "API documentation",
+            "guides /zh/api visitors from a pinned public install to a traceable export"
+          ],
+          "duration": 1201,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "API documentation",
+            "keeps full requests and response schemas readable on mobile"
+          ],
+          "duration": 850,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "API documentation",
+            "exposes the localized reference and its OpenAPI contract"
+          ],
+          "duration": 1463,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "API documentation",
+            "supports strictV2 power requests while preserving ordinary benchmark requests"
+          ],
+          "duration": 605,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/blog.cy.ts",
+      "duration": 3267,
+      "tests": [
+        {
+          "title": [
+            "Blog",
+            "Rubin agentic article port",
+            "preserves the article, figures, and source boundary on /en"
+          ],
+          "duration": 749,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Blog",
+            "Rubin agentic article port",
+            "preserves the article, figures, and source boundary on /zh"
+          ],
+          "duration": 299,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Blog",
+            "Blog listing page",
+            "serves local card thumbnails through the image optimizer"
+          ],
+          "duration": 378,
+          "attempts": 1
+        },
+        {
+          "title": ["Blog", "Blog post page", "renders the post title as the one and only h1"],
+          "duration": 341,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Blog",
+            "Inline code styling",
+            "does not render generated backticks around inline code"
+          ],
+          "duration": 276,
+          "attempts": 1
+        },
+        {
+          "title": ["Blog", "Math rendering", "renders $$ blocks through KaTeX"],
+          "duration": 402,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Blog",
+            "Math rendering",
+            "leaves single-dollar prices as literal text, not math"
+          ],
+          "duration": 20,
+          "attempts": 1
+        },
+        {
+          "title": ["Blog", "Math rendering", "renders every figure the post references"],
+          "duration": 738,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/cache-reuse.cy.ts",
+      "duration": 7243,
+      "tests": [
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "official rows",
+            "stacks HBM, host, and not-reused shares for every measured concurrency"
+          ],
+          "duration": 507,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "official rows",
+            "takes the host tier from the CPU-offload rate and leaves the external rate out"
+          ],
+          "duration": 60,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "share-link seeding",
+            "falls back to a tiered configuration when the requested one is unknown"
+          ],
+          "duration": 351,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "serving recipes",
+            "switches recipes without mixing bars at 393px"
+          ],
+          "duration": 955,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "serving recipes",
+            "switches recipes without mixing bars at 1280px"
+          ],
+          "duration": 969,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "unofficial-run overlay",
+            "draws the run as its own outlined series beside the official bars"
+          ],
+          "duration": 380,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "fixed sequences",
+            "explains that fixed-sequence rows record no cache tiers"
+          ],
+          "duration": 377,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "layout",
+            "draws phone-width bars as rows, lowest concurrency first, labels inside"
+          ],
+          "duration": 550,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "layout",
+            "keeps desktop columns and their labels inside each segment"
+          ],
+          "duration": 616,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "entry from the inference chart",
+            "links the agentic footer to the tab with the chart state attached"
+          ],
+          "duration": 1000,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "entry from the inference chart",
+            "stays off the fixed-sequence chart"
+          ],
+          "duration": 622,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Prefix Cache Reuse",
+            "Chinese page",
+            "renders the intro and Chinese tier labels"
+          ],
+          "duration": 718,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/calculator-overlay.cy.ts",
+      "duration": 9873,
+      "tests": [
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "agentic trace overlay",
+            "renders official and unofficial DeepSeek V4 agentic calculations separately"
+          ],
+          "duration": 805,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "rendering",
+            "renders overlay bars alongside the official bar"
+          ],
+          "duration": 606,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "rendering",
+            "paints the overlay bar with the run palette color, not the hardware color"
+          ],
+          "duration": 47,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "hardware visibility",
+            "brings hidden overlay bars back when the available hardware changes"
+          ],
+          "duration": 1282,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "hardware visibility",
+            "does not offer a hide control on the run legend entry"
+          ],
+          "duration": 592,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "hardware visibility",
+            "restores every bar via reset filter"
+          ],
+          "duration": 799,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "late overlay arrival",
+            "keeps a GPU filter the user set before the run landed"
+          ],
+          "duration": 2364,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "sequence covered only by the run",
+            "drops stale official hardware from the legend selection"
+          ],
+          "duration": 692,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "dismissing one of several runs on an overlay-only sequence",
+            "keeps the surviving run visible instead of blanking the chart"
+          ],
+          "duration": 660,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "official-only surfaces",
+            "excludes overlay rows from the table view"
+          ],
+          "duration": 729,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "Chinese page",
+            "renders the overlay legend strings in Chinese"
+          ],
+          "duration": 513,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO calculator — unofficial run overlay",
+            "dismissal",
+            "removes the overlay bar when the run is dismissed from the banner"
+          ],
+          "duration": 662,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/certified-power-filter.cy.ts",
+      "duration": 3729,
+      "tests": [
+        {
+          "title": [
+            "Validated vs historical measured power",
+            "rings legacy points on a measured axis and filters them via Quick Filters"
+          ],
+          "duration": 2091,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Validated vs historical measured power",
+            "restores a shared i_power=certified link with the toggle pre-selected"
+          ],
+          "duration": 495,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Validated vs historical measured power",
+            "uses Optimal Only for measured markers while preserving the power boundary"
+          ],
+          "duration": 1122,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
+      "duration": 1541,
+      "tests": [
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "chart view: title and toolbar do not overlap at 768px"
+          ],
+          "duration": 797,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "chart view: title and toolbar do not overlap at 880px"
+          ],
+          "duration": 52,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "chart view: title and toolbar do not overlap at 1024px"
+          ],
+          "duration": 65,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "chart view: title and toolbar do not overlap at 1280px"
+          ],
+          "duration": 79,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "chart view: title and toolbar do not overlap at 500px (normal-flow toolbar)"
+          ],
+          "duration": 57,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "chart header toolbar overlap",
+            "table view: title and toolbar do not overlap across widths"
+          ],
+          "duration": 467,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/chart-overflow-continuation.cy.ts",
+      "duration": 3226,
+      "tests": [
+        {
+          "title": [
+            "Chart overflow continuations",
+            "keeps the original domain and interpolates labeled paths toward clipped points"
+          ],
+          "duration": 817,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chart overflow continuations",
+            "keeps spline paths rendered through panning and zooming"
+          ],
+          "duration": 435,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chart overflow continuations",
+            "draws overlay continuations and removes them when that run is dismissed"
+          ],
+          "duration": 1947,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/collectivex.cy.ts",
+      "duration": 52990,
+      "tests": [
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "shows the run header, coverage stats, and revision-pinned source links"
+          ],
+          "duration": 1091,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "keeps loading bounded discovery batches until every run is listed"
+          ],
+          "duration": 2370,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "selects the EP16 series through the identity controls"
+          ],
+          "duration": 1719,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "switches the y-axis to per-GPU payload bandwidth"
+          ],
+          "duration": 1245,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "selects normal and low-latency kernel modes by default"
+          ],
+          "duration": 2331,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "normalizes runner-pool suffixes in SKU controls and chart labels"
+          ],
+          "duration": 1396,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "selects the available phase when a partial run only measured prefill"
+          ],
+          "duration": 1517,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "clears the chart when the sole series is toggled off in the legend"
+          ],
+          "duration": 1182,
+          "attempts": 1
+        },
+        {
+          "title": ["CollectiveX neutral run view", "pins a compact tooltip on point click"],
+          "duration": 1572,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "lists every version-matching run and overlays checked runs"
+          ],
+          "duration": 2644,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "shift-click applies one visibility state to every run between two clicked rows"
+          ],
+          "duration": 2267,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "defaults to the newest measured run when a newer incomplete run has no series"
+          ],
+          "duration": 1455,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "filters the run table by EP and KV suite without hiding mixed-suite runs"
+          ],
+          "duration": 1824,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "renders the curated known-support matrix at the bottom of the page"
+          ],
+          "duration": 790,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "localizes the complete chart and run-table click path on the Chinese route"
+          ],
+          "duration": 3095,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX neutral run view",
+            "keeps the Chinese explorer and runs table reachable at 375px"
+          ],
+          "duration": 1465,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX run deletion",
+            "deletes a table row after confirm + token prompt and remembers the token"
+          ],
+          "duration": 1225,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX run deletion",
+            "deletes every shown run with one confirmation and one token prompt"
+          ],
+          "duration": 2704,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX run deletion",
+            "clears a stale stored token and reports unauthorized on 401"
+          ],
+          "duration": 1343,
+          "attempts": 1
+        },
+        {
+          "title": ["CollectiveX run deletion", "does nothing when the confirmation is declined"],
+          "duration": 1229,
+          "attempts": 1
+        },
+        {
+          "title": ["CollectiveX availability states", "reports a missing run list"],
+          "duration": 2037,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX availability states",
+            "shows a safe localized error on the Chinese route"
+          ],
+          "duration": 6378,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX availability states",
+            "does not query database availability for the isolated page"
+          ],
+          "duration": 1681,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "renders kv cases with bandwidth-bound cells and per-case outcomes"
+          ],
+          "duration": 1150,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "plots the kv chart and switches metric, axis, and page size"
+          ],
+          "duration": 1346,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "plots the envelope axes and keeps multi-run lines aligned with the legend"
+          ],
+          "duration": 1179,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "toggles the Envelope bulk wire-ceiling lines from Advanced controls"
+          ],
+          "duration": 978,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "plots the overlap-gain view with its dotted ideal line"
+          ],
+          "duration": 619,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX kv-transfer card",
+            "localizes the envelope control and chart copy on the Chinese page"
+          ],
+          "duration": 677,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX swap_blocks",
+            "shows a swap-only run, byte units and linear bandwidth, then switches latency and direction"
+          ],
+          "duration": 1211,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "CollectiveX swap_blocks",
+            "renders the translated controls and tooltip on the Chinese route"
+          ],
+          "duration": 517,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-per-dollar-redirect.cy.ts",
+      "duration": 1969,
+      "tests": [
+        {
+          "title": [
+            "Compare-per-dollar canonical slug redirect",
+            "redirects a non-canonical (reversed) GPU order to alphabetical canonical"
+          ],
+          "duration": 699,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar canonical slug redirect",
+            "redirects a bare reversed GPU pair through both normalizations in one hop"
+          ],
+          "duration": 482,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar canonical slug redirect",
+            "redirects a family-level alias model slug to the canonical version slug"
+          ],
+          "duration": 514,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar canonical slug redirect",
+            "preserves query params across the bare-slug redirect"
+          ],
+          "duration": 134,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-per-dollar-table.cy.ts",
+      "duration": 1888,
+      "tests": [
+        {
+          "title": [
+            "Compare-per-dollar slug page — slimmed table + cross-link",
+            "shows only the Dollar-per-Million-Tokens and Concurrency metric rows"
+          ],
+          "duration": 533,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar slug page — slimmed table + cross-link",
+            "exposes a \"View full latency + throughput comparison\" cross-link to /compare/"
+          ],
+          "duration": 140,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar slug page — slimmed table + cross-link",
+            "attributes pricing to the shared TCO source"
+          ],
+          "duration": 87,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare-per-dollar slug page — slimmed table + cross-link",
+            "renders an indexable comparison PNG with descriptive alt text"
+          ],
+          "duration": 31,
+          "attempts": 1
+        },
+        {
+          "title": ["Chinese compare-per-dollar table", "localizes the per-dollar metric label"],
+          "duration": 484,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare slug page — cross-link to per-dollar view",
+            "renders a cross-link to /compare-per-dollar/<same-slug>"
+          ],
+          "duration": 582,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-precision.cy.ts",
+      "duration": 2147,
+      "tests": [
+        {
+          "title": [
+            "Compare precision index page",
+            "leads the /compare index with AgentX results and keeps fixed-sequence tools"
+          ],
+          "duration": 306,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare precision index page",
+            "ships the same AgentX-first hierarchy on the Simplified Chinese page"
+          ],
+          "duration": 234,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare precision index + slug page",
+            "navigates to the first card slug, renders table + hero PNG + JSON-LD"
+          ],
+          "duration": 706,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare precision index + slug page",
+            "redirects a reversed precision slug to canonical order"
+          ],
+          "duration": 556,
+          "attempts": 1
+        },
+        {
+          "title": ["Compare precision zh index", "renders Chinese hero and /zh card hrefs"],
+          "duration": 312,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-redirect.cy.ts",
+      "duration": 1920,
+      "tests": [
+        {
+          "title": [
+            "Compare canonical slug redirect",
+            "redirects a non-canonical (reversed) GPU order to alphabetical canonical"
+          ],
+          "duration": 629,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare canonical slug redirect",
+            "redirects a bare reversed GPU pair through both normalizations in one hop"
+          ],
+          "duration": 548,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare canonical slug redirect",
+            "redirects a family-level alias model slug to the canonical version slug"
+          ],
+          "duration": 485,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare canonical slug redirect",
+            "preserves query params across the bare-slug redirect"
+          ],
+          "duration": 187,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-scenario-routes.cy.ts",
+      "duration": 3039,
+      "tests": [
+        {
+          "title": [
+            "Compare scenario routes",
+            "serves the agentic workload at its own path with the AgentX explainer"
+          ],
+          "duration": 432,
+          "attempts": 1
+        },
+        {
+          "title": ["Compare scenario routes", "lets the path segment override the pair default"],
+          "duration": 702,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "canonicalizes every scenario view onto the bare slug URL"
+          ],
+          "duration": 360,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "404s an unknown scenario segment instead of silently defaulting"
+          ],
+          "duration": 127,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "keeps the segment when redirecting a non-canonical slug"
+          ],
+          "duration": 49,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "carries the scenario routes across the other compare families"
+          ],
+          "duration": 141,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "links catalog cards to scenario paths rather than query strings"
+          ],
+          "duration": 451,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare scenario routes",
+            "ships the Chinese explainer on the Chinese scenario route"
+          ],
+          "duration": 476,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-spec-decode.cy.ts",
+      "duration": 1834,
+      "tests": [
+        {
+          "title": [
+            "Compare spec-decode index + slug page",
+            "navigates to the first card slug if available, and renders table + hero PNG + JSON-LD + precision in h1"
+          ],
+          "duration": 838,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare spec-decode index + slug page",
+            "redirects a reversed none-vs-method slug to canonical method-vs-none"
+          ],
+          "duration": 411,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare spec-decode zh index",
+            "renders Chinese hero and keeps the none side localized through the slug flow"
+          ],
+          "duration": 563,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/compare-table.cy.ts",
+      "duration": 3677,
+      "tests": [
+        {
+          "title": [
+            "Compare Interpolated Table",
+            "keeps metric context visible while scrolling the mobile comparison"
+          ],
+          "duration": 1833,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare Interpolated Table",
+            "commits target value when pressing Enter and updates the throughput cell"
+          ],
+          "duration": 509,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare Interpolated Table",
+            "updates interpolated values when a target input is changed and blurred"
+          ],
+          "duration": 366,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare Interpolated Table",
+            "flags out-of-range interactivity inputs and clears flag after blur commit"
+          ],
+          "duration": 415,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Compare Interpolated Table",
+            "localizes the comparison reader and target input names"
+          ],
+          "duration": 513,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/csv-export-overlay.cy.ts",
+      "duration": 1469,
+      "tests": [
+        {
+          "title": [
+            "Inference CSV export with an unofficial-run overlay",
+            "exports second-based latency headers and only currently visible overlay rows"
+          ],
+          "duration": 1460,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/csv-export.cy.ts",
+      "duration": 5813,
+      "tests": [
+        {
+          "title": [
+            "CSV download route contract",
+            "exports nonempty data with route-specific headers on every chart surface"
+          ],
+          "duration": 5799,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/current-inferencex-image.cy.ts",
+      "duration": 12523,
+      "tests": [
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "localizes spec decode, age text and tooltip while preserving image tags"
+          ],
+          "duration": 2064,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "preserves the English status, age, and technical tooltip copy"
+          ],
+          "duration": 731,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "keeps rows available when release lookup fails and retries independently"
+          ],
+          "duration": 1833,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "shows a natural empty-filter message"
+          ],
+          "duration": 1034,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "hides primary API details, retries, and keeps the table internally scrollable"
+          ],
+          "duration": 1783,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "labels agentic rows as Agentic (never null/null) and flags stale AgentX submissions"
+          ],
+          "duration": 805,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "lists only model-scenario pairs that are still benchmarked"
+          ],
+          "duration": 1805,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "keeps full configuration and long image tags readable while filtering the catalog"
+          ],
+          "duration": 1025,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Current InferenceX Image localized routes",
+            "pairs compact mobile filters and labels the keyboard-accessible version table in Chinese"
+          ],
+          "duration": 1326,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/custom-user-values.cy.ts",
+      "duration": 14634,
+      "tests": [
+        {
+          "title": [
+            "Custom User Values",
+            "Custom Chip Costs",
+            "opens the custom tier from the caption selector with badges seeded from the tier"
+          ],
+          "duration": 2465,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Custom User Values",
+            "Custom Chip Costs",
+            "re-prices the chart as a badge is edited"
+          ],
+          "duration": 4826,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Custom User Values",
+            "Custom Chip Costs",
+            "re-opening the custom tier quotes the reseeded prices, not the earlier typing"
+          ],
+          "duration": 1372,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Custom User Values",
+            "Custom Chip Costs",
+            "editing a badge on a published tier switches to the custom tier"
+          ],
+          "duration": 946,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Custom User Values",
+            "Custom Chip Powers",
+            "Calculate button applies the newly entered power values (regression: stale closure)"
+          ],
+          "duration": 4972,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/datasets-distributions.cy.ts",
+      "duration": 7423,
+      "tests": [
+        {
+          "title": [
+            "Dataset distribution percentiles",
+            "shows P50/P75/P90/P95 for ISL, OSL, and uncached input"
+          ],
+          "duration": 422,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset distribution percentiles",
+            "summarizes subagents per trace instead of charting group counts"
+          ],
+          "duration": 304,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset distribution percentiles",
+            "shows ISL and OSL distributions for inner subagent requests only"
+          ],
+          "duration": 329,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset distribution percentiles",
+            "localizes the distribution cards and conversation controls"
+          ],
+          "duration": 514,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset distribution percentiles",
+            "keeps the conversation table reachable through internal scrolling on mobile"
+          ],
+          "duration": 527,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset detail loading stability",
+            "keeps the footer below the viewport while /agentx/layout-dataset loads"
+          ],
+          "duration": 1772,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset detail loading stability",
+            "keeps the footer below the viewport while /zh/agentx/layout-dataset loads"
+          ],
+          "duration": 1774,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset detail loading stability",
+            "renders a localized request error separately from 404 and retries at 390px"
+          ],
+          "duration": 1375,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset detail loading stability",
+            "reserves the not-found state for a successful 404 response"
+          ],
+          "duration": 330,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/datasets-flamegraph-time.cy.ts",
+      "duration": 4680,
+      "tests": [
+        {
+          "title": [
+            "Dataset conversation flamegraph timing",
+            "shows turn offsets and a collapsed subagent time range"
+          ],
+          "duration": 438,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset conversation flamegraph timing",
+            "shows subturn offsets when the subagent group is expanded"
+          ],
+          "duration": 445,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset conversation flamegraph timing",
+            "localizes generated flamegraph labels on the Chinese conversation route"
+          ],
+          "duration": 1248,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset conversation flamegraph timing",
+            "keeps the flamegraph reachable through internal scrolling at 375px"
+          ],
+          "duration": 569,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset conversation request states",
+            "renders a localized request error and retries at 375px"
+          ],
+          "duration": 1567,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dataset conversation request states",
+            "reserves the not-found state for a successful 404 response"
+          ],
+          "duration": 339,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/datasets-methodology.cy.ts",
+      "duration": 2732,
+      "tests": [
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "explains the source, replay sequence, controls, and interpretation in English"
+          ],
+          "duration": 309,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "ships the same methodology on the Simplified Chinese page"
+          ],
+          "duration": 306,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "publishes the full English methodology with sourced figures and locale pairing"
+          ],
+          "duration": 273,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "publishes the natural Simplified Chinese methodology sibling"
+          ],
+          "duration": 178,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "renders the landing and methodology click path at 1440px and 375px in both locales"
+          ],
+          "duration": 1508,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX dataset methodology",
+            "permanently redirects legacy dataset routes without dropping path or query"
+          ],
+          "duration": 107,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/dropdown-switching.cy.ts",
+      "duration": 3178,
+      "tests": [
+        {
+          "title": [
+            "Dropdown one-click switching",
+            "clicking another selector closes the first and opens the second in one click"
+          ],
+          "duration": 729,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dropdown one-click switching",
+            "only one MultiSelect content panel is open at a time when switching dropdowns"
+          ],
+          "duration": 840,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dropdown one-click switching",
+            "marks only the still-new AgentX models with a NEW pill in the dropdown"
+          ],
+          "duration": 864,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dropdown one-click switching",
+            "Escape closes the Y-axis SearchableSelect dropdown"
+          ],
+          "duration": 588,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/evaluation-chart.cy.ts",
+      "duration": 11542,
+      "tests": [
+        {
+          "title": [
+            "Evaluation Chart — Content & Interactions",
+            "changing the benchmark selector updates the chart subtitle to reflect the new benchmark"
+          ],
+          "duration": 584,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation Chart — Content & Interactions",
+            "Show Labels switch exists in the legend and toggling it adds score labels to the chart"
+          ],
+          "duration": 419,
+          "attempts": 1
+        },
+        {
+          "title": ["Evaluation sample sharing", "copies and restores a link to the prompt drawer"],
+          "duration": 985,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation sample sharing",
+            "does not apply a stale sample id to a manually opened drawer"
+          ],
+          "duration": 755,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation sample sharing",
+            "copies and restores a link to one expanded sample"
+          ],
+          "duration": 987,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation sample sharing",
+            "wraps sample filters before search on a narrow viewport and keeps filter paging scoped"
+          ],
+          "duration": 848,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation evidence reader",
+            "retains every evidence field and compares target with extracted answer at desktop width"
+          ],
+          "duration": 645,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation evidence reader",
+            "keeps unofficial artifact evidence in the same reader"
+          ],
+          "duration": 1088,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation evidence reader",
+            "stacks Chinese answer blocks on phones without losing raw output or metrics"
+          ],
+          "duration": 541,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation Chart — Simplified Chinese mobile path",
+            "keeps table/chart actions reachable and localizes table labels and dates"
+          ],
+          "duration": 458,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation Chart — Simplified Chinese mobile path",
+            "distinguishes a fetch error from empty data and retries the failed query"
+          ],
+          "duration": 1567,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation Chart — Simplified Chinese mobile path",
+            "keeps evaluation results visible while retrying failed availability metadata"
+          ],
+          "duration": 1763,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation Chart — Simplified Chinese mobile path",
+            "renders a successful empty response without offering an error retry"
+          ],
+          "duration": 770,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/first-token-limits.cy.ts",
+      "duration": 7306,
+      "tests": [
+        {
+          "title": [
+            "First-Token Limits",
+            "official rows only",
+            "picks the cheapest row that clears the interactivity floor, not the cheapest row"
+          ],
+          "duration": 1795,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "official rows only",
+            "re-picks the winner when the legend isolates another chip"
+          ],
+          "duration": 361,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "official rows only",
+            "normalizes a typed ladder into the field and the axis"
+          ],
+          "duration": 1068,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "empty states",
+            "blames the cap ladder, not the floor, when rows qualify but none clears a cap"
+          ],
+          "duration": 459,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "empty states",
+            "blames the floor when nothing reaches the requested interactivity"
+          ],
+          "duration": 650,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "share-link seeding",
+            "reads the interactivity floor and cap ladder from the URL"
+          ],
+          "duration": 884,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "unofficial-run overlay",
+            "adds the run as its own series in the palette color, never as a vendor bar"
+          ],
+          "duration": 903,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "unofficial-run overlay",
+            "lets the legend hide hardware inside the run too"
+          ],
+          "duration": 384,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-Token Limits",
+            "Chinese page",
+            "renders the intro and Chinese control labels"
+          ],
+          "duration": 708,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
+      "duration": 1208,
+      "tests": [
+        {
+          "title": [
+            "Fixed-sequence benchmark logs",
+            "opens all stored .out and .log files on the fixed-sequence detail route"
+          ],
+          "duration": 1198,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/fleet-lifecycle.cy.ts",
+      "duration": 38799,
+      "tests": [
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "keeps benchmark and chart controls inside their panels on phones and desktops"
+          ],
+          "duration": 4790,
+          "attempts": 1
+        },
+        {
+          "title": ["Fleet — Fleet Lifecycle", "the default MW budget drives the lifecycle table"],
+          "duration": 1075,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "quotes both token prices in the caption, and tracks the fields"
+          ],
+          "duration": 2529,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "raising the price above break-even turns margin positive and produces a payback"
+          ],
+          "duration": 775,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "bills the two streams apart — the output price alone moves margin"
+          ],
+          "duration": 1254,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "resets both prices together, keeping the ratio the user set"
+          ],
+          "duration": 806,
+          "attempts": 1
+        },
+        {
+          "title": ["Fleet — Fleet Lifecycle", "names each line with its chip at the right edge"],
+          "duration": 239,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "reads every plotted chip at the hovered date, not just one point"
+          ],
+          "duration": 239,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "freezes the readout on click, and releases it on the next click"
+          ],
+          "duration": 469,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "keeps config detail out of the hover readout, showing it only once frozen"
+          ],
+          "duration": 400,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "links the run behind any step, not just the first and last"
+          ],
+          "duration": 266,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "zooms the time axis, as its own instructions promise"
+          ],
+          "duration": 1702,
+          "attempts": 1
+        },
+        {
+          "title": ["Fleet — Fleet Lifecycle", "switches the y axis between margin and revenue"],
+          "duration": 763,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "a longer horizon accumulates more of whatever the daily margin is"
+          ],
+          "duration": 1071,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "tracks measured config improvements as steps, not one flat plateau"
+          ],
+          "duration": 640,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "rolls each config out over the ramp instead of stepping instantly"
+          ],
+          "duration": 1013,
+          "attempts": 1
+        },
+        {
+          "title": ["Fleet — Fleet Lifecycle", "a shorter MTBI lowers availability"],
+          "duration": 978,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "draws one row per chip, pooling its software configs"
+          ],
+          "duration": 433,
+          "attempts": 1
+        },
+        {
+          "title": ["Fleet — Fleet Lifecycle", "follows legend visibility"],
+          "duration": 492,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "explains chips that were never measured at an extreme target instead of dropping them"
+          ],
+          "duration": 557,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "names the budget, not the slider, when a budget is too small to size a fleet"
+          ],
+          "duration": 667,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle",
+            "clearing the MW budget restores the empty state, and the input survives it"
+          ],
+          "duration": 160,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — self-contained lifecycle regressions",
+            "preserves c_price and derives a non-zero output price"
+          ],
+          "duration": 1266,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — self-contained lifecycle regressions",
+            "plots revenue per MW as a real normalized y-axis metric"
+          ],
+          "duration": 442,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — self-contained lifecycle regressions",
+            "exports the physical fleet sizing alongside its economics"
+          ],
+          "duration": 376,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle with agentic traces",
+            "names the cached tier in the caption, since most input bills at it"
+          ],
+          "duration": 1490,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle with agentic traces",
+            "raises the break-even price it seeds, because fewer tokens are billable"
+          ],
+          "duration": 1030,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle with agentic traces",
+            "lowers margin at a fixed price, where the discount has nowhere to hide"
+          ],
+          "duration": 1130,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle in Chinese",
+            "keeps token-type headers and exported assumptions in Chinese as selections change"
+          ],
+          "duration": 5464,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle in Chinese",
+            "uses the selected cost tier’s Chinese label in the assumptions footer"
+          ],
+          "duration": 532,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle in Chinese",
+            "keeps Chinese axis and pinned dates when zooming at 1280px"
+          ],
+          "duration": 3001,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Fleet — Fleet Lifecycle in Chinese",
+            "keeps Chinese axis and pinned dates when zooming at 390px"
+          ],
+          "duration": 2403,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
+      "duration": 5411,
+      "tests": [
+        {
+          "title": [
+            "GPU comparison agentic point detail",
+            "exposes the per-point charts as a normal browser link"
+          ],
+          "duration": 1511,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU comparison agentic point detail",
+            "restores a soloed compatible selection without requesting engine consent"
+          ],
+          "duration": 602,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU comparison agentic point detail",
+            "defaults to the scored winner and requires consent before showing both engines"
+          ],
+          "duration": 2126,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU comparison agentic point detail",
+            "surfaces automatic resolution of conflicting GPU URL state"
+          ],
+          "duration": 743,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU comparison agentic point detail",
+            "lets vLLM and SGLang share the graph when the feature gate is unlocked"
+          ],
+          "duration": 386,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/gpu-specs.cy.ts",
+      "duration": 7361,
+      "tests": [
+        {
+          "title": ["GPU Specs Tab", "specs table is visible with all GPUs"],
+          "duration": 414,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Tab",
+            "preserves the English expand button label and identifies the scale-out SVG"
+          ],
+          "duration": 29,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Tab",
+            "hides scale-out topology logos with the unofficial-domain notice"
+          ],
+          "duration": 28,
+          "attempts": 1
+        },
+        {
+          "title": ["GPU Specs Bar Chart View", "table view is active by default"],
+          "duration": 263,
+          "attempts": 1
+        },
+        {
+          "title": ["GPU Specs Bar Chart View", "clicking Chart button switches to bar chart view"],
+          "duration": 93,
+          "attempts": 1
+        },
+        {
+          "title": ["GPU Specs Bar Chart View", "FP4 metric excludes GPUs without FP4 support"],
+          "duration": 140,
+          "attempts": 1
+        },
+        {
+          "title": ["GPU Specs Bar Chart View", "switching back to table view restores the table"],
+          "duration": 73,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Radar Chart View",
+            "clicking Radar button switches to radar chart view"
+          ],
+          "duration": 385,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Radar Chart View",
+            "toggling a GPU off via sidebar legend removes its polygon"
+          ],
+          "duration": 158,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Radar Chart View",
+            "hides the radar chart logo on unofficial domains"
+          ],
+          "duration": 34,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Radar Chart View",
+            "switching from radar back to table restores table"
+          ],
+          "duration": 73,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Navigation",
+            "footer link opens GPU Specs and the tab strip shows no active tab"
+          ],
+          "duration": 525,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-out topology dialog next button navigates to next GPU"
+          ],
+          "duration": 578,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-out topology dialog prev button navigates to previous GPU"
+          ],
+          "duration": 391,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-out topology dialog supports keyboard arrow navigation"
+          ],
+          "duration": 479,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-up topology dialog next button navigates to next GPU"
+          ],
+          "duration": 378,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-up topology dialog supports keyboard arrow navigation"
+          ],
+          "duration": 454,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Topology Dialog Navigation",
+            "scale-up topology dialog wraps around from last to first"
+          ],
+          "duration": 429,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Chinese route",
+            "localizes view accessibility, topology values, SVG labels, and dialogs"
+          ],
+          "duration": 412,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Chinese route",
+            "localizes chart and radar registries while preserving technical units"
+          ],
+          "duration": 492,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Chinese route",
+            "supports table, topology, chart, and radar navigation at 1440px"
+          ],
+          "duration": 1099,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "GPU Specs Chinese route",
+            "keeps wide content internally scrollable and emits hreflang metadata"
+          ],
+          "duration": 262,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/gradient-labels.cy.ts",
+      "duration": 3421,
+      "tests": [
+        {
+          "title": ["Gradient Labels Toggle", "both toggles can be enabled simultaneously"],
+          "duration": 1196,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Gradient Labels Toggle",
+            "URL param i_gradlabel=1 enables gradient labels on load"
+          ],
+          "duration": 545,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Gradient Labels with non-default Y-axis metrics",
+            "gradient defs render for cost metric (lower_right roofline)"
+          ],
+          "duration": 682,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Gradient Labels with non-default Y-axis metrics",
+            "gradient defs render for energy metric (lower_right roofline)"
+          ],
+          "duration": 514,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Gradient Labels with non-default Y-axis metrics",
+            "gradient defs render for throughput metric (upper_right roofline)"
+          ],
+          "duration": 448,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/historical-trends.cy.ts",
+      "duration": 11221,
+      "tests": [
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "loads history when the current snapshot lacks the selected energy metric"
+          ],
+          "duration": 905,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "target interactivity slider value updates when the number input is changed"
+          ],
+          "duration": 746,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "keeps fixed precision visible and allows selection for multi-precision models"
+          ],
+          "duration": 501,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "Log Scale switch exists in the legend and can be toggled"
+          ],
+          "duration": 735,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "Y-axis metric selector is present and can be changed"
+          ],
+          "duration": 471,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "offers the published tiers in the caption Cost Tier selector but no Custom User Values"
+          ],
+          "duration": 659,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Content & Interactions",
+            "changing model updates the chart title to reflect the new model"
+          ],
+          "duration": 694,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "localizes the metric title, chart instructions, and point tooltip"
+          ],
+          "duration": 710,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "localizes the Agentic sequence and run date in the chart caption"
+          ],
+          "duration": 743,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "shows a settled Chinese empty state instead of leaving the skeleton mounted"
+          ],
+          "duration": 544,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "shows a safe Chinese primary error and recovers through the reload control"
+          ],
+          "duration": 2106,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "shows a distinct secondary-history error and recovers through the tracked retry"
+          ],
+          "duration": 1860,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Historical Trends — Chinese route",
+            "keeps the target controls and chart reachable at 375px"
+          ],
+          "duration": 448,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/inference-chart.cy.ts",
+      "duration": 14235,
+      "tests": [
+        {
+          "title": [
+            "hydrates a direct PowerX metric link and shows availability for the selected workload"
+          ],
+          "duration": 783,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "replots measured settings for official and unofficial data and preserves overlay dismissal"
+          ],
+          "duration": 885,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "uses Optimal Only to filter power boundary dots without replacing official or overlay curves"
+          ],
+          "duration": 1318,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart",
+            "hides the logo watermark when the unofficial-domain notice is shown"
+          ],
+          "duration": 364,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart",
+            "leads the chart heading with the model and workload, without the cost tier"
+          ],
+          "duration": 67,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart",
+            "plots OpenRouter-priced token revenue for official and unofficial runs"
+          ],
+          "duration": 576,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart",
+            "plots infrastructure total tokens per dollar for official and unofficial runs"
+          ],
+          "duration": 536,
+          "attempts": 1
+        },
+        {
+          "title": ["Inference Chart", "ships OpenRouter-priced token revenue in Chinese"],
+          "duration": 632,
+          "attempts": 1
+        },
+        {
+          "title": ["Inference Chart", "ships infrastructure total tokens per dollar in Chinese"],
+          "duration": 568,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart",
+            "surfaces the error instead of an endless skeleton when availability fails"
+          ],
+          "duration": 1300,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart — Simplified Chinese mobile path",
+            "keeps chart controls reachable and localizes the complete table click path"
+          ],
+          "duration": 744,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Chart — Simplified Chinese mobile path",
+            "localizes architecture and changelog overlays without changing technical model data"
+          ],
+          "duration": 476,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "AgentX replaces a complete curve while preserving an unofficial comparison",
+            "shows only the six new disagg points and keeps the overlay independently dismissible"
+          ],
+          "duration": 703,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication data compatibility",
+            "renders September TRTLLM data and cache metrics under /en"
+          ],
+          "duration": 385,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication data compatibility",
+            "renders September TRTLLM data and cache metrics under /zh"
+          ],
+          "duration": 480,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "defaults only VR to September 9 under /en"],
+          "duration": 473,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "honors explicit g_rundate=2026-09-10 under /en"],
+          "duration": 380,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "honors explicit g_runid=9100001 under /en"],
+          "duration": 367,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "defaults only VR to September 9 under /zh"],
+          "duration": 452,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "honors explicit g_rundate=2026-09-10 under /zh"],
+          "duration": 319,
+          "attempts": 1
+        },
+        {
+          "title": ["VR default date preference", "honors explicit g_runid=9100001 under /zh"],
+          "duration": 338,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR default date preference",
+            "honors a manual selection of the latest date after opening the default"
+          ],
+          "duration": 773,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR default date preference",
+            "keeps the latest official snapshot beside an unofficial comparison"
+          ],
+          "duration": 331,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR default date preference",
+            "falls back to the current curve when September 9 has not been imported"
+          ],
+          "duration": 379,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Staged Pareto deep links",
+            "renders only the requested run line when that run is also selected as the latest run"
+          ],
+          "duration": 398,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/inference-replay.cy.ts",
+      "duration": 9998,
+      "tests": [
+        {
+          "title": ["Inference Replay", "opens the replay preview modal from the MP4 menu item"],
+          "duration": 1417,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay",
+            "advances the date overlay and scrubber when Play is pressed"
+          ],
+          "duration": 1165,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay",
+            "re-renders the replay frame when a parent-chart toggle changes"
+          ],
+          "duration": 811,
+          "attempts": 1
+        },
+        {
+          "title": ["Inference Replay", "renders line labels in the foreground during replay"],
+          "duration": 152,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay",
+            "Fixed axes stay constant across frames; toggling off refits per frame"
+          ],
+          "duration": 355,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay — Simplified Chinese",
+            "waits for fixture history and exercises every localized replay control"
+          ],
+          "duration": 1957,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay — Simplified Chinese",
+            "shows an error, retries after analytics, and then renders controls"
+          ],
+          "duration": 2675,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Inference Replay — Simplified Chinese",
+            "renders the insufficient-history state only after a successful response"
+          ],
+          "duration": 1389,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/jalapeno-preview-notice.cy.ts",
+      "duration": 5607,
+      "tests": [
+        {
+          "title": [
+            "official preview notices",
+            "renders both graph notices and tracks Jalapeño legend visibility"
+          ],
+          "duration": 642,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "official preview notices",
+            "keeps the July Vera Rubin notice off metrics where its curve is unsupported"
+          ],
+          "duration": 423,
+          "attempts": 1
+        },
+        {
+          "title": ["official preview notices", "appears with Jalapeño calculator results"],
+          "duration": 860,
+          "attempts": 1
+        },
+        {
+          "title": ["official preview notices", "appears with Jalapeño historical trend lines"],
+          "duration": 738,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "official preview notices",
+            "keeps the July Vera Rubin notice off unsupported historical metrics"
+          ],
+          "duration": 673,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "official preview notices",
+            "shows the Vera Rubin preview when its output-token fleet curve is visible"
+          ],
+          "duration": 734,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "official preview notices",
+            "uses the Chinese disclaimer on /zh and stays absent without Jalapeño results"
+          ],
+          "duration": 629,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "official preview notices",
+            "renders the TPU7x graph notice on the Qwen3.5 8k/1k curve and nowhere else"
+          ],
+          "duration": 805,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/landing-dashboard-navigation.cy.ts",
+      "duration": 18379,
+      "tests": [
+        {
+          "title": [
+            "landing model curation",
+            "shows the curated ledger on / without changing compare coverage"
+          ],
+          "duration": 684,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing model curation",
+            "opens the STP-only Qwen TPU view from / and retains it on reload"
+          ],
+          "duration": 1189,
+          "attempts": 1
+        },
+        {
+          "title": ["landing model curation", "opens Rubin AgentX results from /"],
+          "duration": 1567,
+          "attempts": 1
+        },
+        {
+          "title": ["landing model curation", "opens Jalapeño R1 results from /"],
+          "duration": 1568,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing model curation",
+            "does not carry TPU precision through Back into Rubin on /"
+          ],
+          "duration": 2317,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing model curation",
+            "shows the curated ledger on /zh without changing compare coverage"
+          ],
+          "duration": 664,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing model curation",
+            "opens the STP-only Qwen TPU view from /zh and retains it on reload"
+          ],
+          "duration": 1534,
+          "attempts": 1
+        },
+        {
+          "title": ["landing model curation", "opens Rubin AgentX results from /zh"],
+          "duration": 1523,
+          "attempts": 1
+        },
+        {
+          "title": ["landing model curation", "opens Jalapeño R1 results from /zh"],
+          "duration": 1518,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing model curation",
+            "does not carry TPU precision through Back into Rubin on /zh"
+          ],
+          "duration": 2161,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "landing → full dashboard navigation",
+            "commits exactly one navigation and one history entry on a cold dashboard load"
+          ],
+          "duration": 3456,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/landing-performance.cy.ts",
+      "duration": 2039,
+      "tests": [
+        {
+          "title": [
+            "Landing page performance",
+            "links Anyscale to its localized quote without loading a landing-page logo"
+          ],
+          "duration": 1124,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing page performance",
+            "does not shift when client JavaScript hydrates after first paint"
+          ],
+          "duration": 317,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing page performance",
+            "hides a dismissed server-rendered banner before paint without shifting content"
+          ],
+          "duration": 282,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing page performance",
+            "does not load the decorative circuit mask on mobile"
+          ],
+          "duration": 243,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing page performance",
+            "preloads only the default font and no supporter logos"
+          ],
+          "duration": 52,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/line-labels.cy.ts",
+      "duration": 4872,
+      "tests": [
+        {
+          "title": ["Line Labels Toggle", "line labels stay in the foreground after zooming"],
+          "duration": 1019,
+          "attempts": 1
+        },
+        {
+          "title": ["Line Labels Toggle", "Line Labels can be enabled alongside Gradient Labels"],
+          "duration": 571,
+          "attempts": 1
+        },
+        {
+          "title": ["Line Labels Toggle", "URL param i_linelabel=0 disables line labels on load"],
+          "duration": 1080,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Line Labels Toggle",
+            "legacy URL param i_nolabel=1 keeps point labels hidden on load"
+          ],
+          "duration": 556,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Line Labels Toggle",
+            "legacy URL param i_advlabel=1 auto-enables Labels so advanced labels render"
+          ],
+          "duration": 523,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Line Labels Toggle",
+            "legacy URL combo i_advlabel=1&i_nolabel=1 keeps point labels hidden (i_nolabel wins)"
+          ],
+          "duration": 526,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Line Labels Toggle",
+            "places the precision between the GPU and engine when multiple precisions are selected"
+          ],
+          "duration": 543,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/measured-power-overlay.cy.ts",
+      "duration": 3811,
+      "tests": [
+        {
+          "title": [
+            "Measured power on unofficial-run overlay",
+            "exposes both measured families and selects average power on the overlay view"
+          ],
+          "duration": 3791,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/model-architecture.cy.ts",
+      "duration": 11724,
+      "tests": [
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - DeepSeek R1)",
+            "expands dense transformer block on click"
+          ],
+          "duration": 772,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - DeepSeek R1)",
+            "expands MoE transformer block on click"
+          ],
+          "duration": 240,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - DeepSeek R1)",
+            "both transformer blocks can be expanded simultaneously"
+          ],
+          "duration": 270,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Block (Dense model - Llama 3.3 70B)",
+            "expanded transformer block contains expandable attention and FFN"
+          ],
+          "duration": 556,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - Kimi K2.5)",
+            "MLA attention is NOT expandable in MoE block"
+          ],
+          "duration": 613,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - MiniMax M2.5)",
+            "GQA attention is NOT expandable despite being GQA type"
+          ],
+          "duration": 592,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Collapsible Transformer Blocks (MoE model - MiniMax M3)",
+            "GQA attention is NOT expandable (sparse attention rendered as a static block)"
+          ],
+          "duration": 558,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Alternating Attention Blocks (MoE model - gpt-oss 120B)",
+            "shows two separate transformer blocks (no single expand-transformer)"
+          ],
+          "duration": 568,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Alternating Attention Blocks (MoE model - gpt-oss 120B)",
+            "first block expands to show Sliding Attention + Sink internals"
+          ],
+          "duration": 241,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)",
+            "shows two separate hybrid (CSA/HCA) blocks with an alternating indicator"
+          ],
+          "duration": 520,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)",
+            "shows a hash-routed MoE prefix block; mHC caption appears once a block is open"
+          ],
+          "duration": 187,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)",
+            "Hybrid attention is expandable and drills down to a Sliding Window block"
+          ],
+          "duration": 225,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - DeepSeek V4 Pro)",
+            "collapsing the parent block hides the union-softmax caption (no orphan caption)"
+          ],
+          "duration": 149,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - Kimi K3)",
+            "renders the KDA and gated-MLA layer categories as two alternating blocks"
+          ],
+          "duration": 398,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - Kimi K3)",
+            "keeps attention static — no CSA/HCA drill-down or union-softmax caption"
+          ],
+          "duration": 172,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Hybrid Attention Blocks (MoE model - Kimi K3)",
+            "labels the dense prefix block KDA rather than the model-wide hybrid type"
+          ],
+          "duration": 133,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Model index page (/model)",
+            "lists every model page with architecture badges"
+          ],
+          "duration": 190,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Model index page (/model)",
+            "navigates to a model deep-dive page"
+          ],
+          "duration": 319,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Model index page (/model)",
+            "is linked from the footer"
+          ],
+          "duration": 77,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Chinese model index and detail journey",
+            "keeps Chinese chrome, metadata, and navigation at desktop"
+          ],
+          "duration": 668,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Chinese model index and detail journey",
+            "keeps Chinese chrome, metadata, and navigation at 375px mobile"
+          ],
+          "duration": 773,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Chinese model index and detail journey",
+            "keeps Chinese chrome, metadata, and navigation at 390px mobile"
+          ],
+          "duration": 728,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Chinese model index and detail journey",
+            "keeps the dashboard architecture link inside the Chinese route tree"
+          ],
+          "duration": 259,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Embedded dashboard changelog starts collapsed",
+            "can still be expanded manually"
+          ],
+          "duration": 735,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Embedded dashboard changelog starts collapsed",
+            "retains the axis selector even though the full filter panel is hidden"
+          ],
+          "duration": 452,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Dashboard architecture icon link (replaces the banner row)",
+            "renders an icon link beside the model selector instead of a banner row"
+          ],
+          "duration": 599,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Model Architecture Diagram",
+            "Dashboard architecture icon link (replaces the banner row)",
+            "navigates to the model deep-dive page"
+          ],
+          "duration": 449,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/model-route-slugs.cy.ts",
+      "duration": 2882,
+      "tests": [
+        {
+          "title": [
+            "Per-model dashboard routes",
+            "seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload"
+          ],
+          "duration": 720,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Per-model dashboard routes",
+            "moves from the bare tab path to a slugged path when a non-default model is chosen"
+          ],
+          "duration": 469,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Per-model dashboard routes",
+            "redirects alias slugs to the canonical model slug, keeping share-link params"
+          ],
+          "duration": 399,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Per-model dashboard routes",
+            "language toggle follows the in-place rewritten per-model path"
+          ],
+          "duration": 756,
+          "attempts": 1
+        },
+        {
+          "title": ["Per-model dashboard routes", "returns 404 for unknown model slugs"],
+          "duration": 106,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Per-model dashboard routes",
+            "renders the /zh sibling with a model-specific Chinese intro"
+          ],
+          "duration": 335,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/navigation.cy.ts",
+      "duration": 39968,
+      "tests": [
+        {
+          "title": ["Chart Section Tabs — E2E", "updates the URL path when switching tabs"],
+          "duration": 3522,
+          "attempts": 1
+        },
+        {
+          "title": ["Chart Section Tabs — E2E", "opens Historical Trends from the footer link"],
+          "duration": 380,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chart Section Tabs — E2E",
+            "opens the TCO Calculator and Fleet Lifecycle from the footer links"
+          ],
+          "duration": 1191,
+          "attempts": 1
+        },
+        {
+          "title": ["Chart Section Tabs — E2E", "opens First-Token Limits from the footer link"],
+          "duration": 366,
+          "attempts": 1
+        },
+        {
+          "title": ["Chart Section Tabs — E2E", "opens Prefix Cache Reuse from the footer link"],
+          "duration": 267,
+          "attempts": 1
+        },
+        {
+          "title": ["Chart Section Tabs — E2E", "opens GPU Reliability from the footer link"],
+          "duration": 142,
+          "attempts": 1
+        },
+        {
+          "title": ["Chart Section Tabs — E2E", "opens Chip Specs from the footer link"],
+          "duration": 246,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chart Section Tabs — E2E",
+            "keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger"
+          ],
+          "duration": 899,
+          "attempts": 1
+        },
+        {
+          "title": ["First-load navigation", "navigates to articles from the footer"],
+          "duration": 1199,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-load navigation",
+            "navigates to overview from the top-level header link"
+          ],
+          "duration": 984,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-load navigation",
+            "navigates to dashboard from the header with one click"
+          ],
+          "duration": 710,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-load navigation",
+            "navigates to comparisons from the footer with one click"
+          ],
+          "duration": 943,
+          "attempts": 1
+        },
+        {
+          "title": ["First-load navigation", "navigates to AgentX from the header with one click"],
+          "duration": 813,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "First-load navigation",
+            "leads the landing page with the AgentX hero and its two CTAs"
+          ],
+          "duration": 1187,
+          "attempts": 1
+        },
+        {
+          "title": ["First-load navigation", "navigates to submissions from the landing CTA"],
+          "duration": 928,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Rubin MiniMax M3 launch banner",
+            "opens MiniMax M3 results from / landing page"
+          ],
+          "duration": 889,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Rubin MiniMax M3 launch banner",
+            "opens MiniMax M3 results from /zh landing page"
+          ],
+          "duration": 1031,
+          "attempts": 1
+        },
+        {
+          "title": ["TPUv7 results", "preserves TPUv7 FP8 cost basis in / share URLs"],
+          "duration": 6338,
+          "attempts": 1
+        },
+        {
+          "title": ["TPUv7 results", "preserves TPUv7 FP8 cost basis in /zh share URLs"],
+          "duration": 6153,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TPUv7 results",
+            "reprices a TPU unofficial overlay without changing throughput"
+          ],
+          "duration": 1979,
+          "attempts": 1
+        },
+        {
+          "title": ["TPUv7 results", "hides the TCO basis selector outside Qwen3.5 8K/1K"],
+          "duration": 412,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "H3 video artifact viewer",
+            "shares a comparison built by opening two CI runs through the page"
+          ],
+          "duration": 3406,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "H3 video artifact viewer",
+            "restores a cross-hardware comparison on reload and retains good results when one artifact fails"
+          ],
+          "duration": 2565,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "H3 video artifact viewer",
+            "uses the shared unlock for navigation and keeps an empty viewer free of sample results"
+          ],
+          "duration": 900,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "H3 video artifact viewer",
+            "shows a recoverable load error and the Chinese empty state"
+          ],
+          "duration": 2125,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/nudge-system.cy.ts",
+      "duration": 24294,
+      "tests": [
+        {
+          "title": ["Landing nudges — modals", "shows the launch banner on fresh first load"],
+          "duration": 465,
+          "attempts": 1
+        },
+        {
+          "title": ["Landing nudges — modals", "localizes the Rubin banner title in Chinese"],
+          "duration": 301,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing nudges — banner",
+            "wraps the full Rubin title on mobile without clipping"
+          ],
+          "duration": 206,
+          "attempts": 1
+        },
+        {
+          "title": ["Landing nudges — banner", "dismissing the banner persists across reloads"],
+          "duration": 532,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Landing nudges — banner",
+            "clicking the banner body navigates without persisting dismissal"
+          ],
+          "duration": 1314,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dashboard nudges — reproducibility toast",
+            "reproducibility nudge is session-only — gone after reload"
+          ],
+          "duration": 4152,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dashboard nudges — filter-hint toast",
+            "does not show the filter-hint nudge outside the inference tab"
+          ],
+          "duration": 3755,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dashboard nudges — filter-hint toast",
+            "arms the filter hint before a client transition into inference"
+          ],
+          "duration": 1110,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dashboard nudges — filter-hint toast",
+            "re-evaluates the localized filter hint after a Chinese tab transition"
+          ],
+          "duration": 1121,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Dashboard nudges — filter-hint toast",
+            "dismissal persists to localStorage and the nudge stays gone after reload"
+          ],
+          "duration": 6842,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Evaluation nudges — eval-samples toast",
+            "eval-samples open event refreshes the cooldown timestamp"
+          ],
+          "duration": 1913,
+          "attempts": 1
+        },
+        {
+          "title": ["Nudge scope isolation", "landing nudges do not appear on dashboard"],
+          "duration": 182,
+          "attempts": 1
+        },
+        {
+          "title": ["Nudge scope isolation", "dashboard nudges do not appear on landing page"],
+          "duration": 2246,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/operatorx.cy.ts",
+      "duration": 693,
+      "tests": [
+        {
+          "title": ["shows measured and missing GPU coverage, then switches the URL to MoE"],
+          "duration": 687,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
+      "duration": 28168,
+      "tests": [
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/ migrates a retired kart preference and keeps the toggle usable"
+          ],
+          "duration": 1716,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh migrates a retired kart preference and keeps the toggle usable"
+          ],
+          "duration": 1499,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "light / at 1440px does not load theme code, assets or fonts"
+          ],
+          "duration": 1723,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "dark / at 390px does not load theme code, assets or fonts"
+          ],
+          "duration": 551,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "light /zh at 390px does not load theme code, assets or fonts"
+          ],
+          "duration": 1911,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "dark /zh at 1440px does not load theme code, assets or fonts"
+          ],
+          "duration": 996,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "default / at 390px does not load theme code, assets or fonts"
+          ],
+          "duration": 816,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "system /zh at 1440px does not load theme code, assets or fonts"
+          ],
+          "duration": 1213,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "English embed ignores saved minecraft before and after hydration"
+          ],
+          "duration": 1374,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh embed ignores saved minecraft before and after hydration"
+          ],
+          "duration": 1131,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "English embed ignores saved csgo before and after hydration"
+          ],
+          "duration": 1217,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh embed ignores saved csgo before and after hydration"
+          ],
+          "duration": 1214,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "English embed ignores saved gta before and after hydration"
+          ],
+          "duration": 911,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh embed ignores saved gta before and after hydration"
+          ],
+          "duration": 866,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "English embed ignores saved doom before and after hydration"
+          ],
+          "duration": 889,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh embed ignores saved doom before and after hydration"
+          ],
+          "duration": 984,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "English embed ignores saved halo before and after hydration"
+          ],
+          "duration": 863,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh embed ignores saved halo before and after hydration"
+          ],
+          "duration": 932,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "keeps crawler metadata and content independent of the optional themes"
+          ],
+          "duration": 91,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata"
+          ],
+          "duration": 4360,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/about keeps the page and default toggle working when optional chunks fail"
+          ],
+          "duration": 1367,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "optional themes stay off the default page",
+            "/zh/about keeps the page and default toggle working when optional chunks fail"
+          ],
+          "duration": 1406,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/overlay-legend-remove.cy.ts",
+      "duration": 1880,
+      "tests": [
+        {
+          "title": [
+            "Official legend X works while an unofficial overlay is loaded",
+            "clicking the official SKU X hides its points but keeps the overlay"
+          ],
+          "duration": 1384,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Official legend X works while an unofficial overlay is loaded",
+            "keeps the official SKU hidden when chart metrics change"
+          ],
+          "duration": 340,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Official legend X works while an unofficial overlay is loaded",
+            "re-activating the SKU from the legend restores the official points"
+          ],
+          "duration": 137,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/overlay-optimal-only.cy.ts",
+      "duration": 995,
+      "tests": [
+        {
+          "title": [
+            "Overlay points follow Optimal Only on the selected axes",
+            "drops only the dominated overlay point in the default Optimal Only view"
+          ],
+          "duration": 728,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overlay points follow Optimal Only on the selected axes",
+            "shows all overlay points when Optimal Only is turned off"
+          ],
+          "duration": 108,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overlay points follow Optimal Only on the selected axes",
+            "re-drops the dominated overlay point when Optimal Only is re-enabled"
+          ],
+          "duration": 145,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/overview-a11y.cy.ts",
+      "duration": 9085,
+      "tests": [
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the English hardware comparison view using the light theme"
+          ],
+          "duration": 1654,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the English hardware comparison view using the dark theme"
+          ],
+          "duration": 1440,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the Chinese hardware comparison view using the light theme"
+          ],
+          "duration": 1300,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the Chinese hardware comparison view using the dark theme"
+          ],
+          "duration": 1202,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the historical comparison view using the light theme"
+          ],
+          "duration": 2124,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview accessibility",
+            "has no WCAG 2.0/2.1 A or AA violations in the historical comparison view using the dark theme"
+          ],
+          "duration": 1313,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/overview.cy.ts",
+      "duration": 29035,
+      "tests": [
+        {
+          "title": [
+            "Overview page",
+            "updates selectors through cached overview JSON without an RSC round trip"
+          ],
+          "duration": 1222,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "preserves pending selections when controls are changed rapidly"
+          ],
+          "duration": 2040,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "keeps the last matrix and history entry when a popstate request fails"
+          ],
+          "duration": 731,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "shows a localized empty state after a selector returns no models"
+          ],
+          "duration": 407,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "keeps one history entry when the overview request fails"],
+          "duration": 1219,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "warms a hovered option and derives the reference without a request"
+          ],
+          "duration": 1134,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "reveals deprecated and maintenance models via the bottom toggle"
+          ],
+          "duration": 589,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "uses a selectable hardware reference and preserves it across overview controls"
+          ],
+          "duration": 952,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "sends one RSC request when a slow language switch preserves overview state"
+          ],
+          "duration": 1106,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "switches between B200 and 30-day comparison without losing page state"
+          ],
+          "duration": 796,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "keeps client-only presentation intent across selectors without forcing fullscreen on load"
+          ],
+          "duration": 847,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "reasserts presentation intent when browser history changes during fullscreen"
+          ],
+          "duration": 551,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "leaves comparison paging to a focused presentation select option"
+          ],
+          "duration": 446,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "switches the history window through the embedded selector"],
+          "duration": 716,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "compares each platform with its own validated result from 30–60 days earlier"
+          ],
+          "duration": 309,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "releases the exact history pair after a model change"],
+          "duration": 890,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "keeps a benchmark result usable without comparison dates"],
+          "duration": 749,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "does not require comparison dates when opening AgentX details"
+          ],
+          "duration": 455,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "keeps the historical comparison complete and non-scrolling across desktop, tablet and phone"
+          ],
+          "duration": 1993,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "narrows the matrix when the row filter is clicked in either comparison mode"
+          ],
+          "duration": 859,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "defaults to community engine scope and switches with canonical links preserving tier and locale"
+          ],
+          "duration": 1214,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "prefers speculative decode and falls back to labelled standard-decode reads"
+          ],
+          "duration": 278,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞"
+          ],
+          "duration": 393,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "renders the full platform matrix for every active model"],
+          "duration": 409,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "gives a model benchmarked on both scenarios one row each, priced independently"
+          ],
+          "duration": 301,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "stacks the metric definition under the title at every width"],
+          "duration": 1299,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "links each cost to the raw source dashboard for exactly that configuration"
+          ],
+          "duration": 301,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "distinguishes per-platform and whole-row missing results with a plain dash"
+          ],
+          "duration": 316,
+          "attempts": 1
+        },
+        {
+          "title": ["Overview page", "re-renders the whole matrix from the six-stop SLO slider"],
+          "duration": 990,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "uses the same cell semantics on mobile and fits both 390px and 320px widths"
+          ],
+          "duration": 604,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "aligns every platform to the same compact row axes on phones"
+          ],
+          "duration": 1351,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "keeps percentage badges beside the value and typographically aligned below desktop"
+          ],
+          "duration": 1319,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "pins the matrix header to the top of the viewport while the page scrolls"
+          ],
+          "duration": 359,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "fits the full matrix without overlap or clipping at desktop widths"
+          ],
+          "duration": 637,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Overview page",
+            "renders the Chinese sibling with equivalent matrix copy and semantics"
+          ],
+          "duration": 771,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/powerx-compare.cy.ts",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/e2e/powerx-timeline.cy.ts",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/e2e/profit-estimator.cy.ts",
+      "duration": 40054,
+      "tests": [
+        {
+          "title": [
+            "keeps the latest VR snapshot in the profit estimator, matching the private preference scope"
+          ],
+          "duration": 909,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (en)"
+          ],
+          "duration": 812,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (zh)"
+          ],
+          "duration": 707,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "ignores power URL overrides while locked and returns to provisioned estimates on relock"
+          ],
+          "duration": 501,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "dates historical power skips without current hardware metadata (with current bars)"
+          ],
+          "duration": 458,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "dates historical power skips without current hardware metadata (empty chart)"
+          ],
+          "duration": 400,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "loads full telemetry and compares matching hardware when opened from a share URL"
+          ],
+          "duration": 372,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit estimator power option",
+            "keeps the benchmark settings and restores the original chart after unavailable power"
+          ],
+          "duration": 707,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "opens with the documented defaults and a priced chart"
+          ],
+          "duration": 1272,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "scales revenue with utilization but leaves TCO alone"
+          ],
+          "duration": 1142,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "clamps utilization and the license fee to 0–100 on blur"
+          ],
+          "duration": 629,
+          "attempts": 1
+        },
+        {
+          "title": ["Profit Estimator per GW", "uses the SKU legend as the bar filter"],
+          "duration": 259,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "lets the OpenRouter catalog or a custom price pair replace the list price"
+          ],
+          "duration": 1046,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "lets a custom $/GPU/hr per chip replace the TCO tier"
+          ],
+          "duration": 1100,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "switches to custom $/GPU/hr when a caption badge is edited"
+          ],
+          "duration": 953,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW",
+            "explains a missing OpenRouter listing instead of drawing an unpriced chart"
+          ],
+          "duration": 1680,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "offers the agentic chip configs and shows the range picker once one is chosen"
+          ],
+          "duration": 824,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "prices the chosen chips on the range endpoints next to today"
+          ],
+          "duration": 1353,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "hydrates the comparison from the URL and clears the range with the chips"
+          ],
+          "duration": 730,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "lists the Config Changelog for the chosen chips and pins a date onto the chart"
+          ],
+          "duration": 1031,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "offers each same-day run as its own numbered bar and adds them all at once"
+          ],
+          "duration": 880,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "hydrates pinned runs from the URL and locks the range endpoints as \"On chart\""
+          ],
+          "duration": 575,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — compare history",
+            "serves the panel on the Chinese mirror with translated labels"
+          ],
+          "duration": 785,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — chart height follows the viewport",
+            "shrinks on a laptop-height viewport and grows back on a tall one"
+          ],
+          "duration": 532,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — per-model route",
+            "serves /profit-estimator-per-gigawatt/kimi-k3 and 308s aliases to the canonical slug"
+          ],
+          "duration": 541,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — per-model route",
+            "404s models the estimator does not serve yet"
+          ],
+          "duration": 80,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — per-model route",
+            "keeps AgentX estimates when an old 8k/1k query opens English profit"
+          ],
+          "duration": 1034,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — per-model route",
+            "keeps AgentX estimates when an old 8k/1k query opens /zh profit"
+          ],
+          "duration": 1092,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — GLM 5.2/5.3",
+            "opens /profit-estimator/glm-5-3 on 100 tok/s/user and the Z.ai list price"
+          ],
+          "duration": 1074,
+          "attempts": 1
+        },
+        {
+          "title": ["Profit Estimator — GLM 5.2/5.3", "308s the older glm-5-2 slug to glm-5-3"],
+          "duration": 71,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — GLM 5.2/5.3",
+            "re-seeds the operating point and price source on a model switch"
+          ],
+          "duration": 768,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — GLM 5.2/5.3",
+            "serves the Chinese mirror with the list price named in Chinese"
+          ],
+          "duration": 354,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — MiniMax M3",
+            "opens /profit-estimator/minimax-m3 on 83 tok/s/user and the MiniMax list price"
+          ],
+          "duration": 1085,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — MiniMax M3",
+            "re-seeds the operating point and price source when switching from GLM"
+          ],
+          "duration": 987,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — MiniMax M3",
+            "serves the Chinese mirror with the list price named in Chinese"
+          ],
+          "duration": 390,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4 Pro",
+            "opens /profit-estimator/deepseek-v4 on 24 tok/s/user and the DeepSeek list price"
+          ],
+          "duration": 1103,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4 Pro",
+            "re-seeds the operating point and price source when switching from Kimi K3"
+          ],
+          "duration": 841,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4 Pro",
+            "serves the Chinese mirror with the list price named in Chinese"
+          ],
+          "duration": 339,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4.1 Flash",
+            "opens /profit-estimator/deepseek-v41-flash on 125 tok/s/user and the DeepSeek Flash list price"
+          ],
+          "duration": 1278,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4.1 Flash",
+            "re-seeds the operating point and price source when switching from DeepSeek V4 Pro"
+          ],
+          "duration": 734,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — DeepSeek V4.1 Flash",
+            "serves the Chinese mirror with the list price named in Chinese"
+          ],
+          "duration": 327,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator per GW — Chinese mirror",
+            "renders /zh/profit-estimator-per-gigawatt with translated controls and caption"
+          ],
+          "duration": 508,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator (per chip-hour)",
+            "prices one chip-hour with the same defaults and TCO $/chip/hr as the expense"
+          ],
+          "duration": 862,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator (per chip-hour)",
+            "serves the Kimi K3 slug, the Chinese mirror, and 404s other models"
+          ],
+          "duration": 518,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — responsive control panels",
+            "keeps benchmark and pricing controls grouped on /profit-estimator at 375px"
+          ],
+          "duration": 953,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — responsive control panels",
+            "keeps benchmark and pricing controls grouped on /profit-estimator at 1440px"
+          ],
+          "duration": 984,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — responsive control panels",
+            "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 375px"
+          ],
+          "duration": 891,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Profit Estimator — responsive control panels",
+            "keeps benchmark and pricing controls grouped on /profit-estimator-per-gigawatt at 1440px"
+          ],
+          "duration": 933,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication economics",
+            "prices cached-input TRTLLM data per chip-hour under /en"
+          ],
+          "duration": 533,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication economics",
+            "prices cached-input TRTLLM data per gw-year under /en"
+          ],
+          "duration": 562,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication economics",
+            "prices cached-input TRTLLM data per chip-hour under /zh"
+          ],
+          "duration": 522,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "VR publication economics",
+            "prices cached-input TRTLLM data per gw-year under /zh"
+          ],
+          "duration": 540,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/profit-power-curves.cy.ts",
+      "duration": 3568
+    },
+    {
+      "spec": "cypress/e2e/reliability-chart.cy.ts",
+      "duration": 7425,
+      "tests": [
+        {
+          "title": [
+            "Reliability Chart — Content & Interactions",
+            "switching date range from default to \"Last 7 days\" changes the chart display"
+          ],
+          "duration": 2126,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Reliability Chart — Content & Interactions",
+            "\"Reset filter\" link appears after deactivating a legend item and restores all items"
+          ],
+          "duration": 359,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Reliability Chart — Chinese route and settled states",
+            "localizes chart chrome, SVG labels, and accessibility text"
+          ],
+          "duration": 1250,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Reliability Chart — Chinese route and settled states",
+            "shows a Chinese empty state only after an empty response settles"
+          ],
+          "duration": 564,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Reliability Chart — Chinese route and settled states",
+            "shows a safe Chinese error and recovers through the tracked retry control"
+          ],
+          "duration": 2376,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Reliability Chart — Chinese route and settled states",
+            "keeps controls reachable without body overflow at 375px"
+          ],
+          "duration": 665,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/resident-sequence-lengths.cy.ts",
+      "duration": 1377,
+      "tests": [
+        {
+          "title": [
+            "resident sequence-length footer summary",
+            "summarizes every resident official point without following legend selection"
+          ],
+          "duration": 773,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "resident sequence-length footer summary",
+            "does not label official-only stats as covering an unofficial overlay"
+          ],
+          "duration": 589,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/sanity.cy.ts",
+      "duration": 2660,
+      "tests": [
+        {
+          "title": ["Page Load & Navigation", "page renders without JavaScript errors"],
+          "duration": 413,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Page Load & Navigation",
+            "navigates from the footer to the land acknowledgement page"
+          ],
+          "duration": 553,
+          "attempts": 1
+        },
+        {
+          "title": ["Page Load & Navigation", "opens and preserves a direct link to an FAQ answer"],
+          "duration": 601,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Splash text",
+            "announces AgentX on the landing page in both light and dark mode"
+          ],
+          "duration": 448,
+          "attempts": 1
+        },
+        {
+          "title": ["Theme Toggle", "theme persists across page reload (localStorage)"],
+          "duration": 604,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/site-search.cy.ts",
+      "duration": 2805,
+      "tests": [
+        {
+          "title": ["Site search", "does not load the search chunk or fetch pages until opened"],
+          "duration": 225,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Site search",
+            "indexes the current page immediately and crawled pages as they load"
+          ],
+          "duration": 833,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Site search",
+            "opens with Ctrl+K, navigates results with the keyboard and closes on selection"
+          ],
+          "duration": 942,
+          "attempts": 1
+        },
+        {
+          "title": ["Site search", "serves Chinese UI and crawls /zh siblings on Chinese pages"],
+          "duration": 787,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/throughput-calculator.cy.ts",
+      "duration": 22767,
+      "tests": [
+        {
+          "title": [
+            "TCO Calculator",
+            "tab navigation",
+            "switches back to inference tab and then returns to calculator"
+          ],
+          "duration": 2184,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "groups benchmark economics above the comparison target"
+          ],
+          "duration": 856,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "shows the precision for a single-precision model"
+          ],
+          "duration": 54,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "places the config-range toggle beside its label above the slider"
+          ],
+          "duration": 24,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "displays chart title that updates when metric changes"
+          ],
+          "duration": 545,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "switching to table view shows the results table"
+          ],
+          "duration": 327,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "hides the table logo with the unofficial-domain notice"
+          ],
+          "duration": 59,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "table view rows contain numeric throughput and cost values"
+          ],
+          "duration": 257,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "table total matches bar count (first page caps at 10 rows)"
+          ],
+          "duration": 161,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "picking a locked rental tier opens the TCO model dialog without changing the provider"
+          ],
+          "duration": 906,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "switching token type updates table column headers"
+          ],
+          "duration": 1042,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "changing cost provider updates the cost metric chart title"
+          ],
+          "duration": 342,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "typing a new value in the number input updates the chart title"
+          ],
+          "duration": 633,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "toggling a legend item changes visible bar count"
+          ],
+          "duration": 172,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "clicking one bar shows a comparison banner with \"selected\" text"
+          ],
+          "duration": 905,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "clicking two bars shows a comparison ratio"
+          ],
+          "duration": 275,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "shows disaggregated throughput disclaimer for throughput metric"
+          ],
+          "duration": 737,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "shows the disaggregated cost disclaimer only for per-token-type cost"
+          ],
+          "duration": 1811,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "controls, interactions, and features",
+            "shows disaggregated throughput disclaimer for power metric"
+          ],
+          "duration": 123,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "direct URL navigation",
+            "?g_model= seeds the model selector before client hydration"
+          ],
+          "duration": 84,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "direct URL navigation",
+            "renders the URL-supplied model in the dropdown after navigating"
+          ],
+          "duration": 258,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "availability failure degradation",
+            "keeps usable benchmark results visible when availability metadata fails"
+          ],
+          "duration": 562,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "DeepSeek V4 agentic calculations",
+            "renders throughput and cost calculations from null-ISL/OSL agentic rows"
+          ],
+          "duration": 708,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "DeepSeek V4 agentic calculations",
+            "recalculates agentic results at P75 and includes it in the share link"
+          ],
+          "duration": 854,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "DeepSeek V4 agentic calculations",
+            "preserves a soloed GPU when the agentic percentile changes"
+          ],
+          "duration": 750,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "DeepSeek V4 agentic calculations",
+            "hides the percentile selector behind the feature gate and defaults to P90"
+          ],
+          "duration": 800,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "cost target",
+            "sits directly under the interactivity slider, since it inverts it"
+          ],
+          "duration": 572,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "cost target",
+            "owns the MW budget input now that the lifecycle section moved to /fleet"
+          ],
+          "duration": 180,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "cost target",
+            "entering a generous cost target renders reachable interactivity per GPU"
+          ],
+          "duration": 309,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "cost target",
+            "an unreachably low cost target shows Not reachable rows"
+          ],
+          "duration": 283,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "cost target",
+            "cost-cap table follows legend visibility (soloing a GPU filters its rows)"
+          ],
+          "duration": 513,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "folding sections away",
+            "folds the chart away, keeping its title as the handle"
+          ],
+          "duration": 556,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator",
+            "folding sections away",
+            "folds the cost-target section away, keeping its heading as the handle"
+          ],
+          "duration": 238,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator Chinese route",
+            "localizes chart internals, table headers, and preserved units"
+          ],
+          "duration": 1240,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator Chinese route",
+            "supports the complete chart-to-table path at 1440px"
+          ],
+          "duration": 1482,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TCO Calculator Chinese route",
+            "keeps dense tables internally scrollable without body overflow at 390px"
+          ],
+          "duration": 573,
+          "attempts": 1
+        },
+        {
+          "title": ["TCO Calculator Chinese route", "keeps the localized chart contained at 375px"],
+          "duration": 519,
+          "attempts": 1
+        },
+        {
+          "title": ["TCO Calculator Chinese route", "emits bidirectional hreflang metadata"],
+          "duration": 452,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/tokens-per-currency.cy.ts",
+      "duration": 996,
+      "tests": [
+        {
+          "title": [
+            "Tokens per dollar and agentic controls",
+            "defaults the y-axis to TCO total tokens per dollar and preserves hardware comparison"
+          ],
+          "duration": 987,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/tpu-publication.cy.ts",
+      "duration": 4393,
+      "tests": [
+        {
+          "title": [
+            "TPU publication preview",
+            "recalculates overlay prices, preserves chips/DP, and hides the control after all TPU data is hidden"
+          ],
+          "duration": 1511,
+          "attempts": 1
+        },
+        {
+          "title": ["TPU publication preview", "restores the pricing basis on a Chinese share URL"],
+          "duration": 636,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TPU publication preview",
+            "keeps TCO inside Chart with aligned, unclipped controls at 375px"
+          ],
+          "duration": 769,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TPU publication preview",
+            "keeps TCO inside Chart with aligned, unclipped controls at 768px"
+          ],
+          "duration": 793,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "TPU publication preview",
+            "keeps TCO inside Chart with aligned, unclipped controls at 1440px"
+          ],
+          "duration": 654,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
+      "duration": 14613,
+      "tests": [
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "defaults to Interactivity and offers all four full names in one axis dropdown"
+          ],
+          "duration": 1256,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "explains normalized interactivity inside its option without changing the axis"
+          ],
+          "duration": 451,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "explains the offload halo in the info footer and distinguishes it from plain points"
+          ],
+          "duration": 50,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "honors explicit label URL overrides for the agentic view"
+          ],
+          "duration": 539,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "switches the x-axis to E2E Latency and updates the heading"
+          ],
+          "duration": 254,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "switches back to request-level E2E Normalized Interactivity"
+          ],
+          "duration": 859,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "does not change the chart while browsing options, and Escape cancels"
+          ],
+          "duration": 610,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle (inference chart)",
+            "follows the percentile selector in the Interactivity axis label"
+          ],
+          "duration": 648,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-axis mode URL param",
+            "keeps a URL-restored mode through the agentic sequence resolving"
+          ],
+          "duration": 434,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-axis mode URL param",
+            "hides the percentile selector behind the feature gate and defaults to P90"
+          ],
+          "duration": 409,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Default scenario",
+            "keeps the labeled scenario field discoverable at 1280px and recovers from empty data"
+          ],
+          "duration": 1006,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Default scenario",
+            "keeps the labeled scenario field discoverable at 375px and recovers from empty data"
+          ],
+          "duration": 1203,
+          "attempts": 1
+        },
+        {
+          "title": ["Default scenario", "keeps 8K / 1K when the link asks for it explicitly"],
+          "duration": 1594,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Default scenario",
+            "opens the Agentic scenario for another model with corresponding data"
+          ],
+          "duration": 303,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Label defaults for fixed-sequence scenarios",
+            "keeps the fixed-sequence chart unchanged while keyboard-browsing other options"
+          ],
+          "duration": 805,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Label defaults for fixed-sequence scenarios",
+            "offers only the three supported axes for fixed sequences"
+          ],
+          "duration": 398,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Label defaults for fixed-sequence scenarios",
+            "honors explicit label URL overrides"
+          ],
+          "duration": 399,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Measured prefill metrics preserve the selected x-axis",
+            "keeps real interactivity and median TTFT coordinates for official and overlay points"
+          ],
+          "duration": 2251,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle — overlay path (finding #8 regression guard)",
+            "shows overlay (unofficial-run) watermark SVG when an overlay is loaded"
+          ],
+          "duration": 618,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "X-Axis Mode Toggle — overlay path (finding #8 regression guard)",
+            "e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays"
+          ],
+          "duration": 302,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/ubenchx.cy.ts",
+      "duration": 4707,
+      "tests": [
+        {
+          "title": [
+            "ubenchX hub and test routes",
+            "opens /ubenchx on the mem-bw view with the Beta title and test selector"
+          ],
+          "duration": 595,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "ubenchX hub and test routes",
+            "switches to sm-l2-distance with the test selector"
+          ],
+          "duration": 886,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "ubenchX hub and test routes",
+            "switches to the TPC Skyline table with the test selector"
+          ],
+          "duration": 716,
+          "attempts": 1
+        },
+        {
+          "title": ["ubenchX hub and test routes", "renders the Chinese TPC Skyline page"],
+          "duration": 171,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "ubenchX hub and test routes",
+            "keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves"
+          ],
+          "duration": 1110,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "ubenchX hub and test routes",
+            "opens /zh/ubenchx on the Chinese mem-bw view with the Beta title"
+          ],
+          "duration": 443,
+          "attempts": 1
+        },
+        {
+          "title": ["ubenchX hub and test routes", "renders the Chinese sm-l2-distance page"],
+          "duration": 719,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/unofficial-watermark.cy.ts",
+      "duration": 1452,
+      "tests": [
+        {
+          "title": [
+            "Unofficial-run watermark",
+            "shows the full two-line warning on unofficial charts"
+          ],
+          "duration": 1443,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/url-params.cy.ts",
+      "duration": 35903,
+      "tests": [
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference legend",
+            "i_legend=0 hides the sidebar legend on load and the reopen button restores it"
+          ],
+          "duration": 1145,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference legend",
+            "preserves a legend subset when chart metrics change"
+          ],
+          "duration": 1324,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference legend",
+            "refreshes the automatic Best per SKU selection when the metric changes"
+          ],
+          "duration": 2242,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Provider remount state",
+            "preserves filters across a standalone dashboard route"
+          ],
+          "duration": 1866,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Provider remount state",
+            "preserves the newest pending model across a retained-provider tab switch"
+          ],
+          "duration": 2850,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "i_metric URL param pre-selects the metric and updates SVG axis label"
+          ],
+          "duration": 1396,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "changing Y-axis metric via dropdown updates SVG axis label"
+          ],
+          "duration": 1532,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "maps the removed API-pricing URL to hyperscaler-volume TCO"
+          ],
+          "duration": 1248,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "keeps the legacy i_metric=y alias on raw throughput"
+          ],
+          "duration": 591,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "switching to energy metric updates SVG axis label to joules"
+          ],
+          "duration": 1520,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "i_metric=y_tpPerMw pre-selects throughput-per-MW"
+          ],
+          "duration": 971,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Inference Y-axis metric",
+            "keeps tooltip rulers aligned after a zoomed metric switch"
+          ],
+          "duration": 1588,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Reliability date range",
+            "r_range=last-7-days pre-selects date range"
+          ],
+          "duration": 709,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error"
+          ],
+          "duration": 1375,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/compare/[slug] with invalid ?i_seq=junk falls back to the seeded default"
+          ],
+          "duration": 910,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/inference?g_model=gpt-oss-120b seeds the model without a hydration error"
+          ],
+          "duration": 918,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/inference with invalid ?g_model=junk falls back to the default"
+          ],
+          "duration": 766,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/inference with invalid ?i_prec=junk falls back to the default"
+          ],
+          "duration": 489,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Hydration on shared-link entry",
+            "/inference with multiple URL params seeds all of them without a hydration error"
+          ],
+          "duration": 2240,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "High contrast mode",
+            "i_hc=0 disables high contrast on load"
+          ],
+          "duration": 1407,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "High contrast mode",
+            "r_hc=1 applies to reliability chart"
+          ],
+          "duration": 688,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "High contrast mode",
+            "e_hc=1 applies to evaluation chart"
+          ],
+          "duration": 1381,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "High contrast mode",
+            "historical trends tab shares the inference high-contrast default (off)"
+          ],
+          "duration": 1473,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "High contrast mode",
+            "i_hc=1 enables historical trends high contrast"
+          ],
+          "duration": 1494,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Default toggle states (share-link correctness)",
+            "a bare /inference link with neither param renders high contrast AND parallelism labels off"
+          ],
+          "duration": 1633,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "URL Parameter Persistence",
+            "Default toggle states (share-link correctness)",
+            "i_hc=1&i_advlabel=1 enables both high contrast and parallelism labels on load"
+          ],
+          "duration": 1599,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/yaxis-metrics-render.cy.ts",
+      "duration": 7839,
+      "tests": [
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Token Throughput per Chip\" renders scatter points without extra interaction"
+          ],
+          "duration": 709,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Input Token Throughput per Chip\" renders scatter points without extra interaction"
+          ],
+          "duration": 186,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Output Token Throughput per Chip\" renders scatter points without extra interaction"
+          ],
+          "duration": 159,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Token Throughput per All in Utility MW\" renders scatter points without extra interaction"
+          ],
+          "duration": 130,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Input Token Throughput per All in Utility MW\" renders scatter points without extra interaction"
+          ],
+          "duration": 148,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Output Token Throughput per All in Utility MW\" renders scatter points without extra interaction"
+          ],
+          "duration": 154,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Total Tokens [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 309,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Total Tokens [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 384,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Output Tokens [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 610,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Output Tokens [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 396,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Input Tokens [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 380,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Input Tokens [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 305,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Total Tokens per $1 TCO [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 381,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Total Tokens per $1 TCO [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 321,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Output Tokens per $1 TCO [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 315,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Output Tokens per $1 TCO [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 287,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Input Tokens per $1 TCO [hyperscaler]\" renders scatter points without extra interaction"
+          ],
+          "duration": 417,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Input Tokens per $1 TCO [rental]\" renders scatter points without extra interaction"
+          ],
+          "duration": 374,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Cost per Million Total Tokens [custom]\" renders scatter points without extra interaction"
+          ],
+          "duration": 458,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Total Tokens per $1 TCO [custom]\" renders scatter points without extra interaction"
+          ],
+          "duration": 334,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"Token Throughput per All in Utility MW (Custom User Values)\" renders scatter points without extra interaction"
+          ],
+          "duration": 176,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"All-in Provisioned Joules per Total Token\" renders scatter points without extra interaction"
+          ],
+          "duration": 150,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"All-in Provisioned Joules per Output Token\" renders scatter points without extra interaction"
+          ],
+          "duration": 244,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Y-Axis Metrics All Render Data",
+            "\"All-in Provisioned Joules per Input Token\" renders scatter points without extra interaction"
+          ],
+          "duration": 273,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/zh-pages.cy.ts",
+      "duration": 16970,
+      "tests": [
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh landing page",
+            "renders the Chinese landing content"
+          ],
+          "duration": 410,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh landing page",
+            "renders the AgentX hero on the Chinese landing page"
+          ],
+          "duration": 65,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh landing page",
+            "footer renders in Chinese with zh-internal links"
+          ],
+          "duration": 44,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh dashboard tab page",
+            "renders the Chinese SEO intro above the chart"
+          ],
+          "duration": 384,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh FAQ",
+            "uses the same direct-link anchor as the English FAQ"
+          ],
+          "duration": 587,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "About pages",
+            "keeps both Chinese article links inside /zh and follows one to its translation"
+          ],
+          "duration": 636,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "Run and Rankings model links",
+            "adds index supporter attribution only to the search description, matching English scope"
+          ],
+          "duration": 373,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "Run and Rankings model links",
+            "opens the matching Chinese model detail from /zh/run/deepseek-r1-on-b300"
+          ],
+          "duration": 544,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "Run and Rankings model links",
+            "opens the matching Chinese model detail from /zh/rankings/fastest-gpu-for-deepseek-r1"
+          ],
+          "duration": 670,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "Glossary pages",
+            "supports a mobile Chinese search, filter, and term navigation journey without overflow"
+          ],
+          "duration": 1321,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "Land acknowledgement pages",
+            "keeps every region and nation visible on mobile"
+          ],
+          "duration": 258,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh blog post page",
+            "localizes the table of contents and heading-link controls at mobile widths"
+          ],
+          "duration": 373,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "localized not-found pages",
+            "returns a noindex English 404 for unknown paths"
+          ],
+          "duration": 97,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "localized not-found pages",
+            "returns a noindex Chinese 404 for unknown /zh paths"
+          ],
+          "duration": 288,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh blog post with math",
+            "renders KaTeX in the translation too"
+          ],
+          "duration": 443,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh submissions workflow",
+            "localizes chart controls, table headers, sorting, and expanded details"
+          ],
+          "duration": 1783,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh submissions workflow",
+            "separates localized empty chart and table states"
+          ],
+          "duration": 555,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh submissions workflow",
+            "shows a safe error and retries through a real button click"
+          ],
+          "duration": 1891,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh submissions workflow",
+            "keeps the chart labels readable and the table scrollable at 375px"
+          ],
+          "duration": 278,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh feedback viewer workflow",
+            "localizes the empty state, key validation, and accessibility label"
+          ],
+          "duration": 1839,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh feedback viewer workflow",
+            "names the feedback loading state instead of showing an objectless spinner label"
+          ],
+          "duration": 938,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh feedback viewer workflow",
+            "shows a safe fetch error and retries through a real button click"
+          ],
+          "duration": 1692,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "zh feedback viewer workflow",
+            "keeps the key controls and content within 375px"
+          ],
+          "duration": 258,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Chinese (/zh) pages",
+            "English pages expose the Chinese sibling",
+            "has a zh-CN hreflang alternate and a language toggle"
+          ],
+          "duration": 970,
+          "attempts": 1
+        }
+      ]
+    }
+  ]
+}

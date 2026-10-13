@@ -53,7 +53,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     interceptDerivedAgenticMetrics();
   });
 
-  it('shows official points and an official legend entry initially', () => {
+  it('clicking the official SKU X hides its points but keeps the overlay', () => {
     cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
       expect(countVisible($dots), 'visible official points').to.be.greaterThan(0);
     });
@@ -62,9 +62,7 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     cy.get('[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="B300"]')
       .should('have.attr', 'title')
       .and('match', /^Hide B300/u);
-  });
 
-  it('clicking the official SKU X hides its points but keeps the overlay', () => {
     // The X only becomes opaque on row hover (CSS group-hover), which Cypress
     // events don't trigger — force the click on the always-present element.
     // Target the OFFICIAL row's X: the overlay run row is listed first and has

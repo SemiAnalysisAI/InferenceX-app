@@ -1,36 +1,16 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate, selectXAxisMode } from '../support/e2e';
 import {
+  captureCsvDownloads,
+  exportFirstChart,
+  readCapturedCsv,
+  type CsvCaptureWindow,
+} from '../support/csv-download';
+import {
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
   OVERLAY_RUN_URL,
 } from '../support/overlay-fixtures';
-
-type CsvCaptureWindow = Cypress.AUTWindow & {
-  __capturedCsvBlob?: Blob;
-};
-
-function captureCsvDownloads(win: Cypress.AUTWindow): void {
-  const captureWindow = win as CsvCaptureWindow;
-  win.URL.createObjectURL = (object: Blob | MediaSource) => {
-    if (object instanceof win.Blob) captureWindow.__capturedCsvBlob = object;
-    return 'blob:csv-export-test';
-  };
-  win.HTMLAnchorElement.prototype.click = () => {};
-}
-
-function exportFirstChart(): void {
-  cy.get('[data-testid="export-button"]').first().click();
-  cy.get('[data-testid="export-csv-button"]').click();
-}
-
-function readCapturedCsv(): Cypress.Chainable<string> {
-  return cy.window().then((win) => {
-    const blob = (win as CsvCaptureWindow).__capturedCsvBlob;
-    expect(blob, 'captured CSV Blob').to.be.instanceOf(win.Blob);
-    return blob!.text();
-  });
-}
 
 describe('Inference CSV export with an unofficial-run overlay', () => {
   before(() => {

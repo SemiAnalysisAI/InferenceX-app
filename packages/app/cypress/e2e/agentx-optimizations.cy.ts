@@ -87,19 +87,6 @@ describe('AgentX optimizations', () => {
     cy.location('pathname').should('eq', '/agentx/optimizations/vllm');
   });
 
-  it('hides the full-resolution call to action only on figures that opt out', () => {
-    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
-    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
-      .should('be.visible')
-      .and('not.contain.text', 'View full-resolution image');
-
-    cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
-    cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
-      'contain.text',
-      'View full-resolution image',
-    );
-  });
-
   it('renders a project page with its measurements, figures, and PR links', () => {
     cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
 
@@ -112,6 +99,10 @@ describe('AgentX optimizations', () => {
         cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"] img').should(
           'be.visible',
         );
+        cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
+          'contain.text',
+          'View full-resolution image',
+        );
         cy.get('[data-testid="agentx-optimizations-pr"]')
           .should('have.length.greaterThan', 20)
           .first()
@@ -123,6 +114,11 @@ describe('AgentX optimizations', () => {
           FRAMEWORK_SLUGS.length - 1,
         );
       });
+
+    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
+      .should('be.visible')
+      .and('not.contain.text', 'View full-resolution image');
   });
 
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {

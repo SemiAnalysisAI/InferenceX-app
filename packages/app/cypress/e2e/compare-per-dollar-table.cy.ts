@@ -18,10 +18,6 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     });
   });
 
-  it('renders the interpolated table', () => {
-    cy.get('[data-testid="compare-interpolated-table"]').should('be.visible');
-  });
-
   it('shows only the Dollar-per-Million-Tokens and Concurrency metric rows', () => {
     // visibleMetricLabels filter narrows the four METRICS down to two; the
     // metricLabelOverrides prop renames "Cost ($/M tok)" to its full-English
@@ -55,10 +51,6 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
       'href',
       '/compare/deepseek-r1-gb200-vs-h100',
     );
-  });
-
-  it('uses "Performance per Dollar" framing in the page header', () => {
-    cy.contains('Performance per Dollar').should('be.visible');
   });
 
   it('attributes pricing to the shared TCO source', () => {

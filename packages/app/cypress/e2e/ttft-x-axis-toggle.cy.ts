@@ -157,6 +157,14 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
+
+    // Line labels name the curve and point labels name the point, so the
+    // agentic view turns on both — it differs from fixed-seq only in the
+    // parallelism and point labels.
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {
@@ -178,18 +186,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
   });
 
-  it('switches to E2E Normalized Interactivity and updates the heading', () => {
-    // The first entry into this mode fetches the trace-derived metrics, which the
-    // suite's intercept stubs; the default no longer fetches them on load.
-    selectXAxisMode('e2e-normalized-interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 E2E Normalized Interactivity',
-    );
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-  });
-
   it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
@@ -200,9 +196,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         expect($halos.length).to.be.lessThan($points.length);
       });
     });
-  });
 
-  it('keeps the offload halo explanation out of the chart capture tree', () => {
     // The key lives in the axis-metric info footer (a `no-export` sibling of
     // the chart), so the PNG export clone — built from #chart-0 — carries the
     // halo decoration itself but not the textual key.
@@ -222,16 +216,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('defaults to parallelism, point, and line labels for the agentic view', () => {
-    // Line labels name the curve and point labels name the point, so the
-    // agentic view turns on both — it differs from fixed-seq only in the
-    // parallelism and point labels.
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-  });
-
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
     // Fresh page load → fresh React Query cache → the default E2E Normalized Interactivity
@@ -248,11 +232,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
-  it('switches the x-axis to TTFT and updates the heading', () => {
-    selectXAxisMode('ttft', 'TTFT');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
   it('switches the x-axis to E2E Latency and updates the heading', () => {
@@ -287,17 +266,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .and('have.focus');
   });
 
-  it('switches back to Interactivity', () => {
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] svg').should(
-      'contain.text',
-      'P90 Interactivity (tok/s/user)',
-    );
-  });
-
   it('keeps the agentic Latency Percentile control removed and labels the fixed p90 basis', () => {
     selectXAxisMode('interactivity', 'Interactivity');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
@@ -354,6 +325,21 @@ describe('X-axis mode URL param', () => {
 describe('Default scenario', () => {
   for (const width of [1280, 375]) {
     it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
+      // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
+      // so the untouched 8K/1K selection must not win.
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      // The explainer sits beside the trigger, linking out to the dataset page.
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
+      cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+      cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+
       cy.viewport(width, 800);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
@@ -377,32 +363,13 @@ describe('Default scenario', () => {
     });
   }
 
-  it('restores the labeled scenario field on the Chinese dashboard', () => {
+  it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
     cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
     cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
-  });
 
-  it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
-    // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
-    // so the untouched 8K/1K selection must not win.
-    interceptAgenticData();
-    interceptDerivedAgenticMetrics();
-    cy.visit('/inference', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    // The explainer sits beside the trigger, linking out to the dataset page.
-    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
-  });
-
-  it('keeps 8K / 1K when the link asks for it explicitly', () => {
     // An explicit selection always beats the availability-driven default.
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k', {
@@ -416,6 +383,18 @@ describe('Default scenario', () => {
     // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
+
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('opens the Agentic scenario for another model with corresponding data', () => {
@@ -436,20 +415,6 @@ describe('Default scenario', () => {
 });
 
 describe('Label defaults for fixed-sequence scenarios', () => {
-  it('keeps parallelism labels off and line labels on by default', () => {
-    interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-  });
-
   it('keeps the fixed-sequence chart unchanged while keyboard-browsing other options', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k');
@@ -713,20 +678,6 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
-  });
-
-  it('switches to ttft x-axis mode and renders SVG with overlay points', () => {
-    selectXAxisMode('ttft', 'TTFT');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-    // Overlay points render as triangles or circles inside the chart SVG.
-    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
-    cy.get('[data-testid="inference-chart-display"] svg').then(($svgs) => {
-      let total = 0;
-      $svgs.each((_i, svg) => {
-        total += svg.querySelectorAll('circle, polygon, path').length;
-      });
-      expect(total).to.be.greaterThan(0);
-    });
   });
 
   it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {

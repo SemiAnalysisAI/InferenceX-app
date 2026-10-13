@@ -53,6 +53,23 @@ function mapAllFormats(topology: Record<string, unknown>) {
 }
 
 describe('shared benchmark and eval topology', () => {
+  it('counts DWDP ranks per group and preserves their width as result metadata', () => {
+    const { benchmark, collected, individual } = mapAllFormats({
+      is_multinode: true,
+      prefill_tp: 1,
+      prefill_ep: 1,
+      prefill_dwdp_size: 8,
+      prefill_num_workers: 2,
+      decode_tp: 8,
+      decode_ep: 8,
+      decode_num_workers: 1,
+    });
+    for (const result of [benchmark, collected, individual]) {
+      expect(result.config.numPrefillGpu).toBe(16);
+      expect(result.config.numDecodeGpu).toBe(8);
+    }
+    expect(benchmark.metrics.prefill_dwdp_size).toBe(8);
+  });
   it.each([
     {
       name: 'mirrored aggregate DP-attention worker',

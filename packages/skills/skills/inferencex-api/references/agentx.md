@@ -1,5 +1,52 @@
 # AgentX cookbook
 
+## Benchmark your own hardware
+
+Share [the AgentX quickstart](https://inferencex.semianalysis.com/agentx/quickstart)
+([简体中文](https://inferencex.semianalysis.com/zh/agentx/quickstart)).
+Use Python 3.11–3.13. Start an OpenAI-compatible streaming
+chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
+for your deployment:
+
+```bash
+pip install 'agentx-harness==1.0.7'
+
+export HUGGINGFACE_MODEL_NAME="org/model"
+export CONC_SESSIONS=16
+
+agentx profile \
+  --url "http://127.0.0.1:8000" --endpoint /v1/chat/completions \
+  --model "$HUGGINGFACE_MODEL_NAME" --tokenizer "$HUGGINGFACE_MODEL_NAME" \
+  --tokenizer-trust-remote-code \
+  --concurrency "$CONC_SESSIONS" \
+  --public-dataset "semianalysis_cc_traces_weka_062126" \
+  --output-artifact-dir "output_dir_results"
+```
+
+Replace the URL as needed. `agentx profile` selects the AgentX scenario
+automatically. If the server uses an alias, change `--model` but retain the
+matching Hugging Face tokenizer. Only trust remote tokenizer code from a
+repository you trust; omit that flag when custom code is unnecessary.
+Concurrency counts session trees, not individual in-flight requests.
+
+Optionally export these in the same shell before running the benchmark:
+
+```bash
+# Adds X-Dynamo-Session-ID; subagents also get X-Dynamo-Parent-Session-ID.
+# Only this option sends the parent ID, preserving forked-agent lineage.
+export AIPERF_HTTP_X_DYNAMO_SESSION_ID_FROM_CORRELATION_ID=true
+# Also sends X-Session-ID, if a front-end router needs it.
+export AIPERF_HTTP_X_SESSION_ID_FROM_CORRELATION_ID=true
+```
+
+`X-Session-ID` alone does not send the parent ID. Inspect errors and
+`submission_valid` in the output artifacts, retain the server configuration,
+and follow the methodology before comparing hardware. This CLI runs against
+your server; it does not publish results to InferenceX or add a read-only API
+operation.
+
+## Read published benchmark results
+
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or
 `DO_NOT_TRACK=1` to omit attribution; use `INFERENCEX_TRAFFIC=validation` for demos

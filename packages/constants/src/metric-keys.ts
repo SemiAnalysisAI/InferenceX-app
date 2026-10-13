@@ -262,4 +262,5 @@ export const METRIC_KEYS = new Set([
   'decode_dcp_size',
   'prefill_pcp_size',
   'decode_pcp_size',
+  'prefill_dwdp_size',
 ]);

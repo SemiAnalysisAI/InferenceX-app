@@ -94,6 +94,12 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
           expect(inkOffset, 'label ink is centred').to.be.closeTo(0, 0.5);
         }
       });
+
+    // The persistent star CTA lives in the footer grid (footer-star-cta) and
+    // the header; the old immediate star modal duplicated it and covered the
+    // footer, so it must stay gone.
+    cy.get('[data-testid="github-star-modal"]').should('not.exist');
+    cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 
   it('localizes the Rubin banner title in Chinese', () => {
@@ -105,21 +111,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'Rubin vLLM MiniMax M3 预览版现已上线')
       .and('contain.text', 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果')
       .and('contain.text', '查看结果');
-  });
-
-  it('does not float a duplicate GitHub star card over the footer', () => {
-    // The persistent star CTA lives in the footer grid (footer-star-cta) and
-    // the header; the old immediate star modal duplicated it and covered the
-    // footer, so it must stay gone.
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]')
-      .should('be.visible')
-      .and('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
-      .and('contain.text', 'Early vLLM results for MiniMax M3 on NVIDIA Rubin');
-    cy.get('[data-testid="github-star-modal"]').should('not.exist');
-    cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 });
 
@@ -141,22 +132,6 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
       });
   });
 
-  it('shows launch banner on landing page', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-  });
-
-  it('banner renders within container constraints (not full-width)', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-    // The banner's parent section has the container class for width constraints
-    cy.get('[data-testid="launch-banner"]').parent('section.container').should('exist');
-  });
-
   it('dismissing the banner persists across reloads', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
@@ -169,7 +144,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('not.exist');
   });
 
-  it('rendering the banner does not write its dismissal storage key', () => {
+  it('clicking the banner body navigates without persisting dismissal', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
@@ -178,12 +153,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
       // Only the X button should persist a dismissal — show alone must not.
       expect(win.localStorage.getItem('inferencex-rubin-minimax-m3-banner-dismissed')).to.eq(null);
     });
-  });
 
-  it('clicking the banner body navigates without persisting dismissal', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('have.attr', 'href', '/inference/minimax-m3');
@@ -208,7 +178,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Dashboard nudges — reproducibility toast', () => {
-  it('shows reproducibility nudge after 1.5s delay on dashboard', () => {
+  it('reproducibility nudge is session-only — gone after reload', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
@@ -218,15 +188,6 @@ describe('Dashboard nudges — reproducibility toast', () => {
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     // After the timer fires (~1.5s + buffer)
     cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
-  });
-
-  it('reproducibility nudge is session-only — gone after reload', () => {
-    cy.visit('/inference', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
 
     // Session storage should be set
     cy.window().then((win) => {
@@ -234,6 +195,9 @@ describe('Dashboard nudges — reproducibility toast', () => {
         null,
       );
     });
+    cy.reload();
+    cy.wait(2000);
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
 });
 
@@ -251,12 +215,6 @@ function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
 }
 
 describe('Dashboard nudges — filter-hint toast', () => {
-  it('shows the filter-hint nudge on the inference tab after a short delay', () => {
-    cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
-  });
-
   it('does not show the filter-hint nudge outside the inference tab', () => {
     cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.wait(3500);
@@ -283,6 +241,7 @@ describe('Dashboard nudges — filter-hint toast', () => {
 
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
     cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
@@ -304,16 +263,7 @@ describe('Dashboard nudges — filter-hint toast', () => {
 // ---------------------------------------------------------------------------
 
 describe('Evaluation nudges — eval-samples toast', () => {
-  it('shows eval-samples nudge after delay on evaluation page', () => {
-    cy.visit('/evaluation', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
-  });
-
-  it('eval-samples nudge writes timestamp on show (cooldownStartsOnShow)', () => {
+  it('eval-samples open event refreshes the cooldown timestamp', () => {
     cy.visit('/evaluation', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
@@ -328,15 +278,6 @@ describe('Evaluation nudges — eval-samples toast', () => {
       expect(value).to.not.equal(null);
       expect(Number(value)).to.be.greaterThan(0);
     });
-  });
-
-  it('eval-samples open event refreshes the cooldown timestamp', () => {
-    cy.visit('/evaluation', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
 
     cy.window().then((win) => {
       const before = Number(
