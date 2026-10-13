@@ -13,7 +13,8 @@ It writes two files next to the port (packages/app/src/lib/power/power_model):
   Python module, which power-model-parity.test.ts maps one-to-one onto the port.
 - power-model.parity.json: the upstream model's own output for every catalog
   system, workload, scale-out state, measured Grace-socket input, and a sweep of
-  GPU watts (including out-of-domain inputs and their errors).
+  GPU watts (including out-of-domain inputs and their errors), plus seeded random
+  GPU and socket watts for every system.
 Output is byte-stable across reruns.
 """
 
@@ -59,6 +60,9 @@ RACK_SOCKET_WATTS = (None, 0.0, 98.066, 250.0, 500.0)
 # Full component trees (with provenance and configuration) for these GPU watts.
 DETAIL_WATTS = (0.0, 612.375)
 SUMMARY_KEYS = ("it_power_w", "facility_overhead_w", "facility_power_w", "AllInPower_per_gpu")
+# Seeded random inputs beyond the grid, drawn like the 2026-10 differential fuzz.
+FUZZ_SEED = 20261012
+FUZZ_CASES = 240
 REPORT_CASES = (
     ("hopper", "agentic", True, 4, 700.0, None),
     ("b300", "agentic-cpu-offloading", False, 1, 1000.0, None),
@@ -178,11 +182,30 @@ def grid():
                 yield system, workload, scale_out, 1, 700.0, 100.0, False
 
 
+def fuzz():
+    """Random (system, workload, scale_out, systems, gpu_watts, socket_watts, False) inputs."""
+    import random
+
+    from power_model.models.advanced.systems.catalog import SYSTEMS
+
+    rng = random.Random(FUZZ_SEED)
+    names = list(SYSTEMS)
+    for _ in range(FUZZ_CASES):
+        system = rng.choice(names)
+        gpu_watts = rng.uniform(0.0, 2000.0 if rng.random() < 0.8 else 40000.0)
+        measured = SYSTEMS[system].has_grace_sockets and rng.random() < 0.6
+        socket_watts = rng.uniform(0.0, 1500.0) if measured else None
+        workload, scale_out, systems = rng.choice(WORKLOADS), rng.random() < 0.5, rng.randint(1, 8)
+        yield system, workload, scale_out, systems, gpu_watts, socket_watts, False
+
+
 def cases(provenance, configuration):
     from power_model import create_power_model
 
     out = []
-    for system, workload, scale_out, systems, gpu_watts, socket_watts, detail in grid():
+    for system, workload, scale_out, systems, gpu_watts, socket_watts, detail in itertools.chain(
+        grid(), fuzz()
+    ):
         estimate, error = evaluate(
             create_power_model, "oss", system, workload, scale_out, systems, gpu_watts, socket_watts
         )

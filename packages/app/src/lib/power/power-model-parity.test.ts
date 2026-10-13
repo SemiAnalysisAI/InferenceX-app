@@ -2,7 +2,8 @@
  * The TypeScript power model (./power_model) is a file-for-file port of the
  * InferenceX Python package. These tests hold it to the pinned upstream revision:
  * every module has a counterpart, and the port reproduces upstream's own output
- * (scripts/generate-power-model-parity.py) for every catalog system and state.
+ * (scripts/generate-power-model-parity.py) for every catalog system and state and
+ * for seeded random inputs.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
