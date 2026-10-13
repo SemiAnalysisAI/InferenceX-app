@@ -11,6 +11,9 @@ for your deployment:
 ```bash
 pip install 'agentx-harness==1.0.7'
 
+export HUGGINGFACE_MODEL_NAME="org/model"
+export CONC_SESSIONS=16
+
 agentx profile \
   --url "http://127.0.0.1:8000" --endpoint /v1/chat/completions \
   --model "$HUGGINGFACE_MODEL_NAME" --tokenizer "$HUGGINGFACE_MODEL_NAME" \

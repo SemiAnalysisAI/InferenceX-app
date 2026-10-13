@@ -1,12 +1,7 @@
 import Link from 'next/link';
 
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
-import {
-  AGENTX_INSTALL,
-  AGENTX_PROFILE,
-  AGENTX_QUICKSTART,
-  AGENTX_ROUTING,
-} from '@/lib/agentx/quickstart';
+import { AGENTX_COMMANDS, AGENTX_QUICKSTART, AGENTX_ROUTING } from '@/lib/agentx/quickstart';
 import { localePath, type Locale } from '@/lib/i18n/i18n';
 
 import { AgentXMethodologyLink } from './agentx-methodology-link';
@@ -24,11 +19,8 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
         {t.title}
       </h2>
       <p className="max-w-prose text-sm leading-6 text-muted-foreground">{t.summary}</p>
-      <CopyableCodeBlock locale={locale} label={t.install}>
-        {AGENTX_INSTALL}
-      </CopyableCodeBlock>
       <CopyableCodeBlock locale={locale} label={t.run}>
-        {AGENTX_PROFILE}
+        {AGENTX_COMMANDS}
       </CopyableCodeBlock>
       <AgentXMethodologyLink
         href={localePath('/agentx/quickstart', locale)}
@@ -44,17 +36,6 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
 
 export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
   const t = AGENTX_QUICKSTART[locale];
-  const sections = [
-    { id: 'install', title: t.install, text: t.requirements, code: AGENTX_INSTALL },
-    {
-      id: 'configure',
-      title: t.configure,
-      text: t.configureHelp,
-      code: 'export HUGGINGFACE_MODEL_NAME="org/model"\nexport CONC_SESSIONS=16',
-    },
-    { id: 'run', title: t.run, text: t.runHelp, code: AGENTX_PROFILE },
-    { id: 'routing', title: t.routing, text: t.routingHelp, code: AGENTX_ROUTING },
-  ];
   return (
     <article data-testid="agentx-quickstart-article" className="min-w-0">
       <header className="border-b border-border pb-6">
@@ -66,22 +47,25 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         <p className="mt-4 max-w-prose leading-7 text-muted-foreground">{t.description}</p>
       </header>
       <div className="space-y-8 py-8">
-        {sections.map((section) => (
-          <section key={section.id} id={section.id} className="scroll-mt-24 space-y-3">
-            <h2 className="text-lg font-semibold">{section.title}</h2>
-            <p className="text-sm leading-6 text-muted-foreground">{section.text}</p>
-            <CopyableCodeBlock locale={locale} label={section.title}>
-              {section.code}
-            </CopyableCodeBlock>
-            {section.id === 'run' && (
-              <p className="text-sm leading-6 text-muted-foreground">{t.trust}</p>
-            )}
-          </section>
-        ))}
-        <section id="results" className="scroll-mt-24 space-y-3">
-          <h2 className="text-lg font-semibold">{t.results}</h2>
+        <section id="run" className="scroll-mt-24 space-y-3">
+          <h2 className="text-lg font-semibold">{t.run}</h2>
+          <p className="text-sm leading-6 text-muted-foreground">{t.runHelp}</p>
+          <CopyableCodeBlock locale={locale} label={t.run}>
+            {AGENTX_COMMANDS}
+          </CopyableCodeBlock>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {t.modelNote} {t.trust}
+          </p>
+        </section>
+        <section id="routing" className="scroll-mt-24 space-y-3">
+          <h2 className="text-lg font-semibold">{t.routing}</h2>
+          <p className="text-sm leading-6 text-muted-foreground">{t.routingHelp}</p>
+          <CopyableCodeBlock locale={locale} label={t.routing}>
+            {AGENTX_ROUTING}
+          </CopyableCodeBlock>
+        </section>
+        <footer className="space-y-3 border-t border-border pt-6">
           <p className="text-sm leading-6 text-muted-foreground">{t.resultsHelp}</p>
-          <p className="text-sm leading-6 text-muted-foreground">{t.compare}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
             <Link
               href={localePath('/agentx/methodology', locale)}
@@ -96,7 +80,7 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
               {t.repository} →
             </Link>
           </div>
-        </section>
+        </footer>
       </div>
     </article>
   );

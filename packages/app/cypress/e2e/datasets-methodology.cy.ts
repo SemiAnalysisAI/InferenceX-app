@@ -201,6 +201,7 @@ describe('AgentX quickstart', () => {
       for (const entry of ['/agentx', '/about']) {
         cy.visit(`${prefix}${entry}`);
         cy.get('[data-testid="agentx-quickstart-callout"]').within(() => {
+          cy.get('[data-testid="copyable-code-block"]').should('have.length', 1);
           cy.contains('code', "pip install 'agentx-harness==1.0.7'").should('exist');
           cy.get(`a[href="${prefix}/agentx/quickstart"]`).click();
         });
@@ -223,6 +224,9 @@ describe('AgentX quickstart', () => {
       cy.get('#run code')
         .invoke('text')
         .then((command) => {
+          expect(command).to.include("pip install 'agentx-harness==1.0.7'");
+          expect(command).to.include('export HUGGINGFACE_MODEL_NAME="org/model"');
+          expect(command).to.include('export CONC_SESSIONS=16');
           expect(command).to.include('--url "http://127.0.0.1:8000"');
           expect(command).to.include('--model "$HUGGINGFACE_MODEL_NAME"');
           expect(command).to.include('--concurrency "$CONC_SESSIONS"');
@@ -241,6 +245,9 @@ describe('AgentX quickstart', () => {
           cy.get('@writeText').should('have.been.calledWithExactly', flags);
         });
       cy.get('[data-testid="agentx-quickstart-article"] details').should('not.exist');
+      cy.get(
+        '[data-testid="agentx-quickstart-article"] [data-testid="copyable-code-block"]',
+      ).should('have.length', 2);
       cy.get('link[rel="canonical"]').should(
         'have.attr',
         'href',
