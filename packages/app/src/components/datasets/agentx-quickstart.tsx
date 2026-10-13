@@ -34,7 +34,7 @@ export function AgentXQuickstartCallout({ locale }: { locale: Locale }) {
         href={localePath('/agentx/quickstart', locale)}
         analyticsEvent="agentx_quickstart_opened"
         analyticsTarget="quickstart-callout"
-        className="inline-flex min-h-11 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        className="inline-flex min-h-11 items-center rounded-md border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
       >
         {t.guide} →
       </AgentXMethodologyLink>
