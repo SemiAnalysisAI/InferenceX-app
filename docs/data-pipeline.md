@@ -355,6 +355,15 @@ large log downloads. `--force` revisits those bundles and inserts only filenames
 already hold, which recovers files a newer artifact reader exposes, such as the single-node
 srt-slurm archive.
 
+Each stored file is capped at 128 MiB of UTF-8 text (override with
+`SERVER_LOG_MAX_FILE_BYTES`). PostgreSQL rejects any value over 1 GB and drops the connection,
+and verbose multinode decode workers can exceed that. An oversized file keeps its first and last
+halves, cut at line boundaries, around a marker recording the original size; the complete file
+remains in the GitHub artifact and GCS backup. KV-cache metadata is still derived from the full
+`server.log` before capping. Server-log and trace-replay writes retry up to three times with
+backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
+because both writers are transactional and re-check existing links.
+
 Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
 character slices, and the API returns at most 50 match contexts rather than transferring the
 complete file. The overlap preserves literal matches that cross a slice boundary. Files are
