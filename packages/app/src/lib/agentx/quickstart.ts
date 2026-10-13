@@ -20,7 +20,7 @@ export const AGENTX_QUICKSTART = {
     description:
       'Install agentx-harness, point it at your inference server, and replay a public agentic workload on your own hardware.',
     requirements:
-      'Use Python 3.11–3.13 in a dedicated virtual environment, separate from upstream aiperf. Start your model server first with an OpenAI-compatible streaming chat-completions endpoint.',
+      'Use Python 3.11–3.13. Start your model server first with an OpenAI-compatible streaming chat-completions endpoint.',
     install: 'Install the harness',
     configure: 'Set your model and concurrency',
     configureHelp:
@@ -42,18 +42,15 @@ export const AGENTX_QUICKSTART = {
     back: 'AgentX datasets',
     methodology: 'Benchmark methodology',
     repository: 'Harness documentation',
-    setup: 'Create a virtual environment',
-    setupNote:
-      'These commands use a POSIX shell. On Linux ARM64, install a C compiler first if the crick dependency needs to build from source.',
     summary:
-      'Set HUGGINGFACE_MODEL_NAME and CONC_SESSIONS for your deployment, then run the commands below from a dedicated Python 3.11–3.13 environment. The guide covers setup, tokenizer safety, optional routing headers, and result checks.',
+      'Set HUGGINGFACE_MODEL_NAME and CONC_SESSIONS for your deployment, then run the commands below with Python 3.11–3.13. The guide covers tokenizer safety, optional routing headers, and result checks.',
   },
   zh: {
     title: '用 AgentX 测试自己的芯片',
     description:
       '安装 agentx-harness，连接推理服务器，即可在自己的硬件上回放公开的智能体工作负载。',
     requirements:
-      '使用 Python 3.11–3.13，并创建独立的虚拟环境，不要与上游 aiperf 混装。先启动模型服务器，提供兼容 OpenAI 的 streaming chat-completions endpoint。',
+      '使用 Python 3.11–3.13。先启动模型服务器，提供兼容 OpenAI 的 streaming chat-completions endpoint。',
     install: '安装测试工具',
     configure: '设置模型与并发数',
     configureHelp:
@@ -75,10 +72,7 @@ export const AGENTX_QUICKSTART = {
     back: 'AgentX 数据集',
     methodology: '基准测试方法',
     repository: '测试工具文档',
-    setup: '创建虚拟环境',
-    setupNote:
-      '这些命令适用于 POSIX shell。在 Linux ARM64 上，如果 crick 依赖需要从源码构建，请先安装 C 编译器。',
     summary:
-      '根据部署设置 HUGGINGFACE_MODEL_NAME 和 CONC_SESSIONS，然后在独立的 Python 3.11–3.13 环境中运行以下命令。完整指南介绍环境配置、tokenizer 代码安全、可选路由 header 和结果检查。',
+      '根据部署设置 HUGGINGFACE_MODEL_NAME 和 CONC_SESSIONS，然后使用 Python 3.11–3.13 运行以下命令。完整指南介绍 tokenizer 代码安全、可选路由 header 和结果检查。',
   },
 } as const;

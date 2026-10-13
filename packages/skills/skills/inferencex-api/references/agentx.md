@@ -4,8 +4,7 @@
 
 Share [the AgentX quickstart](https://inferencex.semianalysis.com/agentx/quickstart)
 ([简体中文](https://inferencex.semianalysis.com/zh/agentx/quickstart)).
-Use Python 3.11–3.13 in a dedicated virtual environment, without upstream
-`aiperf` installed alongside it. Start an OpenAI-compatible streaming
+Use Python 3.11–3.13. Start an OpenAI-compatible streaming
 chat-completions server, then set `HUGGINGFACE_MODEL_NAME` and `CONC_SESSIONS`
 for your deployment:
 

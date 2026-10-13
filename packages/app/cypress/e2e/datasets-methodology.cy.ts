@@ -240,10 +240,7 @@ describe('AgentX quickstart', () => {
           cy.get('#routing button').click();
           cy.get('@writeText').should('have.been.calledWithExactly', flags);
         });
-      cy.get('details summary').click();
-      cy.get('details code').should('be.visible').and('contain', 'python3.11 -m venv .venv');
-      cy.get('details summary').click();
-      cy.get('details').should('not.have.attr', 'open');
+      cy.get('[data-testid="agentx-quickstart-article"] details').should('not.exist');
       cy.get('link[rel="canonical"]').should(
         'have.attr',
         'href',

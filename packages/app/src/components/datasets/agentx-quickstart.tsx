@@ -66,13 +66,6 @@ export function AgentXQuickstartArticle({ locale }: { locale: Locale }) {
         <p className="mt-4 max-w-prose leading-7 text-muted-foreground">{t.description}</p>
       </header>
       <div className="space-y-8 py-8">
-        <details className="rounded-lg border border-border p-4">
-          <summary className="cursor-pointer text-sm font-semibold">{t.setup}</summary>
-          <p className="my-3 text-sm leading-6 text-muted-foreground">{t.setupNote}</p>
-          <CopyableCodeBlock locale={locale} label={t.setup}>
-            {'python3.11 -m venv .venv\nsource .venv/bin/activate'}
-          </CopyableCodeBlock>
-        </details>
         {sections.map((section) => (
           <section key={section.id} id={section.id} className="scroll-mt-24 space-y-3">
             <h2 className="text-lg font-semibold">{section.title}</h2>

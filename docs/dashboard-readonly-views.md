@@ -10,7 +10,7 @@ registry.test.ts, including hidden and feature-gated routes.
 `/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and
 About FAQ entry points, document running the external `agentx-harness` CLI.
 They add no benchmark data, selectors, calculations, or server-side execution.
-Copy buttons and setup disclosure are presentation-only; no API/OpenAPI contract
+Copy buttons are presentation-only; no API/OpenAPI contract
 changes are needed. `/llms.txt` discovers the guide, and the existing
 `packages/skills/skills/inferencex-api/references/agentx.md` cookbook documents the
 same pinned command and routing flags. Running the harness does not submit or
