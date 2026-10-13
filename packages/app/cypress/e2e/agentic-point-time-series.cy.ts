@@ -603,10 +603,10 @@ describe('Agentic point request metric time series', () => {
       failFile = false;
     });
     cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
-    // Wait for the refetch to land before counting attempts — asserting right
-    // after the click races the request.
+    // The error view unmounts as soon as the refetch starts, before the request
+    // reaches the intercept, so retry the count instead of reading it once.
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
-    cy.then(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
+    cy.wrap(null).should(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
     cy.get('[data-testid="server-log-content-query-error"]')
       .should('contain.text', '无法加载日志文件，请稍后重试。')
@@ -617,7 +617,9 @@ describe('Agentic point request metric time series', () => {
     });
     cy.get('[data-testid="server-log-content-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="server-log-content"]').should('contain.text', 'INFO recovered log');
-    cy.then(() => expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry));
+    cy.wrap(null).should(() =>
+      expect(contentAttempts).to.be.greaterThan(contentAttemptsBeforeRetry),
+    );
 
     cy.get('[data-testid="server-log-search"]').type('recovered');
     cy.get('[data-testid="server-log-search-query-error"]').should('contain.text', '重试');
@@ -629,7 +631,7 @@ describe('Agentic point request metric time series', () => {
     cy.wait('@retryServerLogSearch');
     cy.get('[data-testid="server-log-search-query-error"]').should('not.exist');
     cy.get('[data-testid="server-log-search-results"]').should('contain.text', '0 处匹配');
-    cy.then(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));
+    cy.wrap(null).should(() => expect(searchAttempts).to.be.greaterThan(searchAttemptsBeforeRetry));
   });
 
   it('renders the complete Chinese detail, mobile, metadata, and timeline click path', () => {
