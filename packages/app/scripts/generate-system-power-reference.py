@@ -132,6 +132,7 @@ def psu_efficiency(curve, fraction):
                 right["loadFraction"] - left["loadFraction"]
             )
             return left["efficiency"] + weight * (right["efficiency"] - left["efficiency"])
+    raise ValueError(f"PSU load fraction {fraction!r} has no efficiency-curve bracket")
 
 
 def dc_watts(p, gpu_watts_per_gpu, workload, scale_out):
