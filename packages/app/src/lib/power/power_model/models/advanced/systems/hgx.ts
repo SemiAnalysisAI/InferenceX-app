@@ -54,6 +54,7 @@ import type { UniversalBaseBoard } from '../components/ubb/ubb';
 import { AMD_TWO_TIER_NETWORK, B300_TWO_TIER_NETWORK } from '../networking/ethernet_512t';
 import type { NetworkGroup } from '../networking/base';
 import { QM9790_TWO_TIER_NETWORK } from '../networking/qm9790';
+import { X86_CPU_SOCKET_INPUT } from '../profiles';
 import { _profile_parameters, GPUSystem, type SystemEstimateOptions } from './base';
 
 export const DESIGN_OPERATING_STATE = new OperatingState({
@@ -133,14 +134,16 @@ export abstract class HGXSystemChassis extends GPUSystem {
     return this.constructor as typeof HGXSystemChassis;
   }
 
-  _component_groups(state: OperatingState): ComponentGroup[] {
+  _component_groups(
+    state: OperatingState,
+    cpu_measured_power_per_socket: number | null = null,
+  ): ComponentGroup[] {
     const hgx = this.hgx;
-    const groups = [
-      new ComponentGroup({
-        component: X86CPU.for_workload(state.workload_state),
-        quantity: hgx.cpu_count,
-      }),
-    ];
+    const cpu =
+      cpu_measured_power_per_socket === null
+        ? X86CPU.for_workload(state.workload_state)
+        : new CPU({ power_w: cpu_measured_power_per_socket, provenance: X86_CPU_SOCKET_INPUT });
+    const groups = [new ComponentGroup({ component: cpu, quantity: hgx.cpu_count })];
     if (hgx.system_nic_count) {
       if (hgx.default_nic_type === null) {
         throw new ValueError('Chassis-level NIC inventory requires a NIC type');
@@ -177,10 +180,13 @@ export abstract class HGXSystemChassis extends GPUSystem {
 
   _finish_system(
     system_components: readonly PowerComponentBreakdown[],
-    { operating_state }: { operating_state: OperatingState },
+    {
+      cpu_measured_power_per_socket,
+      operating_state,
+    }: { cpu_measured_power_per_socket: number | null; operating_state: OperatingState },
   ): PowerComponentBreakdown {
     const state = operating_state;
-    const groups = this._component_groups(state);
+    const groups = this._component_groups(state, cpu_measured_power_per_socket);
     const components = this._power_components([
       ...system_components,
       PowerComponentBreakdown.group(
@@ -233,10 +239,14 @@ export abstract class HGXSystemChassis extends GPUSystem {
 
   estimate_it_power(
     gpu_level_power_per_gpu: number,
-    { operating_state = DEFAULT_OPERATING_STATE }: SystemEstimateOptions = {},
+    {
+      cpu_measured_power_per_socket = null,
+      operating_state = DEFAULT_OPERATING_STATE,
+    }: SystemEstimateOptions = {},
   ): PowerComponentBreakdown {
     const board = this.ubb.for_operating_state(operating_state);
     return this._finish_system([board.estimate_breakdown(gpu_level_power_per_gpu)], {
+      cpu_measured_power_per_socket,
       operating_state,
     });
   }

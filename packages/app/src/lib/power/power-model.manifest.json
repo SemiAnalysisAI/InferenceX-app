@@ -1,7 +1,7 @@
 {
-  "modelRevision": "1e509932e09f2382f778d0e793893b534b02737b",
-  "sourceTree": "42225371bbd318dbf33127c43688ced65c6ef175",
-  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/1e509932e09f2382f778d0e793893b534b02737b/power_model",
+  "modelRevision": "4c21c69f530bcdb6952f44a05de32bab89a5064c",
+  "sourceTree": "891a1592a0173964029521e57d216b4dce2c1a37",
+  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/4c21c69f530bcdb6952f44a05de32bab89a5064c/power_model",
   "packagePath": "power_model/src/power_model",
   "pythonFiles": [
     "__init__.py",

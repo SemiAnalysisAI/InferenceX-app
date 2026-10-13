@@ -51,9 +51,11 @@ export class OSSAllinPowerModel extends PowerModel {
   protected _estimate_it_power(
     gpu_level_power_per_gpu: number,
     cpu_and_dram_measured_power_per_socket: number | null,
+    cpu_measured_power_per_socket: number | null,
   ): ITPowerBreakdown {
     return this.cluster.estimate_it_power(gpu_level_power_per_gpu, {
       cpu_and_dram_measured_power_per_socket,
+      cpu_measured_power_per_socket,
       operating_state: this.operating_state,
     });
   }

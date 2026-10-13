@@ -40,6 +40,8 @@ export function _profile_parameters(model: FrozenModel): JsonObject {
 export interface SystemEstimateOptions {
   /** Watts per Grace socket; systems without Grace ignore it. */
   cpu_and_dram_measured_power_per_socket?: number | null;
+  /** Watts per x86 CPU package; systems without x86 CPUs ignore it. */
+  cpu_measured_power_per_socket?: number | null;
   operating_state?: OperatingState;
 }
 
@@ -93,6 +95,8 @@ export abstract class GPUSystem extends FrozenModel {
   /**
    * Evaluate one system without PUE. cpu_and_dram_measured_power_per_socket is
    * watts per Grace socket; systems without Grace ignore it.
+   * cpu_measured_power_per_socket is watts per x86 CPU package; systems without
+   * x86 CPUs ignore it.
    */
   abstract estimate_it_power(
     gpu_level_power_per_gpu: number,
@@ -131,12 +135,14 @@ export class SystemGroup extends FrozenModel {
     gpu_level_power_per_gpu: number,
     {
       cpu_and_dram_measured_power_per_socket = null,
+      cpu_measured_power_per_socket = null,
       operating_state = DEFAULT_OPERATING_STATE,
     }: SystemEstimateOptions = {},
   ): PowerComponentBreakdown {
     return this.system
       .estimate_it_power(gpu_level_power_per_gpu, {
         cpu_and_dram_measured_power_per_socket,
+        cpu_measured_power_per_socket,
         operating_state,
       })
       .scaled(this.quantity);

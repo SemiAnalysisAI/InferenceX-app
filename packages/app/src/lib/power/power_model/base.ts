@@ -521,6 +521,7 @@ export interface PowerEstimateFields {
   using_scale_out: boolean;
   gpu_level_power_per_gpu: number;
   cpu_and_dram_measured_power_per_socket: number | null;
+  cpu_measured_power_per_socket: number | null;
   AllInPower_per_gpu: number;
   scope: Scope;
   gpu_count: number;
@@ -541,6 +542,7 @@ export class PowerEstimate extends FrozenModel {
   readonly using_scale_out: boolean;
   readonly gpu_level_power_per_gpu: number;
   readonly cpu_and_dram_measured_power_per_socket: number | null;
+  readonly cpu_measured_power_per_socket: number | null;
   readonly AllInPower_per_gpu: number;
   readonly scope: Scope;
   readonly gpu_count: number;
@@ -563,6 +565,10 @@ export class PowerEstimate extends FrozenModel {
       fields.cpu_and_dram_measured_power_per_socket === null
         ? null
         : validate_watts(fields.cpu_and_dram_measured_power_per_socket);
+    this.cpu_measured_power_per_socket =
+      fields.cpu_measured_power_per_socket === null
+        ? null
+        : validate_watts(fields.cpu_measured_power_per_socket);
     this.AllInPower_per_gpu = validate_watts(fields.AllInPower_per_gpu);
     this.scope = fields.scope;
     this.gpu_count = validate_count(fields.gpu_count);
@@ -598,6 +604,7 @@ export class PowerEstimate extends FrozenModel {
       using_scale_out: this.using_scale_out,
       gpu_level_power_per_gpu: this.gpu_level_power_per_gpu,
       cpu_and_dram_measured_power_per_socket: this.cpu_and_dram_measured_power_per_socket,
+      cpu_measured_power_per_socket: this.cpu_measured_power_per_socket,
       AllInPower_per_gpu: this.AllInPower_per_gpu,
       scope: this.scope,
       gpu_count: this.gpu_count,
@@ -614,6 +621,8 @@ export class PowerEstimate extends FrozenModel {
 export interface EstimateOptions {
   /** Watts per Grace socket; replaces the socket's modeled loads. */
   cpu_and_dram_measured_power_per_socket?: number | null;
+  /** Watts per x86 CPU package; replaces the modeled x86 CPU only. */
+  cpu_measured_power_per_socket?: number | null;
 }
 
 export interface PowerModelFields extends OperatingStateFields {
@@ -647,18 +656,24 @@ export abstract class PowerModel extends OperatingState {
 
   /**
    * cpu_and_dram_measured_power_per_socket is watts per Grace socket and
-   * replaces its modeled loads.
+   * replaces its modeled loads. cpu_measured_power_per_socket is watts per x86
+   * CPU package and replaces the modeled x86 CPU only.
    */
   estimate_breakdown(
     gpu_level_power_per_gpu: number,
-    { cpu_and_dram_measured_power_per_socket = null }: EstimateOptions = {},
+    {
+      cpu_and_dram_measured_power_per_socket = null,
+      cpu_measured_power_per_socket = null,
+    }: EstimateOptions = {},
   ): PowerEstimate {
     const gpu_power = validate_watts(gpu_level_power_per_gpu);
     const socket_power =
       cpu_and_dram_measured_power_per_socket === null
         ? null
         : validate_watts(cpu_and_dram_measured_power_per_socket);
-    const breakdown = this._estimate_it_power(gpu_power, socket_power);
+    const x86_cpu_power =
+      cpu_measured_power_per_socket === null ? null : validate_watts(cpu_measured_power_per_socket);
+    const breakdown = this._estimate_it_power(gpu_power, socket_power, x86_cpu_power);
     const it_power = it_power_w(breakdown);
     const facility_power = validate_watts(it_power * this.cooling.pue);
     return new PowerEstimate({
@@ -669,6 +684,7 @@ export abstract class PowerModel extends OperatingState {
       using_scale_out: this.using_scale_out,
       gpu_level_power_per_gpu: gpu_power,
       cpu_and_dram_measured_power_per_socket: socket_power,
+      cpu_measured_power_per_socket: x86_cpu_power,
       AllInPower_per_gpu: facility_power / breakdown.gpu_count,
       scope: breakdown.scope,
       gpu_count: breakdown.gpu_count,
@@ -685,6 +701,7 @@ export abstract class PowerModel extends OperatingState {
   protected abstract _estimate_it_power(
     gpu_level_power_per_gpu: number,
     cpu_and_dram_measured_power_per_socket: number | null,
+    cpu_measured_power_per_socket: number | null,
   ): ITPowerBreakdown;
 
   protected override fields(): Record<string, unknown> {

@@ -87,10 +87,13 @@ export function format_power_breakdown_per_chassis(estimate: PowerEstimate): str
   const units = new Set(systems.children.map(unitOf));
   const unit = units.size === 1 ? [...units][0] : 'system';
   const socket = estimate.cpu_and_dram_measured_power_per_socket;
+  const x86_cpu = estimate.cpu_measured_power_per_socket;
   const sections = [
     `Power BoM per ${unit}`,
     `GPU input: ${formatWatts(estimate.gpu_level_power_per_gpu)} W/GPU | ${
       socket === null ? '' : `Grace socket input (measured): ${formatWatts(socket)} W/socket | `
+    }${
+      x86_cpu === null ? '' : `x86 CPU input (measured): ${formatWatts(x86_cpu)} W/socket | `
     }Workload: ${estimate.workload_state} | ` +
       `Scale-out: ${estimate.using_scale_out ? 'on' : 'off'}`,
   ];

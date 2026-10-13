@@ -37,6 +37,7 @@ interface ParityCase {
   systems: number;
   gpu_level_power_per_gpu: number;
   cpu_and_dram_measured_power_per_socket: number | null;
+  cpu_measured_power_per_socket: number | null;
   error?: { kind: 'validation' | 'value'; message: string | null };
   estimate?: Record<string, JsonValue> & { components: CompactNode[] };
   summary?: Record<string, number | number[]> & { component_power_w: number[] };
@@ -49,6 +50,7 @@ interface ParityReport {
   systems: number;
   gpu_level_power_per_gpu: number;
   cpu_and_dram_measured_power_per_socket: number | null;
+  cpu_measured_power_per_socket: number | null;
   text: string;
 }
 
@@ -131,6 +133,7 @@ function run(testCase: ParityCase): PowerEstimate {
     systems: testCase.systems,
   }).estimate_breakdown(testCase.gpu_level_power_per_gpu, {
     cpu_and_dram_measured_power_per_socket: testCase.cpu_and_dram_measured_power_per_socket,
+    cpu_measured_power_per_socket: testCase.cpu_measured_power_per_socket,
   });
 }
 
@@ -143,6 +146,7 @@ function label(testCase: ParityCase): string {
     `x${testCase.systems}`,
     `${testCase.gpu_level_power_per_gpu}W`,
     `socket=${testCase.cpu_and_dram_measured_power_per_socket ?? 'modeled'}`,
+    `cpu=${testCase.cpu_measured_power_per_socket ?? 'modeled'}`,
   ].join(' ');
 }
 
@@ -191,6 +195,12 @@ describe('power model port: upstream parity', () => {
     expect(cases.some((c) => c.error?.kind === 'value')).toBe(true);
   });
 
+  it('covers estimates from both measured CPU inputs', () => {
+    const estimated = cases.filter((c) => !c.error);
+    expect(estimated.some((c) => c.cpu_and_dram_measured_power_per_socket !== null)).toBe(true);
+    expect(estimated.some((c) => c.cpu_measured_power_per_socket !== null)).toBe(true);
+  });
+
   it.each(cases.map((testCase) => [label(testCase), testCase] as const))('%s', (_, testCase) => {
     if (testCase.error) {
       const { kind, message } = testCase.error;
@@ -227,6 +237,7 @@ describe('power model port: per-system report', () => {
       systems: report.systems,
     }).estimate_breakdown(report.gpu_level_power_per_gpu, {
       cpu_and_dram_measured_power_per_socket: report.cpu_and_dram_measured_power_per_socket,
+      cpu_measured_power_per_socket: report.cpu_measured_power_per_socket,
     });
     expect(format_power_breakdown_per_chassis(estimate)).toBe(report.text);
   });

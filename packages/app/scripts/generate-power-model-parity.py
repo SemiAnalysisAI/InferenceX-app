@@ -12,9 +12,9 @@ It writes two files next to the port (packages/app/src/lib/power/power_model):
 - power-model.manifest.json: the revision, its source tree, and every upstream
   Python module, which power-model-parity.test.ts maps one-to-one onto the port.
 - power-model.parity.json: the upstream model's own output for every catalog
-  system, workload, scale-out state, measured Grace-socket input, and a sweep of
-  GPU watts (including out-of-domain inputs and their errors), plus seeded random
-  GPU and socket watts for every system.
+  system, workload, scale-out state, measured Grace-socket or x86 CPU input, and a
+  sweep of GPU watts (including out-of-domain inputs and their errors), plus seeded
+  random GPU and socket watts for every system.
 Output is byte-stable across reruns.
 """
 
@@ -30,8 +30,8 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-# InferenceX #3887 merge commit: the measured Grace-socket input landed here.
-REVISION = "1e509932e09f2382f778d0e793893b534b02737b"
+# The measured x86 CPU socket input landed here.
+REVISION = "4c21c69f530bcdb6952f44a05de32bab89a5064c"
 SOURCE_PATH = "power_model"
 PACKAGE_PATH = "power_model/src/power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
@@ -57,6 +57,8 @@ SPARSE_WATTS = (0.0, 700.0, 1400.0)
 CLUSTER_WATTS = (700.0, 1440.0)
 # None models Grace; 98.066 W is a measured GB300 NVL72 replay mean.
 RACK_SOCKET_WATTS = (None, 0.0, 98.066, 250.0, 500.0)
+# None models the x86 CPU; 180 W per package is the upstream CLI test's input.
+CHASSIS_CPU_WATTS = (None, 0.0, 180.0, 400.0)
 # Full component trees (with provenance and configuration) for these GPU watts.
 DETAIL_WATTS = (0.0, 612.375)
 SUMMARY_KEYS = ("it_power_w", "facility_overhead_w", "facility_power_w", "AllInPower_per_gpu")
@@ -64,11 +66,11 @@ SUMMARY_KEYS = ("it_power_w", "facility_overhead_w", "facility_power_w", "AllInP
 FUZZ_SEED = 20261012
 FUZZ_CASES = 240
 REPORT_CASES = (
-    ("hopper", "agentic", True, 4, 700.0, None),
-    ("b300", "agentic-cpu-offloading", False, 1, 1000.0, None),
-    ("mi355", "fixed-seq-len", True, 1, 1200.0, None),
-    ("gb200-nvl72", "agentic", True, 1, 1000.0, None),
-    ("gb300-nvl72", "fixed-seq-len", False, 4, 1200.0, 98.066),
+    ("hopper", "agentic", True, 4, 700.0, None, None),
+    ("b300", "agentic-cpu-offloading", False, 1, 1000.0, None, None),
+    ("mi355", "fixed-seq-len", True, 1, 1200.0, None, 180.0),
+    ("gb200-nvl72", "agentic", True, 1, 1000.0, None, None),
+    ("gb300-nvl72", "fixed-seq-len", False, 4, 1200.0, 98.066, None),
 )
 
 
@@ -142,7 +144,9 @@ def totals(node):
     ]
 
 
-def evaluate(create, model, system, workload, scale_out, systems, gpu_watts, socket_watts):
+def evaluate(
+    create, model, system, workload, scale_out, systems, gpu_watts, socket_watts, cpu_watts
+):
     try:
         estimate = create(
             system=system,
@@ -150,40 +154,51 @@ def evaluate(create, model, system, workload, scale_out, systems, gpu_watts, soc
             workload_state=workload,
             using_scale_out=scale_out,
             systems=systems,
-        ).estimate_breakdown(gpu_watts, cpu_and_dram_measured_power_per_socket=socket_watts)
+        ).estimate_breakdown(
+            gpu_watts,
+            cpu_and_dram_measured_power_per_socket=socket_watts,
+            cpu_measured_power_per_socket=cpu_watts,
+        )
     except ValueError as error:
         return None, error_of(error)
     return estimate, None
 
 
 def grid():
-    """(system, workload, scale_out, systems, gpu_watts, socket_watts, detail) inputs."""
+    """(system, workload, scale_out, systems, gpu_watts, socket_watts, cpu_watts, detail)."""
     from power_model.models.advanced.systems.catalog import SYSTEMS
 
     for system, system_class in SYSTEMS.items():
         rack = system_class.has_grace_sockets
+        # A rack measures its Grace sockets, a chassis its x86 CPU packages; the dense
+        # value is swept across every GPU watt.
+        measured, dense = (RACK_SOCKET_WATTS, 98.066) if rack else (CHASSIS_CPU_WATTS, 180.0)
+        inputs = (lambda watts: (watts, None)) if rack else (lambda watts: (None, watts))
         for workload, scale_out in itertools.product(WORKLOADS, SCALE_OUT):
             if rack and workload == "idle":
                 # Grace has no idle profile: one modeled and one measured rejection suffice.
                 for gpu_watts, socket_watts in ((700.0, None), (700.0, 98.066)):
-                    yield system, workload, scale_out, 1, gpu_watts, socket_watts, False
+                    yield system, workload, scale_out, 1, gpu_watts, socket_watts, None, False
                 continue
             for gpu_watts in GPU_WATTS:
-                for socket_watts in RACK_SOCKET_WATTS if rack else (None,):
-                    if socket_watts not in (None, 98.066) and gpu_watts not in SPARSE_WATTS:
+                for watts in measured:
+                    if watts not in (None, dense) and gpu_watts not in SPARSE_WATTS:
                         continue
-                    detail = gpu_watts in DETAIL_WATTS and socket_watts in (None, 98.066)
-                    yield system, workload, scale_out, 1, gpu_watts, socket_watts, detail
+                    detail = gpu_watts in DETAIL_WATTS and watts in (None, dense)
+                    yield system, workload, scale_out, 1, gpu_watts, *inputs(watts), detail
             for gpu_watts in CLUSTER_WATTS:
-                for socket_watts in (None, 98.066) if rack else (None,):
-                    yield system, workload, scale_out, 4, gpu_watts, socket_watts, False
-            if not rack:
-                # A chassis has no Grace socket to measure.
-                yield system, workload, scale_out, 1, 700.0, 100.0, False
+                for watts in (None, dense):
+                    yield system, workload, scale_out, 4, gpu_watts, *inputs(watts), False
+            # Each family rejects the other's measured input; negative watts are invalid.
+            if rack:
+                yield system, workload, scale_out, 1, 700.0, None, 180.0, False
+            else:
+                yield system, workload, scale_out, 1, 700.0, 100.0, None, False
+                yield system, workload, scale_out, 1, 700.0, None, -1.0, False
 
 
 def fuzz():
-    """Random (system, workload, scale_out, systems, gpu_watts, socket_watts, False) inputs."""
+    """Random grid-shaped inputs; a measured input matches the system's CPU family."""
     import random
 
     from power_model.models.advanced.systems.catalog import SYSTEMS
@@ -193,21 +208,30 @@ def fuzz():
     for _ in range(FUZZ_CASES):
         system = rng.choice(names)
         gpu_watts = rng.uniform(0.0, 2000.0 if rng.random() < 0.8 else 40000.0)
-        measured = SYSTEMS[system].has_grace_sockets and rng.random() < 0.6
-        socket_watts = rng.uniform(0.0, 1500.0) if measured else None
+        watts = rng.uniform(0.0, 1500.0) if rng.random() < 0.6 else None
+        rack = SYSTEMS[system].has_grace_sockets
+        socket_watts, cpu_watts = (watts, None) if rack else (None, watts)
         workload, scale_out, systems = rng.choice(WORKLOADS), rng.random() < 0.5, rng.randint(1, 8)
-        yield system, workload, scale_out, systems, gpu_watts, socket_watts, False
+        yield system, workload, scale_out, systems, gpu_watts, socket_watts, cpu_watts, False
 
 
 def cases(provenance, configuration):
     from power_model import create_power_model
 
     out = []
-    for system, workload, scale_out, systems, gpu_watts, socket_watts, detail in itertools.chain(
-        grid(), fuzz()
-    ):
+    for (
+        system, workload, scale_out, systems, gpu_watts, socket_watts, cpu_watts, detail
+    ) in itertools.chain(grid(), fuzz()):
         estimate, error = evaluate(
-            create_power_model, "oss", system, workload, scale_out, systems, gpu_watts, socket_watts
+            create_power_model,
+            "oss",
+            system,
+            workload,
+            scale_out,
+            systems,
+            gpu_watts,
+            socket_watts,
+            cpu_watts,
         )
         case = {
             "model": "oss",
@@ -217,6 +241,7 @@ def cases(provenance, configuration):
             "systems": systems,
             "gpu_level_power_per_gpu": gpu_watts,
             "cpu_and_dram_measured_power_per_socket": socket_watts,
+            "cpu_measured_power_per_socket": cpu_watts,
         }
         if error:
             case["error"] = error
@@ -236,12 +261,20 @@ def cases(provenance, configuration):
                 ],
             }
         out.append(case)
-    # The one-GPU example model: every workload, with and without a socket input.
-    for system, workload, socket_watts in itertools.product(
-        ("hopper", "gb200-nvl72"), WORKLOADS, (None, 100.0)
+    # The one-GPU example model: every workload, without and with each measured input.
+    for system, workload, (socket_watts, cpu_watts) in itertools.product(
+        ("hopper", "gb200-nvl72"), WORKLOADS, ((None, None), (100.0, None), (None, 180.0))
     ):
         estimate, error = evaluate(
-            create_power_model, "example", system, workload, False, 1, 700.0, socket_watts
+            create_power_model,
+            "example",
+            system,
+            workload,
+            False,
+            1,
+            700.0,
+            socket_watts,
+            cpu_watts,
         )
         case = {
             "model": "example",
@@ -251,6 +284,7 @@ def cases(provenance, configuration):
             "systems": 1,
             "gpu_level_power_per_gpu": 700.0,
             "cpu_and_dram_measured_power_per_socket": socket_watts,
+            "cpu_measured_power_per_socket": cpu_watts,
         }
         if error:
             case["error"] = error
@@ -269,10 +303,14 @@ def reports():
     from power_model.reporting import format_power_breakdown_per_chassis
 
     out = []
-    for system, workload, scale_out, systems, gpu_watts, socket_watts in REPORT_CASES:
+    for system, workload, scale_out, systems, gpu_watts, socket_watts, cpu_watts in REPORT_CASES:
         estimate = create_power_model(
             system=system, workload_state=workload, using_scale_out=scale_out, systems=systems
-        ).estimate_breakdown(gpu_watts, cpu_and_dram_measured_power_per_socket=socket_watts)
+        ).estimate_breakdown(
+            gpu_watts,
+            cpu_and_dram_measured_power_per_socket=socket_watts,
+            cpu_measured_power_per_socket=cpu_watts,
+        )
         out.append(
             {
                 "system": system,
@@ -281,6 +319,7 @@ def reports():
                 "systems": systems,
                 "gpu_level_power_per_gpu": gpu_watts,
                 "cpu_and_dram_measured_power_per_socket": socket_watts,
+                "cpu_measured_power_per_socket": cpu_watts,
                 "text": format_power_breakdown_per_chassis(estimate),
             }
         )

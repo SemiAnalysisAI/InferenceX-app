@@ -72,6 +72,23 @@ export const GRACE_SOCKET_INPUT = new Provenance({
       'cold-plate heat. Routing all ~42 W to air would add up to ~0.5 kW of rack IT power.',
   ],
 });
+export const X86_CPU_SOCKET_INPUT = new Provenance({
+  profile_id: 'x86-cpu-socket-input',
+  version: '1',
+  source:
+    'cpu_measured_power_per_socket argument; ' +
+    'RAPL package-N energy averaged over the window, per socket',
+  kind: 'measured',
+  input_boundary: 'One x86 CPU package as reported by RAPL; excludes DIMMs',
+  assumptions: [
+    'Replaces the modeled X86CPU only.',
+    'DDR5 DIMMs stay modeled. AMD EPYC RAPL has no DRAM domain; package power excludes DIMMs.',
+    'Sits downstream of the PSU, so PSU loss and fan draw respond.',
+    'Fan sizing keeps the modeled design-state CPU.',
+    'AMD Zen RAPL is not validated against wall power. Schöne et al. (TU Dresden, 2021) found ' +
+      'Zen 2 RAPL inaccurate, so treat the value as measured with that caveat.',
+  ],
+});
 export const NVME_BASELINE = new Provenance({
   profile_id: 'hgx-idle-nvme',
   version: '1',

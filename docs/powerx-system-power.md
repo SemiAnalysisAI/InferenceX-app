@@ -35,7 +35,7 @@ supported air-cooled chassis).
 port to the pinned revision: every upstream module has a counterpart and no
 module lacks one, and the port reproduces the upstream model's own output to a
 relative 1e-12 for every catalog system, workload state, scale-out flag, a
-sweep of GPU watts and Grace-socket inputs, and every rejection (component
+sweep of GPU watts, Grace-socket and x86 CPU socket inputs, and every rejection (component
 trees, provenance and configuration included). Numerical parity establishes
 implementation equivalence, not empirical chassis calibration.
 
@@ -366,7 +366,7 @@ dropping that replicate.
 再修改 `generate-power-model-parity.py` 中固定的 InferenceX commit，用装有 pydantic 2
 的 Python 3.12+ 运行脚本并指向本地 InferenceX 仓库。脚本用 `git archive` 取出该 commit
 的 `power_model`，写出上游模块清单和上游模型自身的输出；`power-model-parity.test.ts`
-检查模块一一对应，并要求移植版本在全部系统、运行状态、GPU 功耗和 Grace socket 输入以及
+检查模块一一对应，并要求移植版本在全部系统、运行状态、GPU 功耗、Grace socket 和 x86 CPU socket 输入以及
 所有报错情况下与上游结果一致（相对误差 1e-12）。同一 commit 重复运行，输出逐字节相同。
 通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
 冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
