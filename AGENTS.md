@@ -3,6 +3,7 @@
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
+- Changes under `packages/app/src/lib/power/power_model/` need a companion InferenceX `power_model/` PR, cross-linked both ways. See [Power Model — TS Port and Upstream Python MUST Stay in Sync](#power-model--ts-port-and-upstream-python-must-stay-in-sync).
 - **Easter egg themes and games are just for fun.** Optional themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future ones) and the games launched from them do not need stable infrastructure, carry no compatibility or uptime guarantees, and may be deleted at any time without notice or migration. Do not add unit, component, E2E, or CI checks for them; delete existing feature tests rather than fixing or extending them. The only exceptions are `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: retain and maintain these checks to protect normal light/dark pages, embeds, resource loading, and SEO. Do not expand them into gameplay or visual-fidelity coverage. See [Easter egg policy](./docs/testing.md#easter-egg-themes-and-games).
 - Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. Missing updates are BLOCKING on PR review. See [Read-only coverage for public views](#read-only-coverage-for-public-views) for coverage requirements and documented exclusions.
 
@@ -259,6 +260,17 @@ Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a
 - Adjusting the Y-clamp behavior that prevents spline overshoot
 
 The Python file has a header comment explaining the pipeline and a `_cli()` entrypoint for stdin/stdout JSON usage. When you update it, keep the structure 1:1 with the TS so future readers can diff the two files line by line. Run the helper against a known dataset and confirm the outputs match what the chart renders before merging.
+
+## Power Model — TS Port and Upstream Python MUST Stay in Sync
+
+`packages/app/src/lib/power/power_model/` is a file-for-file TypeScript port of the InferenceX [`power_model`](https://github.com/SemiAnalysisAI/InferenceX/tree/main/power_model) package (`power_model/src/power_model`): one `.ts` per `.py`, the same directory tree, and the same class, field and method names. `power-model.manifest.json` records the pinned upstream merge commit and every upstream module; `power-model.parity.json` holds that revision's own outputs for the catalog grid plus seeded random inputs. `power-model-parity.test.ts` fails on a missing or extra module and on any number outside a relative 1e-12 of the fixture, so the port cannot drift from its pin unnoticed. The dashboard never runs the Python package, so a merged upstream change is invisible to users until the companion app PR lands.
+
+**Rule: every change to either side needs a companion PR on the other side, and each PR body links the other.** A missing companion PR is 🔴 BLOCKING on review in both repositories.
+
+- **Upstream change** (new system or component, profile value, validator, message text, workload state): land the InferenceX `power_model/` PR first. The companion app PR ports the same change with identical identifiers, bumps `REVISION` in `packages/app/scripts/generate-power-model-parity.py` to that merge commit, and regenerates the manifest and fixture with that script (Python 3.12 with pydantic, pointed at an InferenceX clone that contains the commit).
+- **Port change that upstream needs too** (a bug found in the port, a missing rejection, a new field): open the InferenceX PR first, then follow the upstream-change route.
+- **Port-only change** is allowed only when it brings the port closer to the pinned upstream behaviour and needs no upstream edit, for example matching a pydantic rejection or Python's `%g` rounding. Cite the upstream lines it mirrors, cover the case in `power-model-validation.test.ts` or the parity generator, and keep the regenerated fixture byte-stable apart from the cases you added.
+- Never hand-edit `power-model.parity.json` or `power-model.manifest.json`; regenerate them.
 
 ## Model Parameter Counts (verified)
 

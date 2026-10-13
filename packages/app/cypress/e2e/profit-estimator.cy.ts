@@ -8,7 +8,7 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 //    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
-//  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
+//  - DeepSeek V4 Pro opens on 35 tok/s/user, the DeepSeek peak list price
 //    ($1.32 / $0.044 cached / $3.96), and a 0% license fee (MIT weights);
 //  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
 //    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
@@ -1176,16 +1176,16 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.viewport(1280, 1000);
   });
 
-  it('opens /profit-estimator/deepseek-v4 on 24 tok/s/user and the DeepSeek list price', () => {
+  it('opens /profit-estimator/deepseek-v4 on 35 tok/s/user and the DeepSeek list price', () => {
     cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
+      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 35 tok/s/user Interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1195,7 +1195,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
       .and('contain.text', 'DeepSeek');
-    // 24 tok/s/user sits inside every fixture curve, the short H200 one included,
+    // 35 tok/s/user sits inside every fixture curve, the short H200 one included,
     // so all five SKUs are priced.
     chart().find('image.bar-vendor-mark').should('have.length', 5);
     chart().should('contain.text', 'H200');
@@ -1236,8 +1236,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v4');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'DeepSeek V4 Pro')
-      .and('contain.text', '24 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      .and('contain.text', '35 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1258,7 +1258,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
   it('serves the Chinese mirror with the list price named in Chinese', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', '输入：$1.32')
       .and('contain.text', 'DeepSeek 官方定价');
@@ -1324,7 +1324,7 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
   it('re-seeds the operating point and price source when switching from DeepSeek V4 Pro', () => {
     cy.visit('/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
 
     // Both DeepSeek models share a vendor label, so the switch must land on the

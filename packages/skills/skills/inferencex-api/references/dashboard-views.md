@@ -37,6 +37,14 @@ results or treat its interpolated values as separately measured operating points
 
 These are raw API captures, outside the six formal CLI bundle families.
 `inferencex verify` does not convert a view capture into a formal evidence bundle.
+The inference dashboard resets manual legend selections and Best per SKU overrides
+when the reader chooses a different model in the model selector; same-model axis
+changes preserve manual selections. Initial
+share links and explicit presets still apply their selections. View API requests
+are stateless: omit `best` for the default ranking, or send `best=false` explicitly
+for each model to retain all selected series. Do not infer a destination model's
+default from a manual engine selection made on another model.
+
 Example URLs (check deployed availability before use):
 
 ```text
@@ -45,6 +53,17 @@ https://inferencex.semianalysis.com/api/v1/views/inference?model=DeepSeek-V4-Pro
 https://inferencex.semianalysis.com/api/v1/views/first-token?model=DeepSeek-V4-Pro&caps=2,5,10&minInteractivity=150
 https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek-V4-Pro&priceSource=custom&inputPrice=1&cachedInputPrice=0.1&outputPrice=1
 ```
+
+## Profit estimator defaults
+
+Both profit views default DeepSeek V4 Pro to `target=35` tok/s/user when
+`target` is omitted, matching the English and Chinese dashboards. Explicit
+targets still override the default; list pricing and the 0% model license fee
+are unchanged. The 2026-10-13 choice uses the early-October
+[OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
+as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
+Treat 35 as an editable operating assumption, not a traffic-weighted mean or
+an OpenRouter P90-equivalent measurement.
 
 ## Staged-run Pareto links
 
@@ -113,6 +132,28 @@ which controls belong together.
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                                                                                                                                                                                                                           |
 
 ## Interpretation and maintenance
+
+### Image submission age
+
+`/api/v1/views/current-inferencex-image?includeHistory=true` adds `ageHistory`:
+90 daily UTC points ending on `asOf` (today by default), each containing `date`,
+`p90AgeDays` and `configurationCount`. `ageSummary` is always returned for the
+current filtered image rows. All existing model, sequence, hardware, precision,
+speculation, node-type and framework filters apply to both.
+The default scenario is `agentic-traces` (Agentic) and the default `nodeType` is
+`all`, including non-disaggregated and disaggregated configurations. A model
+without Agentic observations falls back to its first available active scenario.
+
+P90 uses nearest rank, one vote per displayed configuration, measured in whole
+days since its latest successful image-bearing submission. Reusing the same
+image tag in a new submission resets age. This is not the container's build age.
+History carries older observations into the window, includes configurations
+only from their first submission, and excludes future observations. Empty days
+have `p90AgeDays: null`, not zero. Today's model/scenario retirement rules apply
+throughout the historical window; historical retirement states are not stored.
+The current table uses the latest benchmark snapshot, whereas history uses
+successful image-bearing submission events. The chart's hover and keyboard
+inspection are presentation-only and introduce no extra selectors.
 
 OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to

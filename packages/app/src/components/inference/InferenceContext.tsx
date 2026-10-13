@@ -935,10 +935,16 @@ export function InferenceProvider({
   }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
+      // Reset deliberate model changes, not initial URL hydration or presets.
+      // Axis preferences and Compare History remain intact.
+      if (v !== selectedModel) {
+        setBestPerSku(activeTab === 'inference' ? null : false);
+        setPendingActiveHwTypes(null);
+      }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedModel, clearScopedSelectionOnChange],
+    [selectedModel, activeTab, setSelectedModel, clearScopedSelectionOnChange],
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
@@ -1393,6 +1399,7 @@ export function InferenceProvider({
     engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
+  const lastHwResetModelRef = useRef(selectedModel);
 
   // Restore legend-active selection from URL on first availability of
   // selectableHwTypes. Sets lastHwResetKeyRef so the reset effect below treats
@@ -1428,6 +1435,7 @@ export function InferenceProvider({
     }
     setActiveHwTypes(restored);
     lastHwResetKeyRef.current = hwResetKey;
+    lastHwResetModelRef.current = selectedModel;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
@@ -1446,6 +1454,7 @@ export function InferenceProvider({
     if (pendingActiveHwTypes) return;
     if (selectableHwTypes.size === 0) return;
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
+    const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
     // Metric changes must preserve manual legend subsets, but automatic
     // selections still need to follow the newly selected axes. In particular,
@@ -1453,6 +1462,10 @@ export function InferenceProvider({
     // metric's winners while its toggle remained enabled.
     if (!scopeChanged && !bestPerSku && !presetFilter) return;
     lastHwResetKeyRef.current = hwResetKey;
+    lastHwResetModelRef.current = selectedModel;
+    // Keep engine stickiness within a model, never across model navigation.
+    const previousSelection = modelChanged ? new Set<string>() : undefined;
+    if (modelChanged) preferredHwTypesRef.current = new Set();
     if (presetFilter) {
       const filtered = new Set(
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
@@ -1460,7 +1473,7 @@ export function InferenceProvider({
       if (filtered.size > 0) {
         // Presets explicitly choose configs. Resolve any engine conflict
         // silently so loading a preset never flashes an invalid comparison.
-        setActiveHwTypes(resolveHwSelection(filtered).result);
+        setActiveHwTypes(resolveHwSelection(filtered, previousSelection).result);
         return;
       }
     }
@@ -1470,7 +1483,7 @@ export function InferenceProvider({
       // sticky group so their charts remain useful; variant-only rules retain
       // the existing clear-all behavior.
       const automaticSelection = bestPerSku ? bestHwTypes : selectableHwTypes;
-      const { result, droppedGroups } = resolveHwSelection(automaticSelection);
+      const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
         setEngineConflict({

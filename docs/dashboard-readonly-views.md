@@ -59,7 +59,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                |
 | `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                     |
 | `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                        |
-| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                   |
+| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `includeHistory`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                 |
 | `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                            |
 | `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                            |
 | `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                   |
@@ -78,6 +78,28 @@ combinations, not the full Cartesian product of all possible filter values.
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
+
+### Current image age
+
+The page and view API default to Agentic (`agentic-traces`) and all node types
+(`nodeType=all`). The selected model falls back to its first available active
+scenario when Agentic is unavailable. Explicit node-type and scenario selections
+still override those defaults.
+
+`ageSummary` contains the nearest-rank p90 submission age and configuration count
+for the current filtered image rows. `includeHistory=true` adds `ageHistory`, with
+90 daily UTC points ending on `asOf` (today by default). Every existing image
+filter applies. History uses successful image-bearing submissions, carries the
+latest pre-window observation forward, and never backfills a configuration before
+its first submission. Empty days have a null p90, not zero. Each displayed
+configuration has one vote, including node type in its identity.
+
+These values measure submission freshness, not image build age. Repeated
+submissions of the same tag reset age. Current model/scenario retirement rules
+apply to the whole window; historical retirement states are not stored. The
+current summary uses the latest benchmark snapshot, while the historical series
+uses submission events. Chart hover, keyboard inspection, and retry are
+presentation controls and do not introduce additional data selectors.
 
 ## Source audit and shared computations
 
