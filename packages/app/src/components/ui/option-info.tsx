@@ -179,7 +179,9 @@ export function InfoHelp({
         data-testid={contentTestId ?? `option-help-content-${value}`}
         className={cn(
           HELP_CONTENT_CLASS_NAME,
-          'z-[130] w-96 max-w-[min(calc(100vw-1.5rem),var(--radix-popover-content-available-width))] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
+          // Avoid feeding the observed width back into its own size limit when
+          // the viewport changes (Firefox ResizeObserver loop).
+          'z-[130] w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
         )}
       >
         <p id={titleId} className="font-medium text-foreground">

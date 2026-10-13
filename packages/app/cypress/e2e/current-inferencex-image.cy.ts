@@ -84,7 +84,12 @@ describe('Current InferenceX Image localized routes', () => {
       .should('contain.text', '单节点指非分离式推理')
       .and('contain.text', '独立的 prefill/decode 池')
       .and('contain.text', 'MoRI')
-      .and('not.contain.text', '=');
+      .and('not.contain.text', '=')
+      .and(($content) => {
+        const rect = $content[0].getBoundingClientRect();
+        expect(rect.left, 'help stays inside the phone viewport').to.be.at.least(0);
+        expect(rect.right, 'help stays inside the phone viewport').to.be.at.most(390);
+      });
 
     cy.viewport(1440, 900);
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
