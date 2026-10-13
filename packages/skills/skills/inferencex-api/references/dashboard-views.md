@@ -37,6 +37,14 @@ results or treat its interpolated values as separately measured operating points
 
 These are raw API captures, outside the six formal CLI bundle families.
 `inferencex verify` does not convert a view capture into a formal evidence bundle.
+The inference dashboard resets manual legend selections and Best per SKU overrides
+when the reader chooses a different model in the model selector; same-model axis
+changes preserve manual selections. Initial
+share links and explicit presets still apply their selections. View API requests
+are stateless: omit `best` for the default ranking, or send `best=false` explicitly
+for each model to retain all selected series. Do not infer a destination model's
+default from a manual engine selection made on another model.
+
 Example URLs (check deployed availability before use):
 
 ```text
