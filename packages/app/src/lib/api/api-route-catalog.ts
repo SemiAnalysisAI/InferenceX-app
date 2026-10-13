@@ -1129,6 +1129,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/calculator/profit-estimator.ts',
+    sourceSha256: 'd2e29a36f10f348a150e66ce6380bef10b8a5d10ee634a73ae0e3ddae37a6a85',
+    reviewArea: {
+      en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
+      zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
+    },
+  },
+  {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
     reviewArea: {
