@@ -44,6 +44,7 @@ export const GENERATED_FAQ_DATA = {
     'kimik2.7-code': 'Kimi-K2.7-Code',
     'minimaxm2.7': 'MiniMax-M2.7',
     'glm5.1': 'GLM-5.1',
+    'glm5.3': 'GLM-5.3',
   }),
   frameworkNames: [...new Set(Object.values(FRAMEWORK_LABELS))].map((name) =>
     name.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
