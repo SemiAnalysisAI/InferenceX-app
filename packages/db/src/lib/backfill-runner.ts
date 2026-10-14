@@ -164,8 +164,8 @@ export async function runCandidateIdBackfill(
 
 /**
  * List a candidate run's GitHub artifacts with transient-failure retry.
- * Returns `null` when GitHub no longer has the run at all, so a sweep over
- * months of history reports the gap and moves on instead of aborting.
+ * Returns `null` when GitHub returns 404: the run may be deleted or inaccessible
+ * to the token. Historical sweeps report that gap without aborting.
  */
 export function listBackfillRunArtifacts(
   repository: string,

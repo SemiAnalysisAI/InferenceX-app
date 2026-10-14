@@ -5,7 +5,7 @@
  *
  * GitHub keeps run artifacts for 90 days and the GCS mirror only covers
  * scheduled/push runs on main, so the reachable history is bounded by GitHub
- * retention; runs GitHub has since deleted are reported and skipped. Each
+ * retention; runs not visible to the token are reported and skipped. Each
  * gpu_metrics artifact is paired with its exact `bmk_<suffix>`
  * (or `bmk_agentic_<suffix>`) sibling, the raw rows are mapped through the
  * production mapper, and the series is linked to those persisted points.
@@ -15,10 +15,14 @@
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --yes
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --dry-run
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --force --limit 20 --yes
+ *   bun run --cwd packages/db db:backfill-gpu-metrics --run 34557177019 --attempt 2 --artifact gpu_metrics_example --receipt power-publication.json --yes
  *
- * --all skips runs that already have a stored series unless --force is passed;
+ * --all skips runs with complete retained telemetry inventories unless --force is passed;
  * --run selects its run either way. --force also replaces the stored samples of
  * unchanged series, so a parser fix reaches runs whose artifacts GitHub retains.
+ * --attempt selects one attempt (default: latest); --artifact restricts repair to
+ * one exact artifact name; --receipt updates an existing publication receipt in place.
+ * These three options require --run.
  */
 
 import fs from 'node:fs';
@@ -67,6 +71,10 @@ import {
   type GpuMetricsArtifactPair,
 } from './lib/gpu-metrics-backfill.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
+import {
+  gpuMetricsRunCoverage,
+  type GpuMetricSeriesCoverageRow,
+} from './queries/gpu-metrics-coverage.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
@@ -79,7 +87,7 @@ interface CandidateRun {
   run_attempt: number;
   html_url: string | null;
   date: string;
-  series_count: number;
+  series_coverage: GpuMetricSeriesCoverageRow[];
 }
 
 interface BackfillFlags {
@@ -145,7 +153,11 @@ async function loadCandidateRuns(flags: BackfillFlags): Promise<CandidateRun[]> 
     .slice(0, 10);
   const rows = await sql<CandidateRun[]>`
     select wr.id, wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date,
-      (select count(*)::int from gpu_metric_series s where s.workflow_run_id = wr.id) as series_count
+      coalesce((select jsonb_agg(jsonb_build_object(
+        'artifact_name', s.artifact_name, 'file_name', s.file_name, 'sample_count', s.sample_count,
+        'run_artifact_inventory', s.sidecars -> 'runArtifactInventory',
+        'series_inventory', s.sidecars -> 'seriesInventory'
+      )) from gpu_metric_series s where s.workflow_run_id = wr.id), '[]'::jsonb) as series_coverage
     from workflow_runs wr
     where exists (select 1 from benchmark_results br where br.workflow_run_id = wr.id)
       and (${flags.run}::bigint is null or wr.github_run_id = ${flags.run})
@@ -161,9 +173,13 @@ async function loadCandidateRuns(flags: BackfillFlags): Promise<CandidateRun[]> 
       ...row,
       id: Number(row.id),
       github_run_id: Number(row.github_run_id),
-      series_count: Number(row.series_count),
     }))
-    .filter((row) => flags.force || flags.run !== null || row.series_count === 0);
+    .filter(
+      (row) =>
+        flags.force ||
+        flags.run !== null ||
+        gpuMetricsRunCoverage(row.series_coverage).status !== 'complete',
+    );
   return flags.limit === null ? candidates : candidates.slice(0, flags.limit);
 }
 
@@ -242,6 +258,7 @@ async function processPair(
   expectationErrors: NonNullable<TelemetryReceipt['expectationErrors']>,
   uniqueFallbacks: Map<string, number>,
   replace: boolean,
+  expectedRunArtifacts: readonly string[],
 ): Promise<PairOutcome> {
   let benchmarkDir: string | null = null;
   let gpuMetricsDir: string | null = null;
@@ -318,6 +335,7 @@ async function processPair(
       artifact: { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir },
       benchmarkResultIds: resultIds,
       replace,
+      expectedRunArtifacts,
     });
     if (ingested.seriesIds.length === 0) {
       throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
@@ -383,7 +401,9 @@ async function main(): Promise<void> {
         const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
         if (artifacts === null) {
           goneRuns++;
-          console.log(`  run ${run.github_run_id} (${run.date}): gone from GitHub`);
+          console.log(
+            `  run ${run.github_run_id} (${run.date}): not visible on GitHub (deleted or inaccessible to token)`,
+          );
           continue;
         }
         const runPairs = pairGpuMetricsArtifacts(
@@ -406,7 +426,7 @@ async function main(): Promise<void> {
     }
     console.log(
       `\n=== dry run: ${runs.length} run(s), ${pairedRuns} with pairs, ${pairs} pair(s), ` +
-        `${goneRuns} gone from GitHub, ${failedRuns} failed ===`,
+        `${goneRuns} not visible on GitHub (deleted or inaccessible to token), ${failedRuns} failed ===`,
     );
     if (failedRuns > 0) process.exitCode = 1;
     return;
@@ -443,9 +463,9 @@ async function main(): Promise<void> {
       if (listedArtifacts === null) {
         goneRuns++;
         runFailures++;
-        recoveryError = `Run ${runId} attempt ${run.run_attempt} is gone from GitHub`;
+        recoveryError = `Run ${runId} attempt ${run.run_attempt} is not visible on GitHub (deleted or inaccessible to token)`;
         console.log(
-          `  [${runIndex + 1}/${runs.length}] run ${runId} attempt ${run.run_attempt}: gone from GitHub`,
+          `  [${runIndex + 1}/${runs.length}] run ${runId} attempt ${run.run_attempt}: not visible on GitHub (deleted or inaccessible to token)`,
         );
         continue;
       }
@@ -455,6 +475,7 @@ async function main(): Promise<void> {
         run.run_attempt,
       );
       const allPairs = pairGpuMetricsArtifacts(artifacts);
+      const expectedRunArtifacts = allPairs.map((pair) => pair.gpuMetrics.name);
       const pairs = allPairs.filter(
         (pair) => !flags.artifact || pair.gpuMetrics.name === flags.artifact,
       );
@@ -519,6 +540,7 @@ async function main(): Promise<void> {
               missing.errors,
               uniqueFallbacks,
               flags.force,
+              expectedRunArtifacts,
             ),
           ),
         ),
@@ -588,7 +610,7 @@ async function main(): Promise<void> {
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +
       `${auditsWritten} AgentX audit(s) written, ${unmatchedArtifacts} unmatched artifact(s), ` +
-      `${missingRuns} run(s) without pairs, ${goneRuns} run(s) gone from GitHub, ` +
+      `${missingRuns} run(s) without pairs, ${goneRuns} run(s) not visible on GitHub (deleted or inaccessible to token), ` +
       `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );
   console.log(

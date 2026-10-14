@@ -4,11 +4,11 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 //  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
 //    ($3.00 / $0.30 cached / $15.00), 60% utilization, 30% model license fee;
 //  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
-//    ($1.40 / $0.26 cached / $4.40), and a 10% license fee; a model switch
+//    ($1.40 / $0.26 cached / $4.40), and a 20% license fee; a model switch
 //    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
-//  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
+//  - DeepSeek V4 Pro opens on 35 tok/s/user, the DeepSeek peak list price
 //    ($1.32 / $0.044 cached / $3.96), and a 0% license fee (MIT weights);
 //  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
 //    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
@@ -977,8 +977,8 @@ describe('Profit Estimator per GW — per-model route', () => {
           .invoke('val')
           .should((value) => {
             const shared = new URL(String(value));
-            expect(shared.searchParams.get('i_seq')).to.equal('agentic-traces');
-            expect(shared.searchParams.has('c_profit_target')).to.equal(false);
+            expect(shared.pathname).to.equal(route);
+            expect(shared.search).to.equal('');
           });
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
@@ -1005,8 +1005,8 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '10%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 100 tok/s/user Interactivity',
@@ -1059,6 +1059,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
@@ -1069,6 +1070,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
       .should('contain.text', 'Kimi K3')
       .and('contain.text', '45 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $3')
       .and('contain.text', '(Moonshot list price)');
@@ -1077,6 +1079,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.4')
       .and('contain.text', '(Z.ai list price)');
@@ -1151,7 +1154,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'MiniMax M3').click();
@@ -1194,16 +1197,45 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.viewport(1280, 1000);
   });
 
-  it('opens /profit-estimator/deepseek-v4 on 24 tok/s/user and the DeepSeek list price', () => {
+  it('shares an explicit P90 interactivity target and reopens on it', () => {
+    cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
+    cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .then((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4/target/24');
+        expect(shared.search).to.equal('');
+        cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: suppressNudges });
+      });
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 24 tok/s/user');
+
+    // Back on the model's default operating point, the link carries no target.
+    cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4');
+        expect(shared.search).to.equal('');
+      });
+  });
+
+  it('opens /profit-estimator/deepseek-v4 on 35 tok/s/user and the DeepSeek list price', () => {
     cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
+      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 35 tok/s/user Interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1213,7 +1245,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
       .and('contain.text', 'DeepSeek');
-    // 24 tok/s/user sits inside every fixture curve, the short H200 one included,
+    // 35 tok/s/user sits inside every fixture curve, the short H200 one included,
     // so all five SKUs are priced.
     chart().find('image.bar-vendor-mark').should('have.length', 5);
     chart().should('contain.text', 'H200');
@@ -1254,8 +1286,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v4');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'DeepSeek V4 Pro')
-      .and('contain.text', '24 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      .and('contain.text', '35 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1276,7 +1308,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
   it('serves the Chinese mirror with the list price named in Chinese', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', '输入：$1.32')
       .and('contain.text', 'DeepSeek 官方定价');
@@ -1342,7 +1374,7 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
   it('re-seeds the operating point and price source when switching from DeepSeek V4 Pro', () => {
     cy.visit('/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
 
     // Both DeepSeek models share a vendor label, so the switch must land on the
@@ -1611,35 +1643,47 @@ describe('VR publication economics', () => {
           onBeforeLoad: suppressNudges,
         });
         cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
-        cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
-          const rows = [...$bars].map(
-            (node) =>
-              (
-                node as unknown as {
-                  __data__: {
-                    row: {
-                      hwKey: string;
-                      tco: number;
-                      revenue: number;
+        const assertCachePricing = (cacheHitRate: number) =>
+          cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+            const rows = [...$bars].map(
+              (node) =>
+                (
+                  node as unknown as {
+                    __data__: {
+                      row: {
+                        hwKey: string;
+                        tco: number;
+                        revenue: number;
+                      };
                     };
-                  };
-                }
-              ).__data__.row,
-          );
-          const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
-          const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
-          expect(vr, 'VR is priced').not.to.equal(undefined);
-          expect(gb, 'GB300 remains priced').not.to.equal(undefined);
-          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
-          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
-          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
-          // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
-          // 95% cache hit, DeepSeek list prices, 60% revenue utilization.
-          const revenuePerHour =
-            (((12_600 * (0.05 * 1.32 + 0.95 * 0.044) + 5_400 * 3.96) * 3600) / 1_000_000) * 0.6;
-          expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
-        });
+                  }
+                ).__data__.row,
+            );
+            const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
+            const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
+            expect(vr, 'VR is priced').not.to.equal(undefined);
+            expect(gb, 'GB300 remains priced').not.to.equal(undefined);
+            const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
+            const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
+            expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
+            expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+            // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
+            // the selected cache rate, DeepSeek list prices, 60% revenue utilization.
+            const revenuePerHour =
+              (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
+                3600) /
+                1_000_000) *
+              0.6;
+            expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
+          });
+        cy.get('[data-testid="profit-cache-hit-selector"]').should(
+          'contain.text',
+          'Theroticial Roofline',
+        );
+        assertCachePricing(0.97);
+        cy.get('[data-testid="profit-cache-hit-selector"]').click();
+        cy.contains('[role="option"]', /^Actual$/).click();
+        assertCachePricing(0.95);
       });
     }
   }
@@ -1648,7 +1692,7 @@ describe('VR publication economics', () => {
 it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
   interceptVrPublicationData(true);
   cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
-  cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+  cy.visit('/profit-estimator/deepseek-v4/cache-hit-mode/actual', { onBeforeLoad: suppressNudges });
   cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
   cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
     const rows = [...$bars].map(

@@ -40,6 +40,18 @@ describe('run override selection', () => {
     },
   );
 
+  it('selects only the whole-run purge for run 35855544139', () => {
+    expect(selectRunOverrides(['--run-id', '35855544139', '--yes'])).toEqual({
+      runId: 35855544139,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([35855544139]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('selects only the whole-run purge for MI355X DSV4 ATOM disagg LMCache AgentX run 36734492117', () => {
     expect(selectRunOverrides(['--run-id', '36734492117', '--yes'])).toEqual({
       runId: 36734492117,

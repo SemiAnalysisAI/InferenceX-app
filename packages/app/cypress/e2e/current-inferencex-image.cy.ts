@@ -6,6 +6,104 @@ function visitCurrentImage() {
   });
 }
 
+function selectFixedSequence() {
+  cy.get('#image-sequence-select').click();
+  cy.get('[data-slot="select-item"]').contains('8k/1k').click();
+}
+
+describe('Current image P90 age history', () => {
+  const asOf = '2026-10-13';
+  const row = {
+    model: 'qwen3.5',
+    hardware: 'b200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'none',
+    disagg: false,
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+    image: 'lmsysorg/sglang:v0.5.6',
+    date: '2026-10-01',
+  };
+  const ageHistory = Array.from({ length: 90 }, (_, index) => ({
+    date: new Date(Date.parse(`${asOf}T00:00:00Z`) - (89 - index) * 86_400_000)
+      .toISOString()
+      .slice(0, 10),
+    p90AgeDays: index < 77 ? null : index - 77,
+    configurationCount: index < 77 ? 0 : 1,
+  }));
+  beforeEach(() => {
+    cy.clock(Date.parse(`${asOf}T12:00:00Z`), ['Date']);
+    cy.intercept('GET', '**/api/v1/latest-images', {
+      body: [
+        row,
+        { ...row, model: 'unknown-new-model', hardware: 'h200', disagg: true, date: '2026-10-12' },
+      ],
+    });
+    cy.intercept('GET', '**/api/v1/framework-releases', { body: {} });
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', { body: { ageHistory } }).as(
+      'ageHistory',
+    );
+  });
+
+  it('shows p90 and a dated chart, inspects by keyboard, and refetches after model filtering', () => {
+    cy.visit('/current-inferencex-image');
+    cy.wait('@ageHistory').its('request.query').should('include', {
+      includeHistory: 'true',
+      asOf,
+      sequence: 'agentic-traces',
+      nodeType: 'all',
+    });
+    cy.get('#image-sequence-select').should('contain', 'Agentic');
+    cy.get('#image-node-type-select').should('contain', 'All');
+    cy.get('tbody tr').should('have.length', 2);
+    cy.get('[data-testid="image-age-p90"]').should('have.text', '12d');
+    cy.get('[data-testid="image-age-panel"] svg[role="img"]')
+      .focus()
+      .trigger('keydown', { key: 'ArrowLeft' });
+    cy.get('[data-testid="image-age-readout"]').should('contain', '2026-10-12');
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', (request) => {
+      if (request.query.model === 'unknown-new-model') request.alias = 'filteredHistory';
+      request.reply({ body: { ageHistory } });
+    });
+    cy.get('#image-model-select').click();
+    cy.get('[role="option"]').contains('unknown-new-model').click();
+    cy.wait('@filteredHistory').its('request.query.model').should('eq', 'unknown-new-model');
+    cy.get('[data-testid="image-age-p90"]').should('have.text', '1d');
+  });
+
+  it('keeps the current table and metric available if history fails, with a working retry', () => {
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', {
+      statusCode: 503,
+      body: {},
+    });
+    cy.visit('/current-inferencex-image');
+    cy.get('[data-testid="image-age-error"]', { timeout: 20000 }).should('be.visible');
+    cy.get('[data-testid="image-age-p90"]').should('have.text', '12d');
+    cy.get('tbody tr').should('have.length', 2);
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', { body: { ageHistory } }).as(
+      'recovered',
+    );
+    cy.get('[data-testid="image-age-error"]').contains('button', 'Retry').click();
+    cy.wait('@recovered');
+    cy.get('[data-testid="image-age-panel"] svg[role="img"]').should('be.visible');
+  });
+
+  it('shows empty history rather than a zero-valued line and fits a mobile viewport', () => {
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', {
+      body: {
+        ageHistory: ageHistory.map((p) => ({ ...p, p90AgeDays: null, configurationCount: 0 })),
+      },
+    });
+    cy.viewport(375, 812);
+    cy.visit('/current-inferencex-image');
+    cy.get('[data-testid="image-age-panel"]').should('contain', 'No historical observations');
+    cy.get('[data-testid="image-age-panel"] svg').should('not.exist');
+    cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(375));
+  });
+});
+
 describe('Current InferenceX Image localized routes', () => {
   const fixedNow = Date.parse('2026-08-23T12:00:00Z');
   const today = '2026-08-23';
@@ -56,6 +154,7 @@ describe('Current InferenceX Image localized routes', () => {
   beforeEach(() => {
     cy.clock(fixedNow, ['Date']);
     cy.viewport(390, 844);
+    cy.intercept('GET', '**/api/v1/views/current-inferencex-image?*', { body: { ageHistory: [] } });
   });
 
   it('localizes spec decode, age text and tooltip while preserving image tags', () => {
@@ -70,6 +169,7 @@ describe('Current InferenceX Image localized routes', () => {
     visitCurrentImage();
     cy.contains('加载中……').should('be.visible');
     cy.wait('@latestImages');
+    selectFixedSequence();
     cy.get('table')
       .should('contain.text', '关闭')
       .and('contain.text', '0 天')
@@ -115,6 +215,7 @@ describe('Current InferenceX Image localized routes', () => {
       vllm: 'v0.10.1',
     });
     cy.visit('/current-inferencex-image');
+    selectFixedSequence();
     cy.get('table')
       .should('contain.text', 'Off')
       .and('contain.text', '0d')
@@ -266,7 +367,10 @@ describe('Current InferenceX Image localized routes', () => {
     });
     cy.visit('/current-inferencex-image');
 
-    // Default 8K/1K view across all models: the still-swept rows only.
+    // Agentic is the default; explicitly select the still-swept fixed scenario.
+    cy.get('#image-sequence-select').should('contain.text', 'Agentic');
+    cy.get('#image-node-type-select').should('contain.text', 'All');
+    selectFixedSequence();
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
     cy.get('table')
       .should('contain.text', 'lmsysorg/sglang:v0.5.2')
@@ -346,6 +450,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', {});
     visitCurrentImage();
+    selectFixedSequence();
     cy.get('[data-testid="current-image-filters"] fieldset legend')
       .first()
       .should('have.text', '配置');

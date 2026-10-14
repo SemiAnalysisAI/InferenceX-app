@@ -7,6 +7,7 @@ import path from 'node:path';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
 import { verifyRequiredPowerArtifacts } from './etl/required-power-publication.js';
+import { isRunAttemptPurged } from './etl/run-overrides.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 
@@ -150,15 +151,19 @@ function main(): void {
     downloadWithRetries(artifact, artifactsPath);
   }
   // This command precedes migrations: malformed required input must not reach any DB write.
-  verifyRequiredPowerArtifacts(
-    artifactsPath,
-    {
-      runId: Number(sourceRunId),
-      runAttempt: sourceMetadata.run_attempt ?? 1,
-      headSha: sourceMetadata.head_sha ?? null,
-    },
-    process.env.INGEST_REQUIRE_POWER === 'true',
-  );
+  if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {
+    console.log(`Source run ${sourceRunId} is purged; skipping required-power verification.`);
+  } else {
+    verifyRequiredPowerArtifacts(
+      artifactsPath,
+      {
+        runId: Number(sourceRunId),
+        runAttempt: sourceMetadata.run_attempt ?? 1,
+        headSha: sourceMetadata.head_sha ?? null,
+      },
+      process.env.INGEST_REQUIRE_POWER === 'true',
+    );
+  }
   if (plan.reused) {
     writeReuseMetadata(artifactsPath, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
   }

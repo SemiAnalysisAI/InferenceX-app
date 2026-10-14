@@ -367,6 +367,20 @@ describe('published API documentation invariants', () => {
     expect(runSummary?.kv_cases).toMatchObject({ type: 'object' });
   });
 
+  it.each([
+    'get-benchmark-siblings',
+    'get-request-timeline',
+    'get-server-log-files',
+    'get-trace-server-metrics',
+  ])('documents safe positive integer bounds for %s', (operationId) => {
+    const operation = apiOperations.find((candidate) => candidate.id === operationId);
+    expect(operation?.parameters.find((parameter) => parameter.name === 'id')?.schema).toEqual({
+      type: 'integer',
+      minimum: 1,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
+  });
+
   it('uses canonical shared-route error examples', () => {
     const bulkIds = [
       'get-agentic-aggregates',

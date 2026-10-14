@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest';
 describe('purged CI ingestion', () => {
   it.each([
     { runId: 20286769842, runAttempt: 1, reused: false },
+    { runId: 35855544139, runAttempt: 1, reused: false },
+    { runId: 35855544139, runAttempt: 2, reused: true },
     { runId: 25199291771, runAttempt: 2, reused: false },
     { runId: 25199291771, runAttempt: 2, reused: true },
   ])(

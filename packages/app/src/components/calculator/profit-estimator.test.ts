@@ -361,10 +361,10 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens GLM 5.2/5.3 on 100 tok/s/user, the Z.ai list price, and a 10% license fee', () => {
+  it('opens GLM 5.2/5.3 on 100 tok/s/user, the Z.ai list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.GLM_5_2);
     expect(defaults.interactivity).toBe(100);
-    expect(defaults.labCutPct).toBe(10);
+    expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'Z.ai',
       inputPerMillion: 1.4,
@@ -393,9 +393,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 24 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4 Pro on 35 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
-    expect(defaults.interactivity).toBe(24);
+    expect(defaults.interactivity).toBe(35);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',

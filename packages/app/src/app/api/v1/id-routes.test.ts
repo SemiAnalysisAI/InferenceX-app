@@ -90,17 +90,29 @@ describe('idsQueryRoute', () => {
 });
 
 describe('idQueryRoute', () => {
-  it('fetches by id and returns the payload', async () => {
-    const fetch = vi.fn().mockResolvedValue({ value: 42 });
-    const GET = idQueryRoute({ logLabel: 'thing', fetch });
+  it.each([7, Number.MAX_SAFE_INTEGER])(
+    'fetches safe id %s and returns the payload',
+    async (id) => {
+      const fetch = vi.fn().mockResolvedValue({ value: 42 });
+      const GET = idQueryRoute({ logLabel: 'thing', fetch });
 
-    const res = await GET(req('/x?id=7'));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ value: 42 });
-    expect(fetch).toHaveBeenCalledWith(7);
-  });
+      const res = await GET(req(`/x?id=${id}`));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ value: 42 });
+      expect(fetch).toHaveBeenCalledWith(id);
+    },
+  );
 
-  it.each(['/x', '/x?id=abc', '/x?id=0'])('returns 400 for %s', async (url) => {
+  it.each([
+    '/x',
+    '/x?id=abc',
+    '/x?id=0',
+    '/x?id=-1',
+    '/x?id=1.5',
+    '/x?id=1e21',
+    '/x?id=9007199254740992',
+    '/x?id=9007199254740993',
+  ])('returns 400 for %s', async (url) => {
     const fetch = vi.fn();
     const GET = idQueryRoute({ logLabel: 'thing', fetch });
 
