@@ -42,6 +42,10 @@ export function subscribeClientSearch(subscriber: () => void): () => void {
 }
 
 export function getClientSearchSnapshot(): string {
+  return typeof window === 'undefined' ? '' : window.location.search;
+}
+
+function getClientRouteSearchSnapshot(): string {
   if (typeof window === 'undefined') return '';
   if (profitRouteParams(window.location.pathname) === null) return window.location.search;
   const search = profitRouteSearch(window.location.pathname, window.location.search).toString();
@@ -60,6 +64,15 @@ export function useClientSearch(): string {
   return useSyncExternalStore(
     subscribeClientSearch,
     getClientSearchSnapshot,
+    getServerSearchSnapshot,
+  );
+}
+
+/** Filter-reader adapter; navigation links must use the actual query snapshot above. */
+export function useClientRouteSearch(): string {
+  return useSyncExternalStore(
+    subscribeClientSearch,
+    getClientRouteSearchSnapshot,
     getServerSearchSnapshot,
   );
 }

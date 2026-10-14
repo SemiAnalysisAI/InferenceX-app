@@ -30,6 +30,8 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.get('[data-testid="profit-target-input"]').clear().type('28').blur();
         cy.location('pathname').should('eq', `${base}/target/28/cache-hit-mode/theoretical`);
         cy.location('search').should('eq', '');
+        const translated = `${prefix ? '' : '/zh'}/${tab}/deepseek-v4/target/28/cache-hit-mode/theoretical`;
+        cy.get(`a[href="${translated}"]`).should('exist');
         cy.document().its('documentElement.dataset.routeSentinel').should('eq', 'same-document');
         cy.get('[data-testid="share-button"]').click();
         cy.get('[data-testid="share-url-input"]')

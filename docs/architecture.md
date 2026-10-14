@@ -62,9 +62,11 @@ including on `/zh`: `/profit-estimator/deepseek-v4/target/24`.
 Their existing query-key state store is adapted at the routing boundary by
 `profit-estimator-routes.ts`. Shallow history replacements keep the address bar
 current; these client-owned writes bypass Next navigation rehydration so it
-cannot overwrite a pending control edit. Legacy query links remain readable. Profit dashboards use P90 only
-and strip legacy percentile parameters. Other dashboards keep their
-existing query-state behavior.
+cannot overwrite a pending control edit. Legacy query links remain readable.
+Profit dashboards use P90 only and strip legacy percentile parameters.
+Language links retain route state without copying it into the query string;
+the unofficial-run filter reader uses a separate route-aware adapter.
+Other dashboards keep their existing query-state behavior.
 
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) would spam `history.pushState`. Debouncing batches them into a single URL update.
 

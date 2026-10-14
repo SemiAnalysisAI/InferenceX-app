@@ -19,7 +19,7 @@ import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
-import { useClientSearch } from '@/hooks/useClientSearch';
+import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import chartDefinitions from '@/components/inference/metric-registry';
@@ -377,7 +377,7 @@ export function UnofficialRunProvider({
   showBanner?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const search = useClientSearch();
+  const search = useClientRouteSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
   const runIdsKey = runIds.join(',');
   const query = useQuery({
