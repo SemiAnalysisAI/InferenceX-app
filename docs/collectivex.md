@@ -1,101 +1,112 @@
 # CollectiveX
 
 Design rationale for the CollectiveX tab's data pipeline. Unlike every other tab
-(Neon DB → ETL ingest → `/api/v1/*`), CollectiveX uses **lazy ingest-on-read**: its
-database is a durable cache of GitHub Actions, populated by the API routes themselves.
+(Neon DB → ETL ingest → `/api/v1/*`), CollectiveX has **no database**: each build
+assembles a static snapshot from the result files committed to the benchmark repo,
+and the API routes serve that snapshot.
 
-## Why lazy ingest instead of the main pipeline
+## Why a build-time snapshot
 
-- **Sweep artifacts expire after 14 days.** The sweep workflow
-  (`collectivex-sweep.yml` in the harness repo) uploads a matrix artifact
-  (`cxsweep-matrix-{run_id}`) and per-cell result artifacts
-  (`cxshard-{cell}-{run_id}-{attempt}`) with 14-day retention. Persisting on first
-  view makes a run outlive its artifacts once anyone has looked at it.
-- **The sweep JSON contract is expected to change.** The DB stores the RAW documents
-  verbatim; the shared reader (`packages/db/src/collectivex/reader.ts`) is the single
-  transform point and runs at API-read time, so a reader fix retroactively applies to
-  already-stored runs — no re-ingest. A contract change = reader change + a bump of the
-  numeric `version` in the harness's `experimental/CollectiveX/configs/sweep.json`.
-- **No CI plumbing.** There is no ingest workflow, no cross-repo dispatch, and no GH
-  secrets. Runs launched via `gh api` on any harness branch appear on the dashboard
-  within the CDN TTL of someone viewing the page — only the workflow identity is
-  checked, never the branch.
+- **Results are committed, not uploaded.** CollectiveX runs by hand on each pool's
+  login node (`collectivex/run.sh <sku>` in SemiAnalysisAI/InferenceX). Each run writes
+  `collectivex/results/<sku>/<case_id>.json`; committing those files to `main` is the
+  publish step. The benchmark repo's `collectivex/tests/test_results.py` checks every
+  committed result: a current runnable case, clean source, no host identifiers.
+- **Git is the durable store.** Results never expire and every published number has
+  a commit. The previous design ingested GitHub Actions artifacts lazily into a
+  separate Neon database because artifacts expired after 14 days; that cache,
+  its tombstoned deletes, and its admin delete route are gone.
+- **The reader stays the single transform.** `packages/db/src/collectivex/reader.ts`
+  assembles the dataset from raw result documents, now once per build. A reader fix
+  applies on the next deployment. A contract change = reader change + a bump of the
+  numeric `version` that `cases.json` and every EP result document carry.
 
 ## How it works
 
-`packages/app/src/lib/collectivex/collectivex-lazy-ingest.ts` exposes three `ensure*` functions the
-routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
+`packages/app/scripts/sync-collectivex.ts` runs before `next build` (`bun run build`)
+and, with `--if-missing`, before `next dev`:
 
-- `ensureLatestCollectiveXRun` — walk GitHub's completed sweep runs newest-first; stop at
-  the first live requested-version run; persist it if absent.
-- `ensureCollectiveXRunsList` — progressively backfill every requested-version run whose
-  14-day artifacts may still be downloaded. Each request changes at most eight rows; an
-  incomplete response is uncached and the client refetches until the workflow history is
-  exhausted. Known rows do not consume the batch, so discovery advances past the newest runs.
-  GitHub discovery is limited to runs created within the last 44 days: the 30-day workflow
-  rerun window plus 14-day artifact retention, covering the oldest rerun whose artifacts can
-  still exist without rescanning permanent workflow history on every cold-origin request.
-- `ensureCollectiveXRun` — fetch one run by id, or compare a stored run's `run_attempt`
-  against GitHub and refresh it when a rerun is newer. Only completed runs are persisted.
+1. Pin InferenceX `main` (or `COLLECTIVEX_RESULTS_REF`) to a commit. With `GITHUB_TOKEN`
+   it asks the commits API; without one it reads the commit id that `git archive` embeds
+   in the tarball.
+2. Download `https://codeload.github.com/SemiAnalysisAI/InferenceX/tar.gz/<sha>` and
+   keep only `collectivex/results/**`.
+3. Validate, assemble with the shared reader, and write
+   `packages/app/.collectivex/snapshot.json` (`{ summary, dataset }`, gitignored).
 
-Key invariants:
+`next.config.ts` bundles the file with the CollectiveX routes through
+`outputFileTracingIncludes`; `src/lib/collectivex/snapshot.ts` (`server-only`) reads it
+once per server instance. Nothing polls InferenceX: a result committed to `main`
+appears with the next app deployment.
 
-- **Writes are atomic and race-safe**: one CTE statement with
-  `ON CONFLICT (run_id) DO NOTHING`; concurrent first-viewers can't double-ingest or
-  expose a partial run. A GitHub re-run (newer `run_attempt`) is replaced through a
-  `FOR UPDATE`-guarded refresh statement.
-- **Reads after lazy persistence use the primary**: discovery state checks, writes, and
-  each route's post-discovery query use `DATABASE_COLLECTIVEX_WRITE_URL`. This guarantees
-  that a newly inserted or refreshed run is visible in the same request even when
-  `DATABASE_COLLECTIVEX_READONLY_URL` points at a lagging replica. Ordinary read-only
-  consumers can still use the read URL.
-- **Deletion tombstones** (`cx_runs.deleted_at`, documents freed): discovery must never
-  resurrect a deleted run. Re-ingesting via the CLI
-  (`bun run admin:db:ingest:collectivex <run-url-or-id>`) clears the tombstone — that CLI is
-  the operator tool for pre-warming runs before artifact expiry, backfills, and un-deletes.
-- **"Latest" orders by `run_id`** (monotonic with run creation, matching the discovery
-  walk) — not by completion time, where a long-failing older run would shadow a newer
-  successful one.
-- **Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia`
-  result shards (case-insensitive). Other vendor values are omitted from chart series,
-  coverage, and SKU summaries; runs with no supported-vendor cases stay hidden.
-- **GitHub being down never takes the page down**: routes serve whatever the DB holds and
-  only surface an error when there is no stored fallback.
-- **Run-list completeness is progressive**: `/api/v1/collectivex/runs` returns
-  `discovery_complete: false` while another bounded ingest pass is required. Those responses
-  use `private, no-store`; the client polls once per second until the field becomes `true`.
-  Stored runs remain visible indefinitely, while never-ingested runs disappear with their
-  upstream artifacts and can no longer be reconstructed.
-- **Caching**: responses carry the `collectivex` CDN tag with a 60s
-  `s-maxage` (freshness bound for lazy discovery). Run deletion and
-  `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the main dashboard's
-  blob cache is untouched by CollectiveX operations.
-- **Env**: `DATABASE_COLLECTIVEX_READONLY_URL` is the ordinary read-only connection and
-  may point at a replica. `DATABASE_COLLECTIVEX_WRITE_URL` is the primary used by lazy
-  persistence, its consistent reads, deletion, and migrations via
-  `bun run admin:db:migrate:collectivex`. `COLLECTIVEX_ADMIN_SECRET` is the delete route
-  Bearer token (deliberately not `INVALIDATE_SECRET`, since it is remembered in browser
-  localStorage), and `GITHUB_TOKEN` authorizes artifact reads.
+Validation fails the build — the script exits non-zero — on any of:
+
+- a fetch failure, or a missing `collectivex/results/cases.json`;
+- a `.json` file that is not at `<sku>/<case_id>.json`, or whose folder and file name
+  do not match the document's SKU (`identity.case_factors.sku`, swap
+  `runtime.sku`) and `case_id`;
+- a result that is not a runnable case in `cases.json`, or was measured with
+  uncommitted `collectivex/` edits (`source_dirty` not `false`);
+- a missing `generated_at`, or anything the reader rejects (for example an EP
+  document whose `version` differs from `cases.json`). Each document is checked alone
+  first, so the error names its file.
+
+Other flags: `--ref <git ref>` reads another branch, tag, or commit;
+`--from <InferenceX checkout>` reads a local clone's committed objects (`HEAD`, or
+`--ref`) instead of GitHub. Without `--ref`, `COLLECTIVEX_RESULTS_REF` selects the ref,
+so a preview deployment can build from a results branch; production leaves it unset
+and reads `main`, failing the build while `main` has no `cases.json`.
+`bun run --cwd packages/app sync:collectivex -- --ref <branch>` refreshes a development
+snapshot. `E2E_FIXTURES=1` skips the sync: fixture mode serves
+`cypress/fixtures/api/collectivex-latest.json` as the snapshot.
+
+### The snapshot run
+
+A snapshot is one synthetic run, so the existing response shapes (and skills 1.1.0)
+keep working:
+
+- `run_id`: the newest result `generated_at` in epoch seconds (the commit time when
+  there are no results yet), so a later snapshot always has a larger id;
+- `run_attempt` 1, `conclusion` `success`, `generated_at` that time as
+  `YYYY-MM-DDTHH:MM:SSZ`, and `source_sha` the InferenceX commit the results came from.
+
+Coverage comes from `cases.json`: a requested case without a result file is pending,
+so an empty results folder is still a valid snapshot.
+
+## Routes
+
+- `latest?version=1` returns the snapshot dataset.
+- `runs?version=1` returns `{ version, runs: [summary], discovery_complete: true }`.
+- `runs/[runId]?version=1` returns the dataset when `runId` is the snapshot's run id,
+  else 404.
+- A version the snapshot does not carry is 404 (`latest`, `runs/[runId]`) or an empty
+  list (`runs`). A deployment without a snapshot answers 503; an unreadable snapshot 500.
+- Responses use the shared one-day CDN policy of `cachedJson`. The data only changes
+  with a deployment, so the routes need neither a separate cache tag nor an
+  invalidation scope. They stay dynamic because they validate `?version=` and the
+  view route applies filters.
+
+**Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia` EP
+result documents (case-insensitive). Other vendor values are omitted from chart series,
+coverage, and SKU summaries.
 
 ## Multi-run explorer
 
-The frontend loads every stored live run summary for the selected benchmark version and keeps
-refetching while recent GitHub history is still being ingested. The summary query has no arbitrary
-row cap and does not load artifact documents. Each table row has a visibility checkbox; checking a
-run fetches its cached dataset through `/api/v1/collectivex/runs/[runId]`. Checked datasets are
-combined client-side, and the EP, phase, kernel mode, precision, SKU, and backend controls filter
-their combined series. Shift-clicking a checkbox applies its new state to every row between it and the
-previously clicked row, in the table's current (suite-filtered) order.
+The frontend lists the run summaries for the selected benchmark version — one run per
+deployment — and fetches a checked run's dataset through `/api/v1/collectivex/runs/[runId]`.
+Checked datasets are combined client-side, and the EP, phase, kernel mode, precision,
+SKU, and backend controls filter their combined series. Shift-clicking a checkbox
+applies its new state to every row between it and the previously clicked row, in the
+table's current (suite-filtered) order. A loaded run links to its committed results
+(`tree/<source_sha>/collectivex/results`).
 
-Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
+Series ids are namespaced by run id so the same matrix case from two runs remains
 independently toggleable. Configuration color stays consistent across runs; run identity is encoded
 by the active selection order: the first checked run is solid and each additional checked run gets
 the next non-repeating dash pattern. Removing a run compacts those style slots, so a lone remaining
 run is always solid. Active patterns appear in both the run table and legend, keeping run ids out of
 visible legend labels while retaining them in the legend item's accessible title.
-The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
-cannot blank the initial explorer. Deletion is available per row or as one confirmed action for all
-currently shown runs; both paths keep the same tombstone semantics described above.
+The newest run with measured cases is checked by default.
 The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
 both appears under both filters, and changing the filter does not alter the checked-run selection.
 The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
@@ -110,26 +121,29 @@ change here.
 
 ## The raw-rows exception
 
-CollectiveX routes return the **assembled** dataset (reader over stored matrix + docs)
-instead of raw rows. The reader is shared between the app and the CLI through the db
-package (`@semianalysisai/inferencex-db/collectivex/*`), so ingest-time validation and
-read-time assembly can never drift; shipping raw docs to the client would only move the
-same shared transform across the wire.
+CollectiveX routes return the **assembled** dataset (reader over `cases.json` plus result
+documents) instead of raw rows. The reader lives in the db package
+(`@semianalysisai/inferencex-db/collectivex/*`) and is shared by the sync script, tests,
+and the fixtures, so validation and assembly can never drift; shipping raw documents to
+the client would only move the same shared transform across the wire.
 
 ## vLLM swap_blocks
 
 **English** | [中文](./collectivex-swap-blocks_zh.md)
 
-Standalone `backend=swap-blocks` sweep runs are discovered through the same matrix/shard
-artifact path. Their execution-only matrix (`include` with one or more swap-blocks cells) maps to
-app contract version 1. The shared reader validates `collectivex-swap-blocks-v1` documents,
-including correctness, payload arithmetic, finite positive ordered latency percentiles,
-sample counts and the run's source SHA. EP/KV documents keep their existing reader path.
-No database migration is needed: raw JSON documents remain the source of truth.
+`cases.json` requests swap_blocks cases with `suite: "swap-blocks"`, one per GPU pool and
+layout; they have no EP token ladder and never enter EP coverage. Their results are
+`collectivex-swap-blocks-v1` documents carrying `case_id`, `profile`, `generated_at`, and
+`runtime.sku`. The shared reader accepts a document only when it answers exactly one
+requested swap_blocks case of its own GPU pool, and validates correctness, payload
+arithmetic, finite positive ordered latency percentiles, sample counts, and runtime
+provenance (`runtime.source_sha` is the measuring commit and may predate the snapshot
+commit). EP/KV documents keep their existing reader path.
 
 The additive `swap_blocks` dataset field holds runtime provenance and measured points;
-`swap_cases` labels their run summaries separately from EP/KV. One verified artifact counts
-as one case; each measured (direction, layout, block bytes, block count, seed) is one point.
+`swap_cases` counts requested and measured swap_blocks cases separately from EP/KV. One
+verified document counts as one measured case; a requested case without one stays
+pending. Each measured (direction, layout, block bytes, block count, seed) is one point.
 Budget-excluded combinations are reported separately and are never plotted as measurements.
 The run-table suite filter includes swap_blocks; checked runs share the normal comparison
 selection and run dash styles. The chart selects direction, layout and latency percentile,
@@ -154,6 +168,5 @@ References: [H200 specifications](https://www.nvidia.com/en-us/data-center/h200/
 [GB200 bidirectional C2C](https://developer.nvidia.com/blog/nvidia-gb200-nvl72-delivers-trillion-parameter-llm-training-and-real-time-inference/),
 [HGX CPU uplink topology](https://docs.nvidia.com/enterprise-reference-architectures/whitepaper/hgx-servers-and-spectrum-x.pdf).
 
-Multi-pool artifacts must carry `runtime.sku` matching a requested matrix cell. Older
-single-pool artifacts may omit it. Measurement identity includes SKU so equivalent grid
-points from different GPU pools remain independent.
+Measurement identity includes SKU so equivalent grid points from different GPU pools
+remain independent.

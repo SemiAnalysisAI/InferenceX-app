@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getCollectiveXDb, getDb, resolveDatabaseConnection } from './connection';
+import { getDb, getOperatorXDb, resolveDatabaseConnection } from './connection';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -103,7 +103,7 @@ describe('resolveDatabaseConnection', () => {
   it('memoizes clients by effective connection identity rather than environment name', () => {
     const url = 'postgres://user:pass@ep-memo-test.us-east-1.aws.neon.tech/app';
     const first = getDb({ url, driver: 'neon' });
-    const sameConnectionFromAnotherClient = getCollectiveXDb({ url, driver: 'neon' });
+    const sameConnectionFromAnotherClient = getOperatorXDb({ url, driver: 'neon' });
     const otherUrl = getDb({
       url: 'postgres://user:pass@ep-memo-other.us-east-1.aws.neon.tech/app',
       driver: 'neon',

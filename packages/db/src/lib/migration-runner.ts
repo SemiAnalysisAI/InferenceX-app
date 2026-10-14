@@ -1,6 +1,6 @@
 /**
  * Shared SQL-file migration loop used by `migrate.ts` (main DB) and
- * `migrate-collectivex.ts` (CollectiveX DB). Applies pending `*.sql` files
+ * `migrate-operatorx.ts` (OperatorX DB). Applies pending `*.sql` files
  * from a directory in filename order, tracking them in a `schema_migrations`
  * table on the target database.
  */

@@ -38,7 +38,6 @@ import {
 } from '@semianalysisai/inferencex-db/collectivex/types';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 300;
 export function GET(request: NextRequest) {
   return runViewsRoute('collectivex', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['collectivex']);

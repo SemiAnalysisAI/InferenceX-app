@@ -12,8 +12,8 @@
     "**/polyfills*"
   ],
   "scripts": {
-    "dev": "bun --env-file=../../.env next dev --turbopack",
-    "build": "bun --env-file=../../.env next build --turbopack",
+    "dev": "bun --env-file=../../.env scripts/sync-collectivex.ts --if-missing && bun --env-file=../../.env next dev --turbopack",
+    "build": "bun --env-file=../../.env scripts/sync-collectivex.ts && bun --env-file=../../.env next build --turbopack",
     "start": "bun --env-file=../../.env next start",
     "preview": "bun run build && bun run start --port 3001",
     "test": "bun run test:unit && bun run test:e2e:full",
@@ -31,6 +31,7 @@
     "cache:invalidate": "bun --env-file=../../.env scripts/invalidate-cache.ts",
     "cache:warmup": "bun --env-file=../../.env scripts/warmup-cache.ts",
     "capture:fixtures": "bun scripts/capture-cypress-fixtures.ts",
+    "sync:collectivex": "bun --env-file=../../.env scripts/sync-collectivex.ts",
     "guard:zh-copy:chinese-only": "bun scripts/check-zh-chinese-only.ts --chinese-only"
   },
   "dependencies": {
@@ -78,6 +79,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "server-only": "^0.0.1",
     "shiki": "^4.4.3",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1",

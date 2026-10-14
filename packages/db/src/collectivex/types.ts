@@ -1,6 +1,6 @@
 /**
- * CollectiveX neutral contract — the version-tagged shape shared by the sweep
- * artifacts' reader, the ingest script, and the dashboard frontend.
+ * CollectiveX neutral contract — the version-tagged shape shared by the
+ * result reader, the app's build-time snapshot sync, and the dashboard frontend.
  *
  * This module is pure TypeScript (no Node/DB imports) so it is safe to import
  * from client components. UI-only types (chart points, axis modes, display

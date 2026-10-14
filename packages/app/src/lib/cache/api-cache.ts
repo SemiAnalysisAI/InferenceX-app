@@ -4,43 +4,19 @@ import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
 /**
- * CollectiveX data lives in its own database and gets its own cache scope:
- * every CollectiveX response carries this CDN/unstable_cache tag (via
- * `cachedJson(..., { tag })`), so run deletion can purge the CollectiveX
- * cache without dropping the main dashboard's. CollectiveX routes read their
- * DB directly — no blob layer, so the tag is the entire scope.
- */
-export const COLLECTIVEX_CACHE_SCOPE = 'collectivex';
-
-/**
- * CDN/unstable_cache tag for CollectiveX responses, namespaced the same way as
- * the main database tag. Environments that share a Vercel project share its
- * cache tags, so an unnamespaced `collectivex` would let a purge in one
- * environment drop another's cached responses. `COLLECTIVEX_CACHE_SCOPE` stays
- * unnamespaced on purpose — it is the public identifier callers pass to
- * `/api/v1/invalidate?scope=`.
- */
-export function collectiveXCacheTag(): string {
-  const namespace = cacheNamespace();
-  return namespace ? `${COLLECTIVEX_CACHE_SCOPE}:${namespace}` : COLLECTIVEX_CACHE_SCOPE;
-}
-
-/**
- * Short CDN window shared by the CollectiveX latest/runs routes: new sweep
- * runs are discovered lazily at the origin, so freshness is bounded by this
- * TTL rather than by an ingest-time purge.
- */
-export const COLLECTIVEX_CACHE_CONTROL =
-  'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
-
-/**
- * OperatorX reads its own database and has its own scope, like CollectiveX: its
- * responses carry this tag and stay cached until an OperatorX ingest purges it
+ * OperatorX reads its own database and has its own cache scope: its responses
+ * carry this tag and stay cached until an OperatorX ingest purges it
  * (`/api/v1/invalidate?scope=operatorx`).
  */
 export const OPERATORX_CACHE_SCOPE = 'operatorx';
 
-/** CDN tag for OperatorX responses, namespaced like the other scopes. */
+/**
+ * CDN tag for OperatorX responses, namespaced the same way as the main database
+ * tag. Environments that share a Vercel project share its cache tags, so an
+ * unnamespaced tag would let a purge in one environment drop another's cached
+ * responses. `OPERATORX_CACHE_SCOPE` stays unnamespaced on purpose — it is the
+ * public identifier callers pass to `/api/v1/invalidate?scope=`.
+ */
 export function operatorXCacheTag(): string {
   const namespace = cacheNamespace();
   return namespace ? `${OPERATORX_CACHE_SCOPE}:${namespace}` : OPERATORX_CACHE_SCOPE;
@@ -196,27 +172,14 @@ export function cachedDerivedData<T, Args extends unknown[]>(
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();
   revalidateTag(cacheTag(), { expire: 0 });
-  // CollectiveX responses are cached only under their own tag (no blobs), so
-  // a full purge must drop that tag explicitly — this line is the sole
-  // mechanism that clears CollectiveX from the CDN.
-  purgeCollectiveX();
   purgeOperatorX();
   return deleted;
 }
 
 /**
- * Purge only the CollectiveX cache scope. CollectiveX routes read straight
- * from their own DB (no blob layer), so this is just the CDN/unstable_cache
- * tag.
- */
-export function purgeCollectiveX(): void {
-  revalidateTag(collectiveXCacheTag(), { expire: 0 });
-}
-
-/**
  * 1 day unless overridden. Purged on demand via revalidateTag with the matching
- * tag. `tag` defaults to the environment-scoped database tag; CollectiveX routes
- * pass their own scope (and a shorter cacheControl).
+ * tag. `tag` defaults to the environment-scoped database tag; OperatorX routes
+ * pass their own scope.
  */
 function cdnHeaders(tag: string = cacheTag(), cacheControl?: string): Record<string, string> {
   return {

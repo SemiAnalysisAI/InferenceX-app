@@ -47,6 +47,8 @@
 
 # local data
 .worktrees/
+# CollectiveX snapshot written by packages/app/scripts/sync-collectivex.ts at build time
+packages/app/.collectivex/
 **/gcs
 **/logs
 **/public/data/*

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-20T08:25:30.857Z",
+  "generatedAt": "2026-10-14T07:27:42.244Z",
   "fixtures": {
     "agentic-catalog": {
       "bytes": 10027,
@@ -31,23 +31,9 @@
       "topLevel": "array"
     },
     "collectivex-latest": {
-      "bytes": 63278,
-      "capturedAt": "2026-08-20T08:25:30.857Z",
-      "sha256": "66dd9287f7b5c1d33fa2dc76f69622b25dc42d89fcd62644b01c8edd7d6290b3",
-      "source": "synthetic://collectivex",
-      "topLevel": "object"
-    },
-    "collectivex-run-159": {
-      "bytes": 20374,
-      "capturedAt": "2026-08-20T08:25:30.857Z",
-      "sha256": "54e33df39b51158ed3fb0956dd70e10e2c3540845dd62ab7c64fabad175d2259",
-      "source": "synthetic://collectivex",
-      "topLevel": "object"
-    },
-    "collectivex-runs": {
-      "bytes": 687,
-      "capturedAt": "2026-08-20T08:25:30.857Z",
-      "sha256": "9f3d47af2543fc56b0afec7b0c577ba08fcfc2d6c91b07d98163e721e50146c8",
+      "bytes": 63344,
+      "capturedAt": "2026-10-14T07:27:42.244Z",
+      "sha256": "e43f523ae71fddcfd7af67efecce68bd0145603d7ae2b945932893649611fb4f",
       "source": "synthetic://collectivex",
       "topLevel": "object"
     },

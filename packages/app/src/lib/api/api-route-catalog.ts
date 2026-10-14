@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: 'c6bd88eb04d11d19daad2d05e84791dcb31c2a792e5ed137fd76d7a8f12a297c',
+    sourceSha256: 'edf5a53f800b79adc384ec233a1882e357300dce8dbbb029c92d957bcb203fad',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -666,7 +666,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-latest',
-    sourceSha256: 'c60fff45af91fa38a071fee69b253983fe403738f7e35c56711708b5b3cb2d70',
+    sourceSha256: '12901a165ec89436263a877ff91ea6ab78308ff4dd7166d32d2d3e450586798d',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/route.ts',
@@ -674,7 +674,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-collectivex-runs',
-    sourceSha256: '32eaf00f56cb30db70b128f9aa8ec1132c56d9b02c2c6728072fd5bb4c465258',
+    sourceSha256: '3b5add44660522e3357fe4d450ee1dbf739c5a545e72b2faf56dd9588f23990d',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
@@ -682,18 +682,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-run',
-    sourceSha256: '960e59d2af33ddcc3995be78feac5a510cc5b194a3bcd0ec9f1a884501a1b711',
-  },
-  {
-    source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
-    path: '/api/v1/collectivex/runs/{runId}',
-    method: 'DELETE',
-    classification: 'admin',
-    exclusionReason: {
-      en: 'Authenticated CollectiveX administration mutation; deletion is not part of the public read API.',
-      zh: '需要身份验证的 CollectiveX 管理写操作；删除不属于公开只读 API。',
-    },
-    sourceSha256: '960e59d2af33ddcc3995be78feac5a510cc5b194a3bcd0ec9f1a884501a1b711',
+    sourceSha256: 'f174892488f9addddc014163f4a6161b8c0a387340e085e5b808d6c695b15dff',
   },
   {
     source: 'src/app/api/v1/datasets/route.ts',
@@ -804,7 +793,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'a4dc0b8c809837dfc33d78c8bd70ad8db78558ecee4ca2e857fa9b61f86d9b9a',
+    sourceSha256: '1a1392e93a5fde7b3b178118190bc235ebd782127cd88b518dc63a2eb5f848c4',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1340,7 +1329,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
+    sourceSha256: '0da4d2305cd78d20c6059403efde450bfbb3b584dbfeb35f6535352ce9886e37',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1412,7 +1401,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '39beddbcbea7decf60f0e2e8217083e0c88516fab3181e3f2b94cdd1dca2b8f1',
+    sourceSha256: '43e1cc640ca72d0ea50bd4476f1e9d5fafe7169d51ceceeec4e59b97a7c3b287',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1455,8 +1444,16 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: '../db/src/collectivex/reader.ts',
+    sourceSha256: 'a82dd73ce500be55a522981feeedf3afb2a939a89c44c2c99d6c884e80f8691e',
+    reviewArea: {
+      en: 'CollectiveX dataset assembly from cases.json and result documents: run summaries, coverage, series, KV cases, and swap_blocks results.',
+      zh: '根据 cases.json 和结果文档组装 CollectiveX 数据集：运行汇总、覆盖范围、序列、KV 用例和 swap_blocks 结果。',
+    },
+  },
+  {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: 'a4478f8c939f20a31c2e862348e03ad24990a43f90550fc567df8f19aea69799',
+    sourceSha256: '77844103e9d07c9a8ea1b57015c6448e1fe39b296b7600072821e4ecc3ef90c1',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -1492,14 +1489,6 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
-    },
-  },
-  {
-    source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '3eaf48a67933cfbda9068bc6367b16120fe46c28428dc1740763d6957a8365a0',
-    reviewArea: {
-      en: 'CollectiveX dataset projection, run summaries, coverage, series, and discovery state.',
-      zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和发现状态。',
     },
   },
   {

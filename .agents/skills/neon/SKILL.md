@@ -20,7 +20,7 @@ Read the relevant local documentation before changing code:
 - `docs/index.md`
 - `docs/architecture.md` for the API and cache boundaries
 - `docs/data-pipeline.md` for ingestion and schema flow
-- `docs/collectivex.md` for the separate CollectiveX database
+- `docs/operatorx.md` for the separate OperatorX database
 
 Existing database code lives in `packages/db/`. Reuse its connection helpers,
 tagged SQL patterns, migrations, and scripts instead of creating a parallel
@@ -30,8 +30,11 @@ client or configuration layer.
 
 - Main read path: `DATABASE_READONLY_URL`
 - Main administrative writes: `DATABASE_WRITE_URL`
-- CollectiveX read path: `DATABASE_COLLECTIVEX_READONLY_URL`
-- CollectiveX writes and migrations: `DATABASE_COLLECTIVEX_WRITE_URL`
+- OperatorX read path: `DATABASE_OPERATORX_READONLY_URL`
+- OperatorX writes and migrations: `DATABASE_OPERATORX_WRITE_URL`
+
+CollectiveX has no database: it serves a build-time snapshot of committed result
+files (`docs/collectivex.md`).
 
 Keep credentials in environment variables. Never print, commit, copy into
 source, or expose connection strings in logs or responses. Use the read-only
@@ -58,7 +61,7 @@ Useful commands:
 
 ```bash
 bun run admin:db:migrate
-bun run admin:db:migrate:collectivex
+bun run admin:db:migrate:operatorx
 bun run admin:db:verify
 bun run typecheck
 bun run test:unit

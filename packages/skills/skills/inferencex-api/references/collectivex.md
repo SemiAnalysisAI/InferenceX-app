@@ -1,10 +1,10 @@
 # Compare existing CollectiveX runs
 
-Use this cookbook to discover public communication sweeps, compare two returned
+Use this cookbook to discover public communication runs, compare two returned
 runs, and export the evidence. These are existing observations; no new benchmark
-is run. Public GETs can populate the service's documented lazy cache from existing
-GitHub artifacts. No database credentials, admin operations, or launch tools are
-needed.
+is run. Each deployment serves one snapshot run, assembled at build time from the
+CollectiveX results committed to the InferenceX repository's `main` branch. No
+database credentials, admin operations, or launch tools are needed.
 
 For a replayable contract 1 comparison:
 
@@ -44,12 +44,17 @@ node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
 Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
-bounded example selection, not a representative sample. A cancelled or failed
-workflow can still contain measured cases; its conclusion remains in the export.
+bounded example selection, not a representative sample. The service lists only its
+current snapshot run, so discovery normally exports `fewer_than_two_measured_runs`.
+A snapshot's conclusion is always `success`; that does not mean every requested case
+was measured.
 
 Run-list counts identify candidate pairs; exact EP and KV identities in the returned
 details establish whether they have matched groups. For a requested pair, supply
-both exact string IDs from discovery:
+both exact string IDs from discovery. Both must be served by the same deployment:
+earlier snapshots are not retained, and any other run ID is HTTP 404. Their source
+files remain in the InferenceX history under `collectivex/results/` at each run's
+`source_sha`.
 
 ```bash
 node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
@@ -65,33 +70,30 @@ never substitutes a different run.
 
 The public operations require `version=1`:
 
-| Operation                                                                                        | Meaning                                                                          |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest available run by run ID; it need not contain measurements.                |
-| [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Retained summaries and `discovery_complete`; the helper uses this for selection. |
-| `/collectivex/runs/{runId}`                                                                      | One run dataset, possibly refreshed to a newer attempt.                          |
+| Operation                                                                                        | Meaning                                                                        |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | The deployment's snapshot run; it need not contain measurements.               |
+| [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Snapshot summary and `discovery_complete`; the helper uses this for selection. |
+| `/collectivex/runs/{runId}`                                                                      | The snapshot run's dataset; any other run ID is HTTP 404.                      |
 
 All paths above are under `/api/v1`. Consult the [public API reference](https://inferencex.semianalysis.com/api)
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
-current contract. A missing/unsupported version is HTTP 400. HTTP 404, an upstream
-502/503, malformed data, a redirect, or an interrupted response is a failed read,
-not an empty comparison. The command exits nonzero without a completed manifest on
+current contract. A missing/unsupported version is HTTP 400. HTTP 404, a 503 (no
+snapshot in the deployment), malformed data, a redirect, or an interrupted response
+is a failed read, not an empty comparison. The command exits nonzero without a completed manifest on
 those failures; it never substitutes a different run.
 
-`discovery_complete=false` means further bounded discovery passes may reveal more
-runs. Report that flag even when two selections were available. The route has no
-documented `limit`, `offset`, or cursor: do not invent pagination parameters. If
-fewer than two measured summaries were returned, the helper exports
-`fewer_than_two_measured_runs` and makes no detail requests. Further discovery, if
-needed, should have an explicit small request budget and retain each response.
+`discovery_complete` is always `true`: the list holds the deployment's one snapshot.
+Report the flag anyway. The route has no documented `limit`, `offset`, or cursor: do
+not invent pagination parameters. If fewer than two measured summaries were
+returned, the helper exports `fewer_than_two_measured_runs` and makes no detail
+requests.
 
-Even `discovery_complete=true` does **not** mean complete workflow history. Recent
-discovery has a bounded upstream window, artifacts expire, and retained runs can
-outlive their artifacts. The export therefore always sets `history_complete=false`.
-Stored fallback data can also be served when upstream refresh fails. Compare each
-detail's returned `run_attempt` with its discovery summary; a later attempt is a
-different snapshot, even under the same run ID. Equal attempt numbers do not prove
-identical snapshots; data can refresh within an attempt.
+`discovery_complete=true` does **not** mean complete history: earlier snapshots are
+not served. The export therefore always sets `history_complete=false`. A snapshot's
+`run_attempt` is always 1. Its run ID is the newest result time in epoch seconds, so
+a deployment with new results serves a larger run ID; equal run IDs from different
+deployments are not proof of identical data, so compare `source_sha` too.
 
 ## 2. Check comparability before interpreting differences
 
@@ -137,27 +139,31 @@ requested cases. Cases with **no measured rows** have no comparison group. Inspe
 the complete datasets' `coverage` and optional `kv` arrays for their outcome,
 disposition, reason, detail, and per-point terminal status. Retain pending,
 unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
-coverage statement. A successful workflow does not imply complete measurement
+coverage statement. A `success` conclusion does not imply complete measurement
 coverage; absence of the optional `kv` field does not imply a failed KV suite.
-Pending data and a cancelled run do not establish whether a case started or why
-measurements are missing. Keep those returned states separate from explanations.
+Pending data does not establish whether a case started or why measurements are
+missing. Keep those returned states separate from explanations.
 
 For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
-by outcome. Reconcile their combined totals with the run's `requested_cases`,
+by outcome, and add the swap_blocks cases: `swap_requested_cases` requested, of
+which `swap_measured_cases` are measured (one `swap_blocks[]` result each) and the
+rest pending. Reconcile these combined totals with the run's `requested_cases`,
 `terminal_cases`, `measured_cases`, `unsupported_cases`, and `failed_cases` before
 reporting them. An EP case is terminal only when all its points have a non-pending
-`terminal_status`; a KV case is terminal when its outcome is not `pending`.
-`failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
-These case counters combine EP and KV; `kv_requested_cases` and
-`kv_measured_cases` identify the KV subset, while the run's point counters are
-EP-only. Run-list summaries expose this subset at `kv_cases.requested` and
-`kv_cases.measured`; the flat names above belong to run details. Inspect the
-returned object at the appropriate path when reporting availability.
+`terminal_status`; a KV case is terminal when its outcome is not `pending`; a
+swap_blocks case is terminal once measured. `failed_cases` includes `failed`,
+`invalid`, and `diagnostic` outcomes. These case counters combine EP, KV, and
+swap_blocks; `kv_*` and `swap_*` identify those subsets. The run's point counters
+cover EP ladder points plus measured swap_blocks points. Run-list summaries expose
+the subsets at `kv_cases` and `swap_cases` (`requested`, `measured`); the flat
+names above belong to run details. Inspect the returned object at the appropriate
+path when reporting availability.
 A listed subset of SKUs or reasons is not the total. If the returned
 arrays and counters do not reconcile, report that inconsistency.
 
 For EP point accounting, compute a histogram of `coverage[].points[].terminal_status`
-and reconcile it with the point counters. Compute pending points as
+and reconcile it with the point counters after subtracting the measured swap_blocks
+points (`swap_blocks[].points`). Compute pending points as
 `requested_points - terminal_points` and terminal-but-unmeasured points as
 `terminal_points - measured_points`. Carry those computed values and labels into
 the report; pending and terminal-but-unmeasured are separate populations.
@@ -165,8 +171,8 @@ the report; pending and terminal-but-unmeasured are separate populations.
 Matching is deliberately conservative: a changed case ID remains unmatched even
 if visible labels look alike. `comparison_scope.basis=exact_public_identity`
 describes the fields exposed by this API, not proof of a controlled experiment.
-The API returns an **assembled dataset**, not the original matrix/shard artifacts,
-software build manifests, or every runtime setting. Preserve each `source_sha`;
+The API returns an **assembled dataset**, not the original result files, software
+build manifests, or every runtime setting. Preserve each `source_sha`;
 `source_sha_equal=false` is a revision difference, not evidence of its causal
 effect. Equal SHAs also do not establish identical runtime conditions.
 

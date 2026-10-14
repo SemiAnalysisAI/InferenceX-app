@@ -237,13 +237,15 @@ describe('CollectiveX artifact assembly', () => {
     ).toBeNull();
   });
 
-  it('rejects malformed and cross-version artifacts', () => {
+  it('rejects malformed and cross-version artifacts, naming the mismatched case', () => {
     expect(() => buildDatasetFromNeutral({}, [], makeRunMeta())).toThrow(/matrix/);
     const shard = makeRawShard();
     shard.version = 2;
     expect(() =>
       buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()),
-    ).toThrow(/version/);
+    ).toThrow(
+      'CollectiveX version mismatch: h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16 has version 2, cases.json has 1',
+    );
   });
 });
 

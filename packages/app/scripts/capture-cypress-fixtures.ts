@@ -8,18 +8,13 @@
  * Usage:
  *   bun run --cwd packages/app capture:fixtures                              (prod)
  *   bun run --cwd packages/app capture:fixtures http://localhost:3000        (local dev)
- *   bun run --cwd packages/app capture:fixtures -- --collectivex-only         (synthetic multi-run data)
+ *   bun run --cwd packages/app capture:fixtures -- --collectivex-only         (synthetic CollectiveX snapshot)
  */
 
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
-import {
-  buildDataset,
-  makeCollectiveXDataset,
-  makeRawShard,
-} from '@semianalysisai/inferencex-db/collectivex/test-fixture';
+import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import {
   FIXTURE_MANIFEST_FILENAME,
@@ -188,35 +183,11 @@ async function writeFixtureManifest(updatedNames: Set<string>, source: string): 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
+// Fixture mode serves this dataset as the deployment's one CollectiveX snapshot run.
 async function writeCollectiveXFixtures(): Promise<[string, number][]> {
-  const latest = makeCollectiveXDataset();
-  const comparison = buildDataset({
-    shards: [makeRawShard({ precision: 'fp8' })],
-    meta: {
-      run_id: '159',
-      generated_at: '2026-07-07T12:20:00Z',
-      source_sha: 'd'.repeat(40),
-    },
-  });
-  const datasets = [latest, comparison];
-  const sizes: [string, number][] = [
-    ['collectivex-latest', await writeFixture('collectivex-latest', latest)],
+  return [
+    ['collectivex-latest', await writeFixture('collectivex-latest', makeCollectiveXDataset())],
   ];
-  // The newest dataset already has the stable `collectivex-latest` fixture;
-  // older runs get id-keyed files for multi-run selection.
-  for (const dataset of datasets.slice(1)) {
-    const name = `collectivex-run-${dataset.run.run_id}`;
-    sizes.push([name, await writeFixture(name, dataset)]);
-  }
-  sizes.push([
-    'collectivex-runs',
-    await writeFixture('collectivex-runs', {
-      version: 1,
-      runs: datasets.map(buildRunSummary),
-      discovery_complete: true,
-    }),
-  ]);
-  return sizes;
 }
 
 function printSizes(sizes: [string, number][]) {
