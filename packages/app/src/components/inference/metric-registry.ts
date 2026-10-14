@@ -388,8 +388,10 @@ export const METRIC_REGISTRY = {
     field: 'measuredPowerTimeline.y',
     label: 'Measured Average Power per Chip over Time (W)',
     labelZh: '每芯片实测平均功耗时间线（W）',
-    title: 'Measured Average Power per Chip over Time',
-    titleZh: '每芯片实测平均功耗时间线',
+    // Line mode decides what a line is (GPU mean, one GPU, or a pool's sum) and
+    // the y-axis names it, so the title stays true in every mode.
+    title: 'Measured GPU Power over Time',
+    titleZh: 'GPU 实测功耗时间线',
     polarity: 'lower',
   },
   // Power boundaries beyond GPU-measured telemetry (`lib/power/power-basis.ts`).
