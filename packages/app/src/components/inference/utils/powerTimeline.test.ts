@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { bucketPowerSeries, bucketTimeMs } from '@/components/gpu-power/power-series';
 import type { InferenceData } from '@/components/inference/types';
 
 import {
   prioritizeRuns,
   summarizeTraceWindow,
   tracePools,
+  windowPhase,
   type PowerTimelineTrace,
 } from './powerTimeline';
 
@@ -66,6 +68,42 @@ describe('summarizeTraceWindow', () => {
       { role: 'prefill', gpuCount: 2, peakWatts: 540 },
       { role: 'decode', gpuCount: 2, peakWatts: 840 },
     ]);
+  });
+});
+
+describe('windowPhase', () => {
+  it('classifies each bucket by its samples’ time, not the start of their second', () => {
+    // GB300 run 38460258140 at c4: DCGM sampled at .87 s past each second and
+    // the validated window opened at .354 s, so flooring dropped the first
+    // in-window scrape and kept the first one after the window closed.
+    const windowStartMs = Date.UTC(2026, 9, 13, 18, 25, 28, 354);
+    const rows = [-0.484, 0.516, 1.516, 2.516, 3.516].map((offset, i) => ({
+      timestamp: new Date(windowStartMs + offset * 1000).toISOString(),
+      index: 0,
+      power: 400 + i,
+      temperature: 40,
+      smClock: 1,
+      memClock: 1,
+      gpuUtil: 0,
+      memUtil: 0,
+    }));
+    const series = bucketPowerSeries('power_audit_edge', rows)!;
+    const trace: PowerTimelineTrace = {
+      key: 'edge',
+      point: point({}),
+      runId: '38460258140',
+      series,
+      windowStartMs,
+      windowEndMs: windowStartMs + 2711,
+    };
+    expect(series.t.map((_, column) => windowPhase(trace, bucketTimeMs(series, column)))).toEqual([
+      'before',
+      'window',
+      'window',
+      'window',
+      'after',
+    ]);
+    expect(bucketTimeMs(series, 1)).toBe(windowStartMs + 516);
   });
 });
 
