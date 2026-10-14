@@ -102,16 +102,19 @@ const MULTINODE_MANIFEST = {
   sample_interval_seconds: 1,
 };
 
-function writePowerAuditArtifact() {
+function writePowerAuditArtifact(
+  csv = MULTINODE_POWER_CSV,
+  manifest: Record<string, unknown> = MULTINODE_MANIFEST,
+) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
   roots.push(root);
   const artifactName = 'power_audit_kimik3_conc8_fp4_dynamo-vllm_b200-slurm_0';
   const artifactDir = path.join(root, artifactName);
   fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
-  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'samples.csv'), MULTINODE_POWER_CSV);
+  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'samples.csv'), csv);
   fs.writeFileSync(
     path.join(artifactDir, 'LOGS', 'power', 'manifest.json'),
-    JSON.stringify(MULTINODE_MANIFEST),
+    JSON.stringify(manifest),
   );
   fs.writeFileSync(path.join(artifactDir, 'agg_kimik3_conc8.json'), '{}');
   return { artifactName, artifactDir };
@@ -152,9 +155,142 @@ describe('prepareGpuMetricsArtifact', () => {
       'gpu_metrics.csv',
     ]);
   });
+
+  it('recognizes legacy AMD profiles and requires the DME scope for generic power metrics', () => {
+    const legacyAmd = writePowerAuditArtifact(MULTINODE_POWER_CSV, {
+      ...MULTINODE_MANIFEST,
+      power_profile: 'amd-device-metrics',
+    });
+    expect(prepareGpuMetricsArtifact(legacyAmd).map(({ vendor }) => vendor)).toEqual([
+      'amd',
+      'amd',
+    ]);
+    const otherMetric = writePowerAuditArtifact(MULTINODE_POWER_CSV, {
+      ...MULTINODE_MANIFEST,
+      source_metric: 'gpu_power_usage',
+      power_scope: 'gpu_board_power',
+    });
+    expect(prepareGpuMetricsArtifact(otherMetric).map(({ vendor }) => vendor)).toEqual([
+      'nvidia',
+      'nvidia',
+    ]);
+  });
 });
 
 describe('ingestGpuMetricsArtifact', () => {
+  it('persists native AMD temperature and utilization by column name through the point reader', async () => {
+    const csv = [
+      'temperature_c,sm_active,hostname,power_w,GPU_UTIL_PCT,gpu_index,timestamp_unix,gpu_uuid,schema_version,scrape_seq',
+      '68,0.72,host-a,450,85,0,1789194365.292,GPU-a0,3,4',
+      '70,0.81,host-a,470,95,0,1789194366.292,GPU-a0,3,5',
+    ].join('\n');
+    await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writePowerAuditArtifact(csv, {
+        ...MULTINODE_MANIFEST,
+        source_metric: 'gpu_power_usage',
+        power_scope: 'gpu_device_power_as_reported_by_amd_device_metrics_exporter',
+      }),
+      benchmarkResultIds: [10],
+    });
+
+    const payload = await getGpuMetricsForPoint(sql, 10);
+    expect(payload?.series).toHaveLength(1);
+    const series = payload!.series[0]!;
+    expect(series.vendor).toBe('amd');
+    expect(
+      series.data.map(({ power, temperature, gpuUtil }) => ({ power, temperature, gpuUtil })),
+    ).toEqual([
+      { power: 450, temperature: 68, gpuUtil: 85 },
+      { power: 470, temperature: 70, gpuUtil: 95 },
+    ]);
+    expect(
+      series.stats.map(({ metric, count, min, max, mean }) => ({ metric, count, min, max, mean })),
+    ).toEqual([
+      { metric: 'gpu_util_pct', count: 2, min: 85, max: 95, mean: 90 },
+      { metric: 'power_w', count: 2, min: 450, max: 470, mean: 460 },
+      { metric: 'temperature_c', count: 2, min: 68, max: 70, mean: 69 },
+    ]);
+  });
+
+  it.each([
+    { version: 1, columns: '', readings: '', gpuUtil: undefined },
+    { version: 2, columns: ',gpu_util_pct,sm_active', readings: ',85,0.72', gpuUtil: 85 },
+  ])(
+    'preserves native v$version power and only collected metrics',
+    async ({ version, columns, readings, gpuUtil: expectedGpuUtil }) => {
+      await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact: writePowerAuditArtifact(
+          [
+            `schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w${columns}`,
+            `${version},1789194365.292,4,host-a,0,GPU-a0,450${readings}`,
+          ].join('\n'),
+        ),
+        benchmarkResultIds: [10],
+      });
+
+      const payload = await getGpuMetricsForPoint(sql, 10);
+      expect(payload?.series).toHaveLength(1);
+      const series = payload!.series[0]!;
+      expect(
+        series.data.map(({ power, temperature, gpuUtil }) => ({ power, temperature, gpuUtil })),
+      ).toEqual([{ power: 450, temperature: undefined, gpuUtil: expectedGpuUtil }]);
+      expect(series.stats.find(({ metric }) => metric === 'power_w')).toMatchObject({
+        count: 1,
+        min: 450,
+        max: 450,
+        mean: 450,
+      });
+    },
+  );
+
+  it('preserves optional zero readings and omits absent, invalid and unavailable native readings', async () => {
+    const csv = [
+      'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w,gpu_util_pct,sm_active,temperature_c',
+      '3,1789194365,0,host-a,0,GPU-a0,450,0,0.72,0',
+      '3,1789194366,1,host-a,0,GPU-a0,451,100,0.72,-273.15',
+      '3,1789194367,2,host-a,0,GPU-a0,452, ,0.72, ',
+      '3,1789194368,3,host-a,0,GPU-a0,453,N/A,0.72,NaN',
+      '3,1789194369,4,host-a,0,GPU-a0,454,Infinity,0.72,-Infinity',
+      '3,1789194370,5,host-a,0,GPU-a0,455,85junk,0.72,68C',
+      '3,1789194371,6,host-a,0,GPU-a0,456,-1,0.72,-274',
+      '3,1789194372,7,host-a,0,GPU-a0,457,101,0.72,2147483632',
+      '3,1789194373,8,host-a,0,GPU-a0,458',
+      '3,1789194374,9,host-a,0,GPU-a0,459,,0.72,64',
+    ].join('\n');
+    await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writePowerAuditArtifact(csv),
+      benchmarkResultIds: [10],
+    });
+
+    const payload = await getGpuMetricsForPoint(sql, 10);
+    expect(payload?.series).toHaveLength(1);
+    const series = payload!.series[0]!;
+    expect(
+      series.data.map(({ power, temperature, gpuUtil }) => [power, temperature, gpuUtil]),
+    ).toEqual([
+      [450, 0, 0],
+      [451, -273.15, 100],
+      [452, undefined, undefined],
+      [453, undefined, undefined],
+      [454, undefined, undefined],
+      [455, undefined, undefined],
+      [456, undefined, undefined],
+      [457, undefined, undefined],
+      [458, undefined, undefined],
+      [459, 64, undefined],
+    ]);
+    expect(
+      series.stats.map(({ metric, count, min, max }) => ({ metric, count, min, max })),
+    ).toEqual([
+      { metric: 'gpu_util_pct', count: 2, min: 0, max: 100 },
+      { metric: 'power_w', count: 10, min: 450, max: 459 },
+      { metric: 'temperature_c', count: 3, min: -273.15, max: 64 },
+    ]);
+  });
+
   it('refuses a partial artifact when a discovered host CSV has only a header', async () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const missingHostFile = path.join(artifact.artifactDir, 'host-b', 'gpu_metrics.csv');
