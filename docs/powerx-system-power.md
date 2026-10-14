@@ -42,8 +42,9 @@ implementation equivalence, not empirical chassis calibration.
 The port accepts both per-socket inputs for HGX and rack-scale systems. A CPU-and-DRAM
 input replaces modeled CPU and memory power; a CPU-only input replaces modeled CPU
 power and leaves memory modeled. When both are supplied, HGX uses CPU-only and
-rack-scale systems use CPU-and-DRAM. Today, qualified CPU-and-DRAM telemetry is
-available only for rack-scale Grace sockets, and CPU-only telemetry only for HGX.
+rack-scale systems use CPU-and-DRAM. Today, CPU-and-DRAM telemetry is available
+only for rack-scale Grace sockets. The CPU-only RAPL source is on HGX and has not
+had a hardware run yet.
 The dashboard still passes only the validated Grace socket input.
 
 ## Operating state
@@ -377,8 +378,9 @@ dropping that replicate.
 所有报错情况下与上游结果一致（相对误差 1e-12）。同一 commit 重复运行，输出逐字节相同。
 移植层的 HGX 和 rack-scale 系统都支持两种每 socket 输入：CPU+DRAM 输入替换建模的
 CPU 和内存功耗，CPU-only 输入仅替换 CPU 功耗。两种输入同时提供时，HGX 优先使用
-CPU-only，rack-scale 优先使用 CPU+DRAM。目前通过验证的 CPU+DRAM 遥测只来自
-rack-scale Grace socket，CPU-only 遥测只来自 HGX；仪表板仍仅传入已验证的 Grace socket 指标。
+CPU-only，rack-scale 优先使用 CPU+DRAM。目前 CPU+DRAM 遥测只来自 rack-scale
+Grace socket；CPU-only 的 RAPL 来源在 HGX，但尚未进行真机运行。仪表板仍仅传入已验证的
+Grace socket 指标。
 通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
 冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
 没有的输入，应保留不可用状态，也不能把新一轮测得的功耗配到旧吞吐结果上。
