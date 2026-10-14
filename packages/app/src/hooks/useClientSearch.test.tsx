@@ -36,9 +36,7 @@ describe('useClientSearch', () => {
     act(() => replaceClientPathname(path));
     expect(window.location.pathname).toBe(path);
     expect(container.textContent).toBe(`${path}?utm_campaign=test`);
-    const filters = new URLSearchParams(
-      container.firstElementChild?.getAttribute('data-filters') ?? '',
-    );
+    const filters = new URLSearchParams(container.querySelector('output')?.dataset.filters ?? '');
     expect(filters.get('i_prec')).toBe('fp4,fp8');
     expect(filters.get('unofficialruns')).toBe('123,456');
     expect(window.location.search).toBe('?utm_campaign=test');
