@@ -1169,7 +1169,8 @@ price`, next to OpenRouter and Custom; the caption names the source in force and
   Values are URI-encoded once. All previously shareable profit parameters use
   the route; no chart state is emitted as a query. The pinned AgentX sequence
   and other tabs' parameters are omitted. Controls update history in place,
-  using the same shallow replacement as the inference model selector.
+  using native history replacement without rehydrating the URL into controls.
+  Actual navigations still rehydrate their own state.
   Both profit dashboards are P90-only, including behind the feature gate.
   Percentile is never emitted in a query or path. Old `/percentile/p75` and
   percentile query links resolve to the corresponding P90 view without that

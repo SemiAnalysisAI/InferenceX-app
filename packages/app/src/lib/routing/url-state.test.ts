@@ -657,6 +657,42 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
+  it('does not rehydrate over an edit queued during a client-owned profit route write', async () => {
+    const { location, history } = setupWindow('', '/profit-estimator/deepseek-v4');
+    const state = await import('@/lib/routing/url-state');
+    let firstWrite = true;
+    const nativeReplace = vi.fn((_state, _title, href: string) => {
+      const url = new URL(href, location.origin);
+      location.pathname = url.pathname;
+      location.search = url.search;
+      if (firstWrite) {
+        firstWrite = false;
+        // A control edit lands before React's pathname-driven hydration effect.
+        state.writeUrlParams({ g_tco: 'external', g_runid: '123', i_prec: 'fp8' });
+      }
+    });
+    vi.stubGlobal('History', { prototype: { replaceState: nativeReplace } });
+    history.replaceState.mockImplementation((value, title, href) => {
+      nativeReplace(value, title, String(href));
+      state.refreshUrlParams();
+    });
+
+    state.writeUrlParams({ c_ivtarget: '24' });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(state.readUrlParams()).toMatchObject({
+      c_ivtarget: '24',
+      g_tco: 'external',
+      g_runid: '123',
+      i_prec: 'fp8',
+    });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(location.pathname).toBe(
+      '/profit-estimator/deepseek-v4/target/24/tco-basis/external/run/123/precision/fp8',
+    );
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(nativeReplace).toHaveBeenCalledTimes(2);
+  });
+
   it('preserves the exact locale, slug, scenario, and hash for non-dashboard chart routes', async () => {
     setupWindow('', '/zh/compare/h100-vs-h200/8k-1k', '#interactive-results');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');

@@ -15,7 +15,7 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
-import { replaceRouterPathname } from '@/lib/routing/client-navigation';
+import { replaceClientPathname } from '@/lib/routing/client-navigation';
 import {
   PROFIT_ROUTE_PARAMS,
   profitRouteParams,
@@ -393,13 +393,13 @@ export function writeUrlParams(params: UrlStateParams): void {
   }, 150);
 }
 
-/** Match the inference selector: shallow history replacement, no reload or RSC fetch. */
+/** Client-owned filter writes must not trigger Next's navigation rehydration effects. */
 function syncProfitRoute(): void {
   if (typeof window === 'undefined') return;
   const params = collectTabParams();
   const pathname = profitRoutePathname(window.location.pathname, params);
   if (pathname === null) return;
-  replaceRouterPathname(pathname, [
+  replaceClientPathname(pathname, [
     ...URL_STATE_KEYS,
     'percentile',
     ...[...new URLSearchParams(window.location.search).keys()].filter((key) =>

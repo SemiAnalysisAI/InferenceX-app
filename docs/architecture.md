@@ -61,7 +61,8 @@ The two profit estimators use model slugs followed by named route pairs instead,
 including on `/zh`: `/profit-estimator/deepseek-v4/target/24`.
 Their existing query-key state store is adapted at the routing boundary by
 `profit-estimator-routes.ts`. Shallow history replacements keep the address bar
-current; legacy query links remain readable. Profit dashboards use P90 only
+current; these client-owned writes bypass Next navigation rehydration so it
+cannot overwrite a pending control edit. Legacy query links remain readable. Profit dashboards use P90 only
 and strip legacy percentile parameters. Other dashboards keep their
 existing query-state behavior.
 
