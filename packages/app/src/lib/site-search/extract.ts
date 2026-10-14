@@ -21,13 +21,17 @@ const EXCLUDED_SELECTOR = [
   'input',
   'textarea',
   '[role="dialog"]',
-  '[aria-hidden="true"]',
+  // Authored aria-hidden only. An open modal (this dialog) marks everything
+  // behind it aria-hidden with a `data-aria-hidden` marker; that is still the
+  // page on screen and must be indexed.
+  '[aria-hidden="true"]:not([data-aria-hidden])',
   '[data-site-search-ignore]',
 ].join(',');
 
 const HEADING_SELECTOR = 'h1,h2,h3';
-const MAX_SECTIONS_PER_PAGE = 80;
-const MAX_SECTION_CHARS = 4000;
+/** Caps shared with the build-time index so live and indexed pages match. */
+export const MAX_SECTIONS_PER_PAGE = 80;
+export const MAX_SECTION_CHARS = 4000;
 const TITLE_SUFFIX = /\s*[|\u2013\u2014-]\s*InferenceX(?: by SemiAnalysis)?\s*$/u;
 
 function clean(text: string): string {
@@ -45,12 +49,12 @@ function anchorFor(heading: Element): string | undefined {
 }
 
 /**
- * Split a document (live or parsed) into heading-delimited sections.
+ * Split the live document into heading-delimited sections.
  *
  * Text before the first heading becomes an untitled intro section together
  * with the meta description, so a page with no headings is still one doc.
- * Parsed documents from `DOMParser` are inert: no scripts run and no
- * subresources load, so extraction has no side effects.
+ * Used only for the page on screen, which can be fresher than the build-time
+ * index (live benchmark data, client-rendered panels).
  */
 export function extractSections(doc: Document, path: string): SearchDoc[] {
   const root = doc.querySelector('main') ?? doc.body;
@@ -112,53 +116,4 @@ export function extractSections(doc: Document, path: string): SearchDoc[] {
     });
   }
   return docs;
-}
-
-export interface SeedPage {
-  /** Same-origin path, e.g. `/chips/b200`. */
-  path: string;
-  title: string;
-  description: string;
-  /** The `##` group the link was listed under in llms.txt. */
-  group: string;
-}
-
-const LINK_LINE = /^- \[(?<title>[^\]]+)\]\((?<href>[^)\s]+)\)(?::\s*(?<desc>.*))?$/u;
-const NON_PAGE_PATH = /\.(?:xml|txt|json|pdf|png|jpe?g|webp|svg)$/iu;
-
-/**
- * Parse the public `llms.txt` site index into same-site page seeds. It is a
- * small cached text file that already lists every curated page with a title
- * and summary, so results appear before any page has been fetched.
- */
-export function parseLlmsTxt(text: string, siteOrigins: readonly string[]): SeedPage[] {
-  const seeds: SeedPage[] = [];
-  const seen = new Set<string>();
-  let group = '';
-  for (const rawLine of text.split('\n')) {
-    const line = rawLine.trim();
-    if (line.startsWith('## ')) {
-      group = line.slice(3).trim();
-      continue;
-    }
-    const match = LINK_LINE.exec(line);
-    if (!match) continue;
-    let url: URL;
-    try {
-      url = new URL(match.groups!.href);
-    } catch {
-      continue;
-    }
-    if (!siteOrigins.includes(url.origin)) continue;
-    const path = url.pathname.replace(/\/$/u, '') || '/';
-    if (NON_PAGE_PATH.test(path) || seen.has(path)) continue;
-    seen.add(path);
-    seeds.push({
-      path,
-      title: match.groups!.title.trim(),
-      description: (match.groups!.desc ?? '').replace(/\s*\(PDF:[^)]*\)\s*$/u, '').trim(),
-      group,
-    });
-  }
-  return seeds;
 }

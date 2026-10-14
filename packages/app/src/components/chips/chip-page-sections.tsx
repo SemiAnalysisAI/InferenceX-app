@@ -45,7 +45,8 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 
-const STRINGS = {
+/** Page copy; also read by the site search index builder for section labels. */
+export const CHIP_PAGE_STRINGS = {
   en: {
     breadcrumbRoot: 'AI Chips',
     backToIndex: 'All AI inference chips',
@@ -191,7 +192,7 @@ function faqJsonLd(faq: readonly ChipFaqItem[], url: string, locale: Locale) {
 }
 
 function breadcrumbJsonLd(locale: Locale, leafName: string, leafPath: string) {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   return {
     '@type': 'BreadcrumbList',
     itemListElement: [
@@ -214,7 +215,7 @@ function breadcrumbJsonLd(locale: Locale, leafName: string, leafPath: string) {
 const FaqSection = ({ faq, locale }: { faq: readonly ChipFaqItem[]; locale: Locale }) => (
   <section aria-labelledby="chip-faq" className="mt-10 border-t border-border/50 pt-10">
     <h2 id="chip-faq" className="text-xl font-semibold tracking-tight">
-      {STRINGS[locale].faqHeading}
+      {CHIP_PAGE_STRINGS[locale].faqHeading}
     </h2>
     <dl className="mt-4 space-y-6">
       {faq.map((item) => (
@@ -228,7 +229,7 @@ const FaqSection = ({ faq, locale }: { faq: readonly ChipFaqItem[]; locale: Loca
 );
 
 const LiveResultsSection = ({ locale }: { locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   const links = [
     { href: localePath('/', locale), label: t.liveLinkInference },
     { href: localePath('/compare', locale), label: t.liveLinkCompare },
@@ -271,7 +272,7 @@ const SEMIANALYSIS_MODELS = [
 ] as const;
 
 const ModelsSection = ({ locale }: { locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   return (
     <section aria-labelledby="chip-models" className="mt-10 border-t border-border/50 pt-10">
       <h2 id="chip-models" className="text-xl font-semibold tracking-tight">
@@ -301,11 +302,12 @@ const ModelsSection = ({ locale }: { locale: Locale }) => {
   );
 };
 
-export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
-  const t = STRINGS[locale];
+/** Spec table rows as rendered; also indexed by the site search builder. */
+export function chipSpecRows(entry: ChipPageEntry, locale: Locale): readonly [string, string][] {
+  const t = CHIP_PAGE_STRINGS[locale];
   const spec = getChipSpec(entry);
   const hw = getChipHw(entry);
-  const rows: readonly [string, string][] = [
+  return [
     [t.specLabels.vendor, hw.vendor],
     [t.specLabels.arch, hw.arch],
     [t.specLabels.memory, `${spec.memory} ${spec.memoryType}`],
@@ -324,6 +326,11 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
     [t.specLabels.costHyperscaler, `$${hw.costh.toFixed(2)}`],
     [t.specLabels.costRetail, `$${hw.costr.toFixed(2)}`],
   ];
+}
+
+export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
+  const t = CHIP_PAGE_STRINGS[locale];
+  const rows = chipSpecRows(entry, locale);
   return (
     <div className="relative mt-4">
       <div className="overflow-x-auto rounded-lg border border-border/40">
@@ -361,7 +368,7 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
 };
 
 const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   const posts = entry.relatedBlogSlugs.flatMap((slug) => {
     const post = getPostBySlug(slug, locale === 'zh' ? 'zh' : undefined) ?? getPostBySlug(slug);
     return post ? [{ slug, title: post.meta.title }] : [];
@@ -432,7 +439,7 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
 };
 
 export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   const translation = locale === 'zh' ? getZhChipTranslation(entry.slug) : undefined;
   const overview = translation?.overview ?? entry.overview;
   const benchmarkContext = translation?.benchmarkContext ?? entry.benchmarkContext;
@@ -512,7 +519,7 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
 };
 
 export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   const highlights = buildChipVsHighlights(page);
   const labels = locale === 'zh' ? CHIP_VS_HIGHLIGHT_LABELS_ZH : CHIP_VS_HIGHLIGHT_LABELS_EN;
   const faq = vsFaq(page, locale);
@@ -607,7 +614,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
 };
 
 export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
-  const t = STRINGS[locale];
+  const t = CHIP_PAGE_STRINGS[locale];
   const chips = getAllChipPages();
   const vsPages = getAllChipVsPages();
   const jsonLd = {

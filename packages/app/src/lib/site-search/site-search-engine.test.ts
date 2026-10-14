@@ -1,22 +1,14 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 
-import { extractSections, parseLlmsTxt } from './extract';
+import { extractSections } from './extract';
+import {
+  type IndexedPage,
+  SEARCH_INDEX_MANIFEST_PATH,
+  SEARCH_INDEX_SCHEMA,
+  searchIndexFilePath,
+} from './index-format';
 import { SiteSearchEngine } from './site-search-engine';
-
-const LLMS_TXT = `# InferenceX by SemiAnalysis
-
-## Chip Pages
-
-- [NVIDIA B200](https://inferencex.semianalysis.com/chips/b200): specs, pricing and benchmarks
-- [AMD Instinct MI355X](https://inferencex.semianalysis.com/chips/mi355x): specs, pricing and benchmarks
-- [GitHub](https://github.com/SemiAnalysisAI/InferenceX)
-- [RSS Feed](https://inferencex.semianalysis.com/feed.xml)
-
-## Whitepapers
-
-- [AgentX](https://inferencex.semianalysis.com/whitepaper/agentx): Agentic serving (PDF: https://inferencex.semianalysis.com/whitepaper/agentx.pdf)
-`;
 
 function html(title: string, main: string): string {
   return `<!doctype html><html><head><title>${title} | InferenceX</title>
@@ -26,19 +18,23 @@ function html(title: string, main: string): string {
 <script>self.__next_f.push(["secret payload"])</script></body></html>`;
 }
 
-describe('parseLlmsTxt', () => {
-  it('keeps same-site pages and drops feeds, PDFs and external links', () => {
-    const seeds = parseLlmsTxt(LLMS_TXT, ['https://inferencex.semianalysis.com']);
-    expect(seeds.map((s) => s.path)).toEqual([
-      '/chips/b200',
-      '/chips/mi355x',
-      '/whitepaper/agentx',
-    ]);
-    expect(seeds[2]).toMatchObject({ group: 'Whitepapers', description: 'Agentic serving' });
-  });
-});
-
 describe('extractSections', () => {
+  it('reads page content that the open search modal marks aria-hidden', () => {
+    // Radix hides everything behind a modal with aria-hidden plus a
+    // data-aria-hidden marker; that content is still the page on screen.
+    // Authored aria-hidden content stays excluded.
+    document.title = 'About | InferenceX';
+    document.body.innerHTML = `<main data-aria-hidden="true" aria-hidden="true">
+      <h2 id="faq" data-aria-hidden="true" aria-hidden="true">FAQ</h2>
+      <p data-aria-hidden="true" aria-hidden="true">The benchmark is open source.</p>
+      <p aria-hidden="true">Decorative duplicate text.</p>
+    </main>`;
+    const docs = extractSections(document, '/about');
+    expect(docs.find((doc) => doc.url === '/about#faq')?.text).toBe(
+      'The benchmark is open source.',
+    );
+  });
+
   it('splits main content by heading and ignores chrome, scripts and charts', () => {
     const doc = new DOMParser().parseFromString(
       html(
@@ -62,184 +58,251 @@ describe('extractSections', () => {
   });
 });
 
-function response(body: string, type = 'text/html'): Response {
-  return new Response(body, { status: 200, headers: { 'content-type': type } });
+function json(body: unknown, status = 200): Response {
+  return Response.json(body, { status });
 }
 
-async function settle(engine: SiteSearchEngine): Promise<void> {
-  for (let i = 0; i < 200 && engine.status().crawling; i++) {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 5);
-    });
-  }
+const GENERATED_AT = '2026-10-14T12:00:00.000Z';
+
+const EN_PAGES: IndexedPage[] = [
+  {
+    url: '/chips/b200',
+    title: 'NVIDIA B200',
+    coverage: 'partial',
+    sections: [
+      { text: 'Blackwell datacenter GPU.' },
+      {
+        anchor: 'chip-overview',
+        heading: 'Overview',
+        text: '1000 W power envelope, 180 GB HBM3E.',
+      },
+    ],
+  },
+  {
+    url: '/agentx/methodology',
+    title: 'AgentX Methodology',
+    coverage: 'summary',
+    sections: [{ text: 'How AgentX replays coding-agent traces against inference servers.' }],
+  },
+  {
+    url: '/blog/agentx-replay',
+    title: 'Inside AgentX replay',
+    coverage: 'full',
+    sections: [
+      {
+        anchor: 'trace-replay',
+        heading: 'Trace replay',
+        text: 'AgentX methodology for trace replay.',
+      },
+    ],
+  },
+];
+
+const ZH_PAGES: IndexedPage[] = [
+  {
+    url: '/zh/chips/b200',
+    title: 'NVIDIA B200',
+    coverage: 'partial',
+    sections: [
+      { anchor: 'chip-overview', heading: '概述', text: 'Blackwell 数据中心 GPU，功耗 1000 W。' },
+    ],
+  },
+  {
+    // English-only page inside a /zh session keeps its English URL.
+    url: '/blog/english-only',
+    title: 'English only post',
+    coverage: 'full',
+    sections: [{ text: 'Untranslated benchmark notes.' }],
+  },
+];
+
+function manifest(version: string, schema: number = SEARCH_INDEX_SCHEMA) {
+  return {
+    schema,
+    version,
+    generatedAt: GENERATED_AT,
+    locales: {
+      en: {
+        path: searchIndexFilePath(version, 'en'),
+        pages: EN_PAGES.length,
+        sections: 4,
+        bytes: 1,
+      },
+      zh: {
+        path: searchIndexFilePath(version, 'zh'),
+        pages: ZH_PAGES.length,
+        sections: 2,
+        bytes: 1,
+      },
+    },
+  };
+}
+
+function indexFile(version: string, locale: 'en' | 'zh') {
+  return {
+    schema: SEARCH_INDEX_SCHEMA,
+    version,
+    locale,
+    pages: locale === 'en' ? EN_PAGES : ZH_PAGES,
+  };
+}
+
+type Route = (init?: RequestInit) => Response | Promise<Response>;
+
+/** Fetch stub answering only the given paths; anything else fails the test. */
+function server(routes: Record<string, Route>) {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const route = routes[String(input)];
+    if (!route) throw new Error(`unexpected fetch ${String(input)}`);
+    return Promise.resolve(route(init));
+  });
+}
+
+function currentServer(version = 'v1') {
+  return server({
+    [SEARCH_INDEX_MANIFEST_PATH]: () => json(manifest(version)),
+    [searchIndexFilePath(version, 'en')]: () => json(indexFile(version, 'en')),
+    [searchIndexFilePath(version, 'zh')]: () => json(indexFile(version, 'zh')),
+  });
 }
 
 describe('SiteSearchEngine', () => {
-  it('serves seed results immediately, then replaces them with fetched page content', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path === '/llms.txt') return Promise.resolve(response(LLMS_TXT, 'text/plain'));
-      if (path === '/chips/b200') {
-        return Promise.resolve(
-          response(html('NVIDIA B200', '<h2 id="power">Power</h2><p>1000 W TDP Blackwell.</p>')),
-        );
-      }
-      return Promise.resolve(response(html(path, `<p>${path} body</p>`)));
-    });
+  it('loads the manifest and versioned index once, then answers queries locally', async () => {
+    const fetchMock = currentServer();
     const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    expect(engine.status().state).toBe('idle');
 
-    await engine.seed();
-    expect(engine.search('b200')[0]).toMatchObject({ url: '/chips/b200', source: 'seed' });
-
-    engine.prioritize('b200');
-    engine.start();
-    await settle(engine);
-
-    // Seed is replaced by the real section; "watt" reaches it through concepts.
-    expect(engine.search('watts')[0]).toMatchObject({
-      url: '/chips/b200#power',
-      source: 'page',
-      section: 'Power',
+    await engine.load();
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([
+      SEARCH_INDEX_MANIFEST_PATH,
+      searchIndexFilePath('v1', 'en'),
+    ]);
+    // The manifest is revalidated; the content-addressed file uses the HTTP cache.
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ cache: 'no-cache' });
+    expect(engine.status()).toMatchObject({
+      state: 'ready',
+      pages: 3,
+      summaryPages: 1,
+      generatedAt: GENERATED_AT,
     });
-    // Query-matching pages are fetched before the rest of the queue.
-    const crawlOrder = fetchMock.mock.calls
-      .map(([input]) => String(input))
-      .filter((p) => p !== '/llms.txt');
-    expect(crawlOrder[0]).toBe('/chips/b200');
-    // Feeds and external links from llms.txt are never fetched.
-    expect(crawlOrder).not.toContain('/feed.xml');
-    expect(engine.status()).toMatchObject({ crawling: false, seeded: true });
-    expect(engine.status().indexedPages).toBe(engine.status().totalPages);
+
+    // Anchored section results and related-term matching ("watts" -> power/W).
+    expect(engine.search('b200 hbm3e')[0]).toMatchObject({
+      url: '/chips/b200#chip-overview',
+      pageTitle: 'NVIDIA B200',
+      section: 'Overview',
+      source: 'page',
+    });
+    expect(engine.search('watts')[0].url).toBe('/chips/b200#chip-overview');
+
+    // Summary-only pages are marked and lose ties to real page sections.
+    const methodology = engine.search('agentx methodology');
+    expect(methodology.map((r) => r.source)).toContain('summary');
+    expect(methodology.find((r) => r.url === '/agentx/methodology')?.source).toBe('summary');
+
+    await engine.load();
+    engine.search('anything');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not crawl until started and stays usable when llms.txt fails', async () => {
-    const fetchMock = vi.fn(() => Promise.reject(new TypeError('offline')));
+  it('refetches the manifest once when the named version is gone after a deploy', async () => {
+    let deployed = 'old';
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path === SEARCH_INDEX_MANIFEST_PATH) {
+        // A cached manifest still names the old build until caches are bypassed.
+        return Promise.resolve(json(manifest(init?.cache === 'reload' ? deployed : 'old')));
+      }
+      if (path === searchIndexFilePath('new', 'en')) {
+        return Promise.resolve(json(indexFile('new', 'en')));
+      }
+      return Promise.resolve(new Response('Not found', { status: 404 }));
+    });
+    deployed = 'new';
     const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await engine.load();
+
+    expect(fetchMock.mock.calls.map(([input, init]) => [String(input), init?.cache])).toEqual([
+      [SEARCH_INDEX_MANIFEST_PATH, 'no-cache'],
+      [searchIndexFilePath('old', 'en'), undefined],
+      [SEARCH_INDEX_MANIFEST_PATH, 'reload'],
+      [searchIndexFilePath('new', 'en'), undefined],
+    ]);
+    expect(engine.status()).toMatchObject({ state: 'ready', pages: 3 });
+  });
+
+  it('rejects an index file whose version does not match the manifest', async () => {
+    const fetchMock = server({
+      [SEARCH_INDEX_MANIFEST_PATH]: () => json(manifest('v2')),
+      // A stale cached copy of the previous version, served at the new URL.
+      [searchIndexFilePath('v2', 'en')]: () => json(indexFile('v1', 'en')),
+    });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    await engine.load();
+    expect(engine.status()).toMatchObject({ state: 'unavailable', pages: 0 });
+    expect(engine.search('b200')).toEqual([]);
+  });
+
+  it('keeps the live page searchable when the index is missing, and retries on next open', async () => {
+    let online = false;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (!online) return Promise.reject(new TypeError('offline'));
+      const path = String(input);
+      return Promise.resolve(
+        json(path === SEARCH_INDEX_MANIFEST_PATH ? manifest('v1') : indexFile('v1', 'en')),
+      );
+    });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
 
     document.title = 'About | InferenceX';
     document.body.innerHTML = '<main><h2 id="team">Team</h2><p>SemiAnalysis engineers.</p></main>';
     engine.indexLiveDocument('/about');
+    await engine.load();
+    expect(engine.status()).toMatchObject({ state: 'unavailable', liveIndexed: true });
     expect(engine.search('engineer')[0].url).toBe('/about#team');
 
-    await engine.seed();
-    expect(engine.status().seeded).toBe(true);
+    online = true;
+    await engine.load();
+    expect(engine.status().state).toBe('ready');
+    expect(engine.search('b200')[0].url).toBe('/chips/b200');
+    expect(engine.search('engineer')[0].url).toBe('/about#team');
   });
 
-  it('crawls the Chinese tree for /zh sessions', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) =>
-      Promise.resolve(
-        String(input) === '/llms.txt'
-          ? response(LLMS_TXT, 'text/plain')
-          : response(html('页面', '<p>内容</p>')),
-      ),
-    );
-    const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
-    engine.start();
-    await engine.seed();
-    await settle(engine);
-    const paths = fetchMock.mock.calls.map(([input]) => String(input));
-    expect(paths).toContain('/zh/chips/b200');
-    expect(paths).toContain('/zh/agentx');
-  });
-
-  it('links untranslated /zh family members to the English page instead of a 404', async () => {
-    const llms = `## Articles
-
-- [Untranslated post](https://inferencex.semianalysis.com/blog/untranslated-post): English only
-- [B200](https://inferencex.semianalysis.com/chips/b200): chip page
-`;
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path === '/llms.txt') return Promise.resolve(response(llms, 'text/plain'));
-      if (path === '/zh/blog/untranslated-post') {
-        return Promise.resolve(new Response('missing', { status: 404 }));
-      }
-      if (path === '/blog/untranslated-post') {
-        return Promise.resolve(response(html('Untranslated post', '<p>Sunflower rack scale.</p>')));
-      }
-      if (path === '/zh/chips/b200') {
-        return Promise.resolve(response(html('B200 中文', '<p>Blackwell 中文页面</p>')));
-      }
-      return Promise.resolve(new Response('missing', { status: 404 }));
+  it('treats an unknown manifest schema as unavailable', async () => {
+    const fetchMock = server({
+      [SEARCH_INDEX_MANIFEST_PATH]: () => json(manifest('v1', SEARCH_INDEX_SCHEMA + 1)),
     });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    await engine.load();
+    expect(engine.status().state).toBe('unavailable');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the Chinese index for /zh sessions and keeps English-only URLs', async () => {
+    const fetchMock = currentServer();
+    const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
+    await engine.load();
+    expect(String(fetchMock.mock.calls[1][0])).toBe(searchIndexFilePath('v1', 'zh'));
+    expect(engine.search('功耗')[0]).toMatchObject({
+      url: '/zh/chips/b200#chip-overview',
+      section: '概述',
+    });
+    expect(engine.search('untranslated')[0].url).toBe('/blog/english-only');
+  });
+
+  it('prefers the live DOM over the indexed copy of the page on screen', async () => {
+    const fetchMock = currentServer();
     const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
 
-    // Before anything is crawled, seeds link the English page, which always exists.
-    await engine.seed();
-    expect(engine.search('untranslated')[0].url).toBe('/blog/untranslated-post');
+    document.title = 'NVIDIA B200 | InferenceX';
+    const liveId = 'chip-live-results';
+    document.body.innerHTML = `<main><h2 id="${liveId}">实测结果</h2><p>DeepSeek 吞吐量 12345 tok/s。</p></main>`;
+    engine.indexLiveDocument('/zh/chips/b200');
+    await engine.load();
 
-    engine.start();
-    await settle(engine);
-    expect(engine.search('sunflower')[0].url).toBe('/blog/untranslated-post');
-    // Translated pages switch to /zh once that page loads, replacing the English seed.
-    expect(engine.search('blackwell').map((r) => r.url)).toEqual(['/zh/chips/b200']);
-    expect(engine.search('chip').every((r) => r.url !== '/chips/b200')).toBe(true);
-  });
-
-  it('indexes redirected pages under their final path so anchors survive', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path === '/ubenchx') {
-        const res = response(
-          html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Zebrafish bandwidth.</p>'),
-        );
-        Object.defineProperty(res, 'redirected', { value: true });
-        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
-        return Promise.resolve(res);
-      }
-      return Promise.resolve(new Response('missing', { status: 404 }));
-    });
-    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
-    engine.start();
-    await engine.seed();
-    await settle(engine);
-    expect(engine.search('zebrafish')[0].url).toBe('/ubenchx/mem-bw#sweep');
-  });
-
-  it('applies a query typed before the seed list loads to the seeded queue', async () => {
-    const { promise: seedsLoaded, resolve: releaseSeeds } = Promise.withResolvers<Response>();
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path === '/llms.txt') return seedsLoaded;
-      return Promise.resolve(response(html(path, `<p>${path}</p>`)));
-    });
-    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
-    engine.start();
-    // The user types while /llms.txt is still in flight.
-    engine.prioritize('mi355x');
-    releaseSeeds(response(LLMS_TXT, 'text/plain'));
-    await engine.seed();
-    await settle(engine);
-    const crawlOrder = fetchMock.mock.calls
-      .map(([input]) => String(input))
-      .filter((p) => p !== '/llms.txt');
-    expect(crawlOrder[0]).toBe('/chips/mi355x');
-  });
-
-  it('still indexes a redirect destination after a mid-crawl pause', async () => {
-    let calls = 0;
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const path = String(input);
-      if (path !== '/ubenchx') return Promise.resolve(new Response('missing', { status: 404 }));
-      calls++;
-      const res = response(
-        html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Okapi bandwidth.</p>'),
-      );
-      Object.defineProperty(res, 'redirected', { value: true });
-      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
-      // First attempt: the dialog closes while the page waits for idle time
-      // to be parsed, after the redirect has already been observed.
-      if (calls === 1) setTimeout(() => engine.stop(), 5);
-      return Promise.resolve(res);
-    });
-    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
-    engine.start();
-    await engine.seed();
-    await settle(engine);
-    engine.start();
-    await settle(engine);
-    expect(calls).toBeGreaterThanOrEqual(2);
-    expect(engine.search('okapi')[0].url).toBe('/ubenchx/mem-bw#sweep');
+    // The index copy did not overwrite the live sections of the same page.
+    expect(engine.search('12345')[0].url).toBe('/zh/chips/b200#chip-live-results');
+    expect(engine.search('概述').some((r) => r.url === '/zh/chips/b200#chip-overview')).toBe(false);
+    expect(engine.status().pages).toBe(2);
   });
 });

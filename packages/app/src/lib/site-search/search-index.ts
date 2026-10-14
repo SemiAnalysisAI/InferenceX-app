@@ -1,7 +1,7 @@
 import { relatedTerms } from './concepts';
 import { isCjkTerm, tokenize } from './tokenize';
 
-/** One searchable unit: a page section (or a whole page for metadata seeds). */
+/** One searchable unit: a page section (or a whole page for summary-only pages). */
 export interface SearchDoc {
   /** Path plus optional `#anchor`, e.g. `/blog/foo#results`. */
   url: string;
@@ -11,8 +11,11 @@ export interface SearchDoc {
   section?: string;
   /** Section body text. */
   text: string;
-  /** `seed` docs come from the site index before the page itself is fetched. */
-  source: 'seed' | 'page';
+  /**
+   * `summary` docs carry only a page's title and description (its body is JSX
+   * or live data); `page` docs are real page sections.
+   */
+  source: 'summary' | 'page';
 }
 
 export interface SnippetPart {
@@ -54,8 +57,8 @@ const CONCEPT_WEIGHT = 0.45;
 const CONCEPT_COVERAGE = 0.6;
 const MAX_PREFIX_EXPANSIONS = 24;
 const SNIPPET_WORDS = 28;
-// Seeds are thin placeholders; fetched page sections should win ties.
-const SEED_PENALTY = 0.8;
+// Summaries are thin; real page sections should win ties.
+const SUMMARY_PENALTY = 0.8;
 // Results scoring at least this share of the best score are "relevant" and
 // ordered by page tier first; weaker matches follow in score order so a
 // barely related main page cannot outrank a strong article match.
@@ -278,7 +281,7 @@ export class SiteSearchIndex {
       .map(([id, score]) => {
         const doc = this.docs[id];
         const covered = (coverage.get(id) ?? 0) / expanded.length;
-        const final = score * covered ** 2 * (doc.source === 'seed' ? SEED_PENALTY : 1);
+        const final = score * covered ** 2 * (doc.source === 'summary' ? SUMMARY_PENALTY : 1);
         return { id, score: final };
       })
       .sort((a, b) => b.score - a.score);

@@ -19,6 +19,10 @@ describe('pageTier', () => {
     expect(pageTier('/blog')).toBe(PAGE_TIER.article);
     expect(pageTier('/blog/powerx#joules')).toBe(PAGE_TIER.article);
     expect(pageTier('/whitepaper/agentx')).toBe(PAGE_TIER.article);
+    // Per-framework optimization write-ups read as articles; the overview stays main.
+    expect(pageTier('/agentx/optimizations')).toBe(PAGE_TIER.main);
+    expect(pageTier('/agentx/optimizations/mooncake#packaging')).toBe(PAGE_TIER.article);
+    expect(pageTier('/zh/agentx/optimizations/mori-umbp')).toBe(PAGE_TIER.article);
     // Prefixes match whole segments only.
     expect(pageTier('/blogroll')).toBe(PAGE_TIER.reference);
   });

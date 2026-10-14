@@ -120,15 +120,15 @@ describe('SiteSearchIndex', () => {
     expect(results[0].url).toBe('/chips/mi355x#pricing');
   });
 
-  it('limits results per page and replaces seed docs when the page is indexed', () => {
+  it('limits results per page and replaces summary docs when the page is indexed', () => {
     const index = new SiteSearchIndex();
     index.add({
       url: '/chips/b200',
       pageTitle: 'NVIDIA B200',
       text: 'specs, pricing and benchmarks',
-      source: 'seed',
+      source: 'summary',
     });
-    expect(index.search('b200')[0].source).toBe('seed');
+    expect(index.search('b200')[0].source).toBe('summary');
     index.replacePages([
       { url: '/chips/b200', pageTitle: 'NVIDIA B200', text: 'Blackwell GPU', source: 'page' },
       {

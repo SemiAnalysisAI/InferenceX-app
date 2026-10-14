@@ -16,7 +16,7 @@ function staticImports(file: string): string[] {
 }
 
 describe('site search bundle isolation', () => {
-  // Every page ships the header. The index, crawler and dialog must stay in a
+  // Every page ships the header. The search engine and dialog must stay in a
   // lazily loaded chunk so search costs nothing until a user opens it.
   it('keeps the dialog and search engine out of the header bundle', () => {
     for (const file of ['header.tsx', 'site-search-button.tsx']) {
@@ -29,5 +29,13 @@ describe('site search bundle isolation', () => {
   it('loads the dialog through a dynamic import', () => {
     const text = readFileSync(path.join(here, 'site-search-button.tsx'), 'utf8');
     expect(text).toMatch(/import\(\s*'\.\/site-search-dialog'\s*\)/u);
+  });
+
+  // The build-time generator reads MDX from disk; it must never reach the client.
+  it('keeps the index generator out of the dialog and engine', () => {
+    const engine = path.join('..', '..', 'lib', 'site-search', 'site-search-engine.ts');
+    for (const file of ['site-search-dialog.tsx', engine]) {
+      expect(staticImports(file).filter((s) => s.includes('build-index'))).toEqual([]);
+    }
   });
 });

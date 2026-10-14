@@ -14,20 +14,24 @@ import { getSiteSearchEngine, type SiteSearchStatus } from '@/lib/site-search/si
 const STRINGS = {
   en: {
     title: 'Search InferenceX',
-    description:
-      'Search pages, articles, chips and models. Results improve as more pages are indexed.',
+    description: 'Search pages, articles, chips and models.',
     placeholder: 'Search GPUs, models, metrics, articles…',
-    indexing: (done: number, total: number) => `Indexing pages… ${done} of ${total}`,
-    indexed: (total: number) => `${total} pages indexed`,
-    paused: (done: number, total: number) => `${done} of ${total} pages indexed`,
     loading: 'Loading site index…',
+    loadingLive: 'Loading site index… this page is searchable now',
+    ready: (pages: number, summaries: number, built: string) =>
+      summaries > 0
+        ? `${pages} pages indexed · ${summaries} summary only · built ${built}`
+        : `${pages} pages indexed · built ${built}`,
+    unavailable: 'Site index unavailable',
+    unavailableLive: 'Site index unavailable · searching this page only',
     empty: 'Type to search. Related terms match too, so “energy” finds power and J/token pages.',
     tryLabel: 'Try',
     examples: ['MI355X vs B200', 'power efficiency', 'AgentX methodology', 'cheapest GPU DeepSeek'],
     noResults: 'No matches.',
-    noResultsIndexing: 'No matches yet. Still indexing, results will appear as pages load.',
+    noResultsLoading: 'No matches on this page. The site index is still loading.',
+    noResultsUnavailable: 'No matches on this page. The site index could not be loaded.',
     previewBadge: 'Summary',
-    previewHint: 'Full page not indexed yet',
+    previewHint: 'Only the page title and description are indexed',
     navigate: 'to navigate',
     open: 'to open',
     close: 'to close',
@@ -35,19 +39,24 @@ const STRINGS = {
   },
   zh: {
     title: '搜索 InferenceX',
-    description: '搜索页面、文章、芯片和模型。索引的页面越多，结果越完整。',
+    description: '搜索页面、文章、芯片和模型。',
     placeholder: '搜索 GPU、模型、指标、文章…',
-    indexing: (done: number, total: number) => `正在索引页面… ${done} / ${total}`,
-    indexed: (total: number) => `已索引 ${total} 个页面`,
-    paused: (done: number, total: number) => `已索引 ${done} / ${total} 个页面`,
     loading: '正在加载站点索引…',
+    loadingLive: '正在加载站点索引… 当前页面已可搜索',
+    ready: (pages: number, summaries: number, built: string) =>
+      summaries > 0
+        ? `已索引 ${pages} 个页面 · ${summaries} 个仅摘要 · 构建于 ${built}`
+        : `已索引 ${pages} 个页面 · 构建于 ${built}`,
+    unavailable: '站点索引不可用',
+    unavailableLive: '站点索引不可用 · 仅搜索当前页面',
     empty: '输入关键词开始搜索。相关术语也会匹配，例如“能耗”可以找到功耗和 J/token 相关页面。',
     tryLabel: '试试',
     examples: ['MI355X vs B200', '能效', 'AgentX methodology', 'DeepSeek 成本'],
     noResults: '没有匹配结果。',
-    noResultsIndexing: '暂无匹配结果。仍在索引中，页面加载后结果会陆续出现。',
+    noResultsLoading: '当前页面没有匹配结果。站点索引仍在加载。',
+    noResultsUnavailable: '当前页面没有匹配结果。站点索引无法加载。',
     previewBadge: '摘要',
-    previewHint: '完整页面尚未索引',
+    previewHint: '仅索引了页面标题和简介',
     navigate: '选择',
     open: '打开',
     close: '关闭',
@@ -56,6 +65,25 @@ const STRINGS = {
 } as const;
 
 const QUERY_TRACK_DELAY_MS = 1000;
+
+/** Status line: what is searchable right now, never a promise of more to come. */
+export function describeStatus(status: SiteSearchStatus, locale: Locale): string {
+  const strings = STRINGS[locale];
+  if (status.state === 'ready') {
+    const built = status.generatedAt
+      ? new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }).format(new Date(status.generatedAt))
+      : '';
+    return strings.ready(status.pages, status.summaryPages, built);
+  }
+  if (status.state === 'unavailable') {
+    return status.liveIndexed ? strings.unavailableLive : strings.unavailable;
+  }
+  return status.liveIndexed ? strings.loadingLive : strings.loading;
+}
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
@@ -85,24 +113,18 @@ export function SiteSearchDialog({
 
   useEffect(() => engine.subscribe(setStatus), [engine]);
 
-  // Index the page on screen, then crawl in the background only while open.
+  // Index the page on screen, then load the build-time site index (once per
+  // tab; a failed load retries on the next open).
   useEffect(() => {
     if (!open) return;
     // Wait a frame so the dialog portal exists and is excluded from extraction.
     const frame = requestAnimationFrame(() => engine.indexLiveDocument(pathname));
-    engine.start();
-    return () => {
-      cancelAnimationFrame(frame);
-      engine.stop();
-    };
+    void engine.load();
+    return () => cancelAnimationFrame(frame);
   }, [open, engine, pathname]);
 
-  useEffect(() => {
-    engine.prioritize(query);
-  }, [engine, query]);
-
-  // `status.version` changes whenever pages finish indexing, so results
-  // refresh live as the crawl progresses.
+  // `status.version` changes whenever the live page or the site index lands,
+  // so results refresh without retyping.
   const results: SearchResult[] = useMemo(
     () => (query.trim() ? engine.search(query, 20) : []),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- version is the index revision
@@ -110,7 +132,7 @@ export function SiteSearchDialog({
   );
 
   useEffect(() => setActiveIndex(0), [query]);
-  // The crawl can shrink the list under the cursor; clamp so the highlight and
+  // An index update can shrink the list under the cursor; clamp so the highlight and
   // Enter always target a real row.
   const selected = results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1);
 
@@ -147,12 +169,8 @@ export function SiteSearchDialog({
     }
   };
 
-  let statusText: string = strings.loading;
-  if (status.crawling) statusText = strings.indexing(status.indexedPages, status.totalPages);
-  else if (status.indexedPages >= status.totalPages)
-    statusText = strings.indexed(status.totalPages);
-  else if (status.seeded) statusText = strings.paused(status.indexedPages, status.totalPages);
-  const progress = status.totalPages > 0 ? status.indexedPages / status.totalPages : 0;
+  const statusText = describeStatus(status, locale);
+  const loading = status.state === 'idle' || status.state === 'loading';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,12 +221,7 @@ export function SiteSearchDialog({
         </div>
 
         <div className="relative h-0.5 bg-transparent" aria-hidden>
-          {status.crawling && (
-            <div
-              className="absolute inset-y-0 left-0 bg-brand/60 transition-[width] duration-300"
-              style={{ width: `${Math.round(progress * 100)}%` }}
-            />
-          )}
+          {loading && <div className="absolute inset-0 animate-pulse bg-brand/40" />}
         </div>
 
         <div className="max-h-[min(60vh,32rem)] overflow-y-auto overscroll-contain">
@@ -235,7 +248,11 @@ export function SiteSearchDialog({
             </div>
           ) : results.length === 0 ? (
             <p data-testid="site-search-empty" className="px-4 py-6 text-sm text-muted-foreground">
-              {status.crawling || !status.seeded ? strings.noResultsIndexing : strings.noResults}
+              {loading
+                ? strings.noResultsLoading
+                : status.state === 'unavailable'
+                  ? strings.noResultsUnavailable
+                  : strings.noResults}
             </p>
           ) : (
             <ul
@@ -273,15 +290,16 @@ export function SiteSearchDialog({
                     }}
                   >
                     <div className="flex items-baseline gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">
+                      {/* The page title keeps priority over a long section heading. */}
+                      <span className="max-w-[70%] shrink-0 truncate text-sm font-medium text-foreground">
                         {result.pageTitle}
                       </span>
                       {result.section && (
-                        <span className="truncate text-xs text-muted-foreground">
+                        <span className="min-w-0 truncate text-xs text-muted-foreground">
                           › {result.section}
                         </span>
                       )}
-                      {result.source === 'seed' && (
+                      {result.source === 'summary' && (
                         <span
                           className="ml-auto shrink-0 text-2xs text-muted-foreground"
                           title={strings.previewHint}
@@ -314,7 +332,7 @@ export function SiteSearchDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-2xs text-muted-foreground">
-          <span data-testid="site-search-status" aria-live="polite">
+          <span data-testid="site-search-status" data-state={status.state} aria-live="polite">
             {statusText}
           </span>
           <span className="hidden items-center gap-1.5 sm:flex">

@@ -1,61 +1,47 @@
-import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { type Locale, zhPath } from '@/lib/i18n/i18n';
 
-import { hasZhSibling, type Locale, zhPath } from '@/lib/i18n/i18n';
-import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
-
+import { extractSections } from './extract';
+import {
+  type IndexedPage,
+  parseSearchIndexFile,
+  parseSearchIndexManifest,
+  SEARCH_INDEX_MANIFEST_PATH,
+  type SearchIndexManifest,
+} from './index-format';
 import { pageTier } from './page-tiers';
-import { extractSections, parseLlmsTxt, type SeedPage } from './extract';
-import { type SearchResult, SiteSearchIndex } from './search-index';
-import { tokenize } from './tokenize';
+import { type SearchDoc, type SearchResult, SiteSearchIndex } from './search-index';
 
 /**
- * Progressive, client-only site search.
+ * Client-side site search over a build-time index.
  *
- * 1. The page on screen is indexed from the live DOM the moment search opens.
- * 2. `/llms.txt` (about 20 KB, CDN-cached) seeds every curated page's title and
- *    summary, so the whole site is searchable at the metadata level at once.
- * 3. While the dialog is open, pages are fetched two at a time, parsed with an
- *    inert `DOMParser` during idle time, and their sections replace the seed.
- *    Pages that best match the current query are fetched first.
+ * 1. The page on screen is indexed from the live DOM the moment search opens,
+ *    so live data (benchmark tables, client-rendered panels) is searchable on
+ *    the page the reader is looking at.
+ * 2. The first open fetches `/search-index/manifest.json` (revalidated) and
+ *    then the versioned per-locale index it names (immutable, CDN cached).
+ *    Every query runs locally against that in-memory index.
  *
- * Nothing runs until the user opens search, crawling pauses when it closes,
- * and Data Saver disables step 3. The index lives in memory for the tab's
- * lifetime, so client-side navigation keeps everything already indexed.
+ * No page HTML is ever fetched. If the manifest or index is missing, stale or
+ * malformed, search keeps working on the live page and the status says so.
  */
 
+export type SiteIndexState = 'idle' | 'loading' | 'ready' | 'unavailable';
+
 export interface SiteSearchStatus {
-  /** Pages whose full content is indexed (fetched or live DOM). */
-  indexedPages: number;
-  /** Pages known to the index, fetched or not. */
-  totalPages: number;
-  /** True while background fetching is active. */
-  crawling: boolean;
-  /** True once the llms.txt seed list has loaded (or failed). */
-  seeded: boolean;
+  state: SiteIndexState;
+  /** Pages in the loaded site index (0 until it is ready). */
+  pages: number;
+  /** Of those, pages indexed from their title and description only. */
+  summaryPages: number;
+  /** Build time of the loaded index, ISO 8601. */
+  generatedAt: string | null;
+  /** True once the page on screen has been indexed from the live DOM. */
+  liveIndexed: boolean;
   /** Incremented on every index change so subscribers can re-run queries. */
   version: number;
 }
 
 type Listener = (status: SiteSearchStatus) => void;
-
-const CONCURRENCY = 2;
-const MAX_CRAWLED_PAGES = 160;
-// Indexing a single HTML response well under this is typical; larger pages
-// (the API reference) are still fine but bigger ones are not worth parsing.
-const MAX_HTML_BYTES = 2_500_000;
-
-/** Core destinations crawled first so primary navigation is fully searchable. */
-const CORE_PATHS = ['/', '/agentx', '/overview', '/about', '/blog', '/ubenchx'];
-
-/**
- * Candidate `/zh` URL for an English path. `hasZhSibling` is a route-family
- * check, so some family members (untranslated blog posts) still 404 at the
- * candidate; the crawler only links a `/zh` URL after fetching it successfully.
- */
-function zhCandidate(path: string, locale: Locale): string | null {
-  if (locale !== 'zh' || !hasZhSibling(path)) return null;
-  return zhPath(path);
-}
 
 /** English canonical path for a (possibly `/zh`) pathname. */
 function canonicalPath(path: string): string {
@@ -63,37 +49,30 @@ function canonicalPath(path: string): string {
   return path.startsWith('/zh/') ? path.slice(3) : path;
 }
 
-function idle(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(() => resolve(), { timeout: 500 });
-    } else {
-      setTimeout(resolve, 16);
-    }
-  });
-}
-
-function saveDataEnabled(): boolean {
-  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
-  return connection?.saveData === true;
+function pageDocs(page: IndexedPage): SearchDoc[] {
+  const source: SearchDoc['source'] = page.coverage === 'summary' ? 'summary' : 'page';
+  return page.sections.map((section) => ({
+    url: section.anchor ? `${page.url}#${section.anchor}` : page.url,
+    pageTitle: page.title,
+    section: section.heading && section.heading !== page.title ? section.heading : undefined,
+    text: section.text,
+    source,
+  }));
 }
 
 export class SiteSearchEngine {
   readonly index = new SiteSearchIndex(pageTier);
   private readonly locale: Locale;
   private readonly fetchImpl: typeof fetch;
-  private queue: string[] = [];
-  private queued = new Set<string>();
-  private crawled = new Set<string>();
-  private seeds = new Map<string, SeedPage>();
   private listeners = new Set<Listener>();
-  private active = 0;
-  private running = false;
-  private seeded = false;
-  private seeding: Promise<void> | null = null;
-  private controllers = new Set<AbortController>();
+  private state: SiteIndexState = 'idle';
+  private loading: Promise<void> | null = null;
+  private manifest: SearchIndexManifest | null = null;
+  private loadedPages = 0;
+  private summaryPages = 0;
+  /** Canonical paths indexed from the live DOM; the site index never overwrites them. */
+  private livePaths = new Set<string>();
   private version = 0;
-  private lastQuery = '';
 
   constructor(locale: Locale, fetchImpl: typeof fetch = (...args) => fetch(...args)) {
     this.locale = locale;
@@ -101,12 +80,12 @@ export class SiteSearchEngine {
   }
 
   status(): SiteSearchStatus {
-    const known = new Set([...this.crawled, ...this.queued, ...this.seeds.keys()]);
     return {
-      indexedPages: this.crawled.size,
-      totalPages: Math.max(known.size, this.crawled.size),
-      crawling: this.running && (this.active > 0 || this.queue.length > 0),
-      seeded: this.seeded,
+      state: this.state,
+      pages: this.loadedPages,
+      summaryPages: this.summaryPages,
+      generatedAt: this.manifest?.generatedAt ?? null,
+      liveIndexed: this.livePaths.size > 0,
       version: this.version,
     };
   }
@@ -132,207 +111,87 @@ export class SiteSearchEngine {
     const docs = extractSections(doc, path);
     if (docs.length === 0) return;
     const canonical = canonicalPath(path);
-    // A live /zh page supersedes its English seed.
-    if (canonical !== path) this.index.removePage(canonical);
+    // The live page supersedes its indexed copy in either locale.
+    this.index.removePage(canonical);
+    this.index.removePage(zhPath(canonical));
     this.index.replacePages(docs);
-    this.crawled.add(canonical);
-    this.dequeue(canonical);
+    this.livePaths.add(canonical);
     this.emit();
   }
 
-  private enqueue(path: string): void {
-    if (this.crawled.has(path) || this.queued.has(path)) return;
-    if (this.crawled.size + this.queued.size >= MAX_CRAWLED_PAGES) return;
-    this.queued.add(path);
-    this.queue.push(path);
-  }
-
-  private dequeue(path: string): void {
-    if (!this.queued.delete(path)) return;
-    this.queue = this.queue.filter((p) => p !== path);
-  }
-
-  /** Load the llms.txt seed list once; failures leave the live-page index usable. */
-  seed(): Promise<void> {
-    this.seeding ??= (async () => {
-      for (const route of DASHBOARD_ROUTES) {
-        if (route.indexable && route.navGroup === 'primary') {
-          this.enqueue(route.path);
-        }
-      }
-      for (const path of CORE_PATHS) this.enqueue(path);
-      try {
-        const res = await this.fetchImpl('/llms.txt');
-        if (res.ok) {
-          const origins = [SITE_URL, window.location.origin];
-          const pages = parseLlmsTxt(await res.text(), origins);
-          for (const page of pages) {
-            // Queue, seed and link by the English path, which always exists;
-            // the crawl swaps in the /zh URL once that page loads.
-            const { path } = page;
-            this.seeds.set(path, page);
-            if (!this.crawled.has(path) && !this.index.hasPage(path)) {
-              this.index.add({
-                url: path,
-                pageTitle: page.title,
-                text: [page.description, page.group].filter(Boolean).join(' · '),
-                source: 'seed',
-              });
-            }
-            this.enqueue(path);
-          }
-        }
-      } catch {
-        // Offline or blocked: search still covers the live page and core paths.
-      }
-      this.seeded = true;
-      this.emit();
-    })();
-    return this.seeding;
-  }
-
   /**
-   * Move pages whose seed metadata matches the query to the front of the
-   * queue, so the pages most likely to answer it are fetched next.
+   * Load the site index once per tab. Safe to call on every dialog open: a
+   * successful load is kept, and a failed one is retried on the next open.
    */
-  prioritize(query: string): void {
-    // Remembered so seeds that arrive after the user started typing are
-    // reordered too (see `start`).
-    this.lastQuery = query;
-    const terms = new Set(tokenize(query));
-    if (terms.size === 0 || this.queue.length === 0) return;
-    const score = (path: string) => {
-      const seed = this.seeds.get(path);
-      const haystack = tokenize(
-        `${path.replaceAll(/[/-]/gu, ' ')} ${seed?.title ?? ''} ${seed?.description ?? ''}`,
-      );
-      let hits = 0;
-      for (const term of haystack) {
-        for (const q of terms) if (term === q || term.startsWith(q)) hits++;
-      }
-      return hits;
-    };
-    const scored = this.queue.map((path, order) => ({ path, order, hits: score(path) }));
-    scored.sort((a, b) => b.hits - a.hits || a.order - b.order);
-    this.queue = scored.map((entry) => entry.path);
-  }
-
-  /** Begin (or resume) background crawling. */
-  start(): void {
-    if (this.running) return;
-    this.running = true;
-    void this.seed().then(() => {
-      this.prioritize(this.lastQuery);
-      this.pump();
+  load(): Promise<void> {
+    if (this.state === 'ready') return Promise.resolve();
+    this.loading ??= this.fetchIndex().finally(() => {
+      this.loading = null;
     });
-    this.emit();
+    return this.loading;
   }
 
-  /** Pause crawling and abort in-flight requests; aborted pages are re-queued. */
-  stop(): void {
-    if (!this.running) return;
-    this.running = false;
-    for (const controller of this.controllers) controller.abort();
-    this.controllers.clear();
-    this.emit();
-  }
-
-  private pump(): void {
-    if (!this.running || saveDataEnabled()) return;
-    while (this.active < CONCURRENCY && this.queue.length > 0) {
-      const path = this.queue.shift()!;
-      this.queued.delete(path);
-      this.active++;
-      void this.crawl(path).finally(() => {
-        this.active--;
-        this.emit();
-        this.pump();
-      });
-    }
-  }
-
-  /**
-   * Fetch one page as HTML and report the final same-origin path after
-   * redirects (`/ubenchx` lands on `/ubenchx/mem-bw`), so sections are indexed
-   * and deep-linked where they actually live. Returns null for errors,
-   * non-HTML responses, oversized bodies and cross-origin redirects.
-   */
-  private async fetchHtml(
-    url: string,
-    signal: AbortSignal,
-  ): Promise<{ html: string; path: string } | null> {
-    const res = await this.fetchImpl(url, {
-      signal,
+  private async fetchManifest(cache: RequestCache): Promise<SearchIndexManifest> {
+    const res = await this.fetchImpl(SEARCH_INDEX_MANIFEST_PATH, {
+      cache,
       credentials: 'same-origin',
-      headers: { Accept: 'text/html' },
     });
-    const type = res.headers.get('content-type') ?? '';
-    if (!res.ok || !type.includes('text/html')) return null;
-    let path = url;
-    if (res.redirected && res.url) {
-      const final = new URL(res.url, window.location.href);
-      if (final.origin !== window.location.origin) return null;
-      path = final.pathname.replace(/(?<=.)\/$/u, '');
-    }
-    const html = await res.text();
-    return html.length > MAX_HTML_BYTES ? null : { html, path };
+    if (!res.ok) throw new Error(`manifest ${res.status}`);
+    const manifest = parseSearchIndexManifest(await res.json());
+    if (!manifest) throw new Error('manifest schema');
+    return manifest;
   }
 
-  /** Crawl an English canonical path, preferring its `/zh` sibling for zh sessions. */
-  private async crawl(path: string): Promise<void> {
-    const controller = new AbortController();
-    this.controllers.add(controller);
+  /** Returns null when the file no longer matches the manifest (a deploy happened). */
+  private async fetchIndexFile(manifest: SearchIndexManifest): Promise<IndexedPage[] | null> {
+    const res = await this.fetchImpl(manifest.locales[this.locale].path, {
+      credentials: 'same-origin',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`index ${res.status}`);
+    const file = parseSearchIndexFile(await res.json(), {
+      version: manifest.version,
+      locale: this.locale,
+    });
+    return file ? file.pages : null;
+  }
+
+  private async fetchIndex(): Promise<void> {
+    this.state = 'loading';
+    this.emit();
     try {
-      const zh = zhCandidate(path, this.locale);
-      let page: { html: string; path: string } | null = null;
-      if (zh) {
-        page = await this.fetchHtml(zh, controller.signal);
-        // A missing /zh page can redirect elsewhere (e.g. the /zh home); only
-        // accept the candidate itself or a page beneath it.
-        if (page && page.path !== zh && !page.path.startsWith(`${zh}/`)) page = null;
+      // `no-cache` revalidates with the CDN, which answers 304 until a deploy.
+      let manifest = await this.fetchManifest('no-cache');
+      let pages = await this.fetchIndexFile(manifest);
+      if (pages === null) {
+        // The named version is gone or mismatched: a deploy replaced it after
+        // the manifest was cached somewhere. Bypass caches once and retry.
+        manifest = await this.fetchManifest('reload');
+        pages = await this.fetchIndexFile(manifest);
       }
-      page ??= await this.fetchHtml(path, controller.signal);
-      if (page === null) {
-        this.crawled.add(path);
-        return;
-      }
-      const { html, path: url } = page;
-      const finalCanonical = canonicalPath(url);
-      // Redirected to a page the live DOM or an earlier crawl already indexed.
-      if (finalCanonical !== path && this.crawled.has(finalCanonical)) {
-        this.crawled.add(path);
-        return;
-      }
-      await idle();
-      if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
-      const parsed = new DOMParser().parseFromString(html, 'text/html');
-      const docs = extractSections(parsed, url);
-      const seed = this.seeds.get(path);
-      if (docs.length > 0) {
-        // Prefer the curated seed title when the page's <title> is generic.
-        if (seed) for (const doc of docs) if (doc.pageTitle === url) doc.pageTitle = seed.title;
-        // The English seed is superseded by the /zh page when that loaded.
-        if (url !== path) this.index.removePage(path);
-        this.index.replacePages(docs);
-      }
-      // Marked only after indexing, so an abort before this point re-queues
-      // the source and leaves the redirect destination eligible.
-      this.crawled.add(path);
-      if (finalCanonical !== path) {
-        this.crawled.add(finalCanonical);
-        this.dequeue(finalCanonical);
-      }
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') {
-        // Paused mid-flight: try again on the next open.
-        this.queued.add(path);
-        this.queue.unshift(path);
-      } else {
-        this.crawled.add(path);
-      }
-    } finally {
-      this.controllers.delete(controller);
+      if (pages === null) throw new Error('index version mismatch');
+      this.apply(manifest, pages);
+      this.state = 'ready';
+    } catch {
+      // Offline, blocked or malformed: the live page stays searchable.
+      this.state = 'unavailable';
     }
+    this.emit();
+  }
+
+  private apply(manifest: SearchIndexManifest, pages: readonly IndexedPage[]): void {
+    const docs: SearchDoc[] = [];
+    let summaries = 0;
+    for (const page of pages) {
+      if (page.coverage === 'summary') summaries++;
+      // Keep the fresher live-DOM copy of the page on screen.
+      if (this.livePaths.has(canonicalPath(page.url))) continue;
+      docs.push(...pageDocs(page));
+    }
+    this.index.replacePages(docs);
+    this.manifest = manifest;
+    this.loadedPages = pages.length;
+    this.summaryPages = summaries;
   }
 }
 
