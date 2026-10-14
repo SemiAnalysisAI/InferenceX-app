@@ -550,7 +550,7 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-ruler .perf-ruler-hit').eq(0).click({ force: true });
     cy.get('#test-gpu-ruler .perf-ruler-hit').eq(1).click({ force: true });
     cy.get('#test-gpu-ruler .perf-ruler .pr-text-ratio').should('have.text', '2.00x');
-    cy.get('#gpu-clear-perf-rulers').click();
+    cy.get('[data-testid="gpu-clear-perf-rulers"]').click();
     cy.get('#test-gpu-ruler .perf-ruler').should('not.exist');
   });
 });
