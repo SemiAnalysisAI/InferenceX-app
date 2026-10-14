@@ -61,7 +61,6 @@ export abstract class GPUSystem extends FrozenModel {
   static readonly default_cooling: CoolingProfile;
   static readonly system_unit: string = 'chassis';
   static readonly has_grace_sockets: boolean = false;
-  static readonly has_x86_cpu_sockets: boolean = false;
   static readonly default_networking: readonly NetworkGroup[] | null = null;
   readonly gpu_count: number;
   readonly provenance: Provenance;
@@ -80,10 +79,6 @@ export abstract class GPUSystem extends FrozenModel {
     return this.type.has_grace_sockets;
   }
 
-  get has_x86_cpu_sockets(): boolean {
-    return this.type.has_x86_cpu_sockets;
-  }
-
   get default_networking(): readonly NetworkGroup[] | null {
     return this.type.default_networking;
   }
@@ -98,10 +93,8 @@ export abstract class GPUSystem extends FrozenModel {
   }
 
   /**
-   * Evaluate one system without PUE. cpu_and_dram_measured_power_per_socket is
-   * watts per Grace socket; systems without Grace ignore it.
-   * cpu_measured_power_per_socket is watts per x86 CPU package; systems without
-   * x86 CPUs ignore it.
+   * Evaluate one system without PUE. The measured inputs cover CPU and DRAM,
+   * or CPU alone, in watts per socket.
    */
   abstract estimate_it_power(
     gpu_level_power_per_gpu: number,

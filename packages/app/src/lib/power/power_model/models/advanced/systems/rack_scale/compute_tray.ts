@@ -81,6 +81,7 @@ export abstract class ComputeTray extends FrozenModel {
     gpu_level_power_per_gpu: number,
     {
       cpu_and_dram_measured_power_per_socket = null,
+      cpu_measured_power_per_socket = null,
       operating_state = DEFAULT_OPERATING_STATE,
     }: SystemEstimateOptions = {},
   ): PowerComponentBreakdown {
@@ -88,6 +89,7 @@ export abstract class ComputeTray extends FrozenModel {
     const state = operating_state;
     const board = this.board.estimate_breakdown(gpu_level_power_per_gpu, {
       cpu_and_dram_measured_power_per_socket,
+      cpu_measured_power_per_socket,
       operating_state: state,
     });
     const nics = new tray.nic_type({ state: state.nic_state })

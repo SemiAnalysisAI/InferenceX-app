@@ -9,7 +9,6 @@ import {
   PowerComponentBreakdown,
   validate_watts,
   ValidationError,
-  ValueError,
 } from '../../base';
 import type { NetworkGroup } from './networking/base';
 import type { SystemEstimateOptions, SystemGroup } from './systems/base';
@@ -47,20 +46,6 @@ export class Cluster extends FrozenModel {
     }: SystemEstimateOptions & { operating_state?: OperatingState } = {},
   ): ITPowerBreakdown {
     const per_gpu = validate_watts(gpu_level_power_per_gpu);
-    if (
-      cpu_and_dram_measured_power_per_socket !== null &&
-      !this.systems.some((group) => group.system.has_grace_sockets)
-    ) {
-      throw new ValueError(
-        'cpu_and_dram_measured_power_per_socket requires a system with Grace sockets',
-      );
-    }
-    if (
-      cpu_measured_power_per_socket !== null &&
-      !this.systems.some((group) => group.system.has_x86_cpu_sockets)
-    ) {
-      throw new ValueError('cpu_measured_power_per_socket requires a system with x86 CPU sockets');
-    }
     return {
       scope: 'cluster',
       gpu_count: this.gpu_count,

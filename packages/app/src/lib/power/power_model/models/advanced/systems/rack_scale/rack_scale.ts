@@ -77,6 +77,7 @@ export abstract class RackScaleSystem extends GPUSystem {
     gpu_level_power_per_gpu: number,
     {
       cpu_and_dram_measured_power_per_socket = null,
+      cpu_measured_power_per_socket = null,
       operating_state = DEFAULT_OPERATING_STATE,
     }: SystemEstimateOptions = {},
   ): PowerComponentBreakdown {
@@ -85,6 +86,7 @@ export abstract class RackScaleSystem extends GPUSystem {
     const compute = this.compute_tray
       .estimate_breakdown(per_gpu, {
         cpu_and_dram_measured_power_per_socket,
+        cpu_measured_power_per_socket,
         operating_state: state,
       })
       .scaled(this.compute_tray_count);

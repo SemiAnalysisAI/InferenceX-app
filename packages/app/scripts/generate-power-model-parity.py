@@ -30,7 +30,7 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-REVISION = "c44492fcb0230ea8bdeb878fc532a2b10857c594"
+REVISION = "5cfc833db4fd1a4eba2937c776a4ffef224a7ed0"
 SOURCE_PATH = "power_model"
 PACKAGE_PATH = "power_model/src/power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
@@ -188,12 +188,13 @@ def grid():
             for gpu_watts in CLUSTER_WATTS:
                 for watts in (None, dense):
                     yield system, workload, scale_out, 4, gpu_watts, *inputs(watts), False
-            # Each family rejects the other's measured input; negative watts are invalid.
+            # Exercise the alternate input and both-input precedence on each family.
             if rack:
                 yield system, workload, scale_out, 1, 700.0, None, 180.0, False
             else:
                 yield system, workload, scale_out, 1, 700.0, 100.0, None, False
                 yield system, workload, scale_out, 1, 700.0, None, -1.0, False
+            yield system, workload, scale_out, 1, 700.0, 98.066, 180.0, False
 
 
 def fuzz():

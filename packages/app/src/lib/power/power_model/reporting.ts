@@ -91,9 +91,9 @@ export function format_power_breakdown_per_chassis(estimate: PowerEstimate): str
   const sections = [
     `Power BoM per ${unit}`,
     `GPU input: ${formatWatts(estimate.gpu_level_power_per_gpu)} W/GPU | ${
-      socket === null ? '' : `Grace socket input (measured): ${formatWatts(socket)} W/socket | `
+      socket === null ? '' : `CPU+DRAM input (measured): ${formatWatts(socket)} W/socket | `
     }${
-      x86_cpu === null ? '' : `x86 CPU input (measured): ${formatWatts(x86_cpu)} W/socket | `
+      x86_cpu === null ? '' : `CPU input (measured): ${formatWatts(x86_cpu)} W/socket | `
     }Workload: ${estimate.workload_state} | ` +
       `Scale-out: ${estimate.using_scale_out ? 'on' : 'off'}`,
   ];

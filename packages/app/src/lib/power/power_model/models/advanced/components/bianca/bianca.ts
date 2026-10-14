@@ -10,7 +10,7 @@ import {
   validate_watts,
   ValidationError,
 } from '../../../../base';
-import { GPU_INPUT, GRACE_SOCKET_INPUT } from '../../profiles';
+import { GPU_INPUT, GRACE_CPU_SOCKET_INPUT, GRACE_SOCKET_INPUT } from '../../profiles';
 import { GraceCPU, GraceWorkloadProfile } from '../grace_cpu';
 import { LPDDR5XMemory } from '../lpddr5x';
 
@@ -38,6 +38,7 @@ export interface BiancaBoardFields {
 
 export interface BiancaEstimateOptions {
   cpu_and_dram_measured_power_per_socket?: number | null;
+  cpu_measured_power_per_socket?: number | null;
   operating_state?: OperatingState;
 }
 
@@ -74,6 +75,7 @@ export abstract class BiancaBoard extends FrozenModel {
     gpu_level_power_per_gpu: number,
     {
       cpu_and_dram_measured_power_per_socket = null,
+      cpu_measured_power_per_socket = null,
       operating_state = DEFAULT_OPERATING_STATE,
     }: BiancaEstimateOptions = {},
   ): PowerComponentBreakdown {
@@ -87,9 +89,12 @@ export abstract class BiancaBoard extends FrozenModel {
     if (cpu_and_dram_measured_power_per_socket === null) {
       grace = [
         new GraceCPU({
-          power_w: point.cpu_power_w,
+          power_w: cpu_measured_power_per_socket ?? point.cpu_power_w,
           workload_state: state.workload_state,
-          provenance: this.workload_profile.provenance,
+          provenance:
+            cpu_measured_power_per_socket === null
+              ? this.workload_profile.provenance
+              : GRACE_CPU_SOCKET_INPUT,
         }).estimate_breakdown(),
         memory,
       ];

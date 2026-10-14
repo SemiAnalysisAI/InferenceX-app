@@ -36,6 +36,11 @@ export class CPU extends FixedPowerComponent {
   static override readonly typeName: string = 'CPU';
 }
 
+/** Measured CPU and attached DRAM power for one socket. */
+export class CPUAndDRAM extends FixedPowerComponent {
+  static override readonly typeName: string = 'CPUAndDRAM';
+}
+
 export type X86CPUState = 'Idle' | 'FixedSeqLen' | 'Agentic' | 'AgenticOffloadingOn';
 
 const X86_STATE_POWER_W: Record<X86CPUState, number> = {
