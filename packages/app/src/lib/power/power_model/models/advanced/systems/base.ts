@@ -61,6 +61,7 @@ export abstract class GPUSystem extends FrozenModel {
   static readonly default_cooling: CoolingProfile;
   static readonly system_unit: string = 'chassis';
   static readonly has_grace_sockets: boolean = false;
+  static readonly has_x86_cpu_sockets: boolean = false;
   static readonly default_networking: readonly NetworkGroup[] | null = null;
   readonly gpu_count: number;
   readonly provenance: Provenance;
@@ -77,6 +78,10 @@ export abstract class GPUSystem extends FrozenModel {
 
   get has_grace_sockets(): boolean {
     return this.type.has_grace_sockets;
+  }
+
+  get has_x86_cpu_sockets(): boolean {
+    return this.type.has_x86_cpu_sockets;
   }
 
   get default_networking(): readonly NetworkGroup[] | null {

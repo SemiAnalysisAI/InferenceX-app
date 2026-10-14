@@ -57,7 +57,7 @@ export class Cluster extends FrozenModel {
     }
     if (
       cpu_measured_power_per_socket !== null &&
-      this.systems.every((group) => group.system.has_grace_sockets)
+      !this.systems.some((group) => group.system.has_x86_cpu_sockets)
     ) {
       throw new ValueError('cpu_measured_power_per_socket requires a system with x86 CPU sockets');
     }

@@ -30,8 +30,7 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-# The measured x86 CPU socket input landed here.
-REVISION = "4c21c69f530bcdb6952f44a05de32bab89a5064c"
+REVISION = "c44492fcb0230ea8bdeb878fc532a2b10857c594"
 SOURCE_PATH = "power_model"
 PACKAGE_PATH = "power_model/src/power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"

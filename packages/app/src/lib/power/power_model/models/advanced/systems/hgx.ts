@@ -77,6 +77,7 @@ type ChassisDefaults = Partial<HGXSystemChassisFields>;
 export abstract class HGXSystemChassis extends GPUSystem {
   static override readonly typeName: string = 'HGXSystemChassis';
   static override readonly default_cooling: CoolingProfile = new CoolingProfile({ mode: 'air' });
+  static override readonly has_x86_cpu_sockets: boolean = true;
   static readonly cpu_count: number = 2;
   static readonly dimm_count: number = 32;
   static readonly dimm_capacity_gb: number = 64;
