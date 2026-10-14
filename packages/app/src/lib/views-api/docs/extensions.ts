@@ -73,8 +73,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -105,8 +105,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
   ],
   cacheHitMode: [
-    'actual (default) or theoretical. Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace.',
-    'actual（默认）或 theoretical。Actual 使用基准测试中服务端实测的 cache 命中率；Theoretical 使用 trace 计算的无限缓存理论命中率。',
+    'actual or theoretical (default, displayed as Theroticial Roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
+    'actual 或 theoretical（默认，界面显示为 Theroticial Roofline）。Actual 使用基准测试中服务端实测的 cache 命中率；theoretical 使用 trace 计算的无限缓存理论命中率，缺失时回退到实测值。',
   ],
   customCosts: [
     'JSON object from base hardware keys to finite nonnegative USD/chip-hour values, at most 100 entries.',

@@ -20,7 +20,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { type CalculatorUrlSeed, profitTargetUrlValue } from '@/components/calculator/url-seed';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -42,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
-import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -85,6 +85,7 @@ import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import {
   applyCacheHitMode,
   clampPercent,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
@@ -239,10 +240,10 @@ const STRINGS = {
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     cacheHitLabel: 'Cache Hit Rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity — an upper-bound revenue estimate.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
@@ -364,10 +365,10 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     cacheHitLabel: 'Cache 命中率',
     cacheHitTooltip:
-      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theoretical 使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力——一种收入上限估算。',
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
@@ -515,15 +516,13 @@ export default function ProfitEstimatorDisplay({
 }) {
   return (
     <GlobalFilterProvider
+      key={`${basis}:${urlSeed?.model}:${urlSeed?.profitTarget}:${urlSeed?.profitRouteKey}`}
       initialModel={urlSeed?.model}
       initialSequence={Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
-      <ProfitEstimatorInner
-        initialPercentile={urlSeed?.percentile ?? Percentile.P90}
-        basis={basis}
-      />
+      <ProfitEstimatorInner initialTarget={urlSeed?.profitTarget} basis={basis} />
     </GlobalFilterProvider>
   );
 }
@@ -555,10 +554,11 @@ function usePercentField(defaultValue: number, eventName: string) {
 }
 
 function ProfitEstimatorInner({
-  initialPercentile,
+  initialTarget,
   basis,
 }: {
-  initialPercentile: Percentile;
+  /** Shared `c_ivtarget`, parsed on the server so the first paint matches the link. */
+  initialTarget?: number;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
@@ -622,10 +622,17 @@ function ProfitEstimatorInner({
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
+  // The server seed belongs to this navigation; the URL store can outlive a model.
   const [targetValue, setTargetValue] = useState<number>(
-    () => profitModelDefaults(selectedModel).interactivity,
+    () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  // Only a target that differs from the model's default is written, so default
+  // views keep unchanged share links. A model switch re-seeds the default below,
+  // which clears the param.
+  useEffect(() => {
+    setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
+  }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
@@ -634,10 +641,10 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
   }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
   useEffect(() => {
     const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
+    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -669,7 +676,7 @@ function ProfitEstimatorInner({
   // one model and the allow-list swapped it); fall back to the catalog.
   const effectivePriceSource: PriceSource =
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
-  const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
+  const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
 
   const {
@@ -1141,15 +1148,6 @@ function ProfitEstimatorInner({
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
-  );
-
-  const handlePercentileChange = useCallback(
-    (value: Percentile) => {
-      setSelectedPercentile(value);
-      setUrlParam('i_pctl', value);
-      track('profit_percentile_selected', { percentile: value });
-    },
-    [setUrlParam],
   );
 
   const toggleGpuVisibility = useCallback(
@@ -1641,7 +1639,7 @@ function ProfitEstimatorInner({
                           const next = values[0];
                           if (next !== 'actual' && next !== 'theoretical') return;
                           setCacheHitMode(next);
-                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
+                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
                           track('profit_cache_hit_mode_changed', { mode: next });
                         }}
                         open={openDropdown === 'cacheHit'}
@@ -1655,16 +1653,6 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {featureGateUnlocked && (
-                    <div className="min-w-0">
-                      <PercentileSelector
-                        id="profit-percentile"
-                        data-testid="profit-percentile-selector"
-                        value={selectedPercentile}
-                        onChange={handlePercentileChange}
-                      />
-                    </div>
-                  )}
                   {powerControlsEnabled && (
                     <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip

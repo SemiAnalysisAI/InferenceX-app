@@ -29,7 +29,8 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
 }
 
 /**
- * Replace only the current document's pathname (keeping search and hash)
+ * Replace the current document's pathname, preserving hash and any search
+ * parameters not explicitly dropped,
  * without involving the App Router — same pristine-prototype trick as
  * `replaceClientSearch`. Used by per-model dashboard routes so switching
  * models rewrites `/historical/kimi-k3` in the address bar without an RSC
@@ -39,11 +40,19 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
  * live address bar (the header language toggle) subscribe via
  * `useClientPathname`, which listens for CLIENT_PATHNAME_CHANGE_EVENT.
  */
-export function replaceClientPathname(pathname: string): void {
-  const href = `${pathname}${window.location.search}${window.location.hash}`;
-  History.prototype.replaceState.call(window.history, window.history.state, '', href);
+export function replaceClientPathname(pathname: string, dropParams: readonly string[] = []): void {
+  const search = new URLSearchParams(window.location.search);
+  for (const param of dropParams) search.delete(param);
+  const qs = search.toString();
+  if (window.location.pathname === pathname && window.location.search === (qs ? `?${qs}` : ''))
+    return;
+  const href = `${pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+  const nativeReplace =
+    typeof History === 'undefined' ? window.history.replaceState : History.prototype.replaceState;
+  nativeReplace.call(window.history, window.history.state, '', href);
   clientPathnameOverride = pathname;
   window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: pathname }));
+  notifyClientSearchChange(href);
 }
 
 let clientPathnameOverride: string | null = null;
@@ -64,15 +73,19 @@ export function getClientPathnameOverride(): string | null {
  * Router state is carried over so Back/Forward keep working.
  */
 export function replaceRouterPathname(target: string, dropParams: readonly string[] = []): void {
-  if (window.location.pathname === target) return;
   const search = new URLSearchParams(window.location.search);
   for (const param of dropParams) search.delete(param);
   const qs = search.toString();
+  if (window.location.pathname === target && window.location.search === (qs ? `?${qs}` : ''))
+    return;
   window.history.replaceState(
     window.history.state,
     '',
     `${target}${qs ? `?${qs}` : ''}${window.location.hash}`,
   );
+  clientPathnameOverride = target;
+  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: target }));
+  notifyClientSearchChange(`${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
 }
 
 /**

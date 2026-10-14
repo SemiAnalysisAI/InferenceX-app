@@ -18,7 +18,8 @@ import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
-import { useClientSearch } from '@/hooks/useClientSearch';
+import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
+import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import chartDefinitions from '@/components/inference/metric-registry';
@@ -376,7 +377,7 @@ export function UnofficialRunProvider({
   showBanner?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const search = useClientSearch();
+  const search = useClientRouteSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
   const runIdsKey = runIds.join(',');
   const query = useQuery({
@@ -429,6 +430,7 @@ export function UnofficialRunProvider({
   const clearUnofficialRun = useCallback(() => {
     const url = new URL(window.location.href);
     deleteUnofficialRunParams(url.searchParams);
+    setProfitRouteUnofficialRuns(url, []);
     window.history.pushState({}, '', url);
     notifyClientSearchChange(url.href);
   }, []);
@@ -447,6 +449,7 @@ export function UnofficialRunProvider({
       const url = new URL(window.location.href);
       deleteUnofficialRunParams(url.searchParams);
       if (remainingIds.length > 0) url.searchParams.set('unofficialruns', remainingIds.join(','));
+      setProfitRouteUnofficialRuns(url, remainingIds);
       window.history.pushState({}, '', url);
       notifyClientSearchChange(url.href);
     },

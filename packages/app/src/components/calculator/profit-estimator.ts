@@ -181,6 +181,7 @@ export function listPricingToTokenRevenuePricing(list: ProfitListPricing): Token
  *   unbounded. Useful as an upper-bound revenue estimate.
  */
 export type CacheHitMode = 'actual' | 'theoretical';
+export const DEFAULT_CACHE_HIT_MODE: CacheHitMode = 'theoretical';
 
 /** Fraction of benchmarked throughput that is actually sold. */
 export const DEFAULT_UTILIZATION_PCT = 60;
