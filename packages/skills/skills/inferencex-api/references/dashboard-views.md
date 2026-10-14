@@ -37,6 +37,14 @@ results or treat its interpolated values as separately measured operating points
 
 These are raw API captures, outside the six formal CLI bundle families.
 `inferencex verify` does not convert a view capture into a formal evidence bundle.
+The inference dashboard resets manual legend selections and Best per SKU overrides
+when the reader chooses a different model in the model selector; same-model axis
+changes preserve manual selections. Initial
+share links and explicit presets still apply their selections. View API requests
+are stateless: omit `best` for the default ranking, or send `best=false` explicitly
+for each model to retain all selected series. Do not infer a destination model's
+default from a manual engine selection made on another model.
+
 Example URLs (check deployed availability before use):
 
 ```text
@@ -45,6 +53,24 @@ https://inferencex.semianalysis.com/api/v1/views/inference?model=DeepSeek-V4-Pro
 https://inferencex.semianalysis.com/api/v1/views/first-token?model=DeepSeek-V4-Pro&caps=2,5,10&minInteractivity=150
 https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek-V4-Pro&priceSource=custom&inputPrice=1&cachedInputPrice=0.1&outputPrice=1
 ```
+
+## Profit estimator defaults
+
+Both views default `cacheHitMode` to `theoretical`, displayed as
+“Theroticial Roofline” in English and Chinese dashboards. This uses the
+trace-derived infinite-cache hit rate, falling back to the measured rate when
+unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
+links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
+`params.cacheHitMode` alongside the pricing assumptions.
+
+Both profit views default DeepSeek V4 Pro to `target=35` tok/s/user when
+`target` is omitted, matching the English and Chinese dashboards. Explicit
+targets still override the default; list pricing and the 0% model license fee
+are unchanged. The 2026-10-13 choice uses the early-October
+[OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
+as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
+Treat 35 as an editable operating assumption, not a traffic-weighted mean or
+an OpenRouter P90-equivalent measurement.
 
 ## Staged-run Pareto links
 
@@ -107,12 +133,49 @@ which API selectors belong together.
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                                                                                                                                                                                                                                                      |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                                                                                                                                                                                                                                                           |
-| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                               |
 | `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                                                                                                                                                                                                                                     |
 | `ubenchx`                       | Test selector (`test`: `mem-bw`, `sm-l2-distance`, `tpc-skyline`, or `all`) plus GPU selector (`all` or one GPU). `mem-bw` returns static device-memory copy bandwidth rows with derived MBU and latency. `sm-l2-distance` returns SM-to-SM L2 latency difference matrix with GPC/die topology and summary statistics. `tpc-skyline` returns measured TPCs per GPC (sorted descending) with GPC, TPC, and SM counts, defaulting to every GPU. `all` (default) returns every test. The Y-axis selector on `/ubenchx/mem-bw` is presentation-only. |
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                                                                                                                                                                                                                           |
 
 ## Interpretation and maintenance
+
+### GPU telemetry coverage
+
+`/api/v1/views/gpu-metrics` requires a positive safe-integer `runId`. Choose
+`artifact` from `artifacts[]`: a plain artifact name, or `<artifact>/<file>` when
+one artifact contains several files. `downsample` only sets the renderer hint
+`maxInteractivePoints` to 2000 (default) or `null`; rows and statistics stay unsampled.
+
+Stored telemetry includes run-wide `coverage`, even when one host is selected:
+`complete` means the recorded artifact/file inventory is present, `partial` means
+recorded telemetry is missing, and `unknown` means a complete inventory was not
+retained. `missingArtifacts` lists entirely missing artifacts and may be empty
+when only a file is incomplete. GitHub coverage is `null`
+(unassessed). Available stored telemetry remains readable when partial; do not
+interpret it as a complete run or combine it with live GitHub samples.
+
+### Image submission age
+
+`/api/v1/views/current-inferencex-image?includeHistory=true` adds `ageHistory`:
+90 daily UTC points ending on `asOf` (today by default), each containing `date`,
+`p90AgeDays` and `configurationCount`. `ageSummary` is always returned for the
+current filtered image rows. All existing model, sequence, hardware, precision,
+speculation, node-type and framework filters apply to both.
+The default scenario is `agentic-traces` (Agentic) and the default `nodeType` is
+`all`, including non-disaggregated and disaggregated configurations. A model
+without Agentic observations falls back to its first available active scenario.
+
+P90 uses nearest rank, one vote per displayed configuration, measured in whole
+days since its latest successful image-bearing submission. Reusing the same
+image tag in a new submission resets age. This is not the container's build age.
+History carries older observations into the window, includes configurations
+only from their first submission, and excludes future observations. Empty days
+have `p90AgeDays: null`, not zero. Today's model/scenario retirement rules apply
+throughout the historical window; historical retirement states are not stored.
+The current table uses the latest benchmark snapshot, whereas history uses
+successful image-bearing submission events. The chart's hover and keyboard
+inspection are presentation-only and introduce no extra selectors.
 
 OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to

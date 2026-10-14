@@ -370,6 +370,15 @@ large log downloads. `--force` revisits those bundles and inserts only filenames
 already hold, which recovers files a newer artifact reader exposes, such as the single-node
 srt-slurm archive.
 
+Each stored file is capped at 128 MiB of UTF-8 text (override with
+`SERVER_LOG_MAX_FILE_BYTES`). PostgreSQL rejects any value over 1 GB and drops the connection,
+and verbose multinode decode workers can exceed that. An oversized file keeps its first and last
+halves, cut at line boundaries, around a marker recording the original size; the complete file
+remains in the GitHub artifact and GCS backup. KV-cache metadata is still derived from the full
+`server.log` before capping. Server-log and trace-replay writes retry up to three times with
+backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
+because both writers are transactional and re-check existing links.
+
 Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
 character slices, and the API returns at most 50 match contexts rather than transferring the
 complete file. The overlap preserves literal matches that cross a slice boundary. Files are
@@ -612,6 +621,8 @@ do not depend on GitHub's 90-day artifact retention:
 - `benchmark_result_gpu_metrics` — links each benchmark point to the series that
   was recorded while it ran (several series per point for multinode artifacts).
 
+Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds optional `temperature_c`. Ingest stores valid readings in the existing GPU sample fields. Missing or invalid readings remain absent. `sm_active` is distinct from GPU utilization and has no stored field.
+
 Ingest is idempotent: the same CSV hash, sidecars, and unique sample count refresh
 only the point links. A source change replaces the samples inside one transaction,
 including corrected timezone or identity sidecars. Repeated samples keep the first
@@ -623,8 +634,8 @@ series to the measured serving interval is a reader concern; the raw series
 deliberately includes server start-up and warm-up so both phases can be inspected.
 
 `bun run admin:db:backfill-gpu-metrics --all --yes` stores telemetry for runs from
-the last 90 days. `--all` skips runs that already have series; target those with
-`--run` or add `--force`. `--force` also replaces the samples of unchanged series,
+the last 90 days. `--all` revisits partial and unknown runs; complete runs require
+`--run` or `--force`. `--force` also replaces unchanged stored samples,
 which is how a parser fix reaches stored telemetry. The backfill downloads from
 GitHub only; the GCS backup mirrors just `schedule` and `push` runs on `main`, so
 GitHub's 90-day artifact retention bounds the reachable history, including for
@@ -638,6 +649,12 @@ artifacts keep separate file/host series, and successful reads and storage error
 use no-store. For a run with stored telemetry, the public GPU metrics view reads
 only its selected file/host series while keeping the complete artifact-name
 inventory; the GitHub path downloads every `gpu_metrics_` artifact of the run.
+Stored responses report run-wide `coverage.status` as `complete`, `partial`,
+or `unknown`. `missingArtifacts` names entirely absent artifacts; missing files
+or mismatched sample counts make coverage partial. Older series without an
+inventory remain readable with unknown coverage. Re-ingest with no parseable
+series preserves historical samples but invalidates their inventory until
+repair. GitHub coverage is null (unassessed).
 
 Point and run readers fetch series rows and primary-key pages of samples in separate
 autocommit statements, then return each selected series complete and in time order.
@@ -680,6 +697,45 @@ cached payloads for every linked point. Samples are stored as `real` (float32), 
 statistics over stored samples can differ from a computation over the original CSV
 by the float32 rounding of the inputs; compare with a float32 tolerance (e.g. 1e-5
 relative), not bit equality.
+
+#### Migration and targeted recovery
+
+The ingest workflows apply pending migrations before ingest; Vercel deploys do not.
+Apply `016_gpu_metrics.sql` before deploying readers if deployment precedes the first
+post-merge ingest, or telemetry reads return 503 until the migration runs. From the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+process must use the same database.
+
+For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
+affected rows. With `DATABASE_WRITE_URL` and `GITHUB_TOKEN` set, preview the target,
+then repair it using an absolute receipt path:
+
+```sh
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --dry-run
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
+```
+
+After a parser fix, add `--force` to replace unchanged stored samples. GitHub recovery
+accepts only the current attempt; older or expired artifacts require retained original
+bytes through `admin:db:ingest:ci`. Never substitute another attempt's artifacts.
+Backfill may fill missing AgentX audits and refreshes `latest_benchmarks`, but those
+benchmark changes also need the app's API cache refreshed. With its `INVALIDATE_SECRET`:
+
+```sh
+bun run admin:cache:invalidate https://TARGET_ORIGIN
+bun run admin:cache:warmup https://TARGET_ORIGIN
+bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
+```
+
+For protected previews, follow the bypass handling in
+`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
+The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+and API values; ingest success alone does not establish complete coverage. To undo a
+repair, restore the snapshotted rows or original bytes under the same identities.
+Do not delete a shared series to repair one point.
 
 ### PowerX publication receipts
 

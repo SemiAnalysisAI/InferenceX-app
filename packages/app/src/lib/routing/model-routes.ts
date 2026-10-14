@@ -200,8 +200,13 @@ export function parseModelRoutePathname(pathname: string): ParsedModelRoutePathn
     if (enPath === tabPath) return { tab, zh, slug: null };
     if (enPath.startsWith(`${tabPath}/`)) {
       const rest = enPath.slice(tabPath.length + 1);
-      if (!rest || rest.includes('/')) return null;
-      return { tab, zh, slug: rest };
+      if (!rest) return null;
+      const [slug, ...filters] = rest.split('/');
+      if (filters.length > 0) {
+        if (tab !== 'profit-estimator' && tab !== 'profit-estimator-per-gigawatt') return null;
+        if (filters.length % 2 !== 0 || filters.some((part) => !part)) return null;
+      }
+      return { tab, zh, slug };
     }
   }
   return null;
@@ -241,6 +246,13 @@ export function modelRoutePathnameRewrite(pathname: string, model: Model): strin
   if (!slug) return null;
   if (parsed.slug === slug) return null;
   if (!parsed.slug && model === defaultRouteModel(parsed.tab)) return null;
-  const enPath = modelRoutePath(parsed.tab, slug);
+  const suffix =
+    parsed.tab === 'profit-estimator' || parsed.tab === 'profit-estimator-per-gigawatt'
+      ? pathname
+          .split('/')
+          .slice(parsed.zh ? 4 : 3)
+          .join('/')
+      : '';
+  const enPath = `${modelRoutePath(parsed.tab, slug)}${suffix ? `/${suffix}` : ''}`;
   return parsed.zh ? `/zh${enPath}` : enPath;
 }

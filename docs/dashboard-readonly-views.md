@@ -59,7 +59,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                           |
 | `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                                                                                                                                                |
 | `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                                                                                                                                                   |
-| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                                              |
+| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `includeHistory`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                            |
 | `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                                       |
 | `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                                                                                                                                              |
@@ -78,6 +78,28 @@ combinations, not the full Cartesian product of all possible filter values.
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
+
+### Current image age
+
+The page and view API default to Agentic (`agentic-traces`) and all node types
+(`nodeType=all`). The selected model falls back to its first available active
+scenario when Agentic is unavailable. Explicit node-type and scenario selections
+still override those defaults.
+
+`ageSummary` contains the nearest-rank p90 submission age and configuration count
+for the current filtered image rows. `includeHistory=true` adds `ageHistory`, with
+90 daily UTC points ending on `asOf` (today by default). Every existing image
+filter applies. History uses successful image-bearing submissions, carries the
+latest pre-window observation forward, and never backfills a configuration before
+its first submission. Empty days have a null p90, not zero. Each displayed
+configuration has one vote, including node type in its identity.
+
+These values measure submission freshness, not image build age. Repeated
+submissions of the same tag reset age. Current model/scenario retirement rules
+apply to the whole window; historical retirement states are not stored. The
+current summary uses the latest benchmark snapshot, while the historical series
+uses submission events. Chart hover, keyboard inspection, and retry are
+presentation controls and do not introduce additional data selectors.
 
 ## Source audit and shared computations
 
@@ -117,7 +139,7 @@ anonymized ProxyTrace snapshot from a separate database through page-owned
 `/api/v1/agentic-workload-explorer/*` routes (catalogued as `page-bff`); it has
 no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
-state. GPU interactive downsampling does not alter returned raw data or statistics.
+state. GPU `downsample` sets the renderer hint `maxInteractivePoints` to 2000 or `null`; it does not alter returned raw data or statistics. The `artifact` selector uses an `artifacts[]` entry: the artifact name, or `<artifact>/<file>` for multi-file artifacts.
 Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
 Provisioned, and All in Measured. The last combines measured GPU power with modeled
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
@@ -126,7 +148,7 @@ or calculations. Profit comparison `powerLabel` display text follows the same na
 GPU statistics include startup and warmup for all chips in the selected series,
 regardless of chip visibility. They are separate from serving-window power and
 J/token. Run telemetry comes from one source per run: stored series once the run is
-ingested, otherwise its artifacts. The public view returns private, no-store
+ingested, otherwise its artifacts. Stored `coverage` describes the whole run, even when one host is selected: `complete` means the recorded artifact and file inventory is present, `partial` means recorded telemetry is missing, and `unknown` means a complete inventory was not retained. `missingArtifacts` lists entirely missing artifacts and may be empty when only a file is incomplete. GitHub `coverage` is `null` (unassessed). The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`
@@ -318,7 +340,6 @@ OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operat
 GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取已存序列，其余 run 读取产物。
 全记录统计在读取时由所选文件、主机序列的全部芯片样本计算，包含启动与 warmup；缺失读数不补零。
 芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
-
 `/inference` 的 Power Timeline 与原始 `gpu-metrics` 浏览器是两个不同视图。
 时间线通过现有只读 `/api/gpu-metrics?series=power` 获取逐秒采样、设备角色和验证来源，
 再结合基准测试 `power_audit` 中的服务窗口边界；公开的 `/api/v1/views/gpu-metrics`

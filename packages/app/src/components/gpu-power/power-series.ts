@@ -110,7 +110,8 @@ export function bucketPowerSeries(
   const parsed: { ms: number; gpu: number; power: number }[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    if (!Number.isFinite(row.power) || !Number.isInteger(row.index)) continue;
+    if (row.power === undefined || !Number.isFinite(row.power) || !Number.isInteger(row.index))
+      continue;
     const ms = parseTelemetryTimestampUtc(row.timestamp);
     if (ms === null) continue;
     const key = `${row.index}:${ms}`;

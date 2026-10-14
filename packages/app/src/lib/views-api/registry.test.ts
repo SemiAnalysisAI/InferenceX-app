@@ -8,6 +8,19 @@ import { DASHBOARD_API_COVERAGE, VIEW_QUERY_PARAMS } from './registry';
 import { comparisonSelections } from './source';
 
 describe('public view contract coverage', () => {
+  it('documents nullable run-wide GPU telemetry coverage', () => {
+    const operation = apiOperations.find((op) => op.path === '/api/v1/views/gpu-metrics');
+    const schema = operation?.responses.find((response) => response.status === '200')?.schema;
+    expect(schema?.properties?.coverage).toEqual({
+      type: ['object', 'null'],
+      properties: {
+        status: { type: 'string', enum: ['complete', 'partial', 'unknown'] },
+        missingArtifacts: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['status', 'missingArtifacts'],
+      additionalProperties: false,
+    });
+  });
   it('documents the bodyless video response without a content schema', () => {
     const document = buildOpenApiDocument();
     const pathItem = document.paths['/api/v1/views/video'] as {

@@ -203,8 +203,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Defaults to true: rank all candidate frameworks per SKU using the current axes and shared measured range. best=false returns all selected series, including vLLM and SGLang on the same SKU. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
-      '默认为 true：按当前坐标轴和共同实测区间，对每个 SKU 的所有候选框架进行排名。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
+      'Defaults to true: rank all candidate frameworks per SKU using the current axes and shared measured range. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：按当前坐标轴和共同实测区间，对每个 SKU 的所有候选框架进行排名。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
     schema: { type: 'boolean', default: true },
     example: 'true',

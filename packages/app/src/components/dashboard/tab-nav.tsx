@@ -26,7 +26,8 @@ import { TAB_LABELS_ZH } from '@/lib/routing/tab-meta-zh';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Card } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useClientSearchParams } from '@/hooks/useClientSearch';
+import { useClientRouteSearch } from '@/hooks/useClientSearch';
+import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -151,15 +152,20 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     locale === 'zh' ? TAB_LABELS_ZH[route.key] : TAB_LABELS_EN[route.key];
 
   const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
-  const searchParams = useClientSearchParams();
+  const search = useClientRouteSearch();
   const unofficialIds = useMemo(() => {
-    for (const [key, value] of searchParams) {
+    for (const [key, value] of new URLSearchParams(search)) {
       if (/^unofficialruns?$/iu.test(key) && value) return value;
     }
     return '';
-  }, [searchParams]);
-  const tabHref = (path: string) =>
-    unofficialIds ? `${path}?unofficialruns=${unofficialIds}` : path;
+  }, [search]);
+  const tabHref = (path: string) => {
+    if (!unofficialIds) return path;
+    return (
+      profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
+      `${path}?unofficialruns=${unofficialIds}`
+    );
+  };
 
   return (
     <div className="mb-1 pt-3 lg:mb-4 lg:pt-0">

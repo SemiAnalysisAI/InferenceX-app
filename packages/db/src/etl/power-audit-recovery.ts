@@ -5,12 +5,6 @@ import { recoveredPowerAudit, type RecoveredPowerAudit } from './power-audit-val
 /** Retained AgentX windows of one telemetry artifact, keyed by concurrency. */
 export type AgentxWindowPlan = ReadonlyMap<number, RecoveredPowerAudit>;
 
-/**
- * One telemetry artifact owns its retained windows, keyed by concurrency.
- * Normalization aliases at most one nested validation per concurrency, and legacy
- * top-level documents never recover (`recoveredPowerAudit`), so each
- * concurrency maps to one window.
- */
 export function agentxWindowPlan(
   validations: Readonly<Record<string, Record<string, unknown>>>,
 ): AgentxWindowPlan {
