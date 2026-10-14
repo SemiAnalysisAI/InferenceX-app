@@ -4,7 +4,7 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 //  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
 //    ($3.00 / $0.30 cached / $15.00), 60% utilization, 30% model license fee;
 //  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
-//    ($1.40 / $0.26 cached / $4.40), and a 10% license fee; a model switch
+//    ($1.40 / $0.26 cached / $4.40), and a 20% license fee; a model switch
 //    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
@@ -987,8 +987,8 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '10%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 100 tok/s/user Interactivity',
@@ -1041,6 +1041,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
@@ -1051,6 +1052,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
       .should('contain.text', 'Kimi K3')
       .and('contain.text', '45 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $3')
       .and('contain.text', '(Moonshot list price)');
@@ -1059,6 +1061,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.4')
       .and('contain.text', '(Z.ai list price)');
@@ -1133,7 +1136,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'MiniMax M3').click();
