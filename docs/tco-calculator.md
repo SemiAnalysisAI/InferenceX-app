@@ -1160,6 +1160,14 @@ and the two can be collapsed into one once both are on master.
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom
   seeds the three fields from whichever price is in force.
+- **The target is share-link state (`c_ivtarget`).** A target that differs from the
+  selected model's default is written as `c_ivtarget` (the exact number, matching the
+  API's `target`), so a shared link reopens on the same interactivity at the
+  percentile in `i_pctl`. A target equal to the model default is not written, so
+  default views keep unchanged links and follow future default changes. The server
+  parses it into the URL seed (`profitTarget`) so the first paint matches; invalid
+  values fall back to the model default, and a model switch re-seeds that default
+  and clears the param. The retired fixed-8k/1k `c_profit_target` stays ignored.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and

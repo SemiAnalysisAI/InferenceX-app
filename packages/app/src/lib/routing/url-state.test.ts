@@ -585,6 +585,34 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
+  for (const pathname of ['/profit-estimator', '/zh/profit-estimator-per-gigawatt/kimi-k3']) {
+    it(`shares the profit interactivity target and percentile on ${pathname}`, async () => {
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+
+      writeUrlParams({ i_pctl: 'p75', c_ivtarget: '24' });
+      await vi.advanceTimersByTimeAsync(200);
+
+      const shared = new URL(buildShareUrl());
+      expect(shared.pathname).toBe(pathname);
+      expect(shared.searchParams.get('c_ivtarget')).toBe('24');
+      expect(shared.searchParams.get('i_pctl')).toBe('p75');
+    });
+  }
+
+  it('drops c_ivtarget from the share link once the target returns to the model default', async () => {
+    setupWindow('?c_ivtarget=24', '/profit-estimator');
+    const { readUrlParams, writeUrlParams, buildShareUrl } =
+      await import('@/lib/routing/url-state');
+    expect(readUrlParams().c_ivtarget).toBe('24');
+
+    // The estimator writes '' when the target equals the selected model's default.
+    writeUrlParams({ c_ivtarget: '' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe('https://example.com/profit-estimator');
+  });
+
   it('defaults to inference tab prefixes when on root path', async () => {
     setupWindow('', '/');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');

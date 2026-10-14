@@ -108,6 +108,11 @@ const URL_STATE_KEYS = [
   // Cache reuse: the serving recipe within that group. Empty means the recipe
   // with the most rows reporting cache tiers.
   'c_recipe',
+  // Profit estimator: the interactivity target (tok/s/user) at the selected
+  // percentile. Empty means the selected model's default operating point, so
+  // default views keep their short links. Distinct from the retired
+  // `c_profit_target`, which carried a fixed-8k/1k operating point.
+  'c_ivtarget',
   // Profit estimator: which cache hit rate to use — actual (server-measured,
   // default) or theoretical (infinite-cache rate from the trace).
   'c_chmode',
@@ -210,6 +215,9 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_ttft: '',
   c_cfg: '',
   c_recipe: '',
+  // Model-dependent default (`profitModelDefaults(model).interactivity`), so the
+  // estimator writes '' itself when the target equals the model's default.
+  c_ivtarget: '',
   c_chmode: '',
   // Empty means the default y metric (margin).
   c_ly: '',

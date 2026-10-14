@@ -20,7 +20,11 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import {
+  type CalculatorUrlSeed,
+  parseProfitTargetParam,
+  profitTargetUrlValue,
+} from '@/components/calculator/url-seed';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -522,6 +526,7 @@ export default function ProfitEstimatorDisplay({
     >
       <ProfitEstimatorInner
         initialPercentile={urlSeed?.percentile ?? Percentile.P90}
+        initialTarget={urlSeed?.profitTarget}
         basis={basis}
       />
     </GlobalFilterProvider>
@@ -556,9 +561,12 @@ function usePercentField(defaultValue: number, eventName: string) {
 
 function ProfitEstimatorInner({
   initialPercentile,
+  initialTarget,
   basis,
 }: {
   initialPercentile: Percentile;
+  /** Shared `c_ivtarget`, parsed on the server so the first paint matches the link. */
+  initialTarget?: number;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
@@ -622,10 +630,22 @@ function ProfitEstimatorInner({
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
+  // A shared link's `c_ivtarget` wins over the model's default operating point.
+  // The server-parsed seed covers the first document load; the live snapshot
+  // covers a client-side navigation back to this page.
   const [targetValue, setTargetValue] = useState<number>(
-    () => profitModelDefaults(selectedModel).interactivity,
+    () =>
+      initialTarget ??
+      parseProfitTargetParam(getUrlParam('c_ivtarget')) ??
+      profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  // Only a target that differs from the model's default is written, so default
+  // views keep unchanged share links. A model switch re-seeds the default below,
+  // which clears the param.
+  useEffect(() => {
+    setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
+  }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
