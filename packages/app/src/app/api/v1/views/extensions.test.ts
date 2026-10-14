@@ -241,6 +241,45 @@ describe('new dashboard projections', () => {
       expect(customBody.data).not.toEqual(body.data);
     },
   );
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s defaults to theoretical cache pricing but honors actual',
+    async (view, handler) => {
+      const row = agenticRow();
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          {
+            ...row,
+            metrics: { ...row.metrics, theoretical_cache_hit_rate: 0.98 },
+          },
+        ]),
+      );
+      const query = 'model=DeepSeek-V4-Pro&target=45';
+      const read = async (suffix = '') => {
+        const response = await handler(req(view, query + suffix));
+        expect(response.status).toBe(200);
+        return response.json();
+      };
+      const implicit = await read();
+      const theoretical = await read('&cacheHitMode=theoretical');
+      const actual = await read('&cacheHitMode=actual');
+      expect(implicit.params.cacheHitMode).toBe('theoretical');
+      expect(implicit.data.rows.length).toBeGreaterThan(0);
+      expect(implicit.data).toEqual(theoretical.data);
+      expect(actual.params.cacheHitMode).toBe('actual');
+      expect(actual.data).not.toEqual(implicit.data);
+
+      mocks.benchmarks.mockImplementation(() => Response.json([row]));
+      const fallback = await read();
+      const measured = await read('&cacheHitMode=actual');
+      expect(fallback.data).toEqual(measured.data);
+      const invalid = await handler(req(view, `${query}&cacheHitMode=unknown`));
+      expect(invalid.status).toBe(400);
+    },
+  );
+
   it('exact-run and public-overlay selectors are forwarded only to fixed GET handlers', async () => {
     await first(
       req(

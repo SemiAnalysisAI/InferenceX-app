@@ -56,6 +56,13 @@ https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek
 
 ## Profit estimator defaults
 
+Both views default `cacheHitMode` to `theoretical`, displayed as
+“Theroticial Roofline” in English and Chinese dashboards. This uses the
+trace-derived infinite-cache hit rate, falling back to the measured rate when
+unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
+links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
+`params.cacheHitMode` alongside the pricing assumptions.
+
 Both profit views default DeepSeek V4 Pro to `target=35` tok/s/user when
 `target` is omitted, matching the English and Chinese dashboards. Explicit
 targets still override the default; list pricing and the 0% model license fee

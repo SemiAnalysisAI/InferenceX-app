@@ -13,6 +13,28 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
 
   for (const prefix of ['', '/zh']) {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+      it(`defaults to roofline and preserves explicit Actual in ${prefix}/${tab}`, () => {
+        const base = `${prefix}/${tab}/deepseek-v4`;
+        cy.visit(base, { onBeforeLoad: suppressNudges });
+        cy.get('[data-testid="profit-estimator-chart"]').should('exist');
+        cy.get('[data-testid="profit-cache-hit-selector"]')
+          .should('contain.text', 'Theroticial Roofline')
+          .click();
+        cy.contains('[role="option"]', /^Actual$/).click();
+        cy.location('pathname').should('eq', `${base}/cache-hit-mode/actual`);
+        cy.reload();
+        cy.get('[data-testid="profit-cache-hit-selector"]')
+          .should('contain.text', 'Actual')
+          .click();
+        cy.contains('[role="option"]', 'Theroticial Roofline').click();
+        cy.location('pathname').should('eq', base);
+        cy.reload();
+        cy.get('[data-testid="profit-cache-hit-selector"]').should(
+          'contain.text',
+          'Theroticial Roofline',
+        );
+      });
+
       it(`hydrates, edits, reloads and resets ${prefix}/${tab} route state`, () => {
         const base = `${prefix}/${tab}/deepseek-v4`;
         cy.visit(`${base}/target/24/percentile/p75/cache-hit-mode/theoretical`, {
@@ -23,7 +45,10 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.get('label[for="profit-target"]').should('contain.text', 'P90');
         cy.get('[data-testid="profit-percentile-selector"]').should('not.exist');
         cy.location('pathname').should('eq', `${base}/target/24/cache-hit-mode/theoretical`);
-        cy.get('[data-testid="profit-cache-hit-selector"]').should('contain.text', 'Theoretical');
+        cy.get('[data-testid="profit-cache-hit-selector"]').should(
+          'contain.text',
+          'Theroticial Roofline',
+        );
         cy.document().then((doc) => {
           doc.documentElement.dataset.routeSentinel = 'same-document';
         });
