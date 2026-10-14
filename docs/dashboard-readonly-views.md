@@ -139,11 +139,19 @@ anonymized ProxyTrace snapshot from a separate database through page-owned
 `/api/v1/agentic-workload-explorer/*` routes (catalogued as `page-bff`); it has
 no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
-state. GPU interactive downsampling does not alter returned raw data or statistics.
+state. GPU `downsample` sets a renderer hint (`maxInteractivePoints: 2000` or
+`null`); it does not alter returned raw data or statistics. The `artifact` selector
+uses an `artifacts[]` entry: the artifact name, or `<artifact>/<file>` for multi-file
+artifacts.
 GPU statistics include startup and warmup for all chips in the selected series,
 regardless of chip visibility. They are separate from serving-window power and
 J/token. Run telemetry comes from one source per run: stored series once the run is
-ingested, otherwise its artifacts. The public view returns private, no-store
+ingested, otherwise its artifacts. Stored `coverage` describes the whole run, even
+when one host is selected: `complete` means the recorded artifact/file inventory
+is present, `partial` means recorded telemetry is missing, and `unknown` means a
+complete inventory was not retained. `missingArtifacts` lists entirely missing
+artifacts; it may be empty when only a file is incomplete.
+GitHub `coverage` is `null` (unassessed). The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`

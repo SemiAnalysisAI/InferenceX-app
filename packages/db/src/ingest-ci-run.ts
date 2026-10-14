@@ -543,6 +543,17 @@ async function main(): Promise<void> {
     }
 
     const files = benchmarkFiles();
+    const expectedRunArtifacts = [
+      ...new Set(
+        files.flatMap((file) => {
+          const parentDir = path.posix.basename(path.posix.dirname(file.path));
+          const artifact =
+            gpuMetricsArtifacts.get(parentDir.replace(/^bmk_/u, '')) ??
+            gpuMetricsArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
+          return artifact ? [artifact.artifactName] : [];
+        }),
+      ),
+    ].sort();
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${files.length} benchmark JSON file(s)`);
 
@@ -759,11 +770,14 @@ async function main(): Promise<void> {
             if (gpuMetricsArtifact) {
               try {
                 const gpuMetricsStart = Date.now();
-                const ingested = await ingestGpuMetricsArtifact(sql, {
-                  workflowRunId,
-                  artifact: gpuMetricsArtifact,
-                  benchmarkResultIds: insertedIds,
-                });
+                const ingested = await withTransientDbRetry(`gpu_metrics for ${configKey}`, () =>
+                  ingestGpuMetricsArtifact(sql, {
+                    workflowRunId,
+                    artifact: gpuMetricsArtifact,
+                    benchmarkResultIds: insertedIds,
+                    expectedRunArtifacts,
+                  }),
+                );
                 if (ingested.seriesIds.length === 0)
                   throw new Error(
                     `No parseable telemetry series in ${gpuMetricsArtifact.artifactName}`,

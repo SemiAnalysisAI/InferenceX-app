@@ -1,9 +1,16 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DbClient } from '../connection';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint, getGpuMetricsForRun, SAMPLE_PAGE_SIZE } from './gpu-metrics';
+import { getGpuMetricsPointRevision } from './gpu-metrics-revision';
+import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
+import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
+import { withTransientDbRetry } from '../etl/db-retry';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -142,10 +149,9 @@ describe('getGpuMetricsForRun', () => {
     expect(node0?.data.map((sample) => [sample.timestamp, sample.index, sample.power])).toEqual([
       ['2026-09-11T04:19:41.000Z', 0, 187.5],
       ['2026-09-11T04:19:41.000Z', 1, 190.5],
-      ['2026-09-11T04:19:42.000Z', 0, 0],
+      ['2026-09-11T04:19:42.000Z', 0, undefined],
     ]);
-    // Collector dropout: power reads 0 W, every other metric stays absent rather than 0.
-    expect(node0?.data[2]).toEqual({ timestamp: '2026-09-11T04:19:42.000Z', index: 0, power: 0 });
+    expect(node0?.data[2]).toEqual({ timestamp: '2026-09-11T04:19:42.000Z', index: 0 });
     expect(node0?.data[0]).toEqual({
       timestamp: '2026-09-11T04:19:41.000Z',
       index: 0,
@@ -194,6 +200,141 @@ it('returns null only when the run has no stored series', async () => {
   });
   expect(await getGpuMetricsForRun(sql, NO_SERIES)).toBeNull();
   expect(await getGpuMetricsForRun(sql, NO_SERIES, { artifact: 'missing' })).toBeNull();
+});
+
+it('reports whole-run gaps while preserving readable stored data and artifact selection', async () => {
+  const legacy = await getGpuMetricsForRun(sql, WITH_SERIES);
+  expect(legacy?.coverage).toEqual({
+    status: 'unknown',
+    missingArtifacts: [],
+  });
+  await sql`update gpu_metric_series set sidecars = sidecars || jsonb_build_object(
+    'runArtifactInventory', jsonb_build_array(artifact_name, 'gpu_metrics_missing'),
+    'seriesInventory', jsonb_build_array(jsonb_build_object('fileName', file_name, 'sampleCount', sample_count))
+  ) where workflow_run_id = 1`;
+  const payload = await getGpuMetricsForRun(sql, WITH_SERIES, { artifact: null });
+  expect(payload?.series).toHaveLength(1);
+  expect(payload?.coverage).toEqual({
+    status: 'partial',
+    missingArtifacts: ['gpu_metrics_missing'],
+  });
+});
+
+it('retries when run coverage changes before the selected series snapshot is read', async () => {
+  await sql`update gpu_metric_series set sidecars = sidecars || jsonb_build_object(
+    'runArtifactInventory', jsonb_build_array(artifact_name),
+    'seriesInventory', jsonb_build_array(jsonb_build_object('fileName', file_name, 'sampleCount', sample_count))
+  ) where workflow_run_id = 1`;
+  let inventories = 0;
+  const observed: DbClient = async (strings, ...values) => {
+    const rows = await sql(strings, ...values);
+    if (strings.join('').includes("sidecars -> 'runArtifactInventory'")) {
+      inventories++;
+      if (inventories === 1) {
+        await sql`update gpu_metric_series set sidecars = sidecars || jsonb_build_object(
+          'runArtifactInventory', jsonb_build_array(artifact_name, 'gpu_metrics_missing')
+        ), ingested_at = ingested_at + interval '1 second' where workflow_run_id = 1`;
+        await sql`update gpu_metric_samples set power_w = power_w + 1 where series_id = 100`;
+      }
+    }
+    return rows;
+  };
+  const payload = await getGpuMetricsForRun(observed, WITH_SERIES, { artifact: null });
+  expect(inventories).toBe(2);
+  expect(payload?.coverage).toEqual({
+    status: 'partial',
+    missingArtifacts: ['gpu_metrics_missing'],
+  });
+  expect(payload?.series[0]?.data[0]?.power).toBe(188.5);
+});
+
+describe('getGpuMetricsPointRevision', () => {
+  it('returns null for an unlinked point and versions linked payloads by the stats calculator', async () => {
+    expect(await getGpuMetricsPointRevision(sql, 12)).toBeNull();
+    expect(await getGpuMetricsPointRevision(sql, 10)).toMatch(new RegExp(`^${GPU_STATS_VERSION}:`));
+  });
+
+  it('changes after replacement even when the CSV is unchanged', async () => {
+    const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'revision-'));
+    try {
+      fs.writeFileSync(
+        path.join(artifactDir, 'gpu_metrics.csv'),
+        'timestamp, index, power.draw [W]\n2026/09/11 04:19:41.982, 0, 187.80 W\n',
+      );
+      fs.writeFileSync(
+        path.join(artifactDir, 'gpu_metrics_context.json'),
+        JSON.stringify({ timestamp_timezone: 'UTC' }),
+      );
+      const input = {
+        workflowRunId: 1,
+        artifact: { artifactName: 'gpu_metrics_revision', artifactDir },
+        benchmarkResultIds: [12],
+      };
+      await ingestGpuMetricsArtifact(sql, input);
+      const before = await getGpuMetricsPointRevision(sql, 12);
+      expect(before).not.toBeNull();
+      await ingestGpuMetricsArtifact(sql, { ...input, replace: true });
+      expect(await getGpuMetricsPointRevision(sql, 12)).not.toBe(before);
+    } finally {
+      fs.rmSync(artifactDir, { recursive: true, force: true });
+    }
+  });
+
+  it('changes when another point is linked to a shared series', async () => {
+    const before = await getGpuMetricsPointRevision(sql, 10);
+    await sql`insert into benchmark_result_gpu_metrics (benchmark_result_id, series_id) values (12, 100)`;
+    expect(await getGpuMetricsPointRevision(sql, 10)).not.toBe(before);
+  });
+
+  it('changes when a different linked point receives an updated audit', async () => {
+    const before = await getGpuMetricsPointRevision(sql, 10);
+    await sql`update benchmark_results set power_audit = '{"window": "recovered"}' where id = 11`;
+    expect(await getGpuMetricsPointRevision(sql, 10)).not.toBe(before);
+  });
+
+  it('changes when series metadata is corrected', async () => {
+    const before = await getGpuMetricsPointRevision(sql, 10);
+    await sql`update gpu_metric_series set sidecars = '{"context": {"corrected": true}}' where id = 100`;
+    expect(await getGpuMetricsPointRevision(sql, 10)).not.toBe(before);
+  });
+});
+
+it('retries a transient telemetry transaction and stores one complete series and link', async () => {
+  const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'telemetry-retry-'));
+  const begin = vi
+    .spyOn(sql, 'begin')
+    .mockRejectedValueOnce(
+      Object.assign(new Error('connection closed'), { code: 'CONNECTION_CLOSED' }),
+    );
+  try {
+    fs.writeFileSync(
+      path.join(artifactDir, 'gpu_metrics.csv'),
+      'timestamp, index, power.draw [W]\n2026/09/11 04:19:41.982, 0, 187.80 W\n',
+    );
+    fs.writeFileSync(
+      path.join(artifactDir, 'gpu_metrics_context.json'),
+      JSON.stringify({ timestamp_timezone: 'UTC' }),
+    );
+    const result = await withTransientDbRetry(
+      'gpu_metrics',
+      () =>
+        ingestGpuMetricsArtifact(sql, {
+          workflowRunId: 1,
+          artifact: { artifactName: 'gpu_metrics_retry', artifactDir },
+          benchmarkResultIds: [12],
+        }),
+      { sleep: async () => {}, log: () => {} },
+    );
+    expect(begin).toHaveBeenCalledTimes(2);
+    expect(result.samplesInserted).toBe(1);
+    const stored = await getGpuMetricsForPoint(sql, 12);
+    expect(stored?.series).toHaveLength(1);
+    expect(stored?.series[0]?.data).toHaveLength(1);
+    expect(stored?.series[0]?.data[0]?.power).toBe(187.8);
+  } finally {
+    begin.mockRestore();
+    fs.rmSync(artifactDir, { recursive: true, force: true });
+  }
 });
 
 it('reads only the selected view host while retaining every exact explorer label', async () => {
@@ -245,4 +386,4 @@ it('pages a single large series without dropping microseconds and retries change
   expect(payload!.series[0]!.stats.find((stat) => stat.metric === 'power_w')?.count).toBe(
     SAMPLE_PAGE_SIZE + 2,
   );
-});
+}, 15_000);

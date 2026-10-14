@@ -105,6 +105,7 @@ const multinodeSeries = {
   data: [],
 };
 const storedRunPayload = {
+  coverage: { status: 'complete' as const, missingArtifacts: [] },
   workflowRun: {
     id: 7,
     githubRunId: 34557177019,
@@ -141,6 +142,7 @@ describe('databasePayloadToResponse', () => {
   it('shapes the stored digest like the GitHub payload and disambiguates multinode CSVs', () => {
     const response = databasePayloadToResponse(storedRunPayload);
     expect(response.source).toBe('database');
+    expect(response.coverage).toEqual(storedRunPayload.coverage);
     expect(response.runInfo).toEqual({
       id: 34557177019,
       name: 'Run Sweep - dsr1 fp4 b200',
@@ -202,6 +204,17 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it('preserves partial stored-run coverage without mixing in GitHub telemetry', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    const coverage = { status: 'partial', missingArtifacts: ['gpu_metrics_missing_host'] };
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({ ...storedRunPayload, coverage });
+    globalThis.fetch = vi.fn();
+    const response = await GET(req('/api/gpu-metrics?runId=34557177019'));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ source: 'database', coverage });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('reports a database failure separately instead of treating it as missing data', async () => {
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
@@ -229,12 +242,26 @@ describe('GET /api/gpu-metrics', () => {
     expect(body.error).toBe('runId must be a numeric workflow run ID');
   });
 
-  it('returns 400 when runId has non-digit chars', async () => {
-    const res = await GET(req('/api/gpu-metrics?runId=123abc'));
+  it.each([
+    '123abc',
+    '0',
+    '-1',
+    '1.5',
+    '1e21',
+    '9007199254740992',
+    '9007199254740993',
+    '99999999999999999999',
+  ])('rejects invalid runId %s before any source lookup', async (runId) => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    globalThis.fetch = vi.fn();
+    const res = await GET(req(`/api/gpu-metrics?runId=${runId}`));
     expect(res.status).toBe(400);
+    expect(mockGetGpuMetricsForRun).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('returns gpu metrics for valid runId', async () => {
+  it('falls back to live telemetry when the configured database has no stored run', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     const mockRunData = {
       id: 12345,
       name: 'GPU Benchmark',
@@ -276,7 +303,11 @@ describe('GET /api/gpu-metrics', () => {
 
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 12345, {});
     const body = await res.json();
+    expect(body.source).toBe('github');
+    expect(body).not.toHaveProperty('coverage');
     expect(body.runInfo).toEqual({
       id: 12345,
       name: 'GPU Benchmark',

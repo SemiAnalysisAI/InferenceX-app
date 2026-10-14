@@ -23,6 +23,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isRecord } from '../lib/records.js';
+
 import { sha256Hex } from './benchmark-artifacts.js';
 import {
   isPowerAuditValidationEntry,
@@ -38,7 +40,6 @@ export interface GpuMetricsArtifact {
 }
 
 export interface GpuMetricsCsvFile {
-  /** POSIX-style path relative to the artifact root. */
   fileName: string;
   path: string;
 }
@@ -49,6 +50,7 @@ export interface GpuMetricsSidecars {
   validations?: Record<string, Record<string, unknown>>;
   /** Expected stored files and deduplicated row counts from this one artifact. */
   seriesInventory?: { fileName: string; sampleCount: number }[];
+  runArtifactInventory?: string[];
   /** Bundle manifest when the preferred CSV has its own collector context. */
   powerManifest?: Record<string, unknown> | null;
   identity: unknown | null;
@@ -56,7 +58,6 @@ export interface GpuMetricsSidecars {
   energyEnd: Record<string, number> | null;
 }
 
-/** Return the shared suffix that pairs a telemetry artifact with bmk[_agentic]_<suffix>. */
 export function gpuMetricsArtifactSuffix(artifactName: string): string | null {
   for (const prefix of [GPU_METRICS_ARTIFACT_PREFIX, POWER_AUDIT_ARTIFACT_PREFIX]) {
     if (artifactName.startsWith(prefix)) return artifactName.slice(prefix.length);
@@ -83,7 +84,6 @@ export function isGpuMetricsCsvPath(relativePath: string): boolean {
   return !lower.includes('_identity') && !lower.includes('_energy_');
 }
 
-/** Recursively list the files under an extracted artifact root whose relative path matches. */
 export function walkFiles(
   root: string,
   matches: (relativePath: string) => boolean,
@@ -104,12 +104,9 @@ export function walkFiles(
   return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
-/** The producer manifest next to `samples.csv`; null when absent or malformed. */
 export function readMultinodePowerManifest(samplesPath: string): Record<string, unknown> | null {
   const parsed = readJsonIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : null;
+  return isRecord(parsed) ? parsed : null;
 }
 
 /** Preserve window boundaries and role overrides before GitHub artifact expiry. */
@@ -155,7 +152,6 @@ function readJsonIfPresent(pathname: string): unknown | null {
   }
 }
 
-/** `gpu,total_energy_consumption` two-column CSV → { "<gpu>": joules }. */
 export function parseEnergyCsv(text: string): Record<string, number> | null {
   const lines = text
     .split('\n')
@@ -171,7 +167,6 @@ export function parseEnergyCsv(text: string): Record<string, number> | null {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-/** Identity CSV (nvidia-smi) → array of column objects; JSON identity passes through. */
 function readIdentity(csvDir: string): unknown | null {
   const json = readJsonIfPresent(path.join(csvDir, 'gpu_metrics_identity.json'));
   if (json !== null) return json;
@@ -206,8 +201,8 @@ export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
     .sort();
   for (const entry of contextFiles) {
     const parsed = readJsonIfPresent(path.join(dir, entry));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      context = parsed as Record<string, unknown>;
+    if (isRecord(parsed)) {
+      context = parsed;
       break;
     }
   }
@@ -245,8 +240,7 @@ export function contextUtcOffsetMinutes(context: Record<string, unknown> | null)
  * `gpu_metrics_` upload wins over the `power_audit_` bundle for the same
  * suffix. Single-node jobs upload both, with legacy top-level validations
  * only; multinode jobs upload the bundle alone, and it is the one carrier of
- * nested AgentX windows (`normalizePowerAuditValidations`). A single-node
- * bundle that started carrying nested windows would be shadowed here.
+ * nested AgentX windows (`normalizePowerAuditValidations`).
  */
 export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
   const discovered = new Map<string, GpuMetricsArtifact>();

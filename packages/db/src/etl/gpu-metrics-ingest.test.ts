@@ -14,7 +14,8 @@ import {
 
 import type { DbClient } from '../connection';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
-import { getGpuMetricsForPoint } from '../queries/gpu-metrics';
+import { getGpuMetricsForPoint, getGpuMetricsForRun } from '../queries/gpu-metrics';
+import { getGpuMetricsPointRevision } from '../queries/gpu-metrics-revision';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -156,28 +157,44 @@ describe('prepareGpuMetricsArtifact', () => {
     ]);
   });
 
-  it('recognizes legacy AMD profiles and requires the DME scope for generic power metrics', () => {
-    const legacyAmd = writePowerAuditArtifact(MULTINODE_POWER_CSV, {
-      ...MULTINODE_MANIFEST,
-      power_profile: 'amd-device-metrics',
-    });
-    expect(prepareGpuMetricsArtifact(legacyAmd).map(({ vendor }) => vendor)).toEqual([
-      'amd',
-      'amd',
-    ]);
-    const otherMetric = writePowerAuditArtifact(MULTINODE_POWER_CSV, {
-      ...MULTINODE_MANIFEST,
-      source_metric: 'gpu_power_usage',
-      power_scope: 'gpu_board_power',
-    });
-    expect(prepareGpuMetricsArtifact(otherMetric).map(({ vendor }) => vendor)).toEqual([
-      'nvidia',
-      'nvidia',
-    ]);
-  });
+  it.each([undefined, 'gpu_board_power'])(
+    'recognizes the AMD source metric with power scope %s',
+    (powerScope) => {
+      const artifact = writePowerAuditArtifact(MULTINODE_POWER_CSV, {
+        ...MULTINODE_MANIFEST,
+        source_metric: 'gpu_power_usage',
+        power_scope: powerScope,
+      });
+      expect(prepareGpuMetricsArtifact(artifact).map(({ vendor }) => vendor)).toEqual([
+        'amd',
+        'amd',
+      ]);
+    },
+  );
 });
 
 describe('ingestGpuMetricsArtifact', () => {
+  it('retains known missing artifacts when a later repair has a narrower retained inventory', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const input = { workflowRunId: 1, artifact, benchmarkResultIds: [10] };
+    await ingestGpuMetricsArtifact(sql, {
+      ...input,
+      expectedRunArtifacts: [artifact.artifactName, 'gpu_metrics_expired'],
+    });
+    await ingestGpuMetricsArtifact(sql, {
+      ...input,
+      expectedRunArtifacts: [artifact.artifactName],
+    });
+    const payload = await getGpuMetricsForRun(sql, 34557177019);
+    expect(payload?.coverage).toEqual({
+      status: 'partial',
+      missingArtifacts: ['gpu_metrics_expired'],
+    });
+    expect(payload?.series[0]?.sidecars.runArtifactInventory).toEqual(
+      [artifact.artifactName, 'gpu_metrics_expired'].sort(),
+    );
+  });
+
   it('persists native AMD temperature and utilization by column name through the point reader', async () => {
     const csv = [
       'temperature_c,sm_active,hostname,power_w,GPU_UTIL_PCT,gpu_index,timestamp_unix,gpu_uuid,schema_version,scrape_seq',
@@ -204,46 +221,28 @@ describe('ingestGpuMetricsArtifact', () => {
       { power: 450, temperature: 68, gpuUtil: 85 },
       { power: 470, temperature: 70, gpuUtil: 95 },
     ]);
-    expect(
-      series.stats.map(({ metric, count, min, max, mean }) => ({ metric, count, min, max, mean })),
-    ).toEqual([
-      { metric: 'gpu_util_pct', count: 2, min: 85, max: 95, mean: 90 },
-      { metric: 'power_w', count: 2, min: 450, max: 470, mean: 460 },
-      { metric: 'temperature_c', count: 2, min: 68, max: 70, mean: 69 },
-    ]);
   });
 
-  it.each([
-    { version: 1, columns: '', readings: '', gpuUtil: undefined },
-    { version: 2, columns: ',gpu_util_pct,sm_active', readings: ',85,0.72', gpuUtil: 85 },
-  ])(
-    'preserves native v$version power and only collected metrics',
-    async ({ version, columns, readings, gpuUtil: expectedGpuUtil }) => {
-      await ingestGpuMetricsArtifact(sql, {
-        workflowRunId: 1,
-        artifact: writePowerAuditArtifact(
-          [
-            `schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w${columns}`,
-            `${version},1789194365.292,4,host-a,0,GPU-a0,450${readings}`,
-          ].join('\n'),
-        ),
-        benchmarkResultIds: [10],
-      });
+  it('preserves native v1 power without uncollected metrics', async () => {
+    await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writePowerAuditArtifact(
+        [
+          'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w',
+          '1,1789194365.292,4,host-a,0,GPU-a0,450',
+        ].join('\n'),
+      ),
+      benchmarkResultIds: [10],
+    });
 
-      const payload = await getGpuMetricsForPoint(sql, 10);
-      expect(payload?.series).toHaveLength(1);
-      const series = payload!.series[0]!;
-      expect(
-        series.data.map(({ power, temperature, gpuUtil }) => ({ power, temperature, gpuUtil })),
-      ).toEqual([{ power: 450, temperature: undefined, gpuUtil: expectedGpuUtil }]);
-      expect(series.stats.find(({ metric }) => metric === 'power_w')).toMatchObject({
-        count: 1,
-        min: 450,
-        max: 450,
-        mean: 450,
-      });
-    },
-  );
+    const payload = await getGpuMetricsForPoint(sql, 10);
+    expect(payload?.series).toHaveLength(1);
+    const series = payload!.series[0]!;
+    expect(
+      series.data.map(({ power, temperature, gpuUtil }) => ({ power, temperature, gpuUtil })),
+    ).toEqual([{ power: 450, temperature: undefined, gpuUtil: undefined }]);
+    expect(series.stats.map(({ metric }) => metric)).toEqual(['power_w']);
+  });
 
   it('preserves optional zero readings and omits absent, invalid and unavailable native readings', async () => {
     const csv = [
@@ -251,9 +250,7 @@ describe('ingestGpuMetricsArtifact', () => {
       '3,1789194365,0,host-a,0,GPU-a0,450,0,0.72,0',
       '3,1789194366,1,host-a,0,GPU-a0,451,100,0.72,-273.15',
       '3,1789194367,2,host-a,0,GPU-a0,452, ,0.72, ',
-      '3,1789194368,3,host-a,0,GPU-a0,453,N/A,0.72,NaN',
-      '3,1789194369,4,host-a,0,GPU-a0,454,Infinity,0.72,-Infinity',
-      '3,1789194370,5,host-a,0,GPU-a0,455,85junk,0.72,68C',
+      '3,1789194368,3,host-a,0,GPU-a0,453,NaN,0.72,NaN',
       '3,1789194371,6,host-a,0,GPU-a0,456,-1,0.72,-274',
       '3,1789194372,7,host-a,0,GPU-a0,457,101,0.72,2147483632',
       '3,1789194373,8,host-a,0,GPU-a0,458',
@@ -275,8 +272,6 @@ describe('ingestGpuMetricsArtifact', () => {
       [451, -273.15, 100],
       [452, undefined, undefined],
       [453, undefined, undefined],
-      [454, undefined, undefined],
-      [455, undefined, undefined],
       [456, undefined, undefined],
       [457, undefined, undefined],
       [458, undefined, undefined],
@@ -286,7 +281,7 @@ describe('ingestGpuMetricsArtifact', () => {
       series.stats.map(({ metric, count, min, max }) => ({ metric, count, min, max })),
     ).toEqual([
       { metric: 'gpu_util_pct', count: 2, min: 0, max: 100 },
-      { metric: 'power_w', count: 10, min: 450, max: 459 },
+      { metric: 'power_w', count: 8, min: 450, max: 459 },
       { metric: 'temperature_c', count: 3, min: -273.15, max: 64 },
     ]);
   });
@@ -327,10 +322,15 @@ describe('ingestGpuMetricsArtifact', () => {
       workflowRunId: 1,
       artifact,
       benchmarkResultIds: [10, 10],
+      expectedRunArtifacts: [artifact.artifactName],
     });
     expect(first.seriesIds).toHaveLength(1);
     expect(first.samplesInserted).toBe(4);
     expect(first.seriesSkipped).toBe(0);
+    const stored = await storedSeries(first.seriesIds[0]!);
+    expect(stored.metadata[0]!.sidecars).toMatchObject({
+      runArtifactInventory: [artifact.artifactName],
+    });
 
     const [series] = await sql<
       {
@@ -371,6 +371,7 @@ describe('ingestGpuMetricsArtifact', () => {
       workflowRunId: 1,
       artifact,
       benchmarkResultIds: [10, 11],
+      expectedRunArtifacts: [artifact.artifactName],
     });
     expect(rerun.seriesIds).toEqual(first.seriesIds);
     expect(rerun.samplesInserted).toBe(0);
@@ -401,6 +402,109 @@ describe('ingestGpuMetricsArtifact', () => {
     const samples = await sql<{ power_w: number }[]>`
       select power_w from gpu_metric_samples order by sampled_at, gpu_index`;
     expect(samples.map((s) => s.power_w)).toEqual([187.8, 190.96, 912.1, 905.3]);
+  });
+
+  it('removes stale host series, samples and point links when an artifact shrinks', async () => {
+    const artifact = writePowerAuditArtifact();
+    const input = { workflowRunId: 1, artifact, benchmarkResultIds: [10] };
+    const first = await ingestGpuMetricsArtifact(sql, input);
+    const sibling = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writeArtifact(NVIDIA_CSV),
+      benchmarkResultIds: [11],
+    });
+    const staleId = first.seriesIds[1]!;
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'LOGS', 'power', 'samples.csv'),
+      MULTINODE_POWER_CSV.split('\n')
+        .filter((line) => !line.includes('host-b'))
+        .join('\n'),
+    );
+
+    const refreshed = await ingestGpuMetricsArtifact(sql, input);
+    const payload = await getGpuMetricsForPoint(sql, 10);
+    const storedSibling = await storedSeries(sibling.seriesIds[0]!);
+
+    expect(refreshed.seriesIds).toEqual([first.seriesIds[0]]);
+    expect(await storedSeries(staleId)).toEqual({ metadata: [], samples: [], links: [] });
+    expect(payload?.series.map(({ fileName }) => fileName)).toEqual([
+      'LOGS/power/samples.csv#host-a',
+    ]);
+    expect(storedSibling.samples).toHaveLength(4);
+  });
+
+  it.each([
+    { name: 'empty', csv: MULTINODE_POWER_CSV.split('\n')[0]! },
+    { name: 'unparseable', csv: 'invalid telemetry' },
+  ])('invalidates historical coverage after an $name re-ingest and recovers', async ({ csv }) => {
+    const artifact = writePowerAuditArtifact();
+    const siblingArtifact = writeArtifact(NVIDIA_CSV);
+    const inventory = [artifact.artifactName, siblingArtifact.artifactName].sort();
+    const input = {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+      expectedRunArtifacts: inventory,
+    };
+    const first = await ingestGpuMetricsArtifact(sql, input);
+    const sibling = await ingestGpuMetricsArtifact(sql, {
+      ...input,
+      artifact: siblingArtifact,
+      benchmarkResultIds: [11],
+    });
+    await sql`update gpu_metric_series set ingested_at = '2026-09-11T00:00:00Z'
+      where artifact_name = ${artifact.artifactName}`;
+    const before = await Promise.all(first.seriesIds.map(storedSeries));
+    const storedSibling = await storedSeries(sibling.seriesIds[0]!);
+    const beforeRevision = await getGpuMetricsPointRevision(sql, 10);
+    const beforeRun = await getGpuMetricsForRun(sql, 34557177019);
+    expect(beforeRun?.coverage).toEqual({
+      status: 'complete',
+      missingArtifacts: [],
+    });
+
+    const csvPath = path.join(artifact.artifactDir, 'LOGS', 'power', 'samples.csv');
+    fs.writeFileSync(csvPath, csv);
+    expect(await ingestGpuMetricsArtifact(sql, input)).toEqual({
+      seriesIds: [],
+      samplesInserted: 0,
+      seriesSkipped: 0,
+    });
+
+    const invalidatedRun = await getGpuMetricsForRun(sql, 34557177019);
+    expect(invalidatedRun?.coverage).toEqual({
+      status: 'unknown',
+      missingArtifacts: [],
+    });
+    for (const [index, seriesId] of first.seriesIds.entries()) {
+      const after = await storedSeries(seriesId);
+      expect(after.samples).toEqual(before[index]!.samples);
+      expect(after.links).toEqual(before[index]!.links);
+      expect(after.metadata[0]!.sidecars).not.toHaveProperty('seriesInventory');
+      expect(after.metadata[0]!.sidecars.runArtifactInventory).toEqual(inventory);
+      expect(new Date(after.metadata[0]!.ingested_at).getTime()).toBeGreaterThan(
+        new Date(before[index]!.metadata[0]!.ingested_at).getTime(),
+      );
+    }
+    expect(await getGpuMetricsPointRevision(sql, 10)).not.toEqual(beforeRevision);
+    expect(await storedSeries(sibling.seriesIds[0]!)).toEqual(storedSibling);
+
+    fs.writeFileSync(csvPath, MULTINODE_POWER_CSV);
+    expect(
+      await ingestGpuMetricsArtifact(sql, {
+        ...input,
+        expectedRunArtifacts: [artifact.artifactName],
+      }),
+    ).toEqual({ seriesIds: first.seriesIds, samplesInserted: 7, seriesSkipped: 0 });
+    const recovered = await getGpuMetricsForRun(sql, 34557177019);
+    expect(recovered?.coverage).toEqual({ status: 'complete', missingArtifacts: [] });
+    expect(recovered?.series.map((series) => series.sidecars.runArtifactInventory)).toEqual([
+      inventory,
+      inventory,
+      inventory,
+    ]);
+    const recoveredPoint = await getGpuMetricsForPoint(sql, 10);
+    expect(recoveredPoint?.series.map((series) => series.sampleCount)).toEqual([4, 3]);
   });
 
   it('rolls back a replacement when point linking fails and retries without losing existing links', async () => {

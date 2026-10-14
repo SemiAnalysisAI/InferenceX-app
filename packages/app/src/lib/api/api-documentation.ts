@@ -725,6 +725,7 @@ const percentileSchema = objectSchema({
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
+const safePositiveIdSchema: ApiSchema = { ...positiveIdSchema, maximum: Number.MAX_SAFE_INTEGER };
 
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
@@ -2239,9 +2240,9 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'integer',
-        'Positive benchmark result ID.',
-        '正整数基准结果 ID。',
-        positiveIdSchema,
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
         421,
       ),
     ],
@@ -2387,9 +2388,9 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'integer',
-        'Positive benchmark result ID.',
-        '正整数基准结果 ID。',
-        positiveIdSchema,
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
         421,
       ),
     ],
@@ -2693,9 +2694,9 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'integer',
-        'Positive benchmark result ID.',
-        '正整数基准结果 ID。',
-        positiveIdSchema,
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
         421,
       ),
     ],
@@ -2893,9 +2894,9 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         true,
         'integer',
-        'Positive benchmark result ID.',
-        '正整数基准结果 ID。',
-        positiveIdSchema,
+        'Positive safe-integer benchmark result ID.',
+        '基准结果 ID，必须为正安全整数。',
+        safePositiveIdSchema,
         421,
       ),
     ],

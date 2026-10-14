@@ -255,8 +255,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '各视图对应的指标键。OperatorX 支持 tflops、latency；GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
   ],
   artifact: [
-    'GPU metric artifact name, or video numeric artifact ID paired with run.',
-    'GPU 指标产物名称，或配合 run 使用的视频数字产物 ID。',
+    'GPU metric artifact name, or <artifact>/<file> for multi-file artifacts, as returned in artifacts[]. For video, a numeric artifact ID paired with run.',
+    'GPU 指标使用 artifacts[] 返回的产物名称；一个产物含多个文件时，格式为 <artifact>/<file>。视频使用数字产物 ID，需配合 run。',
   ],
   chartView: [
     'chart (default) or correlation. Both return unsampled source rows.',
@@ -271,8 +271,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '相关性图 y 轴 GPU 指标。默认 temperature；若该产物未采集温度，则改用 corrXMetric 以外第一个已采集的指标，没有此类指标时相关性数据为空。显式指定的指标即使未采集也照常使用，此时相关性数据为空。',
   ],
   downsample: [
-    'Boolean, default true; declares the UI 2000-interactive-point rendering cap. Returned raw rows and statistics are never sampled.',
-    '布尔值，默认 true，指定界面 2000 个交互点的渲染上限。返回的原始行和统计量不降采样。',
+    'Boolean, default true; sets the renderer hint maxInteractivePoints to 2000, or null when false. Returned raw rows and statistics are never sampled.',
+    '布尔值，默认 true；将渲染提示 maxInteractivePoints 设为 2000，false 时为 null。返回的原始行和统计量不降采样。',
   ],
   sort: [
     'Table sort column; submissions defaults to date, GPU statistics to gpuIndex.',
@@ -464,6 +464,15 @@ const NEW_VIEWS = {
     {
       runInfo: object,
       artifacts: strings,
+      coverage: {
+        type: ['object', 'null'],
+        properties: {
+          status: { type: 'string', enum: ['complete', 'partial', 'unknown'] },
+          missingArtifacts: strings,
+        },
+        required: ['status', 'missingArtifacts'],
+        additionalProperties: false,
+      },
       rows: objects,
       stats: {
         ...objects,
@@ -507,7 +516,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
             : view === 'current-inferencex-image'
               ? ' ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from successful image-bearing submissions with the current active catalog. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age.'
               : view === 'gpu-metrics'
-                ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Statistics cover every chip of the selected file/host series, including startup and warmup, and are computed from its samples on each read; a stored series whose samples do not match its recorded sample count returns none. Mean is sample-weighted, P50/P95/P99 interpolate linearly at p*(N-1), and standard deviation divides by N. These statistics are not serving-window power or J/token. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
+                ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Stored coverage describes the entire run: complete means the recorded artifact/file inventory is present, partial means recorded telemetry is missing, and unknown means no complete inventory was retained; missingArtifacts names entirely missing artifacts and may be empty when only a file is incomplete. GitHub coverage is null (unassessed). Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Statistics cover every chip of the selected file/host series, including startup and warmup, and are computed from its samples on each read; a stored series whose samples do not match its recorded sample count returns none. Mean is sample-weighted, P50/P95/P99 interpolate linearly at p*(N-1), and standard deviation divides by N. These statistics are not serving-window power or J/token. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
                 : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
@@ -516,7 +525,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
             : view === 'current-inferencex-image'
               ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于带镜像的成功提交和当前有效模型目录重建 90 个每日 ageHistory 点。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。'
               : view === 'gpu-metrics'
-                ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选芯片索引筛选。统计则覆盖所选文件或主机序列的全部芯片，包含启动阶段和 warmup，每次读取时由该序列的样本计算；若已存序列读取到的样本数与记录不符，则不返回统计。均值按样本加权，P50/P95/P99 在 p*(N-1) 处线性插值，标准差以 N 为分母。这些统计不是 serving-window 功率或 J/token。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
+                ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。数据库 coverage 描述整个 run：complete 表示记录的产物与文件清单均已入库，partial 表示部分已记录的遥测缺失，unknown 表示未保留完整清单；missingArtifacts 仅列出整体缺失的产物；若只是文件不完整，此列表可能为空。GitHub 数据的 coverage 为 null，表示尚未评估。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选芯片索引筛选。统计则覆盖所选文件或主机序列的全部芯片，包含启动阶段和 warmup，每次读取时由该序列的样本计算；若已存序列读取到的样本数与记录不符，则不返回统计。均值按样本加权，P50/P95/P99 在 p*(N-1) 处线性插值，标准差以 N 为分母。这些统计不是 serving-window 功率或 J/token。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
                 : ''
         }`,
       ),

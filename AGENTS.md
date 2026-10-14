@@ -87,7 +87,7 @@ API routes (`packages/app/src/app/api/v1/`):
 - `reliability` — raw `ReliabilityRow[]`
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
-- `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU statistics computed on read) linked to one benchmark point
+- `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU statistics cached per revision) linked to one benchmark point
 - `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
 - `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
   from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
@@ -115,7 +115,7 @@ backend-for-frontend (BFF), not a reusable public data API; and `pareto`, which 
 frontier/hinterland coordinates over stored benchmark rows with explicit axis preferences (see
 [Pareto API](./docs/pareto-api.md)), reusing the chart dominance algorithm without UI filters;
 and `gpu-metrics-point`, a point-detail BFF that computes per-GPU statistics from stored samples
-on each read.
+on a cache miss and caches the payload by telemetry revision.
 
 ### Read-only coverage for public views
 

@@ -593,6 +593,13 @@ readings stay absent. `sm_active` is a distinct measurement with no stored field
 is not treated as GPU utilization.
 
 Run reads use the database when the run has stored telemetry, otherwise GitHub.
+Stored responses report `coverage.status` as `complete`, `partial`, or `unknown`,
+with `missingArtifacts` naming absent artifacts from the retained run inventory.
+Missing files or mismatched sample-count metadata also make coverage partial.
+Older series without inventories remain readable with unknown coverage. A re-ingest
+with no parseable series preserves historical samples but invalidates their inventory
+until a successful repair. Backfill `--all` revisits partial and unknown runs; complete
+runs require `--force` or `--run`.
 Database errors remain errors. Point reads use linked database series and check their
 revision before using cached payloads, so re-ingest needs no manual telemetry-cache
 purge. Readers retry if a series changes while its samples are being loaded.
@@ -605,10 +612,12 @@ semantics change so cached point payloads are refreshed.
 
 #### Migration and targeted recovery
 
-Apply `016_gpu_metrics.sql` before deploying readers or running writers; the PowerX
-workflows do not apply it. From the repository root, with credentials for the reviewed
-target database, run `bun run admin:db:migrate --yes` after checking pending migrations.
-The app and ingest process must use the same database.
+The ingest workflows apply pending migrations before ingest; Vercel deploys do not.
+Apply `016_gpu_metrics.sql` before deploying readers if deployment precedes the first
+post-merge ingest, or telemetry reads return 503 until the migration runs. From the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+process must use the same database.
 
 For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
 affected rows. With `DATABASE_WRITE_URL` and `GITHUB_TOKEN` set, preview the target,

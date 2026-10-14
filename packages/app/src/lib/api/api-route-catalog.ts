@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '07981a86ac72ea968e8f4453049d67f6b48da4d37c816a6d23cf24759373e95a',
+    sourceSha256: 'b5f9de381bb588faafa7af9ca193030d73248394332e387a77f025a51c9f961c',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -582,10 +582,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Raw PowerX telemetry read behind the public GPU metrics view, which calls it in-process: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. DB failures return 503 DATABASE_UNAVAILABLE. Responses use no-store. This is not a stable public API.',
-      zh: '原始 PowerX 遥测读取接口，由公开的 GPU 指标视图在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。数据库故障返回 503 DATABASE_UNAVAILABLE。响应使用 no-store，不作为稳定公开 API。',
+      en: 'Raw PowerX telemetry read behind the public GPU metrics view, which calls it in-process: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. runId must be a positive safe integer. Stored coverage reports complete, partial or unknown run inventory; missingArtifacts names wholly missing artifacts. DB failures return 503 DATABASE_UNAVAILABLE. Responses use no-store. This is not a stable public API.',
+      zh: '原始 PowerX 遥测读取接口，由公开的 GPU 指标视图在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。runId 必须为正安全整数。数据库 coverage 标明 run 清单完整、部分缺失或未知，missingArtifacts 列出整体缺失的产物。数据库故障返回 503 DATABASE_UNAVAILABLE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: 'ae36e0dfa4586f9f66c35c39aa3cfa67bdb76e54718d0e1c719cb227ff31fd2d',
+    sourceSha256: '6e6694aef67f962c7632e5c17f34a9780c53a57e025776a8d0fc39cb29393d11',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -847,8 +847,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Point-detail BFF returning linked PowerX telemetry series, per-GPU statistics computed from their stored samples and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest, shared-link and statistics algorithm version changes do not require manual cache purges. The CI publication verifier reads it after each telemetry ingest.',
-      zh: '数据点详情 BFF；返回关联的 PowerX 遥测序列、由已存样本计算的每 GPU 统计，以及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库、共享链接及统计算法版本变化无需手动清理缓存。CI 发布校验会在每次遥测入库后读取此接口。',
+      en: 'Point-detail BFF accepting a positive safe-integer id and returning linked PowerX telemetry series, per-GPU statistics computed from their stored samples and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest, shared-link and statistics algorithm version changes do not require manual cache purges. The CI publication verifier reads it after each telemetry ingest.',
+      zh: '数据点详情 BFF；id 必须为正安全整数，返回关联的 PowerX 遥测序列、由已存样本计算的每 GPU 统计，以及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库、共享链接及统计算法版本变化无需手动清理缓存。CI 发布校验会在每次遥测入库后读取此接口。',
     },
     sourceSha256: 'de607d7ae70093d9575fe63158946574d2cd2bfbbd058b504602377995cd0a57',
   },
@@ -1140,16 +1140,24 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
-    source: '../db/src/queries/gpu-metrics.ts',
-    sourceSha256: '2cd183ed871d0f8d0290dd8b029f96b1ff97cd1a4fd2eed34d24c69ff6e7a85b',
+    source: '../db/src/queries/gpu-metrics-coverage.ts',
+    sourceSha256: '7582534ab355487c6a88bd80e0dcb389595aa27f1bc58b73a566fc6a26ef5593',
     reviewArea: {
-      en: 'Stored PowerX telemetry reads: latest attempt, GPU metrics view artifact selection, point lookups and per-GPU statistics computed from complete stored samples.',
-      zh: '数据库 PowerX 遥测读取：最新 attempt、GPU 指标视图的产物选择、单点查询，以及基于完整已存样本计算的每 GPU 统计。',
+      en: 'Run-wide stored telemetry coverage: complete, partial or unknown inventory and entirely missing artifact names.',
+      zh: '已存遥测在整个 run 的覆盖范围：清单完整、部分缺失或未知，以及整体缺失的产物名称。',
+    },
+  },
+  {
+    source: '../db/src/queries/gpu-metrics.ts',
+    sourceSha256: '8271c98355f69dc405f7dc44c11ef9151effe7af0a88bbb3e106cb8d30070764',
+    reviewArea: {
+      en: 'Stored PowerX telemetry reads: latest attempt, GPU metrics view artifact selection, point lookups, run inventory coverage, missing metric readings and per-GPU statistics computed from complete stored samples.',
+      zh: '数据库 PowerX 遥测读取：最新 attempt、GPU 指标视图的产物选择、单点查询、run 清单覆盖范围、缺失指标读数，以及基于完整已存样本计算的每 GPU 统计。',
     },
   },
   {
     source: 'src/app/api/gpu-metrics/github-telemetry.ts',
-    sourceSha256: '62090f68b09824ff6f28e06f2d533680e5879a29bd770fe4732f5e4502789856',
+    sourceSha256: 'd6bdebc87b107fe71d680e0f7cff4c52a5be2cbbf5d70dd96a202ca1640c90d4',
     reviewArea: {
       en: 'Live PowerX gpu_metrics artifact selection, download bounds, per-artifact failure isolation and CSV context timezone normalization.',
       zh: 'PowerX 实时 gpu_metrics 产物选择、下载限制、单产物故障隔离及 CSV context 时区规范化。',
@@ -1396,10 +1404,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/app/api/v1/id-routes.ts',
-    sourceSha256: '32892e1725205dac69cc1a24fcffc4ed81039b89de7e227b5dbe71d525fdb708',
+    sourceSha256: '3cbdca0fa30ced136921109fdd3061d52456983c7a3e80b05a88f442305fe587',
     reviewArea: {
-      en: 'Shared positive-ID and ID-list validation, status codes, and error payloads for diagnostic reads.',
-      zh: '诊断读取共享的正整数 ID 与 ID 列表校验、状态码和错误载荷。',
+      en: 'Shared positive safe-integer single-ID and ID-list validation, status codes, and error payloads for diagnostic reads.',
+      zh: '诊断读取共享的正安全整数单 ID 与 ID 列表校验、状态码和错误载荷。',
     },
   },
   {

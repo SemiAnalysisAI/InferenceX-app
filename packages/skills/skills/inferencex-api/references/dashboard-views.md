@@ -140,6 +140,21 @@ which controls belong together.
 
 ## Interpretation and maintenance
 
+### GPU telemetry coverage
+
+`/api/v1/views/gpu-metrics` requires a positive safe-integer `runId`. Choose
+`artifact` from `artifacts[]`: a plain artifact name, or `<artifact>/<file>` when
+one artifact contains several files. `downsample` only sets the renderer hint
+`maxInteractivePoints` to 2000 (default) or `null`; rows and statistics stay unsampled.
+
+Stored telemetry includes run-wide `coverage`, even when one host is selected:
+`complete` means the recorded artifact/file inventory is present, `partial` means
+recorded telemetry is missing, and `unknown` means a complete inventory was not
+retained. `missingArtifacts` lists entirely missing artifacts and may be empty
+when only a file is incomplete. GitHub coverage is `null`
+(unassessed). Available stored telemetry remains readable when partial; do not
+interpret it as a complete run or combine it with live GitHub samples.
+
 ### Image submission age
 
 `/api/v1/views/current-inferencex-image?includeHistory=true` adds `ageHistory`:

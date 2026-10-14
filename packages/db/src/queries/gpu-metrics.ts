@@ -14,11 +14,16 @@ import {
 } from '../lib/gpu-metric-stats';
 
 import type { DbClient } from '../connection.js';
+import {
+  gpuMetricsRunCoverage,
+  type GpuMetricSeriesCoverageRow,
+  type GpuMetricsRunCoverage,
+} from './gpu-metrics-coverage';
 
 export interface GpuMetricSampleRow {
   timestamp: string;
   index: number;
-  power: number;
+  power?: number;
   /**
    * Absent when the collector did not sample the metric (the multinode DCGM
    * power bundle scrapes power only), so readers can tell "not collected"
@@ -84,6 +89,8 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
+  /** Coverage across the whole run, including when the samples are scoped to one artifact. */
+  coverage: GpuMetricsRunCoverage;
   /** Every artifact label when only one view artifact's samples were requested. */
   artifactNames?: string[];
 }
@@ -163,7 +170,7 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   return {
     timestamp: isoString(raw.sampled_at),
     index: Number(raw.gpu_index),
-    power: raw.power_w ?? 0,
+    power: optional(raw.power_w),
     temperature: optional(raw.temperature_c),
     smClock: optional(raw.sm_clock_mhz),
     memClock: optional(raw.mem_clock_mhz),
@@ -345,6 +352,14 @@ async function readGpuMetricsForRun(
   const run = runRows[0];
   if (!run?.has_series) return null;
 
+  const coverageRows = (await sql`
+    select id, artifact_name, file_name, sample_count, csv_sha256, ingested_at,
+      sidecars -> 'runArtifactInventory' as run_artifact_inventory,
+      sidecars -> 'seriesInventory' as series_inventory
+    from gpu_metric_series
+    where workflow_run_id = ${Number(run.id)}
+  `) as unknown as (GpuMetricSeriesCoverageRow & RawSeriesVersionRow)[];
+
   let artifactNames: string[] | undefined;
   let selectedIds: number[] | null = null;
   if (selection.artifact !== undefined) {
@@ -368,6 +383,19 @@ async function readGpuMetricsForRun(
     workflowRunId: Number(run.id),
     seriesIds: selectedIds,
   });
+  const series = await loadSeriesDetails(sql, seriesRows);
+  const runVersions = (await sql`
+    select id, csv_sha256, sample_count, ingested_at
+    from gpu_metric_series
+    where workflow_run_id = ${Number(run.id)}
+  `) as unknown as RawSeriesVersionRow[];
+  const versionKeys = new Set(runVersions.map(seriesVersionKey));
+  if (
+    runVersions.length !== coverageRows.length ||
+    !coverageRows.every((row) => versionKeys.has(seriesVersionKey(row)))
+  ) {
+    throw new TelemetrySnapshotChangedError(coverageRows.map((row) => Number(row.id)));
+  }
 
   return {
     workflowRun: {
@@ -383,7 +411,8 @@ async function readGpuMetricsForRun(
       status: run.status,
       createdAt: run.created_at ? isoString(run.created_at) : null,
     },
-    series: await loadSeriesDetails(sql, seriesRows),
+    series,
+    coverage: gpuMetricsRunCoverage(coverageRows),
     ...(artifactNames === undefined ? {} : { artifactNames }),
   };
 }

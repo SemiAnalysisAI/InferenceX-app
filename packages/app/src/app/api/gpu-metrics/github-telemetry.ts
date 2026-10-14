@@ -1,5 +1,6 @@
 /** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
 import { parseNvidiaTimestamp } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
+import { isRecord } from '@semianalysisai/inferencex-db/lib/records';
 
 import {
   parseCsvData,
@@ -71,9 +72,7 @@ async function downloadArtifact(
     const base = name.slice(name.lastIndexOf('/') + 1);
     if (!base.includes('gpu_metrics') || !base.toLowerCase().endsWith('_context.json')) return [];
     const context: unknown = JSON.parse(contents);
-    return context && typeof context === 'object' && !Array.isArray(context)
-      ? [{ name, context: context as Record<string, unknown> }]
-      : [];
+    return isRecord(context) ? [{ name, context }] : [];
   });
   // Ingest uses code-unit filename order, not archive order or the host locale.
   contextFiles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

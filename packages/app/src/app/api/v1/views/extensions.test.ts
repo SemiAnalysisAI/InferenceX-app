@@ -106,6 +106,7 @@ describe('new dashboard projections', () => {
     expect(result.headers.get('cache-control')).toContain('no-store');
     const body = await result.json();
     expect(body.rows).toEqual(metricRows.filter((r) => r.index === 1));
+    expect(body.coverage).toBeNull();
     expect(body.chart).toEqual(
       Object.fromEntries(buildGroupedData(metricRows, new Set([1]), 'temperature')),
     );
@@ -121,6 +122,26 @@ describe('new dashboard projections', () => {
     expect(corr.chart).toEqual(
       buildCorrelationData(metricRows, new Set([0]), 'temperature', 'power'),
     );
+  });
+  it('preserves run-wide partial coverage when selecting one stored host', async () => {
+    const coverage = { status: 'partial', missingArtifacts: ['gpu_metrics_missing_host'] };
+    const artifact = 'gpu_metrics_run/host-a/gpu_metrics.csv';
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        coverage,
+        artifactNames: [artifact, 'gpu_metrics_run/host-b/gpu_metrics.csv'],
+        artifacts: [{ name: artifact, data: metricRows }],
+      }),
+    );
+    const response = await gpu(
+      req('gpu-metrics', `runId=123&artifact=${encodeURIComponent(artifact)}`),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.coverage).toEqual(coverage);
+    expect(body.params.artifact).toBe(artifact);
+    expect(body.artifacts).toHaveLength(2);
   });
   it('rejects invalid GPU indices, artifacts and unsafe IDs', async () => {
     for (const query of [

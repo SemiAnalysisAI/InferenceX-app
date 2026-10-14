@@ -26,6 +26,7 @@ export const maxDuration = 300;
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: 'database' | 'github';
   artifactNames?: string[];
+  coverage?: GpuMetricsRunPayload['coverage'];
 }
 
 /** Shape stored series like the GitHub payload so readers are source-agnostic. */
@@ -37,6 +38,7 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   }
   return {
     source: 'database',
+    coverage: payload.coverage,
     ...(payload.artifactNames ? { artifactNames: payload.artifactNames } : {}),
     runInfo: {
       id: run.githubRunId,
@@ -64,11 +66,11 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
 }
 
 async function fetchGpuMetricsFromDatabase(
-  runId: string,
+  runId: number,
   selection: GpuMetricsRunSelection,
 ): Promise<GpuMetricsRouteResponse | null> {
   if (!process.env.DATABASE_READONLY_URL) return null;
-  const payload = await getGpuMetricsForRun(getDb(), Number(runId), selection);
+  const payload = await getGpuMetricsForRun(getDb(), runId, selection);
   return payload ? databasePayloadToResponse(payload) : null;
 }
 
@@ -83,14 +85,15 @@ export function readGpuMetricsForView(request: NextRequest, artifact: string | n
 
 async function readGpuMetrics(request: NextRequest, selection: GpuMetricsRunSelection) {
   const runId = request.nextUrl.searchParams.get('runId');
+  const numericRunId = Number(runId);
 
-  if (!runId || !/^\d+$/u.test(runId)) {
+  if (!runId || !/^\d+$/u.test(runId) || !Number.isSafeInteger(numericRunId) || numericRunId <= 0) {
     return NextResponse.json({ error: 'runId must be a numeric workflow run ID' }, { status: 400 });
   }
 
   let stored: GpuMetricsRouteResponse | null;
   try {
-    stored = await fetchGpuMetricsFromDatabase(runId, selection);
+    stored = await fetchGpuMetricsFromDatabase(numericRunId, selection);
   } catch (error) {
     // Missing data may use live artifacts; a failed read cannot establish absence.
     console.error(`gpu-metrics: database lookup failed for run ${runId}:`, error);
