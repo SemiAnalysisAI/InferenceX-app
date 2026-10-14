@@ -39,14 +39,14 @@ describe('bucketPowerSeries', () => {
     expect(series!.startMs).toBe(Date.UTC(2026, 8, 12, 20, 20, 41));
     expect(series!.bucketSeconds).toBe(1);
     expect(series!.gpus).toEqual([0, 1]);
-    expect(series!.t).toEqual([0, 1, 2]);
+    expect(series!.t).toEqual([0.819, 1.816, 2.844]);
     expect(series!.power).toEqual([
       [194.4, 300, 450],
       [192.4, null, 350],
     ]);
     expect(meanPowerAt(series!, 1)).toBe(300);
     expect(meanPowerAt(series!, 2)).toBe(400);
-    expect(bucketTimeMs(series!, 2)).toBe(Date.UTC(2026, 8, 12, 20, 20, 43));
+    expect(bucketTimeMs(series!, 2)).toBe(Date.UTC(2026, 8, 12, 20, 20, 43, 844));
   });
 });
 
