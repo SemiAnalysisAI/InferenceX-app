@@ -59,6 +59,11 @@ using `?model=DeepSeek-V4-Pro&target=24` (P90 is the default). Dashboard segment
 `runId`, `precisions`, `gpus`, and `unofficialrun`; `power` maps to `powerBasis`,
 and `dates`, `start`, and `end` keep their names.
 
+Both profit estimators and their read-only APIs default to `theoretical`, displayed
+as “Theroticial Roofline”. This uses trace-derived infinite-cache reuse, with the
+measured rate as a fallback when unavailable. Choose `cacheHitMode=actual` in the
+API or `/cache-hit-mode/actual` in a dashboard link for measured cache hit rates.
+
 Open a new Claude Code session and type `/inferencex <your task>`. In Codex,
 select **inferencex** from `/skills` or mention `$inferencex`. If the entry does
 not appear after installation, restart the agent in the project where you installed

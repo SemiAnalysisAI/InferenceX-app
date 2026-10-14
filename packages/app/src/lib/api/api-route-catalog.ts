@@ -1130,7 +1130,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'd2e29a36f10f348a150e66ce6380bef10b8a5d10ee634a73ae0e3ddae37a6a85',
+    sourceSha256: '6c6680c62b2743597d7f6315539f3c2c5ece02aff2293c7dacba99a4ce87cf23',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1228,7 +1228,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'a50dd37bd10334b7804a531479795f7b83a407abc21a8ed3038c733d20425a95',
+    sourceSha256: '085c31257fa7acf41a143064bcf78923c4eeaa909323e44da7a46f96126666af',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

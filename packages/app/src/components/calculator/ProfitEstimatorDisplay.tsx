@@ -85,6 +85,7 @@ import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import {
   applyCacheHitMode,
   clampPercent,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
@@ -239,10 +240,10 @@ const STRINGS = {
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     cacheHitLabel: 'Cache Hit Rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity — an upper-bound revenue estimate.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
@@ -364,10 +365,10 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     cacheHitLabel: 'Cache 命中率',
     cacheHitTooltip:
-      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theoretical 使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力——一种收入上限估算。',
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
@@ -640,10 +641,10 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
   }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
   useEffect(() => {
     const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
+    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -1638,7 +1639,7 @@ function ProfitEstimatorInner({
                           const next = values[0];
                           if (next !== 'actual' && next !== 'theoretical') return;
                           setCacheHitMode(next);
-                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
+                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
                           track('profit_cache_hit_mode_changed', { mode: next });
                         }}
                         open={openDropdown === 'cacheHit'}

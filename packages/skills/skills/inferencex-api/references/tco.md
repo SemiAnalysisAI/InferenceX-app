@@ -1,5 +1,13 @@
 # Compare modeled GPU-rate costs
 
+For the profit-estimator views (`profit-estimator` and
+`profit-estimator-per-gigawatt`), `cacheHitMode` defaults to `theoretical`, labeled
+“Theroticial Roofline” in the dashboards. It uses trace-derived infinite-cache
+reuse, falling back to the measured cache hit rate when no theoretical rate is
+available. Pass `cacheHitMode=actual` to price measured cache behavior explicitly.
+Report the selected mode with the economics assumptions; a roofline estimate is
+not measured cache performance.
+
 Use explicit user-supplied USD/GPU-hour rates to estimate cost per million output
 tokens **on the API's reported throughput basis**. A supplied `/GPU-hour` rate
 establishes its billing unit; keep its source with the assumptions. Normalize a
