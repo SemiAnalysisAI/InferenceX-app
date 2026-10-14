@@ -73,8 +73,8 @@ export interface ProfitModelDefaults {
  * aggregate also sits below it, and on 83 tok/s/user, the speed MiniMax's own
  * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
  * point, and the Hopper and MI300-series curves top out below it and list as
- * not priced. GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on
- * 20%, instead of the 30% the other models assume. DeepSeek V4 Pro opens on
+ * not priced. GLM 5.2/5.3 and MiniMax M3 open on a 20% model license fee
+ * instead of the 30% the other models assume. DeepSeek V4 Pro opens on
  * DeepSeek's peak-hour list price ($1.32 / $0.044 cached / $3.96 per M tok;
  * off-peak is half that) because third-party hosts undercut it on OpenRouter,
  * on 35 tok/s/user, and on a 0% model license fee. The 35 tok/s/user default
@@ -127,7 +127,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
   },
   [Model.GLM_5_2]: {
     interactivity: 100,
-    labCutPct: 10,
+    labCutPct: 20,
     listPricing: {
       vendor: 'Z.ai',
       inputPerMillion: 1.4,

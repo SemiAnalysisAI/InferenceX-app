@@ -653,7 +653,7 @@ function ProfitEstimatorInner({
   );
   // Each model has its own operating point, price source, and license fee
   // (Kimi K3: 45 tok/s/user on the Moonshot list price at 30%; GLM 5.2/5.3: 100 tok/s/user
-  // on the Z.ai list price at 10%; MiniMax M3: 83 tok/s/user on the MiniMax
+  // on the Z.ai list price at 20%; MiniMax M3: 83 tok/s/user on the MiniMax
   // list price at 20%; DeepSeek V4 Pro: 35 tok/s/user on the DeepSeek list
   // price at 0%, MIT-licensed; DeepSeek V4.1 Flash: 125 tok/s/user on the
   // DeepSeek Flash list price at 0%, MIT-licensed), so a model switch re-seeds

@@ -1136,7 +1136,7 @@ and the two can be collapsed into one once both are on master.
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
   H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
-  GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on 20%; Kimi K3
+  GLM 5.2/5.3 and MiniMax M3 open on a 20% model license fee; Kimi K3
   opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 35 tok/s/user,
   an editable operating assumption chosen on 2026-10-13 using the early-October
   [OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
