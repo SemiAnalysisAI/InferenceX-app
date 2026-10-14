@@ -646,7 +646,7 @@ describe('Inference ChartControls cost metrics', () => {
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
+      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
@@ -671,9 +671,9 @@ describe('Inference ChartControls cost metrics', () => {
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedSequence: Sequence.OneK_OneK,
       },
-      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.OneK_OneK },
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
