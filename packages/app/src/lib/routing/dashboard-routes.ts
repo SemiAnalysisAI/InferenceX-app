@@ -272,16 +272,6 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
   {
-    key: 'gpu-metrics',
-    path: '/gpu-metrics',
-    canonicalPath: '/gpu-metrics',
-    navGroup: 'feature-gated',
-    indexable: true,
-    localeMirrored: true,
-    providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['g_', 'i_'],
-  },
-  {
     key: 'current-inferencex-image',
     path: '/current-inferencex-image',
     canonicalPath: '/current-inferencex-image',

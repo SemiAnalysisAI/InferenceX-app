@@ -20,23 +20,27 @@ export function buildGroupedData(
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
 ): Map<number, ParsedPoint[]> {
+  // t=0 is the first sample of the whole series, not of the visible chips, so
+  // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
   const parsed: { row: GpuMetricRow; ms: number }[] = [];
   for (const row of data) {
-    if (!visibleGpus.has(row.index)) continue;
     const time = parseTimestamp(row.timestamp);
     if (!time) continue;
     const ms = time.getTime();
-    parsed.push({ row, ms });
     if (ms < minTime) minTime = ms;
+    if (visibleGpus.has(row.index)) parsed.push({ row, ms });
   }
 
   const groups = new Map<number, ParsedPoint[]>();
   for (const { row, ms } of parsed) {
+    const value = row[metricKey];
+    // A metric the collector never sampled has no point, not a zero.
+    if (value === undefined) continue;
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
-      value: row[metricKey] ?? 0,
+      value,
       gpuIndex: row.index,
       raw: row,
     });
@@ -55,5 +59,9 @@ export function buildCorrelationData(
 ) {
   return data
     .filter((r) => visibleGpus.has(r.index))
-    .map((r) => ({ x: r[xMetric] ?? 0, y: r[yMetric] ?? 0, gpuIndex: r.index, raw: r }));
+    .flatMap((r) => {
+      const x = r[xMetric];
+      const y = r[yMetric];
+      return x === undefined || y === undefined ? [] : [{ x, y, gpuIndex: r.index, raw: r }];
+    });
 }

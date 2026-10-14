@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import type { BenchmarkPointBackfill } from '../etl/run-overrides.js';
+import { isRecord } from './records.js';
 
 interface BackfillRow {
   offload_mode: unknown;
@@ -9,9 +10,7 @@ interface BackfillRow {
 }
 
 function asMetricsRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  return isRecord(value) ? value : null;
 }
 
 /** Reject a replayed correction when its audited source telemetry changed. */

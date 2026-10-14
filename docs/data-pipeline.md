@@ -84,23 +84,24 @@ must use the append-only contract below.
 
 ### Required Power Publication
 
-Ordinary sweeps that opt into `require-power` upload the producer's
-`required-power-sweep-manifest/sweep_manifest.json`. Before any CI ingest upsert,
-the app matches its required benchmark rows by recipe fingerprint, concurrency,
-and scenario/sequence lengths, then requires valid v2 power and positive energy.
-Disaggregated recipes also require both role energy measurements. Identical
-per-job and collected artifact copies are allowed; conflicting copies fail.
-Matching uses the ingest mapper's canonical identity, including AgentX `users`
-precedence over `conc`. After benchmark writes, any required point omitted by a
-purge or another filter fails the run; purged data is never restored to satisfy
-the declaration.
+Required sweeps publish a versioned
+`required-power-sweep-manifest/sweep_manifest.json` binding the required matrix to
+source run/head/attempt, point identities, topology, measurement windows and hashed
+evidence. Required intent also travels in the dispatch payload so a missing manifest
+cannot silently downgrade the gate. Unversioned required manifests fail closed;
+optional legacy bundles retain their existing behavior.
 
-The manifest must name the source run and head. A successful earlier attempt of
-that same run may supply the scope and retained points when failed jobs are
-rerun; ingestion logs both declared and current attempts. Sweeps without this
-optional manifest keep historical behavior. The separate PowerX publication
-receipt compares ingested 8K/1K and AgentX measurements with the database and
-public API after cache invalidation; it does not assert browser rendering.
+Artifact preparation validates evidence before workflow migrations. Ingestion checks
+it again before upserts and rejects unexplained loss of existing recipes or concurrency
+points under the normal curve-replacement rules. Destructive replacement requires
+explicit old-snapshot and lost-point identities; the ordinary producer grants none.
+Required energy must be finite and positive, with physical evidence for both roles
+in disaggregated deployments. Successful earlier attempts of the same run/head may
+supply retained evidence when failed jobs are rerun.
+
+These checks are preflight, not atomic publication: concurrent writers and partial
+import failures remain possible. The publication receipt verifies DB and exact-run
+API values after ingest; it does not prove latest-curve visibility or browser rendering.
 
 ### Append-Only Curve Extensions
 
@@ -570,26 +571,99 @@ re-ingest that could leave the incorrect config alongside the corrected one.
 Producers (`aggregate_power.py`) annotate every aggregate result row with two optional provenance fields alongside the `power_valid` verdict:
 
 - **`power_invalid_reasons`** — array of snake_case reason-code strings explaining a withheld verdict (emitted when `power_valid == 0`), e.g. `sampling_gap_exceeded`, `expected_gpu_count_mismatch`.
-- **`power_audit`** — compact measurement-window audit object with optional fields: `window_start_unix`, `window_end_unix`, `expected_gpu_count`, `observed_gpu_count`, `sample_count`, `max_sample_gap_s`, `producer_sha`, `exporter_image_sha256`, `source`, `observed_gpu_ids`. `source` is a safe relative path inside the original artifact bundle, and device identifiers may be indices on older collectors. Present on valid and invalid rows alike.
+- **`power_audit`** — compact measurement-window audit object with optional fields: `window_start_unix`, `window_end_unix`, `expected_gpu_count`, `observed_gpu_count`, `sample_count`, `max_sample_gap_s`, `producer_sha`, `exporter_image_sha256`, `source`, `observed_gpu_ids`, `cpu`. `source` is a safe relative path inside the original artifact bundle, except on AgentX rows whose retained window ingest or backfill recovered: there it is the alias `power_validation_<stem>_conc<N>.json` for `LOGS/agentic/conc_<N>/power_validation.json` in `power_audit_<stem>`, and only the window bounds accompany it. Device identifiers may be indices on older collectors. Present on valid and invalid rows alike.
 
 `mapBenchmarkRow()` narrows them defensively (`extractPowerInvalidReasons` / `extractPowerAudit`): reason codes must match `/^[a-z][a-z0-9_]*$/` (≤ 64 chars, deduplicated, capped at 32), audit numerics must be finite (counts: non-negative safe integers), shas collapse to `null` unless a non-empty string ≤ 128 chars, and unknown audit keys are dropped. A failed `benchmark_outcome.status` is rejected as a performance point, retaining its original artifact as evidence. An empty result maps to `undefined`, so the dedicated `benchmark_results.power_invalid_reasons` / `power_audit` JSONB columns (migration 015, mirroring the `workers` precedent from migration 006) store SQL NULL — never `[]` or `{}`. Legacy artifacts without the fields flow through every layer as NULL/undefined.
 
 Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns as `to_jsonb(br) -> 'power_invalid_reasons'` (and `lb` on the matview branch) rather than bare column references. A bare reference fails during query planning until the next ingest workflow applies the migration, because migrations run in the ingest workflows rather than at Vercel deploy. The key lookup degrades to NULL while the column is missing and is byte-identical once it exists, making deploy order irrelevant.
 
+### PowerX Telemetry Storage (`gpu_metric_*`, migration 016)
+
+CI persists telemetry so historical reads survive GitHub artifact expiry.
+`gpu_metric_series` stores CSV identity and sidecars, `gpu_metric_samples` stores
+UTC samples, and `benchmark_result_gpu_metrics` links points to their series.
+Each file/host remains separate; multiple benchmark points can share a series.
+Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry from
+`power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
+samples transactionally.
+
+Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
+Ingest stores these readings in the existing GPU sample fields; missing or invalid
+readings stay absent. `sm_active` is a distinct measurement with no stored field and
+is not treated as GPU utilization.
+
+Run reads use the database when the run has stored telemetry, otherwise GitHub.
+Stored responses report `coverage.status` as `complete`, `partial`, or `unknown`,
+with `missingArtifacts` naming absent artifacts from the retained run inventory.
+Missing files or mismatched sample-count metadata also make coverage partial.
+Older series without inventories remain readable with unknown coverage. A re-ingest
+with no parseable series preserves historical samples but invalidates their inventory
+until a successful repair. Backfill `--all` revisits partial and unknown runs; complete
+runs require `--force` or `--run`.
+Database errors remain errors. Point reads use linked database series and check their
+revision before using cached payloads, so re-ingest needs no manual telemetry-cache
+purge. Readers retry if a series changes while its samples are being loaded.
+
+Per-GPU statistics cover the full recording, including startup and warmup, rather
+than the serving window. They preserve zero, skip missing readings per metric, and
+remain empty when the stored sample count is incomplete. Chart downsampling and GPU
+visibility do not change their population. Bump `GPU_STATS_VERSION` when statistical
+semantics change so cached point payloads are refreshed.
+
+#### Migration and targeted recovery
+
+The ingest workflows apply pending migrations before ingest; Vercel deploys do not.
+Apply `016_gpu_metrics.sql` before deploying readers if deployment precedes the first
+post-merge ingest, or telemetry reads return 503 until the migration runs. From the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+process must use the same database.
+
+For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
+affected rows. With `DATABASE_WRITE_URL` and `GITHUB_TOKEN` set, preview the target,
+then repair it using an absolute receipt path:
+
+```sh
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --dry-run
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
+```
+
+After a parser fix, add `--force` to replace unchanged stored samples. GitHub recovery
+accepts only the current attempt; older or expired artifacts require retained original
+bytes through `admin:db:ingest:ci`. Never substitute another attempt's artifacts.
+Backfill may fill missing AgentX audits and refreshes `latest_benchmarks`, but those
+benchmark changes also need the app's API cache refreshed. With its `INVALIDATE_SECRET`:
+
+```sh
+bun run admin:cache:invalidate https://TARGET_ORIGIN
+bun run admin:cache:warmup https://TARGET_ORIGIN
+bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
+```
+
+For protected previews, follow the bypass handling in
+`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
+The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+and API values; ingest success alone does not establish complete coverage. To undo a
+repair, restore the snapshotted rows or original bytes under the same identities.
+Do not delete a shared series to repair one point.
+
 ### PowerX publication receipts
 
 The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
-8K/1K point records the mapped, override-adjusted metric contract, all configuration
-dimensions, original source run/attempt, structured audit, and input file SHA-256.
-Reused sweeps keep their original source identity. Failed or unmapped explicit 8K/1K
-results and database errors remain in the manifest; they cannot pass verification.
+point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
+mapped, override-adjusted metric contract, all configuration dimensions, original
+source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
+their original source identity. Failed or unmapped results at those workloads and
+database errors remain in the manifest; they cannot pass verification.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database
 run attempt and public `runId=…&exactRun=true` response. It checks missing values and
 withheld telemetry as well as numbers; legacy missing measurements remain missing.
 A `matched` receipt establishes transport fidelity, not collection coverage. An
-empty receipt says `no_8k1k_points`, never that power coverage was validated.
+empty receipt says `no_power_points`, never that power coverage was validated.
 The workflow retains both the input manifest and verification receipt. Cache
 invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
 ledger edits trigger the existing reviewed override workflow.

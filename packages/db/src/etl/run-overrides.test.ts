@@ -13,6 +13,7 @@ import {
   PURGED_RUNS,
   isBenchmarkPointPurged,
   isRunAttemptPurged,
+  planBenchmarkPoint,
   recordBackfilledPointIdentity,
   validateRunBackfills,
 } from './run-overrides';
@@ -454,6 +455,52 @@ describe('audited run backfills', () => {
     expect(() => recordBackfilledPointIdentity(seen, 'source-on', 'desired-on')).toThrow(
       /collision/u,
     );
+  });
+});
+
+describe('planBenchmarkPoint', () => {
+  const point = {
+    configId: 456,
+    config: EXAMPLE_CONFIG,
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 64,
+    offloadMode: 'off',
+    recipeFingerprint: null,
+    metrics: { median_itl: 0.1 },
+  };
+
+  it('purges a registered point before any correction is considered', () => {
+    const purged = PURGED_BENCHMARK_POINTS[0];
+    const plan = planBenchmarkPoint(
+      purged,
+      { ...purged, config: EXAMPLE_CONFIG, metrics: {} },
+      new Map(),
+    );
+    expect(plan).toEqual({ kind: 'purged' });
+  });
+
+  it('applies the matching backfill and refuses a second row that collapses onto its identity', () => {
+    const backfill = examplePointBackfill();
+    const registry = BENCHMARK_POINT_BACKFILLS as BenchmarkPointBackfill[];
+    registry.push(backfill);
+    try {
+      const seen = new Map<string, string>();
+      const plan = planBenchmarkPoint({ githubRunId: 123, runAttempt: 1 }, point, seen);
+      expect(plan).toMatchObject({ kind: 'planned', backfillId: backfill.id });
+      expect(plan.kind === 'planned' && plan.point.offloadMode).toBe('on');
+      // The artifact also carries the already-corrected row: same identity, other source.
+      expect(() =>
+        planBenchmarkPoint(
+          { githubRunId: 123, runAttempt: 1 },
+          { ...point, offloadMode: 'on' },
+          seen,
+        ),
+      ).toThrow(/collision/u);
+    } finally {
+      registry.splice(registry.indexOf(backfill), 1);
+    }
   });
 });
 

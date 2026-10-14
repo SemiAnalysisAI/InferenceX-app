@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   unofficial: vi.fn(),
   submissions: vi.fn(),
 }));
-vi.mock('@/app/api/gpu-metrics/route', () => ({ GET: mocks.metrics }));
+vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
@@ -106,6 +106,7 @@ describe('new dashboard projections', () => {
     expect(result.headers.get('cache-control')).toContain('no-store');
     const body = await result.json();
     expect(body.rows).toEqual(metricRows.filter((r) => r.index === 1));
+    expect(body.coverage).toBeNull();
     expect(body.chart).toEqual(
       Object.fromEntries(buildGroupedData(metricRows, new Set([1]), 'temperature')),
     );
@@ -121,6 +122,26 @@ describe('new dashboard projections', () => {
     expect(corr.chart).toEqual(
       buildCorrelationData(metricRows, new Set([0]), 'temperature', 'power'),
     );
+  });
+  it('preserves run-wide partial coverage when selecting one stored host', async () => {
+    const coverage = { status: 'partial', missingArtifacts: ['gpu_metrics_missing_host'] };
+    const artifact = 'gpu_metrics_run/host-a/gpu_metrics.csv';
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        coverage,
+        artifactNames: [artifact, 'gpu_metrics_run/host-b/gpu_metrics.csv'],
+        artifacts: [{ name: artifact, data: metricRows }],
+      }),
+    );
+    const response = await gpu(
+      req('gpu-metrics', `runId=123&artifact=${encodeURIComponent(artifact)}`),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.coverage).toEqual(coverage);
+    expect(body.params.artifact).toBe(artifact);
+    expect(body.artifacts).toHaveLength(2);
   });
   it('rejects invalid GPU indices, artifacts and unsafe IDs', async () => {
     for (const query of [
@@ -139,6 +160,63 @@ describe('new dashboard projections', () => {
     const result = await gpu(req('gpu-metrics', 'runId=123'));
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({ error: 'Source data unavailable' });
+  });
+  it("returns the reader's all-chip statistics instead of recomputing them from GPU-filtered rows", async () => {
+    const stats = [0, 1].map((gpuIndex) => ({
+      gpuIndex,
+      metric: 'power_w',
+      count: 10,
+      min: 0,
+      max: 800,
+      mean: 350,
+      median: 300,
+      p95: 750,
+      p99: 790,
+      stddev: 200,
+    }));
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123&gpus=0'));
+    const body = await response.json();
+    expect(body.stats).toEqual(stats.map(({ metric: _metric, ...stat }) => stat));
+    expect(mocks.metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe('123');
+  });
+  it('returns no statistics when the reader withholds them for incomplete samples', async () => {
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats: [] } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123'));
+    const body = await response.json();
+    expect(body.stats).toEqual([]);
+  });
+  it('reports the correlation y-axis it draws when the series has no temperature', async () => {
+    const data = [
+      { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
+      { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, smClock: 1900 },
+    ];
+    mocks.metrics.mockImplementation(() =>
+      Response.json({ runInfo: { id: 123 }, artifacts: [{ name: 'h200', data }] }),
+    );
+    const correlation = async (query: string) => {
+      const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
+      return response.json();
+    };
+    const defaulted = await correlation('');
+    expect(defaulted.params.corrYMetric).toBe('smClock');
+    expect(defaulted.chart).toEqual([
+      { x: 100, y: 1500, gpuIndex: 0, raw: data[0] },
+      { x: 300, y: 1900, gpuIndex: 0, raw: data[1] },
+    ]);
+    const explicit = await correlation('&corrYMetric=temperature');
+    expect(explicit.params.corrYMetric).toBe('temperature');
+    expect(explicit.chart).toEqual([]);
   });
   it('reads published video evidence without triggering artifact publication', async () => {
     mocks.video.mockImplementation(() => new Response(null, { status: 204 }));

@@ -8,6 +8,7 @@ import type { ConfigParams } from './config-cache';
 import { resolveConfigTopology } from './topology';
 import type { SkipTracker } from './skip-tracker';
 import {
+  CPU_SIDE_POWER_METRIC_KEYS,
   MEASURED_POWER_METRIC_KEYS,
   METRIC_KEYS,
   PRECISION_KEYS,
@@ -147,10 +148,28 @@ export interface PowerAudit {
   max_sample_gap_s?: number;
   producer_sha?: string | null;
   exporter_image_sha256?: string | null;
-  /** Relative path within the source run artifact bundle. */
+  /** Validation filename; nested AgentX documents use a canonical filename alias. */
   source?: string;
   /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
   observed_gpu_ids?: string[];
+  /** NVL72 CPU-side leg provenance; present only when the producer ran that leg. */
+  cpu?: PowerAuditCpu;
+}
+
+/** Sensor kinds the consumer's CPU-side leg can select as the headline series. */
+export const POWER_AUDIT_CPU_SENSOR_KINDS = ['module', 'grace_socket', 'dcgm_cpu_rail'] as const;
+
+/**
+ * Bounded CPU-side provenance emitted next to `cpu_power_valid`: which sensor fed
+ * the Grace-side keys, its source, socket coverage, and the leg's reason codes.
+ */
+export interface PowerAuditCpu {
+  sensor_kind?: (typeof POWER_AUDIT_CPU_SENSOR_KINDS)[number];
+  source?: string;
+  expected_sockets?: number;
+  observed_sockets?: number;
+  sample_row_count?: number;
+  reason_codes?: string[];
 }
 
 export interface BenchmarkParams {
@@ -177,6 +196,11 @@ export interface BenchmarkParams {
   workers?: WorkerPower[];
   powerInvalidReasons?: string[];
   powerAudit?: PowerAudit;
+}
+
+/** Agentic-trace rows emit `scenario_type: 'agentic-coding'` (and variants). */
+export function isAgenticRow(row: Record<string, unknown>): boolean {
+  return String(row.scenario_type ?? '').startsWith('agentic');
 }
 
 /**
@@ -229,9 +253,9 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  // Agentic-trace runs emit `scenario_type: 'agentic-coding'` (and variants),
-  // no isl/osl, and `users` instead of `conc`. Everything else stays as-is.
-  const isAgentic = String(row.scenario_type ?? '').startsWith('agentic');
+  // Agentic-trace runs carry no isl/osl and `users` instead of `conc`.
+  // Everything else stays as-is.
+  const isAgentic = isAgenticRow(row);
   const benchmarkType: BenchmarkType = isAgentic ? 'agentic_traces' : 'single_turn';
 
   const isl = isAgentic ? null : (parseInt2(row.isl) ?? islOslFallback?.isl ?? null);
@@ -399,11 +423,13 @@ export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
-  if (Object.hasOwn(row, 'power_valid')) {
-    const verdict = row.power_valid;
-    metrics.power_valid = verdict === 1 || verdict === '1' ? 1 : 0;
-  } else {
-    delete metrics.power_valid;
+  for (const field of ['power_valid', 'cpu_power_valid'] as const) {
+    if (Object.hasOwn(row, field)) {
+      const verdict = row[field];
+      metrics[field] = verdict === 1 || verdict === '1' ? 1 : 0;
+    } else {
+      delete metrics[field];
+    }
   }
 
   if (!Object.hasOwn(row, 'power_metric_schema_version')) {
@@ -428,15 +454,24 @@ export function normalizePowerContractMetrics(
 
 /**
  * Enforces fail-closed power publication at ingest. An explicit normalized
- * invalid verdict removes every measured field while preserving the contract
- * and diagnostic fields; legacy rows without a verdict remain unchanged.
- * Returns true so callers also drop worker telemetry. Paths that bypass
- * `mapBenchmarkRow` must normalize the verdict before calling this function.
- * Queries intentionally remain raw; the frontend withholds independently.
+ * invalid GPU verdict removes every GPU-side measured field while preserving
+ * the contract and diagnostic fields; legacy rows without a verdict remain
+ * unchanged. The NVL72 CPU-side keys follow their own `cpu_power_valid`
+ * verdict instead: anything but a normalized 1 withholds them, because no
+ * legacy rows predate that verdict and the estimator admits rows the same way.
+ * Returns true when GPU power was withheld so callers also drop worker
+ * telemetry. Paths that bypass `mapBenchmarkRow` must normalize the verdicts
+ * before calling this function. Queries intentionally remain raw; the
+ * frontend withholds independently.
  */
 export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.cpu_power_valid !== 1) {
+    for (const key of CPU_SIDE_POWER_METRIC_KEYS) delete metrics[key];
+  }
   if (metrics.power_valid !== 0) return false;
-  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  for (const key of MEASURED_POWER_METRIC_KEYS) {
+    if (!CPU_SIDE_POWER_METRIC_KEYS.has(key)) delete metrics[key];
+  }
   return true;
 }
 
@@ -526,6 +561,32 @@ function auditSha(v: unknown): string | null {
 }
 
 /**
+ * Narrow the CPU-side leg's provenance. Reason codes reuse the producer reason
+ * grammar; an unrecognised sensor kind is dropped rather than stored as a label
+ * the dashboard would misread. Undefined when nothing well-formed remains.
+ */
+function extractPowerAuditCpu(raw: unknown): PowerAuditCpu | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const cpu: PowerAuditCpu = {};
+  if ((POWER_AUDIT_CPU_SENSOR_KINDS as readonly unknown[]).includes(e.sensor_kind)) {
+    cpu.sensor_kind = e.sensor_kind as PowerAuditCpu['sensor_kind'];
+  }
+  if (typeof e.source === 'string' && e.source.length > 0 && e.source.length <= 32) {
+    cpu.source = e.source;
+  }
+  for (const field of ['expected_sockets', 'observed_sockets', 'sample_row_count'] as const) {
+    const n = auditCount(e[field]);
+    if (n !== undefined) cpu[field] = n;
+  }
+  // An empty list is the producer's "leg valid, nothing to report"; keep it.
+  if (Array.isArray(e.reason_codes)) {
+    cpu.reason_codes = extractPowerInvalidReasons(e.reason_codes) ?? [];
+  }
+  return Object.keys(cpu).length > 0 ? cpu : undefined;
+}
+
+/**
  * Missing or malformed audit values must not become a fabricated measurement;
  * SQL NULL distinguishes absent evidence from an empty recorded object.
  */
@@ -560,6 +621,8 @@ export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
     );
     if (ids.length > 0) audit.observed_gpu_ids = [...new Set(ids)].slice(0, 1024);
   }
+  const cpu = extractPowerAuditCpu(e.cpu);
+  if (cpu !== undefined) audit.cpu = cpu;
   const hasNumericField = Object.keys(audit).length > 0;
 
   audit.producer_sha = auditSha(e.producer_sha);

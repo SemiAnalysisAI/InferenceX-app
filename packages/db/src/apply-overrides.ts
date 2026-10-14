@@ -358,17 +358,30 @@ async function previewPurge(
     );
   }
 
-  const [[bmk], [stats], [evals], [changelogs], [logs]] = await Promise.all([
+  const [[bmk], [stats], [evals], [changelogs], [logs], [telemetry]] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(DISTINCT server_log_id)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL`,
+    sql`
+      SELECT count(*)::int AS series, coalesce(sum(sample_count), 0)::bigint AS samples,
+        (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+          JOIN gpu_metric_series ls ON ls.id = l.series_id
+          WHERE ls.workflow_run_id = ANY(${wrIds})) AS links
+      FROM gpu_metric_series WHERE workflow_run_id = ANY(${wrIds})
+    `,
   ]);
 
   console.log(
     `    ${bmk.n} benchmarks, ${logs.n} server_logs, ${stats.n} run_stats, ${evals.n} evals, ${changelogs.n} changelogs`,
   );
+  // FK cascades delete a run's telemetry with it. Past GitHub's 90-day artifact
+  // retention these samples are the only copy, so the preview shows what goes.
+  if (telemetry.series > 0)
+    console.log(
+      `    ${telemetry.series} gpu_metric_series (${Number(telemetry.samples).toLocaleString('en-US')} samples, ${telemetry.links} point links)`,
+    );
 
   return {
     githubRunId,
@@ -511,7 +524,9 @@ async function previewBenchmarkPointPurge(
 ): Promise<BenchmarkPointPurgeTarget | null> {
   console.log(`  ${point.githubRunId} (attempt ${point.runAttempt})`);
   const rows = await sql`
-    SELECT br.id
+    SELECT br.id,
+      (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+        WHERE l.benchmark_result_id = br.id) AS telemetry_links
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     WHERE wr.github_run_id = ${point.githubRunId}
@@ -533,6 +548,9 @@ async function previewBenchmarkPointPurge(
     return null;
   }
   console.log(`    ${description}, ${rows.length} benchmark row(s).`);
+  const links = rows.reduce((sum, row) => sum + (row.telemetry_links as number), 0);
+  if (links > 0)
+    console.log(`    removes ${links} gpu_metric_series link(s); the series stay with the run.`);
   return { resultIds: rows.map((row) => row.id as number) };
 }
 

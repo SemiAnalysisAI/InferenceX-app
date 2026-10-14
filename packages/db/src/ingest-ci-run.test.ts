@@ -55,6 +55,7 @@ describe('purged CI ingestion', () => {
           runAttempt,
           points: [],
           ingestErrors: [],
+          telemetryWarnings: [],
         });
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });

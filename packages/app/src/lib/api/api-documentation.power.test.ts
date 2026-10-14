@@ -1,4 +1,5 @@
 import { POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
+import { POWER_AUDIT_CPU_SENSOR_KINDS } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { describe, expect, it } from 'vitest';
 
 import { apiOperations, buildOpenApiDocument, getApiDocumentation } from './api-documentation';
@@ -43,9 +44,13 @@ describe('measured-power API documentation', () => {
         'max_sample_gap_s',
         'producer_sha',
         'exporter_image_sha256',
+        'cpu',
       ].toSorted(),
     );
     expect(audit?.required).toBeUndefined();
+    expect(audit?.properties?.cpu?.properties?.sensor_kind?.enum).toEqual(
+      POWER_AUDIT_CPU_SENSOR_KINDS,
+    );
 
     expect(benchmarkRowSchema?.required).not.toContain('power_invalid_reasons');
     expect(benchmarkRowSchema?.required).not.toContain('power_audit');

@@ -10,6 +10,18 @@ export interface Skips {
   noIslOsl: number;
   failedRun: number;
   dbError: number;
+  /**
+   * PowerX telemetry failures: a `gpu_metrics_*` or `power_audit_*` artifact
+   * whose series could not be stored, or an AgentX window plan that could not
+   * be read or attached.
+   * Counted apart from `dbError` because they are not fatal: the benchmark
+   * rows land either way, only the point's telemetry or provenance is
+   * affected, and `admin:db:backfill-gpu-metrics` can repeat the step later.
+   * Folding these into `dbError` would let one malformed CSV turn the whole
+   * production ingest red, through the publication manifest that
+   * verify-power-publication treats as fatal.
+   */
+  telemetryError: number;
   /** Agentic point whose sibling `agentic_<suffix>` artifact had no trace_replay files. */
   traceReplayMissing: number;
 }
@@ -35,6 +47,8 @@ export interface SkipTracker {
    * @param err - The caught error.
    */
   recordDbError: (context: string, err: Error) => void;
+  /** Same as `recordDbError`, but counts into `skips.telemetryError`. */
+  recordTelemetryError: (context: string, err: Error) => void;
   /**
    * Capture a point-in-time snapshot of the current skip counters and
    * unmapped-name sets. Used together with `diff()` to report per-artifact drops.
@@ -76,12 +90,25 @@ export function createSkipTracker(): SkipTracker {
     noIslOsl: 0,
     failedRun: 0,
     dbError: 0,
+    telemetryError: 0,
     traceReplayMissing: 0,
   };
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
   const unmappedPrecisions = new Set<string>();
-  let dbErrorsPrinted = 0;
+  const cappedRecorder = (key: 'dbError' | 'telemetryError', tag: string, noun: string) => {
+    let printed = 0;
+    return (context: string, err: Error): void => {
+      skips[key]++;
+      if (printed < MAX_DB_ERRORS) {
+        console.error(`  [${tag}] ${context}: ${err.message}`);
+        printed++;
+        if (printed === MAX_DB_ERRORS) {
+          console.error(`  [${tag}] further ${noun} errors suppressed; count included in summary`);
+        }
+      }
+    };
+  };
 
   return {
     skips,
@@ -89,16 +116,8 @@ export function createSkipTracker(): SkipTracker {
     unmappedHws,
     unmappedPrecisions,
 
-    recordDbError(context: string, err: Error): void {
-      skips.dbError++;
-      if (dbErrorsPrinted < MAX_DB_ERRORS) {
-        console.error(`  [DB ERROR] ${context}: ${err.message}`);
-        dbErrorsPrinted++;
-        if (dbErrorsPrinted === MAX_DB_ERRORS) {
-          console.error('  [DB ERROR] further DB errors suppressed; count included in summary');
-        }
-      }
-    },
+    recordDbError: cappedRecorder('dbError', 'DB ERROR', 'DB'),
+    recordTelemetryError: cappedRecorder('telemetryError', 'TELEMETRY', 'telemetry'),
 
     snapshot(): SkipSnapshot {
       return {
