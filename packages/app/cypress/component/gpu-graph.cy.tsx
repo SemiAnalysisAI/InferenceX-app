@@ -854,6 +854,21 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL');
   });
 
+  it('measures an unofficial curve from its point and removes the ruler when hidden', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      DATES.flatMap((date) => [8, 16, 32].map((x) => official(date, x, 300 - x))),
+      [8, 16, 32].map((x) => overlay(x, 2 * (300 - x))),
+    );
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    cy.get('#gpu-overlay .dot-group .visible-shape').first().click({ force: true });
+    cy.get('#gpu-overlay .unofficial-overlay-pt .overlay-x').first().click({ force: true });
+    cy.get('#gpu-overlay .perf-ruler .pr-text-ratio').should('have.text', '2.00x');
+    cy.contains('button', 'Hide overlay hardware').click();
+    cy.get('#gpu-overlay .perf-ruler').should('not.exist');
+  });
+
   it('opens the power trace from an official point on the date comparison', () => {
     const setSelectedYAxisMetric = cy.stub().as('setMetric');
     const audited = (date: string, conc: number, y: number): InferenceData => ({
