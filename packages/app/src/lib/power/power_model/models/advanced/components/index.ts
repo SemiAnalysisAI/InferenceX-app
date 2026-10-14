@@ -5,6 +5,7 @@ export { ComponentGroup, FixedPowerComponent, GenericComponent } from './base';
 export { FanPower } from './fan';
 export {
   CPU,
+  CPUAndDRAM,
   DDR5DIMM,
   FrontendDPU,
   NVMeDrive,
