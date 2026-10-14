@@ -2,7 +2,11 @@
 
 import { useMemo, useSyncExternalStore } from 'react';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import {
+  CLIENT_PATHNAME_CHANGE_EVENT,
+  CLIENT_SEARCH_CHANGE_EVENT,
+} from '@/lib/routing/client-navigation';
+import { profitRouteParams, profitRouteSearch } from '@/lib/routing/profit-estimator-routes';
 
 const subscribers = new Set<() => void>();
 let listening = false;
@@ -15,6 +19,7 @@ function startListening(): void {
   if (listening || typeof window === 'undefined') return;
   window.addEventListener('popstate', emitSearchChange);
   window.addEventListener(CLIENT_SEARCH_CHANGE_EVENT, emitSearchChange);
+  window.addEventListener(CLIENT_PATHNAME_CHANGE_EVENT, emitSearchChange);
   listening = true;
 }
 
@@ -22,6 +27,7 @@ function stopListening(): void {
   if (!listening || subscribers.size > 0 || typeof window === 'undefined') return;
   window.removeEventListener('popstate', emitSearchChange);
   window.removeEventListener(CLIENT_SEARCH_CHANGE_EVENT, emitSearchChange);
+  window.removeEventListener(CLIENT_PATHNAME_CHANGE_EVENT, emitSearchChange);
   listening = false;
 }
 
@@ -36,7 +42,10 @@ export function subscribeClientSearch(subscriber: () => void): () => void {
 }
 
 export function getClientSearchSnapshot(): string {
-  return typeof window === 'undefined' ? '' : window.location.search;
+  if (typeof window === 'undefined') return '';
+  if (profitRouteParams(window.location.pathname) === null) return window.location.search;
+  const search = profitRouteSearch(window.location.pathname, window.location.search).toString();
+  return search ? `?${search}` : '';
 }
 
 export function getServerSearchSnapshot(): string {

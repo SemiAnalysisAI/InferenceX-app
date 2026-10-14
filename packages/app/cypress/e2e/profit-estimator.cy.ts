@@ -959,8 +959,8 @@ describe('Profit Estimator per GW — per-model route', () => {
           .invoke('val')
           .should((value) => {
             const shared = new URL(String(value));
-            expect(shared.searchParams.get('i_seq')).to.equal('agentic-traces');
-            expect(shared.searchParams.has('c_profit_target')).to.equal(false);
+            expect(shared.pathname).to.equal(route);
+            expect(shared.search).to.equal('');
           });
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
@@ -1186,8 +1186,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
       .invoke('val')
       .then((value) => {
         const shared = new URL(String(value));
-        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4');
-        expect(shared.searchParams.get('c_ivtarget')).to.equal('24');
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4/target/24');
+        expect(shared.search).to.equal('');
         cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: suppressNudges });
       });
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
@@ -1199,7 +1199,9 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
       .should((value) => {
-        expect(new URL(String(value)).searchParams.has('c_ivtarget')).to.equal(false);
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4');
+        expect(shared.search).to.equal('');
       });
   });
 

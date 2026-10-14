@@ -15,6 +15,13 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
+import { replaceRouterPathname } from '@/lib/routing/client-navigation';
+import {
+  PROFIT_ROUTE_PARAMS,
+  profitRouteParams,
+  profitRoutePathname,
+  profitRouteSearch,
+} from '@/lib/routing/profit-estimator-routes';
 
 // All known share-link parameter keys
 const URL_STATE_KEYS = [
@@ -235,7 +242,7 @@ const currentState: Record<string, string> = {};
 const _initialParams: UrlStateParams = {};
 const explicitUrlParams: UrlStateParams = {};
 if (typeof window !== 'undefined') {
-  const searchParams = new URLSearchParams(window.location.search);
+  const searchParams = profitRouteSearch(window.location.pathname, window.location.search);
   for (const key of URL_STATE_KEYS) {
     const value = searchParams.get(key);
     if (value !== null) {
@@ -305,11 +312,18 @@ export function readUrlParams(): UrlStateParams {
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
   flushPendingParams();
-  const searchParams = new URLSearchParams(window.location.search);
+  const searchParams = profitRouteSearch(window.location.pathname, window.location.search);
+  const onProfitRoute = profitRouteParams(window.location.pathname) !== null;
   for (const key of URL_STATE_KEYS) {
     delete explicitUrlParams[key];
     const value = searchParams.get(key);
-    if (value === null) continue;
+    if (value === null) {
+      if (onProfitRoute) {
+        delete _initialParams[key];
+        delete currentState[key];
+      }
+      continue;
+    }
     explicitUrlParams[key] = value;
     _initialParams[key] = value;
     currentState[key] = value;
@@ -375,7 +389,22 @@ export function writeUrlParams(params: UrlStateParams): void {
 
   writeTimer = setTimeout(() => {
     flushPendingParams();
+    syncProfitRoute();
   }, 150);
+}
+
+/** Match the inference selector: shallow history replacement, no reload or RSC fetch. */
+function syncProfitRoute(): void {
+  if (typeof window === 'undefined') return;
+  const params = collectTabParams();
+  const pathname = profitRoutePathname(window.location.pathname, params);
+  if (pathname === null) return;
+  replaceRouterPathname(pathname, [
+    ...URL_STATE_KEYS,
+    ...[...new URLSearchParams(window.location.search).keys()].filter((key) =>
+      UNOFFICIAL_RUN_PARAM_RE.test(key),
+    ),
+  ]);
 }
 
 /** Immediately flush any pending param writes into the in-memory store. */
@@ -424,8 +453,13 @@ function collectTabParams(): URLSearchParams {
   // stay outside the dashboard registry.
   const prefixes = route?.shareParamScopes ?? getDashboardRoute('inference').shareParamScopes;
   const filtered = new URLSearchParams();
+  const onProfitRoute = profitRouteParams(window.location.pathname) !== null;
+  const profitKeys: readonly string[] = Object.values(PROFIT_ROUTE_PARAMS);
   for (const [key, value] of Object.entries(currentState)) {
-    if (prefixes.some((p) => key.startsWith(p))) {
+    if (
+      prefixes.some((p) => key.startsWith(p)) &&
+      (!onProfitRoute || key === 'g_model' || profitKeys.includes(key))
+    ) {
       filtered.set(key, value);
     }
   }
@@ -442,7 +476,7 @@ function collectTabParams(): URLSearchParams {
   // Only the first match is forwarded and it's always emitted under the plural
   // `unofficialruns` key — the canonical form the app writes on dismiss/load
   // and the one we want shared links to use going forward.
-  const liveParams = new URLSearchParams(window.location.search);
+  const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
   for (const [key, value] of liveParams) {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
       filtered.set('unofficialruns', value);
@@ -454,7 +488,12 @@ function collectTabParams(): URLSearchParams {
 }
 
 export function buildShareUrl(): string {
-  const search = collectTabParams().toString();
+  const params = collectTabParams();
+  const profitPath = profitRoutePathname(window.location.pathname, params);
+  if (profitPath !== null) {
+    return `${window.location.origin}${profitPath}${window.location.hash}`;
+  }
+  const search = params.toString();
   return `${window.location.origin}${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
 }
 
@@ -482,6 +521,10 @@ export function currentChartSearch(): string {
  */
 export function rememberChartStateInUrl(): string {
   if (typeof window === 'undefined') return '';
+  if (profitRouteParams(window.location.pathname) !== null) {
+    syncProfitRoute();
+    return collectTabParams().toString();
+  }
   const { pathname, hash, search: liveSearch } = window.location;
   const chartParams = collectTabParams();
 

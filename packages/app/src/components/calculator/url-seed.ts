@@ -19,6 +19,8 @@ export interface CalculatorUrlSeed {
   runId?: string;
   /** Profit estimator interactivity target (tok/s/user) from `c_ivtarget`. */
   profitTarget?: number;
+  /** Server navigation identity, distinct from shallow client-owned route edits. */
+  profitRouteKey?: string;
 }
 
 /**

@@ -1160,14 +1160,23 @@ and the two can be collapsed into one once both are on master.
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom
   seeds the three fields from whichever price is in force.
-- **The target is share-link state (`c_ivtarget`).** A target that differs from the
-  selected model's default is written as `c_ivtarget` (the exact number, matching the
-  API's `target`), so a shared link reopens on the same interactivity at the
-  percentile in `i_pctl`. A target equal to the model default is not written, so
-  default views keep unchanged links and follow future default changes. The server
-  parses it into the URL seed (`profitTarget`) so the first paint matches; invalid
-  values fall back to the model default, and a model switch re-seeds that default
-  and clears the param. The retired fixed-8k/1k `c_profit_target` stays ignored.
+- **Share state lives in the route.** Both profit estimators and their `/zh`
+  siblings use `/<tab>/<model>/<name>/<value>` pairs, for example
+  `/profit-estimator/deepseek-v4/target/24/percentile/p75`.
+  `profit-estimator-routes.ts` owns the names and deterministic ordering:
+  `target`, `percentile`, `cache-hit-mode`, `power`, `tco-basis`, `date`, `run`,
+  `precision`, `chips`, `dates`, `start`, `end`, and `unofficial-runs`.
+  Values are URI-encoded once. All previously shareable profit parameters use
+  the route; no chart state is emitted as a query. The pinned AgentX sequence
+  and other tabs' parameters are omitted. Controls update history in place,
+  using the same shallow replacement as the inference model selector.
+  Legacy queries remain readable, with path values taking precedence.
+  The target is server-seeded, defaults are omitted, and a model switch resets
+  its target. A fresh navigation must not reuse the previous page's target.
+  Filtered pages retain the model page's canonical/hreflang metadata rather
+  than indexing every combination. The read-only API still uses its existing
+  query contract (`target`, `percentile`, etc.). The retired fixed-8k/1k
+  `c_profit_target` remains ignored.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and

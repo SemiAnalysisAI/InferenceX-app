@@ -20,11 +20,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import {
-  type CalculatorUrlSeed,
-  parseProfitTargetParam,
-  profitTargetUrlValue,
-} from '@/components/calculator/url-seed';
+import { type CalculatorUrlSeed, profitTargetUrlValue } from '@/components/calculator/url-seed';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -519,6 +515,7 @@ export default function ProfitEstimatorDisplay({
 }) {
   return (
     <GlobalFilterProvider
+      key={`${basis}:${urlSeed?.model}:${urlSeed?.profitTarget}:${urlSeed?.profitRouteKey}`}
       initialModel={urlSeed?.model}
       initialSequence={Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
@@ -630,14 +627,9 @@ function ProfitEstimatorInner({
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
-  // A shared link's `c_ivtarget` wins over the model's default operating point.
-  // The server-parsed seed covers the first document load; the live snapshot
-  // covers a client-side navigation back to this page.
+  // The server seed belongs to this navigation; the URL store can outlive a model.
   const [targetValue, setTargetValue] = useState<number>(
-    () =>
-      initialTarget ??
-      parseProfitTargetParam(getUrlParam('c_ivtarget')) ??
-      profitModelDefaults(selectedModel).interactivity,
+    () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   // Only a target that differs from the model's default is written, so default

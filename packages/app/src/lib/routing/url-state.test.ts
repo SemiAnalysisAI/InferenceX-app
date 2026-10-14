@@ -10,7 +10,7 @@ function setupWindow(search = '', pathname = '/inference', hash = '') {
   };
   const history = { replaceState: vi.fn(), state: { __NA: 1 } };
 
-  vi.stubGlobal('window', { location, history });
+  vi.stubGlobal('window', { location, history, dispatchEvent: vi.fn() });
   return { location, history };
 }
 
@@ -594,9 +594,9 @@ describe('buildShareUrl tab filtering', () => {
       await vi.advanceTimersByTimeAsync(200);
 
       const shared = new URL(buildShareUrl());
-      expect(shared.pathname).toBe(pathname);
-      expect(shared.searchParams.get('c_ivtarget')).toBe('24');
-      expect(shared.searchParams.get('i_pctl')).toBe('p75');
+      const base = pathname.endsWith('/kimi-k3') ? pathname : `${pathname}/kimi-k3`;
+      expect(shared.pathname).toBe(`${base}/target/24/percentile/p75`);
+      expect(shared.search).toBe('');
     });
   }
 
@@ -611,6 +611,37 @@ describe('buildShareUrl tab filtering', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     expect(buildShareUrl()).toBe('https://example.com/profit-estimator');
+  });
+
+  it('refreshes route state and clears stale values on a fresh estimator navigation', async () => {
+    const { location } = setupWindow('', '/profit-estimator/deepseek-v4/target/24/percentile/p75');
+    const { readUrlParams, refreshUrlParamsOnNavigation, buildShareUrl } =
+      await import('@/lib/routing/url-state');
+    expect(readUrlParams()).toMatchObject({ c_ivtarget: '24', i_pctl: 'p75' });
+    location.pathname = '/profit-estimator/kimi-k3';
+    refreshUrlParamsOnNavigation(location.pathname);
+    expect(readUrlParams().c_ivtarget).toBeUndefined();
+    expect(readUrlParams().i_pctl).toBeUndefined();
+    expect(buildShareUrl()).toBe('https://example.com/profit-estimator/kimi-k3');
+  });
+
+  it('updates the visible path with pending filters and preserves hash and unrelated queries', async () => {
+    const { history } = setupWindow(
+      '?utm_campaign=test',
+      '/profit-estimator/deepseek-v4',
+      '#chart',
+    );
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+    writeUrlParams({ c_ivtarget: '24', i_pctl: 'p75' });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      history.state,
+      '',
+      '/profit-estimator/deepseek-v4/target/24/percentile/p75?utm_campaign=test#chart',
+    );
+    expect(buildShareUrl()).toBe(
+      'https://example.com/profit-estimator/deepseek-v4/target/24/percentile/p75#chart',
+    );
   });
 
   it('defaults to inference tab prefixes when on root path', async () => {

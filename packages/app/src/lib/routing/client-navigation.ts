@@ -64,15 +64,19 @@ export function getClientPathnameOverride(): string | null {
  * Router state is carried over so Back/Forward keep working.
  */
 export function replaceRouterPathname(target: string, dropParams: readonly string[] = []): void {
-  if (window.location.pathname === target) return;
   const search = new URLSearchParams(window.location.search);
   for (const param of dropParams) search.delete(param);
   const qs = search.toString();
+  if (window.location.pathname === target && window.location.search === (qs ? `?${qs}` : ''))
+    return;
   window.history.replaceState(
     window.history.state,
     '',
     `${target}${qs ? `?${qs}` : ''}${window.location.hash}`,
   );
+  clientPathnameOverride = target;
+  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: target }));
+  notifyClientSearchChange(`${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
 }
 
 /**

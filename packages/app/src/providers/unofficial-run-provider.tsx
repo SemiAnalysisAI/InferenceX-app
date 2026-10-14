@@ -18,6 +18,7 @@ import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
+import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
@@ -429,6 +430,7 @@ export function UnofficialRunProvider({
   const clearUnofficialRun = useCallback(() => {
     const url = new URL(window.location.href);
     deleteUnofficialRunParams(url.searchParams);
+    setProfitRouteUnofficialRuns(url, []);
     window.history.pushState({}, '', url);
     notifyClientSearchChange(url.href);
   }, []);
@@ -447,6 +449,7 @@ export function UnofficialRunProvider({
       const url = new URL(window.location.href);
       deleteUnofficialRunParams(url.searchParams);
       if (remainingIds.length > 0) url.searchParams.set('unofficialruns', remainingIds.join(','));
+      setProfitRouteUnofficialRuns(url, remainingIds);
       window.history.pushState({}, '', url);
       notifyClientSearchChange(url.href);
     },

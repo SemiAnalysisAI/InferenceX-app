@@ -47,6 +47,17 @@ If you need to build the archive, run `npm pack` in `packages/skills`.
 
 ## Usage
 
+Profit-estimator dashboard links encode share state in named route segments,
+for example `/profit-estimator/deepseek-v4/target/24/percentile/p75`.
+The per-gigawatt page and `/zh` pages use the same format. Legacy query links
+remain readable; the read-only API and CLI contracts have not changed.
+To reproduce that example through `/api/v1/views/profit-estimator`, continue
+using `?model=DeepSeek-V4-Pro&target=24&percentile=p75`. Dashboard segments
+`cache-hit-mode`, `tco-basis`, `date`, `run`, `precision`, `chips`, and
+`unofficial-runs` map to API parameters `cacheHitMode`, `tcoBasis`, `date`,
+`runId`, `precisions`, `gpus`, and `unofficialrun`; `power` maps to `powerBasis`,
+and `dates`, `start`, and `end` keep their names.
+
 Open a new Claude Code session and type `/inferencex <your task>`. In Codex,
 select **inferencex** from `/skills` or mention `$inferencex`. If the entry does
 not appear after installation, restart the agent in the project where you installed
