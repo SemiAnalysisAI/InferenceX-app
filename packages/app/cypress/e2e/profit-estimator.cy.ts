@@ -959,8 +959,8 @@ describe('Profit Estimator per GW — per-model route', () => {
           .invoke('val')
           .should((value) => {
             const shared = new URL(String(value));
-            expect(shared.searchParams.get('i_seq')).to.equal('agentic-traces');
-            expect(shared.searchParams.has('c_profit_target')).to.equal(false);
+            expect(shared.pathname).to.equal(route);
+            expect(shared.search).to.equal('');
           });
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
@@ -1174,6 +1174,35 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
   beforeEach(() => {
     stubOpenRouter();
     cy.viewport(1280, 1000);
+  });
+
+  it('shares an explicit P90 interactivity target and reopens on it', () => {
+    cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
+    cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .then((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4/target/24');
+        expect(shared.search).to.equal('');
+        cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: suppressNudges });
+      });
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 24 tok/s/user');
+
+    // Back on the model's default operating point, the link carries no target.
+    cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4');
+        expect(shared.search).to.equal('');
+      });
   });
 
   it('opens /profit-estimator/deepseek-v4 on 35 tok/s/user and the DeepSeek list price', () => {
