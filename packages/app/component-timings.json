@@ -1,21 +1,21 @@
 {
   "provenance": {
-    "revision": "45d351673d0dd2a833a8fc2c155cdf802d197801",
-    "runId": "38310601763",
+    "revision": "6cabf2b0ba724455a48ec700aabab8241fe5d10c",
+    "runId": "38494627606",
     "runAttempt": "1",
     "browser": "chrome",
     "kind": "component",
     "shards": 4,
-    "sourceHash": "02748fec4ce92fd7be2ab8a2192e6909034c9370edd3a2a0b5b887f437813129"
+    "sourceHash": "2229118663d618d455595a5d593c3f47a7d57996333395317a4859027fde1e27"
   },
   "durations": [
     {
       "spec": "cypress/component/agentic-distribution.cy.tsx",
-      "duration": 465,
+      "duration": 330,
       "tests": [
         {
           "title": ["Agentic ISL/OSL distribution", "bins on a log axis without a fitted overlay"],
-          "duration": 171,
+          "duration": 95,
           "attempts": 1
         },
         {
@@ -23,7 +23,7 @@
             "Agentic ISL/OSL distribution",
             "spreads mass across the axis instead of piling it into the first bins"
           ],
-          "duration": 51,
+          "duration": 29,
           "attempts": 1
         },
         {
@@ -31,7 +31,7 @@
             "Agentic ISL/OSL distribution",
             "reports zero-token requests that a log axis cannot place"
           ],
-          "duration": 57,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -39,7 +39,7 @@
             "Agentic ISL/OSL distribution",
             "still draws the histogram when every request is the same length"
           ],
-          "duration": 46,
+          "duration": 50,
           "attempts": 1
         },
         {
@@ -47,7 +47,7 @@
             "Agentic ISL/OSL distribution",
             "shows the empty placeholder when nothing can be plotted"
           ],
-          "duration": 42,
+          "duration": 53,
           "attempts": 1
         },
         {
@@ -55,86 +55,86 @@
             "Agentic ISL/OSL distribution",
             "renders in Simplified Chinese on the /zh route"
           ],
-          "duration": 73,
+          "duration": 53,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/autumn-leaves-gutter.cy.tsx",
-      "duration": 941,
+      "duration": 881,
       "tests": [
         {
           "title": [
             "Autumn leaf gutter regression",
             "keeps leaves visible despite the retired opt-out"
           ],
-          "duration": 67,
+          "duration": 66,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "still hides the decoration in embeds"],
-          "duration": 36,
+          "duration": 30,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 320px"],
-          "duration": 122,
+          "duration": 114,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 640px"],
-          "duration": 116,
+          "duration": 107,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 768px"],
-          "duration": 106,
+          "duration": 107,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 1024px"],
-          "duration": 112,
+          "duration": 102,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 1280px"],
-          "duration": 111,
+          "duration": 103,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 1440px"],
-          "duration": 109,
+          "duration": 101,
           "attempts": 1
         },
         {
           "title": ["Autumn leaf gutter regression", "does not paint over content at 1536px"],
-          "duration": 121,
+          "duration": 115,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/blog-shared-chrome.cy.tsx",
-      "duration": 284,
+      "duration": 188,
       "tests": [
         {
           "title": [
             "Blog shared chrome",
             "localizes heading-link feedback and tracks a Chinese copy interaction"
           ],
-          "duration": 276,
+          "duration": 185,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/chart-buttons.cy.tsx",
-      "duration": 2680,
+      "duration": 2282,
       "tests": [
         {
           "title": ["ChartButtons", "renders localized accessible actions on mobile by default"],
-          "duration": 285,
+          "duration": 158,
           "attempts": 1
         },
         {
@@ -142,7 +142,7 @@
             "ChartButtons",
             "keeps wrapping actions above long captions at 320px without losing actions"
           ],
-          "duration": 676,
+          "duration": 508,
           "attempts": 1
         },
         {
@@ -150,7 +150,7 @@
             "ChartButtons",
             "keeps wrapping actions above long captions at 768px without losing actions"
           ],
-          "duration": 416,
+          "duration": 379,
           "attempts": 1
         },
         {
@@ -158,17 +158,17 @@
             "ChartButtons",
             "keeps wrapping actions above long captions at 1280px without losing actions"
           ],
-          "duration": 385,
+          "duration": 361,
           "attempts": 1
         },
         {
           "title": ["ChartButtons", "without CSV export", "zoom reset dispatches custom event"],
-          "duration": 138,
+          "duration": 129,
           "attempts": 1
         },
         {
           "title": ["ChartButtons", "with CSV export", "clicking CSV calls onExportCsv"],
-          "duration": 231,
+          "duration": 218,
           "attempts": 1
         },
         {
@@ -177,7 +177,7 @@
             "with MP4 export",
             "shows MP4 option in the export popover and triggers the callback"
           ],
-          "duration": 221,
+          "duration": 213,
           "attempts": 1
         },
         {
@@ -186,7 +186,7 @@
             "with MP4 export",
             "shows the popover when only MP4 export is provided (no CSV)"
           ],
-          "duration": 215,
+          "duration": 206,
           "attempts": 1
         },
         {
@@ -195,21 +195,21 @@
             "hideZoomReset",
             "hides zoom reset button when hideZoomReset is true"
           ],
-          "duration": 46,
+          "duration": 48,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/chart-legend.cy.tsx",
-      "duration": 4975,
+      "duration": 4159,
       "tests": [
         {
           "title": [
             "ChartLegend (sidebar variant)",
             "derives long unofficial labels without a nested update"
           ],
-          "duration": 92,
+          "duration": 54,
           "attempts": 1
         },
         {
@@ -217,7 +217,7 @@
             "ChartLegend (sidebar variant)",
             "renders no search input (removed from the sidebar panel)"
           ],
-          "duration": 43,
+          "duration": 14,
           "attempts": 1
         },
         {
@@ -225,7 +225,7 @@
             "ChartLegend (sidebar variant)",
             "fits the longest single-line name with a compact, aligned points-button column"
           ],
-          "duration": 321,
+          "duration": 274,
           "attempts": 1
         },
         {
@@ -233,7 +233,7 @@
             "ChartLegend (sidebar variant)",
             "keeps long unofficial names and their points action inside the panel at 390px"
           ],
-          "duration": 102,
+          "duration": 91,
           "attempts": 1
         },
         {
@@ -241,7 +241,7 @@
             "ChartLegend (sidebar variant)",
             "keeps the same toggle and hit area in place across collapse and reopen at 390px"
           ],
-          "duration": 221,
+          "duration": 183,
           "attempts": 1
         },
         {
@@ -249,7 +249,7 @@
             "ChartLegend (sidebar variant)",
             "fits a short list and keeps actions with the close button at 390px"
           ],
-          "duration": 636,
+          "duration": 543,
           "attempts": 1
         },
         {
@@ -257,7 +257,7 @@
             "ChartLegend (sidebar variant)",
             "scrolls a long flat list without hiding controls at 390px"
           ],
-          "duration": 280,
+          "duration": 263,
           "attempts": 1
         },
         {
@@ -265,7 +265,7 @@
             "ChartLegend (sidebar variant)",
             "scrolls a long grouped list without hiding controls at 390px"
           ],
-          "duration": 301,
+          "duration": 265,
           "attempts": 1
         },
         {
@@ -273,7 +273,7 @@
             "ChartLegend (sidebar variant)",
             "keeps long unofficial names and their points action inside the panel at 1280px"
           ],
-          "duration": 162,
+          "duration": 88,
           "attempts": 1
         },
         {
@@ -281,7 +281,7 @@
             "ChartLegend (sidebar variant)",
             "keeps the same toggle and hit area in place across collapse and reopen at 1280px"
           ],
-          "duration": 227,
+          "duration": 177,
           "attempts": 1
         },
         {
@@ -289,7 +289,7 @@
             "ChartLegend (sidebar variant)",
             "fits a short list and keeps actions with the close button at 1280px"
           ],
-          "duration": 585,
+          "duration": 543,
           "attempts": 1
         },
         {
@@ -297,7 +297,7 @@
             "ChartLegend (sidebar variant)",
             "scrolls a long flat list without hiding controls at 1280px"
           ],
-          "duration": 299,
+          "duration": 286,
           "attempts": 1
         },
         {
@@ -305,7 +305,7 @@
             "ChartLegend (sidebar variant)",
             "scrolls a long grouped list without hiding controls at 1280px"
           ],
-          "duration": 310,
+          "duration": 299,
           "attempts": 1
         },
         {
@@ -313,12 +313,12 @@
             "ChartLegend (sidebar variant)",
             "clicking a legend item toggles its active state"
           ],
-          "duration": 110,
+          "duration": 106,
           "attempts": 1
         },
         {
           "title": ["ChartLegend (sidebar variant)", "reset filter restores all items"],
-          "duration": 221,
+          "duration": 195,
           "attempts": 1
         },
         {
@@ -326,7 +326,7 @@
             "ChartLegend (sidebar variant)",
             "close button hides the panel and the reopen button restores it"
           ],
-          "duration": 221,
+          "duration": 174,
           "attempts": 1
         },
         {
@@ -334,7 +334,7 @@
             "ChartLegend (sidebar variant)",
             "renders no points-table icon when items have no onShowPoints handler"
           ],
-          "duration": 22,
+          "duration": 8,
           "attempts": 1
         },
         {
@@ -342,7 +342,7 @@
             "ChartLegend (sidebar variant)",
             "renders an exportable key explaining the agentic offload halo"
           ],
-          "duration": 35,
+          "duration": 15,
           "attempts": 1
         },
         {
@@ -350,7 +350,7 @@
             "ChartLegend points-table icon + dialog",
             "opens the dialog with the series points sorted by concurrency, with row links"
           ],
-          "duration": 177,
+          "duration": 117,
           "attempts": 1
         },
         {
@@ -358,26 +358,26 @@
             "ChartLegend points-table icon + dialog",
             "overlay series opens a link-free table with the metrics-only caption"
           ],
-          "duration": 145,
+          "duration": 108,
           "attempts": 1
         },
         {
           "title": ["ChartLegend points-table icon + dialog", "dialog closes and can be reopened"],
-          "duration": 322,
+          "duration": 267,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/chart-selectors.cy.tsx",
-      "duration": 18714,
+      "duration": 17435,
       "tests": [
         {
           "title": [
             "Consistent informational help",
             "uses the same surface for label, selected-value, option and action hints (en, 390px)"
           ],
-          "duration": 2007,
+          "duration": 1954,
           "attempts": 1
         },
         {
@@ -385,7 +385,7 @@
             "Consistent informational help",
             "uses the same surface for label, selected-value, option and action hints (en, 1280px)"
           ],
-          "duration": 1892,
+          "duration": 1876,
           "attempts": 1
         },
         {
@@ -393,7 +393,7 @@
             "Consistent informational help",
             "uses the same surface for label, selected-value, option and action hints (zh, 390px)"
           ],
-          "duration": 1984,
+          "duration": 1932,
           "attempts": 1
         },
         {
@@ -401,7 +401,7 @@
             "Consistent informational help",
             "uses the same surface for label, selected-value, option and action hints (zh, 1280px)"
           ],
-          "duration": 2567,
+          "duration": 1879,
           "attempts": 1
         },
         {
@@ -409,7 +409,7 @@
             "Chart Selectors",
             "keeps fixed and selectable values the same height when disabled and enabled at 390px"
           ],
-          "duration": 1075,
+          "duration": 963,
           "attempts": 1
         },
         {
@@ -417,7 +417,7 @@
             "Chart Selectors",
             "keeps fixed and selectable values the same height when disabled and enabled at 768px"
           ],
-          "duration": 990,
+          "duration": 884,
           "attempts": 1
         },
         {
@@ -425,7 +425,7 @@
             "Chart Selectors",
             "keeps fixed and selectable values the same height when disabled and enabled at 1280px"
           ],
-          "duration": 937,
+          "duration": 889,
           "attempts": 1
         },
         {
@@ -433,12 +433,12 @@
             "Chart Selectors",
             "keeps single-value benchmark context readable on Chinese phones"
           ],
-          "duration": 42,
+          "duration": 34,
           "attempts": 1
         },
         {
           "title": ["Chart Selectors", "ModelSelector", "shows options when clicked"],
-          "duration": 127,
+          "duration": 113,
           "attempts": 1
         },
         {
@@ -447,7 +447,7 @@
             "ModelSelector",
             "selecting an option updates the displayed value"
           ],
-          "duration": 213,
+          "duration": 216,
           "attempts": 1
         },
         {
@@ -456,7 +456,7 @@
             "ModelSelector",
             "searches across model groups, recovers from no results, and selects by keyboard (en)"
           ],
-          "duration": 864,
+          "duration": 854,
           "attempts": 1
         },
         {
@@ -465,7 +465,7 @@
             "ModelSelector",
             "searches across model groups, recovers from no results, and selects by keyboard (zh)"
           ],
-          "duration": 868,
+          "duration": 837,
           "attempts": 1
         },
         {
@@ -474,12 +474,12 @@
             "ModelSelector",
             "groups maintenance models separately from deprecated models"
           ],
-          "duration": 125,
+          "duration": 131,
           "attempts": 1
         },
         {
           "title": ["Chart Selectors", "ModelSelector", "explains maintenance mode in a tooltip"],
-          "duration": 178,
+          "duration": 181,
           "attempts": 1
         },
         {
@@ -488,12 +488,12 @@
             "ModelSelector",
             "localizes model category labels and reasons on Chinese routes"
           ],
-          "duration": 196,
+          "duration": 195,
           "attempts": 1
         },
         {
           "title": ["Chart Selectors", "SequenceSelector", "shows options when clicked"],
-          "duration": 105,
+          "duration": 116,
           "attempts": 1
         },
         {
@@ -502,7 +502,7 @@
             "SequenceSelector",
             "selecting an option updates the displayed value"
           ],
-          "duration": 196,
+          "duration": 199,
           "attempts": 1
         },
         {
@@ -511,7 +511,7 @@
             "ScenarioSelector",
             "explains the agentic workload in a tooltip that links to /agentx"
           ],
-          "duration": 337,
+          "duration": 341,
           "attempts": 1
         },
         {
@@ -520,7 +520,7 @@
             "ScenarioSelector",
             "keeps the fixed-sequence scenario visible without a one-option menu"
           ],
-          "duration": 41,
+          "duration": 32,
           "attempts": 1
         },
         {
@@ -529,7 +529,7 @@
             "ScenarioSelector",
             "keeps the agentic scenario and its explanation visible with one option"
           ],
-          "duration": 102,
+          "duration": 99,
           "attempts": 1
         },
         {
@@ -538,7 +538,7 @@
             "ScenarioSelector",
             "keeps the fixed Agentic explainer inside on Chinese phones"
           ],
-          "duration": 84,
+          "duration": 103,
           "attempts": 1
         },
         {
@@ -547,7 +547,7 @@
             "ScenarioSelector",
             "keeps the selectable Agentic explainer inside on Chinese phones"
           ],
-          "duration": 99,
+          "duration": 103,
           "attempts": 1
         },
         {
@@ -556,7 +556,7 @@
             "ScenarioSelector",
             "marks model-specific retired scenarios in their option labels"
           ],
-          "duration": 125,
+          "duration": 124,
           "attempts": 1
         },
         {
@@ -565,7 +565,7 @@
             "ScenarioSelector",
             "marks 8K/1K retired for DeepSeek V4 Pro while AgentX stays active"
           ],
-          "duration": 124,
+          "duration": 111,
           "attempts": 1
         },
         {
@@ -574,7 +574,7 @@
             "ScenarioSelector",
             "keeps retired choices selectable in one fixed-length group with inline status (en)"
           ],
-          "duration": 805,
+          "duration": 792,
           "attempts": 1
         },
         {
@@ -583,7 +583,7 @@
             "ScenarioSelector",
             "keeps retired choices selectable in one fixed-length group with inline status (zh)"
           ],
-          "duration": 796,
+          "duration": 784,
           "attempts": 1
         },
         {
@@ -592,7 +592,7 @@
             "ScenarioSelector",
             "keeps 8K/1K in the default group for models still sweeping it"
           ],
-          "duration": 116,
+          "duration": 110,
           "attempts": 1
         },
         {
@@ -601,12 +601,12 @@
             "ScenarioSelector",
             "hides the agentic explainer on fixed-sequence scenarios"
           ],
-          "duration": 217,
+          "duration": 207,
           "attempts": 1
         },
         {
           "title": ["Chart Selectors", "PrecisionSelector", "shows current selection"],
-          "duration": 32,
+          "duration": 26,
           "attempts": 1
         },
         {
@@ -615,7 +615,7 @@
             "PrecisionSelector",
             "removes a precision from its chip without opening the menu or losing other selections"
           ],
-          "duration": 294,
+          "duration": 290,
           "attempts": 1
         },
         {
@@ -624,7 +624,7 @@
             "PrecisionSelector",
             "separates the compact selection count from the minimum and keeps it accurate (en)"
           ],
-          "duration": 445,
+          "duration": 418,
           "attempts": 1
         },
         {
@@ -633,7 +633,7 @@
             "PrecisionSelector",
             "separates the compact selection count from the minimum and keeps it accurate (zh)"
           ],
-          "duration": 499,
+          "duration": 428,
           "attempts": 1
         },
         {
@@ -642,32 +642,32 @@
             "PrecisionSelector",
             "keeps the fixed precision visible without a one-option menu"
           ],
-          "duration": 37,
+          "duration": 29,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/collectivex-swap.cy.tsx",
-      "duration": 762,
+      "duration": 447,
       "tests": [
         {
           "title": ["keeps comparison runs independently toggleable and distinguishes their lines"],
-          "duration": 751,
+          "duration": 444,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/component-css.cy.tsx",
-      "duration": 4570,
+      "duration": 4323,
       "tests": [
         {
           "title": [
             "component CSS harness",
             "keeps focus undecorated without losing selection, validation, or input in light mode"
           ],
-          "duration": 526,
+          "duration": 484,
           "attempts": 1
         },
         {
@@ -675,7 +675,7 @@
             "component CSS harness",
             "keeps focus undecorated without losing selection, validation, or input in dark mode"
           ],
-          "duration": 450,
+          "duration": 421,
           "attempts": 1
         },
         {
@@ -683,7 +683,7 @@
             "component CSS harness",
             "aligns form controls and preserves readable labels at 390px in light mode"
           ],
-          "duration": 141,
+          "duration": 124,
           "attempts": 1
         },
         {
@@ -691,7 +691,7 @@
             "component CSS harness",
             "aligns form controls and preserves readable labels at 390px in dark mode"
           ],
-          "duration": 164,
+          "duration": 196,
           "attempts": 1
         },
         {
@@ -699,7 +699,7 @@
             "component CSS harness",
             "aligns form controls and preserves readable labels at 1280px in light mode"
           ],
-          "duration": 133,
+          "duration": 113,
           "attempts": 1
         },
         {
@@ -707,7 +707,7 @@
             "component CSS harness",
             "aligns form controls and preserves readable labels at 1280px in dark mode"
           ],
-          "duration": 141,
+          "duration": 133,
           "attempts": 1
         },
         {
@@ -715,7 +715,7 @@
             "component CSS harness",
             "keeps compact controls touchable and selects a searched option with the keyboard"
           ],
-          "duration": 602,
+          "duration": 559,
           "attempts": 1
         },
         {
@@ -723,7 +723,7 @@
             "component CSS harness",
             "keeps selected segments concentric with their outlines at 390px in light mode"
           ],
-          "duration": 210,
+          "duration": 196,
           "attempts": 1
         },
         {
@@ -731,7 +731,7 @@
             "component CSS harness",
             "keeps selected segments concentric with their outlines at 390px in dark mode"
           ],
-          "duration": 211,
+          "duration": 198,
           "attempts": 1
         },
         {
@@ -739,7 +739,7 @@
             "component CSS harness",
             "keeps selected segments concentric with their outlines at 1280px in light mode"
           ],
-          "duration": 207,
+          "duration": 193,
           "attempts": 1
         },
         {
@@ -747,7 +747,7 @@
             "component CSS harness",
             "keeps selected segments concentric with their outlines at 1280px in dark mode"
           ],
-          "duration": 208,
+          "duration": 193,
           "attempts": 1
         },
         {
@@ -755,7 +755,7 @@
             "component CSS harness",
             "exposes value filters as pressed buttons and does not submit the surrounding form"
           ],
-          "duration": 122,
+          "duration": 113,
           "attempts": 1
         },
         {
@@ -763,7 +763,7 @@
             "component CSS harness",
             "copies the complete code example while keeping a long example in a keyboard-scrollable reader"
           ],
-          "duration": 123,
+          "duration": 108,
           "attempts": 1
         },
         {
@@ -771,7 +771,7 @@
             "component CSS harness",
             "keeps code selectable and explains a clipboard failure in Chinese"
           ],
-          "duration": 104,
+          "duration": 102,
           "attempts": 1
         },
         {
@@ -779,12 +779,12 @@
             "component CSS harness",
             "makes control help keyboard accessible without submitting its form"
           ],
-          "duration": 401,
+          "duration": 450,
           "attempts": 1
         },
         {
           "title": ["component CSS harness", "keeps tapped help readable inside a narrow viewport"],
-          "duration": 325,
+          "duration": 314,
           "attempts": 1
         },
         {
@@ -792,12 +792,12 @@
             "component CSS harness",
             "wraps a long multi-option metric control inside a narrow panel"
           ],
-          "duration": 117,
+          "duration": 116,
           "attempts": 1
         },
         {
           "title": ["component CSS harness", "loads Tailwind visibility and sizing utilities"],
-          "duration": 35,
+          "duration": 22,
           "attempts": 1
         },
         {
@@ -805,7 +805,7 @@
             "component CSS harness",
             "aligns comparison names and vs without splitting hardware names at 375px"
           ],
-          "duration": 44,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -813,7 +813,7 @@
             "component CSS harness",
             "keeps dashboard heading actions clear of long descriptions at 375px"
           ],
-          "duration": 37,
+          "duration": 30,
           "attempts": 1
         },
         {
@@ -821,7 +821,7 @@
             "component CSS harness",
             "aligns compound card sections with directly rendered content at 375px"
           ],
-          "duration": 29,
+          "duration": 28,
           "attempts": 1
         },
         {
@@ -829,7 +829,7 @@
             "component CSS harness",
             "aligns comparison names and vs without splitting hardware names at 1280px"
           ],
-          "duration": 41,
+          "duration": 33,
           "attempts": 1
         },
         {
@@ -837,7 +837,7 @@
             "component CSS harness",
             "keeps dashboard heading actions clear of long descriptions at 1280px"
           ],
-          "duration": 34,
+          "duration": 27,
           "attempts": 1
         },
         {
@@ -845,23 +845,23 @@
             "component CSS harness",
             "aligns compound card sections with directly rendered content at 1280px"
           ],
-          "duration": 35,
+          "duration": 28,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/cost-tier-selector.cy.tsx",
-      "duration": 1723,
+      "duration": 1649,
       "tests": [
         {
           "title": ["CostTierSelector", "renders nothing for metrics without a pricing basis"],
-          "duration": 62,
+          "duration": 63,
           "attempts": 1
         },
         {
           "title": ["CostTierSelector", "does not reseed $/hr the reader has already entered"],
-          "duration": 260,
+          "duration": 256,
           "attempts": 1
         },
         {
@@ -869,12 +869,12 @@
             "CostTierSelector",
             "leaves Custom User Values out when the chart has no custom pricing path"
           ],
-          "duration": 148,
+          "duration": 127,
           "attempts": 1
         },
         {
           "title": ["CostTierSelector", "shows the rental tier on rental-tier metrics"],
-          "duration": 41,
+          "duration": 38,
           "attempts": 1
         },
         {
@@ -883,7 +883,7 @@
             "on a hyperscaler-tier cost metric",
             "shows published tiers, custom values and locked rental terms"
           ],
-          "duration": 214,
+          "duration": 211,
           "attempts": 1
         },
         {
@@ -892,7 +892,7 @@
             "on a hyperscaler-tier cost metric",
             "switches to the custom axis and seeds the per-chip $/hr from the current tier"
           ],
-          "duration": 213,
+          "duration": 211,
           "attempts": 1
         },
         {
@@ -901,7 +901,7 @@
             "on a hyperscaler-tier cost metric",
             "opens the TCO model dialog for locked rental tiers instead of changing the axis"
           ],
-          "duration": 583,
+          "duration": 572,
           "attempts": 1
         },
         {
@@ -910,21 +910,21 @@
             "on a hyperscaler-tier cost metric",
             "has no detectable a11y violations"
           ],
-          "duration": 166,
+          "duration": 134,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/data-table.cy.tsx",
-      "duration": 1707,
+      "duration": 1861,
       "tests": [
         {
           "title": [
             "DataTable presets",
             "keeps search readable and its clear action touchable on phones"
           ],
-          "duration": 563,
+          "duration": 629,
           "attempts": 1
         },
         {
@@ -932,7 +932,7 @@
             "DataTable presets",
             "switches to all data, searches hidden columns, clears search, and keeps sort state"
           ],
-          "duration": 1066,
+          "duration": 1132,
           "attempts": 1
         },
         {
@@ -940,21 +940,21 @@
             "DataTable presets",
             "pins the explicit configuration identifier inside the horizontal scroller"
           ],
-          "duration": 61,
+          "duration": 82,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/dataset-list.cy.tsx",
-      "duration": 909,
+      "duration": 440,
       "tests": [
         {
           "title": [
             "DatasetList",
             "describes the 256K dataset with missing metadata in en at 1280px"
           ],
-          "duration": 185,
+          "duration": 106,
           "attempts": 1
         },
         {
@@ -962,7 +962,7 @@
             "DatasetList",
             "describes the 256K dataset with missing metadata in en at 390px"
           ],
-          "duration": 100,
+          "duration": 47,
           "attempts": 1
         },
         {
@@ -970,7 +970,7 @@
             "DatasetList",
             "describes the 256K dataset with missing metadata in zh at 1280px"
           ],
-          "duration": 118,
+          "duration": 48,
           "attempts": 1
         },
         {
@@ -978,73 +978,73 @@
             "DatasetList",
             "describes the 256K dataset with missing metadata in zh at 390px"
           ],
-          "duration": 76,
+          "duration": 43,
           "attempts": 1
         },
         {
           "title": ["DatasetList", "renders a card per dataset with its summary stats"],
-          "duration": 145,
+          "duration": 65,
           "attempts": 1
         },
         {
           "title": ["DatasetList", "keeps grouped metrics readable when cards stack on mobile"],
-          "duration": 93,
+          "duration": 56,
           "attempts": 1
         },
         {
           "title": ["DatasetList", "shows the empty state when no datasets are ingested"],
-          "duration": 100,
+          "duration": 32,
           "attempts": 1
         },
         {
           "title": ["DatasetList", "shows the error state when the request fails"],
-          "duration": 55,
+          "duration": 30,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/date-picker.cy.tsx",
-      "duration": 2879,
+      "duration": 2290,
       "tests": [
         {
           "title": ["DatePicker", "displays formatted date when date is provided"],
-          "duration": 96,
+          "duration": 53,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "available dates are clickable"],
-          "duration": 183,
+          "duration": 142,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "unavailable dates have visual indicator"],
-          "duration": 156,
+          "duration": 122,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "\"Go to Latest\" button navigates to latest available date"],
-          "duration": 468,
+          "duration": 407,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "Previous/Next date arrows work"],
-          "duration": 256,
+          "duration": 185,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "Apply button submits selected date"],
-          "duration": 628,
+          "duration": 572,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "Cancel reverts selection"],
-          "duration": 500,
+          "duration": 401,
           "attempts": 1
         },
         {
           "title": ["DatePicker", "localizes the complete dialog chrome on Chinese routes"],
-          "duration": 233,
+          "duration": 142,
           "attempts": 1
         },
         {
@@ -1052,7 +1052,7 @@
             "DatePicker",
             "keeps the full date readable and adjacent actions touch-sized in a narrow en panel"
           ],
-          "duration": 143,
+          "duration": 109,
           "attempts": 1
         },
         {
@@ -1060,43 +1060,43 @@
             "DatePicker",
             "keeps the full date readable and adjacent actions touch-sized in a narrow zh panel"
           ],
-          "duration": 149,
+          "duration": 110,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/date-range-picker.cy.tsx",
-      "duration": 1783,
+      "duration": 1730,
       "tests": [
         {
           "title": ["DateRangePicker", "apply is disabled when no dates selected"],
-          "duration": 184,
+          "duration": 161,
           "attempts": 1
         },
         {
           "title": ["DateRangePicker", "cancel closes the dialog"],
-          "duration": 510,
+          "duration": 505,
           "attempts": 1
         },
         {
           "title": ["DateRangePicker", "displays formatted range when dates are provided"],
-          "duration": 33,
+          "duration": 31,
           "attempts": 1
         },
         {
           "title": ["DateRangePicker", "shows quick select buttons when availableDates provided"],
-          "duration": 128,
+          "duration": 118,
           "attempts": 1
         },
         {
           "title": ["DateRangePicker", "shows overlay when no available dates"],
-          "duration": 121,
+          "duration": 122,
           "attempts": 1
         },
         {
           "title": ["DateRangePicker", "shows overlay when only 1 available date"],
-          "duration": 120,
+          "duration": 117,
           "attempts": 1
         },
         {
@@ -1104,7 +1104,7 @@
             "DateRangePicker",
             "view anyway button selects the single available date and closes dialog"
           ],
-          "duration": 486,
+          "duration": 496,
           "attempts": 1
         },
         {
@@ -1112,18 +1112,18 @@
             "DateRangePicker",
             "localizes status, quick actions, and dialog actions on Chinese routes"
           ],
-          "duration": 165,
+          "duration": 143,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/distribution-card.cy.tsx",
-      "duration": 569,
+      "duration": 424,
       "tests": [
         {
           "title": ["DistributionCard", "renders the title, summary stats, and one bar per bin"],
-          "duration": 177,
+          "duration": 121,
           "attempts": 1
         },
         {
@@ -1131,12 +1131,12 @@
             "DistributionCard",
             "shows a \"No data\" placeholder when no distribution is provided"
           ],
-          "duration": 62,
+          "duration": 46,
           "attempts": 1
         },
         {
           "title": ["DistributionCard", "marks the chart as log scale when scale=\"log\""],
-          "duration": 45,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -1144,7 +1144,7 @@
             "DistributionCard",
             "renders older v1 stats without unavailable percentile guides"
           ],
-          "duration": 59,
+          "duration": 43,
           "attempts": 1
         },
         {
@@ -1152,7 +1152,7 @@
             "DistributionCard",
             "exposes localized bin values to keyboard and screen-reader users"
           ],
-          "duration": 163,
+          "duration": 136,
           "attempts": 1
         },
         {
@@ -1160,21 +1160,21 @@
             "DistributionCard",
             "renders each distribution tick only once for small bin counts"
           ],
-          "duration": 36,
+          "duration": 28,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/engine-comparison-confirmation.cy.tsx",
-      "duration": 1236,
+      "duration": 1086,
       "tests": [
         {
           "title": [
             "Engine comparison confirmation",
             "requires an affirmative agreement and focuses Cancel first"
           ],
-          "duration": 519,
+          "duration": 450,
           "attempts": 1
         },
         {
@@ -1182,7 +1182,7 @@
             "Engine comparison confirmation",
             "treats Escape as cancellation, not acceptance"
           ],
-          "duration": 374,
+          "duration": 339,
           "attempts": 1
         },
         {
@@ -1190,21 +1190,21 @@
             "Engine comparison confirmation",
             "provides the same warning and agreement in Chinese"
           ],
-          "duration": 321,
+          "duration": 285,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/error-boundary.cy.tsx",
-      "duration": 572,
+      "duration": 445,
       "tests": [
         {
           "title": [
             "App error boundary localization",
             "preserves the accessible English recovery UI and tracks its lifecycle"
           ],
-          "duration": 244,
+          "duration": 171,
           "attempts": 1
         },
         {
@@ -1212,7 +1212,7 @@
             "App error boundary localization",
             "keeps the localized Chinese recovery flow usable on mobile"
           ],
-          "duration": 178,
+          "duration": 140,
           "attempts": 1
         },
         {
@@ -1220,26 +1220,26 @@
             "Not-found recovery analytics",
             "tracks the locale when returning from a Chinese 404"
           ],
-          "duration": 130,
+          "duration": 118,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/eval-bar-chart.cy.tsx",
-      "duration": 1588,
+      "duration": 867,
       "tests": [
         {
           "title": [
             "EvalBarChartD3",
             "omits default DP in table cells while preserving DP8 and physical chip counts"
           ],
-          "duration": 392,
+          "duration": 205,
           "attempts": 1
         },
         {
           "title": ["EvalBarChartD3", "shows skeleton during loading with no data"],
-          "duration": 91,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -1247,7 +1247,7 @@
             "EvalBarChartD3",
             "shows an error message when the evaluation-data query fails"
           ],
-          "duration": 63,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -1255,17 +1255,17 @@
             "EvalBarChartD3",
             "shows empty state when chartData is empty and selections are made"
           ],
-          "duration": 64,
+          "duration": 32,
           "attempts": 1
         },
         {
           "title": ["EvalBarChartD3", "renders SVG with chart elements when data is provided"],
-          "duration": 123,
+          "duration": 63,
           "attempts": 1
         },
         {
           "title": ["EvalBarChartD3", "renders legend items for each configuration"],
-          "duration": 64,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -1273,7 +1273,7 @@
             "EvalBarChartD3",
             "renders interactive unofficial markers with a portaled tooltip (without official rows)"
           ],
-          "duration": 417,
+          "duration": 229,
           "attempts": 1
         },
         {
@@ -1281,21 +1281,21 @@
             "EvalBarChartD3",
             "renders interactive unofficial markers with a portaled tooltip (with official rows)"
           ],
-          "duration": 332,
+          "duration": 214,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/eval-chart-controls.cy.tsx",
-      "duration": 1943,
+      "duration": 1410,
       "tests": [
         {
           "title": [
             "Evaluation ChartControls",
             "renders the model selector with the current model label"
           ],
-          "duration": 163,
+          "duration": 100,
           "attempts": 1
         },
         {
@@ -1303,7 +1303,7 @@
             "Evaluation ChartControls",
             "renders the benchmark selector with the current benchmark"
           ],
-          "duration": 118,
+          "duration": 53,
           "attempts": 1
         },
         {
@@ -1311,7 +1311,7 @@
             "Evaluation ChartControls",
             "displays all available benchmarks in the dropdown"
           ],
-          "duration": 198,
+          "duration": 138,
           "attempts": 1
         },
         {
@@ -1319,12 +1319,12 @@
             "Evaluation ChartControls",
             "calls setSelectedBenchmark when a benchmark is chosen"
           ],
-          "duration": 265,
+          "duration": 210,
           "attempts": 1
         },
         {
           "title": ["Evaluation ChartControls", "shows the current run date in the date picker"],
-          "duration": 40,
+          "duration": 31,
           "attempts": 1
         },
         {
@@ -1332,7 +1332,7 @@
             "Evaluation ChartControls",
             "keeps benchmark controls aligned beside the secondary run context on desktop"
           ],
-          "duration": 80,
+          "duration": 50,
           "attempts": 1
         },
         {
@@ -1340,7 +1340,7 @@
             "Evaluation ChartControls",
             "stacks the control groups on a narrow viewport and keeps precision selectable"
           ],
-          "duration": 373,
+          "duration": 304,
           "attempts": 1
         },
         {
@@ -1348,12 +1348,12 @@
             "Evaluation ChartControls",
             "keeps primary controls visible while run context collapses on mobile"
           ],
-          "duration": 223,
+          "duration": 186,
           "attempts": 1
         },
         {
           "title": ["Evaluation ChartControls", "shows run context by default on desktop"],
-          "duration": 42,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -1361,7 +1361,7 @@
             "Evaluation ChartControls",
             "localizes the mobile secondary changed-count label"
           ],
-          "duration": 62,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -1369,7 +1369,7 @@
             "Evaluation ChartControls",
             "keeps a long changelog configuration inside the viewport"
           ],
-          "duration": 252,
+          "duration": 196,
           "attempts": 1
         },
         {
@@ -1377,54 +1377,54 @@
             "Evaluation ChartControls",
             "keeps fixed precision visible beside the selected benchmark"
           ],
-          "duration": 58,
+          "duration": 29,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/faq-question-link.cy.tsx",
-      "duration": 257,
+      "duration": 214,
       "tests": [
         {
           "title": ["FaqQuestionLink", "shows an icon-only control and copies the direct URL"],
-          "duration": 205,
+          "duration": 178,
           "attempts": 1
         },
         {
           "title": ["FaqQuestionLink", "uses concise Chinese button copy on the Chinese route"],
-          "duration": 41,
+          "duration": 29,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/footer.cy.tsx",
-      "duration": 871,
+      "duration": 442,
       "tests": [
         {
           "title": ["Footer", "displays copyright notice with semianalysis.com and current year"],
-          "duration": 166,
+          "duration": 72,
           "attempts": 1
         },
         {
           "title": ["Footer", "has Privacy Policy link"],
-          "duration": 59,
+          "duration": 34,
           "attempts": 1
         },
         {
           "title": ["Footer", "has Cookie Policy link"],
-          "duration": 50,
+          "duration": 28,
           "attempts": 1
         },
         {
           "title": ["Footer", "has Contribute section with GitHub links"],
-          "duration": 67,
+          "duration": 35,
           "attempts": 1
         },
         {
           "title": ["Footer", "contains the destinations moved out of the primary navigation"],
-          "duration": 65,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -1432,7 +1432,7 @@
             "Footer",
             "keeps every footer destination readable and inside the page at 390px"
           ],
-          "duration": 144,
+          "duration": 83,
           "attempts": 1
         },
         {
@@ -1440,7 +1440,7 @@
             "Footer",
             "keeps every footer destination readable and inside the page at 768px"
           ],
-          "duration": 145,
+          "duration": 71,
           "attempts": 1
         },
         {
@@ -1448,33 +1448,33 @@
             "Footer",
             "keeps every footer destination readable and inside the page at 1280px"
           ],
-          "duration": 133,
+          "duration": 69,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/gpu-graph.cy.tsx",
-      "duration": 1686,
+      "duration": 1526,
       "tests": [
         {
           "title": ["GPUGraph", "renders SVG within chart container"],
-          "duration": 86,
+          "duration": 78,
           "attempts": 1
         },
         {
           "title": ["GPUGraph", "shows empty state when data is empty"],
-          "duration": 40,
+          "duration": 36,
           "attempts": 1
         },
         {
           "title": ["GPUGraph", "explains missing role-local energy in GPU comparison mode"],
-          "duration": 38,
+          "duration": 32,
           "attempts": 1
         },
         {
           "title": ["GPUGraph", "localizes the Chinese comparison empty state"],
-          "duration": 43,
+          "duration": 39,
           "attempts": 1
         },
         {
@@ -1482,7 +1482,7 @@
             "GPUGraph",
             "renders chart with points when data and selectedGPUs are provided"
           ],
-          "duration": 37,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -1498,7 +1498,7 @@
             "GPUGraph",
             "shows spec decoding only on hover while retaining the offload halo"
           ],
-          "duration": 63,
+          "duration": 61,
           "attempts": 1
         },
         {
@@ -1506,17 +1506,17 @@
             "GPUGraph",
             "renders date line labels along each roofline when showLineLabels is on"
           ],
-          "duration": 42,
+          "duration": 41,
           "attempts": 1
         },
         {
           "title": ["GPUGraph", "hides line labels when showLineLabels is off"],
-          "duration": 23,
+          "duration": 20,
           "attempts": 1
         },
         {
           "title": ["GPUGraph", "renders legend with GPU and date entries"],
-          "duration": 31,
+          "duration": 32,
           "attempts": 1
         },
         {
@@ -1524,7 +1524,7 @@
             "GPU comparison power envelopes",
             "reveals off-boundary measurements and historical rings without changing power envelopes or axes"
           ],
-          "duration": 286,
+          "duration": 268,
           "attempts": 1
         },
         {
@@ -1532,7 +1532,7 @@
             "GPU comparison power envelopes",
             "keeps boundary measurements toward higher E2E Normalized Interactivity"
           ],
-          "duration": 34,
+          "duration": 28,
           "attempts": 1
         },
         {
@@ -1540,7 +1540,7 @@
             "GPU comparison power envelopes",
             "keeps boundary measurements by default toward lower latency"
           ],
-          "duration": 69,
+          "duration": 36,
           "attempts": 1
         },
         {
@@ -1548,18 +1548,18 @@
             "GPU comparison power envelopes",
             "uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto"
           ],
-          "duration": 821,
+          "duration": 755,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/gpu-specs-bar-chart.cy.tsx",
-      "duration": 554,
+      "duration": 341,
       "tests": [
         {
           "title": ["GpuSpecsBarChart", "changing metric re-renders chart"],
-          "duration": 382,
+          "duration": 291,
           "attempts": 1
         },
         {
@@ -1567,21 +1567,21 @@
             "GpuSpecsBarChart",
             "localizes metric controls, axis text, and chart instructions on /zh"
           ],
-          "duration": 156,
+          "duration": 41,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/header.cy.tsx",
-      "duration": 5147,
+      "duration": 1807,
       "tests": [
         {
           "title": [
             "Header",
             "keeps the sticky header opaque enough that content cannot show through"
           ],
-          "duration": 244,
+          "duration": 83,
           "attempts": 1
         },
         {
@@ -1589,22 +1589,22 @@
             "Header",
             "pushes the desktop Overview link exactly once — no timer-based re-push"
           ],
-          "duration": 220,
+          "duration": 114,
           "attempts": 1
         },
         {
           "title": ["Header", "pushes locale navigation exactly once outside Overview"],
-          "duration": 159,
+          "duration": 103,
           "attempts": 1
         },
         {
           "title": ["Header", "makes a click on the tab already showing a no-op"],
-          "duration": 130,
+          "duration": 87,
           "attempts": 1
         },
         {
           "title": ["Header", "still navigates to Dashboard from a sibling dashboard tab"],
-          "duration": 181,
+          "duration": 96,
           "attempts": 1
         },
         {
@@ -1612,7 +1612,7 @@
             "Header",
             "keeps Comparisons and Articles out of the header nav (they live in the footer)"
           ],
-          "duration": 39,
+          "duration": 14,
           "attempts": 1
         },
         {
@@ -1620,12 +1620,12 @@
             "Header",
             "shows AgentX as a top-level nav link and highlights AgentX child pages"
           ],
-          "duration": 98,
+          "duration": 46,
           "attempts": 1
         },
         {
           "title": ["Header", "keeps AgentX in the Chinese navigation tree"],
-          "duration": 58,
+          "duration": 31,
           "attempts": 1
         },
         {
@@ -1633,37 +1633,37 @@
             "Header",
             "localizes the mobile navigation accessible name without changing English"
           ],
-          "duration": 69,
+          "duration": 37,
           "attempts": 1
         },
         {
           "title": ["Header", "orders the nav with Home first and AgentX second"],
-          "duration": 34,
+          "duration": 32,
           "attempts": 1
         },
         {
           "title": ["Header", "keeps footer destinations out of the primary nav"],
-          "duration": 24,
+          "duration": 17,
           "attempts": 1
         },
         {
           "title": ["Header", "shows the GitHub stars button linking to the correct repo"],
-          "duration": 49,
+          "duration": 34,
           "attempts": 1
         },
         {
           "title": ["Header", "omits the leaves toggle from desktop and mobile headers on /"],
-          "duration": 440,
+          "duration": 107,
           "attempts": 1
         },
         {
           "title": ["Header", "omits the leaves toggle from desktop and mobile headers on /zh"],
-          "duration": 455,
+          "duration": 105,
           "attempts": 1
         },
         {
           "title": ["Header", "shows mobile hamburger menu on small viewports"],
-          "duration": 864,
+          "duration": 131,
           "attempts": 1
         },
         {
@@ -1671,7 +1671,15 @@
             "Header",
             "uses the same resting icon color and shape for all three header utilities in light and dark"
           ],
-          "duration": 267,
+          "duration": 124,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Header",
+            "fits a 320px phone that shows a classic 15px scrollbar (305px content width)"
+          ],
+          "duration": 32,
           "attempts": 1
         },
         {
@@ -1679,7 +1687,7 @@
             "Header",
             "pushes the mobile Overview link exactly once — no timer-based re-push"
           ],
-          "duration": 534,
+          "duration": 183,
           "attempts": 1
         },
         {
@@ -1687,7 +1695,7 @@
             "Header",
             "uses the hamburger without horizontal overflow from 1009 through 1024 CSS pixels"
           ],
-          "duration": 255,
+          "duration": 47,
           "attempts": 1
         },
         {
@@ -1695,12 +1703,12 @@
             "Header",
             "keeps every primary link inside the header at the xl desktop breakpoint"
           ],
-          "duration": 139,
+          "duration": 45,
           "attempts": 1
         },
         {
           "title": ["Header", "at 320x700", "hides the GitHub star control"],
-          "duration": 72,
+          "duration": 18,
           "attempts": 1
         },
         {
@@ -1709,7 +1717,7 @@
             "at 320x700",
             "keeps the remaining controls inside the header bounds"
           ],
-          "duration": 117,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -1718,7 +1726,7 @@
             "at 320x700",
             "gives the brand and language controls a 44px touch height"
           ],
-          "duration": 88,
+          "duration": 30,
           "attempts": 1
         },
         {
@@ -1727,31 +1735,31 @@
             "at 320x700",
             "gives the icon controls a 44px touch target in both dimensions"
           ],
-          "duration": 107,
+          "duration": 28,
           "attempts": 1
         },
         {
           "title": ["Header", "at 320x700", "does not overflow horizontally"],
-          "duration": 74,
+          "duration": 19,
           "attempts": 1
         },
         {
           "title": ["Header", "at 320x700", "still opens the menu and exposes its links"],
-          "duration": 203,
+          "duration": 139,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/inference-chart-controls.cy.tsx",
-      "duration": 24630,
+      "duration": 22659,
       "tests": [
         {
           "title": [
             "Modeled system-power table",
             "shows validated eight-GPU topology separately from the configured 64-chip alias in both locales"
           ],
-          "duration": 470,
+          "duration": 496,
           "attempts": 1
         },
         {
@@ -1759,17 +1767,17 @@
             "Inference ChartControls",
             "hides the Measured Energy and Modeled System Power groups while the gate is locked"
           ],
-          "duration": 249,
+          "duration": 211,
           "attempts": 1
         },
         {
           "title": ["Inference ChartControls", "renders the Y-axis metric selector"],
-          "duration": 72,
+          "duration": 68,
           "attempts": 1
         },
         {
           "title": ["Inference ChartControls", "Y-axis metric selector shows grouped options"],
-          "duration": 171,
+          "duration": 149,
           "attempts": 1
         },
         {
@@ -1777,7 +1785,7 @@
             "Inference ChartControls",
             "calls setSelectedYAxisMetric when a Y-axis option is chosen"
           ],
-          "duration": 309,
+          "duration": 261,
           "attempts": 1
         },
         {
@@ -1785,7 +1793,7 @@
             "Inference ChartControls",
             "finds the existing schema-v2 metric names through search"
           ],
-          "duration": 2886,
+          "duration": 2793,
           "attempts": 1
         },
         {
@@ -1793,7 +1801,7 @@
             "Inference ChartControls",
             "offers modeled chassis power separately and explains its measurement boundary"
           ],
-          "duration": 767,
+          "duration": 638,
           "attempts": 1
         },
         {
@@ -1801,7 +1809,7 @@
             "Inference ChartControls",
             "does not render the Cost Tier selector; it lives in the chart caption"
           ],
-          "duration": 52,
+          "duration": 50,
           "attempts": 1
         },
         {
@@ -1809,7 +1817,7 @@
             "Inference ChartControls",
             "lists each tiered metric once in the Y-axis selector, without the tier suffix"
           ],
-          "duration": 142,
+          "duration": 139,
           "attempts": 1
         },
         {
@@ -1817,7 +1825,7 @@
             "Inference ChartControls",
             "opens tiered metrics on the hyperscaler tier from an untiered metric"
           ],
-          "duration": 240,
+          "duration": 230,
           "attempts": 1
         },
         {
@@ -1825,7 +1833,7 @@
             "Inference ChartControls",
             "hides the GPU comparison section when no GPUs are selected"
           ],
-          "duration": 54,
+          "duration": 42,
           "attempts": 1
         },
         {
@@ -1833,7 +1841,7 @@
             "Inference ChartControls",
             "uses a full-width benchmark row above chart and history controls on desktop"
           ],
-          "duration": 68,
+          "duration": 40,
           "attempts": 1
         },
         {
@@ -1841,7 +1849,7 @@
             "Inference ChartControls",
             "aligns the X and Y fields with equal desktop heights"
           ],
-          "duration": 59,
+          "duration": 38,
           "attempts": 1
         },
         {
@@ -1849,7 +1857,7 @@
             "Inference ChartControls",
             "selects an axis through the existing action and closes the menu"
           ],
-          "duration": 221,
+          "duration": 206,
           "attempts": 1
         },
         {
@@ -1857,7 +1865,7 @@
             "Inference ChartControls",
             "wraps the semantic groups into a single column on narrow screens"
           ],
-          "duration": 137,
+          "duration": 131,
           "attempts": 1
         },
         {
@@ -1865,7 +1873,7 @@
             "Inference ChartControls",
             "keeps benchmark and chart settings in one row when history comparison is omitted"
           ],
-          "duration": 53,
+          "duration": 55,
           "attempts": 1
         },
         {
@@ -1873,12 +1881,12 @@
             "Inference ChartControls",
             "keeps primary controls visible while secondary controls collapse on mobile"
           ],
-          "duration": 202,
+          "duration": 208,
           "attempts": 1
         },
         {
           "title": ["Inference ChartControls", "shows secondary controls by default on desktop"],
-          "duration": 54,
+          "duration": 51,
           "attempts": 1
         },
         {
@@ -1886,7 +1894,7 @@
             "Inference ChartControls",
             "localizes the mobile secondary changed-count label"
           ],
-          "duration": 65,
+          "duration": 61,
           "attempts": 1
         },
         {
@@ -1894,7 +1902,7 @@
             "Inference ChartControls grouped measured metrics",
             "offers two measured families without repeating all thirteen configurations"
           ],
-          "duration": 482,
+          "duration": 420,
           "attempts": 1
         },
         {
@@ -1902,7 +1910,7 @@
             "Inference ChartControls grouped measured metrics",
             "finds measured families by their displayed names without mixing power into energy (en)"
           ],
-          "duration": 2270,
+          "duration": 2052,
           "attempts": 1
         },
         {
@@ -1910,7 +1918,7 @@
             "Inference ChartControls grouped measured metrics",
             "finds measured families by their displayed names without mixing power into energy (zh)"
           ],
-          "duration": 1619,
+          "duration": 1448,
           "attempts": 1
         },
         {
@@ -1918,7 +1926,7 @@
             "Inference ChartControls grouped measured metrics",
             "keeps P75 and P90 visible and selects their existing metric keys"
           ],
-          "duration": 278,
+          "duration": 248,
           "attempts": 1
         },
         {
@@ -1926,7 +1934,7 @@
             "Inference ChartControls grouped measured metrics",
             "resets a fleet percentile to role average and only enables TDP for the whole-fleet average"
           ],
-          "duration": 1008,
+          "duration": 937,
           "attempts": 1
         },
         {
@@ -1934,7 +1942,7 @@
             "Inference ChartControls grouped measured metrics",
             "keeps energy normalization separate from role attribution when changing denominator"
           ],
-          "duration": 1088,
+          "duration": 1073,
           "attempts": 1
         },
         {
@@ -1942,7 +1950,7 @@
             "Inference ChartControls grouped measured metrics",
             "switches successful-query J and Wh and restores J for token normalization"
           ],
-          "duration": 1364,
+          "duration": 1344,
           "attempts": 1
         },
         {
@@ -1950,7 +1958,7 @@
             "Inference ChartControls grouped measured metrics",
             "hydrates y_measuredPrefillAvgPower with only role-average statistics enabled"
           ],
-          "duration": 69,
+          "duration": 60,
           "attempts": 1
         },
         {
@@ -1958,7 +1966,7 @@
             "Inference ChartControls grouped measured metrics",
             "hydrates y_measuredDecodeAvgPower with only role-average statistics enabled"
           ],
-          "duration": 72,
+          "duration": 58,
           "attempts": 1
         },
         {
@@ -1966,7 +1974,7 @@
             "Inference ChartControls grouped measured metrics",
             "hydrates a selected P75 key while retaining the benchmark row and chart panel layout"
           ],
-          "duration": 70,
+          "duration": 64,
           "attempts": 1
         },
         {
@@ -1974,7 +1982,7 @@
             "Inference ChartControls grouped measured metrics",
             "hydrates an existing successful-query Wh selection without changing its metric"
           ],
-          "duration": 69,
+          "duration": 58,
           "attempts": 1
         },
         {
@@ -1982,7 +1990,7 @@
             "Inference ChartControls grouped measured metrics",
             "keeps Chinese P75 controls within the mobile chart panel"
           ],
-          "duration": 252,
+          "duration": 210,
           "attempts": 1
         },
         {
@@ -1990,7 +1998,7 @@
             "Inference ChartControls cost metrics",
             "hides the TCO basis toggle for other models and scenarios"
           ],
-          "duration": 61,
+          "duration": 41,
           "attempts": 1
         },
         {
@@ -1998,7 +2006,7 @@
             "Inference ChartControls cost metrics",
             "hides TCO for y_tpPerGpu even with visible TPU hardware"
           ],
-          "duration": 44,
+          "duration": 29,
           "attempts": 1
         },
         {
@@ -2006,7 +2014,7 @@
             "Inference ChartControls cost metrics",
             "hides TCO for y_tpPerMw even with visible TPU hardware"
           ],
-          "duration": 39,
+          "duration": 30,
           "attempts": 1
         },
         {
@@ -2014,7 +2022,7 @@
             "Inference ChartControls cost metrics",
             "hides TCO for a cost metric when no TPU hardware is visible"
           ],
-          "duration": 54,
+          "duration": 22,
           "attempts": 1
         },
         {
@@ -2022,7 +2030,7 @@
             "Inference ChartControls cost metrics",
             "sizes the TCO basis toggle to its buttons on desktop and mobile"
           ],
-          "duration": 122,
+          "duration": 100,
           "attempts": 1
         },
         {
@@ -2030,7 +2038,7 @@
             "Inference ChartControls cost metrics",
             "shows cost per million and tokens per dollar as separate Y-axis options"
           ],
-          "duration": 139,
+          "duration": 121,
           "attempts": 1
         },
         {
@@ -2038,7 +2046,7 @@
             "Inference ChartControls cost metrics",
             "selects tokens per dollar through the Y-axis metric control on the active tier"
           ],
-          "duration": 243,
+          "duration": 203,
           "attempts": 1
         },
         {
@@ -2046,7 +2054,7 @@
             "Inference ChartControls infrastructure tokens per dollar",
             "keeps the rental tier when switching between tiered metrics"
           ],
-          "duration": 242,
+          "duration": 214,
           "attempts": 1
         },
         {
@@ -2054,7 +2062,7 @@
             "Inference ChartControls infrastructure tokens per dollar",
             "does not show the token sale-price source control"
           ],
-          "duration": 71,
+          "duration": 35,
           "attempts": 1
         },
         {
@@ -2062,7 +2070,7 @@
             "Inference ChartControls with GPUs selected",
             "shows the date range picker when GPUs are selected"
           ],
-          "duration": 79,
+          "duration": 42,
           "attempts": 1
         },
         {
@@ -2070,7 +2078,7 @@
             "Inference ChartControls with GPUs selected",
             "leaves the optional date range unflagged for a selected current config"
           ],
-          "duration": 70,
+          "duration": 41,
           "attempts": 1
         },
         {
@@ -2078,7 +2086,7 @@
             "Inference ChartControls with GPUs selected",
             "leaves the date range unflagged when exact comparison entries are pinned"
           ],
-          "duration": 53,
+          "duration": 46,
           "attempts": 1
         },
         {
@@ -2086,7 +2094,7 @@
             "Inference ChartControls with hideGpuComparison",
             "hides GPU config selector when hideGpuComparison is true"
           ],
-          "duration": 33,
+          "duration": 30,
           "attempts": 1
         },
         {
@@ -2094,7 +2102,7 @@
             "Inference axis selector — Chinese Agentic controls",
             "keeps every full option name and a localized FAQ link on phones"
           ],
-          "duration": 299,
+          "duration": 267,
           "attempts": 1
         },
         {
@@ -2102,7 +2110,7 @@
             "Axis option help",
             "lets Tab leave the help grid in both directions (searchable=true)"
           ],
-          "duration": 626,
+          "duration": 578,
           "attempts": 1
         },
         {
@@ -2110,7 +2118,7 @@
             "Axis option help",
             "lets Tab leave the help grid in both directions (searchable=false)"
           ],
-          "duration": 611,
+          "duration": 594,
           "attempts": 1
         },
         {
@@ -2118,7 +2126,7 @@
             "Axis option help",
             "shows selected-value help inside #scenario-select without opening its menu"
           ],
-          "duration": 267,
+          "duration": 245,
           "attempts": 1
         },
         {
@@ -2126,7 +2134,7 @@
             "Axis option help",
             "keeps selected-value help open when activating its focused button in #scenario-select"
           ],
-          "duration": 345,
+          "duration": 325,
           "attempts": 1
         },
         {
@@ -2134,7 +2142,7 @@
             "Axis option help",
             "shows selected-value help inside #x-axis-mode-select without opening its menu"
           ],
-          "duration": 263,
+          "duration": 244,
           "attempts": 1
         },
         {
@@ -2142,7 +2150,7 @@
             "Axis option help",
             "keeps selected-value help open when activating its focused button in #x-axis-mode-select"
           ],
-          "duration": 342,
+          "duration": 322,
           "attempts": 1
         },
         {
@@ -2150,7 +2158,7 @@
             "Axis option help",
             "shows selected-value help inside #y-axis-select without opening its menu"
           ],
-          "duration": 265,
+          "duration": 242,
           "attempts": 1
         },
         {
@@ -2158,7 +2166,7 @@
             "Axis option help",
             "keeps selected-value help open when activating its focused button in #y-axis-select"
           ],
-          "duration": 326,
+          "duration": 332,
           "attempts": 1
         },
         {
@@ -2166,7 +2174,7 @@
             "Axis option help",
             "keeps hover help readable across the pointer gap without taking search focus"
           ],
-          "duration": 875,
+          "duration": 795,
           "attempts": 1
         },
         {
@@ -2174,7 +2182,7 @@
             "Axis option help",
             "dismisses hover help with Escape and still allows clicking it to keep it open"
           ],
-          "duration": 719,
+          "duration": 673,
           "attempts": 1
         },
         {
@@ -2182,7 +2190,7 @@
             "Axis option help",
             "aligns help with the first line of wrapped options at 390px"
           ],
-          "duration": 111,
+          "duration": 91,
           "attempts": 1
         },
         {
@@ -2190,7 +2198,7 @@
             "Axis option help",
             "aligns help with the first line of wrapped options at 1280px"
           ],
-          "duration": 118,
+          "duration": 91,
           "attempts": 1
         },
         {
@@ -2198,7 +2206,7 @@
             "Axis option help",
             "opens descriptions and formulas without selecting an option or losing the search"
           ],
-          "duration": 937,
+          "duration": 883,
           "attempts": 1
         },
         {
@@ -2206,7 +2214,7 @@
             "Axis option help",
             "navigates to help with arrow keys and restores focus on Escape"
           ],
-          "duration": 731,
+          "duration": 753,
           "attempts": 1
         },
         {
@@ -2214,12 +2222,12 @@
             "Axis option help",
             "keeps long help readable on phones without horizontal overflow"
           ],
-          "duration": 307,
+          "duration": 300,
           "attempts": 1
         },
         {
           "title": ["Axis option help", "exposes separate accessible selection and help actions"],
-          "duration": 391,
+          "duration": 330,
           "attempts": 1
         },
         {
@@ -2227,7 +2235,7 @@
             "Workflow run dropdown",
             "removes run arrows but keeps date navigation, status, run selection, and external links"
           ],
-          "duration": 296,
+          "duration": 272,
           "attempts": 1
         },
         {
@@ -2235,18 +2243,18 @@
             "Workflow run dropdown",
             "keeps the Chinese run dropdown touch-sized on phones"
           ],
-          "duration": 230,
+          "duration": 199,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/inference-tco-badges.cy.tsx",
-      "duration": 1427,
+      "duration": 1396,
       "tests": [
         {
           "title": ["InferenceTcoBadges", "quotes the published prices on a tiered metric"],
-          "duration": 73,
+          "duration": 71,
           "attempts": 1
         },
         {
@@ -2254,7 +2262,7 @@
             "InferenceTcoBadges",
             "moves onto the custom tier on the first keystroke, carrying the other prices"
           ],
-          "duration": 203,
+          "duration": 197,
           "attempts": 1
         },
         {
@@ -2262,7 +2270,7 @@
             "InferenceTcoBadges",
             "seeds every chip from the hyperscaler prices on a deep link to the custom metric"
           ],
-          "duration": 44,
+          "duration": 36,
           "attempts": 1
         },
         {
@@ -2270,7 +2278,7 @@
             "InferenceTcoBadges",
             "edits custom costs in place and drops a blanked chip instead of pricing it at zero"
           ],
-          "duration": 260,
+          "duration": 262,
           "attempts": 1
         },
         {
@@ -2286,26 +2294,26 @@
             "InferenceTcoBadges",
             "drops a typed draft once the shared costs are reseeded or edited elsewhere"
           ],
-          "duration": 601,
+          "duration": 588,
           "attempts": 1
         },
         {
           "title": ["InferenceTcoBadges", "gives each mounted set of badges its own input ids"],
-          "duration": 36,
+          "duration": 32,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/inferencex-wordmark.cy.tsx",
-      "duration": 1005,
+      "duration": 805,
       "tests": [
         {
           "title": [
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 320px in light mode"
           ],
-          "duration": 213,
+          "duration": 153,
           "attempts": 1
         },
         {
@@ -2313,7 +2321,7 @@
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 320px in dark mode"
           ],
-          "duration": 147,
+          "duration": 127,
           "attempts": 1
         },
         {
@@ -2321,7 +2329,7 @@
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 375px in light mode"
           ],
-          "duration": 152,
+          "duration": 125,
           "attempts": 1
         },
         {
@@ -2329,7 +2337,7 @@
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 375px in dark mode"
           ],
-          "duration": 143,
+          "duration": 123,
           "attempts": 1
         },
         {
@@ -2337,7 +2345,7 @@
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 1440px in light mode"
           ],
-          "duration": 144,
+          "duration": 120,
           "attempts": 1
         },
         {
@@ -2345,40 +2353,40 @@
             "Halloween wordmark",
             "keeps the pumpkin over the wordmark at 1440px in dark mode"
           ],
-          "duration": 165,
+          "duration": 129,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/mode-toggle.cy.tsx",
-      "duration": 428,
+      "duration": 263,
       "tests": [
         {
           "title": [
             "ModeToggle",
             "switches from light to dark, persists the selection, and reports analytics"
           ],
-          "duration": 250,
+          "duration": 140,
           "attempts": 1
         },
         {
           "title": ["ModeToggle", "keeps a native button and retains focus after activation"],
-          "duration": 163,
+          "duration": 115,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/multi-select.cy.tsx",
-      "duration": 3458,
+      "duration": 3900,
       "tests": [
         {
           "title": [
             "MultiSelect",
             "selects with the keyboard, skips unavailable values, and restores trigger focus"
           ],
-          "duration": 506,
+          "duration": 577,
           "attempts": 1
         },
         {
@@ -2386,12 +2394,12 @@
             "MultiSelect",
             "closes after each selection and deselection, preserving the other selected values"
           ],
-          "duration": 682,
+          "duration": 805,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "keeps single-value selectors a one-click replacement"],
-          "duration": 197,
+          "duration": 231,
           "attempts": 1
         },
         {
@@ -2399,32 +2407,32 @@
             "MultiSelect",
             "still closes with Escape when the open menu has lost element focus"
           ],
-          "duration": 178,
+          "duration": 200,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "keeps disabled choices in grouped menus unavailable"],
-          "duration": 179,
+          "duration": 202,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "renders placeholder when no selections"],
-          "duration": 45,
+          "duration": 56,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "click trigger opens dropdown"],
-          "duration": 101,
+          "duration": 130,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "selecting an item adds a badge"],
-          "duration": 187,
+          "duration": 235,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "deselecting removes badge"],
-          "duration": 234,
+          "duration": 218,
           "attempts": 1
         },
         {
@@ -2432,51 +2440,51 @@
             "MultiSelect",
             "keeps long selected labels contained in the shared trigger density"
           ],
-          "duration": 106,
+          "duration": 146,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "search filters options"],
-          "duration": 235,
+          "duration": 255,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "maxSelections prevents selecting more items"],
-          "duration": 108,
+          "duration": 123,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "minSelections prevents deselecting below minimum"],
-          "duration": 106,
+          "duration": 107,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "clear all removes all selections"],
-          "duration": 110,
+          "duration": 112,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "localizes visible and accessible defaults on Chinese routes"],
-          "duration": 231,
+          "duration": 222,
           "attempts": 1
         },
         {
           "title": ["MultiSelect", "click outside closes dropdown"],
-          "duration": 170,
+          "duration": 172,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/normalized-interactivity-help-link.cy.tsx",
-      "duration": 101,
+      "duration": 104,
       "tests": [
         {
           "title": [
             "NormalizedInteractivityHelpLink",
             "renders a descriptive link to the English FAQ"
           ],
-          "duration": 62,
+          "duration": 66,
           "attempts": 1
         },
         {
@@ -2491,19 +2499,19 @@
     },
     {
       "spec": "cypress/component/power-metric-availability.cy.tsx",
-      "duration": 663,
+      "duration": 523,
       "tests": [
         {
           "title": [
             "PowerX metric availability",
             "explains missing GB and withheld AMD data, exposes source links, and switches metrics"
           ],
-          "duration": 415,
+          "duration": 352,
           "attempts": 1
         },
         {
           "title": ["PowerX metric availability", "uses Chinese copy for the same coverage states"],
-          "duration": 152,
+          "duration": 117,
           "attempts": 1
         },
         {
@@ -2511,21 +2519,21 @@
             "PowerX metric availability",
             "counts filtered unofficial rows before the metric filter and respects hidden overlay hardware"
           ],
-          "duration": 76,
+          "duration": 40,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/profit-estimator-chart.cy.tsx",
-      "duration": 2888,
+      "duration": 2333,
       "tests": [
         {
           "title": [
             "ProfitEstimatorChart revenue labels",
             "never lets neighbouring revenue figures overlap on a phone"
           ],
-          "duration": 374,
+          "duration": 211,
           "attempts": 1
         },
         {
@@ -2533,7 +2541,7 @@
             "ProfitEstimatorChart revenue labels",
             "keeps every loss figure inside its own band on a phone"
           ],
-          "duration": 316,
+          "duration": 166,
           "attempts": 1
         },
         {
@@ -2541,7 +2549,7 @@
             "ProfitEstimatorChart revenue labels",
             "keeps the word and the decimal on a desktop-width loss figure"
           ],
-          "duration": 63,
+          "duration": 33,
           "attempts": 1
         },
         {
@@ -2549,21 +2557,21 @@
             "ProfitEstimatorChart revenue labels",
             "keeps full precision on a desktop-width chart"
           ],
-          "duration": 2103,
+          "duration": 1910,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/quick-filters-dialog.cy.tsx",
-      "duration": 9705,
+      "duration": 8670,
       "tests": [
         {
           "title": [
             "QuickFiltersDialog",
             "explains every filter on hover without changing selections (en, 390px)"
           ],
-          "duration": 1743,
+          "duration": 1602,
           "attempts": 1
         },
         {
@@ -2571,7 +2579,7 @@
             "QuickFiltersDialog",
             "explains every filter on hover without changing selections (en, 1280px)"
           ],
-          "duration": 1620,
+          "duration": 1438,
           "attempts": 1
         },
         {
@@ -2579,7 +2587,7 @@
             "QuickFiltersDialog",
             "explains every filter on hover without changing selections (zh, 390px)"
           ],
-          "duration": 1634,
+          "duration": 1531,
           "attempts": 1
         },
         {
@@ -2587,7 +2595,7 @@
             "QuickFiltersDialog",
             "explains every filter on hover without changing selections (zh, 1280px)"
           ],
-          "duration": 1675,
+          "duration": 1573,
           "attempts": 1
         },
         {
@@ -2595,7 +2603,7 @@
             "QuickFiltersDialog",
             "keeps hovered help readable without stealing filter focus"
           ],
-          "duration": 496,
+          "duration": 439,
           "attempts": 1
         },
         {
@@ -2603,7 +2611,7 @@
             "QuickFiltersDialog",
             "supports keyboard help without dismissing the dialog or blocking filter selection"
           ],
-          "duration": 369,
+          "duration": 314,
           "attempts": 1
         },
         {
@@ -2611,7 +2619,7 @@
             "QuickFiltersDialog",
             "removes only the chosen visible filter without resetting the benchmark scope"
           ],
-          "duration": 134,
+          "duration": 99,
           "attempts": 1
         },
         {
@@ -2619,7 +2627,7 @@
             "QuickFiltersDialog",
             "localizes active filter values and leaves inapplicable AgentX spec filters untouched"
           ],
-          "duration": 147,
+          "duration": 100,
           "attempts": 1
         },
         {
@@ -2627,12 +2635,12 @@
             "QuickFiltersDialog",
             "toggles visible options with one keyboard press and lets Escape close the dialog"
           ],
-          "duration": 373,
+          "duration": 330,
           "attempts": 1
         },
         {
           "title": ["QuickFiltersDialog", "shows every filter group for fixed-sequence charts"],
-          "duration": 79,
+          "duration": 53,
           "attempts": 1
         },
         {
@@ -2640,7 +2648,7 @@
             "QuickFiltersDialog",
             "explains validated and historical power measurements in plain language"
           ],
-          "duration": 361,
+          "duration": 301,
           "attempts": 1
         },
         {
@@ -2648,7 +2656,7 @@
             "QuickFiltersDialog",
             "removes speculative decoding from agentic charts and toggles supported filters"
           ],
-          "duration": 311,
+          "duration": 269,
           "attempts": 1
         },
         {
@@ -2656,36 +2664,36 @@
             "QuickFiltersDialog",
             "keeps stale selections removable and disables unavailable options"
           ],
-          "duration": 308,
+          "duration": 258,
           "attempts": 1
         },
         {
           "title": ["QuickFiltersDialog", "clears every filter category from one action"],
-          "duration": 346,
+          "duration": 295,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/quotes-content.cy.tsx",
-      "duration": 1185,
+      "duration": 906,
       "tests": [
         {
           "title": [
             "QuotesContent",
             "renders a discrete separator between every quote (n - 1 separators)"
           ],
-          "duration": 270,
+          "duration": 191,
           "attempts": 1
         },
         {
           "title": ["QuotesContent", "gives the first quote of each org a stable anchor id"],
-          "duration": 190,
+          "duration": 233,
           "attempts": 1
         },
         {
           "title": ["QuotesContent", "renders one jump button per unique org logo"],
-          "duration": 80,
+          "duration": 60,
           "attempts": 1
         },
         {
@@ -2693,7 +2701,7 @@
             "QuotesContent",
             "renders the Mooncake team quote with the KVCache.AI identity"
           ],
-          "duration": 170,
+          "duration": 135,
           "attempts": 1
         },
         {
@@ -2701,23 +2709,23 @@
             "QuotesContent",
             "renders Seiji Eicher’s Anyscale quote and loads its logo in both locales"
           ],
-          "duration": 263,
+          "duration": 118,
           "attempts": 1
         },
         {
           "title": ["QuotesContent", "scrolls to the matching quote when a logo is clicked"],
-          "duration": 170,
+          "duration": 139,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/reliability-bar-chart.cy.tsx",
-      "duration": 452,
+      "duration": 358,
       "tests": [
         {
           "title": ["ReliabilityBarChartD3", "tracks retry and requests reliability data again"],
-          "duration": 205,
+          "duration": 170,
           "attempts": 1
         },
         {
@@ -2725,7 +2733,7 @@
             "ReliabilityBarChartD3",
             "shows \"No reliability data\" when chartData is empty"
           ],
-          "duration": 57,
+          "duration": 40,
           "attempts": 1
         },
         {
@@ -2733,43 +2741,43 @@
             "ReliabilityBarChartD3",
             "renders SVG with horizontal bars when data is provided"
           ],
-          "duration": 85,
+          "duration": 59,
           "attempts": 1
         },
         {
           "title": ["ReliabilityBarChartD3", "legend items render for each model"],
-          "duration": 45,
+          "duration": 38,
           "attempts": 1
         },
         {
           "title": ["ReliabilityBarChartD3", "high contrast switch is present in the legend"],
-          "duration": 41,
+          "duration": 38,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/reliability-chart-controls.cy.tsx",
-      "duration": 699,
+      "duration": 623,
       "tests": [
         {
           "title": ["Reliability ChartControls", "shows the current date range value from context"],
-          "duration": 78,
+          "duration": 68,
           "attempts": 1
         },
         {
           "title": ["Reliability ChartControls", "displays all date range options"],
-          "duration": 176,
+          "duration": 143,
           "attempts": 1
         },
         {
           "title": ["Reliability ChartControls", "calls setDateRange when an option is selected"],
-          "duration": 221,
+          "duration": 198,
           "attempts": 1
         },
         {
           "title": ["Reliability ChartControls", "calls setDateRange with \"all-time\" value"],
-          "duration": 209,
+          "duration": 199,
           "attempts": 1
         }
       ]
@@ -2780,51 +2788,51 @@
       "tests": [
         {
           "title": ["ScaleUpTopologyDiagram", "renders compact SVG view"],
-          "duration": 91,
+          "duration": 92,
           "attempts": 1
         },
         {
           "title": ["ScaleUpTopologyDiagram", "click opens dialog with expanded view"],
-          "duration": 179,
+          "duration": 193,
           "attempts": 1
         },
         {
           "title": ["ScaleUpTopologyDiagram", "dialog shows GPU spec name"],
-          "duration": 190,
+          "duration": 176,
           "attempts": 1
         },
         {
           "title": ["ScaleUpTopologyDiagram", "Prev/Next navigation works"],
-          "duration": 579,
+          "duration": 568,
           "attempts": 1
         },
         {
           "title": ["ScaleUpTopologyDiagram", "different topology types render without errors"],
-          "duration": 88,
+          "duration": 97,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/scatter-graph.cy.tsx",
-      "duration": 13965,
+      "duration": 11260,
       "tests": [
         {
           "title": [
             "ScatterGraph",
             "keeps the frontier modes and overlay winners without exposing the retired hinterland"
           ],
-          "duration": 1545,
+          "duration": 1483,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "shows the refresh changelog for a matching run series"],
-          "duration": 120,
+          "duration": 87,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "hides the refresh changelog for a mixed run series"],
-          "duration": 57,
+          "duration": 60,
           "attempts": 1
         },
         {
@@ -2832,32 +2840,32 @@
             "ScatterGraph",
             "offers the complete table when matching official points are all clipped"
           ],
-          "duration": 111,
+          "duration": 114,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "renders SVG within chart container"],
-          "duration": 52,
+          "duration": 42,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "shows empty state when data array is empty"],
-          "duration": 47,
+          "duration": 42,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "explains when the selected dataset lacks role-local energy"],
-          "duration": 46,
+          "duration": 36,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "localizes the complete Chinese empty state"],
-          "duration": 76,
+          "duration": 72,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "localizes the missing role-energy explanation"],
-          "duration": 44,
+          "duration": 36,
           "attempts": 1
         },
         {
@@ -2865,7 +2873,7 @@
             "ScatterGraph",
             "offers targeted quick-filter recovery on y_tpPerGpu without changing model, precision or date"
           ],
-          "duration": 124,
+          "duration": 125,
           "attempts": 1
         },
         {
@@ -2873,7 +2881,7 @@
             "ScatterGraph",
             "offers targeted quick-filter recovery on y_measuredPrefillJPerInputToken without changing model, precision or date"
           ],
-          "duration": 110,
+          "duration": 122,
           "attempts": 1
         },
         {
@@ -2881,12 +2889,12 @@
             "ScatterGraph",
             "restores hidden matching official and unofficial chip series together"
           ],
-          "duration": 108,
+          "duration": 119,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "renders scatter points as shapes in SVG with mock data"],
-          "duration": 39,
+          "duration": 46,
           "attempts": 1
         },
         {
@@ -2894,17 +2902,17 @@
             "ScatterGraph",
             "keeps official-only legend toggles active after a scope change"
           ],
-          "duration": 280,
+          "duration": 257,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "keeps a preview scope pending until official data arrives"],
-          "duration": 218,
+          "duration": 206,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "renders legend with hardware items"],
-          "duration": 34,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -2912,7 +2920,7 @@
             "ScatterGraph",
             "renders line labels for both official and overlay (unofficial) rooflines"
           ],
-          "duration": 67,
+          "duration": 69,
           "attempts": 1
         },
         {
@@ -2920,7 +2928,7 @@
             "ScatterGraph",
             "places precision between the GPU and engine in multi-precision labels"
           ],
-          "duration": 43,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -2928,7 +2936,7 @@
             "ScatterGraph",
             "renders a line label for a singleton unofficial overlay series"
           ],
-          "duration": 42,
+          "duration": 40,
           "attempts": 1
         },
         {
@@ -2936,7 +2944,7 @@
             "ScatterGraph",
             "renders a line label for a singleton ingested hardware series"
           ],
-          "duration": 303,
+          "duration": 292,
           "attempts": 1
         },
         {
@@ -2944,7 +2952,7 @@
             "ScatterGraph",
             "renders M3 mtp rooflines with the EAGLE label (official + overlay)"
           ],
-          "duration": 46,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -2952,7 +2960,7 @@
             "ScatterGraph",
             "renders cross-engine official and unofficial AgentX STP series together in preview mode"
           ],
-          "duration": 120,
+          "duration": 112,
           "attempts": 1
         },
         {
@@ -2968,7 +2976,7 @@
             "ScatterGraph",
             "renders both official and overlay AgentX STP series from the same engine family"
           ],
-          "duration": 36,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -2976,12 +2984,12 @@
             "ScatterGraph",
             "removes unofficial marks when the last preview run is dismissed"
           ],
-          "duration": 117,
+          "duration": 118,
           "attempts": 1
         },
         {
           "title": ["ScatterGraph", "clears perf rulers when the y-axis or x-axis metric changes"],
-          "duration": 718,
+          "duration": 691,
           "attempts": 1
         },
         {
@@ -2989,7 +2997,7 @@
             "ChartDisplay responsive status notes",
             "uses available width and preserves complete notices (en, 390px)"
           ],
-          "duration": 212,
+          "duration": 184,
           "attempts": 1
         },
         {
@@ -2997,7 +3005,7 @@
             "ChartDisplay responsive status notes",
             "uses available width and preserves complete notices (en, 1440px)"
           ],
-          "duration": 176,
+          "duration": 162,
           "attempts": 1
         },
         {
@@ -3013,7 +3021,7 @@
             "ChartDisplay responsive status notes",
             "uses available width and preserves complete notices (zh, 1440px)"
           ],
-          "duration": 178,
+          "duration": 145,
           "attempts": 1
         },
         {
@@ -3021,7 +3029,7 @@
             "ChartDisplay responsive status notes",
             "includes offload and ATOM notices when only the unofficial overlay uses them"
           ],
-          "duration": 100,
+          "duration": 97,
           "attempts": 1
         },
         {
@@ -3029,7 +3037,7 @@
             "ChartDisplay engine comparison guard",
             "includes explicitly clipped official and unofficial points in table mode"
           ],
-          "duration": 318,
+          "duration": 297,
           "attempts": 1
         },
         {
@@ -3037,7 +3045,7 @@
             "ChartDisplay engine comparison guard",
             "keeps official table rows synchronized with legend state after a scope change"
           ],
-          "duration": 449,
+          "duration": 354,
           "attempts": 1
         },
         {
@@ -3045,7 +3053,7 @@
             "ChartDisplay engine comparison guard",
             "renders the table columns without the median interactivity or TTFT columns"
           ],
-          "duration": 252,
+          "duration": 140,
           "attempts": 1
         },
         {
@@ -3053,7 +3061,7 @@
             "ChartDisplay engine comparison guard",
             "keeps same-hardware cross-engine AgentX STP rows out of table mode"
           ],
-          "duration": 267,
+          "duration": 142,
           "attempts": 1
         },
         {
@@ -3061,7 +3069,7 @@
             "ChartDisplay engine comparison guard",
             "keeps cross-engine official and unofficial rows together in preview table mode"
           ],
-          "duration": 261,
+          "duration": 192,
           "attempts": 1
         },
         {
@@ -3069,7 +3077,7 @@
             "ChartDisplay engine comparison guard",
             "keeps an explicitly empty official legend out of table mode"
           ],
-          "duration": 209,
+          "duration": 179,
           "attempts": 1
         },
         {
@@ -3077,7 +3085,7 @@
             "ChartDisplay engine comparison guard",
             "commits a new table overlay scope and preserves an explicit empty selection"
           ],
-          "duration": 1083,
+          "duration": 673,
           "attempts": 1
         },
         {
@@ -3085,7 +3093,7 @@
             "Power envelopes",
             "suppresses power-envelope clipping continuations with Optimal Only off"
           ],
-          "duration": 119,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -3093,7 +3101,7 @@
             "Power envelopes",
             "suppresses power-envelope clipping continuations with Optimal Only on"
           ],
-          "duration": 85,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -3101,7 +3109,7 @@
             "Power envelopes",
             "measures displayed power boundaries across official and dated overlay runs"
           ],
-          "duration": 1481,
+          "duration": 1033,
           "attempts": 1
         },
         {
@@ -3109,7 +3117,7 @@
             "Power envelopes",
             "colors measured-power boundaries by configuration without changing their geometry"
           ],
-          "duration": 1374,
+          "duration": 1118,
           "attempts": 1
         },
         {
@@ -3117,7 +3125,7 @@
             "Power envelopes",
             "keeps a single-configuration power boundary solid with its configuration label"
           ],
-          "duration": 101,
+          "duration": 93,
           "attempts": 1
         },
         {
@@ -3133,7 +3141,7 @@
             "Power envelopes",
             "keeps a fixed measured-power boundary while Optimal Only changes measurement visibility"
           ],
-          "duration": 1172,
+          "duration": 925,
           "attempts": 1
         },
         {
@@ -3141,7 +3149,7 @@
             "Power envelopes",
             "smooths measuredAvgPower across configurations and preserves overlay runs through zoom"
           ],
-          "duration": 500,
+          "duration": 304,
           "attempts": 1
         },
         {
@@ -3149,26 +3157,26 @@
             "Power envelopes",
             "smooths measuredP75Power across configurations and preserves overlay runs through zoom"
           ],
-          "duration": 484,
+          "duration": 309,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/scatter-label-overlap.cy.tsx",
-      "duration": 375,
+      "duration": 227,
       "tests": [
         {
           "title": [
             "Scatter label overlap",
             "draws both label kinds (guards the overlap assertions below)"
           ],
-          "duration": 218,
+          "duration": 128,
           "attempts": 1
         },
         {
           "title": ["Scatter label overlap", "keeps point labels clear of the run-name pills"],
-          "duration": 76,
+          "duration": 45,
           "attempts": 1
         },
         {
@@ -3176,18 +3184,18 @@
             "Scatter label overlap",
             "keeps the wider parallelism labels clear of the run-name pills"
           ],
-          "duration": 67,
+          "duration": 47,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/submissions-table.cy.tsx",
-      "duration": 1154,
+      "duration": 908,
       "tests": [
         {
           "title": ["SubmissionsTable — Spec Method column", "renders a Spec Method column header"],
-          "duration": 105,
+          "duration": 65,
           "attempts": 1
         },
         {
@@ -3195,12 +3203,12 @@
             "SubmissionsTable — Spec Method column",
             "renders canonical spec_method labels and shows an em-dash for \"none\""
           ],
-          "duration": 101,
+          "duration": 55,
           "attempts": 1
         },
         {
           "title": ["SubmissionsTable — Spec Method column", "renders M3 mtp as EAGLE, not MTP"],
-          "duration": 44,
+          "duration": 42,
           "attempts": 1
         },
         {
@@ -3208,7 +3216,7 @@
             "SubmissionsTable — Spec Method column",
             "sorts by spec_method when the header is clicked"
           ],
-          "duration": 256,
+          "duration": 217,
           "attempts": 1
         },
         {
@@ -3216,7 +3224,7 @@
             "SubmissionsTable — Spec Method column",
             "filters rows when the search query matches a spec_method"
           ],
-          "duration": 284,
+          "duration": 233,
           "attempts": 1
         },
         {
@@ -3224,7 +3232,7 @@
             "SubmissionsTable — Image diff in expanded row",
             "shows previous → current image on the bump-day row"
           ],
-          "duration": 145,
+          "duration": 124,
           "attempts": 1
         },
         {
@@ -3232,21 +3240,21 @@
             "SubmissionsTable — Image diff in expanded row",
             "renders just the current image when there is no preceding run"
           ],
-          "duration": 184,
+          "duration": 148,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/tab-nav.cy.tsx",
-      "duration": 2574,
+      "duration": 1403,
       "tests": [
         {
           "title": [
             "TabNav — attached unofficial-run banner",
             "keeps long branches and all actions inside the navigation at 320px"
           ],
-          "duration": 437,
+          "duration": 244,
           "attempts": 1
         },
         {
@@ -3254,7 +3262,7 @@
             "TabNav — attached unofficial-run banner",
             "keeps long branches and all actions inside the navigation at 390px"
           ],
-          "duration": 285,
+          "duration": 191,
           "attempts": 1
         },
         {
@@ -3262,7 +3270,7 @@
             "TabNav — attached unofficial-run banner",
             "keeps long branches and all actions inside the navigation at 768px"
           ],
-          "duration": 248,
+          "duration": 187,
           "attempts": 1
         },
         {
@@ -3270,7 +3278,7 @@
             "TabNav — attached unofficial-run banner",
             "keeps long branches and all actions inside the navigation at 1440px"
           ],
-          "duration": 274,
+          "duration": 191,
           "attempts": 1
         },
         {
@@ -3278,7 +3286,7 @@
             "TabNav — attached unofficial-run banner",
             "does not leave an empty status strip when there are no unofficial runs"
           ],
-          "duration": 82,
+          "duration": 31,
           "attempts": 1
         },
         {
@@ -3286,7 +3294,7 @@
             "TabNav — unofficialrun URL preservation (issue #319)",
             "renders bare hrefs when the URL has no unofficialrun param"
           ],
-          "duration": 96,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -3294,7 +3302,7 @@
             "TabNav — unofficialrun URL preservation (issue #319)",
             "appends unofficialruns to every tab href when the URL has the param"
           ],
-          "duration": 70,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -3302,7 +3310,7 @@
             "TabNav — unofficialrun URL preservation (issue #319)",
             "preserves a comma-separated list of run ids verbatim"
           ],
-          "duration": 57,
+          "duration": 29,
           "attempts": 1
         },
         {
@@ -3310,7 +3318,7 @@
             "TabNav — unofficialrun URL preservation (issue #319)",
             "accepts the singular alias `unofficialrun` and forwards it under `unofficialruns`"
           ],
-          "duration": 58,
+          "duration": 25,
           "attempts": 1
         },
         {
@@ -3318,7 +3326,7 @@
             "TabNav — Hidden popover for gated tabs",
             "omits the Hidden trigger and gated links when the feature gate is locked"
           ],
-          "duration": 90,
+          "duration": 32,
           "attempts": 1
         },
         {
@@ -3326,7 +3334,7 @@
             "TabNav — Hidden popover for gated tabs",
             "shows every primary chart as a one-tap mobile pill with the current one marked"
           ],
-          "duration": 106,
+          "duration": 37,
           "attempts": 1
         },
         {
@@ -3334,7 +3342,7 @@
             "TabNav — Hidden popover for gated tabs",
             "still names the current gated page in the locked mobile selector"
           ],
-          "duration": 67,
+          "duration": 28,
           "attempts": 1
         },
         {
@@ -3342,7 +3350,7 @@
             "TabNav — Hidden popover for gated tabs",
             "renders the Hidden trigger when unlocked; popover reveals gated links"
           ],
-          "duration": 200,
+          "duration": 117,
           "attempts": 1
         },
         {
@@ -3350,7 +3358,7 @@
             "TabNav — Hidden popover for gated tabs",
             "forwards the unofficialruns param onto every gated link in the popover"
           ],
-          "duration": 165,
+          "duration": 100,
           "attempts": 1
         },
         {
@@ -3358,7 +3366,7 @@
             "TabNav — Hidden popover for gated tabs",
             "highlights the Hidden trigger when the current path is one of the gated tabs"
           ],
-          "duration": 82,
+          "duration": 30,
           "attempts": 1
         },
         {
@@ -3366,7 +3374,7 @@
             "TabNav — Hidden popover for gated tabs",
             "highlights the Hidden trigger on /collectivex, which is now gated"
           ],
-          "duration": 63,
+          "duration": 26,
           "attempts": 1
         },
         {
@@ -3374,21 +3382,21 @@
             "TabNav — Hidden popover for gated tabs",
             "does NOT highlight the Hidden trigger on a non-gated path"
           ],
-          "duration": 72,
+          "duration": 26,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/trace-flamegraph.cy.tsx",
-      "duration": 751,
+      "duration": 546,
       "tests": [
         {
           "title": [
             "TraceFlamegraph",
             "renders the legend, main-turn rows, and the subagent group header"
           ],
-          "duration": 136,
+          "duration": 84,
           "attempts": 1
         },
         {
@@ -3396,12 +3404,12 @@
             "TraceFlamegraph",
             "keeps subagent children collapsed until the group is expanded"
           ],
-          "duration": 160,
+          "duration": 120,
           "attempts": 1
         },
         {
           "title": ["TraceFlamegraph", "expand all / collapse all toggles every subagent group"],
-          "duration": 248,
+          "duration": 195,
           "attempts": 1
         },
         {
@@ -3409,7 +3417,7 @@
             "TraceFlamegraph",
             "auto-expands and highlights the target group child for a request-timeline deep link"
           ],
-          "duration": 55,
+          "duration": 25,
           "attempts": 1
         },
         {
@@ -3417,21 +3425,21 @@
             "TraceFlamegraph",
             "exposes bar values on keyboard focus without regressing pointer tooltips"
           ],
-          "duration": 122,
+          "duration": 105,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/umbp-run-label.cy.tsx",
-      "duration": 504,
+      "duration": 472,
       "tests": [
         {
           "title": [
             "UMBP run recognition legend",
             "renders the official and overlay legends as UMBP MoRI SGLang at 2026-10-09T23:59:59-04:00"
           ],
-          "duration": 296,
+          "duration": 270,
           "attempts": 1
         },
         {
@@ -3439,35 +3447,19 @@
             "UMBP run recognition legend",
             "renders the official and overlay legends as MoRI SGLang at 2026-10-10T00:00:00-04:00"
           ],
-          "duration": 199,
+          "duration": 192,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/unofficial-banner.cy.tsx",
-      "duration": 685,
+      "duration": 484,
       "tests": [
         {
           "title": [
             "Standalone unofficial-run banner",
             "aligns with compare and model page content at 390px"
-          ],
-          "duration": 240,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Standalone unofficial-run banner",
-            "aligns with compare and model page content at 1440px"
-          ],
-          "duration": 167,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "Standalone unofficial-run banner",
-            "aligns with compare and model page content at 1920px"
           ],
           "duration": 171,
           "attempts": 1
@@ -3475,23 +3467,39 @@
         {
           "title": [
             "Standalone unofficial-run banner",
+            "aligns with compare and model page content at 1440px"
+          ],
+          "duration": 122,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Standalone unofficial-run banner",
+            "aligns with compare and model page content at 1920px"
+          ],
+          "duration": 115,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Standalone unofficial-run banner",
             "adds no banner or spacing when no runs are loaded"
           ],
-          "duration": 78,
+          "duration": 55,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/video-ci-runs.cy.tsx",
-      "duration": 7811,
+      "duration": 5955,
       "tests": [
         {
           "title": [
             "H3 automatic CI viewer (synthetic API fixtures)",
             "keeps an open long-label menu within mobile bounds and supports keyboard selection"
           ],
-          "duration": 429,
+          "duration": 328,
           "attempts": 1
         },
         {
@@ -3499,7 +3507,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "loads the newest run automatically and switches to a failed run without inventing media"
           ],
-          "duration": 607,
+          "duration": 447,
           "attempts": 1
         },
         {
@@ -3507,7 +3515,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "starts shared-artifact loading before run metadata finishes"
           ],
-          "duration": 232,
+          "duration": 69,
           "attempts": 1
         },
         {
@@ -3515,7 +3523,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "keeps navigation and bundle validation errors visible on an empty tradeoff link"
           ],
-          "duration": 334,
+          "duration": 158,
           "attempts": 1
         },
         {
@@ -3523,7 +3531,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "keeps the shared run selected when browsing the first catalog page"
           ],
-          "duration": 516,
+          "duration": 358,
           "attempts": 1
         },
         {
@@ -3531,7 +3539,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "keeps a direct selection and its download active when an older catalog arrives"
           ],
-          "duration": 3480,
+          "duration": 3387,
           "attempts": 1
         },
         {
@@ -3539,7 +3547,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "shows stored measurements without downloading the archive"
           ],
-          "duration": 270,
+          "duration": 116,
           "attempts": 1
         },
         {
@@ -3547,7 +3555,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "opens the shared serving cell and switches from the chart without reloading the CI artifact"
           ],
-          "duration": 1275,
+          "duration": 760,
           "attempts": 1
         },
         {
@@ -3555,7 +3563,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "shows a malformed serving matrix error instead of empty paired results"
           ],
-          "duration": 147,
+          "duration": 44,
           "attempts": 1
         },
         {
@@ -3563,7 +3571,7 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "reports expiration without downloading or substituting another artifact"
           ],
-          "duration": 134,
+          "duration": 34,
           "attempts": 1
         },
         {
@@ -3571,21 +3579,21 @@
             "H3 automatic CI viewer (synthetic API fixtures)",
             "withholds invalid generation measurements and separates warmup energy"
           ],
-          "duration": 296,
+          "duration": 207,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/video-fidelity.cy.tsx",
-      "duration": 1075,
+      "duration": 1069,
       "tests": [
         {
           "title": [
             "Native paired fidelity UI (synthetic artifacts)",
             "distinguishes valid media from 18 threshold failures and changes both selected videos"
           ],
-          "duration": 553,
+          "duration": 498,
           "attempts": 1
         },
         {
@@ -3593,7 +3601,7 @@
             "Native paired fidelity UI (synthetic artifacts)",
             "rewrites report media/download links and removes scripts and external resources"
           ],
-          "duration": 237,
+          "duration": 226,
           "attempts": 1
         },
         {
@@ -3609,7 +3617,7 @@
             "Native paired fidelity UI (synthetic artifacts)",
             "clears old evidence and reports an invalid or empty comparison"
           ],
-          "duration": 82,
+          "duration": 105,
           "attempts": 1
         },
         {
@@ -3617,21 +3625,21 @@
             "Native paired fidelity UI (synthetic artifacts)",
             "renders Chinese status and original-audio controls without relabeling failures as invalid media"
           ],
-          "duration": 86,
+          "duration": 122,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/video-serving-results.cy.tsx",
-      "duration": 4247,
+      "duration": 2301,
       "tests": [
         {
           "title": [
             "H3 serving results (synthetic fixtures)",
             "follows chart-driven cell changes while the result remains mounted"
           ],
-          "duration": 994,
+          "duration": 567,
           "attempts": 1
         },
         {
@@ -3639,7 +3647,7 @@
             "H3 serving results (synthetic fixtures)",
             "renders a parent-created blob in the report while keeping scripts disabled"
           ],
-          "duration": 354,
+          "duration": 242,
           "attempts": 1
         },
         {
@@ -3647,7 +3655,7 @@
             "H3 serving results (synthetic fixtures)",
             "shows each concurrency without manufacturing a candidate and separates participating and allocated GPU counts"
           ],
-          "duration": 1287,
+          "duration": 646,
           "attempts": 1
         },
         {
@@ -3655,7 +3663,7 @@
             "H3 serving results (synthetic fixtures)",
             "shows server stages separately from delivery and retains partial coverage"
           ],
-          "duration": 601,
+          "duration": 223,
           "attempts": 1
         },
         {
@@ -3663,7 +3671,7 @@
             "H3 serving results (synthetic fixtures)",
             "distinguishes requested and decoded duration and withholds invalid power"
           ],
-          "duration": 393,
+          "duration": 267,
           "attempts": 1
         },
         {
@@ -3671,7 +3679,7 @@
             "H3 serving results (synthetic fixtures)",
             "withholds headline metrics and power for an unverified configuration"
           ],
-          "duration": 129,
+          "duration": 61,
           "attempts": 1
         },
         {
@@ -3679,21 +3687,21 @@
             "H3 serving results (synthetic fixtures)",
             "supports Chinese copy and missing request, media, and allocation data"
           ],
-          "duration": 428,
+          "duration": 264,
           "attempts": 1
         }
       ]
     },
     {
       "spec": "cypress/component/video-tradeoff.cy.tsx",
-      "duration": 4675,
+      "duration": 4419,
       "tests": [
         {
           "title": [
             "Video tradeoff chart (synthetic fixtures)",
             "plots participating GPU efficiency by default and requires assumptions for the cost axis"
           ],
-          "duration": 2572,
+          "duration": 2525,
           "attempts": 1
         },
         {
@@ -3701,7 +3709,7 @@
             "Video tradeoff chart (synthetic fixtures)",
             "still withholds P90 for single-request results until median diagnostics are selected"
           ],
-          "duration": 202,
+          "duration": 170,
           "attempts": 1
         },
         {
@@ -3709,7 +3717,7 @@
             "Video tradeoff chart (synthetic fixtures)",
             "shows an empty state without inventing fixture results"
           ],
-          "duration": 62,
+          "duration": 39,
           "attempts": 1
         },
         {
@@ -3717,7 +3725,7 @@
             "Video tradeoff chart (synthetic fixtures)",
             "distinguishes groups with the same short label and exposes their full workload"
           ],
-          "duration": 535,
+          "duration": 496,
           "attempts": 1
         },
         {
@@ -3725,7 +3733,7 @@
             "Video serving matrix chart (synthetic contract fixture)",
             "shows server coverage in point details without changing the client latency axis"
           ],
-          "duration": 204,
+          "duration": 187,
           "attempts": 1
         },
         {
@@ -3733,7 +3741,7 @@
             "Video serving matrix chart (synthetic contract fixture)",
             "defaults to P90 when individual serving cells have enough samples"
           ],
-          "duration": 81,
+          "duration": 78,
           "attempts": 1
         },
         {
@@ -3741,7 +3749,7 @@
             "Video serving matrix chart (synthetic contract fixture)",
             "shows three labeled cell medians and opens the selected concurrency result"
           ],
-          "duration": 808,
+          "duration": 754,
           "attempts": 1
         },
         {
@@ -3749,7 +3757,7 @@
             "Video serving matrix chart (synthetic contract fixture)",
             "shows the Chinese serving labels with per-cell medians"
           ],
-          "duration": 153,
+          "duration": 120,
           "attempts": 1
         }
       ]
