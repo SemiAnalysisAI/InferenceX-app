@@ -2,6 +2,7 @@ import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { TabNav } from '@/components/dashboard/tab-nav';
+import { CLIENT_PATHNAME_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 import {
   UnofficialRunBanner,
   UnofficialRunContext,
@@ -12,8 +13,7 @@ import { createMockRouter } from '../support/mock-router';
 
 /**
  * Mount TabNav with the provided URL search string written into the window
- * via history.replaceState. The component reads `window.location.search` in a
- * useEffect, so the URL must be set before mount.
+ * via history.replaceState. Set the URL before the live route/query snapshot mounts.
  */
 function mountTabNav(opts: {
   pathname?: string;
@@ -156,7 +156,59 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/submissions?unofficialruns=12345',
     );
+    cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+      'have.attr',
+      'href',
+      '/profit-estimator/kimi-k3/unofficial-runs/12345',
+    );
+    cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should(
+      'have.attr',
+      'href',
+      '/profit-estimator-per-gigawatt/kimi-k3/unofficial-runs/12345',
+    );
   });
+
+  for (const prefix of ['', '/zh']) {
+    for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+      it(`carries route-owned runs from ${prefix}/${tab} to desktop and mobile tabs`, () => {
+        const base = `${prefix}/${tab}/deepseek-v4/target/24`;
+        mountTabNav({ pathname: `${base}/unofficial-runs/111%2C222` });
+        for (const selector of ['tab-trigger', 'mobile-tab']) {
+          cy.get(`[data-testid="${selector}-inference"]`).should(
+            'have.attr',
+            'href',
+            `${prefix}/inference?unofficialruns=111,222`,
+          );
+          cy.get(`[data-testid="${selector}-evaluation"]`).should(
+            'have.attr',
+            'href',
+            `${prefix}/evaluation?unofficialruns=111,222`,
+          );
+          for (const destination of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
+            cy.get(`[data-testid="${selector}-${destination}"]`).should(
+              'have.attr',
+              'href',
+              `${prefix}/${destination}/kimi-k3/unofficial-runs/111%2C222`,
+            );
+          }
+        }
+        cy.window().then((win) => {
+          win.history.replaceState(null, '', base);
+          win.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT));
+        });
+        cy.get('[data-testid="tab-trigger-inference"]').should(
+          'have.attr',
+          'href',
+          `${prefix}/inference`,
+        );
+        cy.get('[data-testid="tab-trigger-profit-estimator"]').should(
+          'have.attr',
+          'href',
+          `${prefix}/profit-estimator`,
+        );
+      });
+    }
+  }
 
   it('preserves a comma-separated list of run ids verbatim', () => {
     mountTabNav({ search: '?unofficialruns=111,222,333' });

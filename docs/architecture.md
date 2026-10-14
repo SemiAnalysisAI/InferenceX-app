@@ -65,7 +65,9 @@ current; these client-owned writes bypass Next navigation rehydration so it
 cannot overwrite a pending control edit. Legacy query links remain readable.
 Profit dashboards use P90 only and strip legacy percentile parameters.
 Language links retain route state without copying it into the query string;
-the unofficial-run filter reader uses a separate route-aware adapter.
+the unofficial-run filter reader and cross-tab overlay links use a separate
+route-aware adapter. Tab links encode run IDs in the destination's format:
+route segments for profit estimators, query parameters for other dashboards.
 Other dashboards keep their existing query-state behavior.
 
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) would spam `history.pushState`. Debouncing batches them into a single URL update.
