@@ -586,7 +586,7 @@ describe('buildShareUrl tab filtering', () => {
   });
 
   for (const pathname of ['/profit-estimator', '/zh/profit-estimator-per-gigawatt/kimi-k3']) {
-    it(`shares the profit interactivity target and percentile on ${pathname}`, async () => {
+    it(`shares the profit target but never a percentile on ${pathname}`, async () => {
       setupWindow('', pathname);
       const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
@@ -595,7 +595,7 @@ describe('buildShareUrl tab filtering', () => {
 
       const shared = new URL(buildShareUrl());
       const base = pathname.endsWith('/kimi-k3') ? pathname : `${pathname}/kimi-k3`;
-      expect(shared.pathname).toBe(`${base}/target/24/percentile/p75`);
+      expect(shared.pathname).toBe(`${base}/target/24`);
       expect(shared.search).toBe('');
     });
   }
@@ -617,7 +617,8 @@ describe('buildShareUrl tab filtering', () => {
     const { location } = setupWindow('', '/profit-estimator/deepseek-v4/target/24/percentile/p75');
     const { readUrlParams, refreshUrlParamsOnNavigation, buildShareUrl } =
       await import('@/lib/routing/url-state');
-    expect(readUrlParams()).toMatchObject({ c_ivtarget: '24', i_pctl: 'p75' });
+    expect(readUrlParams()).toMatchObject({ c_ivtarget: '24' });
+    expect(readUrlParams().i_pctl).toBeUndefined();
     location.pathname = '/profit-estimator/kimi-k3';
     refreshUrlParamsOnNavigation(location.pathname);
     expect(readUrlParams().c_ivtarget).toBeUndefined();
@@ -637,10 +638,10 @@ describe('buildShareUrl tab filtering', () => {
     expect(history.replaceState).toHaveBeenLastCalledWith(
       history.state,
       '',
-      '/profit-estimator/deepseek-v4/target/24/percentile/p75?utm_campaign=test#chart',
+      '/profit-estimator/deepseek-v4/target/24?utm_campaign=test#chart',
     );
     expect(buildShareUrl()).toBe(
-      'https://example.com/profit-estimator/deepseek-v4/target/24/percentile/p75#chart',
+      'https://example.com/profit-estimator/deepseek-v4/target/24#chart',
     );
   });
 

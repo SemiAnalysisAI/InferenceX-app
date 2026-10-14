@@ -42,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
-import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -521,11 +521,7 @@ export default function ProfitEstimatorDisplay({
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
-      <ProfitEstimatorInner
-        initialPercentile={urlSeed?.percentile ?? Percentile.P90}
-        initialTarget={urlSeed?.profitTarget}
-        basis={basis}
-      />
+      <ProfitEstimatorInner initialTarget={urlSeed?.profitTarget} basis={basis} />
     </GlobalFilterProvider>
   );
 }
@@ -557,11 +553,9 @@ function usePercentField(defaultValue: number, eventName: string) {
 }
 
 function ProfitEstimatorInner({
-  initialPercentile,
   initialTarget,
   basis,
 }: {
-  initialPercentile: Percentile;
   /** Shared `c_ivtarget`, parsed on the server so the first paint matches the link. */
   initialTarget?: number;
   basis: ProfitBasis;
@@ -681,7 +675,7 @@ function ProfitEstimatorInner({
   // one model and the allow-list swapped it); fall back to the catalog.
   const effectivePriceSource: PriceSource =
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
-  const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
+  const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
 
   const {
@@ -1153,15 +1147,6 @@ function ProfitEstimatorInner({
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
-  );
-
-  const handlePercentileChange = useCallback(
-    (value: Percentile) => {
-      setSelectedPercentile(value);
-      setUrlParam('i_pctl', value);
-      track('profit_percentile_selected', { percentile: value });
-    },
-    [setUrlParam],
   );
 
   const toggleGpuVisibility = useCallback(
@@ -1667,16 +1652,6 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {featureGateUnlocked && (
-                    <div className="min-w-0">
-                      <PercentileSelector
-                        id="profit-percentile"
-                        data-testid="profit-percentile-selector"
-                        value={selectedPercentile}
-                        onChange={handlePercentileChange}
-                      />
-                    </div>
-                  )}
                   {powerControlsEnabled && (
                     <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip

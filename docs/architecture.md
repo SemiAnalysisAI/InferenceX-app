@@ -58,10 +58,11 @@ canonical home of the default model; alias slugs 308-redirect like `/compare`.
 Chart filter state (model, sequence, metric, precisions, date range, GPU selections) is serialized to URL query params. This enables shareable links that reproduce exact chart views.
 
 The two profit estimators use model slugs followed by named route pairs instead,
-including on `/zh`: `/profit-estimator/deepseek-v4/target/24/percentile/p75`.
+including on `/zh`: `/profit-estimator/deepseek-v4/target/24`.
 Their existing query-key state store is adapted at the routing boundary by
 `profit-estimator-routes.ts`. Shallow history replacements keep the address bar
-current; legacy query links remain readable. Other dashboards keep their
+current; legacy query links remain readable. Profit dashboards use P90 only
+and strip legacy percentile parameters. Other dashboards keep their
 existing query-state behavior.
 
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) would spam `history.pushState`. Debouncing batches them into a single URL update.

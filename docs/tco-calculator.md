@@ -1162,15 +1162,18 @@ price`, next to OpenRouter and Custom; the caption names the source in force and
   seeds the three fields from whichever price is in force.
 - **Share state lives in the route.** Both profit estimators and their `/zh`
   siblings use `/<tab>/<model>/<name>/<value>` pairs, for example
-  `/profit-estimator/deepseek-v4/target/24/percentile/p75`.
+  `/profit-estimator/deepseek-v4/target/24`.
   `profit-estimator-routes.ts` owns the names and deterministic ordering:
-  `target`, `percentile`, `cache-hit-mode`, `power`, `tco-basis`, `date`, `run`,
+  `target`, `cache-hit-mode`, `power`, `tco-basis`, `date`, `run`,
   `precision`, `chips`, `dates`, `start`, `end`, and `unofficial-runs`.
   Values are URI-encoded once. All previously shareable profit parameters use
   the route; no chart state is emitted as a query. The pinned AgentX sequence
   and other tabs' parameters are omitted. Controls update history in place,
   using the same shallow replacement as the inference model selector.
-  Legacy queries remain readable, with path values taking precedence.
+  Both profit dashboards are P90-only, including behind the feature gate.
+  Percentile is never emitted in a query or path. Old `/percentile/p75` and
+  percentile query links resolve to the corresponding P90 view without that
+  parameter. Other legacy queries remain readable, with path values taking precedence.
   The target is server-seeded, defaults are omitted, and a model switch resets
   its target. A fresh navigation must not reuse the previous page's target.
   Filtered pages retain the model page's canonical/hreflang metadata rather

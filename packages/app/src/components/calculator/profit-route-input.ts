@@ -27,13 +27,18 @@ export async function profitRouteInput(
   const route = parseProfitRouteFilters(filters);
   if (!resolved || !modelRouteAvailableForTab(tab, resolved.route.model) || !route) notFound();
 
-  const merged = { ...query, ...Object.fromEntries(route) };
+  const { i_pctl, percentile, ...activeQuery } = query;
+  const merged = { ...activeQuery, ...Object.fromEntries(route) };
   // Filtered paths are authoritative; retain legacy model queries on bare model pages.
   if (filters.length > 0) merged.g_model = resolved.route.model;
-  if (resolved.isAlias) {
+  const retiredPercentile =
+    i_pctl !== undefined ||
+    percentile !== undefined ||
+    filters.some((segment, index) => index % 2 === 0 && segment === 'percentile');
+  if (resolved.isAlias || retiredPercentile) {
     const base = `${zh ? '/zh' : ''}${modelRoutePath(tab, resolved.route.slug)}`;
     const pathname = profitRoutePathname(base, route) ?? base;
-    permanentRedirect(pathWithSearchParams(pathname, query));
+    permanentRedirect(pathWithSearchParams(pathname, activeQuery));
   }
   return { resolved, searchParams: merged };
 }

@@ -401,6 +401,7 @@ function syncProfitRoute(): void {
   if (pathname === null) return;
   replaceRouterPathname(pathname, [
     ...URL_STATE_KEYS,
+    'percentile',
     ...[...new URLSearchParams(window.location.search).keys()].filter((key) =>
       UNOFFICIAL_RUN_PARAM_RE.test(key),
     ),

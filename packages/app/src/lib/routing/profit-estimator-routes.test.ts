@@ -18,7 +18,6 @@ describe('profit estimator route state', () => {
       it(`round-trips every supported parameter on ${base}`, () => {
         const values = [
           '24.5',
-          'p75',
           'theoretical',
           'compare',
           'external',
@@ -34,7 +33,7 @@ describe('profit estimator route state', () => {
         const params = new URLSearchParams();
         Object.values(PROFIT_ROUTE_PARAMS).forEach((key, index) => params.set(key, values[index]));
         const path = profitRoutePathname(base, params)!;
-        expect(path).toContain(`${base}/target/24.5/percentile/p75`);
+        expect(path).toContain(`${base}/target/24.5/cache-hit-mode/theoretical`);
         expect(path).not.toMatch(/[?#]/u);
         expect(profitRouteParams(path)).toEqual(params);
       });
@@ -46,6 +45,7 @@ describe('profit estimator route state', () => {
       g_model: Model.DeepSeek_V4_Pro,
       c_ivtarget: '24',
       i_seq: 'agentic-traces',
+      i_pctl: 'p75',
       i_metric: 'y_tokensPerSecond',
       c_mw: '100',
       r_range: 'last-7-days',
@@ -59,10 +59,10 @@ describe('profit estimator route state', () => {
   it('keeps other route values and locale when switching models', () => {
     expect(
       modelRoutePathnameRewrite(
-        '/zh/profit-estimator/deepseek-v4/target/24/percentile/p75',
+        '/zh/profit-estimator/deepseek-v4/target/24/cache-hit-mode/theoretical',
         Model.Kimi_K3,
       ),
-    ).toBe('/zh/profit-estimator/kimi-k3/target/24/percentile/p75');
+    ).toBe('/zh/profit-estimator/kimi-k3/target/24/cache-hit-mode/theoretical');
   });
 
   it('gives route state priority over conflicting legacy queries', () => {
@@ -72,7 +72,16 @@ describe('profit estimator route state', () => {
     );
     expect(params.get('c_ivtarget')).toBe('24');
     expect(params.get('g_model')).toBe(Model.DeepSeek_V4_Pro);
-    expect(params.get('i_pctl')).toBe('p75');
+    expect(params.has('i_pctl')).toBe(false);
+  });
+
+  it('discards legacy percentiles without changing other dashboards', () => {
+    const path = '/profit-estimator/deepseek-v4/target/24/percentile/p75';
+    const params = profitRouteSearch(path, '?i_pctl=p50&percentile=p99');
+    expect(params.has('i_pctl')).toBe(false);
+    expect(params.has('percentile')).toBe(false);
+    expect(profitRoutePathname(path, params)).toBe('/profit-estimator/deepseek-v4/target/24');
+    expect(profitRouteSearch('/inference', '?i_pctl=p75').get('i_pctl')).toBe('p75');
   });
 
   it('encodes reserved characters once and rejects malformed route shapes', () => {

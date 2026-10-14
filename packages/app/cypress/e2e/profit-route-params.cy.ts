@@ -20,16 +20,15 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         });
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
         cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-        cy.get('label[for="profit-target"]').should('contain.text', 'P75');
+        cy.get('label[for="profit-target"]').should('contain.text', 'P90');
+        cy.get('[data-testid="profit-percentile-selector"]').should('not.exist');
+        cy.location('pathname').should('eq', `${base}/target/24/cache-hit-mode/theoretical`);
         cy.get('[data-testid="profit-cache-hit-selector"]').should('contain.text', 'Theoretical');
         cy.document().then((doc) => {
           doc.documentElement.dataset.routeSentinel = 'same-document';
         });
         cy.get('[data-testid="profit-target-input"]').clear().type('28').blur();
-        cy.location('pathname').should(
-          'eq',
-          `${base}/target/28/percentile/p75/cache-hit-mode/theoretical`,
-        );
+        cy.location('pathname').should('eq', `${base}/target/28/cache-hit-mode/theoretical`);
         cy.location('search').should('eq', '');
         cy.document().its('documentElement.dataset.routeSentinel').should('eq', 'same-document');
         cy.get('[data-testid="share-button"]').click();
@@ -37,25 +36,20 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
           .invoke('val')
           .should((value) => {
             const shared = new URL(String(value));
-            expect(shared.pathname).to.equal(
-              `${base}/target/28/percentile/p75/cache-hit-mode/theoretical`,
-            );
+            expect(shared.pathname).to.equal(`${base}/target/28/cache-hit-mode/theoretical`);
             expect(shared.search).to.equal('');
           });
         cy.reload();
         cy.get('[data-testid="profit-target-input"]').should('have.value', '28');
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
         cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
-        cy.location('pathname').should('eq', `${base}/percentile/p75/cache-hit-mode/theoretical`);
+        cy.location('pathname').should('eq', `${base}/cache-hit-mode/theoretical`);
         // A model switch must also clear a non-default target, not only a default.
         cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
         cy.get('[data-testid="profit-model-selector"]').click();
         cy.contains('[role="option"]', 'Kimi K3').click();
         cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
-        cy.location('pathname').should(
-          'eq',
-          `${prefix}/${tab}/kimi-k3/percentile/p75/cache-hit-mode/theoretical`,
-        );
+        cy.location('pathname').should('eq', `${prefix}/${tab}/kimi-k3/cache-hit-mode/theoretical`);
       });
     }
   }
@@ -66,10 +60,32 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="profit-estimator-chart"]').should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
-    cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4/target/24/percentile/p75');
+    cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4/target/24');
+    cy.get('label[for="profit-target"]').should('contain.text', 'P90');
     cy.location('search').should('eq', '');
     cy.get('a[href="/profit-estimator-per-gigawatt"]').filter(':visible').first().click();
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.location('pathname').should('not.include', '/target/24');
+  });
+
+  it('keeps P90 pinned even with the feature gate unlocked and a bare-page percentile query', () => {
+    cy.visit('/profit-estimator?i_pctl=p75&percentile=p50&c_ivtarget=24', {
+      onBeforeLoad(win) {
+        suppressNudges(win);
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.get('[data-testid="profit-estimator-chart"]').should('exist');
+    cy.get('label[for="profit-target"]').should('contain.text', 'P90');
+    cy.get('[data-testid="profit-percentile-selector"]').should('not.exist');
+    cy.location('search').should('eq', '');
+    cy.location('pathname').should('eq', '/profit-estimator/kimi-k3/target/24');
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should((value) => {
+        expect(new URL(String(value)).pathname).to.equal('/profit-estimator/kimi-k3/target/24');
+        expect(new URL(String(value)).search).to.equal('');
+      });
   });
 });

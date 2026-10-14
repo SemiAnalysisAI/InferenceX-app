@@ -48,11 +48,12 @@ If you need to build the archive, run `npm pack` in `packages/skills`.
 ## Usage
 
 Profit-estimator dashboard links encode share state in named route segments,
-for example `/profit-estimator/deepseek-v4/target/24/percentile/p75`.
-The per-gigawatt page and `/zh` pages use the same format. Legacy query links
-remain readable; the read-only API and CLI contracts have not changed.
+for example `/profit-estimator/deepseek-v4/target/24`.
+The per-gigawatt page and `/zh` pages use the same format. These dashboards
+are P90-only and remove legacy percentile parameters. Other legacy query links
+remain readable; the separate read-only API and CLI contracts have not changed.
 To reproduce that example through `/api/v1/views/profit-estimator`, continue
-using `?model=DeepSeek-V4-Pro&target=24&percentile=p75`. Dashboard segments
+using `?model=DeepSeek-V4-Pro&target=24` (P90 is the default). Dashboard segments
 `cache-hit-mode`, `tco-basis`, `date`, `run`, `precision`, `chips`, and
 `unofficial-runs` map to API parameters `cacheHitMode`, `tcoBasis`, `date`,
 `runId`, `precisions`, `gpus`, and `unofficialrun`; `power` maps to `powerBasis`,

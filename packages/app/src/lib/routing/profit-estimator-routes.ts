@@ -11,7 +11,6 @@ export type ProfitRouteTab = 'profit-estimator' | 'profit-estimator-per-gigawatt
 /** Public path vocabulary; query keys remain an internal adapter for shared controls. */
 export const PROFIT_ROUTE_PARAMS = {
   target: 'c_ivtarget',
-  percentile: 'i_pctl',
   'cache-hit-mode': 'c_chmode',
   power: 'c_power',
   'tco-basis': 'g_tco',
@@ -33,13 +32,17 @@ export function isProfitRouteTab(tab: string): tab is ProfitRouteTab {
 export function parseProfitRouteFilters(filters: readonly string[]): URLSearchParams | null {
   if (filters.length % 2 !== 0) return null;
   const result = new URLSearchParams();
+  const seen = new Set<string>();
   for (let i = 0; i < filters.length; i += 2) {
     const name = filters[i];
+    const value = filters[i + 1];
+    if (!value || [...value].some((char) => char < ' ' || char === '\u007F') || seen.has(name))
+      return null;
+    seen.add(name);
+    // Read retired segments only to redirect old links to the P90-only route.
+    if (name === 'percentile') continue;
     if (!Object.hasOwn(PROFIT_ROUTE_PARAMS, name)) return null;
     const key = PROFIT_ROUTE_PARAMS[name as keyof typeof PROFIT_ROUTE_PARAMS];
-    const value = filters[i + 1];
-    if (!value || [...value].some((char) => char < ' ' || char === '\u007F') || result.has(key))
-      return null;
     result.set(key, value);
   }
   return result;
@@ -63,6 +66,8 @@ export function profitRouteSearch(pathname: string, search: string): URLSearchPa
   const result = new URLSearchParams(search);
   const route = profitRouteParams(pathname);
   if (!route) return result;
+  result.delete('i_pctl');
+  result.delete('percentile');
   for (const [key, value] of route) result.set(key, value);
   const parsed = parseModelRoutePathname(pathname);
   if (route.size > 0 && parsed?.slug) {
