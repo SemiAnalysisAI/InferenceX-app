@@ -1622,35 +1622,47 @@ describe('VR publication economics', () => {
           onBeforeLoad: suppressNudges,
         });
         cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
-        cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
-          const rows = [...$bars].map(
-            (node) =>
-              (
-                node as unknown as {
-                  __data__: {
-                    row: {
-                      hwKey: string;
-                      tco: number;
-                      revenue: number;
+        const assertCachePricing = (cacheHitRate: number) =>
+          cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+            const rows = [...$bars].map(
+              (node) =>
+                (
+                  node as unknown as {
+                    __data__: {
+                      row: {
+                        hwKey: string;
+                        tco: number;
+                        revenue: number;
+                      };
                     };
-                  };
-                }
-              ).__data__.row,
-          );
-          const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
-          const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
-          expect(vr, 'VR is priced').not.to.equal(undefined);
-          expect(gb, 'GB300 remains priced').not.to.equal(undefined);
-          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
-          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
-          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
-          // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
-          // 95% cache hit, DeepSeek list prices, 60% revenue utilization.
-          const revenuePerHour =
-            (((12_600 * (0.05 * 1.32 + 0.95 * 0.044) + 5_400 * 3.96) * 3600) / 1_000_000) * 0.6;
-          expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
-        });
+                  }
+                ).__data__.row,
+            );
+            const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
+            const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
+            expect(vr, 'VR is priced').not.to.equal(undefined);
+            expect(gb, 'GB300 remains priced').not.to.equal(undefined);
+            const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
+            const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
+            expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
+            expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+            // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
+            // the selected cache rate, DeepSeek list prices, 60% revenue utilization.
+            const revenuePerHour =
+              (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
+                3600) /
+                1_000_000) *
+              0.6;
+            expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
+          });
+        cy.get('[data-testid="profit-cache-hit-selector"]').should(
+          'contain.text',
+          'Theroticial Roofline',
+        );
+        assertCachePricing(0.97);
+        cy.get('[data-testid="profit-cache-hit-selector"]').click();
+        cy.contains('[role="option"]', /^Actual$/).click();
+        assertCachePricing(0.95);
       });
     }
   }
@@ -1659,7 +1671,7 @@ describe('VR publication economics', () => {
 it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
   interceptVrPublicationData(true);
   cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
-  cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+  cy.visit('/profit-estimator/deepseek-v4/cache-hit-mode/actual', { onBeforeLoad: suppressNudges });
   cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
   cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
     const rows = [...$bars].map(
