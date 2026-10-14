@@ -11,7 +11,7 @@
  *
  * Multinode jobs (`benchmark-multinode-tmpl.yml`) upload no `gpu_metrics_`
  * artifact; their telemetry travels inside `power_audit_<suffix>`:
- *   LOGS/power/samples.csv                  deployment-wide DCGM power, one row per (host, GPU, s)
+ *   LOGS/power/samples.csv                  native telemetry, one row per (host, GPU, s)
  *   LOGS/power/manifest.json                producer, source metric, cadence
  * Single-node jobs upload a `power_audit_` bundle too, so it only stands in
  * for a point when no `gpu_metrics_<suffix>` sibling exists.
@@ -64,7 +64,6 @@ export function gpuMetricsArtifactSuffix(artifactName: string): string | null {
   return null;
 }
 
-/** The nvidia-smi/amd-smi CSV carries clocks, utilization and temperature; the power bundle only power. */
 export function isPowerAuditArtifact(artifactName: string): boolean {
   return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
 }

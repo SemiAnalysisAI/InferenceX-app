@@ -587,6 +587,11 @@ Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry fro
 `power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
 samples transactionally.
 
+Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
+Ingest stores these readings in the existing GPU sample fields; missing or invalid
+readings stay absent. `sm_active` is a distinct measurement with no stored field and
+is not treated as GPU utilization.
+
 Run reads use the database when the run has stored telemetry, otherwise GitHub.
 Database errors remain errors. Point reads use linked database series and check their
 revision before using cached payloads, so re-ingest needs no manual telemetry-cache

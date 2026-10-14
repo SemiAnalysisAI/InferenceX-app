@@ -3,15 +3,15 @@
  *
  * `benchmark-multinode-tmpl.yml` uploads no `gpu_metrics_` artifact; its
  * telemetry travels inside `power_audit_<suffix>` as one CSV for the whole
- * deployment, written by `srt-slurm.dcgm-power` (DCGM scraped on every host
- * once per second):
+ * deployment, written by `srt-slurm.dcgm-power` for native NVIDIA or AMD
+ * telemetry:
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
- * Only power is scraped, so every other `GpuMetricSample` field stays null and
- * per-GPU statistics cover `powerW` alone. Rows are regrouped per host so each
- * host becomes its own series, the shape the reader already uses for multinode
- * staging ("one CSV per node"). Pure module: no I/O.
+ * Version 2 adds optional GPU utilization and version 3 adds temperature in
+ * Celsius. Uncollected readings retain null. Rows are regrouped per host so
+ * each host becomes its own series, the shape the reader already uses for
+ * multinode staging ("one CSV per node"). Pure module: no I/O.
  */
 
 import {
@@ -23,7 +23,7 @@ import {
 
 export interface MultinodePowerHost {
   hostname: string;
-  /** Host-local GPU indices, as DCGM reports them. */
+  /** Host-local GPU indices, as the collector reports them. */
   samples: GpuMetricSample[];
   /** gpu_index → gpu_uuid for the identity sidecar. */
   gpuUuids: Record<number, string>;
@@ -74,7 +74,19 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push({ ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW });
+    const sample = { ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW };
+    const temperatureText = at(cells, 'temperature_c');
+    const temperature = temperatureText ? Number(temperatureText) : Number.NaN;
+    // DCGM reserves INT32_BLANK and larger values for unavailable readings.
+    if (Number.isFinite(temperature) && temperature >= -273.15 && temperature < 2147483632) {
+      sample.temperatureC = temperature;
+    }
+    const gpuUtilText = at(cells, 'gpu_util_pct');
+    const gpuUtil = gpuUtilText ? Number(gpuUtilText) : Number.NaN;
+    if (Number.isFinite(gpuUtil) && gpuUtil >= 0 && gpuUtil <= 100) {
+      sample.gpuUtilPct = gpuUtil;
+    }
+    host.samples.push(sample);
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }
@@ -83,11 +95,16 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
 }
 
 /**
- * The producer manifest names its source metric; DCGM means NVIDIA. Anything
- * naming AMD tooling maps to 'amd', and an absent manifest defaults to NVIDIA
- * because only the DCGM producer writes this layout today.
+ * Native AMD DME records its metric and power scope; older bundles name the
+ * AMD profile explicitly. Both retain the historical DCGM producer name.
  */
 export function multinodePowerVendor(manifest: Record<string, unknown> | null): GpuMetricsVendor {
+  if (
+    manifest?.power_profile === 'amd-device-metrics' ||
+    (manifest?.source_metric === 'gpu_power_usage' &&
+      manifest?.power_scope === 'gpu_device_power_as_reported_by_amd_device_metrics_exporter')
+  )
+    return 'amd';
   const source = [manifest?.source_metric, manifest?.producer]
     .filter((value): value is string => typeof value === 'string')
     .join(' ')
