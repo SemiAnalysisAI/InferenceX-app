@@ -88,11 +88,11 @@ API routes (`packages/app/src/app/api/v1/`):
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
 - `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU statistics cached per revision) linked to one benchmark point
-- `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
-- `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
-  from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
-  assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
-  `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
+- `invalidate` — invalidate API cache (admin; `?scope=operatorx` purges only that scope)
+- `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX results,
+  served from a static snapshot that `packages/app/scripts/sync-collectivex.ts` assembles at build
+  time (no database) from the result files committed to InferenceX `main`, through the shared
+  reader. See [CollectiveX](./docs/collectivex.md).
 - `agentic-workload-explorer/*` — page-owned (`page-bff`) reads of a frozen, anonymized ProxyTrace
   snapshot from a **separate** read replica (`DATABASE_PROXYTRACE_READONLY_URL`) backing the
   feature-gated `/agentic-workload-explorer` pages. See [Agentic Workload Explorer](./docs/agentic-workload-explorer.md).
@@ -103,8 +103,9 @@ API routes (`packages/app/src/app/api/v1/`):
 **Raw-data API routes return raw DB data**. Dashboard projections under
 `/api/v1/views/*` use shared pure UI transformations server-side and publish their
 selectors and assumptions. Keep raw-data contracts separate from these projections.
-Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
-`packages/db/src/collectivex/` (see [docs/collectivex.md](./docs/collectivex.md) for why); and
+Exceptions: the CollectiveX routes serve a dataset assembled from committed result documents
+through the shared reader in `packages/db/src/collectivex/` (see
+[docs/collectivex.md](./docs/collectivex.md) for why); and
 `tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
 (spreadsheets) cannot execute the TS transforms — its assumptions (tier weights, workload mix, α)
 enter only as explicit query params with documented defaults, so a published sheet's URL fully

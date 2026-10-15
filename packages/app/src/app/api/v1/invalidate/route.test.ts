@@ -1,16 +1,14 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
+const { mockPurgeAll, mockPurgeOperatorX } = vi.hoisted(() => ({
   mockPurgeAll: vi.fn(),
-  mockPurgeCollectiveX: vi.fn(),
+  mockPurgeOperatorX: vi.fn(),
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,
-  purgeCollectiveX: mockPurgeCollectiveX,
-  purgeOperatorX: vi.fn(),
+  purgeOperatorX: mockPurgeOperatorX,
 }));
 
 import { POST } from './route';
@@ -130,21 +128,26 @@ describe('POST /api/v1/invalidate', () => {
     expect(body).toEqual({ invalidated: true, blobsDeleted: 0 });
   });
 
-  it('purges only the CollectiveX scope when requested', async () => {
+  it('purges only the OperatorX scope when requested', async () => {
     const res = await POST(
-      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=collectivex'),
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx'),
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ invalidated: true, scope: 'collectivex' });
-    expect(mockPurgeCollectiveX).toHaveBeenCalledOnce();
+    expect(body).toEqual({ invalidated: true, scope: 'operatorx' });
+    expect(mockPurgeOperatorX).toHaveBeenCalledOnce();
     expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 
-  it('rejects unknown scopes without purging anything', async () => {
-    const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=nope'));
-    expect(res.status).toBe(400);
-    expect(mockPurgeAll).not.toHaveBeenCalled();
-    expect(mockPurgeCollectiveX).not.toHaveBeenCalled();
-  });
+  it.each(['nope', 'collectivex'])(
+    'rejects the unknown scope %s without purging anything',
+    async (scope) => {
+      const res = await POST(
+        postReq({ Authorization: 'Bearer test-secret-123' }, `?scope=${scope}`),
+      );
+      expect(res.status).toBe(400);
+      expect(mockPurgeAll).not.toHaveBeenCalled();
+      expect(mockPurgeOperatorX).not.toHaveBeenCalled();
+    },
+  );
 });

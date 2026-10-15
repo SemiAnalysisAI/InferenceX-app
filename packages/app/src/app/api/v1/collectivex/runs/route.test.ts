@@ -3,39 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockList, mockGetWriteDb, mockEnsureList, mockCachedJson } = vi.hoisted(() => ({
-  mockList: vi.fn(),
-  mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
-  mockEnsureList: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
-}));
+const { mockLoad } = vi.hoisted(() => ({ mockLoad: vi.fn() }));
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXWriteDb: mockGetWriteDb,
-  FIXTURES_MODE: false,
-}));
-
-vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
-  listCollectiveXRuns: mockList,
-}));
-
-vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
-  ensureCollectiveXRunsList: mockEnsureList,
-  collectiveXSweepErrorStatus: (error: unknown) => {
-    const code = error instanceof Error && 'code' in error ? (error.code as string) : null;
-    if (code === 'not-found') return 404;
-    if (code === 'unavailable') return 503;
-    if (code === 'invalid') return 502;
-    return null;
-  },
-}));
-
-vi.mock('@/lib/cache/api-cache', () => ({
-  COLLECTIVEX_CACHE_SCOPE: 'collectivex',
-  COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
-  cachedJson: mockCachedJson,
-  collectiveXCacheTag: () => 'collectivex',
-}));
+vi.mock('@/lib/collectivex/snapshot', () => ({ loadCollectiveXSnapshot: mockLoad }));
 
 import { NextRequest } from 'next/server';
 
@@ -45,17 +15,17 @@ function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
 }
 
-function sweepError(code: string): Error {
-  return Object.assign(new Error(code), { code });
+function body(response: Response): Promise<unknown> {
+  return new Response(response.body!.pipeThrough(new DecompressionStream('gzip'))).json();
 }
 
-const summary = buildRunSummary(makeCollectiveXDataset());
+const dataset = makeCollectiveXDataset();
+const summary = buildRunSummary(dataset);
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  mockEnsureList.mockResolvedValue(true);
-  mockList.mockResolvedValue([summary]);
+  mockLoad.mockResolvedValue({ summary, dataset });
 });
 
 describe('GET /api/v1/collectivex/runs', () => {
@@ -64,70 +34,33 @@ describe('GET /api/v1/collectivex/runs', () => {
       const res = await GET(req(url));
       expect(res.status).toBe(400);
     }
-    expect(mockEnsureList).not.toHaveBeenCalled();
+    expect(mockLoad).not.toHaveBeenCalled();
   });
 
-  it('backfills recent runs then lists stored summaries newest first', async () => {
+  it('lists the snapshot run as a complete discovery result', async () => {
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      version: 1,
-      runs: [summary],
-      discovery_complete: true,
-    });
-    expect(mockEnsureList).toHaveBeenCalledWith(1);
-    expect(mockList).toHaveBeenCalledWith('mock-write-sql', 1);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
+    expect(await body(res)).toEqual({ version: 1, runs: [summary], discovery_complete: true });
   });
 
-  it('marks the list incomplete when another bounded discovery pass is needed', async () => {
-    mockEnsureList.mockResolvedValue(false);
-
-    const res = await GET(req('/api/v1/collectivex/runs?version=1'));
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      version: 1,
-      runs: [summary],
-      discovery_complete: false,
-    });
-    expect(mockCachedJson).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ cacheControl: 'private, no-store' }),
-    );
-  });
-
-  it('serves the stored list as incomplete when the GitHub backfill fails', async () => {
-    mockEnsureList.mockRejectedValue(sweepError('unavailable'));
+  it('returns an empty complete list when the snapshot has another contract version', async () => {
+    mockLoad.mockResolvedValue({ summary, dataset: { ...dataset, version: 2 } });
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
-      version: 1,
-      runs: [summary],
-      discovery_complete: false,
-    });
-    expect(mockCachedJson).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ cacheControl: 'private, no-store' }),
-    );
+    expect(await body(res)).toEqual({ version: 1, runs: [], discovery_complete: true });
   });
 
-  it('returns 503 when the backfill fails and nothing is stored', async () => {
-    mockEnsureList.mockRejectedValue(sweepError('unavailable'));
-    mockList.mockResolvedValue([]);
+  it('returns 503 when the deployment has no snapshot', async () => {
+    mockLoad.mockResolvedValue(null);
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(503);
   });
 
-  it('returns an empty list when GitHub has no runs yet', async () => {
-    mockList.mockResolvedValue([]);
-    const res = await GET(req('/api/v1/collectivex/runs?version=1'));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ version: 1, runs: [], discovery_complete: true });
-  });
-
-  it('returns 500 without leaking details on DB failure', async () => {
-    mockList.mockRejectedValue(new Error('boom'));
+  it('returns 500 without leaking details when the snapshot is unreadable', async () => {
+    mockLoad.mockRejectedValue(new Error('boom'));
     const res = await GET(req('/api/v1/collectivex/runs?version=1'));
     expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Internal server error' });
   });
 });

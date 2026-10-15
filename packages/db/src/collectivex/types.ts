@@ -1,6 +1,6 @@
 /**
- * CollectiveX neutral contract — the version-tagged shape shared by the sweep
- * artifacts' reader, the ingest script, and the dashboard frontend.
+ * CollectiveX neutral contract — the version-tagged shape shared by the
+ * result reader, the app's build-time snapshot sync, and the dashboard frontend.
  *
  * This module is pure TypeScript (no Node/DB imports) so it is safe to import
  * from client components. UI-only types (chart points, axis modes, display
@@ -34,10 +34,13 @@ export type CollectiveXOutcome =
 export type CollectiveXTerminalStatus = Exclude<CollectiveXOutcome, 'success'> | 'measured';
 
 export type CollectiveXPercentiles = Record<CollectiveXPercentile, number>;
+// EP rows: null where the harness withheld a tail because too many of its samples were misaligned
+// or host-stalled. p50 is always published.
+export type CollectiveXTailPercentiles = Record<CollectiveXPercentile, number | null>;
 
 export interface CollectiveXComponent {
-  latency_us: CollectiveXPercentiles;
-  activation_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  latency_us: CollectiveXTailPercentiles;
+  activation_data_rate_gbps_at_latency_percentile: CollectiveXTailPercentiles | null;
   /**
    * Per-GPU bandwidth over the FULL logical payload (activation bytes plus any
    * FP8 scale bytes), i.e. `total_logical_bytes / ep_size / latency`. Distinct
@@ -45,7 +48,7 @@ export interface CollectiveXComponent {
    * and excludes scale bytes. Null when the component carries no byte
    * provenance (e.g. an unavailable component).
    */
-  payload_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  payload_data_rate_gbps_at_latency_percentile: CollectiveXTailPercentiles | null;
   /**
    * Aggregate total logical payload bytes for this component at this point
    * (the numerator behind `payload_data_rate_*`). Carried raw so a consumer can
@@ -59,7 +62,7 @@ export interface CollectiveXPoint {
   tokens_per_rank: number;
   global_tokens: number;
   components: Record<CollectiveXOperation, CollectiveXComponent | null>;
-  roundtrip_token_rate_at_latency_percentile: CollectiveXPercentiles;
+  roundtrip_token_rate_at_latency_percentile: CollectiveXTailPercentiles;
 }
 
 export interface CollectiveXTopology {

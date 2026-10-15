@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  // CollectiveX routes read the snapshot that scripts/sync-collectivex.ts writes
+  // before `next build` (src/lib/collectivex/snapshot.ts); tracing cannot see
+  // that runtime read, so bundle the file with every route that serves it.
+  outputFileTracingIncludes: {
+    '/api/v1/collectivex/**': ['./.collectivex/snapshot.json'],
+    '/api/v1/views/collectivex': ['./.collectivex/snapshot.json'],
+  },
   redirects() {
     return Promise.resolve([
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,

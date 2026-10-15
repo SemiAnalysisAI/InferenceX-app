@@ -166,6 +166,8 @@ The [CollectiveX cookbook](../packages/skills/skills/inferencex-api/references/c
 discovers existing communication runs and exports exact EP/KV configuration
 comparisons with source bodies, run attempts, revision context, units and coverage.
 It distinguishes missing or unmatched data from zero metrics and never launches a sweep.
+The service now publishes one snapshot run per deployment, so discovery finds at most
+one run and the helper reports `fewer_than_two_measured_runs`.
 
 > Find two existing CollectiveX communication runs on InferenceX and save their
 > comparison as JSON. Match the operation, backend, precision, topology and byte

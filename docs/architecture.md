@@ -15,7 +15,7 @@ API routes return raw DB rows with zero transformation, validation, or filtering
 
 Some routes serve a purpose that raw DB rows cannot satisfy:
 
-- CollectiveX assembles stored sweep documents through its shared reader.
+- CollectiveX serves a build-time snapshot of committed result documents, assembled through its shared reader.
 - `tco-feed` performs server-side frontier interpolation for spreadsheet consumers that cannot run the TypeScript transforms.
 - `server-log-search` searches immutable log bundles in bounded database slices and returns only contextual matches. Returning raw rows would require transferring complete files that can exceed 100 MB before the browser could search them.
 - `/api/v1/overview` is a page-owned backend-for-frontend (BFF). It returns the compact `OverviewPageData` shape used by the initial server render, allowing selector changes to update the matrix without downloading every model's raw benchmark history or triggering a React Server Component (RSC) round trip. It is not a reusable public data API.
@@ -120,7 +120,7 @@ API route responses are cached at two layers before hitting the CDN.
 
 `unstable_cache` entries are tagged `'db'`. Calling `revalidateTag('db', { expire: 0 })` evicts all local cache entries in one call. Blob storage has no built-in tag system, so `blobPurge()` walks the paginated blob list and deletes every object under the prefix.
 
-`purgeAll()` calls both mechanisms and also invalidates the separate CollectiveX tag. Blob keys are versioned and encoded deterministically so structured arguments cannot collide.
+`purgeAll()` calls both mechanisms and also invalidates the separate OperatorX tag. Blob keys are versioned and encoded deterministically so structured arguments cannot collide.
 
 ### CDN Cache Headers
 
@@ -135,7 +135,7 @@ Vercel-Cache-Tag: db
 
 ### /api/v1/invalidate
 
-`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header, checked through the shared byte-safe constant-time bearer helper. On success it calls `purgeAll()`, which clears blob storage and revalidates the database and CollectiveX tags, then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipelines after benchmark runs and by the run-override pipeline after it applies and verifies merged override changes.
+`POST /api/v1/invalidate` requires a `Bearer {INVALIDATE_SECRET}` header, checked through the shared byte-safe constant-time bearer helper. On success it calls `purgeAll()`, which clears blob storage and revalidates the database and OperatorX tags, then returns `{ invalidated: true, blobsDeleted: N }`. This endpoint is called by the CI ingest pipelines after benchmark runs and by the run-override pipeline after it applies and verifies merged override changes.
 
 ## React Query Configuration
 

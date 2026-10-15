@@ -1,86 +1,29 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
 import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collectivex/test-fixture';
 
-const { mockGetRun, mockDelete, mockFromRow, mockGetWriteDb, mockPurge, mockEnsureRun } =
-  vi.hoisted(() => ({
-    mockGetRun: vi.fn(),
-    mockDelete: vi.fn(),
-    mockFromRow: vi.fn(),
-    mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
-    mockPurge: vi.fn(() => Promise.resolve(0)),
-    mockEnsureRun: vi.fn(),
-  }));
+const { mockLoad } = vi.hoisted(() => ({ mockLoad: vi.fn() }));
 
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  getCollectiveXWriteDb: mockGetWriteDb,
-  FIXTURES_MODE: false,
-}));
-
-vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
-  getCollectiveXRun: mockGetRun,
-  deleteCollectiveXRun: mockDelete,
-  collectiveXDatasetFromRow: mockFromRow,
-}));
-
-vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
-  ensureCollectiveXRun: mockEnsureRun,
-  collectiveXSweepErrorStatus: (error: unknown) => {
-    const code = error instanceof Error && 'code' in error ? (error.code as string) : null;
-    if (code === 'not-found') return 404;
-    if (code === 'unavailable') return 503;
-    if (code === 'invalid') return 502;
-    return null;
-  },
-}));
-
-vi.mock('@/lib/cache/api-cache', () => ({
-  COLLECTIVEX_CACHE_SCOPE: 'collectivex',
-  COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
-  cachedJson: (data: unknown) => Response.json(data),
-  collectiveXCacheTag: () => 'collectivex',
-  purgeCollectiveX: mockPurge,
-}));
+vi.mock('@/lib/collectivex/snapshot', () => ({ loadCollectiveXSnapshot: mockLoad }));
 
 import { NextRequest } from 'next/server';
 
-import { DELETE, GET } from './route';
+import * as route from './route';
 
-const SECRET = 'test-admin-secret';
 const dataset = makeCollectiveXDataset();
 const runId = dataset.run.run_id;
 
-function sweepError(code: string): Error {
-  return Object.assign(new Error(code), { code });
-}
-
 function get(url: string, id: string) {
-  return GET(new NextRequest(new URL(url, 'http://localhost')), {
+  return route.GET(new NextRequest(new URL(url, 'http://localhost')), {
     params: Promise.resolve({ runId: id }),
   });
 }
 
-function del(id: string, token?: string) {
-  return DELETE(
-    new NextRequest(new URL(`/api/v1/collectivex/runs/${id}`, 'http://localhost'), {
-      method: 'DELETE',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    }),
-    { params: Promise.resolve({ runId: id }) },
-  );
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv('COLLECTIVEX_ADMIN_SECRET', SECRET);
-  mockEnsureRun.mockResolvedValue(undefined);
-  mockGetRun.mockResolvedValue({ run_id: runId });
-  mockFromRow.mockReturnValue(dataset);
-  mockDelete.mockResolvedValue(true);
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  mockLoad.mockResolvedValue({ summary: buildRunSummary(dataset), dataset });
 });
 
 describe('GET /api/v1/collectivex/runs/[runId]', () => {
@@ -89,80 +32,42 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
     const badVersion = await get(`/x?version=99`, runId);
     expect(badRunId.status).toBe(400);
     expect(badVersion.status).toBe(400);
-    expect(mockEnsureRun).not.toHaveBeenCalled();
+    expect(mockLoad).not.toHaveBeenCalled();
   });
 
-  it('lazily ingests then serves the run assembled as a dataset', async () => {
+  it('serves the snapshot dataset for its run id', async () => {
     const res = await get(`/x?version=1`, runId);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(dataset);
-    expect(mockEnsureRun).toHaveBeenCalledWith(1, runId);
-    expect(mockGetRun).toHaveBeenCalledWith('mock-write-sql', 1, runId);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=86400');
+    const body = await new Response(res.body!.pipeThrough(new DecompressionStream('gzip'))).json();
+    expect(body).toEqual(dataset);
   });
 
-  it.each([
-    ['not-found', 404],
-    ['unavailable', 503],
-    ['invalid', 502],
-  ] as const)('maps %s ingest failures without exposing details', async (code, status) => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockEnsureRun.mockRejectedValue(sweepError(code));
-    mockGetRun.mockResolvedValue(null);
+  it('returns 404 for any other run or contract version', async () => {
+    const otherRun = await get(`/x?version=1`, '999');
+    expect(otherRun.status).toBe(404);
+    mockLoad.mockResolvedValue({
+      summary: buildRunSummary(dataset),
+      dataset: { ...dataset, version: 2 },
+    });
+    const otherVersion = await get(`/x?version=1`, runId);
+    expect(otherVersion.status).toBe(404);
+  });
+
+  it('returns 503 when the deployment has no snapshot', async () => {
+    mockLoad.mockResolvedValue(null);
     const res = await get(`/x?version=1`, runId);
-    expect(res.status).toBe(status);
+    expect(res.status).toBe(503);
   });
 
-  it('serves a stored run when its GitHub refresh fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockEnsureRun.mockRejectedValue(sweepError('unavailable'));
-
+  it('returns 500 without leaking details when the snapshot is unreadable', async () => {
+    mockLoad.mockRejectedValue(new Error('boom'));
     const res = await get(`/x?version=1`, runId);
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(dataset);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Internal server error' });
   });
 
-  it('returns 404 when the run is absent after a clean ensure', async () => {
-    mockGetRun.mockResolvedValue(null);
-    const res = await get(`/x?version=1`, runId);
-    expect(res.status).toBe(404);
-  });
-});
-
-describe('DELETE /api/v1/collectivex/runs/[runId]', () => {
-  it('rejects missing or wrong bearer tokens', async () => {
-    const missing = await del(runId);
-    const wrong = await del(runId, 'wrong-token');
-    expect(missing.status).toBe(401);
-    expect(wrong.status).toBe(401);
-    expect(mockDelete).not.toHaveBeenCalled();
-  });
-
-  it('rejects all requests when the secret is not configured', async () => {
-    vi.stubEnv('COLLECTIVEX_ADMIN_SECRET', '');
-    const res = await del(runId, '');
-    expect(res.status).toBe(401);
-    expect(mockDelete).not.toHaveBeenCalled();
-  });
-
-  it('tombstones the run and purges only the CollectiveX cache scope', async () => {
-    const res = await del(runId, SECRET);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ deleted: true, runId });
-    expect(mockDelete).toHaveBeenCalledWith('mock-write-sql', runId);
-    expect(mockPurge).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns 404 without purging when the run does not exist', async () => {
-    mockDelete.mockResolvedValue(false);
-    const res = await del(runId, SECRET);
-    expect(res.status).toBe(404);
-    expect(mockPurge).not.toHaveBeenCalled();
-  });
-
-  it('returns 400 for malformed run ids', async () => {
-    const res = await del('not-a-run-id', SECRET);
-    expect(res.status).toBe(400);
-    expect(mockDelete).not.toHaveBeenCalled();
+  it('exposes no deletion handler', () => {
+    expect(Object.keys(route)).not.toContain('DELETE');
   });
 });

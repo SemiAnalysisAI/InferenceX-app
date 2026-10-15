@@ -140,19 +140,6 @@ export function getWriteDb(overrides?: DatabaseClientOverrides): DbClient {
   return memoizedClient('DATABASE_WRITE_URL', overrides);
 }
 
-/**
- * Ordinary read client for the separate CollectiveX database. Lazy-ingest
- * paths use the write client for state checks and post-write reads.
- */
-export function getCollectiveXDb(overrides?: DatabaseClientOverrides): DbClient {
-  return memoizedClient('DATABASE_COLLECTIVEX_READONLY_URL', overrides);
-}
-
-/** CollectiveX primary client for lazy ingest, consistent reads, and deletion. */
-export function getCollectiveXWriteDb(overrides?: DatabaseClientOverrides): DbClient {
-  return memoizedClient('DATABASE_COLLECTIVEX_WRITE_URL', overrides);
-}
-
 /** Read-only client for the separate OperatorX database; runs arrive by push ingest. */
 export function getOperatorXDb(overrides?: DatabaseClientOverrides): DbClient {
   return memoizedClient('DATABASE_OPERATORX_READONLY_URL', overrides);

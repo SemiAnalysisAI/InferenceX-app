@@ -2,14 +2,16 @@
 
 [English](./collectivex.md#vllm-swap_blocks) | **中文**
 
-独立的 `backend=swap-blocks` 扫描通过现有 matrix/shard 产物流程发现。包含一个或多个
-swap-blocks 单元的执行矩阵映射到应用契约版本 1。共享读取器验证
-`collectivex-swap-blocks-v1` 文档的正确性标记、有效载荷计算、有限且递增的正延迟分位值、
-样本数量，以及与运行记录一致的源代码 SHA。EP/KV 保持原有读取流程。
-原始 JSON 仍是数据来源，无需数据库迁移。
+`cases.json` 以 `suite: "swap-blocks"` 请求 swap_blocks 用例，每个 GPU 池的每种布局各一个；
+这些用例没有 EP token 阶梯，不会计入 EP 覆盖范围。对应结果为 `collectivex-swap-blocks-v1`
+文档，记录 `case_id`、`profile`、`generated_at` 和 `runtime.sku`。共享读取器只接受恰好对应
+本 GPU 池一个已请求 swap_blocks 用例的文档，并验证正确性标记、有效载荷计算、有限且递增的
+正延迟分位值、样本数量和运行环境来源（`runtime.source_sha` 是实际测量时的提交，可能早于
+快照所用的提交）。EP/KV 保持原有读取流程。
 
 数据集新增 `swap_blocks` 字段，保存运行环境来源和实测数据点；运行摘要通过 `swap_cases`
-区分 EP/KV 与块交换。每份校验通过的产物计为一个用例，每个实测的传输方向、布局、块大小、
+单独统计已请求和已测量的 swap_blocks 用例，与 EP/KV 区分。每份校验通过的文档计为一个
+已测量用例；没有结果文档的已请求用例保持待处理状态。每个实测的传输方向、布局、块大小、
 块数量和 seed 组合计为一个数据点。因预算限制而未测量的组合单独统计，不绘制为实测数据。
 
 运行表支持按 swap_blocks 筛选，多运行对比沿用现有勾选操作及线型。图表可选择传输方向、
@@ -27,6 +29,4 @@ swap-blocks 单元的执行矩阵映射到应用契约版本 1。共享读取器
 切换至延迟模式或隐藏所有匹配曲线时，参考线一并隐藏；带宽纵轴始终为线性，并覆盖参考值。
 
 来源见[英文文档](./collectivex.md#vllm-swap_blocks)中的硬件规格和拓扑链接。
-多平台矩阵包含一个或多个 swap-blocks 执行项；产物必须在 `runtime.sku` 中记录
-矩阵请求的 GPU 池。旧版单平台产物可省略此字段。测量标识包含 SKU，避免不同平台
-相同网格点之间发生冲突。
+测量标识包含 SKU，避免不同平台相同网格点之间发生冲突。

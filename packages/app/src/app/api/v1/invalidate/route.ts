@@ -2,13 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { bearerMatches } from '@/lib/api/bearer-auth';
 
-import {
-  COLLECTIVEX_CACHE_SCOPE,
-  OPERATORX_CACHE_SCOPE,
-  purgeAll,
-  purgeCollectiveX,
-  purgeOperatorX,
-} from '@/lib/cache/api-cache';
+import { OPERATORX_CACHE_SCOPE, purgeAll, purgeOperatorX } from '@/lib/cache/api-cache';
 
 export async function POST(request: Request) {
   const secret = process.env.INVALIDATE_SECRET;
@@ -27,15 +21,11 @@ export async function POST(request: Request) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
-  // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the
-  // default remains a full purge (which covers both).
+  // ?scope=operatorx purges only that cache scope; the default remains a full
+  // purge (which covers it).
   const scope = new URL(request.url).searchParams.get('scope');
-  if (scope && scope !== COLLECTIVEX_CACHE_SCOPE && scope !== OPERATORX_CACHE_SCOPE) {
+  if (scope && scope !== OPERATORX_CACHE_SCOPE) {
     return NextResponse.json({ error: 'unknown scope' }, { status: 400 });
-  }
-  if (scope === COLLECTIVEX_CACHE_SCOPE) {
-    purgeCollectiveX();
-    return NextResponse.json({ invalidated: true, scope });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
     purgeOperatorX();
