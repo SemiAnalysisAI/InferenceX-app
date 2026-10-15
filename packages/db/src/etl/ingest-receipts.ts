@@ -31,6 +31,8 @@ export interface IngestReceiptInput {
   points: readonly PowerPublicationPoint[];
   /** PowerX publication errors collected during the ingest. */
   publicationErrors: readonly string[];
+  /** Known-failed PowerX results, excluded on purpose; never fatal. */
+  publicationWarnings?: readonly string[];
   tracker: Pick<SkipTracker, 'skips' | 'dbWriteErrors' | 'dbWriteWarnings'>;
   /** Telemetry artifacts that were produced but held no telemetry files. */
   telemetryNotCollectedArtifacts?: number;
@@ -48,6 +50,7 @@ export function buildPowerPublicationManifest(input: IngestReceiptInput): PowerP
     // write failure that leaves a hole in a PowerX curve is already among the
     // publication errors (config) or caught by the verifier (missing row).
     ingestErrors: [...input.publicationErrors],
+    publicationWarnings: [...(input.publicationWarnings ?? [])],
     // Reported but not fatal — see Skips.telemetryError.
     telemetryWarnings: [
       ...(skips.telemetryError

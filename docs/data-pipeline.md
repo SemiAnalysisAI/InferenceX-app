@@ -660,9 +660,11 @@ The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
 point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
 mapped, override-adjusted metric contract, all configuration dimensions, original
 source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
-their original source identity. Failed or unmapped results at those workloads, and
-failed config writes for their rows, remain in the manifest; they cannot pass
-verification. Other database write failures do not enter the manifest. The ingest
+their original source identity. Unmapped results at those workloads, and failed
+config writes for their rows, remain in the manifest as `ingestErrors`; they cannot
+pass verification. Results the benchmark itself marked failed are excluded on purpose:
+they are listed under `publicationWarnings`, copied into the verification receipt, and
+never fatal. Other database write failures do not enter the manifest. The ingest
 writes them to the database write receipt (`DATABASE_WRITE_RECEIPT`) as
 `{ kind, subject, message, code }` entries, where `code` is the SQLSTATE or
 postgres.js client code. The workflow step "Check database writes" runs even after

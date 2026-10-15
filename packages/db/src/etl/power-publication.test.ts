@@ -4,6 +4,8 @@ import { createSkipTracker } from './skip-tracker';
 import {
   POWER_WORKLOADS,
   powerPublicationPoint,
+  powerVerificationReceipt,
+  unmappedPowerResultIssue,
   powerWorkloadForScenario,
   rawPowerWorkloadOf,
   verifyPowerPublication,
@@ -193,5 +195,57 @@ describe('NVL72 CPU publication', () => {
     expect(
       verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
     ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
+});
+
+describe('known-failed PowerX results', () => {
+  it('warns for results the benchmark marked failed', () => {
+    expect(
+      unmappedPowerResultIssue({ ...raw, isl: 8192, osl: 1024 }, true, 'bmk_a/r.json'),
+    ).toEqual({ warning: 'Known-failed 8k1k result excluded: bmk_a/r.json' });
+    expect(
+      unmappedPowerResultIssue(
+        { ...raw, isl: undefined, osl: undefined, scenario_type: 'agentic-coding', users: 32 },
+        true,
+        'bmk_agentic_a/r.json',
+      ),
+    ).toEqual({ warning: 'Known-failed agentic result excluded: bmk_agentic_a/r.json' });
+  });
+
+  it('keeps unmapped results that are not marked failed fatal', () => {
+    expect(
+      unmappedPowerResultIssue({ ...raw, isl: 1024, osl: 1024 }, false, 'bmk_b/r.json'),
+    ).toEqual({ error: 'Unmapped 1k1k result: bmk_b/r.json' });
+  });
+
+  it('ignores results outside the PowerX workloads', () => {
+    expect(unmappedPowerResultIssue({ ...raw, isl: 4096, osl: 1024 }, true, 'x.json')).toBeNull();
+    expect(unmappedPowerResultIssue({ ...raw, isl: 4096, osl: 1024 }, false, 'x.json')).toBeNull();
+  });
+
+  it('copies publication warnings into the verification receipt without failing it', () => {
+    const manifest = {
+      version: 1 as const,
+      runId: 7,
+      runAttempt: 1,
+      points: [],
+      ingestErrors: [],
+      publicationWarnings: ['Known-failed 8k1k result excluded: bmk_a/r.json'],
+      telemetryWarnings: [],
+    };
+    expect(powerVerificationReceipt(manifest, [], '2026-10-15T00:00:00Z')).toEqual({
+      runId: 7,
+      runAttempt: 1,
+      checkedAt: '2026-10-15T00:00:00Z',
+      points: 0,
+      counts: { strict: 0, invalid: 0, other: 0 },
+      status: 'no_power_points',
+      errors: [],
+      publicationWarnings: ['Known-failed 8k1k result excluded: bmk_a/r.json'],
+      telemetryWarnings: [],
+    });
+    expect(powerVerificationReceipt(manifest, ['Unmapped 1k1k result: bmk_b/r.json']).status).toBe(
+      'failed',
+    );
   });
 });
