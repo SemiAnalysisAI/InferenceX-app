@@ -78,26 +78,23 @@ export_dump() {
   ) &
   local agentx_pid=$!
 
-  # Keep the exporting transaction busy while the readers run, so the
+  # Heartbeat the exporting transaction while the readers run, so the
   # server's idle-in-transaction timeout (5 min on Neon) cannot end it before
   # they import the snapshot. Writes run in a subshell so a lost exporter
   # cannot kill this script with SIGPIPE.
-  local exporter_alive=1
-  while kill -0 "$dump_pid" 2>/dev/null || kill -0 "$agentx_pid" 2>/dev/null; do
-    if ((exporter_alive)); then
-      if (echo 'select 1;' >&3) 2>/dev/null; then
-        read -r -t 60 -u 4 _ || exporter_alive=0
-      else
-        exporter_alive=0
-      fi
-    fi
-    sleep 10
-  done
+  (
+    while (echo 'select 1;' >&3) 2>/dev/null && read -r -t 60 -u 4 _; do
+      sleep 5
+    done
+  ) &
+  local heartbeat_pid=$!
 
   local status=0
   wait "$dump_pid" || status=1
   wait "$agentx_pid" || status=1
-  if ((exporter_alive)); then (echo 'commit;' >&3) 2>/dev/null || true; fi
+  kill "$heartbeat_pid" 2>/dev/null || true
+  wait "$heartbeat_pid" 2>/dev/null || true
+  (echo 'commit;' >&3) 2>/dev/null || true
   exec 3>&- 4<&-
   wait "$snapshot_pid" || true
   rm -rf "$fifo_dir"
