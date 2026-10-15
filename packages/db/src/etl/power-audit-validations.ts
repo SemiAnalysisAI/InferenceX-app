@@ -1,5 +1,5 @@
 /** Pure normalization of legacy and retained AgentX power-audit documents. */
-import { isRecord } from '../lib/records.js';
+import { isRecord } from '../lib/records';
 
 const LEGACY_VALIDATION = /^power_validation_[^/]+\.json$/u;
 const AGENTX_VALIDATION = /^LOGS\/agentic\/conc_(?<concurrency>[1-9]\d*)\/power_validation\.json$/u;

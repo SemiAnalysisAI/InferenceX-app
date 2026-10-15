@@ -152,6 +152,7 @@ function buildOptionsPayload() {
     specMethods: [...SPEC_METHOD_KEYS].toSorted(),
     percentiles: PERCENTILE_OPTIONS,
     xAxisModes: X_AXIS_MODES,
+    fixedSequenceStatistics: ['median', 'mean'],
     scaleModes: ['auto', 'linear', 'log'],
     metrics,
     quickFilters: {
@@ -190,6 +191,10 @@ function buildOptionsPayload() {
       metric: DEFAULT_METRIC_CONFIG_KEY,
       percentile: 'p90',
       xmode: 'interactivity',
+      xstat: 'median',
+      serviceCompare: false,
+      roleShare: false,
+      powerFit: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',
