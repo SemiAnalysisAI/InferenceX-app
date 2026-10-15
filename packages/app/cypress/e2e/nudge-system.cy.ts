@@ -138,13 +138,26 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
-        const win = $modal[0].ownerDocument.defaultView!;
-        expect(Math.abs(rect.left + rect.width / 2 - win.innerWidth / 2)).to.be.lessThan(2);
-        expect(Math.abs(rect.top + rect.height / 2 - win.innerHeight / 2)).to.be.lessThan(2);
+        // clientWidth/Height exclude the scrollbar, which the fixed overlay also excludes.
+        const root = $modal[0].ownerDocument.documentElement;
+        expect(Math.abs(rect.left + rect.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
+        expect(Math.abs(rect.top + rect.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
       });
     cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
+    // Focus moves into the dialog so keyboard users land on the action.
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
     cy.get('[data-testid="launch-modal-action"]').click();
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
+  });
+
+  it('dismisses on Escape', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.focused().type('{esc}');
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+    });
   });
 
   it('persists "Maybe Later" dismissal', () => {

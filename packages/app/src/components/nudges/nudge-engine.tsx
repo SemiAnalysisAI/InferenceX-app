@@ -494,9 +494,62 @@ function ModalRenderer({
   const titleId = `${idPrefix}-title`;
   const descriptionId = `${idPrefix}-description`;
   const centered = content.centered;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  // A centered modal covers the page, so it owns the keyboard: focus moves
+  // in, Tab cycles inside, Escape dismisses, and focus returns on close.
+  useEffect(() => {
+    if (!centered) return;
+    const dialogEl = dialogRef.current;
+    if (!dialogEl) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () =>
+      [
+        ...dialogEl.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((el) => el.offsetParent !== null);
+    const primary = dialogEl.querySelector<HTMLElement>('[data-modal-primary]');
+    (primary ?? focusable()[0] ?? dialogEl).focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onDismissRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        dialogEl.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items.at(-1)!;
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialogEl.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialogEl.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [centered]);
 
   const dialog = (
     <div
+      ref={dialogRef}
+      tabIndex={centered ? -1 : undefined}
       data-testid={content.testId}
       role="dialog"
       aria-modal={centered ? 'true' : 'false'}
@@ -549,6 +602,7 @@ function ModalRenderer({
             {content.primaryAction && (
               <Button
                 onClick={onAction}
+                data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
                 className={content.actionClassName}
               >
