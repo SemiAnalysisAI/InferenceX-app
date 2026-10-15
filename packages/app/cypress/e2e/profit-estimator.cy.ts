@@ -169,9 +169,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       );
       const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
       cy.get('#profit-target').should('have.value', '125');
-      chart().find('text.revenue-label').should('have.length', 3);
+      // GB300 fills one NVL72 tray and prices with modeled Grace sockets.
+      chart().find('text.revenue-label').should('have.length', 4);
       chart()
-        .should('contain', 'B200')
+        .should('contain', 'GB300')
+        .and('contain', 'B200')
         .and('contain', 'B300')
         .and('contain', 'MI355X')
         .and('contain', label);
@@ -199,9 +201,12 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
             .split('\n')
             .filter(
               (line) =>
-                line.startsWith('B200') || line.startsWith('B300') || line.startsWith('MI355X'),
+                line.startsWith('GB300') ||
+                line.startsWith('B200') ||
+                line.startsWith('B300') ||
+                line.startsWith('MI355X'),
             ),
-        ).to.have.length(3);
+        ).to.have.length(4);
       });
     });
   }

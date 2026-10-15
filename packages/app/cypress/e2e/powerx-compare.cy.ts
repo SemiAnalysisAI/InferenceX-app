@@ -232,6 +232,8 @@ const agenticRows = [
   framework,
   benchmark_type: 'agentic_traces',
   disagg: false,
+  // GB200 TP8 runs on one node; a multinode row would be two whole trays.
+  is_multinode: hardware !== 'gb200',
   isl: null,
   osl: null,
   prefill_tp: tp,
