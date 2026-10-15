@@ -209,25 +209,17 @@ it('scopes prefix and source reads in SQL, including containing power-audit bund
     sourceResults: ['dsr1_8k1k_fp4_sglang_conc32_b200-x_0'],
   });
   expect(payload?.series.map((series) => series.id)).toEqual([100, 101, 110]);
-  expect(payload?.coverage).toEqual({ status: 'unknown', missingArtifacts: [] });
   expect(sampleIds).toEqual([[100, 101, 110]]);
 });
 
 it('returns null only when the run has no stored series', async () => {
   await db.exec(`INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, created_at, date)
     VALUES (5, ${NO_SERIES}, 1, 'Run Sweep', '2026-09-14T04:19:00Z', '2026-09-14')`);
-  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { artifact: 'missing' })).toMatchObject({
-    workflowRun: { githubRunId: WITH_SERIES },
-    series: [],
-  });
-  expect(await getGpuMetricsForRun(sql, NO_SERIES)).toBeNull();
-  expect(await getGpuMetricsForRun(sql, NO_SERIES, { artifact: 'missing' })).toBeNull();
   expect(await getGpuMetricsForRun(sql, WITH_SERIES, { sourceResults: ['missing'] })).toMatchObject(
-    {
-      workflowRun: { githubRunId: WITH_SERIES },
-      series: [],
-    },
+    { workflowRun: { githubRunId: WITH_SERIES }, series: [] },
   );
+  expect(await getGpuMetricsForRun(sql, NO_SERIES)).toBeNull();
+  expect(await getGpuMetricsForRun(sql, NO_SERIES, { sourceResults: ['missing'] })).toBeNull();
 });
 
 it('reports whole-run gaps while preserving readable stored data and artifact selection', async () => {

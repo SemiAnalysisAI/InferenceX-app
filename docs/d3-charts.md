@@ -124,7 +124,7 @@ Dividing watts by one hardware's positive, constant TDP preserves its boundary m
 
 Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
 
-**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
+**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Energy and other Pareto views retain their ruler behavior.
 
 ### Concurrency is not an x-axis
 
@@ -132,7 +132,7 @@ There is no concurrency x-axis mode. GPU count varies across configurations, so 
 
 ### Unofficial runs in date comparisons
 
-`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned tooltips, official and overlay alike, offer **View power trace**, which opens the comparison Timeline focused on that trace; official points also keep **View PowerX**.
+`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned tooltips, official and overlay alike, offer **View power trace**, which opens the comparison Timeline focused on that trace; official points also keep **View PowerX**. With Perf Ruler on, an overlay marker selects its run's curve like an official point, and hiding the run's hardware removes rulers on that curve.
 
 ## Gradient Roofline Labels
 

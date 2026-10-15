@@ -1,10 +1,11 @@
 /**
  * Read side of the stored PowerX telemetry (migration 016).
  *
- * Two entry points: everything recorded during one GitHub Actions run (keyed by
- * run ID), and the series linked to one benchmark point. Samples are returned
- * as flat rows with ISO timestamps, the shape the live artifact parser produces.
- * Per-GPU statistics are computed from the stored samples on every read.
+ * Two entry points: everything recorded during one GitHub Actions run (the
+ * PowerX explorer keyed by run ID), and the series linked to one benchmark
+ * point (the per-point detail tab). Samples are returned as flat rows with
+ * ISO timestamps so the existing D3 charts consume them unchanged. Per-GPU
+ * statistics are computed from the stored samples on every read.
  */
 
 import {
@@ -89,16 +90,16 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
-  /** Coverage across the whole run, including when the samples are scoped to one artifact. */
+  /** Coverage across the whole run, however `prefix`, `sourceResults` or `artifact` scope the samples. */
   coverage: GpuMetricsRunCoverage;
-  /** Every artifact label when only one view artifact's samples were requested. */
+  /** Complete explorer labels when only one view artifact's samples were requested. */
   artifactNames?: string[];
 }
 
 export interface GpuMetricsRunSelection {
   prefix?: string | null;
   sourceResults?: readonly string[] | null;
-  /** Undefined reads all matching artifacts; null selects the first artifact name. */
+  /** Undefined reads all matching artifacts; null selects the first explorer artifact. */
   artifact?: string | null;
 }
 
@@ -400,12 +401,14 @@ async function readGpuMetricsForRun(
       .filter((entry) => entry.name === selected)
       .map((entry) => Number(entry.id));
   }
+  const prefix = selection.prefix ?? null;
+  const sources = selection.sourceResults ?? null;
 
   const seriesRows = await readSeriesRows(sql, {
     workflowRunId: Number(run.id),
     seriesIds: selectedIds,
-    prefix: selection.prefix ?? null,
-    sources: selection.sourceResults ?? null,
+    prefix,
+    sources,
   });
   const series = await loadSeriesDetails(sql, seriesRows);
   const runVersions = (await sql`

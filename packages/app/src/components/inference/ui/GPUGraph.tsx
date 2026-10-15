@@ -141,8 +141,9 @@ const CHART_MARGIN = { top: 24, right: 10, bottom: 60, left: 60 };
 // Series id of an unofficial run: `overlay-run<index>_<hwKey>`. Official series
 // ids are `${date}_${hwKey}`, the `activeDates` key.
 const OVERLAY_SERIES_PREFIX = 'overlay-run';
+
 // Roofline paths in this chart carry the class `roofline-<key>` where key is
-// `${seriesIdOf(point)}_${precision}` (see `renderRooflines`). The perf ruler
+// `${seriesId}_${precision}` (see `renderRooflines`). The perf ruler
 // identifies curves by that class token.
 const ROOFLINE_CLASS_PREFIX = 'roofline-';
 
@@ -785,8 +786,9 @@ const GPUGraph = React.memo(
     // iso-x stored in DATA space so it survives zoom (axis-metric changes
     // clear rulers; see usePerfRulerAxisReset).
     // Any two curves may be paired — two dates of the same chip config, two
-    // chip configs on the same date, or a mix — which is the point of this
-    // view: quantify the multiple between comparison series at a glance.
+    // chip configs on the same date, an unofficial run, or a mix — which is
+    // the point of this view: quantify the multiple between comparison series
+    // at a glance.
     const [perfRulerMode, setPerfRulerMode] = useState(false);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     // Changing the x- or y-axis metric clears every ruler: the curves are
@@ -874,8 +876,8 @@ const GPUGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // A point click selects its (date, chip, precision) curve at that point's
-    // x, including when the measurement itself is off the power boundary.
+    // A point click selects its series' curve (a compared date's or an
+    // unofficial run's) at that point's x, including off-boundary measurements.
     // Ruler-mode clicks measure INSTEAD of pinning the tooltip, so drop the
     // pin the shared click handler applied just before this callback ran.
     const handlePerfRulerPointClick = useCallback(
@@ -894,8 +896,8 @@ const GPUGraph = React.memo(
       [clampPerfRulerIsoXToOverlap, seriesIdOf],
     );
 
-    // Read by the long-lived D3 click closure in the tooltip config, which is
-    // captured at render time — refs over closures.
+    // Read by long-lived D3 click closures (official tooltip config + overlay
+    // marker handlers), which are captured at render time — refs over closures.
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
@@ -1180,7 +1182,7 @@ const GPUGraph = React.memo(
       rooflines,
     ]);
 
-    // Dismiss tooltip when pinned point's combo is hidden
+    // Dismiss tooltip when pinned point's series is hidden
     useEffect(() => {
       const handle = chartRef.current;
       const pp = handle?.getPinnedPoint() as InferenceData | null;
@@ -1330,8 +1332,18 @@ const GPUGraph = React.memo(
               hide: () => zoomGroup.select('.ruler-group').style('display', 'none'),
             },
             onClick: (point) => {
-              if (perfRulerRef.current.mode) {
-                perfRulerRef.current.onPointClick(point);
+              // Ruler mode: the marker measures its run's curve instead of
+              // keeping the tooltip the shared handler just pinned.
+              const ruler = perfRulerRef.current;
+              if (ruler.mode) {
+                track('gpu_timeseries_data_point_clicked', {
+                  hw: String(point.hwKey),
+                  x: point.x,
+                  y: point.y,
+                  overlay: true,
+                  perfRuler: true,
+                });
+                ruler.onPointClick(point);
                 return;
               }
               track('gpu_timeseries_data_point_clicked', {

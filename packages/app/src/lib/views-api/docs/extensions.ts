@@ -468,7 +468,6 @@ const NEW_VIEWS = {
     {
       runInfo: object,
       artifacts: strings,
-
       coverage: {
         type: ['object', 'null'],
         properties: {
@@ -478,7 +477,6 @@ const NEW_VIEWS = {
         required: ['status', 'missingArtifacts'],
         additionalProperties: false,
       },
-
       rows: objects,
       stats: {
         ...objects,

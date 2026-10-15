@@ -204,9 +204,10 @@ day. Date-only comparisons select that day's exact logical snapshot; the primary
 source observations inclusively.
 Public unofficial overlays must not be relabeled as official results.
 
-`i_rulers` belongs to browser share links, including run-specific comparison
-curves. It is not a views API parameter. Tooltip scrolling and viewport limits
-only affect access to existing actions; neither changes API data or calculations.
+`i_rulers` belongs to browser share links for the primary inference chart;
+date-comparison rulers are not shared. It is not a views API parameter. Tooltip
+scrolling and viewport limits only affect access to existing actions; neither
+changes API data or calculations.
 
 For measured-power gauges, `optimal=true` keeps the chart's higher-power outer
 envelope. `frontier.direction` describes that boundary; `metric.direction` retains
