@@ -202,7 +202,7 @@ export function fitAlphaBeta(
     const component = point.components[operation];
     if (component === null || component.payload_bytes === null) continue;
     const latency = component.latency_us[percentile];
-    if (latency <= 0) continue;
+    if (latency === null || latency <= 0) continue;
     bytesPerGpu.push(component.payload_bytes / ep);
     latencies.push(latency);
   }

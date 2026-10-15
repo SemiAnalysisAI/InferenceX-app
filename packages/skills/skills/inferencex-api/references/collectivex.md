@@ -189,6 +189,11 @@ effect. Equal SHAs also do not establish identical runtime conditions.
 | Swap `swap_blocks[].points[].latency_us`                         | Copy latency in microseconds at the named percentile.                                                                                         |
 | Swap `swap_blocks[].points[].payload_gbps_at_latency_percentile` | Payload GB/s at the named latency percentile, with bytes counted once.                                                                        |
 
+EP p90, p95 and p99 are null where the harness withheld that tail: too many of the
+series' samples were misaligned across ranks or host-stalled. The rates at a
+withheld tail are null too; p50 is always present. Report a null tail as withheld,
+not as zero or as a missing measurement.
+
 The saved OpenAPI operation description defines the optional swap metrics even
 when their property schemas omit descriptions. Swap points remain in the raw
 datasets, outside the formal EP/KV comparison groups. For supplemental summaries,

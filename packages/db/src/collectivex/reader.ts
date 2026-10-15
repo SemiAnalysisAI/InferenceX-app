@@ -21,11 +21,11 @@ import type {
   CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOutcome,
-  CollectiveXPercentiles,
   CollectiveXPoint,
   CollectiveXPrecision,
   CollectiveXRunSummary,
   CollectiveXSeries,
+  CollectiveXTailPercentiles,
   CollectiveXTerminalStatus,
 } from './types';
 
@@ -51,13 +51,13 @@ interface RawCase {
 
 interface RawComponent {
   availability: string;
-  percentiles_us: CollectiveXPercentiles | null;
+  percentiles_us: CollectiveXTailPercentiles | null;
 }
 
 interface RawRow {
   tokens_per_rank: number;
   global_tokens: number;
-  token_rate_at_latency_percentile: CollectiveXPercentiles;
+  token_rate_at_latency_percentile: CollectiveXTailPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
   /**
@@ -179,10 +179,11 @@ function toMode(raw: string | undefined): CollectiveXMode {
 // splits an aggregate world byte count into a per-GPU figure (divisor = ep_size).
 function ratesFrom(
   bytes: number,
-  latency: CollectiveXPercentiles,
+  latency: CollectiveXTailPercentiles,
   divisor = 1,
-): CollectiveXPercentiles {
-  const rate = (us: number) => (bytes / divisor / us) * 1e-3;
+): CollectiveXTailPercentiles {
+  const rate = (us: number | null) =>
+    us !== null && us > 0 ? (bytes / divisor / us) * 1e-3 : null;
   return {
     p50: rate(latency.p50),
     p90: rate(latency.p90),
