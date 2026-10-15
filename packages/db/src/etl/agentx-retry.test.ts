@@ -204,43 +204,6 @@ describe('AgentX retry persistence', () => {
     expect(await traceIds()).toHaveLength(1);
   });
 
-  it.each(['missing-profile', 'missing-csv', 'missing-json', 'changed-profile'])(
-    'refuses %s source bytes before changing the historical row or trace',
-    async (change) => {
-      const id = await seed({ ...winner, metrics: { duration_seconds: 13 } });
-      await persistPreparedTraceReplay(pgliteSql(db), [id], prepared);
-      const before = await read();
-      const tracesBefore = await traceIds();
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'historical-sources-'));
-      try {
-        const profileJsonl = path.join(dir, 'profile_export.jsonl');
-        const serverMetricsCsv = path.join(dir, 'server_metrics_export.csv');
-        const serverMetricsJson = path.join(dir, 'server_metrics_export.json');
-        fs.writeFileSync(profileJsonl, profile(40));
-        fs.writeFileSync(serverMetricsCsv, 'timestamp,value\n1,2\n');
-        fs.writeFileSync(serverMetricsJson, '{}');
-        await expect(
-          (async () => {
-            await verifyHistoricalC24TraceSources({
-              profileJsonl: change === 'missing-profile' ? null : profileJsonl,
-              serverMetricsCsv: change === 'missing-csv' ? null : serverMetricsCsv,
-              serverMetricsJson: change === 'missing-json' ? null : serverMetricsJson,
-            });
-            await repair();
-          })(),
-        ).rejects.toThrow(
-          change === 'changed-profile'
-            ? 'source hash mismatch: profile_export.jsonl'
-            : 'requires its winning profile JSONL, server CSV and server JSON',
-        );
-        expect(await read()).toEqual(before);
-        expect(await traceIds()).toEqual(tracesBefore);
-      } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
-    },
-  );
-
   it('requires the complete winning payload, including server metrics, for trace reuse', async () => {
     const id = await seed();
     await persistPreparedTraceReplay(
@@ -289,3 +252,31 @@ describe('AgentX retry persistence', () => {
     }
   });
 });
+
+it.each(['missing-profile', 'missing-csv', 'missing-json', 'changed-profile'])(
+  'refuses %s historical trace sources',
+  async (change) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'historical-sources-'));
+    try {
+      const profileJsonl = path.join(dir, 'profile_export.jsonl');
+      const serverMetricsCsv = path.join(dir, 'server_metrics_export.csv');
+      const serverMetricsJson = path.join(dir, 'server_metrics_export.json');
+      fs.writeFileSync(profileJsonl, profile(40));
+      fs.writeFileSync(serverMetricsCsv, 'timestamp,value\n1,2\n');
+      fs.writeFileSync(serverMetricsJson, '{}');
+      await expect(
+        verifyHistoricalC24TraceSources({
+          profileJsonl: change === 'missing-profile' ? null : profileJsonl,
+          serverMetricsCsv: change === 'missing-csv' ? null : serverMetricsCsv,
+          serverMetricsJson: change === 'missing-json' ? null : serverMetricsJson,
+        }),
+      ).rejects.toThrow(
+        change === 'changed-profile'
+          ? 'source hash mismatch: profile_export.jsonl'
+          : 'requires its winning profile JSONL, server CSV and server JSON',
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);

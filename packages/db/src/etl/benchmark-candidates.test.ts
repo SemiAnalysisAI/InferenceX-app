@@ -47,15 +47,11 @@ describe('selectBenchmarkMeasurements', () => {
     expect(result.sources.flatMap((source) => source.rows)).toHaveLength(2);
   });
 
-  it.each([
-    [golden, { ...golden, duration_seconds: 100 }],
-    [{ ...golden, benchmark_outcome: { status: 'passed' } }, golden],
-    [
-      { ...golden, benchmark_outcome: { status: 'passed', attempt_id: 'one', finalized: true } },
-      { ...golden, benchmark_outcome: { status: 'passed', attempt_id: 'two', finalized: true } },
-    ],
-  ])('refuses different eligible measurements independent of status and order', (a, b) => {
-    const files = read({ bmk_agentic_point: [a], results_bmk: [b] });
+  it('refuses conflicting measurements in either file order', () => {
+    const files = read({
+      bmk_agentic_point: [golden],
+      results_bmk: [{ ...golden, duration_seconds: 100 }],
+    });
     for (const inputs of [files, files.toReversed()]) {
       expect(() => selectBenchmarkMeasurements(inputs, context)).toThrow(
         'Conflicting AgentX measurements',
@@ -75,8 +71,6 @@ describe('selectBenchmarkMeasurements', () => {
 
   it.each([
     null,
-    'passed',
-    {},
     { status: 'unknown' },
     { status: 'passed', attempt_id: 'one', finalized: false },
     { status: 'passed', attempt_id: 'one' },

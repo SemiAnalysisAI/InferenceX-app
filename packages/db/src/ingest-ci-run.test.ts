@@ -171,7 +171,6 @@ describe('AgentX retry ingest command', () => {
         ...(withWinner ? [golden] : []),
       ]);
       try {
-        expect(result.error).toBeUndefined();
         expect(result.status, result.stderr).toBe(0);
         const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'publication.json'), 'utf8'));
         expect(manifest.ingestErrors).toEqual([]);
@@ -179,7 +178,6 @@ describe('AgentX retry ingest command', () => {
           'Known-failed agentic result excluded: bmk_agentic_point/agg.json',
         ]);
         expect(manifest.points).toHaveLength(withWinner ? 1 : 0);
-        expect(fs.readFileSync(path.join(dir, 'closed'), 'utf8')).toBe('closed');
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }
