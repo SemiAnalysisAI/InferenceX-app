@@ -5,38 +5,51 @@ description: Download and analyze InferenceX ML inference benchmark data — GPU
 
 # Setup
 
-Download the latest database dump from GitHub releases. It is xz-compressed and split into
-one or more `.tar.xz.part*` files; reassemble them by piping `cat` through `xz` (requires `xz`):
+Download the latest weekly database dump from GitHub releases and restore it into an empty
+PostgreSQL 18 database. This needs PostgreSQL 18 client tools (`pg_restore`, `psql`) and `zstd`.
+The release ships `db-dump.sh`, which restores the pg_dump archive and the AgentX
+export in the right order:
 
 ```bash
-gh release download --repo SemiAnalysisAI/InferenceX-app --pattern 'inferencex-dump-*.tar.xz.part*' --dir .
-cat inferencex-dump-*.tar.xz.part* | xz -d -T0 | tar -x
+tag=$(gh release list --repo SemiAnalysisAI/InferenceX-app --limit 100 --json tagName \
+  --jq '[.[].tagName | select(startswith("db-dump/"))] | first')
+gh release download "$tag" --repo SemiAnalysisAI/InferenceX-app --dir inferencex-dump
+cd inferencex-dump && shasum -a 256 -c SHA256SUMS
+createdb inferencex
+bash db-dump.sh restore "postgres:///inferencex" .
 ```
+
+Then query with `psql inferencex` or any PostgreSQL client.
 
 # Data
 
-Each `.json` file corresponds to one database table.
+The dump keeps every table's schema. Raw AgentX trace payloads, engine server logs
+(`server_logs`, `server_log_files`, `benchmark_server_logs`), per-sample eval prompts
+(`eval_samples`) and `user_feedback` ship without rows.
 
-| File                     | Description                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `configs.json`           | Serving deployment configs: hardware + framework + model + precision + parallelism |
-| `workflow_runs.json`     | GitHub Actions workflow run metadata                                               |
-| `server_logs.json`       | Raw benchmark server logs (~140KB per row, very large — avoid loading entirely)    |
-| `benchmark_results.json` | Performance metrics per config/concurrency/sequence-length/date                    |
-| `run_stats.json`         | Per-hardware reliability stats (n_success / total)                                 |
-| `eval_results.json`      | LM evaluation accuracy results (e.g. gsm8k)                                        |
-| `availability.json`      | Denormalized date x config availability                                            |
-| `changelog_entries.json` | PR/change descriptions per workflow run                                            |
+| Table                  | Description                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `configs`              | Serving deployment configs: hardware + framework + model + precision + parallelism |
+| `workflow_runs`        | GitHub Actions workflow run metadata                                               |
+| `benchmark_results`    | Performance metrics per config/concurrency/sequence-length/date                    |
+| `run_stats`            | Per-hardware reliability stats (n_success / total)                                 |
+| `eval_results`         | LM evaluation accuracy results (e.g. gsm8k)                                        |
+| `availability`         | Denormalized date x config availability                                            |
+| `changelog_entries`    | PR/change descriptions per workflow run                                            |
+| `agentic_trace_replay` | AgentX per-point `aggregate_stats`, `chart_series` and `request_timeline` (JSONB)  |
+| `gpu_metric_samples`   | PowerX per-GPU telemetry samples, grouped by `gpu_metric_series`                   |
 
 ## Relationships
 
-- `benchmark_results[].config_id` -> `configs[].id`
-- `benchmark_results[].workflow_run_id` -> `workflow_runs[].id`
-- `benchmark_results[].server_log_id` -> `server_logs[].id` (nullable)
-- `eval_results[].config_id` -> `configs[].id`
-- `eval_results[].workflow_run_id` -> `workflow_runs[].id`
-- `run_stats[].workflow_run_id` -> `workflow_runs[].id`
-- `changelog_entries[].workflow_run_id` -> `workflow_runs[].id`
+- `benchmark_results.config_id` -> `configs.id`
+- `benchmark_results.workflow_run_id` -> `workflow_runs.id`
+- `benchmark_results.trace_replay_id` -> `agentic_trace_replay.id` (nullable, AgentX points)
+- `benchmark_result_gpu_metrics.benchmark_result_id` -> `benchmark_results.id`, `.series_id` -> `gpu_metric_series.id`
+- `gpu_metric_samples.series_id` -> `gpu_metric_series.id`
+- `eval_results.config_id` -> `configs.id`
+- `eval_results.workflow_run_id` -> `workflow_runs.id`
+- `run_stats.workflow_run_id` -> `workflow_runs.id`
+- `changelog_entries.workflow_run_id` -> `workflow_runs.id`
 
 ## Config Fields
 
@@ -141,7 +154,7 @@ Framework names are normalized during ingest: `dynamo-trtllm` -> `dynamo-trt`, `
 
 # Analysis Recipes
 
-- **Load data**: Parse `configs.json` and `benchmark_results.json`, join on `config_id`, filter out rows where `error` is not null.
+- **Load data**: Join `benchmark_results` to `configs` on `config_id` in SQL and filter out rows where `error` is not null. The `latest_benchmarks` materialized view already holds the latest successful row per point.
 - **Latest per config**: First filter `workflow_runs` to the highest `run_attempt` per `github_run_id`, then join to `benchmark_results`. For each unique `(config_id, conc, isl, osl)`, keep only the row with the latest `date`.
 - **Pareto frontier (chip vs chip)**: Fix a model/concurrency/sequence length. Plot throughput (x) vs median TTFT (y) per hardware. The pareto frontier connects points that dominate all others (higher throughput AND lower latency). Sort by descending throughput, greedily collect points with improving latency.
 - **Pareto frontier (date vs date)**: Fix a hardware/model/concurrency/sequence length. Plot throughput and latency over time to see how performance evolves across benchmark dates.

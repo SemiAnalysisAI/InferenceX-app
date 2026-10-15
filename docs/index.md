@@ -22,6 +22,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Architecture](./architecture.md) — Why client-first, route navigation, URL state, provider nesting, server-side caching (unstable_cache + blob), in-memory client cache, color system, analytics enforcement
 - [D3 Charts](./d3-charts.md) — Why 4 effects, in-place mutation, refs for zoom, rAF throttling, HTML tooltips, Pareto directions, gradient labels
 - [Data Pipeline](./data-pipeline.md) — DB schema reasoning, ETL design, transform pipeline, spline method choice, normalizer resolution order (model/GPU/framework)
+- [Public DB Dump](./public-db-dump.md) covers what the weekly release contains, why heavy tables stay out, and how export, restore and verification work
 - [Pitfalls](./pitfalls.md) — Failure modes: token type consistency, schema evolution, empty objects, zoom loss, stale closures, disaggregated metrics, negative splines, date stamping, ref stability, cost inheritance
 - [GPU Specs](./gpu-specs.md) — Unit conventions, topology invariants, SVG layout rationale, hardware gotchas
 - [TCO Calculator](./tco-calculator.md) — Why interpolation, composite keys, cost matrix, token type bugs, badge logic, state design, Fleet Lifecycle, Profit Estimator, First-Token Limits

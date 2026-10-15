@@ -4,12 +4,21 @@ on:
   schedule:
     - cron: '0 0 * * 1' # Every Monday at midnight UTC
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the verified dump as a GitHub release
+        required: false
+        default: true
+        type: boolean
 
 permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
+
+env:
+  POSTGRES_IMAGE: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
 
 jobs:
   preflight:
@@ -19,7 +28,7 @@ jobs:
     permissions:
       contents: read # Tag-collision check
     outputs:
-      dump-file: ${{ steps.names.outputs.dump-file }}
+      prefix: ${{ steps.names.outputs.prefix }}
       tag: ${{ steps.names.outputs.tag }}
       date: ${{ steps.names.outputs.date }}
     steps:
@@ -30,7 +39,7 @@ jobs:
           DATE="$(date -u +%Y-%m-%d)"
           {
             echo "date=${DATE}"
-            echo "dump-file=inferencex-${DATE}.dump.zst"
+            echo "prefix=inferencex-${DATE}"
             echo "tag=db-dump/${DATE}"
           } >> "$GITHUB_OUTPUT"
 
@@ -50,47 +59,87 @@ jobs:
     needs: preflight
     timeout-minutes: 360
     runs-on: blacksmith-32vcpu-ubuntu-2404
+    permissions:
+      contents: read # Check out the dump script
     steps:
-      - name: Dump, compress, and split database
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The public dump holds what end users need to reproduce published
+      # results: every table's schema, the core result tables, PowerX
+      # telemetry, and AgentX derived data. Raw traces, engine logs and eval
+      # prompts are left out; see docs/public-db-dump.md.
+      - name: Export database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
+          PREFIX: ${{ needs.preflight.outputs.prefix }}
         run: |
           set -euo pipefail
-          docker run --rm --env DATABASE_URL \
-            postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15 \
-            sh -ceu 'exec pg_dump \
-              --dbname="$DATABASE_URL" \
-              --format=custom \
-              --compress=none \
-              --no-owner \
-              --no-privileges \
-              --exclude-table-data=public.user_feedback \
-              --verbose' \
-            | zstd -v -T0 -19 --long=27 \
-            | split -b 1900m -d -a 2 - "${DUMP_FILE}.part"
+          docker run -d --name pg-client "$POSTGRES_IMAGE" sleep infinity
+          PG_EXEC='docker exec -i pg-client' \
+            .github/scripts/db-dump.sh export "$DATABASE_URL" "$PREFIX"
+          docker rm -f pg-client >/dev/null
+          ls -l "$PREFIX".*.part*
 
-      - name: Verify compressed stream
+      - name: Verify compressed streams
         env:
-          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
+          PREFIX: ${{ needs.preflight.outputs.prefix }}
         run: |
           set -euo pipefail
-          cat "${DUMP_FILE}".part* | zstd -t --long=27
+          cat "$PREFIX".dump.zst.part* | zstd -t --long=27
+          cat "$PREFIX".agentx.copy.zst.part* | zstd -t --long=27
 
-      - name: Checksum parts
+      # Restore with the published script into a throwaway PostgreSQL, so a
+      # dump that cannot be restored is never published.
+      - name: Verify the dump restores
         env:
-          DUMP_FILE: ${{ needs.preflight.outputs.dump-file }}
+          WORK_DIR: ${{ runner.temp }}/restore-check
         run: |
           set -euo pipefail
-          sha256sum "${DUMP_FILE}".part* > SHA256SUMS
+          mkdir -p "$WORK_DIR"
+          docker run -d --name restore-check \
+            -e POSTGRES_HOST_AUTH_METHOD=trust \
+            -v "$PWD:$PWD" -v "$WORK_DIR:$WORK_DIR" \
+            "$POSTGRES_IMAGE" \
+            -c fsync=off -c synchronous_commit=off -c full_page_writes=off \
+            -c max_wal_size=8GB -c maintenance_work_mem=1GB
+          for _ in $(seq 1 60); do
+            docker exec restore-check pg_isready -U postgres -q && break
+            sleep 2
+          done
+          export PG_EXEC='docker exec -i restore-check'
+          target='postgres://postgres@localhost/postgres'
+          RESTORE_WORK_DIR="$WORK_DIR" .github/scripts/db-dump.sh restore "$target" "$PWD"
+          status=0
+          .github/scripts/db-dump.sh check "$target" | tee "$WORK_DIR/counts.tsv" || status=$?
+          {
+            echo '### Restored row counts'
+            echo
+            echo '```'
+            cat "$WORK_DIR/counts.tsv"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker rm -f restore-check >/dev/null
+          rm -rf "$WORK_DIR"
+          exit "$status"
+
+      - name: Checksum release assets
+        env:
+          PREFIX: ${{ needs.preflight.outputs.prefix }}
+        run: |
+          set -euo pipefail
+          cp .github/scripts/db-dump.sh .
+          sha256sum "$PREFIX".*.part* db-dump.sh > SHA256SUMS
           cat SHA256SUMS
 
-      - name: Upload dump parts
+      - name: Upload release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: db-dump-parts
           path: |
-            inferencex-*.dump.zst.part*
+            inferencex-*.part*
+            db-dump.sh
             SHA256SUMS
           if-no-files-found: error
           retention-days: 1
@@ -99,12 +148,13 @@ jobs:
   release:
     name: Create release
     needs: [preflight, dump]
-    timeout-minutes: 30
+    if: github.event_name == 'schedule' || inputs.publish
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: write # Create the database dump release
     steps:
-      - name: Download dump parts
+      - name: Download release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: db-dump-parts
@@ -119,25 +169,47 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.preflight.outputs.tag }}
           DATE: ${{ needs.preflight.outputs.date }}
-          DUMP_GLOB: ${{ needs.preflight.outputs.dump-file }}.part*
+          PREFIX: ${{ needs.preflight.outputs.prefix }}
         run: |
           set -euo pipefail
           cat > release-notes.md <<'EOF'
           Weekly InferenceX database dump.
 
-          Verify (optional):
-          `sha256sum -c SHA256SUMS`
+          Contents: every table's schema; all benchmark, evaluation-score, reliability,
+          availability, changelog and dataset data; PowerX GPU telemetry; and AgentX
+          per-point data (`aggregate_stats`, `chart_series`, `request_timeline`).
+          Left out: raw AgentX trace payloads, engine server logs, per-sample eval
+          prompts and responses, and user feedback.
 
-          Reassemble and decompress:
-          `cat *.dump.zst.part* | zstd -d --long=27 > inferencex.dump`
+          Restore into an empty PostgreSQL 18 database (needs PostgreSQL 18 client
+          tools and `zstd`). Download every asset of this release into one directory, then:
 
-          Restore to PostgreSQL or Neon:
-          `pg_restore --exit-on-error --clean --if-exists --no-owner --no-privileges --dbname="YOUR_TARGET_DATABASE_URL" inferencex.dump`
+          ```
+          shasum -a 256 -c SHA256SUMS
+          bash db-dump.sh restore "postgres://USER:PASSWORD@HOST/DATABASE" .
+          ```
           EOF
 
-          # shellcheck disable=SC2086
-          gh release create "$TAG" $DUMP_GLOB SHA256SUMS \
+          gh release create "$TAG" "$PREFIX".*.part* db-dump.sh SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" \
             --title "DB Dump $DATE" \
             --notes-file release-notes.md \
             --latest=false
+
+  notify:
+    name: Notify Slack on failure
+    needs: [preflight, dump, release]
+    if: always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": ":rotating_light: *Database dump failed*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
