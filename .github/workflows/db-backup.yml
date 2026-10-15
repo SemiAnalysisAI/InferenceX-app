@@ -98,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$WORK_DIR"
-          docker run -d --name restore-check \
+          docker run -d --name restore-check --shm-size=2g \
             -e POSTGRES_HOST_AUTH_METHOD=trust \
             -v "$PWD:$PWD" -v "$WORK_DIR:$WORK_DIR" \
             "$POSTGRES_IMAGE" \
