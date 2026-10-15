@@ -655,8 +655,14 @@ The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
 point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
 mapped, override-adjusted metric contract, all configuration dimensions, original
 source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
-their original source identity. Failed or unmapped results at those workloads and
-database errors remain in the manifest; they cannot pass verification.
+their original source identity. Failed or unmapped results at those workloads, and
+failed config writes for their rows, remain in the manifest; they cannot pass
+verification. Other database write failures do not enter the manifest. The ingest
+writes them to the database write receipt (`DATABASE_WRITE_RECEIPT`) as
+`{ kind, subject, message, code }` entries, where `code` is the SQLSTATE or
+postgres.js client code. The workflow step "Check database writes" runs even after
+an earlier step fails, annotates each entry on the run page, fails on errors, and
+adds a short summary to the Slack failure message.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database

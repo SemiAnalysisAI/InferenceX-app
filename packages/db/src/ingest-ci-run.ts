@@ -53,6 +53,11 @@ import {
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
+import {
+  buildDatabaseWriteReceipt,
+  buildPowerPublicationManifest,
+  configWriteFailurePublicationError,
+} from './etl/ingest-receipts';
 import { printIngestSummaryFooter } from './etl/ingest-summary';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
@@ -631,7 +636,9 @@ async function main(): Promise<void> {
           configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           telemetryExpectationsUnknown = true;
-          tracker.recordDbError(`config for ${path.posix.basename(file.path)}`, error);
+          tracker.recordDbError('config', path.posix.basename(file.path), error);
+          const publicationError = configWriteFailurePublicationError(row, relativeFile);
+          if (publicationError) powerPublicationErrors.push(publicationError);
           continue;
         }
         const plan = planBenchmarkPoint(
@@ -762,7 +769,7 @@ async function main(): Promise<void> {
                 );
                 console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
-                tracker.recordDbError(`server_logs for ${configKey}`, error);
+                tracker.recordDbError('server_logs', configKey, error);
               }
             }
             // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
@@ -807,6 +814,9 @@ async function main(): Promise<void> {
           // `bmk_agentic_<suffix>` artifact we just ingested.
           if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
             const concMatch = path.posix.basename(file.path).match(/_conc(?<conc>\d+)\.json$/u);
+            const traceSubject = concMatch?.groups?.conc
+              ? `${suffix} conc ${concMatch.groups.conc}`
+              : suffix;
             const trace =
               (concMatch?.groups?.conc
                 ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
@@ -874,12 +884,12 @@ async function main(): Promise<void> {
                       },
                     )
                     .catch((error: any) => {
-                      tracker.recordDbError(`trace_replay for ${suffix}`, error);
+                      tracker.recordDbError('trace_replay', traceSubject, error);
                     });
                   traceTasks.push(task);
                 }
               } catch (error: any) {
-                tracker.recordDbError(`trace_replay for ${suffix}`, error);
+                tracker.recordDbError('trace_replay', traceSubject, error);
               }
             } else {
               console.log(`    trace_replay ${suffix}: missing sibling artifact`);
@@ -887,7 +897,7 @@ async function main(): Promise<void> {
             }
           }
         } catch (error: any) {
-          tracker.recordDbError(path.posix.basename(file.path), error);
+          tracker.recordDbError('benchmark', path.posix.basename(file.path), error);
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
@@ -911,7 +921,7 @@ async function main(): Promise<void> {
         await bulkUpsertAvailability(sql, availRows, date);
         console.log(`  Availability: ${availRows.length} row(s) upserted`);
       } catch (error: any) {
-        tracker.recordDbError('availability', error);
+        tracker.recordDbError('availability', `${availRows.length} row(s)`, error);
       }
     }
 
@@ -971,7 +981,7 @@ async function main(): Promise<void> {
         totalNewStats = newCount;
         totalDupStats = dupCount;
       } catch (error: any) {
-        tracker.recordDbError('run_stats', error);
+        tracker.recordDbError('run_stats', `${statsRows.length} row(s)`, error);
       }
     }
     console.log(`  Run stats: +${totalNewStats} new, ${totalDupStats} dup`);
@@ -1009,7 +1019,7 @@ async function main(): Promise<void> {
         const { outcome } = await ingestEvalRow(sql, configId, mapped, workflowRunId, date);
         if (outcome === 'new') totalEvals++;
       } catch (error: any) {
-        tracker.recordDbError('eval row', error);
+        tracker.recordDbError('eval', `${path.basename(file)} ${mapped.task}`, error);
       }
     }
   }
@@ -1085,7 +1095,7 @@ async function main(): Promise<void> {
         totalSamples += newCount;
         totalSampleFiles++;
       } catch (error: any) {
-        tracker.recordDbError(`samples for ${path.basename(dir)}`, error);
+        tracker.recordDbError('eval', `${path.basename(dir)} ${params.task}`, error);
       }
     }
   }
@@ -1108,7 +1118,7 @@ async function main(): Promise<void> {
       );
       totalChangelogs += written;
     } catch (error: any) {
-      tracker.recordDbError('changelog', error);
+      tracker.recordDbError('changelog', `${baseRef}..${headRef}`, error);
     }
   }
   console.log(`  Changelog: ${totalChangelogs} written`);
@@ -1181,6 +1191,23 @@ main()
   })
   .finally(async () => {
     const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
+    const writeReceiptPath = process.env.DATABASE_WRITE_RECEIPT;
+    const receiptInput = {
+      runId: runIdNum,
+      runAttempt: runAttemptNum,
+      points: [...powerPublicationPoints.values()],
+      publicationErrors: powerPublicationErrors,
+      tracker,
+    };
+    // Write the database write receipt first: the telemetry read below queries
+    // the database and may throw, and the receipt must exist regardless.
+    if (writeReceiptPath) {
+      fs.writeFileSync(
+        writeReceiptPath,
+        `${JSON.stringify(buildDatabaseWriteReceipt(receiptInput), null, 2)}\n`,
+      );
+      console.log(`  Database write receipt: ${writeReceiptPath}`);
+    }
     if (publicationPath) {
       const telemetry = checkTelemetry
         ? await readTelemetryReceipt(
@@ -1197,27 +1224,7 @@ main()
         : undefined;
       fs.writeFileSync(
         publicationPath,
-        `${JSON.stringify(
-          {
-            version: 1,
-            runId: runIdNum,
-            runAttempt: runAttemptNum,
-            points: [...powerPublicationPoints.values()],
-            ingestErrors: [
-              ...powerPublicationErrors,
-              ...(tracker.skips.dbError ? [`${tracker.skips.dbError} database ingest errors`] : []),
-            ],
-            // Reported but not fatal — see Skips.telemetryError.
-            telemetryWarnings: tracker.skips.telemetryError
-              ? [
-                  `${tracker.skips.telemetryError} telemetry errors (gpu_metrics digest or AgentX window)`,
-                ]
-              : [],
-            ...(telemetry ? { telemetry } : {}),
-          },
-          null,
-          2,
-        )}\n`,
+        `${JSON.stringify(buildPowerPublicationManifest({ ...receiptInput, telemetry }), null, 2)}\n`,
       );
       console.log(`  PowerX ingest receipt: ${publicationPath}`);
     }

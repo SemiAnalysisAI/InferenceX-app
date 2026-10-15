@@ -38,18 +38,65 @@ describe('createSkipTracker', () => {
 describe('recordDbError', () => {
   it('increments dbError counter', () => {
     const tracker = createSkipTracker();
-    tracker.recordDbError('test context', new Error('test error'));
+    tracker.recordDbError('benchmark', 'a.json', new Error('test error'));
     expect(tracker.skips.dbError).toBe(1);
-    tracker.recordDbError('test context 2', new Error('test error 2'));
+    tracker.recordDbError('benchmark', 'b.json', new Error('test error 2'));
     expect(tracker.skips.dbError).toBe(2);
   });
 
   it('continues counting after MAX_DB_ERRORS (10) without throwing', () => {
     const tracker = createSkipTracker();
     for (let i = 0; i < 15; i++) {
-      tracker.recordDbError(`context ${i}`, new Error(`error ${i}`));
+      tracker.recordDbError('benchmark', `context ${i}`, new Error(`error ${i}`));
     }
     expect(tracker.skips.dbError).toBe(15);
+    expect(tracker.dbWriteErrors).toHaveLength(15);
+  });
+
+  it('keeps kind, subject, message and SQLSTATE', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError(
+      'server_logs',
+      'qwen3.5_conc12288',
+      Object.assign(new Error('write CONNECTION_CLOSED'), { code: 'CONNECTION_CLOSED' }),
+    );
+    tracker.recordDbError(
+      'config',
+      'result.json',
+      Object.assign(new Error('duplicate key'), { code: '23505' }),
+    );
+    expect(tracker.dbWriteErrors).toEqual([
+      {
+        kind: 'server_logs',
+        subject: 'qwen3.5_conc12288',
+        message: 'write CONNECTION_CLOSED',
+        code: 'CONNECTION_CLOSED',
+      },
+      { kind: 'config', subject: 'result.json', message: 'duplicate key', code: '23505' },
+    ]);
+  });
+
+  it('omits code when the error has none, and reads it from the cause', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'glm5 conc 64', new Error('Authentication timed out'));
+    tracker.recordDbError(
+      'benchmark',
+      'b.json',
+      new Error('batch failed', { cause: Object.assign(new Error('x'), { code: '57014' }) }),
+    );
+    tracker.recordDbError('changelog', 'a..b', 'plain string failure');
+    expect(tracker.dbWriteErrors).toEqual([
+      { kind: 'trace_replay', subject: 'glm5 conc 64', message: 'Authentication timed out' },
+      { kind: 'benchmark', subject: 'b.json', message: 'batch failed', code: '57014' },
+      { kind: 'changelog', subject: 'a..b', message: 'plain string failure' },
+    ]);
+  });
+
+  it('bounds very long messages', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('benchmark', 'big.json', new Error('x'.repeat(10_000)));
+    expect(tracker.dbWriteErrors[0]!.message.length).toBeLessThan(2100);
+    expect(tracker.dbWriteErrors[0]!.message).toMatch(/\(truncated\)$/u);
   });
 });
 

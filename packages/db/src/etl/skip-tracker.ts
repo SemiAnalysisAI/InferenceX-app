@@ -26,6 +26,56 @@ export interface Skips {
   traceReplayMissing: number;
 }
 
+/** Database write steps of an ingest run, as reported in the database write receipt. */
+export const DB_WRITE_KINDS = [
+  'config',
+  'benchmark',
+  'server_logs',
+  'trace_replay',
+  'availability',
+  'run_stats',
+  'eval',
+  'changelog',
+] as const;
+export type DbWriteKind = (typeof DB_WRITE_KINDS)[number];
+
+/** One failed database write. `code` is the SQLSTATE or postgres.js client code, when known. */
+export interface DbWriteFailure {
+  kind: DbWriteKind;
+  /** The point, artifact or batch whose write failed. */
+  subject: string;
+  message: string;
+  code?: string;
+}
+
+// Bound one failure's message so a giant error cannot bloat the receipt.
+const MAX_FAILURE_MESSAGE_CHARS = 2000;
+
+/** SQLSTATE or postgres.js client code of a caught error, or of its cause. */
+export function dbErrorCode(err: unknown): string | undefined {
+  for (let current = err, depth = 0; current && depth < 3; depth++) {
+    if (typeof current !== 'object') return undefined;
+    const { code, cause } = current as { code?: unknown; cause?: unknown };
+    if (typeof code === 'string' && code.length > 0) return code;
+    current = cause;
+  }
+  return undefined;
+}
+
+function failureMessage(err: unknown): string {
+  const message =
+    err instanceof Error ? err.message : typeof err === 'string' ? err : String(err ?? 'unknown');
+  return message.length > MAX_FAILURE_MESSAGE_CHARS
+    ? `${message.slice(0, MAX_FAILURE_MESSAGE_CHARS)}... (truncated)`
+    : message;
+}
+
+/** Build a failure record from a caught error. */
+export function dbWriteFailure(kind: DbWriteKind, subject: string, err: unknown): DbWriteFailure {
+  const code = dbErrorCode(err);
+  return { kind, subject, message: failureMessage(err), ...(code ? { code } : {}) };
+}
+
 export interface SkipSnapshot {
   model: number;
   hw: number;
@@ -39,15 +89,20 @@ export interface SkipTracker {
   unmappedModels: Set<string>;
   unmappedHws: Set<string>;
   unmappedPrecisions: Set<string>;
+  /** Failed database writes, in the order they were recorded. Each one counts in `skips.dbError`. */
+  dbWriteErrors: DbWriteFailure[];
+  /** Failed database writes that are known and not fatal; not counted in `skips.dbError`. */
+  dbWriteWarnings: DbWriteFailure[];
   /**
-   * Record a DB error, printing the first `MAX_DB_ERRORS` to stderr and
-   * suppressing further output while still incrementing the count.
+   * Record a failed database write, printing the first `MAX_DB_ERRORS` to
+   * stderr and suppressing further output while still recording it.
    *
-   * @param context - Human-readable label for where the error occurred.
+   * @param kind - The write step that failed.
+   * @param subject - The point, artifact or batch being written.
    * @param err - The caught error.
    */
-  recordDbError: (context: string, err: Error) => void;
-  /** Same as `recordDbError`, but counts into `skips.telemetryError`. */
+  recordDbError: (kind: DbWriteKind, subject: string, err: unknown) => void;
+  /** Record a non-fatal telemetry failure into `skips.telemetryError`, with the same print cap. */
   recordTelemetryError: (context: string, err: Error) => void;
   /**
    * Capture a point-in-time snapshot of the current skip counters and
@@ -96,19 +151,21 @@ export function createSkipTracker(): SkipTracker {
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
   const unmappedPrecisions = new Set<string>();
-  const cappedRecorder = (key: 'dbError' | 'telemetryError', tag: string, noun: string) => {
+  const dbWriteErrors: DbWriteFailure[] = [];
+  const dbWriteWarnings: DbWriteFailure[] = [];
+  const cappedPrinter = (tag: string, noun: string) => {
     let printed = 0;
-    return (context: string, err: Error): void => {
-      skips[key]++;
-      if (printed < MAX_DB_ERRORS) {
-        console.error(`  [${tag}] ${context}: ${err.message}`);
-        printed++;
-        if (printed === MAX_DB_ERRORS) {
-          console.error(`  [${tag}] further ${noun} errors suppressed; count included in summary`);
-        }
+    return (line: string): void => {
+      if (printed >= MAX_DB_ERRORS) return;
+      console.error(`  [${tag}] ${line}`);
+      printed++;
+      if (printed === MAX_DB_ERRORS) {
+        console.error(`  [${tag}] further ${noun} errors suppressed; count included in summary`);
       }
     };
   };
+  const printDbError = cappedPrinter('DB ERROR', 'DB');
+  const printTelemetryError = cappedPrinter('TELEMETRY', 'telemetry');
 
   return {
     skips,
@@ -116,8 +173,21 @@ export function createSkipTracker(): SkipTracker {
     unmappedHws,
     unmappedPrecisions,
 
-    recordDbError: cappedRecorder('dbError', 'DB ERROR', 'DB'),
-    recordTelemetryError: cappedRecorder('telemetryError', 'TELEMETRY', 'telemetry'),
+    dbWriteErrors,
+    dbWriteWarnings,
+
+    recordDbError(kind: DbWriteKind, subject: string, err: unknown): void {
+      const failure = dbWriteFailure(kind, subject, err);
+      skips.dbError++;
+      dbWriteErrors.push(failure);
+      printDbError(
+        `${kind} for ${subject}: ${failure.message}${failure.code ? ` (code ${failure.code})` : ''}`,
+      );
+    },
+    recordTelemetryError(context: string, err: Error): void {
+      skips.telemetryError++;
+      printTelemetryError(`${context}: ${err.message}`);
+    },
 
     snapshot(): SkipSnapshot {
       return {
