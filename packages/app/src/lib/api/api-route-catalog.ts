@@ -1464,7 +1464,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-request-timeline.ts',
-    sourceSha256: '377d6f6cab10d6d7d59e7021d16e2ca872a2bfff6d28030966e1b36189d6bbc0',
+    // Reviewed for gzip request-timeline storage (migration 017): only the
+    // module comment changed to name request_timeline_gz. Same version,
+    // record fields and timing semantics, so the docs stand.
+    sourceSha256: 'dd540f324f5a5a0d5fa4a3ba19838c5b5f0e2218d3c93084df952149dbba6e66',
     reviewArea: {
       en: 'Request timeline contract version, replay identity, source provenance, and event timing semantics.',
       zh: '请求时间线契约版本、重放标识、来源溯源和事件计时语义。',
@@ -1536,7 +1539,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/request-timeline.ts',
-    sourceSha256: 'e27e2c421d94d55f8178756d31e9791d4143d33e4086f767e4ea15132a7ad708',
+    // Reviewed for gzip request-timeline storage (migration 017): the reader
+    // prefers request_timeline_gz and falls back to legacy JSONB. It returns
+    // the same RequestTimeline document, nullability, 404 and caching, so the
+    // docs stand.
+    sourceSha256: '767ec28afab86fe23b519129215183c07d99b5ab58796abd82c8f8a1a1a1680a',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',
@@ -1568,7 +1575,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-histograms.ts',
-    sourceSha256: 'ec3b7358046ca2acdaaa56d8ecde2829ba8fe4f4b2b31c3795838ac85f59ca89',
+    // Reviewed for gzip request-timeline storage (migration 017): gzip rows
+    // derive the same ISL/OSL arrays in Node. The ID-keyed response shape and
+    // omission of unreadable points are unchanged, so the docs stand.
+    sourceSha256: 'e6abf002d47e564d1be4f2f0942e90b013b15f2f21850780b35b599f260cd2c1',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',

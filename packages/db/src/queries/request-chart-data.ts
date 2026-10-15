@@ -3,9 +3,10 @@
  *
  * The full request timeline contains source-trace metadata and Gantt-only
  * timing fields. Large runs can make that document tens of megabytes, even
- * though the summary charts need only nine values per request. This query
- * projects those values once in Postgres and dictionary-encodes repeated
- * strings before the response crosses the network.
+ * though the summary charts need only nine values per request. Gzip-stored
+ * timelines are decoded in Node and dictionary-encoded there. Small legacy
+ * JSONB timelines are projected once in Postgres so only those nine values
+ * cross the network.
  */
 
 import {
@@ -15,7 +16,7 @@ import {
 } from '../etl/compute-request-timeline';
 
 import type { DbClient } from '../connection.js';
-import { getRequestTimeline } from './request-timeline';
+import { getRequestTimeline, readStoredRequestTimeline } from './request-timeline';
 
 const REQUEST_CHART_SHAPE_VERSION = 2;
 export const REQUEST_CHART_DATA_VERSION =
@@ -44,10 +45,17 @@ export interface RequestChartDataWire {
   requests: RequestChartTuple[];
 }
 
-interface RawChartRow {
+interface RawChartMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
+  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
+  gz_bytes: number | null;
   timeline_version: number | null;
+  /** pg_column_size(request_timeline) for rows without a gzip timeline. */
+  legacy_stored_bytes: number | null;
+}
+
+interface RawProjectedChartRow {
   start_ns: number | null;
   end_ns: number | null;
   duration_s: number | null;
@@ -63,6 +71,15 @@ interface RawChartRow {
     cancelled: boolean,
   ][];
 }
+
+/**
+ * Largest legacy JSONB timeline, by stored size (`pg_column_size`), that is
+ * still projected in SQL. The projection is about as large as the stored
+ * value: trace row 3811 stores 62 MB and projects 71.5 MB, past Neon's 64 MiB
+ * response cap. Larger legacy rows are read in bounded text chunks and encoded
+ * in Node instead.
+ */
+export const LEGACY_PROJECTION_MAX_STORED_BYTES = 40 * 1024 * 1024;
 
 type ChartRecord = Pick<
   RequestRecord,
@@ -118,15 +135,14 @@ export function encodeRequestChartData(
   };
 }
 
-export async function getRequestChartData(
+async function projectLegacyRequestChartData(
   sql: DbClient,
-  benchmarkResultId: number,
+  traceReplayId: number,
 ): Promise<RequestChartDataWire | null> {
+  // The version predicate keeps a timeline that was converted and cleared
+  // since the metadata read from being returned as an empty chart.
   const rows = (await sql`
     select
-      atr.id as trace_replay_id,
-      (atr.profile_export_jsonl_gz is not null) as has_blob,
-      (atr.request_timeline->>'version')::int as timeline_version,
       (atr.request_timeline->>'startNs')::double precision as start_ns,
       (atr.request_timeline->>'endNs')::double precision as end_ns,
       (atr.request_timeline->>'durationS')::double precision as duration_s,
@@ -145,34 +161,67 @@ export async function getRequestChartData(
         from jsonb_array_elements(atr.request_timeline->'requests')
           with ordinality as expanded(request, ordinal)
       ), '[]'::jsonb) as requests
-    from benchmark_results br
-    join agentic_trace_replay atr on atr.id = br.trace_replay_id
-    where br.id = ${benchmarkResultId}
-  `) as unknown as RawChartRow[];
+    from agentic_trace_replay atr
+    where atr.id = ${traceReplayId}
+      and (atr.request_timeline->>'version')::int = ${REQUEST_TIMELINE_VERSION}
+  `) as unknown as RawProjectedChartRow[];
   const row = rows[0];
   if (!row) return null;
 
-  if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
-    const records: ChartRecord[] = row.requests.map((request) => ({
-      cid: request[0],
-      phase: request[1],
-      start: Number(request[2]),
-      end: Number(request[3]),
-      ttftMs: request[4] === null ? null : Number(request[4]),
-      tpotMs: request[5] === null ? null : Number(request[5]),
-      isl: request[6] === null ? null : Number(request[6]),
-      osl: request[7] === null ? null : Number(request[7]),
-      cancelled: Boolean(request[8]),
-    }));
-    return encodeRequestChartData(
-      {
-        version: Number(row.timeline_version),
-        startNs: Number(row.start_ns ?? 0),
-        endNs: Number(row.end_ns ?? 0),
-        durationS: Number(row.duration_s ?? 0),
-      },
-      records,
-    );
+  const records: ChartRecord[] = row.requests.map((request) => ({
+    cid: request[0],
+    phase: request[1],
+    start: Number(request[2]),
+    end: Number(request[3]),
+    ttftMs: request[4] === null ? null : Number(request[4]),
+    tpotMs: request[5] === null ? null : Number(request[5]),
+    isl: request[6] === null ? null : Number(request[6]),
+    osl: request[7] === null ? null : Number(request[7]),
+    cancelled: Boolean(request[8]),
+  }));
+  return encodeRequestChartData(
+    {
+      version: REQUEST_TIMELINE_VERSION,
+      startNs: Number(row.start_ns ?? 0),
+      endNs: Number(row.end_ns ?? 0),
+      durationS: Number(row.duration_s ?? 0),
+    },
+    records,
+  );
+}
+
+export async function getRequestChartData(
+  sql: DbClient,
+  benchmarkResultId: number,
+): Promise<RequestChartDataWire | null> {
+  // Container metadata only: the gzip copy wins whenever it exists, and
+  // neither payload is detoasted to measure it.
+  const rows = (await sql`
+    select
+      atr.id as trace_replay_id,
+      (atr.profile_export_jsonl_gz is not null) as has_blob,
+      octet_length(atr.request_timeline_gz) as gz_bytes,
+      case
+        when atr.request_timeline_gz is not null then atr.request_timeline_version::int
+        else (atr.request_timeline->>'version')::int
+      end as timeline_version,
+      case
+        when atr.request_timeline_gz is null then pg_column_size(atr.request_timeline)
+      end as legacy_stored_bytes
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = ${benchmarkResultId}
+  `) as unknown as RawChartMetaRow[];
+  const row = rows[0];
+  if (!row) return null;
+
+  if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    const gzBytes = row.gz_bytes === null ? null : Number(row.gz_bytes);
+    if (gzBytes === null && Number(row.legacy_stored_bytes) <= LEGACY_PROJECTION_MAX_STORED_BYTES) {
+      return projectLegacyRequestChartData(sql, row.trace_replay_id);
+    }
+    const timeline = await readStoredRequestTimeline(sql, row.trace_replay_id, gzBytes);
+    return timeline ? encodeRequestChartData(timeline, timeline.requests) : null;
   }
 
   if (!row.has_blob) return null;

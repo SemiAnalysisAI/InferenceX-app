@@ -1,20 +1,65 @@
 import { gzipSync } from 'node:zlib';
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
+import { gunzipRequestTimeline, gzipRequestTimeline } from '../etl/request-timeline-codec';
 import type { DbClient } from '../connection.js';
 
-import { getRequestTimeline } from './request-timeline';
+import * as agenticShared from './agentic-shared';
+import {
+  REQUEST_TIMELINE_GZ_SLICE_BYTES,
+  getRequestTimeline,
+  readRequestTimelineGz,
+} from './request-timeline';
 
-function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
+// Observe the self-heal hand-off while still running the real write-back.
+vi.mock('./agentic-shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof agenticShared>();
+  return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
+});
+
+afterEach(() => {
+  vi.mocked(agenticShared.writeBackRequestTimeline).mockClear();
+});
+
+interface SqlCall {
+  text: string;
+  values: unknown[];
+}
+
+function mockSql(queue: unknown[][]): { sql: DbClient; log: SqlCall[] } {
   const responses = [...queue];
-  const calls: string[] = [];
-  const sql = ((strings: TemplateStringsArray) => {
-    calls.push(strings.join('?'));
+  const log: SqlCall[] = [];
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    log.push({ text: strings.join('?'), values });
     return Promise.resolve(responses.shift() ?? []);
   }) as unknown as DbClient;
-  return { sql, calls };
+  return { sql, log };
+}
+
+/**
+ * Serve `substring(request_timeline_gz from $1 for $2)` from `stored` with
+ * PostgreSQL's 1-based semantics, recording every requested range. Any other
+ * query returns `meta`.
+ */
+function sliceServingSql(
+  stored: Buffer,
+  meta?: Record<string, unknown>,
+): { sql: DbClient; ranges: [number, number][]; texts: string[] } {
+  const ranges: [number, number][] = [];
+  const texts: string[] = [];
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const text = strings.join('?');
+    texts.push(text);
+    if (text.includes('substring(request_timeline_gz')) {
+      const [from, length] = values as [number, number];
+      ranges.push([from, length]);
+      return Promise.resolve([{ slice: stored.subarray(from - 1, from - 1 + length) }]);
+    }
+    return Promise.resolve(meta ? [meta] : []);
+  }) as unknown as DbClient;
+  return { sql, ranges, texts };
 }
 
 const timeline: RequestTimeline = {
@@ -25,14 +70,111 @@ const timeline: RequestTimeline = {
   requests: [],
 };
 
+const gzipTimeline: RequestTimeline = {
+  version: REQUEST_TIMELINE_VERSION,
+  startNs: 1_700_000_000_000_000_000,
+  endNs: 1_700_000_001_400_000_000,
+  durationS: 1.4,
+  requests: Array.from({ length: 40 }, (_, index) => ({
+    cid: `trace-${String(index % 7).padStart(3, '0')}`,
+    ri: index % 7,
+    ti: Math.floor(index / 7),
+    srcTrace: `weka-${index % 7}`,
+    wid: String(index % 4),
+    ad: index % 3 === 0 ? 1 : 0,
+    phase: index < 4 ? 'warmup' : 'profiling',
+    credit: index * 1_000_000,
+    start: index * 1_000_000 + 200_000,
+    ack: index % 5 === 0 ? null : index * 1_000_000 + 800_000,
+    end: index * 1_000_000 + 30_000_000,
+    ttftMs: index % 5 === 0 ? null : 42.3 + index,
+    tpotMs: 18.1,
+    isl: 18_000 + index * 37,
+    osl: index % 6 === 0 ? null : 400 + index,
+    cancelled: index === 39,
+  })),
+};
+
+describe('readRequestTimelineGz', () => {
+  it('reassembles a value split across slice boundaries with 1-based offsets', async () => {
+    const stored = await gzipRequestTimeline(gzipTimeline);
+    const { sql, ranges } = sliceServingSql(stored);
+
+    const gz = await readRequestTimelineGz(sql, 870, stored.length, 64);
+
+    expect(gz?.equals(stored)).toBe(true);
+    expect(ranges).toEqual(
+      Array.from({ length: Math.ceil(stored.length / 64) }, (_, index) => [index * 64 + 1, 64]),
+    );
+    expect(gunzipRequestTimeline(gz!)).toEqual(gzipTimeline);
+  });
+
+  it('never requests more than 16 MiB per query for a multi-slice value', async () => {
+    const stored = Buffer.alloc(2 * REQUEST_TIMELINE_GZ_SLICE_BYTES + 123);
+    for (let index = 0; index < stored.length; index += 4096) stored[index] = index % 251;
+    const { sql, ranges } = sliceServingSql(stored);
+
+    const gz = await readRequestTimelineGz(sql, 870, stored.length);
+
+    expect(ranges).toEqual([
+      [1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
+      [REQUEST_TIMELINE_GZ_SLICE_BYTES + 1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
+      [2 * REQUEST_TIMELINE_GZ_SLICE_BYTES + 1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
+    ]);
+    expect(gz?.equals(stored)).toBe(true);
+  });
+
+  it('returns null when the stored value shrinks between slices', async () => {
+    const { sql } = sliceServingSql(Buffer.alloc(60, 7));
+
+    await expect(readRequestTimelineGz(sql, 870, 100, 40)).resolves.toBeNull();
+  });
+
+  it('returns null when the stored value grows between slices', async () => {
+    const { sql } = sliceServingSql(Buffer.alloc(100, 7));
+
+    await expect(readRequestTimelineGz(sql, 870, 90, 40)).resolves.toBeNull();
+  });
+});
+
 describe('getRequestTimeline', () => {
-  it('returns the current precomputed timeline from a bounded text read without selecting the raw profile blob', async () => {
+  it('prefers the gzip timeline and never reads the legacy JSONB or the raw profile blob', async () => {
+    const stored = await gzipRequestTimeline(gzipTimeline);
+    const { sql, texts } = sliceServingSql(stored, {
+      trace_replay_id: 870,
+      has_blob: true,
+      gz_bytes: stored.length,
+      timeline_version: REQUEST_TIMELINE_VERSION,
+    });
+
+    await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(gzipTimeline);
+    expect(texts.slice(1).every((text) => text.includes('substring(request_timeline_gz'))).toBe(
+      true,
+    );
+    expect(texts.some((text) => text.includes('request_timeline::text'))).toBe(false);
+    expect(texts.some((text) => text.includes('profile_export_jsonl_gz as blob'))).toBe(false);
+  });
+
+  it('returns null for a gzip timeline that does not decode', async () => {
+    const stored = gzipSync('{"version":6,"requests":');
+    const { sql } = sliceServingSql(stored, {
+      trace_replay_id: 870,
+      has_blob: true,
+      gz_bytes: stored.length,
+      timeline_version: REQUEST_TIMELINE_VERSION,
+    });
+
+    await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
+  });
+
+  it('reads a current legacy JSONB timeline through bounded text chunks without the profile blob', async () => {
     const encoded = JSON.stringify(timeline);
-    const { sql, calls } = mockSql([
+    const { sql, log } = mockSql([
       [
         {
           trace_replay_id: 870,
           has_blob: true,
+          gz_bytes: null,
           timeline_version: REQUEST_TIMELINE_VERSION,
         },
       ],
@@ -40,17 +182,19 @@ describe('getRequestTimeline', () => {
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
-    expect(calls).toHaveLength(2);
-    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
+    expect(log).toHaveLength(2);
+    expect(log[1]!.text).toContain('substr(text');
+    expect(log[1]!.text).not.toContain('profile_export_jsonl_gz as blob');
   });
 
   it('never uses compressed JSONB storage size to decide whether to read bounded chunks', async () => {
     const encoded = JSON.stringify(timeline);
-    const { sql, calls } = mockSql([
+    const { sql, log } = mockSql([
       [
         {
           trace_replay_id: 870,
           has_blob: true,
+          gz_bytes: null,
           timeline_version: REQUEST_TIMELINE_VERSION,
         },
       ],
@@ -58,33 +202,29 @@ describe('getRequestTimeline', () => {
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toEqual(timeline);
-    expect(calls).toHaveLength(2);
-    expect(calls[0]).not.toContain('pg_column_size');
-    expect(calls[0]).not.toContain('octet_length');
-    expect(calls[1]).toContain('substr(text');
-    expect(calls[1]).not.toContain('profile_export_jsonl_gz as blob');
+    expect(log).toHaveLength(2);
+    expect(log[0]!.text).not.toContain('pg_column_size');
+    expect(log[0]!.text).not.toMatch(/octet_length\(atr\.request_timeline\)/);
+    expect(log[1]!.text).toContain('substr(text');
   });
 
   it('does not fetch a blob when neither a current timeline nor a blob exists', async () => {
-    const { sql, calls } = mockSql([
+    const { sql, log } = mockSql([
       [
         {
           trace_replay_id: 870,
           has_blob: false,
+          gz_bytes: null,
           timeline_version: null,
-          start_ns: null,
-          end_ns: null,
-          duration_s: null,
-          request_count: null,
         },
       ],
     ]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
-    expect(calls).toHaveLength(1);
+    expect(log).toHaveLength(1);
   });
 
-  it('recomputes from the blob AND writes the fresh timeline back when the stored one is stale', async () => {
+  it('recomputes from the blob AND writes the fresh timeline back as gzip when the stored one is stale', async () => {
     const blob = gzipSync(
       Buffer.from(
         JSON.stringify({
@@ -108,39 +248,39 @@ describe('getRequestTimeline', () => {
     const staleHeader = {
       trace_replay_id: 870,
       has_blob: true,
+      gz_bytes: 512,
       timeline_version: REQUEST_TIMELINE_VERSION - 1,
-      start_ns: 100,
-      end_ns: 200,
-      duration_s: 0.0000001,
-      request_count: 0,
     };
-    const { sql, calls } = mockSql([[staleHeader], [{ blob }]]);
+    const { sql, log } = mockSql([[staleHeader], [{ blob }]]);
 
     const result = await getRequestTimeline(sql, 422991);
 
     expect(result?.version).toBe(REQUEST_TIMELINE_VERSION);
     expect(result?.requests).toHaveLength(1);
+    // A stale gzip copy is never sliced; the blob is read instead.
+    expect(log[1]!.text).toContain('profile_export_jsonl_gz as blob');
+    expect(agenticShared.writeBackRequestTimeline).toHaveBeenCalledWith(sql, 870, result);
     // 3 calls: meta read, blob read, then the fire-and-forget write-back.
-    expect(calls).toHaveLength(3);
-    expect(calls[1]).toContain('profile_export_jsonl_gz as blob');
-    expect(calls[2]).toContain('update agentic_trace_replay set request_timeline');
-    expect(calls[2]).toContain('::jsonb where id');
+    await vi.waitFor(() => expect(log).toHaveLength(3));
+    expect(log[2]!.text).toContain('set request_timeline_gz = ?');
+    expect(log[2]!.text).not.toContain('::jsonb');
+    const [gz, version, requestCount, id] = log[2]!.values;
+    expect(gunzipRequestTimeline(gz as Buffer)).toEqual(result);
+    expect([version, requestCount, id]).toEqual([REQUEST_TIMELINE_VERSION, 1, 870]);
   });
 
   it('does not write back when the blob is missing (never persists a null timeline)', async () => {
     const staleHeader = {
       trace_replay_id: 870,
       has_blob: true,
+      gz_bytes: null,
       timeline_version: REQUEST_TIMELINE_VERSION - 1,
-      start_ns: 100,
-      end_ns: 200,
-      duration_s: 0.0000001,
-      request_count: 0,
     };
-    const { sql, calls } = mockSql([[staleHeader], [{ blob: null }]]);
+    const { sql, log } = mockSql([[staleHeader], [{ blob: null }]]);
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
-    // meta read + blob read only — no write-back for a null recompute.
-    expect(calls).toHaveLength(2);
+    expect(agenticShared.writeBackRequestTimeline).not.toHaveBeenCalled();
+    // Meta read and blob read only.
+    expect(log).toHaveLength(2);
   });
 });

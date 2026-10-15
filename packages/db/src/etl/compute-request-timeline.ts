@@ -1,13 +1,14 @@
 /**
  * Pre-compute the per-request timeline for the agentic detail page's
- * Gantt view. Output lands in `agentic_trace_replay.request_timeline`
- * and is read directly by the timeline API route.
+ * Gantt view. Output is stored as gzip-compressed JSON in
+ * `agentic_trace_replay.request_timeline_gz` (see `request-timeline-codec.ts`)
+ * and read by the timeline, request-chart-data, and trace-histograms routes.
  *
- * Shape is a thin array — roughly 150 bytes per request before JSONB
- * compression. The largest throughput runs contain hundreds of thousands of
- * requests, so extraction must not materialize the decompressed JSONL.
+ * Shape is a thin array of compact per-request records. The largest
+ * throughput runs contain hundreds of thousands of requests, so extraction
+ * must not materialize the decompressed JSONL.
  *
- * Versioned so the backfill script knows which rows are stale — bump
+ * Versioned so the backfill script knows which rows are stale. Bump
  * `REQUEST_TIMELINE_VERSION` whenever the extraction algorithm changes.
  */
 

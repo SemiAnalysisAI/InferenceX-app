@@ -1,15 +1,18 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 import { describe, expect, it } from 'vitest';
 
+import { REQUEST_TIMELINE_VERSION, computeRequestTimeline } from './compute-request-timeline';
+import { gunzipRequestTimeline } from './request-timeline-codec';
 import {
   TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
   gzipTraceReplayInput,
   persistPreparedTraceReplay,
+  prepareTraceReplay,
   type PreparedTraceReplay,
   uploadTraceReplayPayloadChunks,
 } from './trace-replay-ingest';
@@ -38,7 +41,7 @@ function preparedFixture(): PreparedTraceReplay {
     serverMetricsJsonSize: 700,
     aggregateStatsJson: Buffer.from('{"version":1}'),
     chartSeriesJson: Buffer.from('{"version":12}'),
-    requestTimelineJson: Buffer.from('{"version":1}'),
+    requestTimelineGz: Buffer.from('timeline-gzip'),
     chartWindows: 2,
     timelineRequests: 3,
     compressionMs: 10,
@@ -91,7 +94,7 @@ describe('uploadTraceReplayPayloadChunks', () => {
     const measuredPayloads = [
       ['profile_export_jsonl_gz', Buffer.alloc(22_992_290)],
       ['server_metrics_json_gz', Buffer.alloc(49_891_135)],
-      ['request_timeline', Buffer.alloc(22_146_655)],
+      ['request_timeline_gz', Buffer.alloc(22_146_655)],
     ] as const;
     const { sql, calls } = mockTransactionSql();
 
@@ -140,6 +143,66 @@ describe('gzipTraceReplayInput', () => {
   }, 15_000);
 });
 
+describe('prepareTraceReplay', () => {
+  it('stores the computed request timeline as gzip of its JSON text', async () => {
+    const profile = Buffer.from(
+      [
+        {
+          metadata: {
+            conversation_id: 'trace-018',
+            x_correlation_id: 'session-a',
+            root_correlation_id: 'session-a',
+            turn_index: 0,
+            worker_id: '7',
+            benchmark_phase: 'profiling',
+            credit_issued_ns: 1_000_000_000,
+            request_start_ns: 1_001_200_000,
+            request_ack_ns: 1_001_800_000,
+            request_end_ns: 1_420_000_000,
+          },
+          metrics: {
+            time_to_first_token: { value: 42.3, unit: 'ms' },
+            time_per_output_token: { value: 18.1, unit: 'ms' },
+            input_sequence_length: { value: 18_320, unit: 'tokens' },
+            output_sequence_length: { value: 410, unit: 'tokens' },
+          },
+        },
+        {
+          metadata: {
+            conversation_id: 'trace-018',
+            x_correlation_id: 'session-b',
+            root_correlation_id: 'session-a',
+            turn_index: 1,
+            worker_id: '7',
+            agent_depth: 1,
+            benchmark_phase: 'profiling',
+            credit_issued_ns: 1_500_000_000,
+            request_start_ns: 1_500_400_000,
+            request_end_ns: 2_400_000_000,
+          },
+          metrics: { input_sequence_length: { value: 19_340, unit: 'tokens' } },
+        },
+      ]
+        .map((record) => JSON.stringify(record))
+        .join('\n'),
+    );
+
+    const prepared = await prepareTraceReplay(profile, null);
+    const expected = await computeRequestTimeline(gzipSync(profile));
+
+    expect(prepared.timelineRequests).toBe(2);
+    expect(prepared.requestTimelineGz).not.toBeNull();
+    expect(gunzipSync(prepared.requestTimelineGz!).toString('utf8')).toBe(JSON.stringify(expected));
+    expect(gunzipRequestTimeline(prepared.requestTimelineGz!)).toMatchObject({
+      version: REQUEST_TIMELINE_VERSION,
+      requests: [
+        { cid: 'trace-018', ti: 0, isl: 18_320 },
+        { ti: 1, ad: 1, isl: 19_340 },
+      ],
+    });
+  });
+});
+
 describe('persistPreparedTraceReplay', () => {
   it('derives ATOM capacity from the stored startup log during ingestion', async () => {
     const { sql, calls } = mockSqlWithTransaction(
@@ -175,9 +238,11 @@ describe('persistPreparedTraceReplay', () => {
     const linkCall = calls.find((call) => call.text.includes('set trace_replay_id'));
     expect(lockIndex).toBe(0);
     expect(blobIndex).toBeGreaterThan(lockIndex);
-    expect(
-      calls.filter((call) => call.text.includes('trace_replay_upload_parts (field, part, data)')),
-    ).toHaveLength(6);
+    const uploads = calls.filter((call) =>
+      call.text.includes('trace_replay_upload_parts (field, part, data)'),
+    );
+    expect(uploads).toHaveLength(6);
+    expect(uploads.map((call) => call.values[0])).toContain('request_timeline_gz');
     expect(linkCall?.values.some((value) => Array.isArray(value) && value.includes(41))).toBe(true);
     const metricUpdate = calls.find((call) =>
       call.text.includes("not (metrics ? 'median_full_response_itl')"),
@@ -186,5 +251,37 @@ describe('persistPreparedTraceReplay', () => {
     expect(metricUpdate?.values).not.toContain(
       JSON.stringify(preparedFixture().fullResponseMetrics),
     );
+  });
+
+  it('stores the timeline only as gzip plus its version and request count', async () => {
+    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+
+    await persistPreparedTraceReplay(sql, [41], preparedFixture());
+    const insert = calls.find((call) => call.text.includes('insert into agentic_trace_replay'));
+
+    expect(insert?.text).toContain('request_timeline_gz,');
+    expect(insert?.text).toContain('request_timeline_version,');
+    expect(insert?.text).toContain('request_count');
+    // Only aggregate_stats and chart_series are still assembled as JSONB.
+    expect(insert?.text.match(/::jsonb/g)).toHaveLength(2);
+    // Sizes of the three blobs, then the timeline version and request count.
+    expect(insert?.values).toEqual([70, 30, 700, REQUEST_TIMELINE_VERSION, 3]);
+  });
+
+  it('leaves every timeline column null when no timeline was computed', async () => {
+    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+
+    await persistPreparedTraceReplay(sql, [41], {
+      ...preparedFixture(),
+      requestTimelineGz: null,
+      timelineRequests: 0,
+    });
+    const insert = calls.find((call) => call.text.includes('insert into agentic_trace_replay'));
+    const uploads = calls.filter((call) =>
+      call.text.includes('trace_replay_upload_parts (field, part, data)'),
+    );
+
+    expect(uploads.map((call) => call.values[0])).not.toContain('request_timeline_gz');
+    expect(insert?.values).toEqual([70, 30, 700, null, null]);
   });
 });

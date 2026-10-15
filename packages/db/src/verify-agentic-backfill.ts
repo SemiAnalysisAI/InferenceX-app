@@ -20,16 +20,33 @@ const sql = createAdminSql({ max: 1, onnotice: () => {} });
 async function states(ids: string[]): Promise<BackfillState[]> {
   const rows: BackfillState[] = [];
   // Hash blobs inside Postgres: raw artifacts never leave the database during verification.
+  // The timeline columns mirror the readers: the gzip copy wins when present, and
+  // legacy JSONB is only detoasted for rows without one.
   for (const id of ids) {
     const result = await sql<BackfillState[]>`
       select br.id::text, a.id::text as trace_id,
         md5(row_to_json(br)::text) as benchmark_hash,
         md5(a.profile_export_jsonl_gz) as profile_hash,
         md5(a.server_metrics_json_gz) as server_hash,
-        md5(a.request_timeline::text) as timeline_hash,
+        case
+          when a.request_timeline_gz is not null then 'gzip'
+          when a.request_timeline is not null then 'jsonb'
+        end as timeline_format,
+        case
+          when a.request_timeline_gz is not null then md5(a.request_timeline_gz)
+          else md5(a.request_timeline::text)
+        end as timeline_hash,
         (a.chart_series->>'version')::int as chart_version,
         (a.aggregate_stats->>'version')::int as stats_version,
-        (a.request_timeline->>'version')::int as timeline_version,
+        case
+          when a.request_timeline_gz is not null then a.request_timeline_version::int
+          else (a.request_timeline->>'version')::int
+        end as timeline_version,
+        case
+          when a.request_timeline_gz is not null then a.request_count
+          when jsonb_typeof(a.request_timeline->'requests') = 'array'
+            then jsonb_array_length(a.request_timeline->'requests')
+        end as timeline_requests,
         jsonb_build_object(
           'kvCacheUsage', coalesce(jsonb_array_length(a.chart_series->'kvCacheUsage'),0),
           'queueDepth', coalesce(jsonb_array_length(a.chart_series->'queueDepth'),0),

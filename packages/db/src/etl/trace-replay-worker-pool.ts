@@ -2,11 +2,12 @@ import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 
 import type { PreparedTraceReplay } from './trace-replay-ingest';
-import type {
-  PreparedTraceReplayWire,
-  TraceReplayWorkerJob,
-  TraceReplayWorkerRequest,
-  TraceReplayWorkerResponse,
+import {
+  PREPARED_TRACE_REPLAY_BUFFER_FIELDS,
+  type PreparedTraceReplayWire,
+  type TraceReplayWorkerJob,
+  type TraceReplayWorkerRequest,
+  type TraceReplayWorkerResponse,
 } from './trace-replay-worker-protocol';
 
 const DEFAULT_MAX_WORKERS = 4;
@@ -44,18 +45,9 @@ interface WorkerSlot {
   task: PendingTask | null;
 }
 
-const BUFFER_FIELDS = [
-  'profileGz',
-  'serverMetricsCsv',
-  'serverMetricsJsonGz',
-  'aggregateStatsJson',
-  'chartSeriesJson',
-  'requestTimelineJson',
-] as const;
-
 function fromWire(wire: PreparedTraceReplayWire): PreparedTraceReplay {
   const prepared = { ...wire } as unknown as PreparedTraceReplay;
-  for (const field of BUFFER_FIELDS) {
+  for (const field of PREPARED_TRACE_REPLAY_BUFFER_FIELDS) {
     const value = wire[field];
     prepared[field] = value
       ? Buffer.from(value.buffer as ArrayBuffer, value.byteOffset, value.byteLength)

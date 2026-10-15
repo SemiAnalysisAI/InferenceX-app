@@ -15,8 +15,10 @@ import { createGzip, gzipSync } from 'node:zlib';
 import type postgres from 'postgres';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
+import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
+import { gzipRequestTimeline } from './request-timeline-codec.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -41,7 +43,7 @@ type TraceReplayUploadField =
   | 'server_metrics_json_gz'
   | 'aggregate_stats'
   | 'chart_series'
-  | 'request_timeline';
+  | 'request_timeline_gz';
 
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
@@ -57,7 +59,8 @@ export interface PreparedTraceReplay {
   serverMetricsJsonSize: number | null;
   aggregateStatsJson: Buffer | null;
   chartSeriesJson: Buffer | null;
-  requestTimelineJson: Buffer | null;
+  /** gzip(JSON) of the request timeline; `timelineRequests` is its request count. */
+  requestTimelineGz: Buffer | null;
   chartWindows: number;
   timelineRequests: number;
   compressionMs: number;
@@ -83,7 +86,7 @@ function elapsed(startMs: number): string {
 
 function jsonBuffer(value: unknown | null): Buffer | null {
   if (value === null) return null;
-  return Buffer.from(JSON.stringify(structuredClone(value)), 'utf8');
+  return Buffer.from(JSON.stringify(value), 'utf8');
 }
 
 function cacheHitRatesFromChartSeries(
@@ -198,6 +201,7 @@ export async function prepareTraceReplay(
   const computeStart = Date.now();
   const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
     await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
+  const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -210,7 +214,7 @@ export async function prepareTraceReplay(
     serverMetricsJsonSize: metricsJson.sourceSize,
     aggregateStatsJson: jsonBuffer(aggregateStats),
     chartSeriesJson: jsonBuffer(chartSeries),
-    requestTimelineJson: jsonBuffer(requestTimeline),
+    requestTimelineGz,
     chartWindows: chartSeries?.timeslicesCount ?? 0,
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
@@ -246,7 +250,8 @@ export async function persistPreparedTraceReplay(
     serverMetricsJsonSize,
     aggregateStatsJson,
     chartSeriesJson,
-    requestTimelineJson,
+    requestTimelineGz,
+    timelineRequests,
     cacheHitRates,
     fullResponseMetrics,
   } = prepared;
@@ -281,7 +286,7 @@ export async function persistPreparedTraceReplay(
       ['server_metrics_json_gz', serverMetricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
       ['chart_series', chartSeriesJson],
-      ['request_timeline', requestTimelineJson],
+      ['request_timeline_gz', requestTimelineGz],
     ];
     for (const [field, payload] of payloads) {
       const uploadStart = Date.now();
@@ -303,7 +308,9 @@ export async function persistPreparedTraceReplay(
         server_metrics_json_uncompressed_size,
         aggregate_stats,
         chart_series,
-        request_timeline
+        request_timeline_gz,
+        request_timeline_version,
+        request_count
       )
       values (
         (
@@ -335,10 +342,12 @@ export async function persistPreparedTraceReplay(
           where field = 'chart_series'
         ),
         (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          select string_agg(data, ''::bytea order by part)
           from pg_temp.trace_replay_upload_parts
-          where field = 'request_timeline'
-        )
+          where field = 'request_timeline_gz'
+        ),
+        ${requestTimelineGz ? REQUEST_TIMELINE_VERSION : null},
+        ${requestTimelineGz ? timelineRequests : null}
       )
       returning id
     `;
