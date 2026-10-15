@@ -1,0 +1,172 @@
+---
+title: 'MiniMax M3 Day-0: H200 Beats B200 by up to 3.5x per GPU at Low Concurrency on vLLM FP8'
+subtitle: 'Blackwell leads at high batch as the silicon predicts; at low concurrency Hopper inverts the result because vLLM defaults the Blackwell FP8 MoE path to DeepGEMM while Hopper runs Marlin. A day-0 kernel-coverage gap. vLLM FP8, ISL/OSL 1024/1024 and 8192/1024, measured 2026-06-13.'
+date: '2026-06-13'
+publishDate: '2026-06-13'
+tags:
+  - benchmark
+  - gpu
+  - inference
+  - minimax
+  - nvidia
+  - b200
+  - b300
+  - h200
+  - h100
+  - vllm
+  - fp8
+---
+
+12 days after MiniMax M3's [release on 2026-06-01](https://venturebeat.com/technology/minimax-teases-upcoming-m3-model-with-new-sparse-attention-mechanism-and-15-6x-response-speed-boost), the day-0 InferenceX numbers on vLLM FP8 split into two regimes. At high batch, NVIDIA B200 and B300 lead on throughput per GPU as their silicon predicts. At low concurrency the result inverts: on the 1024/1024 workload, H200 delivers **up to 3.5x the throughput per GPU of B200 at 70 tok/s/user** — and at matched recipe the gap is cleanly attributable. On the identical TP=8 recipe at concurrency 4, H200 runs at **113 tok/s/GPU and 8.4 ms TPOT versus B200's 59 tok/s/GPU and 16.2 ms** — 1.9x the throughput and half the per-token latency, on the weaker chip.
+
+That inversion is a day-0 kernel-coverage gap. vLLM's Blackwell FP8 block-scale MoE path defaults to DeepGEMM, which is tuned for large-batch throughput and carries a high fixed-latency floor at small batch; the Hopper path runs Marlin, which is tuned for low concurrency. The MiniMax M3 weights, the MiniMax Sparse Attention block, and the MoE routing are identical on both SKUs — the spread at low batch is which MoE kernel each architecture falls back to today. The fix is already in flight: [flashinfer-ai/flashinfer PR #3504](https://github.com/flashinfer-ai/flashinfer/pull/3504) adds the gated-activation parameters needed for a low-latency Blackwell MXFP8 MoE path.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-06-13&g_runid=27451860491&g_model=MiniMax-M3&i_prec=fp8&i_active=b200_vllm%2Ch200_vllm&i_linelabel=1">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<Figure
+  srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-light.png"
+  srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-dark.png"
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 1024/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 and even H100 sustain more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 1024 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
+/>
+
+## MiniMax M3 Model Architecture
+
+MiniMax M3 is MiniMax AI's frontier open-weight model, [released 2026-06-01](https://venturebeat.com/technology/minimax-teases-upcoming-m3-model-with-new-sparse-attention-mechanism-and-15-6x-response-speed-boost). [NVIDIA describes it](https://developer.nvidia.com/blog/deploy-long-context-reasoning-and-agentic-workflows-with-minimax-m3-on-nvidia-accelerated-infrastructure) as a **428B-parameter Mixture-of-Experts model** with a **1M-token context window** and native multimodal input (text, image, video). The headline architectural change is **MiniMax Sparse Attention (MSA)**: a pre-filtering stage selects the relevant context blocks and attention is computed only over those, which MiniMax reports as roughly 1/20th the per-token compute of M2 at 1M context, with ~9x faster prefill and ~15x faster decode. The full technical report and weights are forthcoming, so the official active-parameter and expert counts are not yet published; the M2-series backbone this builds on was 230B total / 10B active across 256 fine-grained experts.
+
+For this post the relevant detail is the MoE GEMM. MSA cuts attention cost, which leaves the expert GEMMs and their routing as the dominant per-step work on the decode path — and the FP8 block-scale MoE GEMM is exactly the kernel whose Blackwell-vs-Hopper coverage differs in vLLM today. That is the lever behind the low-concurrency inversion below.
+
+## On-Paper Specs
+
+This is a cross-generation comparison — Hopper (H200) against Blackwell (B200/B300) — so the silicon ratios set expectations before the measured numbers land. All values are per-GPU, pulled from [`/gpu-specs`](/gpu-specs).
+
+| Spec                              | H200         | B200         | B200 / H200 |
+| --------------------------------- | ------------ | ------------ | ----------- |
+| HBM capacity                      | 141 GB       | 192 GB       | 1.36x       |
+| HBM bandwidth                     | 4.8 TB/s     | 8 TB/s       | 1.67x       |
+| Dense FP4 (TFLOP/s)               | —            | 9,000        | —           |
+| Dense FP8 (TFLOP/s)               | 1,979        | 4,500        | 2.27x       |
+| Dense BF16 (TFLOP/s)              | 989          | 2,250        | 2.28x       |
+| NVLink per GPU (uni-di)           | 450 GB/s     | 900 GB/s     | 2.0x        |
+| TCO (SemiAnalysis AI Cloud Model) | $1.41/GPU/hr | $1.95/GPU/hr | 1.38x       |
+
+B200 brings 2.27x the FP8 dense FLOPS and 1.67x the HBM bandwidth at 1.38x the cost. With the same precision and recipe, B200's perf/$ ceiling versus H200 is bounded by 2.27 / 1.38 ≈ 1.64x on a fully compute-bound workload and 1.67 / 1.38 ≈ 1.21x on a fully bandwidth-bound one. The high-batch results land inside that bracket. The low-concurrency results land **below 1.0x** — B200 returns half H200's throughput where its silicon says it should win. The specs say that gap belongs to software.
+
+## What Shipped to Make This Happen
+
+MiniMax M3 ran day-0 on vLLM's published image `vllm/vllm-openai:minimax-m3` across H100, H200, B200, and B300, FP8, single-node, with MTP and non-MTP arms. The InferenceX recipe that wired M3 into the benchmark loop landed in [SemiAnalysisAI/InferenceX commit `fa0f483`](https://github.com/SemiAnalysisAI/InferenceX/commit/fa0f48326a2d12a6813dc43b0a21d009605ecbdc), sweeping TP=4 and TP=8 with EP=1/4/8 per SKU.
+
+The low-concurrency behavior comes down to the FP8 block-scale MoE GEMM kernel each architecture selects in vLLM:
+
+- **Blackwell (B200/B300) defaults to DeepGEMM.** DeepGEMM's grouped FP8 GEMM is tuned for large-batch throughput; at small batch its fixed launch and scheduling overhead dominates, so per-token latency floors out well above where the silicon could go. This is why B200's low-concurrency points produce few tokens per GPU despite 2.27x H200's FP8 FLOPS.
+- **Hopper (H100/H200) runs Marlin.** Marlin is tuned for low-concurrency / small-batch GEMM, so the Hopper decode path keeps a low per-token latency floor at concurrency 1–8 — which is exactly the band where the measured H200 advantage is largest.
+
+The Blackwell low-latency path is being built: [flashinfer-ai/flashinfer PR #3504](https://github.com/flashinfer-ai/flashinfer/pull/3504) exposes per-expert `gemm1_alpha`, `gemm1_beta`, and `gemm1_clamp_limit` on the TensorRT-LLM FP8 block-scale / MXFP8 MoE path — the gated-activation parameters a low-concurrency Blackwell MoE kernel needs. Once a low-latency Blackwell MoE GEMM is the default, the high-interactivity end of the B200 curve should climb toward its on-paper ceiling.
+
+## The Numbers
+
+All rows are MiniMax M3 on vLLM FP8, single-node, non-MTP, measured on InferenceX on 2026-06-13. Throughput is per-GPU. The two tables below hold the **recipe fixed at TP=8 / EP=1** so the comparison isolates the kernel from recipe choice.
+
+**ISL/OSL 1024/1024 — TP=8, non-MTP:**
+
+| Conc | B200 tok/s/GPU | B200 tok/s/user | B200 TPOT (ms) | H200 tok/s/GPU | H200 tok/s/user | H200 TPOT (ms) | H200 / B200 |
+| ---: | -------------: | --------------: | -------------: | -------------: | --------------: | -------------: | ----------: |
+|    4 |           59.0 |            61.7 |          16.20 |          113.0 |           119.0 |           8.40 |       1.92x |
+|    8 |          111.0 |            57.6 |          17.36 |          186.5 |            96.8 |          10.33 |       1.68x |
+|   16 |          196.9 |            50.5 |          19.79 |          282.7 |            72.8 |          13.73 |       1.44x |
+|   32 |          302.8 |            39.1 |          25.56 |          445.8 |            57.1 |          17.50 |       1.47x |
+|   64 |          436.7 |            27.8 |          36.00 |          580.9 |            37.0 |          26.99 |       1.33x |
+
+**ISL/OSL 8192/1024 — TP=8, non-MTP:**
+
+| Conc | B200 tok/s/GPU | B200 tok/s/user | B200 TPOT (ms) | H200 tok/s/GPU | H200 tok/s/user | H200 TPOT (ms) | H200 / B200 |
+| ---: | -------------: | --------------: | -------------: | -------------: | --------------: | -------------: | ----------: |
+|    4 |          271.8 |            63.0 |          15.88 |          443.9 |           106.1 |           9.43 |       1.63x |
+|    8 |          486.8 |            56.8 |          17.61 |          660.6 |            79.3 |          12.60 |       1.36x |
+|   16 |          860.3 |            50.1 |          19.97 |          933.3 |            54.8 |          18.26 |       1.08x |
+|   32 |        1,385.2 |            40.4 |          24.75 |        1,230.0 |            35.9 |          27.87 |       0.89x |
+|   64 |        2,006.7 |            28.6 |          35.00 |        1,500.6 |            21.3 |          46.91 |       0.75x |
+
+The 8192/1024 table is the crossover in one view: H200 leads at concurrency 4–16 (low batch), B200 takes the lead at concurrency 32–64, where batch is large enough that DeepGEMM amortizes its overhead and Blackwell's FLOPS and HBM bandwidth take over. At concurrency 64 B200 delivers 2,007 tok/s/GPU to H200's 1,501 — a 1.34x throughput lead, the regime where the silicon wins.
+
+<Figure
+  srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-8k1k-light.png"
+  srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-8k1k-dark.png"
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 8192/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. B300 and B200 lead at low interactivity (high batch); the B200 non-MTP curve drops off at high interactivity (low batch) where H200 sustains more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 8192 / OSL 1024, measured 2026-06-13. Same SKUs and MTP split as the 1024/1024 chart above. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
+/>
+
+## Iso-Interactivity Comparison
+
+Throughput per GPU at matched interactivity, interpolated along each SKU's Pareto frontier (which combines the TP=4, TP=8, and EP=4/8 recipes, exactly as the dashboard does when all recipes are toggled on).
+
+**ISL/OSL 1024/1024, non-MTP — throughput tok/s/GPU:**
+
+| Interactivity (tok/s/user) |    H100 |    H200 |    B200 |    B300 | H200 / B200 |
+| -------------------------: | ------: | ------: | ------: | ------: | ----------: |
+|                         20 |     813 |    1058 |    1050 |    2706 |       1.01x |
+|                         30 |     648 |     894 |     583 |    1106 |       1.53x |
+|                         40 |     443 |     711 |     390 |     605 |       1.82x |
+|                         50 |     368 |     560 |     278 |     463 |       2.02x |
+|                         60 |     297 |     444 |     179 |     336 |       2.48x |
+|                     **70** | **241** | **371** | **106** | **209** |   **3.50x** |
+|                         80 |     199 |     317 |      32 |      80 |      10.00x |
+
+Below ~25 tok/s/user the SKUs converge — large batch, where DeepGEMM is in its element and B300 leads outright (2,706 tok/s/GPU at 20 tok/s/user). The gap opens as interactivity rises and batch shrinks: H200 pulls to 2.48x at 60 tok/s/user and 3.50x at 70, and by 80 tok/s/user B200's frontier has collapsed to 32 tok/s/GPU because its only recipes reaching that interactivity run the DeepGEMM MoE path at concurrency 1–4. H100 also outruns B200 above ~30 tok/s/user for the same reason.
+
+**ISL/OSL 1024/1024, non-MTP — cost per million tokens (hyperscaler-tier TCO):**
+
+| Interactivity (tok/s/user) | H200 $/M | B200 $/M | B200 / H200 |
+| -------------------------: | -------: | -------: | ----------: |
+|                         30 |     0.44 |     0.94 |       2.15x |
+|                         40 |     0.55 |     1.35 |       2.45x |
+|                         50 |     0.70 |     1.97 |       2.79x |
+|                     **60** | **0.88** | **2.95** |   **3.36x** |
+|                         70 |     1.04 |     5.04 |       4.87x |
+
+At 60 tok/s/user, serving M3 on B200 costs 3.36x what it costs on H200 today — $2.95 vs $0.88 per million tokens — because the B200 dollars buy idle FLOPS at low batch. This reverses at high batch: on 8192/1024 below 30 tok/s/user, B200 is ~10–25% cheaper than H200, and B300 cheaper still.
+
+<Figure
+  srcLight="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-light.png"
+  srcDark="/images/minimax-m3-vllm-fp8-h200-vs-b200-low-concurrency/benchmark-dark.png"
+  alt="MiniMax M3 vLLM FP8 throughput per GPU vs interactivity at ISL/OSL 1024/1024, all four SKUs — B300, B200, H200, H100 — each with non-MTP and MTP variants. At low interactivity (high batch) B300 and B200 lead on per-GPU throughput; the B200 non-MTP curve falls off steeply at high interactivity (low batch) where H200 and even H100 sustain more throughput per GPU."
+  caption="MiniMax M3 (428B, MoE) on vLLM FP8 at ISL 1024 / OSL 1024, measured 2026-06-13. B300, B200, H200, and H100, each non-MTP and MTP. Point labels denote tensor-parallel size (4 = TP=4, 8 = TP=8)."
+/>
+
+[Live chart](https://inferencex.semianalysis.com/inference?g_rundate=2026-06-13&g_runid=27451860491&g_model=MiniMax-M3&i_prec=fp8&i_active=b200_vllm%2Ch200_vllm&i_linelabel=1), pre-filtered to MiniMax M3 vLLM FP8, B200 vs H200.
+
+## MTP Raises the Crossover Interactivity
+
+With Multi-Token Prediction speculative decoding on, every curve lifts and stretches to higher interactivity — B200 non-MTP tops out near 86 tok/s/user on 1024/1024, while the MTP arm reaches ~198. MTP also moves the Hopper/Blackwell crossover upward: on 1024/1024, B200 leads H200 from ~25 up to ~55 tok/s/user (1.10x at 60), and H200 only pulls ahead above ~60, reaching 1.5x by 100 and ~3x near 180. The low-concurrency kernel floor is the same; MTP raises the per-step token count, so the DeepGEMM overhead is amortized over more accepted tokens and the inversion is pushed to a higher interactivity.
+
+## What's Next for MiniMax M3 on Blackwell
+
+This is the day-0 picture on open vLLM images. The pieces still open:
+
+- **Low-latency Blackwell MoE kernel.** [flashinfer PR #3504](https://github.com/flashinfer-ai/flashinfer/pull/3504) is the path to a low-concurrency Blackwell MXFP8 MoE GEMM. Whether it lands in-tree soon is still under discussion; once it is the default, the high-interactivity end of the B200/B300 curves should climb toward the on-paper ceiling and the inversion should shrink.
+- **FP4 on Blackwell.** All numbers here are FP8. M3 has no FP4 checkpoint in the loop yet; B200/B300 carry 9,000–13,500 TFLOP/s of FP4 that the FP8 path leaves on the table.
+- **Disaggregation and wide EP.** Every config here is single-node aggregated. The MoE dispatch/combine economics that favor rack-scale fabrics on sparse MoE models are untested for M3.
+
+For high-batch, throughput-optimized serving today, B300 and B200 lead on M3 as expected. For low-concurrency, latency-sensitive serving in the 40–80 tok/s/user band, H200 is both faster per GPU and cheaper per token until the Blackwell MoE kernels catch up.
+
+## Acknowledgments
+
+Thanks to the vLLM and MiniMax engineers who diagnosed the Hopper-vs-Blackwell kernel behavior in the launch window — Roger Wang, Thien, and Yongye Zhu — and to the open-source InferenceX team for the day-0 recipes across H100, H200, B200, and B300. Day-0 numbers are never the final word; tracking them from launch is how the curve gets pulled up.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-06-13&g_runid=27451860491&g_model=MiniMax-M3&i_prec=fp8&i_active=b200_vllm%2Ch200_vllm&i_linelabel=1">
+  Click to see the full InferenceX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Does H200 really beat B200 on MiniMax M3?", "acceptedAnswer": {"@type": "Answer", "text": "At low concurrency, yes. On vLLM FP8 at ISL/OSL 1024/1024, non-MTP, the H200 Pareto frontier delivers up to 3.5x the throughput per GPU of B200 at 70 tok/s/user. On the identical TP=8 recipe at concurrency 4, H200 runs at 113 tok/s/GPU and 8.4 ms TPOT versus B200 at 59 tok/s/GPU and 16.2 ms. At high batch the result reverses and B200/B300 lead as their silicon predicts."}},
+    {"@type": "Question", "name": "Why does B200 lose at low concurrency despite more FLOPS?", "acceptedAnswer": {"@type": "Answer", "text": "It is a kernel-coverage gap in vLLM's day-0 path. The Blackwell FP8 block-scale MoE GEMM defaults to DeepGEMM, which is tuned for large-batch throughput and has a high fixed-latency floor at small batch. Hopper runs Marlin, which is tuned for low-concurrency GEMM. The MiniMax M3 weights and architecture are identical on both SKUs, so the low-batch spread is which MoE kernel each architecture selects today."}},
+    {"@type": "Question", "name": "Is this an inherent property of the MiniMax M3 architecture?", "acceptedAnswer": {"@type": "Answer", "text": "No. Nothing in MiniMax Sparse Attention or the MoE routing favors Hopper. B200's on-paper specs (2.27x H200's dense FP8 FLOPS, 1.67x the HBM bandwidth) say it should lead. The low-concurrency inversion is in software, and the Blackwell low-latency MoE path is in flight via flashinfer PR #3504."}},
+    {"@type": "Question", "name": "Where does B200 win on MiniMax M3?", "acceptedAnswer": {"@type": "Answer", "text": "At high batch. On ISL/OSL 8192/1024, B200 takes the lead at concurrency 32-64, delivering 2,007 tok/s/GPU to H200's 1,501 at concurrency 64 (1.34x). On 8192/1024 below 30 tok/s/user, B200 is roughly 10-25% cheaper per token than H200, and B300 leads throughput outright."}},
+    {"@type": "Question", "name": "Does MTP change the result?", "acceptedAnswer": {"@type": "Answer", "text": "MTP lifts every curve and extends the reachable interactivity (B200 reaches ~198 tok/s/user with MTP versus ~86 non-MTP on 1024/1024), and it pushes the Hopper/Blackwell crossover upward to about 60 tok/s/user. The low-concurrency kernel floor is unchanged; MTP just amortizes the DeepGEMM overhead over more accepted tokens per step."}}
+  ]
+}`}</JsonLd>
