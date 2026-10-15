@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { computeGpuMetricStats } from './gpu-metrics-csv';
 import {
+  gpuMetricsArtifactHoldsTelemetry,
   ingestGpuMetricsArtifact,
   prepareGpuMetricsArtifact,
   type GpuMetricsIngestResult,
@@ -120,6 +121,35 @@ function writePowerAuditArtifact(
   fs.writeFileSync(path.join(artifactDir, 'agg_kimik3_conc8.json'), '{}');
   return { artifactName, artifactDir };
 }
+
+describe('gpuMetricsArtifactHoldsTelemetry', () => {
+  function sidecarOnlyArtifact() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
+    roots.push(root);
+    const artifactName = 'power_audit_dsv41flash_conc4096_gb300';
+    const artifactDir = path.join(root, artifactName);
+    fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
+    fs.writeFileSync(path.join(artifactDir, 'power_audit.json'), '{}');
+    fs.writeFileSync(path.join(artifactDir, 'gpu_metrics_identity.csv'), 'gpu_index,uuid\n');
+    fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'manifest.json'), '{}');
+    return { artifactName, artifactDir };
+  }
+
+  it('is false when the artifact holds only sidecars', () => {
+    expect(gpuMetricsArtifactHoldsTelemetry(sidecarOnlyArtifact())).toBe(false);
+  });
+
+  it('is true for a GPU metrics CSV, even an unparseable one', () => {
+    const artifact = sidecarOnlyArtifact();
+    fs.writeFileSync(path.join(artifact.artifactDir, 'gpu_metrics.csv'), 'not,a,metrics,csv\n');
+    expect(gpuMetricsArtifactHoldsTelemetry(artifact)).toBe(true);
+    expect(prepareGpuMetricsArtifact(artifact)).toEqual([]);
+  });
+
+  it('is true for multinode power samples', () => {
+    expect(gpuMetricsArtifactHoldsTelemetry(writePowerAuditArtifact())).toBe(true);
+  });
+});
 
 describe('prepareGpuMetricsArtifact', () => {
   it('falls back to the multinode power bundle, one power-only series per host', () => {

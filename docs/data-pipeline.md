@@ -585,7 +585,12 @@ UTC samples, and `benchmark_result_gpu_metrics` links points to their series.
 Each file/host remains separate; multiple benchmark points can share a series.
 Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry from
 `power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
-samples transactionally.
+samples transactionally. A paired artifact that holds no telemetry file (no
+`gpu_metrics*.csv` series and no `LOGS/**/samples.csv`), such as a sweep run with
+power collection off, marks its points `telemetry_not_collected` rather than
+`ingest_failed`. The telemetry API check skips those points, and the PowerX manifest
+reports them as one `N telemetry artifact(s) held no telemetry` warning. Telemetry
+files that are present but unparseable remain `ingest_failed`.
 
 Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
 Ingest stores these readings in the existing GPU sample fields; missing or invalid
@@ -655,8 +660,18 @@ The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
 point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
 mapped, override-adjusted metric contract, all configuration dimensions, original
 source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
-their original source identity. Failed or unmapped results at those workloads and
-database errors remain in the manifest; they cannot pass verification.
+their original source identity. Failed or unmapped results at those workloads, and
+failed config writes for their rows, remain in the manifest; they cannot pass
+verification. Other database write failures do not enter the manifest. The ingest
+writes them to the database write receipt (`DATABASE_WRITE_RECEIPT`) as
+`{ kind, subject, message, code }` entries, where `code` is the SQLSTATE or
+postgres.js client code. The workflow step "Check database writes" runs even after
+an earlier step fails, annotates each entry on the run page, fails on errors, and
+adds a short summary to the Slack failure message. Known failures listed in
+`DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
+annotated but not counted or fatal. Today that is only `trace_replay` with SQLSTATE
+`54000`, a `request_timeline` past the Postgres jsonb size limit, until trace storage
+changes.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database
