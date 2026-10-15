@@ -407,10 +407,11 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Google',
     title: 'TPU Results',
     titleZh: 'TPU 结果',
-    subtitle: 'Qwen 3.5 · 8K/1K · FP8 · STP',
-    href: '/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e',
+    subtitle: 'Qwen3.5 · AgentX',
+    href: '/inference/qwen-3-5',
     model: 'qwen-3-5',
     analyticsEvent: 'landing_tpu_results_clicked',
+    isNew: true,
   },
   {
     id: 'rubin',
@@ -607,8 +608,15 @@ export function AgentXCompareHero({
                           ))}
                         </svg>
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                            {locale === 'zh' ? result.titleZh : result.title}
+                          <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                            <span className="min-w-0">
+                              {locale === 'zh' ? result.titleZh : result.title}
+                            </span>
+                            {'isNew' in result && result.isNew && (
+                              <NewBadge data-new-badge={`landing-${result.id}`} flashing>
+                                {t.newModel}
+                              </NewBadge>
+                            )}
                           </span>
                           <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
                             {result.subtitle}

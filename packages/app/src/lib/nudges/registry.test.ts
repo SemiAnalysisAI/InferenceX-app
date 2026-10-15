@@ -77,8 +77,8 @@ describe('NUDGE_REGISTRY integrity', () => {
       'filter-hint',
       'gradient-label',
       'reproducibility',
-      'rubin-minimax-m3-banner',
       'star-nudge',
+      'tpuv7-qwen-3-5-agentx-banner',
     ]);
   });
 
@@ -102,24 +102,24 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'rubin-minimax-m3-banner');
+    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     // New storage key so visitors who dismissed the previous launch banner
     // see this one; cypress specs seed/clear this key and must stay in sync.
-    expect(banner.storageKey).toBe('inferencex-rubin-minimax-m3-banner-dismissed');
-    expect(banner.content.href).toBe('/inference/minimax-m3');
+    expect(banner.storageKey).toBe('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+    expect(banner.content.href).toBe('/inference/qwen-3-5');
     expect(banner.analytics).toEqual({
-      shown: 'inference_rubin_minimax_m3_banner_shown',
-      dismissed: 'inference_rubin_minimax_m3_banner_dismissed',
-      action: 'inference_rubin_minimax_m3_banner_clicked',
+      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
+      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
+      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
       properties: {
-        banner_id: 'rubin-minimax-m3',
+        banner_id: 'tpuv7-qwen-3-5-agentx',
         destination: 'inference',
       },
     });
     // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/inference/minimax-m3');
+    expect(location.href).toBe('/zh/inference/qwen-3-5');
   });
 
   it('gives every coach mark an anchor to point at', () => {

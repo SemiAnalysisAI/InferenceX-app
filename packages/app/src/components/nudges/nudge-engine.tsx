@@ -659,7 +659,7 @@ function BannerRenderer({
                 {localized(locale, content.title, content.titleZh)}
               </span>
               {content.badge && (
-                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle">
+                <NewBadge data-new-badge="launch-banner" className="ml-2 align-middle" flashing>
                   {localized(locale, content.badge, content.badgeZh)}
                 </NewBadge>
               )}
