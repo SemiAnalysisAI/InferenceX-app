@@ -79,7 +79,6 @@ import {
   type Model,
 } from '@/lib/catalog/data-mappings';
 import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
-import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
@@ -642,8 +641,7 @@ function ProfitEstimatorInner({
   useEffect(() => {
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
-  const featureGateUnlocked = useFeatureGate();
-  const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
+  const powerControlsEnabled = basis === 'gw-year';
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
   const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
   useEffect(() => {

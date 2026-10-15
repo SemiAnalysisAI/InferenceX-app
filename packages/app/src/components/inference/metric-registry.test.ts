@@ -214,7 +214,7 @@ describe('metric registry', () => {
     );
 
     const measuredGroup = METRIC_CONTROL_GROUPS.find((group) => group.label === 'Measured Energy');
-    expect(measuredGroup?.gated).toBe(true);
+    expect(measuredGroup?.gated).not.toBe(true);
     expect(measuredGroup?.metrics).toEqual([
       ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
       ...POWER_BASIS_METRIC_CONFIG_KEYS,
