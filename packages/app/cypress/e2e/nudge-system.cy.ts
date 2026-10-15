@@ -51,11 +51,12 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'Google TPUv7 joins AgentX')
       .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the three still-new landing ledger
-    // rows — the shared pill must render at the same
+    cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
+    // Banner + header-nav badges, the flashing TPU card badge, plus the three
+    // still-new landing ledger rows — the shared pill must render at the same
     // fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 5)
+      .should('have.length', 6)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -102,7 +103,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 
-  it('localizes the Rubin banner title in Chinese', () => {
+  it('localizes the launch banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
@@ -119,7 +120,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Landing nudges — banner', { testIsolation: true }, () => {
-  it('wraps the full Rubin title on mobile without clipping', () => {
+  it('wraps the full launch banner title on mobile without clipping', () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')

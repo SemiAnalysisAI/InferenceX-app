@@ -79,8 +79,8 @@ describe('landing model curation', () => {
           .and('contain.text', 'Qwen3.5 · AgentX')
           .and('have.attr', 'href', `${prefix}/inference/qwen-3-5`);
         cy.get('[data-new-badge="landing-tpu"]')
-          .should('have.attr', 'data-new-badge-flashing')
-          .and('contain.text', prefix ? '新' : 'NEW');
+          .should('contain.text', prefix ? '新' : 'NEW')
+          .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
         cy.get('[data-testid="landing-tpu-results-link"]')
           .next()
