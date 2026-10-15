@@ -585,7 +585,12 @@ UTC samples, and `benchmark_result_gpu_metrics` links points to their series.
 Each file/host remains separate; multiple benchmark points can share a series.
 Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry from
 `power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
-samples transactionally.
+samples transactionally. A paired artifact that holds no telemetry file (no
+`gpu_metrics*.csv` series and no `LOGS/**/samples.csv`), such as a sweep run with
+power collection off, marks its points `telemetry_not_collected` rather than
+`ingest_failed`. The telemetry API check skips those points, and the PowerX manifest
+reports them as one `N telemetry artifact(s) held no telemetry` warning. Telemetry
+files that are present but unparseable remain `ingest_failed`.
 
 Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
 Ingest stores these readings in the existing GPU sample fields; missing or invalid

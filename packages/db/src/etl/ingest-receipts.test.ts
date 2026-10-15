@@ -72,6 +72,24 @@ describe('ingest receipt routing', () => {
     ]);
   });
 
+  it('reports telemetry artifacts without telemetry as a separate warning line', () => {
+    const tracker = createSkipTracker();
+    tracker.recordTelemetryError('gpu_metrics for x', new Error('bad digest'));
+    const manifest = buildPowerPublicationManifest({
+      runId: 1,
+      runAttempt: 1,
+      points: [],
+      publicationErrors: [],
+      tracker,
+      telemetryNotCollectedArtifacts: 2,
+    });
+    expect(manifest.ingestErrors).toEqual([]);
+    expect(manifest.telemetryWarnings).toEqual([
+      '1 telemetry errors (gpu_metrics digest or AgentX window)',
+      '2 telemetry artifact(s) held no telemetry',
+    ]);
+  });
+
   it('writes empty receipts for a clean ingest', () => {
     const input = {
       runId: 1,

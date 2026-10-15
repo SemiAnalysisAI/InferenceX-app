@@ -97,7 +97,10 @@ import {
   attachAgentxAudits,
   type AgentxWindowPlan,
 } from './etl/power-audit-recovery';
-import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
+import {
+  gpuMetricsArtifactHoldsTelemetry,
+  ingestGpuMetricsArtifact,
+} from './etl/gpu-metrics-ingest';
 import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
@@ -118,6 +121,8 @@ const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
 const telemetryObservations = new Map<string, TelemetryObservation>();
+/** Telemetry artifacts that were produced but held no telemetry files. */
+const telemetryNotCollectedArtifacts = new Set<string>();
 let telemetryExpectationsUnknown = false;
 let checkTelemetry = false;
 const tracker = createSkipTracker();
@@ -774,7 +779,20 @@ async function main(): Promise<void> {
             }
             // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
             // `agentic_` prefix, so agentic points fall back to the bare suffix.
-            if (gpuMetricsArtifact) {
+            if (gpuMetricsArtifact && !gpuMetricsArtifactHoldsTelemetry(gpuMetricsArtifact)) {
+              // Produced, but with no telemetry files: power collection was off
+              // or never wrote samples. Not an ingest failure.
+              telemetryNotCollectedArtifacts.add(gpuMetricsArtifact.artifactName);
+              console.log(
+                `    gpu_metrics ${gpuMetricsArtifact.artifactName} held no telemetry; not collected`,
+              );
+              for (const row of toInsert) {
+                const point = telemetryObservations.get(
+                  stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
+                );
+                if (point) point.notCollected = true;
+              }
+            } else if (gpuMetricsArtifact) {
               try {
                 const gpuMetricsStart = Date.now();
                 const ingested = await withTransientDbRetry(`gpu_metrics for ${configKey}`, () =>
@@ -1198,6 +1216,7 @@ main()
       points: [...powerPublicationPoints.values()],
       publicationErrors: powerPublicationErrors,
       tracker,
+      telemetryNotCollectedArtifacts: telemetryNotCollectedArtifacts.size,
     };
     // Write the database write receipt first: the telemetry read below queries
     // the database and may throw, and the receipt must exist regardless.

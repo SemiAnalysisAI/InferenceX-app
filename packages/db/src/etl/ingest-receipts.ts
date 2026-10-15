@@ -32,6 +32,8 @@ export interface IngestReceiptInput {
   /** PowerX publication errors collected during the ingest. */
   publicationErrors: readonly string[];
   tracker: Pick<SkipTracker, 'skips' | 'dbWriteErrors' | 'dbWriteWarnings'>;
+  /** Telemetry artifacts that were produced but held no telemetry files. */
+  telemetryNotCollectedArtifacts?: number;
   telemetry?: TelemetryReceipt;
 }
 
@@ -47,9 +49,14 @@ export function buildPowerPublicationManifest(input: IngestReceiptInput): PowerP
     // publication errors (config) or caught by the verifier (missing row).
     ingestErrors: [...input.publicationErrors],
     // Reported but not fatal — see Skips.telemetryError.
-    telemetryWarnings: skips.telemetryError
-      ? [`${skips.telemetryError} telemetry errors (gpu_metrics digest or AgentX window)`]
-      : [],
+    telemetryWarnings: [
+      ...(skips.telemetryError
+        ? [`${skips.telemetryError} telemetry errors (gpu_metrics digest or AgentX window)`]
+        : []),
+      ...(input.telemetryNotCollectedArtifacts
+        ? [`${input.telemetryNotCollectedArtifacts} telemetry artifact(s) held no telemetry`]
+        : []),
+    ],
     ...(input.telemetry ? { telemetry: input.telemetry } : {}),
   };
 }
