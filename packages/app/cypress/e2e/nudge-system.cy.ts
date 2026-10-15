@@ -152,7 +152,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
 
   it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
     cy.visit('/', { onBeforeLoad: showLaunchModal });
-    cy.get('[data-testid="launch-modal"]').should('be.visible').click('bottomLeft');
+    cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
     cy.focused().should('have.attr', 'data-testid', 'launch-modal');
     cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
     cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
