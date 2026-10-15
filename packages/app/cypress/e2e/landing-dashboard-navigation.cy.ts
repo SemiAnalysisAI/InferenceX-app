@@ -44,13 +44,11 @@ interface HistoryWrite {
   pathname: string;
 }
 
+// The TPU card opens the bare Qwen3.5 page so it lands on the AgentX defaults.
 function assertTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-  cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-  cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
-  cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
-  cy.get('[data-testid="remove-filter-spec-mtp"]').should('not.exist');
+  cy.location('search').should('not.contain', 'i_seq=');
+  cy.location('search').should('not.contain', 'i_spec=');
 }
 
 describe('landing model curation', () => {
@@ -78,11 +76,11 @@ describe('landing model curation', () => {
           .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k3');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
-          .and(
-            'have.attr',
-            'href',
-            `${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`,
-          );
+          .and('contain.text', 'Qwen3.5 · AgentX')
+          .and('have.attr', 'href', `${prefix}/inference/qwen-3-5`);
+        cy.get('[data-new-badge="landing-tpu"]')
+          .should('contain.text', prefix ? '新' : 'NEW')
+          .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
         cy.get('[data-testid="landing-tpu-results-link"]')
           .next()
@@ -127,7 +125,7 @@ describe('landing model curation', () => {
       });
     });
 
-    it(`opens the STP-only Qwen TPU view from ${prefix || '/'} and retains it on reload`, () => {
+    it(`opens the Qwen3.5 AgentX TPU view from ${prefix || '/'} and retains it on reload`, () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);

@@ -274,6 +274,7 @@ jobs:
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
+          DATABASE_WRITE_RECEIPT: ${{ github.workspace }}/database-writes.json
         run: bun run admin:db:ingest:ci
 
       - name: Apply run overrides
@@ -299,7 +300,18 @@ jobs:
           fi
 
       - name: Verify PowerX source, database and public API
+        id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
+
+      # Database write failures that are not PowerX problems fail this step
+      # instead of the PowerX check. Runs even when an earlier step failed, so
+      # the write receipt is always reported.
+      - name: Check database writes
+        if: always()
+        id: database_writes
+        env:
+          DATABASE_WRITE_RECEIPT: ${{ github.workspace }}/database-writes.json
+        run: bash .github/scripts/check-database-writes.sh "$DATABASE_WRITE_RECEIPT"
 
       - name: Retain PowerX publication receipt
         if: always()
@@ -354,5 +366,5 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n${{ steps.powerx.outcome == 'failure' && 'PowerX publication check failed\n' || '' }}${{ steps.database_writes.outputs.summary_json && format('```{0}```\n', steps.database_writes.outputs.summary_json) || '' }}<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }

@@ -9,6 +9,12 @@ export interface TelemetryObservation {
   artifactNames: string[];
   produced: boolean | null;
   error?: string;
+  /**
+   * The artifact was produced but holds no telemetry files (no GPU metrics CSV
+   * or multinode power samples), for example a sweep run with power collection
+   * off. Nothing was collected, so nothing is stored or API-checked.
+   */
+  notCollected?: true;
 }
 
 interface TelemetrySeriesCoverage {
@@ -22,7 +28,8 @@ export interface TelemetryPointReceipt extends TelemetryObservation {
   benchmarkResultId: number | null;
   series: (TelemetrySeriesCoverage & { id: number })[];
   storage: {
-    status: 'complete' | 'incomplete' | 'unknown';
+    /** `not_collected`: the artifact held no telemetry files, so no series is expected. */
+    status: 'complete' | 'incomplete' | 'unknown' | 'not_collected';
     /** Null means the original artifact inventory was not retained. */
     expectedSeries: TelemetrySeriesCoverage[] | null;
   };
@@ -60,6 +67,8 @@ export interface TelemetryReceipt {
     storedPoints: number | null;
     linkedPoints: number | null;
     storageUnknownPoints: number;
+    /** Points whose artifact held no telemetry files; neither stored nor a storage miss. */
+    notCollectedPoints: number;
     /** Actual successful HTTP reads, including readable but incomplete artifacts. */
     apiReadablePoints: number;
     /** Readable, fully stored/linked points with no outstanding corrective-ingest failure. */
@@ -185,6 +194,7 @@ export function summarizeTelemetryReceipt(receipt: TelemetryReceipt): TelemetryR
     storageUnknownPoints: points.filter(
       (point) => !point.storage || point.storage.status === 'unknown',
     ).length,
+    notCollectedPoints: points.filter((point) => point.storage?.status === 'not_collected').length,
     apiReadablePoints: points.filter((p) => p.api.status === 'readable').length,
     apiCompletePoints:
       receipt.databaseError || receipt.recoveryError
@@ -300,6 +310,7 @@ export async function readTelemetryReceipt(
       (collision &&
         (collision.produced !== observation.produced ||
           collision.error !== observation.error ||
+          Boolean(collision.notCollected) !== Boolean(observation.notCollected) ||
           collision.artifactNames.length !== observation.artifactNames.length ||
           collision.artifactNames.some((name) => !observation.artifactNames.includes(name))))
     ) {
@@ -369,22 +380,30 @@ export async function readTelemetryReceipt(
     const reasons: string[] = [];
     if (observation.produced === false) reasons.push('artifact_missing');
     if (observation.produced === null) reasons.push('artifact_pair_unknown');
-    if (observation.error) reasons.push('ingest_failed');
+    if (observation.notCollected) reasons.push('telemetry_not_collected');
+    else if (observation.error) reasons.push('ingest_failed');
     if (receipt.databaseError) reasons.push('database_check_failed');
     else {
       if (benchmarkResultId === null) reasons.push('benchmark_not_stored');
-      if (matching.length === 0) reasons.push('series_not_stored');
-      else if (matching.some((s) => Number(s.sample_count) === 0)) reasons.push('samples_missing');
+      // No telemetry files existed for not-collected points, so no series is expected.
+      if (!observation.notCollected) {
+        if (matching.length === 0) reasons.push('series_not_stored');
+        else if (matching.some((s) => Number(s.sample_count) === 0))
+          reasons.push('samples_missing');
+      }
       if (matching.some((s) => !linked.includes(s))) reasons.push('point_link_missing');
     }
     const storage: TelemetryPointReceipt['storage'] = receipt.databaseError
       ? { status: 'unknown', expectedSeries: null }
-      : seriesCoverage(matching, reasons);
+      : observation.notCollected
+        ? { status: 'not_collected', expectedSeries: [] }
+        : seriesCoverage(matching, reasons);
     receipt.points.push({
       identity: observation.identity,
       artifactNames: observation.artifactNames,
       produced: observation.produced,
       ...(observation.error ? { error: observation.error } : {}),
+      ...(observation.notCollected ? { notCollected: true as const } : {}),
       key,
       benchmarkResultId,
       series: matching.map((s) => ({
@@ -435,7 +454,8 @@ export async function verifyTelemetryApi(
   options: { fetch?: typeof fetch; headers?: HeadersInit } = {},
 ): Promise<TelemetryReceipt> {
   for (const point of receipt.points) {
-    if (point.benchmarkResultId === null) continue;
+    // Nothing was collected for not-collected points, so there is nothing to read back.
+    if (point.benchmarkResultId === null || point.notCollected) continue;
     const url = new URL('/api/v1/gpu-metrics-point', origin);
     url.searchParams.set('id', String(point.benchmarkResultId));
     const checkedAt = new Date().toISOString();

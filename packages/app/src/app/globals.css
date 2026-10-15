@@ -786,6 +786,29 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   fill: var(--foreground);
 }
 
+/* Flashing NEW badge: a bright brand glow pulse that stays legible at its dimmest frame. */
+@keyframes new-badge-flash {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 70%, transparent);
+  }
+  50% {
+    opacity: 0.45;
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 0%, transparent);
+  }
+}
+
+.new-badge-flash {
+  animation: new-badge-flash 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .new-badge-flash {
+    animation: none;
+  }
+}
+
 /* Subtle star button glow animation - uses opacity for GPU compositing */
 @keyframes star-glow {
   0%,
