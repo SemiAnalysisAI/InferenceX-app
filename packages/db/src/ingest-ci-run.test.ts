@@ -57,6 +57,7 @@ describe('purged CI ingestion', () => {
           runAttempt,
           points: [],
           ingestErrors: [],
+          publicationWarnings: [],
           telemetryWarnings: [],
         });
         expect(JSON.parse(fs.readFileSync(writeReceiptPath, 'utf8'))).toEqual({

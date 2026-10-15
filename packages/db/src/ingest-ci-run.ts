@@ -25,7 +25,7 @@
 import fs from 'fs';
 import {
   powerPublicationPoint,
-  rawPowerWorkloadOf,
+  unmappedPowerResultIssue,
   publicationIdentity,
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -120,6 +120,8 @@ import {
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
+/** Known-failed PowerX-workload results; copied into the receipt, never fatal. */
+const powerPublicationWarnings: string[] = [];
 const telemetryObservations = new Map<string, TelemetryObservation>();
 /** Telemetry artifacts that were produced but held no telemetry files. */
 const telemetryNotCollectedArtifacts = new Set<string>();
@@ -594,13 +596,12 @@ async function main(): Promise<void> {
       const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
         if (mapped) return [mapped];
         if (!failed) fileExpectationsUnknown = true;
-        // A PowerX-workload row that did not map is a hole in the published
-        // curve, so it fails the receipt; every POWER_WORKLOADS scenario counts.
-        const workload = rawPowerWorkloadOf(raw);
-        if (workload)
-          powerPublicationErrors.push(
-            `Unmapped or failed ${workload.scenario} result: ${relativeFile}`,
-          );
+        // An unmapped PowerX-workload row is a hole in the published curve, so
+        // it fails the receipt. A row the benchmark marked failed is excluded
+        // on purpose and only warns. Every POWER_WORKLOADS scenario counts.
+        const issue = unmappedPowerResultIssue(raw, failed, relativeFile);
+        if (issue && 'error' in issue) powerPublicationErrors.push(issue.error);
+        else if (issue) powerPublicationWarnings.push(issue.warning);
         return [];
       });
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
@@ -1215,6 +1216,7 @@ main()
       runAttempt: runAttemptNum,
       points: [...powerPublicationPoints.values()],
       publicationErrors: powerPublicationErrors,
+      publicationWarnings: powerPublicationWarnings,
       tracker,
       telemetryNotCollectedArtifacts: telemetryNotCollectedArtifacts.size,
     };

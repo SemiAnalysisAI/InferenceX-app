@@ -96,10 +96,60 @@ export interface PowerPublicationManifest {
   points: PowerPublicationPoint[];
   /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
+  /**
+   * PowerX-workload results the benchmark itself marked failed. Excluded from
+   * the curve on purpose, so copied into the verification receipt, never fatal.
+   */
+  publicationWarnings?: string[];
   /** Copied into the verification receipt, never fatal; see `Skips.telemetryError`. */
   telemetryWarnings?: string[];
   /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
+}
+
+/** Receipt written next to the manifest by `verify-power-publication.ts`. */
+export function powerVerificationReceipt(
+  manifest: PowerPublicationManifest,
+  errors: readonly string[],
+  checkedAt = new Date().toISOString(),
+) {
+  const counts = { strict: 0, invalid: 0, other: 0 };
+  for (const point of manifest.points) {
+    if (point.metrics.power_valid === 1 && point.metrics.power_metric_schema_version === 2)
+      counts.strict++;
+    else if (point.metrics.power_valid === 0) counts.invalid++;
+    else counts.other++;
+  }
+  return {
+    runId: manifest.runId,
+    runAttempt: manifest.runAttempt,
+    checkedAt,
+    points: manifest.points.length,
+    counts,
+    status:
+      errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
+    errors: [...errors],
+    publicationWarnings: manifest.publicationWarnings ?? [],
+    telemetryWarnings: manifest.telemetryWarnings ?? [],
+    ...(manifest.telemetry ? { telemetry: manifest.telemetry } : {}),
+  };
+}
+
+/**
+ * How a PowerX-workload result that did not map is reported. A result the
+ * benchmark marked failed is a known exclusion (warning); any other unmapped
+ * result is a hole in the published curve (fatal error).
+ */
+export function unmappedPowerResultIssue(
+  raw: Record<string, unknown>,
+  failed: boolean,
+  relativeFile: string,
+): { error: string } | { warning: string } | null {
+  const workload = rawPowerWorkloadOf(raw);
+  if (!workload) return null;
+  return failed
+    ? { warning: `Known-failed ${workload.scenario} result excluded: ${relativeFile}` }
+    : { error: `Unmapped ${workload.scenario} result: ${relativeFile}` };
 }
 
 export interface PublishedPowerRow extends Record<string, unknown> {
