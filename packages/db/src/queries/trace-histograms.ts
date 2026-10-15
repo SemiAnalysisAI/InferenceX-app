@@ -17,10 +17,11 @@
 
 import { gunzipSync } from 'node:zlib';
 
-import { REQUEST_TIMELINE_VERSION, type RequestRecord } from '../etl/compute-request-timeline';
+import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline';
+import { scanRequestTimelineGz } from '../etl/request-timeline-codec';
 
 import type { DbClient } from '../connection.js';
-import { readStoredRequestTimeline } from './request-timeline';
+import { logRequestTimelineReadFailure, readRequestTimelineGz } from './request-timeline';
 
 export interface TraceHistogramPoint {
   /** benchmark_results.id this entry belongs to. */
@@ -38,6 +39,9 @@ const QUERY_CHUNK_SIZE = 12;
 // reads comfortably below its 64 MiB response cap; current ingests store a
 // request timeline and never need this path.
 const MAX_FALLBACK_BLOB_BYTES = 24 * 1024 * 1024;
+
+/** The only request fields a histogram needs from a scanned gzip timeline. */
+const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
 
 interface TimelineRow {
   benchmark_result_id: number;
@@ -60,17 +64,6 @@ function finiteNumbers(values: (number | null)[] | null): number[] {
     if (value !== null && Number.isFinite(n)) out.push(n);
   }
   return out;
-}
-
-/** Numeric ISL/OSL values in request order, as the legacy JSONB unnest returns them. */
-function sequenceLengths(requests: readonly RequestRecord[]): { isl: number[]; osl: number[] } {
-  const isl: number[] = [];
-  const osl: number[] = [];
-  for (const request of requests) {
-    if (typeof request.isl === 'number' && Number.isFinite(request.isl)) isl.push(request.isl);
-    if (typeof request.osl === 'number' && Number.isFinite(request.osl)) osl.push(request.osl);
-  }
-  return { isl, osl };
 }
 
 export async function getTraceHistograms(
@@ -133,17 +126,24 @@ export async function getTraceHistograms(
     }
   }
 
-  // Gzip timelines decode in Node, one point at a time to bound memory. A
-  // timeline that cannot be read is omitted like a malformed blob below.
+  // Gzip timelines are scanned in Node one point at a time, keeping only each
+  // request's ISL and OSL. A timeline that cannot be read is logged and
+  // omitted, like a malformed blob below.
   for (const row of gzRows) {
-    const timeline = await readStoredRequestTimeline(
-      sql,
-      row.trace_replay_id,
-      Number(row.gz_bytes),
-    );
-    if (!timeline) continue;
+    const isl: number[] = [];
+    const osl: number[] = [];
+    try {
+      const gz = await readRequestTimelineGz(sql, row.trace_replay_id, Number(row.gz_bytes));
+      await scanRequestTimelineGz(gz, SEQUENCE_LENGTH_FIELDS, (request) => {
+        if (typeof request.isl === 'number' && Number.isFinite(request.isl)) isl.push(request.isl);
+        if (typeof request.osl === 'number' && Number.isFinite(request.osl)) osl.push(request.osl);
+      });
+    } catch (error) {
+      logRequestTimelineReadFailure(row.trace_replay_id, error);
+      continue;
+    }
     const id = Number(row.benchmark_result_id);
-    result[id] = { id, ...sequenceLengths(timeline.requests) };
+    result[id] = { id, isl, osl };
   }
 
   // Compatibility fallback for pre-timeline rows. Fetch one small blob at a

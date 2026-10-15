@@ -1,13 +1,22 @@
+import { gzipSync } from 'node:zlib';
+
 import type { PGlite } from '@electric-sql/pglite';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
-import { gzipRequestTimeline } from '../etl/request-timeline-codec';
+import { gunzipRequestTimeline, gzipRequestTimeline } from '../etl/request-timeline-codec';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 
+import * as agenticShared from './agentic-shared';
 import { encodeRequestChartData, getRequestChartData } from './request-chart-data';
 import { getRequestTimeline } from './request-timeline';
 import { getTraceHistograms } from './trace-histograms';
+
+// Expose the self-heal promise so the test can await the real write-back.
+vi.mock('./agentic-shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof agenticShared>();
+  return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
+});
 
 /** A small timeline whose request fields differ by `seed`. */
 function timelineFor(seed: number): RequestTimeline {
@@ -82,12 +91,36 @@ beforeAll(async () => {
       ${REQUEST_TIMELINE_VERSION}, 4
     )
   `;
+  // A stale legacy timeline next to the raw profile it was computed from.
+  const profile = gzipSync(
+    JSON.stringify({
+      metadata: {
+        conversation_id: 'trace-018',
+        turn_index: 0,
+        worker_id: '7',
+        benchmark_phase: 'profiling',
+        credit_issued_ns: 1_000,
+        request_start_ns: 1_100,
+        request_end_ns: 2_000,
+      },
+      metrics: { input_sequence_length: { value: 128 }, output_sequence_length: { value: 16 } },
+    }),
+  );
+  await sql`
+    insert into agentic_trace_replay (id, request_timeline, profile_export_jsonl_gz)
+    values (
+      14,
+      ${JSON.stringify({ ...legacyOnly, version: REQUEST_TIMELINE_VERSION - 1 })}::jsonb,
+      ${profile}
+    )
+  `;
   await db.exec(`
     INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc,
       metrics, trace_replay_id)
     VALUES (101, 1, 1, 'agentic_traces', '2026-10-01', 16, '{}', 11),
            (102, 1, 1, 'agentic_traces', '2026-10-01', 32, '{}', 12),
-           (103, 1, 1, 'agentic_traces', '2026-10-01', 64, '{}', 13);
+           (103, 1, 1, 'agentic_traces', '2026-10-01', 64, '{}', 13),
+           (104, 1, 1, 'agentic_traces', '2026-10-01', 128, '{}', 14);
   `);
 }, 30_000);
 
@@ -115,11 +148,47 @@ describe('request timeline storage on PostgreSQL', () => {
     );
   });
 
+  it('scans PostgreSQL JSONB text above the projection limit into the same tuples', async () => {
+    // A one-request limit sends point 101's four-request legacy timeline
+    // through the bounded text scan of `request_timeline::text`.
+    await expect(getRequestChartData(sql, 101, 1)).resolves.toEqual(
+      encodeRequestChartData(legacyOnly, legacyOnly.requests),
+    );
+  });
+
   it('returns the same ISL/OSL arrays from the SQL unnest and the gzip decode', async () => {
     await expect(getTraceHistograms(sql, [101, 102, 103])).resolves.toEqual({
       101: { id: 101, ...sequenceLengths(legacyOnly) },
       102: { id: 102, ...sequenceLengths(gzipOnly) },
       103: { id: 103, ...sequenceLengths(gzipCopy) },
     });
+  });
+
+  it('self-heals a stale timeline as gzip and leaves the legacy JSONB untouched', async () => {
+    const result = await getRequestTimeline(sql, 104);
+    expect(result?.requests).toHaveLength(1);
+
+    const writeBack = vi.mocked(agenticShared.writeBackRequestTimeline);
+    expect(writeBack).toHaveBeenCalledTimes(1);
+    await writeBack.mock.results[0]!.value;
+
+    const [row] = (await sql`
+      select request_timeline_gz, request_timeline_version, request_count,
+        (request_timeline->>'version')::int as legacy_version
+      from agentic_trace_replay
+      where id = 14
+    `) as unknown as {
+      request_timeline_gz: Uint8Array;
+      request_timeline_version: number;
+      request_count: number;
+      legacy_version: number;
+    }[];
+    expect(gunzipRequestTimeline(row!.request_timeline_gz)).toEqual(result);
+    expect(row!.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
+    expect(row!.request_count).toBe(1);
+    expect(row!.legacy_version).toBe(REQUEST_TIMELINE_VERSION - 1);
+    // The next read takes the gzip fast path instead of recomputing.
+    await expect(getRequestTimeline(sql, 104)).resolves.toEqual(result);
+    expect(writeBack).toHaveBeenCalledTimes(1);
   });
 });

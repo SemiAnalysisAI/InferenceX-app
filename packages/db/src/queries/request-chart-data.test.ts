@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -7,9 +7,13 @@ import type { DbClient } from '../connection.js';
 import {
   encodeRequestChartData,
   getRequestChartData,
-  LEGACY_PROJECTION_MAX_STORED_BYTES,
+  LEGACY_PROJECTION_MAX_REQUESTS,
   REQUEST_CHART_DATA_VERSION,
 } from './request-chart-data';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
   const responses = [...queue];
@@ -65,12 +69,20 @@ const timeline: RequestTimeline = {
   ],
 };
 
-const legacyMeta = (legacyStoredBytes: number) => ({
+const legacyMeta = (legacyRequestCount: number) => ({
   trace_replay_id: 3811,
   has_blob: true,
   gz_bytes: null,
   timeline_version: REQUEST_TIMELINE_VERSION,
-  legacy_stored_bytes: legacyStoredBytes,
+  legacy_request_count: legacyRequestCount,
+});
+
+const gzipMeta = (gzBytes: number) => ({
+  trace_replay_id: 3811,
+  has_blob: true,
+  gz_bytes: gzBytes,
+  timeline_version: REQUEST_TIMELINE_VERSION,
+  legacy_request_count: null,
 });
 
 describe('request chart data', () => {
@@ -115,9 +127,9 @@ describe('request chart data', () => {
     ]);
   });
 
-  it('projects chart-only fields of a small legacy JSONB timeline with one expansion', async () => {
+  it('projects a legacy JSONB timeline of up to 250,000 requests in SQL', async () => {
     const { sql, calls } = mockSql([
-      [legacyMeta(LEGACY_PROJECTION_MAX_STORED_BYTES)],
+      [legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS)],
       [
         {
           start_ns: 10,
@@ -132,18 +144,16 @@ describe('request chart data', () => {
 
     expect(result?.requests).toEqual([[0, 0, 1, 2, 3, 4, 5, 6, 0]]);
     expect(calls).toHaveLength(2);
-    expect(calls[0]).not.toContain('jsonb_array_elements');
+    expect(calls[0]).toContain("jsonb_array_length(atr.request_timeline->'requests')");
     expect(calls[1]).toContain('jsonb_array_elements');
-    expect(calls[1]).toContain("request->>'ttftMs'");
-    expect(calls.some((call) => call.includes('profile_export_jsonl_gz as blob'))).toBe(false);
   });
 
-  it('encodes a legacy JSONB timeline above the stored-size limit in Node instead of SQL', async () => {
-    // Trace row 3811 (point 444941) stores 62 MB of JSONB; its SQL projection
+  it('scans a legacy JSONB timeline above 250,000 requests in Node instead of SQL', async () => {
+    // Trace row 3811 (point 444941) holds 459,630 requests; its SQL projection
     // was 71.5 MB, over Neon's 64 MiB response cap.
     const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
-      [legacyMeta(62_000_000)],
+      [legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS + 1)],
       [{ chunk: encoded, chunk_chars: encoded.length }],
     ]);
 
@@ -155,33 +165,9 @@ describe('request chart data', () => {
     expect(calls[1]).toContain('substr(text');
   });
 
-  it('routes a legacy timeline one byte over the limit to the Node path', async () => {
-    const encoded = JSON.stringify(timeline);
-    const { sql, calls } = mockSql([
-      [legacyMeta(LEGACY_PROJECTION_MAX_STORED_BYTES + 1)],
-      [{ chunk: encoded, chunk_chars: encoded.length }],
-    ]);
-
-    await expect(getRequestChartData(sql, 444941)).resolves.toEqual(
-      encodeRequestChartData(timeline, timeline.requests),
-    );
-    expect(calls.some((call) => call.includes('jsonb_array_elements'))).toBe(false);
-  });
-
   it('decodes a gzip timeline in Node and encodes the same tuples as the legacy path', async () => {
     const stored = await gzipRequestTimeline(timeline);
-    const { sql, calls } = mockSql([
-      [
-        {
-          trace_replay_id: 3811,
-          has_blob: true,
-          gz_bytes: stored.length,
-          timeline_version: REQUEST_TIMELINE_VERSION,
-          legacy_stored_bytes: null,
-        },
-      ],
-      [{ slice: stored }],
-    ]);
+    const { sql, calls } = mockSql([[gzipMeta(stored.length)], [{ slice: stored }]]);
 
     const result = await getRequestChartData(sql, 444941);
 
@@ -192,11 +178,23 @@ describe('request chart data', () => {
     ]);
     expect(calls).toHaveLength(2);
     expect(calls[1]).toContain('substring(request_timeline_gz');
-    expect(calls.some((call) => call.includes('jsonb_array_elements'))).toBe(false);
+  });
+
+  it('logs and returns null when a same-length corrupted gzip slice fails decode', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stored = await gzipRequestTimeline(timeline);
+    const corrupted = Buffer.from(stored);
+    const middle = Math.floor(corrupted.length / 2);
+    corrupted.writeUInt8(corrupted.readUInt8(middle) ^ 255, middle);
+    const { sql } = mockSql([[gzipMeta(corrupted.length)], [{ slice: corrupted }]]);
+
+    await expect(getRequestChartData(sql, 444941)).resolves.toBeNull();
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0]![0]).toContain('trace_replay_id=3811');
   });
 
   it('returns null when a legacy timeline is cleared between the metadata read and projection', async () => {
-    const { sql } = mockSql([[legacyMeta(1_024)], []]);
+    const { sql } = mockSql([[legacyMeta(2)], []]);
 
     await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
   });

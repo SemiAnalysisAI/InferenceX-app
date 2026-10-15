@@ -18,7 +18,7 @@ import {
   type RequestTimeline,
 } from '../etl/compute-request-timeline';
 import type { Sql } from '../etl/db-utils';
-import { gunzipRequestTimeline } from '../etl/request-timeline-codec';
+import { gunzipRequestTimeline, parseRequestTimelineJson } from '../etl/request-timeline-codec';
 
 import type { DbClient } from '../connection.js';
 import { writeBackRequestTimeline } from './agentic-shared';
@@ -49,24 +49,36 @@ interface RawTimelineChunkRow {
 export const REQUEST_TIMELINE_GZ_SLICE_BYTES = 16 * 1024 * 1024;
 
 // JSONB can be far smaller on disk than its serialized response due to TOAST
-// compression, so every current timeline uses bounded chunks. Timeline fields
-// are compact identifiers/numbers; 16 MiB leaves ample room for JSON-string
-// escaping under Neon's 64 MiB per-query response cap.
+// compression, so every current legacy timeline uses bounded chunks. Timeline
+// fields are compact identifiers/numbers; 16 MiB leaves ample room for
+// JSON-string escaping under Neon's 64 MiB per-query response cap.
 const TIMELINE_TEXT_CHUNK_CHARS = 16 * 1024 * 1024;
 const MAX_TIMELINE_TEXT_CHUNKS = 64;
 
 /**
+ * Report a stored timeline that could not be read. Callers then serve no data
+ * for the point instead of failing the whole response.
+ */
+export function logRequestTimelineReadFailure(traceReplayId: number, error: unknown): void {
+  console.error(
+    `[request timeline] could not read the stored timeline for trace_replay_id=${traceReplayId}: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
+}
+
+/**
  * Read a stored `request_timeline_gz` value of `byteLength` bytes through
  * bounded `substring()` slices and concatenate them. Never selects the whole
- * value. Returns null when the row disappears or the value changes length
- * between slices; a same-length rewrite fails the gzip checksum on decode.
+ * value. Throws when the row disappears or the value changes length between
+ * slices; a same-length rewrite fails the gzip checksum when decoded.
  */
 export async function readRequestTimelineGz(
   sql: DbClient | Sql,
   traceReplayId: number,
   byteLength: number,
   sliceBytes = REQUEST_TIMELINE_GZ_SLICE_BYTES,
-): Promise<Buffer | null> {
+): Promise<Buffer> {
   const slices: Buffer[] = [];
   let received = 0;
   while (received < byteLength) {
@@ -76,32 +88,26 @@ export async function readRequestTimelineGz(
       where id = ${traceReplayId}
     `;
     const slice: unknown = rows[0]?.slice;
-    if (!(slice instanceof Uint8Array) || slice.length === 0) return null;
+    if (!(slice instanceof Uint8Array) || slice.length === 0) {
+      throw new Error(`request_timeline_gz ended after ${received} of ${byteLength} bytes`);
+    }
     slices.push(Buffer.from(slice.buffer, slice.byteOffset, slice.byteLength));
     received += slice.length;
   }
-  return received === byteLength ? Buffer.concat(slices, byteLength) : null;
-}
-
-async function readGzRequestTimeline(
-  sql: DbClient,
-  traceReplayId: number,
-  byteLength: number,
-): Promise<RequestTimeline | null> {
-  const gz = await readRequestTimelineGz(sql, traceReplayId, byteLength);
-  if (!gz) return null;
-  try {
-    return gunzipRequestTimeline(gz);
-  } catch {
-    return null;
+  if (received !== byteLength) {
+    throw new Error(`request_timeline_gz grew past ${byteLength} bytes during the read`);
   }
+  return Buffer.concat(slices, byteLength);
 }
 
-async function readLegacyRequestTimeline(
+/**
+ * Yield a legacy `request_timeline` JSONB as text in bounded chunks. Throws
+ * when the timeline is missing or longer than the chunk limit.
+ */
+export async function* legacyRequestTimelineText(
   sql: DbClient,
   traceReplayId: number,
-): Promise<RequestTimeline | null> {
-  const pieces: string[] = [];
+): AsyncGenerator<string> {
   for (let part = 0; part < MAX_TIMELINE_TEXT_CHUNKS; part += 1) {
     const offset = part * TIMELINE_TEXT_CHUNK_CHARS;
     const chunkRows = (await sql`
@@ -120,31 +126,28 @@ async function readLegacyRequestTimeline(
       from piece
     `) as unknown as RawTimelineChunkRow[];
     const row = chunkRows[0];
-    if (!row || row.chunk === null) return null;
-    pieces.push(row.chunk);
-    if (row.chunk_chars < TIMELINE_TEXT_CHUNK_CHARS) {
-      try {
-        return JSON.parse(pieces.join('')) as RequestTimeline;
-      } catch {
-        return null;
-      }
-    }
+    if (!row || row.chunk === null) throw new Error('legacy request_timeline is missing');
+    yield row.chunk;
+    if (row.chunk_chars < TIMELINE_TEXT_CHUNK_CHARS) return;
   }
-  return null;
+  throw new Error(`legacy request_timeline is longer than ${MAX_TIMELINE_TEXT_CHUNKS} text chunks`);
 }
 
 /**
  * Read a current stored timeline from the column that holds it: the gzip
  * copy when `gzBytes` (its `octet_length`) is non-null, else the legacy JSONB.
  */
-export function readStoredRequestTimeline(
+async function readStoredRequestTimeline(
   sql: DbClient,
   traceReplayId: number,
   gzBytes: number | null,
-): Promise<RequestTimeline | null> {
-  return gzBytes === null
-    ? readLegacyRequestTimeline(sql, traceReplayId)
-    : readGzRequestTimeline(sql, traceReplayId, gzBytes);
+): Promise<RequestTimeline> {
+  if (gzBytes !== null) {
+    return gunzipRequestTimeline(await readRequestTimelineGz(sql, traceReplayId, gzBytes));
+  }
+  const pieces: string[] = [];
+  for await (const piece of legacyRequestTimelineText(sql, traceReplayId)) pieces.push(piece);
+  return parseRequestTimelineJson(pieces.join(''));
 }
 
 export async function getRequestTimeline(
@@ -175,11 +178,16 @@ export async function getRequestTimeline(
   // path by compressed storage size: a small TOAST value can still serialize
   // past Neon's per-query response limit.
   if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
-    return readStoredRequestTimeline(
-      sql,
-      row.trace_replay_id,
-      row.gz_bytes === null ? null : Number(row.gz_bytes),
-    );
+    try {
+      return await readStoredRequestTimeline(
+        sql,
+        row.trace_replay_id,
+        row.gz_bytes === null ? null : Number(row.gz_bytes),
+      );
+    } catch (error) {
+      logRequestTimelineReadFailure(row.trace_replay_id, error);
+      return null;
+    }
   }
 
   if (!row.has_blob) return null;
@@ -199,10 +207,10 @@ export async function getRequestTimeline(
   // trace-histograms and request-chart-data routes, which read the same
   // columns) takes the fast path. Only write a complete recompute:
   // `computeRequestTimeline` returns null for a missing/malformed blob, which
-  // we must not persist over good data. Fire-and-forget, best-effort (no-ops
-  // on a read-only replica).
+  // we must not persist over good data. Best-effort and not awaited, so the
+  // response is not delayed (no-ops on a read-only replica).
   if (timeline !== null) {
-    writeBackRequestTimeline(sql, row.trace_replay_id, timeline);
+    void writeBackRequestTimeline(sql, row.trace_replay_id, timeline);
   }
 
   return timeline;

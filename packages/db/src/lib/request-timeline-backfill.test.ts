@@ -202,33 +202,75 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
     expect(row.request_timeline).toEqual(legacy);
   });
 
-  it('keeps the legacy JSONB when the gzip request count disagrees', async () => {
+  it('keeps the legacy JSONB when the stored request count disagrees with it', async () => {
     const legacy = timelineWith(5);
     await convertedRow(33, legacy);
     await sql`update agentic_trace_replay set request_count = 4 where id = 33`;
 
-    await expect(dropVerifiedLegacyRequestTimeline(sql, 33)).rejects.toThrow('failed verification');
+    await expect(dropVerifiedLegacyRequestTimeline(sql, 33)).rejects.toThrow(
+      'gzip holds 4 requests but legacy JSONB holds 5',
+    );
     const row = await storedRow(33);
     expect(row.request_timeline).toEqual(legacy);
   });
 
-  it('keeps the legacy JSONB when the gzip copy holds a different request count', async () => {
+  it('keeps the legacy JSONB when same-version, same-count content differs', async () => {
     const legacy = timelineWith(5);
     await sql`
       insert into agentic_trace_replay (id, request_timeline)
       values (34, ${JSON.stringify(legacy)}::jsonb)
     `;
-    const shorter = timelineWith(4);
+    // One request's input length differs; version and request count match.
+    const edited = timelineWith(5);
+    edited.requests[3]!.isl = 1;
     await writeRequestTimelineGz(sql, 34, {
-      gz: await gzipRequestTimeline(shorter),
+      gz: await gzipRequestTimeline(edited),
       version: REQUEST_TIMELINE_VERSION,
-      requestCount: 4,
+      requestCount: 5,
     });
 
     await expect(dropVerifiedLegacyRequestTimeline(sql, 34)).rejects.toThrow(
-      'gzip holds 4 requests but legacy JSONB holds 5',
+      'legacy JSONB differs from the decoded gzip timeline',
     );
     const row = await storedRow(34);
+    expect(row.request_timeline).toEqual(legacy);
+  });
+
+  it('keeps a legacy JSONB of another version, whose content cannot match', async () => {
+    const stale = { ...timelineWith(5), version: REQUEST_TIMELINE_VERSION - 1 };
+    await sql`
+      insert into agentic_trace_replay (id, request_timeline)
+      values (35, ${JSON.stringify(stale)}::jsonb)
+    `;
+    await writeRequestTimelineGz(sql, 35, {
+      gz: await gzipRequestTimeline(timelineWith(5)),
+      version: REQUEST_TIMELINE_VERSION,
+      requestCount: 5,
+    });
+
+    await expect(dropVerifiedLegacyRequestTimeline(sql, 35)).rejects.toThrow(
+      `legacy JSONB is version ${REQUEST_TIMELINE_VERSION - 1}`,
+    );
+    const row = await storedRow(35);
+    expect(row.request_timeline).toEqual(stale);
+  });
+
+  it('keeps the legacy JSONB when the stored gzip is corrupt', async () => {
+    const legacy = timelineWith(5);
+    await convertedRow(36, legacy);
+    // Flip one byte in the middle of the deflate stream; the length is unchanged.
+    await sql`
+      update agentic_trace_replay
+      set request_timeline_gz = set_byte(
+        request_timeline_gz,
+        octet_length(request_timeline_gz) / 2,
+        get_byte(request_timeline_gz, octet_length(request_timeline_gz) / 2) # 255
+      )
+      where id = 36
+    `;
+
+    await expect(dropVerifiedLegacyRequestTimeline(sql, 36)).rejects.toThrow();
+    const row = await storedRow(36);
     expect(row.request_timeline).toEqual(legacy);
   });
 });

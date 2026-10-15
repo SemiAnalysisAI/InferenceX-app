@@ -1540,10 +1540,10 @@ export const apiContractSourceDigests = [
   {
     source: '../db/src/queries/request-timeline.ts',
     // Reviewed for gzip request-timeline storage (migration 017): the reader
-    // prefers request_timeline_gz and falls back to legacy JSONB. It returns
-    // the same RequestTimeline document, nullability, 404 and caching, so the
-    // docs stand.
-    sourceSha256: '767ec28afab86fe23b519129215183c07d99b5ab58796abd82c8f8a1a1a1680a',
+    // prefers request_timeline_gz and falls back to legacy JSONB, and logs a
+    // stored timeline it cannot read. It returns the same RequestTimeline
+    // document, nullability, 404 and caching, so the docs stand.
+    sourceSha256: '9d5e0fb286b02a19b90fe566c70a01ed21825293d88970dc4ff513fbdabcd03d',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',
@@ -1576,9 +1576,10 @@ export const apiContractSourceDigests = [
   {
     source: '../db/src/queries/trace-histograms.ts',
     // Reviewed for gzip request-timeline storage (migration 017): gzip rows
-    // derive the same ISL/OSL arrays in Node. The ID-keyed response shape and
-    // omission of unreadable points are unchanged, so the docs stand.
-    sourceSha256: 'e6abf002d47e564d1be4f2f0942e90b013b15f2f21850780b35b599f260cd2c1',
+    // stream the same ISL/OSL arrays in Node. Unreadable points are now logged
+    // and, as before, omitted. The ID-keyed response shape is unchanged, so
+    // the docs stand.
+    sourceSha256: '87a1d6cf9e901dae7f74716d3ddc98c5884e35fbc7967516f7a6a1b6e48b99c2',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',

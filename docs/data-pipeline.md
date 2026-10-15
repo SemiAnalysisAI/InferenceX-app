@@ -420,22 +420,31 @@ reads more TOAST chunks than one `substring()` slice needs.
 Ingest workers and the backfill stream the JSON text into gzip, so neither
 holds the serialized document. Readers pick a path from the scalar columns
 without detoasting a payload. A current gzip timeline is read in 16 MiB
-`substring()` slices (about 32 MiB each once Neon hex-encodes them), then
-concatenated, decompressed, and parsed in Node. `request-chart-data` and
-`trace-histograms` derive their compact outputs from the decoded document. When
-no current timeline is stored, the slow path recomputes it from the profile and
-writes back only the gzip form.
+`substring()` slices (about 32 MiB each once Neon hex-encodes them) and
+concatenated. `request-timeline` returns the whole document, so it decompresses
+and parses all of it. `request-chart-data` and `trace-histograms` need a few
+fields per request and follow the bounded decode convention of
+`etl/gzip-json-stream.ts`: a timeline of up to 16 MiB of JSON is parsed in one
+piece, and a larger one is gunzipped and tokenized with stream-json, keeping
+only the chart fields or the ISL/OSL values of one request at a time. The
+ceiling is lower than the 128 MiB that ingest uses for server metrics because
+these reads run in request-serving functions. A stored timeline that cannot be
+read (the value changed during the read, corrupt gzip, or malformed JSON) is
+logged with its `trace_replay_id` and served as missing data. When no current
+timeline is stored, the slow path recomputes it from the profile and writes
+back only the gzip form.
 
 Rows ingested before migration 017 keep their JSONB timeline until it is
 converted, and readers fall back to it whenever `request_timeline_gz` is null.
-That legacy reader reconstructs every current timeline from bounded text chunks
-and deliberately does not choose by compressed JSONB storage size, so a highly
+That legacy reader reads every current timeline as bounded text chunks and
+deliberately does not choose by compressed JSONB storage size, so a highly
 compressible timeline cannot cross the response limit or force the database to
 materialize the serialized size just to select a read path. `request-chart-data`
-still projects small legacy timelines in SQL. A legacy value above 40 MiB stored
-(`pg_column_size`) goes through the chunked reader and is encoded in Node
-instead, because its projection can exceed the response limit. Trace row 3811,
-for example, stores 62 MB and projected 71.5 MB.
+still projects a legacy timeline of up to 250,000 requests
+(`jsonb_array_length`) in SQL. The projection costs about 155 bytes per request:
+trace row 3811's 459,630 requests projected to 71.5 MB, past the response
+limit. A larger legacy timeline streams its text chunks through the same
+bounded scan instead.
 
 `db:backfill-request-timeline` fills `request_timeline_gz` for every row whose
 gzip copy is missing or stale. A row that still holds a current-version JSONB
@@ -445,13 +454,30 @@ document header and `jsonb_array_length`, fetches requests in index ranges of
 count matches the array length before and after streaming. Other rows are
 recomputed from the profile. A failed row does not stop the run. It appears in
 the closing failure list and makes the script exit nonzero. The opt-in
-`--drop-legacy-jsonb` flag sets `request_timeline` to null after re-reading and
-decoding the stored gzip and checking its version and request count. A default
-run never clears legacy data.
+`--drop-legacy-jsonb` flag sets `request_timeline` to null only when it equals
+the gzip copy. The script uploads the decompressed gzip JSON in 4 MiB parts
+and lets PostgreSQL compare `request_timeline` with
+`convert_from(<uploaded bytes>, 'UTF8')::jsonb`, so neither document crosses the
+network whole. A legacy timeline of another version, another request count, or
+other content is kept and reported as a failed row. A default run never clears
+legacy data.
+
+#### Migration order
+
+Migration 017 ships in its own change and must reach a database before the
+readers that select its columns. The ingest workflows and Recompute Agentic
+Metrics apply pending migrations before they run; Vercel deploys do not. Apply
+`017_request_timeline_gz.sql` to every database the app reads (from the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations), then
+deploy the readers. Without the columns, the timeline, chart, and histogram
+reads fail until the migration runs. The migration only adds columns and is
+idempotent, so the code that predates it keeps working and a repeated run
+changes nothing.
 
 The Recompute Agentic Metrics workflow applies pending migrations in one job
-before its shards start, so the run triggered by merging this change adds the
-columns before converting the stale rows. Its integrity check accepts the
+before its shards start, so the run triggered by merging the readers converts
+stale rows only after the columns exist. Its integrity check accepts the
 JSONB-to-gzip conversion when a timeline keeps its version and request count,
 and still requires identical stored bytes when the container is unchanged. A
 later migration drops `request_timeline` once every row has been converted and

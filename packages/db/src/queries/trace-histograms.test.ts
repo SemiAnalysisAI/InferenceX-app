@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -96,7 +96,8 @@ describe('getTraceHistograms', () => {
     expect(calls.some((call) => call.includes('profile_export_jsonl_gz as blob'))).toBe(false);
   });
 
-  it('omits a point whose gzip timeline cannot be read', async () => {
+  it('logs and omits a point whose gzip timeline cannot be read', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { sql } = mockSql([
       [
         {
@@ -113,6 +114,9 @@ describe('getTraceHistograms', () => {
     ]);
 
     await expect(getTraceHistograms(sql, [444941])).resolves.toEqual({});
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0]![0]).toContain('trace_replay_id=3811');
+    error.mockRestore();
   });
 
   it('falls back to the blob when the stored timeline is a stale version', async () => {

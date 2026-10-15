@@ -3,11 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
 
+import type { PGlite } from '@electric-sql/pglite';
 import type postgres from 'postgres';
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { REQUEST_TIMELINE_VERSION, computeRequestTimeline } from './compute-request-timeline';
-import { gunzipRequestTimeline } from './request-timeline-codec';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import {
+  REQUEST_TIMELINE_VERSION,
+  computeRequestTimeline,
+  type RequestTimeline,
+} from './compute-request-timeline';
+import { gunzipRequestTimeline, gzipRequestTimeline } from './request-timeline-codec';
 import {
   TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
   gzipTraceReplayInput,
@@ -90,7 +96,9 @@ function mockSqlWithTransaction(
 
 describe('uploadTraceReplayPayloadChunks', () => {
   it('bounds every Bind payload for the measured 90 MiB staging row', async () => {
-    // Exact payload sizes from InferenceX run 29181694248, item 8/9.
+    // Exact payload sizes from InferenceX run 29181694248, item 8/9. That run
+    // stored its request timeline as 22,146,655 bytes of JSON. The gzip copy
+    // uploaded now is several times smaller, so that size is an upper bound.
     const measuredPayloads = [
       ['profile_export_jsonl_gz', Buffer.alloc(22_992_290)],
       ['server_metrics_json_gz', Buffer.alloc(49_891_135)],
@@ -242,7 +250,6 @@ describe('persistPreparedTraceReplay', () => {
       call.text.includes('trace_replay_upload_parts (field, part, data)'),
     );
     expect(uploads).toHaveLength(6);
-    expect(uploads.map((call) => call.values[0])).toContain('request_timeline_gz');
     expect(linkCall?.values.some((value) => Array.isArray(value) && value.includes(41))).toBe(true);
     const metricUpdate = calls.find((call) =>
       call.text.includes("not (metrics ? 'median_full_response_itl')"),
@@ -252,36 +259,129 @@ describe('persistPreparedTraceReplay', () => {
       JSON.stringify(preparedFixture().fullResponseMetrics),
     );
   });
+});
 
-  it('stores the timeline only as gzip plus its version and request count', async () => {
-    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+describe('persistPreparedTraceReplay (PostgreSQL)', () => {
+  interface StoredTrace {
+    trace_replay_id: number | null;
+    request_timeline: unknown;
+    request_timeline_gz: Uint8Array | null;
+    request_timeline_version: number | null;
+    request_count: number | null;
+    profile_export_jsonl_gz: Uint8Array | null;
+    profile_size: number | null;
+    server_metrics_csv: Uint8Array | null;
+    csv_size: number | null;
+    server_metrics_json_gz: Uint8Array | null;
+    metrics_size: number | null;
+    aggregate_stats: unknown;
+    chart_series: unknown;
+  }
 
-    await persistPreparedTraceReplay(sql, [41], preparedFixture());
-    const insert = calls.find((call) => call.text.includes('insert into agentic_trace_replay'));
+  const persistedTimeline: RequestTimeline = {
+    version: REQUEST_TIMELINE_VERSION,
+    startNs: 1_700_000_000_000_000_000,
+    endNs: 1_700_000_001_400_000_000,
+    durationS: 1.4,
+    requests: [0, 1, 2].map((index) => ({
+      cid: 'trace-018',
+      ri: 0,
+      ti: index,
+      wid: '7',
+      ad: 0,
+      phase: 'profiling',
+      credit: index * 1_000_000,
+      start: index * 1_000_000 + 200_000,
+      ack: null,
+      end: index * 1_000_000 + 420_000_000,
+      ttftMs: 42.3,
+      tpotMs: 18.1,
+      isl: 18_320 + index,
+      osl: 410,
+      cancelled: false,
+    })),
+  };
 
-    expect(insert?.text).toContain('request_timeline_gz,');
-    expect(insert?.text).toContain('request_timeline_version,');
-    expect(insert?.text).toContain('request_count');
-    // Only aggregate_stats and chart_series are still assembled as JSONB.
-    expect(insert?.text.match(/::jsonb/g)).toHaveLength(2);
-    // Sizes of the three blobs, then the timeline version and request count.
-    expect(insert?.values).toEqual([70, 30, 700, REQUEST_TIMELINE_VERSION, 3]);
+  let db: PGlite;
+  let pg: PgliteSql;
+
+  beforeAll(async () => {
+    db = await migratedPglite();
+    pg = pgliteSql(db);
+    await db.exec(`
+      INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion, created_at, date)
+      VALUES (1, 29181694248, 1, 'Run Sweep', 'completed', 'success', '2026-10-01T04:19:00Z', '2026-10-01');
+      INSERT INTO configs (id, model, hardware, framework, precision, spec_method, disagg,
+        is_multinode, prefill_tp, decode_tp, num_prefill_gpu, num_decode_gpu)
+      VALUES (1, 'dsv4', 'b200', 'vllm', 'fp4', 'none', false, false, 8, 8, 8, 8);
+      INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics)
+      VALUES (41, 1, 1, 'agentic_traces', '2026-10-01', 16, '{}'),
+             (42, 1, 1, 'agentic_traces', '2026-10-01', 32, '{}');
+    `);
+  }, 30_000);
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  async function storedTrace(benchmarkResultId: number): Promise<StoredTrace> {
+    const [row] = (await pg`
+      select
+        br.trace_replay_id::int as trace_replay_id,
+        atr.request_timeline, atr.request_timeline_gz, atr.request_timeline_version,
+        atr.request_count, atr.profile_export_jsonl_gz,
+        atr.profile_export_uncompressed_size::int as profile_size,
+        atr.server_metrics_csv, atr.server_metrics_csv_size::int as csv_size,
+        atr.server_metrics_json_gz,
+        atr.server_metrics_json_uncompressed_size::int as metrics_size,
+        atr.aggregate_stats, atr.chart_series
+      from benchmark_results br
+      join agentic_trace_replay atr on atr.id = br.trace_replay_id
+      where br.id = ${benchmarkResultId}
+    `) as unknown as StoredTrace[];
+    return row!;
+  }
+
+  it('stores the gzip timeline, its version and its request count in their own columns', async () => {
+    const prepared: PreparedTraceReplay = {
+      ...preparedFixture(),
+      requestTimelineGz: await gzipRequestTimeline(persistedTimeline),
+      timelineRequests: persistedTimeline.requests.length,
+    };
+
+    await expect(persistPreparedTraceReplay(pg, [41], prepared)).resolves.toBe(1);
+
+    const row = await storedTrace(41);
+    expect(row.trace_replay_id).not.toBeNull();
+    expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
+    expect(row.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
+    expect(row.request_count).toBe(3);
+    expect(row.request_timeline).toBeNull();
+    // Every other value still lands in its own column.
+    expect(Buffer.from(row.profile_export_jsonl_gz!).toString()).toBe('profile');
+    expect(row.profile_size).toBe(70);
+    expect(Buffer.from(row.server_metrics_csv!).toString()).toBe('csv');
+    expect(row.csv_size).toBe(30);
+    expect(Buffer.from(row.server_metrics_json_gz!).toString()).toBe('metrics');
+    expect(row.metrics_size).toBe(700);
+    expect(row.aggregate_stats).toEqual({ version: 1 });
+    expect(row.chart_series).toEqual({ version: 12 });
   });
 
   it('leaves every timeline column null when no timeline was computed', async () => {
-    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+    await expect(
+      persistPreparedTraceReplay(pg, [42], {
+        ...preparedFixture(),
+        requestTimelineGz: null,
+        timelineRequests: 0,
+      }),
+    ).resolves.toBe(1);
 
-    await persistPreparedTraceReplay(sql, [41], {
-      ...preparedFixture(),
-      requestTimelineGz: null,
-      timelineRequests: 0,
-    });
-    const insert = calls.find((call) => call.text.includes('insert into agentic_trace_replay'));
-    const uploads = calls.filter((call) =>
-      call.text.includes('trace_replay_upload_parts (field, part, data)'),
-    );
-
-    expect(uploads.map((call) => call.values[0])).not.toContain('request_timeline_gz');
-    expect(insert?.values).toEqual([70, 30, 700, null, null]);
+    const row = await storedTrace(42);
+    expect(row.request_timeline_gz).toBeNull();
+    expect(row.request_timeline_version).toBeNull();
+    expect(row.request_count).toBeNull();
+    expect(row.request_timeline).toBeNull();
+    expect(row.chart_series).toEqual({ version: 12 });
   });
 });

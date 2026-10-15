@@ -3,13 +3,20 @@
  * can run against a real schema in tests: convert a current legacy
  * `request_timeline` JSONB into `request_timeline_gz` without the profile
  * blob, store gzip timelines through the bounded upload protocol trace ingest
- * uses, and clear legacy JSONB only after its gzip copy has been verified.
+ * uses, and clear legacy JSONB only when it equals the decoded gzip copy.
  */
 
-import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline.js';
+import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
+import { createGunzip } from 'node:zlib';
+
+import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline.js';
 import type { Sql } from '../etl/db-utils.js';
-import { gunzipRequestTimeline, gzipRequestTimelineParts } from '../etl/request-timeline-codec.js';
-import { uploadTraceReplayPayloadChunks } from '../etl/trace-replay-ingest.js';
+import { gzipRequestTimelineParts } from '../etl/request-timeline-codec.js';
+import {
+  TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
+  uploadTraceReplayPayloadChunks,
+} from '../etl/trace-replay-ingest.js';
 import { readRequestTimelineGz } from '../queries/request-timeline.js';
 
 /**
@@ -169,14 +176,17 @@ interface StoredTimelineRow {
   gz_bytes: number | null;
   version: number | null;
   request_count: number | null;
+  legacy_version: number | null;
   legacy_count: number | null;
 }
 
 /**
- * Set a row's legacy `request_timeline` JSONB to null after re-reading its
- * stored gzip copy, decoding it, and checking its version and request count
- * against the scalar columns and, when the legacy copy is also current,
- * against the legacy array length. Throws, keeping the JSONB, on any mismatch.
+ * Set a row's legacy `request_timeline` JSONB to null only when it equals its
+ * gzip copy. The stored gzip is read in bounded slices and its decompressed
+ * JSON uploaded in bounded parts, so PostgreSQL parses and compares the two
+ * documents and neither crosses the network whole. Throws, keeping the JSONB,
+ * when the gzip copy is missing, stale, corrupt, or differs in version,
+ * request count, or content.
  */
 export async function dropVerifiedLegacyRequestTimeline(
   sql: Sql,
@@ -187,9 +197,9 @@ export async function dropVerifiedLegacyRequestTimeline(
       octet_length(request_timeline_gz) as gz_bytes,
       request_timeline_version as version,
       request_count,
+      (request_timeline->>'version')::int as legacy_version,
       case
-        when (request_timeline->>'version')::int = ${REQUEST_TIMELINE_VERSION}
-          and jsonb_typeof(request_timeline->'requests') = 'array'
+        when jsonb_typeof(request_timeline->'requests') = 'array'
           then jsonb_array_length(request_timeline->'requests')
       end as legacy_count
     from agentic_trace_replay
@@ -203,34 +213,62 @@ export async function dropVerifiedLegacyRequestTimeline(
   ) {
     throw new Error('gzip request timeline is missing or stale; legacy JSONB kept');
   }
-
-  const gz = await readRequestTimelineGz(sql, traceReplayId, row.gz_bytes);
-  let timeline: RequestTimeline | null;
-  try {
-    timeline = gz ? gunzipRequestTimeline(gz) : null;
-  } catch {
-    timeline = null;
+  if (row.legacy_version !== row.version) {
+    throw new Error(
+      `legacy JSONB is version ${row.legacy_version ?? 'unknown'} and gzip is version ` +
+        `${row.version}, so their content cannot match; legacy JSONB kept`,
+    );
   }
-  if (
-    timeline?.version !== REQUEST_TIMELINE_VERSION ||
-    timeline.requests.length !== row.request_count
-  ) {
-    throw new Error('stored gzip request timeline failed verification; legacy JSONB kept');
-  }
-  if (row.legacy_count !== null && row.legacy_count !== row.request_count) {
+  if (row.legacy_count !== row.request_count) {
     throw new Error(
       `gzip holds ${row.request_count} requests but legacy JSONB holds ` +
-        `${row.legacy_count}; legacy JSONB kept`,
+        `${row.legacy_count ?? 'none'}; legacy JSONB kept`,
     );
   }
 
-  // Clear only the gzip copy that was just verified.
-  await sql`
-    update agentic_trace_replay
-    set request_timeline = null
-    where id = ${traceReplayId}
-      and request_timeline_version = ${REQUEST_TIMELINE_VERSION}
-      and request_count = ${row.request_count}
-      and octet_length(request_timeline_gz) = ${row.gz_bytes}
-  `;
+  const gz = await readRequestTimelineGz(sql, traceReplayId, row.gz_bytes);
+  const gzMd5 = createHash('md5').update(gz).digest('hex');
+  const cleared = await sql.begin(async (tx) => {
+    await tx`
+      create temporary table trace_replay_upload_parts (
+        field text not null,
+        part integer not null,
+        data bytea not null,
+        primary key (field, part)
+      ) on commit drop
+    `;
+    // Corrupt gzip throws here and rolls the transaction back.
+    let part = 0;
+    const json = Readable.from([gz]).pipe(
+      createGunzip({ chunkSize: TRACE_REPLAY_UPLOAD_CHUNK_BYTES }),
+    );
+    for await (const chunk of json) {
+      const data: Buffer = chunk;
+      await tx`
+        insert into pg_temp.trace_replay_upload_parts (field, part, data)
+        values ('request_timeline_json', ${part}, ${data})
+      `;
+      part += 1;
+    }
+    // jsonb equality ignores formatting and key order, so only content counts.
+    // The md5 pins the gzip bytes that were decoded above.
+    const updated = await tx<{ id: number }[]>`
+      update agentic_trace_replay
+      set request_timeline = null
+      where id = ${traceReplayId}
+        and request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+        and request_count = ${row.request_count}
+        and md5(request_timeline_gz) = ${gzMd5}
+        and request_timeline = (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'request_timeline_json'
+        )
+      returning id
+    `;
+    return updated.length;
+  });
+  if (cleared === 0) {
+    throw new Error('legacy JSONB differs from the decoded gzip timeline; legacy JSONB kept');
+  }
 }

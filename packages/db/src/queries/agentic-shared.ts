@@ -255,20 +255,20 @@ export function writeBackTraceReplayJsonb(
 }
 
 /**
- * Best-effort, fire-and-forget persist of a freshly recomputed request
- * timeline in its storage form: `request_timeline_gz` plus the
- * `request_timeline_version` and `request_count` scalars the readers route on.
- * Same read-only contract as {@link writeBackTraceReplayJsonb}. The legacy
- * `request_timeline` JSONB is never written, and a newer stored version is
- * never replaced. Compression runs after the caller has its result, so the
- * response is not delayed.
+ * Best-effort persist of a freshly recomputed request timeline in its storage
+ * form: `request_timeline_gz` plus the `request_timeline_version` and
+ * `request_count` scalars the readers route on. Same read-only contract as
+ * {@link writeBackTraceReplayJsonb}. The legacy `request_timeline` JSONB is
+ * never written, and a newer stored version is never replaced. The returned
+ * promise never rejects; the read path discards it with `void` so compression
+ * and the UPDATE never delay a response.
  */
-export function writeBackRequestTimeline(
+export async function writeBackRequestTimeline(
   sql: DbClient,
   traceReplayId: number,
   timeline: RequestTimeline,
-): void {
-  void (async () => {
+): Promise<void> {
+  try {
     const gz = await gzipRequestTimeline(timeline);
     await sql`
       update agentic_trace_replay
@@ -278,7 +278,7 @@ export function writeBackRequestTimeline(
       where id = ${traceReplayId}
         and coalesce(request_timeline_version, -1) <= ${timeline.version}
     `;
-  })().catch((error: unknown) => {
+  } catch (error) {
     warnWriteBackFailure('request_timeline_gz', error);
-  });
+  }
 }
