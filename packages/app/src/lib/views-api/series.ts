@@ -25,7 +25,10 @@ import type {
   TokenRevenuePricing,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import {
+  bestSeriesPerSku,
+  withUnrankedSkus,
+} from '@/components/inference/utils/best-series-per-sku';
 import {
   allInMeasuredTableData,
   allInMeasuredUnavailableReason,
@@ -417,9 +420,17 @@ export function buildInferenceSeries(
   const count = series.reduce((total, entry) => total + entry.points.length, 0);
   // Remapping retains nested metric objects, including for transient rows without IDs.
   const frontierMetrics = new Set([...frontierPoints].map((point) => point[metricKey]));
-  const tableRows = isAllInMeasuredConfigKey(metricConfigKey)
+  const allInRows = isAllInMeasuredConfigKey(metricConfigKey)
     ? allInMeasuredTableData(scoped, metricKey, resolved.xAxisField)
-        .filter((point) => !best || bestHwKeys.size === 0 || bestHwKeys.has(point.hwKey))
+    : undefined;
+  // Match the dashboard: ranked SKUs keep their winner and table-only SKUs stay.
+  const tableHwKeys =
+    allInRows && best && bestHwKeys.size > 0
+      ? withUnrankedSkus(bestHwKeys, mapped, allInRows)
+      : undefined;
+  const tableRows = allInRows
+    ? allInRows
+        .filter((point) => !tableHwKeys || tableHwKeys.has(point.hwKey))
         .map((point): InferenceTableRow => {
           const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
           const x =

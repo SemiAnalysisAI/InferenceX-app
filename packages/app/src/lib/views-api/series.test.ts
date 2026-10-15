@@ -158,6 +158,33 @@ describe('buildInferenceSeries', () => {
     });
   });
 
+  it('keeps table-only all-in SKUs under best=true like the dashboard', () => {
+    const measured = metrics({
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 4000,
+      pp: 1,
+      pcp_size: 1,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_output_token: 2,
+    });
+    const rankedWinner = makeRow({ metrics: measured });
+    const rankedLoser = makeRow({
+      framework: 'vllm',
+      metrics: { ...measured, tput_per_gpu: 100, output_tput_per_gpu: 90 },
+    });
+    // GB200 has a GPU-valid row but no all-in estimate to rank.
+    const tableOnly = makeRow({ hardware: 'gb200', metrics: measured });
+    const result = buildInferenceSeries([rankedWinner, rankedLoser, tableOnly], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      best: true,
+    });
+
+    expect(result.series.map((series) => series.hwKey)).toEqual(['h200_trt']);
+    expect(result.tableRows?.map((row) => row.hwKey).toSorted()).toEqual(['gb200_trt', 'h200_trt']);
+  });
+
   it('keeps all-in energy missing, honors selected hardware, and leaves ordinary views unchanged', () => {
     const row = makeRow({
       metrics: metrics({
