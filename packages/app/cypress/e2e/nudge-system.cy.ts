@@ -116,6 +116,81 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 });
 
 // ---------------------------------------------------------------------------
+// Landing — centered TPUv7 launch modal
+// ---------------------------------------------------------------------------
+
+const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+
+// cypress/support/e2e.ts seeds the modal key on every load; clearing it here
+// runs after that hook, so only these visits see the modal.
+function showLaunchModal(win: Cypress.AUTWindow) {
+  clearAllNudgeStorage(win);
+  win.localStorage.removeItem(LAUNCH_MODAL_KEY);
+}
+
+describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
+  it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-modal', 'true')
+      .and('contain.text', 'Google TPUv7 joins AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
+      .then(($modal) => {
+        const rect = $modal[0].getBoundingClientRect();
+        // clientWidth/Height exclude the scrollbar, which the fixed overlay also excludes.
+        const root = $modal[0].ownerDocument.documentElement;
+        expect(Math.abs(rect.left + rect.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
+        expect(Math.abs(rect.top + rect.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
+      });
+    cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
+    // Focus moves into the dialog so keyboard users land on the action.
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.get('[data-testid="launch-modal-action"]').click();
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+  });
+
+  it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+  });
+
+  it('dismisses on Escape', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.focused().type('{esc}');
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+    });
+  });
+
+  it('persists "Maybe Later" dismissal', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+    });
+  });
+
+  it('localizes the modal and keeps the Chinese route tree', () => {
+    cy.visit('/zh', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .and('contain.text', 'Google TPUv7 加入 AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
+      .and('contain.text', '稍后再看');
+    cy.get('[data-testid="launch-modal-action"]').should('contain.text', '查看结果').click();
+    cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Landing — banner
 // ---------------------------------------------------------------------------
 

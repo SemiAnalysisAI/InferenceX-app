@@ -5,7 +5,11 @@ import {
   AGENTIC_POINT_ACTION_SELECTOR,
 } from './agentic-point-coach-mark';
 import { dismissesOnAction } from './policy';
-import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
+import {
+  NUDGE_REGISTRY,
+  TELEMETRY_TUTORIAL_STORAGE_KEY,
+  TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+} from './registry';
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -78,6 +82,7 @@ describe('NUDGE_REGISTRY integrity', () => {
       'gradient-label',
       'reproducibility',
       'star-nudge',
+      'tpuv7-agentx-launch-modal',
       'tpuv7-qwen-3-5-agentx-banner',
     ]);
   });
@@ -120,6 +125,26 @@ describe('NUDGE_REGISTRY integrity', () => {
     // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
     expect(location.href).toBe('/zh/inference/qwen-3-5');
+
+    location.href = '';
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
+    modal.content.primaryAction?.onClick();
+    expect(location.href).toBe('/zh/inference/qwen-3-5');
+  });
+
+  it('centers the TPUv7 launch modal on the landing page', () => {
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    expect(modal?.scope).toBe('landing');
+    expect(modal?.content.centered).toBe(true);
+    // cypress/support/e2e.ts seeds this key; a rename has to be mirrored there.
+    expect(modal?.storageKey).toBe(TPUV7_LAUNCH_MODAL_STORAGE_KEY);
+    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe('inferencex-tpuv7-agentx-modal-dismissed');
+    expect(modal?.analytics).toEqual({
+      shown: 'inference_tpuv7_agentx_modal_shown',
+      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
+      action: 'inference_tpuv7_agentx_modal_clicked',
+    });
   });
 
   it('gives every coach mark an anchor to point at', () => {

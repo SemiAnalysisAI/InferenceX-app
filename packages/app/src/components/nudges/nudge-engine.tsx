@@ -494,9 +494,65 @@ function ModalRenderer({
   const titleId = `${idPrefix}-title`;
   const descriptionId = `${idPrefix}-description`;
   const centered = content.centered;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
+  // A centered modal covers the page, so it owns the keyboard: focus moves
+  // in, Tab cycles inside, Escape dismisses, and focus returns on close.
+  useEffect(() => {
+    if (!centered) return;
+    const dialogEl = dialogRef.current;
+    if (!dialogEl) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusable = () =>
+      [
+        ...dialogEl.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((el) => el.offsetParent !== null);
+    const primary = dialogEl.querySelector<HTMLElement>('[data-modal-primary]');
+    (primary ?? focusable()[0] ?? dialogEl).focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onDismissRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      if (items.length === 0) {
+        event.preventDefault();
+        dialogEl.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items.at(-1)!;
+      const active = document.activeElement;
+      // The panel itself (focusable via tabIndex=-1 on click) counts as outside
+      // the item cycle, so Tab from it never escapes to the backdrop.
+      const outside = active === dialogEl || !dialogEl.contains(active);
+      if (event.shiftKey && (active === first || outside)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || outside)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [centered]);
 
   const dialog = (
     <div
+      ref={dialogRef}
+      tabIndex={centered ? -1 : undefined}
       data-testid={content.testId}
       role="dialog"
       aria-modal={centered ? 'true' : 'false'}
@@ -525,7 +581,7 @@ function ModalRenderer({
               <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
-                <NewBadge data-new-badge="launch-modal" className="ml-1">
+                <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
                   {localized(locale, content.badge, content.badgeZh)}
                 </NewBadge>
               )}
@@ -549,6 +605,7 @@ function ModalRenderer({
             {content.primaryAction && (
               <Button
                 onClick={onAction}
+                data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
                 className={content.actionClassName}
               >
@@ -568,6 +625,9 @@ function ModalRenderer({
         <button
           type="button"
           aria-label={rs.close}
+          // Mouse-only dimmer: keyboard users close with Escape or the X, so
+          // it stays out of the Tab order.
+          tabIndex={-1}
           onClick={onDismiss}
           className="absolute inset-0 cursor-default bg-black/50"
         />
