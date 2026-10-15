@@ -4,11 +4,11 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/infer
 
 /**
  * Editorial ordering of the AgentX hero ledger on `/compare` and the landing
- * page. Every model here has AgentX data and a registered `/inference/<slug>`
- * page; the order is a product call, not alphabetical or by launch date.
+ * page. Pending entries are marked explicitly until results are published.
  */
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
+  'muse-spark-open',
   // V4.1 Flash sits directly under Kimi K3, ahead of the V4 Pro flagship it
   // post-dates (InferenceX#2961).
   'deepseek-v41-flash',
@@ -66,6 +66,11 @@ export const FEATURED_AGENTX_MODELS: readonly CompareModelSlug[] = FEATURED_AGEN
     if (!model) throw new Error(`Missing AgentX comparison model: ${slug}`);
     return model;
   },
+);
+
+/** Preview entries remain selectable before the first published observation. */
+export const PENDING_AGENTX_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
+  FEATURED_AGENTX_MODELS.filter((model) => model.resultsPending).map((model) => model.displayName),
 );
 
 const AGENTX_NEW_MODEL_SLUG_SET: ReadonlySet<string> = new Set(AGENTX_NEW_MODEL_SLUGS);

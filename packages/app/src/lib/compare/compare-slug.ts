@@ -35,6 +35,7 @@ export interface CompareModelSlug {
    *  written the way people actually search rather than the fully-qualified
    *  HF checkpoint id. See `compareModelSeoName`. */
   seoName: string;
+  resultsPending?: boolean;
 }
 
 // Order matches the master /compare and /compare-per-dollar index display:
@@ -46,6 +47,14 @@ export interface CompareModelSlug {
 // flagship leading the older M2 series; the two Kimi entries follow the same
 // rule, with K3 leading the K2.5/K2.6/K2.7-Code group.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
+  {
+    slug: 'muse-spark-open',
+    displayName: 'Muse-Spark-Open',
+    dbKeys: ['musespark'],
+    label: 'Muse Spark Open 816B',
+    seoName: 'Muse Spark Open',
+    resultsPending: true,
+  },
   {
     slug: 'deepseek-v4',
     displayName: 'DeepSeek-V4-Pro',

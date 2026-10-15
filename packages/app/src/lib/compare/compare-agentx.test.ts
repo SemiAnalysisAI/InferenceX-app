@@ -13,9 +13,10 @@ import { Model } from '../catalog/data-mappings';
 import { overviewScenariosForModel } from '../overview/overview-data';
 
 describe('AgentX comparison links', () => {
-  it('keeps the live AgentX models in the editorial order', () => {
+  it('keeps the featured AgentX models in the editorial order', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
       'kimi-k3',
+      'muse-spark-open',
       'deepseek-v41-flash',
       'deepseek-v4',
       'glm-5-3',
@@ -48,7 +49,7 @@ describe('AgentX comparison links', () => {
 
   it('opens the bare model subroute — Agentic + Optimal Only are already the defaults', () => {
     expect(agentxDashboardHref('en', FEATURED_AGENTX_MODELS[0])).toBe('/inference/kimi-k3');
-    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[2])).toBe('/zh/inference/deepseek-v4');
+    expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[3])).toBe('/zh/inference/deepseek-v4');
   });
 
   it('routes every featured model to a registered inference page without query params', () => {
@@ -59,8 +60,7 @@ describe('AgentX comparison links', () => {
 
   it('routes DeepSeek V4.1 Flash to AgentX from the featured ledger', () => {
     // V4.1 Flash has no 8K/1K sweep, so the 8K/1K fallback would SSR an empty
-    // compare page. It is now a featured row (second, under Kimi K3), and its
-    // compare cards still point at the agentic workload.
+    // compare page. Its compare cards point at the agentic workload.
     const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'deepseek-v41-flash')!;
     expect(comparisonScenarioForModel(flash)).toEqual({
       label: 'AgentX',
@@ -72,8 +72,23 @@ describe('AgentX comparison links', () => {
     expect(
       comparisonPairHref('zh', 'deepseek-v41-flash-gb300-vs-b200', flash, 'compare-per-dollar'),
     ).toBe('/zh/compare-per-dollar/deepseek-v41-flash-gb300-vs-b200/agentic');
-    expect(FEATURED_AGENTX_MODELS[1]).toBe(flash);
+    expect(FEATURED_AGENTX_MODELS[2]).toBe(flash);
     expect(agentxDashboardHref('en', flash)).toBe('/inference/deepseek-v41-flash');
+  });
+
+  it('routes Muse previews to their own bilingual AgentX view', () => {
+    const muse = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'muse-spark-open')!;
+    expect(muse.resultsPending).toBe(true);
+    expect(agentxDashboardHref('en', muse)).toBe('/inference/muse-spark-open');
+    expect(agentxDashboardHref('zh', muse)).toBe('/zh/inference/muse-spark-open');
+    expect(comparisonScenarioForModel(muse)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(comparisonPairHref('en', 'muse-spark-open-mi355x-vs-b200', muse)).toBe(
+      '/compare/muse-spark-open-mi355x-vs-b200/agentic',
+    );
+    expect(overviewScenariosForModel(Model.Muse_Spark_Open)).toEqual(['agentx']);
   });
 
   it('agrees with the overview matrix about which models are AgentX-only', () => {

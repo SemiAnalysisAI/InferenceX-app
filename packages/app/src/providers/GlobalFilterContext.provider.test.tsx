@@ -212,4 +212,15 @@ describe('GlobalFilterProvider context isolation', () => {
     availabilitySnapshot?.retryAvailability();
     expect(mocks.availability.refetch).toHaveBeenCalledOnce();
   });
+
+  it('keeps the pending Muse preview selectable when other models have data', () => {
+    mocks.availability.data = [
+      { model: 'kimik3', precision: 'fp4', sequence: 'agentic-traces' },
+    ] as unknown[];
+    mountProvider();
+
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Kimi_K3);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.DeepSeek_V4_Pro);
+  });
 });

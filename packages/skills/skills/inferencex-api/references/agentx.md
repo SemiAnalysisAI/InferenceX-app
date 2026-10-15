@@ -47,6 +47,15 @@ operation.
 
 ## Read published benchmark results
 
+Muse Spark Open is pre-registered as display model `Muse-Spark-Open`, raw DB key
+`musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
+Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
+with `sequence=agentic-traces` for the latter. Its initial recipe is
+MI355X SGLang MXFP4 with DFlash2. Registration and the landing-page preview do
+not establish validated results: [the recipe PR](https://github.com/SemiAnalysisAI/InferenceX/pull/4127)
+requires a measured acceptance curve before publication. Preserve empty
+responses as no published data; do not substitute another model or invent results.
+
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or
 `DO_NOT_TRACK=1` to omit attribution; use `INFERENCEX_TRAFFIC=validation` for demos

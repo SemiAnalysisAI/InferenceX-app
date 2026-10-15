@@ -54,6 +54,7 @@ import {
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { PENDING_AGENTX_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -466,11 +467,12 @@ export function GlobalFilterProvider({
     [availabilityRows, dbModelKeys],
   );
 
-  // Models that have any data (DB ∪ unofficial run)
+  // Published/unofficial data, plus explicitly registered pre-publication previews.
   const availableModels = useMemo(() => {
     if (!availabilityRows) return MODEL_OPTIONS;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
+      if (PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(m)) return true;
       if (unofficialModels.has(m)) return true;
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return availabilityRows.some((r) => keys.includes(r.model));

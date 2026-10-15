@@ -397,6 +397,20 @@ describe('GET /api/v1/views/inference', () => {
     expect(h200.points[0].runId).toBe(777);
   });
 
+  it('accepts the pending Muse model without fabricating results', async () => {
+    mockGetLatestBenchmarks.mockResolvedValue([]);
+    const res = await GET(
+      request('/api/v1/views/inference?model=Muse-Spark-Open&sequence=agentic-traces'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.model).toBe('Muse-Spark-Open');
+    expect(body.params.sequence).toBe('agentic-traces');
+    expect(body.series).toEqual([]);
+    expect(body.count).toBe(0);
+    expect(mockGetLatestBenchmarks.mock.calls[0][1]).toEqual(['musespark']);
+  });
+
   it('rejects unknown models and bad enums with a 400 and allowed values', async () => {
     const badModel = await GET(request('/api/v1/views/inference?model=NotAModel'));
     expect(badModel.status).toBe(400);
