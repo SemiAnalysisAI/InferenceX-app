@@ -1,8 +1,9 @@
-import { APP_THEMES } from '../../src/lib/themes';
+import { APP_THEMES } from '../../src/lib/themes/themes';
+import { cycleToTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
-  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
+  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.mc-boss|\.mc-endgame-guide|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
 const featureAsset = new RegExp(
   `/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
   'i',
@@ -49,6 +50,35 @@ const seo = (doc: Document) => [
 ];
 
 describe('optional themes stay off the default page', () => {
+  for (const route of ['/', '/zh']) {
+    it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
+      const requests: string[] = [];
+      cy.intercept('GET', '**', (request) => {
+        requests.push(request.url);
+      });
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'kart');
+          saveMediaOptIns(win, false);
+        },
+      });
+      cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
+      cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+      cy.get('[data-testid="theme-toggle"]').focus();
+      cy.get('[data-testid="theme-option-kart"]').should('not.exist');
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
+      expectNoOptionalResources(requests);
+      // The regular rotation intentionally visits optional themes on the way to light.
+      cycleToTheme('light');
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.reload();
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.then(() => {
+        expect(requests.filter((url) => url.includes('/decorative/kart/'))).to.deep.equal([]);
+      });
+    });
+  }
+
   for (const [theme, route, width] of [
     ['light', '/', 1440],
     ['dark', '/', 390],
@@ -79,12 +109,21 @@ describe('optional themes stay off the default page', () => {
         const splash = win.document.querySelector('.splash-text');
         if (splash) expect(win.getComputedStyle(splash).animationName).to.equal('none');
       });
-      // Merely viewing options and interacting with the page must not activate a theme.
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-option-minecraft"]').should('be.visible');
-      cy.get('body').type('{esc}');
+      // Focusing the toggle must not activate a theme or fetch optional assets.
+      cy.get('[data-testid="theme-toggle"]').focus();
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
+      cy.document().then((doc) => {
+        // Light → dark stays on the default path. Dark's next click selects Minecraft.
+        if (theme !== 'light') return;
+        const baseline = seo(doc);
+        cy.get('[data-testid="theme-toggle"]').click();
+        cy.get('html').should('have.class', 'dark');
+        cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+        expectNoOptionalResources(requests);
+      });
     });
   }
 
@@ -142,7 +181,7 @@ describe('optional themes stay off the default page', () => {
     }
   });
 
-  it('unmounts each selected theme and preserves metadata when switching back', () => {
+  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
@@ -156,16 +195,63 @@ describe('optional themes stay off the default page', () => {
     cy.document().then((doc) => {
       const baseline = seo(doc);
       for (const theme of optionalThemes) {
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get(`[data-testid="theme-option-${theme}"]`).click();
+        cycleToTheme(theme);
         if (theme === 'minecraft') cy.get('canvas').should('exist');
         else cy.get(`[data-testid="${theme}-theme-banner"]`).should('be.visible');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get('[data-testid="theme-option-dark"]').click();
+        cycleToTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
       }
     });
   });
+
+  for (const route of ['/about', '/zh/about']) {
+    it(`${route} keeps the page and default toggle working when optional chunks fail`, () => {
+      cy.viewport(1440, 900);
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'dark');
+          saveMediaOptIns(win, false);
+          // Next captures console.error during bootstrap for caught React errors.
+          cy.spy(win.console, 'error').as('caughtThemeError');
+        },
+      });
+      cy.get('[data-testid="theme-toggle"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'currently dark');
+      cy.document().then((doc) => {
+        const baseline = seo(doc);
+        // Only start failing lazy chunks after the normal page has hydrated.
+        cy.window().then((win) => {
+          const append = win.document.head.appendChild.bind(win.document.head);
+          cy.stub(win.document.head, 'appendChild').callsFake((node: Node) => {
+            // Earlier cases may have cached these chunks. Force a real network
+            // failure instead of silently executing a cached optional module.
+            if (node instanceof win.HTMLScriptElement && node.src.includes('/_next/static/')) {
+              const url = new URL(node.src);
+              url.searchParams.set('optional-theme-failure', '1');
+              node.src = url.href;
+            }
+            return append(node);
+          });
+        });
+        cy.intercept('GET', '**/_next/static/chunks/*.js*', { forceNetworkError: true }).as(
+          'optionalChunk',
+        );
+        cycleToTheme('minecraft');
+        cy.wait('@optionalChunk');
+        cy.get('@caughtThemeError').should(
+          'have.been.calledWithMatch',
+          Cypress.sinon.match((error: unknown) => /Failed to load chunk/.test(String(error))),
+        );
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+        // The shared header remains interactive even after a rejected lazy import.
+        cycleToTheme('light');
+        cycleToTheme('dark');
+        cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+      });
+    });
+  }
 });

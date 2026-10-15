@@ -643,7 +643,7 @@ async function main(): Promise<void> {
         try {
           configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
-          tracker.recordDbError(`config for ${zipFile}`, error);
+          tracker.recordDbError('config', zipFile, error);
           continue;
         }
         const plan = planBenchmarkPoint(
@@ -690,7 +690,7 @@ async function main(): Promise<void> {
             await insertServerLogFiles(sql, insertedIds, logFiles);
           }
         } catch (error: any) {
-          tracker.recordDbError(zipFile, error);
+          tracker.recordDbError('benchmark', zipFile, error);
         }
       }
     }
@@ -724,7 +724,7 @@ async function main(): Promise<void> {
       try {
         await bulkUpsertAvailability(sql, availRows, result.dateDir);
       } catch (error: any) {
-        tracker.recordDbError('availability batch', error);
+        tracker.recordDbError('availability', `${availRows.length} row(s)`, error);
       }
     }
 
@@ -739,7 +739,7 @@ async function main(): Promise<void> {
         wr.newStats += newCount;
         wr.dupStats += dupCount;
       } catch (error: any) {
-        tracker.recordDbError('run_stats batch', error);
+        tracker.recordDbError('run_stats', `${result.statsRows.length} row(s)`, error);
       }
     }
 
@@ -763,7 +763,7 @@ async function main(): Promise<void> {
           }
         }
       } catch (error: any) {
-        tracker.recordDbError('eval row', error);
+        tracker.recordDbError('eval', `run ${result.githubRunId} ${params.task}`, error);
       }
     }
 
@@ -779,7 +779,7 @@ async function main(): Promise<void> {
         );
         wr.changelogs += written;
       } catch (error: any) {
-        tracker.recordDbError('changelog', error);
+        tracker.recordDbError('changelog', `${baseRef}..${headRef}`, error);
       }
     }
 

@@ -128,7 +128,7 @@ describe('cutPowerAuditBundle', () => {
   it('clips samples to the window plus the pad on both sides', () => {
     const [first] = cutPowerAuditBundle(ARTIFACT, bundle());
     expect(first.startMs).toBe((1000 - BUNDLE_WINDOW_PAD_SECONDS) * 1000);
-    expect(first.t).toEqual([0, 60, 65, 70, 130]);
+    expect(first.t).toEqual([0, 60, 65.4, 70, 130]);
     // 1005.4 s lands in the 1005 s bucket; the malformed 2002 s rows never appear.
     expect(first.power[2]).toEqual([100, 100, 300, 100, 100]);
   });

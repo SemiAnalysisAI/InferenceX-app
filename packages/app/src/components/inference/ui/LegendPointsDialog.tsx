@@ -11,10 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
-import { cn } from '@/lib/utils';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
+import { cn } from '@/lib/shared/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   type LegendPointsSortKey,

@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import type * as BlogLib from '@/lib/blog';
-import type { BlogPostMeta } from '@/lib/blog';
+import type * as BlogLib from '@/lib/blog/blog';
+import type { BlogPostMeta } from '@/lib/blog/blog';
 
 const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
   slug,
@@ -28,7 +28,7 @@ const THUMBNAILS: Record<string, BlogLib.PostThumbnail | null> = {
   mid: { light: '/images/mid/context.png', dark: '/images/mid/context.png' },
 };
 
-vi.mock('@/lib/blog', async (importOriginal) => {
+vi.mock('@/lib/blog/blog', async (importOriginal) => {
   const actual = await importOriginal<typeof BlogLib>();
   return {
     ...actual,

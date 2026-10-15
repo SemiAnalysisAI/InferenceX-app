@@ -29,7 +29,7 @@ import {
   assertFixtureContent,
   fixtureSha256,
   fixtureTopLevel,
-} from '../src/lib/test-fixture-manifest';
+} from '../src/lib/testing/test-fixture-manifest';
 
 const cliArgs = process.argv.filter((argument) => argument !== '--').slice(2);
 const collectiveXOnly = cliArgs.includes('--collectivex-only');

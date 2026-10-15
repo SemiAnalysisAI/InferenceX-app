@@ -1,4 +1,4 @@
-import { localePath, type Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n/i18n';
 
 const INDEX_DESCRIPTION_EN =
   'Architecture deep-dives for every model benchmarked on InferenceX: MoE and attention design, official vendor eval scores, and live inference performance data.';

@@ -19,7 +19,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -30,7 +30,7 @@ import {
   LIFECYCLE_DEFAULTS,
   MS_PER_MONTH,
 } from '@/components/calculator/lifecycle';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import { GET } from './route';
 

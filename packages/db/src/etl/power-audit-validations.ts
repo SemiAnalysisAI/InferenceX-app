@@ -1,12 +1,10 @@
 /** Pure normalization of legacy and retained AgentX power-audit documents. */
+import { isRecord } from '../lib/records';
+
 const LEGACY_VALIDATION = /^power_validation_[^/]+\.json$/u;
 const AGENTX_VALIDATION = /^LOGS\/agentic\/conc_(?<concurrency>[1-9]\d*)\/power_validation\.json$/u;
 const AGENTX_WINDOW = /^LOGS\/power\/windows\/agentic_power_concurrency_[1-9]\d*\.json$/u;
 const RESULT_FILE = /^(?<stem>[^/]+)_conc(?<concurrency>[1-9]\d*)\.json$/u;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseObject(text: string | undefined): Record<string, unknown> | null {
   if (text === undefined) return null;

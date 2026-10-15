@@ -9,7 +9,7 @@ import {
   requestPowerTraceFocus,
   traceKeyForPoint,
 } from '@/components/inference/utils/powerTimeline';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import type { D3ChartHandle } from '@/lib/d3-chart/D3Chart/types';
 
 /**

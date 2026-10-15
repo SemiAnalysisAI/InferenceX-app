@@ -5,7 +5,7 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 ## Provider Ownership
 
 `DashboardShell` resolves provider capabilities from
-`packages/app/src/lib/dashboard-routes.ts`:
+`packages/app/src/lib/routing/dashboard-routes.ts`:
 
 ```
 QueryProvider
@@ -35,7 +35,7 @@ tests rather than adding pathname conditionals in the shell.
 
 ### GlobalFilterProvider
 
-File: `packages/app/src/components/GlobalFilterContext.tsx`
+File: `packages/app/src/providers/GlobalFilterContext.tsx`
 
 **Requested selection state** (user or URL intent):
 
@@ -108,11 +108,21 @@ This domain owns inference-only selection state. GPU selections and comparison d
 do not belong in global filter state because evaluation and reliability do not use
 them.
 
+Manual legend selections and explicit Best per SKU overrides are model-local.
+Choosing a different model in the model selector restores that model's default
+Best per SKU mode and does not use
+the previous model's sticky engine preference. Changes to axes within the same
+model preserve a manual selection. Initial share-link selections and explicit
+favorite presets retain their existing restoration paths. Compare History GPU
+and date selections, axis settings, and locked embed filters are unchanged. This navigation reset
+does not change the stateless read-only inference API's ranking or parameters.
+
 **`useInferenceDisplay`**
 
 Axis and presentation state:
 
 - selected x-axis and y-axis metrics, percentile, and effective x-axis mode
+- the y-axis default depends on the power tier quick filter: `defaultYAxisMetric` in `url-state.ts` opens a link that has `i_power` but no `i_metric` on `y_measuredAvgPower`, and `InferenceContext` omits `i_metric` from share links only when the metric equals that contextual default (or the metric a route seeds, as on the compare pages), so an explicit `i_metric` always wins. Turning the tier filter on from empty moves a metric outside the measured family to `y_measuredAvgPower`; tier edits after that, clearing the filter, and restoring `i_power` from a link leave the metric alone
 - the Measured controls (Boundary / Per / Scope / Statistic / Display / Unit) own no state: `measured-metric-config.ts` resolves each selection to the nearest registered metric key and writes it back to `selectedYAxisMetric`, so the power boundary rides on `i_metric` (there is deliberately no `i_pbasis`; see [PowerX Permanent View](./powerx-permanent-view.md))
 - the Measured Power Display value `timeline` (`y_measuredPowerTimeline`) swaps the chart body for `PowerTimeline`; its axis mode, line mode, window-only display, focused trace, all-in reference switch and concurrency filter are component state that `PowerTimeline` itself reads and writes through `useUrlState` as `i_ptaxis` / `i_ptlines` / `i_ptwindow` / `i_ptfocus` / `i_ptutility` / `i_ptconc`, so they never pass through the display domain
 - token-revenue price source (`i_revenue`): normalized uncached/cached/output pricing or the selected model's live OpenRouter catalog prices
@@ -133,7 +143,8 @@ interactivity. The store is scoped to one chart id on purpose. The replay chart
 store would render every ruler twice and let the replay's prune pass delete rulers the
 main chart still shows. `ScatterGraph` binds when its `chartId` is `chart-0` (ChartDisplay
 mounts it as the primary chart) and falls back to component-local state when no matching
-store is present; the date-comparison `GPUGraph` draws no rulers.
+store is present; the date-comparison `GPUGraph` keeps its rulers in component-local
+state and never reads or writes `i_rulers`.
 
 `ScatterGraph` reads `state`/`setState` from the store, so the existing reducers, refs,
 and draw passes are unchanged. The one thing that moved is the axis reset:
@@ -334,7 +345,7 @@ How the GPU-across-time comparison works in the inference tab:
 
 ## URL State Synchronization
 
-Source files: `packages/app/src/lib/url-state.ts`, `packages/app/src/hooks/useUrlState.ts`, `packages/app/src/hooks/useChartContext.ts` (`useUrlStateSync`).
+Source files: `packages/app/src/lib/routing/url-state.ts`, `packages/app/src/hooks/useUrlState.ts`, `packages/app/src/hooks/useChartContext.ts` (`useUrlStateSync`).
 
 ### Prefix convention
 
@@ -414,9 +425,9 @@ registry and carries the canonical `unofficialruns` value from the live URL.
 ### Parameter registry
 
 `UrlStateKey`, `URL_STATE_KEYS`, and `PARAM_DEFAULTS` in
-`packages/app/src/lib/url-state.ts` are the exhaustive parameter source of truth.
+`packages/app/src/lib/routing/url-state.ts` are the exhaustive parameter source of truth.
 Dashboard scope membership is declared by `shareParamScopes` in
-`packages/app/src/lib/dashboard-routes.ts`. Tests enforce completeness and route-specific
+`packages/app/src/lib/routing/dashboard-routes.ts`. Tests enforce completeness and route-specific
 share behavior, so this document deliberately does not duplicate a manually maintained
 parameter table.
 
@@ -440,3 +451,18 @@ the metric alone and the Measured controls show a hint, so the link's intent sur
 detour through another setting. Which comparison rows a reader hid from the legend is
 `ScatterGraph` component state (`hiddenPowerVariants`), never shared — see
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
+
+### Staged-result chart links
+
+The staging workflow reads the successfully ingested run's model, workload,
+precision and hardware scopes and reports one `chart-links` entry (`label`, `url`)
+per visible Pareto line to InferenceX. The links use the same model and hardware
+identity helpers as the chart, and combine `i_gpus` with the exact-run
+`i_dates=YYYY-MM-DD~rRUN_ID` selection. A date entry alone does not enable GPU
+comparison, so it cannot select the staged line.
+
+Run-qualified entries always fetch their exact logical snapshot, even when the
+main run picker selected that run. The base query can carry other runs forward
+and stamps its points with a plain date; reusing it would lose the run-qualified
+series key. This leaves ordinary date comparisons and unofficial-run overlays
+unchanged.

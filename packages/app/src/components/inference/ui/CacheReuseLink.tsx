@@ -3,9 +3,9 @@
 import Link from 'next/link';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
-import { track } from '@/lib/analytics';
-import { cacheReuseHref } from '@/lib/cache-reuse-link';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { cacheReuseHref } from '@/lib/calculator/cache-reuse-link';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: { chart: 'Prefix cache reuse →', point: 'Prefix cache reuse for this config →' },

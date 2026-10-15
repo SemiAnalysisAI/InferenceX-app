@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
-import { getGpuSpecs } from '@/lib/constants';
+import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
 let root: Root;

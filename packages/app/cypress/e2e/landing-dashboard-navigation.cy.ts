@@ -16,7 +16,26 @@
  * natively.
  */
 
-import { interceptVrPublicationData, vrPublicationRows } from '../support/vr-publication-fixtures';
+import { vrPublicationRows } from '../support/vr-publication-fixtures';
+
+// The landing Rubin card links to MiniMax M3; reuse the synthetic Rubin curve under its DB key.
+const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
+
+function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
+  cy.fixture('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability*', {
+      body: [
+        ...availability.filter((row: { model: string }) => row.model !== 'minimaxm3'),
+        ...rows.map(({ metrics: _metrics, ...row }) => row),
+      ],
+    });
+  });
+  cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+    if (String(request.query.model).includes('MiniMax-M3')) {
+      request.reply({ body: rows });
+    }
+  });
+}
 
 const TARGET = '/inference/kimi-k3';
 
@@ -25,13 +44,11 @@ interface HistoryWrite {
   pathname: string;
 }
 
+// The TPU card opens the bare Qwen3.5 page so it lands on the AgentX defaults.
 function assertTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-  cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-  cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
-  cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
-  cy.get('[data-testid="remove-filter-spec-mtp"]').should('not.exist');
+  cy.location('search').should('not.contain', 'i_seq=');
+  cy.location('search').should('not.contain', 'i_spec=');
 }
 
 describe('landing model curation', () => {
@@ -41,30 +58,35 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3', 'qwen-3-5'].map(
+            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
               (slug) => `${prefix}/inference/${slug}`,
             ),
           );
         });
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
-        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]')
+        // Qwen 3.5 is reached through the TPU card, and the hardware cards sit above the ledger.
+        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .should('match', ':first-child')
           .parent()
-          .next()
-          .should('have.attr', 'data-testid', 'landing-tpu-results-link');
+          .next('nav')
+          .find('[data-testid^="compare-agentx-model-"]')
+          .first()
+          .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k3');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
-          .and(
-            'have.attr',
-            'href',
-            `${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`,
-          );
+          .and('contain.text', 'Qwen3.5 · AgentX')
+          .and('have.attr', 'href', `${prefix}/inference/qwen-3-5`);
+        cy.get('[data-new-badge="landing-tpu"]')
+          .should('contain.text', prefix ? '新' : 'NEW')
+          .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
         cy.get('[data-testid="landing-tpu-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-rubin-results-link')
-          .and('have.attr', 'href', `${prefix}/inference/deepseek-v4`)
-          .and('contain.text', 'DeepSeek V4 Pro');
+          .and('have.attr', 'href', `${prefix}/inference/minimax-m3`)
+          .and('contain.text', 'MiniMax M3');
         cy.get('[data-testid="landing-rubin-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
@@ -93,7 +115,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
-        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
+        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
             'href',
@@ -103,7 +125,7 @@ describe('landing model curation', () => {
       });
     });
 
-    it(`opens the STP-only Qwen TPU view from ${prefix || '/'} and retains it on reload`, () => {
+    it(`opens the Qwen3.5 AgentX TPU view from ${prefix || '/'} and retains it on reload`, () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
@@ -115,10 +137,10 @@ describe('landing model curation', () => {
     });
 
     it(`opens Rubin AgentX results from ${prefix || '/'}`, () => {
-      interceptVrPublicationData();
+      interceptMinimaxM3RubinData();
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-v4`);
+      cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').should(
@@ -155,8 +177,8 @@ describe('landing model curation', () => {
       // Include FP8 as well as Rubin's FP4: FP4-only fixtures mask stale FP8
       // because the availability validator falls back to the only precision.
       const rubinRows = [
-        ...vrPublicationRows,
-        ...vrPublicationRows
+        ...minimaxM3RubinRows,
+        ...minimaxM3RubinRows
           .filter((row) => row.hardware === 'vr200')
           .map((row) => ({
             ...row,
@@ -165,19 +187,7 @@ describe('landing model curation', () => {
             precision: 'fp8',
           })),
       ];
-      cy.fixture('api/availability.json').then((availability) => {
-        cy.intercept('GET', '/api/v1/availability*', {
-          body: [
-            ...availability.filter((row: { model: string }) => row.model !== 'dsv4'),
-            ...rubinRows.map(({ metrics: _metrics, ...row }) => row),
-          ],
-        });
-      });
-      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
-        if (String(request.query.model).includes('DeepSeek-V4')) {
-          request.reply({ body: rubinRows });
-        }
-      });
+      interceptMinimaxM3RubinData(rubinRows);
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       assertTpuView();

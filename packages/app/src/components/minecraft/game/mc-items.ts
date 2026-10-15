@@ -38,7 +38,16 @@ function add(def: Omit<ItemDef, 'stack' | 'icon'> & { stack?: number; icon?: Ico
 }
 
 // Every placeable block (except internal ones) is an item.
-const NOT_ITEMS = new Set(['air', 'water', 'lava', 'wheat_crop', 'farmland', 'snowy_grass']);
+const NOT_ITEMS = new Set([
+  'air',
+  'water',
+  'lava',
+  'wheat_crop',
+  'farmland',
+  'snowy_grass',
+  'nether_portal',
+  'end_portal',
+]);
 const BLOCK_FUEL: Record<string, number> = {
   oak_log: 15,
   birch_log: 15,
@@ -99,6 +108,12 @@ for (const t of TIERS) {
 }
 
 const simple: [string, string, string, Partial<ItemDef>?][] = [
+  ['ender_pearl', 'Ender Pearl', '末影珍珠', { stack: 16 }],
+  ['ender_eye', 'Eye of Ender', '末影之眼'],
+  ['blaze_rod', 'Blaze Rod', '烈焰棒', { fuel: 120 }],
+  ['blaze_powder', 'Blaze Powder', '烈焰粉'],
+  ['bow', 'Bow', '弓', { stack: 1 }],
+  ['arrow', 'Arrow', '箭'],
   ['stick', 'Stick', '木棍', { fuel: 5 }],
   ['coal', 'Coal', '煤炭', { fuel: 80 }],
   ['charcoal', 'Charcoal', '木炭', { fuel: 80 }],
@@ -209,6 +224,20 @@ const storage = (block: string, item: string): Recipe[] => [
 ];
 
 export const RECIPES: Recipe[] = [
+  { shapeless: ['blaze_rod'], result: { id: 'blaze_powder', count: 2 } },
+  { shapeless: ['blaze_powder', 'ender_pearl'], result: { id: 'ender_eye', count: 1 } },
+  {
+    pattern: [' SF', 'S F', ' SF'],
+    keys: { S: 'stick', F: 'string' },
+    result: { id: 'bow', count: 1 },
+  },
+  {
+    pattern: ['F', 'S', 'P'],
+    keys: { F: 'flint', S: 'stick', P: 'feather' },
+    result: { id: 'arrow', count: 4 },
+  },
+  // Wool supplies string until spiders are implemented.
+  { shapeless: ['white_wool'], result: { id: 'string', count: 4 } },
   { shapeless: ['oak_log'], result: { id: 'oak_planks', count: 4 } },
   { shapeless: ['birch_log'], result: { id: 'birch_planks', count: 4 } },
   { shapeless: ['spruce_log'], result: { id: 'spruce_planks', count: 4 } },

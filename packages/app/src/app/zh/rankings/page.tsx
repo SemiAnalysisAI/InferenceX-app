@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { getAllRankingPageEntries } from '@/lib/rankings';
-import { rankingPageHeadingZh } from '@/lib/rankings-zh';
+import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
+import { rankingPageHeadingZh } from '@/lib/live-seo/rankings-zh';
 
 const title = 'LLM 推理 GPU 排行榜';
 const description =

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import VideoBenchmark from './VideoBenchmark';
 import FidelityResults from './FidelityResults';
 import VideoSelect from './VideoSelect';

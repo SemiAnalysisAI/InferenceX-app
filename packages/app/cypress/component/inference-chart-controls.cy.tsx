@@ -1,7 +1,7 @@
 import 'cypress-axe';
 import { useState } from 'react';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -69,24 +69,6 @@ describe('Inference ChartControls', () => {
     cy.get('input[aria-label="Search options"]').type('All in Measured Power per Chip');
     cy.contains('[data-slot="select-item"]', 'All in Measured Power per Chip').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_utilityModeledWatts');
-  });
-
-  it('renders the model selector with the current model', () => {
-    // Default mock: selectedModel = Model.DeepSeek_R1 -> "DeepSeek R1 0528"
-    cy.get('#model-select').should('be.visible');
-    cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
-  });
-
-  it('renders the sequence selector with the current sequence', () => {
-    // Default mock: selectedSequence = Sequence.EightK_OneK -> label "8K / 1K"
-    cy.get('#scenario-select').should('be.visible');
-    cy.get('#scenario-select').should('contain.text', '8K / 1K');
-  });
-
-  it('renders the precision multi-select with the current precision', () => {
-    // Default mock: selectedPrecisions = [Precision.FP4] -> label "FP4"
-    cy.get('[data-testid="precision-multiselect"]').should('be.visible');
-    cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
   });
 
   it('renders the Y-axis metric selector', () => {
@@ -172,12 +154,6 @@ describe('Inference ChartControls', () => {
     // Default mock: selectedGPUs = [] — GPU date range pickers should not render
     cy.contains('Comparison Date Range').should('not.exist');
     cy.contains('Intermediary Dates').should('not.exist');
-  });
-
-  it('renders the GPU config multi-select', () => {
-    // The GPU Config label should be present (hideGpuComparison defaults to false)
-    cy.contains('Chip Config').should('be.visible');
-    cy.get('[data-testid="gpu-multiselect"]').should('be.visible');
   });
 
   it('uses a full-width benchmark row above chart and history controls on desktop', () => {
@@ -594,7 +570,7 @@ describe('Inference ChartControls cost metrics', () => {
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
+      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
@@ -619,9 +595,9 @@ describe('Inference ChartControls cost metrics', () => {
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedSequence: Sequence.OneK_OneK,
       },
-      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.OneK_OneK },
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });

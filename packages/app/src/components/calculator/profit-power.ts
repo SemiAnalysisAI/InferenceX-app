@@ -1,4 +1,4 @@
-import { modelSystemPower } from '@/lib/modeled-system-power';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 
 import {
@@ -21,7 +21,7 @@ type PlanningPower =
 function planningPower(point: GPUDataPoint): PlanningPower {
   const row = point.sourceRow;
   if (!row || row.metrics.power_metric_schema_version !== 2) return { reason: 'no-measured-power' };
-  const estimate = modelSystemPower(row, undefined, true);
+  const estimate = modelSystemPower(row);
   if (estimate.status !== 'supported') {
     switch (estimate.reason) {
       case 'hardware': {

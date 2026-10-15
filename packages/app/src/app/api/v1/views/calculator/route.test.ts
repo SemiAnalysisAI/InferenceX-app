@@ -25,7 +25,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
 
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   // Pass-through: the route's cachedQuery wrapper must not hide the query args.
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
@@ -34,9 +34,9 @@ vi.mock('@/lib/api-cache', () => ({
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import { buildGpuGroups } from '@/components/calculator/throughput-data';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 
 import { GET } from './route';
 

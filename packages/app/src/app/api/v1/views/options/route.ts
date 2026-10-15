@@ -33,9 +33,9 @@ import {
 import { LIFECYCLE_DEFAULTS, LIFECYCLE_METRICS } from '@/components/calculator/lifecycle';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from '@/components/reliability/aggregate';
-import { cachedJson } from '@/lib/api-cache';
-import { scenarioSegmentForSequence } from '@/lib/compare-scenario-route';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { scenarioSegmentForSequence } from '@/lib/compare/compare-scenario-route';
+import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import {
   getModelCategory,
   getSequenceLabel,
@@ -47,15 +47,15 @@ import {
   Sequence,
   SEQUENCE_OPTIONS,
   sequenceKind,
-} from '@/lib/data-mappings';
-import { frameworkFamily } from '@/lib/framework-family';
+} from '@/lib/catalog/data-mappings';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   OVERVIEW_ENGINE_SCOPES,
   OVERVIEW_HARDWARE,
   OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_SCENARIOS,
   OVERVIEW_TIERS,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';

@@ -84,38 +84,24 @@ must use the append-only contract below.
 
 ### Required Power Publication
 
-Required ordinary sweeps upload a versioned
-`required-power-sweep-manifest/sweep_manifest.json`. The manifest binds the
-complete required matrix to source run/head/attempt, point identities, topology,
-exact measurement windows, physical node/GPU roles and hashed evidence. Tests use
-the synthetic bundle in `packages/db/src/etl/fixtures/powerx-manifest-v2/`.
-Unversioned required manifests fail closed; optional legacy bundles retain their
-existing behavior.
+Required sweeps publish a versioned
+`required-power-sweep-manifest/sweep_manifest.json` binding the required matrix to
+source run/head/attempt, point identities, topology, measurement windows and hashed
+evidence. Required intent also travels in the dispatch payload so a missing manifest
+cannot silently downgrade the gate. Unversioned required manifests fail closed;
+optional legacy bundles retain their existing behavior.
 
-Artifact preparation validates required evidence before workflow migrations.
-Required intent also travels in the dispatch payload, so losing both the manifest
-and changelog marker cannot downgrade an ordinary required dispatch. Ingestion
-repeats validation before workflow/config upserts, checks purges/backfills before
-writing, and projects the resulting published curves from base-table state. It
-models the actual latest-attempt, whole-curve and same-image append-only rules.
-An unexplained loss of an existing recipe or concurrency point rejects ingestion.
-Destructive replacement requires exact old-snapshot and lost-point identities in
-the manifest; the ordinary producer supplies no such permission.
+Artifact preparation validates evidence before workflow migrations. Ingestion checks
+it again before upserts and rejects unexplained loss of existing recipes or concurrency
+points under the normal curve-replacement rules. Destructive replacement requires
+explicit old-snapshot and lost-point identities; the ordinary producer grants none.
+Required energy must be finite and positive, with physical evidence for both roles
+in disaggregated deployments. Successful earlier attempts of the same run/head may
+supply retained evidence when failed jobs are rerun.
 
-The source run and head must match. A successful earlier attempt of that same run
-may supply retained evidence when failed jobs are rerun; ingestion logs declared
-and current attempts. Required energy must be finite and positive. Missing,
-invalid and measured zero remain different values even though all fail this gate.
-Disaggregated deployments require physical evidence for both roles. Telemetry
-evidence follows the audit's collector: per-job SMI (single node), central DCGM
-(multinode), or native per-node SMI (`telemetry_kind: native_multinode_smi`); any
-other `telemetry_kind` fails the gate.
-
-This is pure preflight, not atomic publication. Schema migrations occur after
-artifact validation but before the curve check. Concurrent writers and failures
-during the existing per-file importer remain a risk. The separate PowerX receipt
-still compares source measurements against the DB and exact-run API after
-ingestion. It does not prove latest-curve visibility or browser rendering.
+These checks are preflight, not atomic publication: concurrent writers and partial
+import failures remain possible. The publication receipt verifies DB and exact-run
+API values after ingest; it does not prove latest-curve visibility or browser rendering.
 
 ### Append-Only Curve Extensions
 
@@ -350,7 +336,12 @@ Server-log artifacts are stored as filename-keyed bundles rather than as a hard-
 router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
 file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
 `multinode_server_logs_*` artifacts whose files are nested inside
-`multinode_server_logs.tar.gz`.
+`multinode_server_logs.tar.gz`. Native srt-slurm single-node runs (fixed-sequence from
+2026-09-24, AgentX from 2026-09-26) keep the client logs at the `server_logs_*` artifact root and
+put the job's `logs/` directory, including the server worker log `<host>_agg_w0.out`, in
+`srt-single-node-logs.tar.gz`. Ingest extracts that archive in place, so its files are stored
+under `srt-single-node-logs/` next to the root files; artifacts without the archive read as
+before.
 
 The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
 extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
@@ -361,7 +352,18 @@ for complete DB history, `--source gcs` to exercise only the backup path, and `-
 inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
 and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
 `files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
-large log downloads.
+large log downloads. `--force` revisits those bundles and inserts only filenames they do not
+already hold, which recovers files a newer artifact reader exposes, such as the single-node
+srt-slurm archive.
+
+Each stored file is capped at 128 MiB of UTF-8 text (override with
+`SERVER_LOG_MAX_FILE_BYTES`). PostgreSQL rejects any value over 1 GB and drops the connection,
+and verbose multinode decode workers can exceed that. An oversized file keeps its first and last
+halves, cut at line boundaries, around a marker recording the original size; the complete file
+remains in the GitHub artifact and GCS backup. KV-cache metadata is still derived from the full
+`server.log` before capping. Server-log and trace-replay writes retry up to three times with
+backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
+because both writers are transactional and re-check existing links.
 
 Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
 character slices, and the API returns at most 50 match contexts rather than transferring the
@@ -508,13 +510,16 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 
 ### Schema Version Detection
 
-`mapBenchmarkRow()` distinguishes legacy flat and role-shaped topology with the `prefill_tp` field, and recognizes modern AgentX single-node metadata separately:
+`mapBenchmarkRow()`, `mapEvalRow()`, and `mapAggEvalRow()` all use
+`resolveConfigTopology()` in `packages/db/src/etl/topology.ts`. It resolves
+flat and role-shaped metadata, physical GPU counts, disaggregation, and aggregate
+role mirroring before config identity is created:
 
 - **v1 (pre-2025-12-19)**: Only `tp`, `ep`, and `dp_attention` are present. These are copied symmetrically: `prefillTp = decodeTp = tp`, `prefillEp = decodeEp = ep`. Both `numPrefillGpu` and `numDecodeGpu` are set to `tp * ep`.
-- **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
-- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
+- **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to the per-worker count times the role worker count if absent. Legacy per-worker counts use `tp * ep`; explicitly identified SGLang AgentX topology uses `tp * pp * pcp_size`.
+- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; ambiguous legacy rows retain the TP × EP per-worker fallback. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
-The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
+The shared v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
 
 Backfill audit provenance may identify the production config or an exact public
 benchmark row (`productionBenchmarkId`); at least one positive ID is required.
@@ -530,6 +535,37 @@ source values differ. Database recovery rejects the mismatch before writing.
 P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
 original average power, including when checking an already-applied correction.
 
+### Shared evaluation and performance topology
+
+Both individual eval artifacts and `agg_eval_all.json` use the same topology
+resolver as performance artifacts; their adapters only handle identity and metrics.
+For SGLang and Dynamo-SGLang AgentX artifacts with an explicit `is_multinode` marker,
+missing physical GPU counts are derived as TP × PP × PCP × workers; EP and DCP share TP devices. Explicit
+`num_gpus` or role GPU counts take precedence. Other frameworks and artifacts
+without a recognized marker retain their legacy count fallback. AgentX is identified
+by its scenario or the eval producer's zero ISL/OSL sentinels. Historical fixed-sequence
+artifacts keep their existing GPU-count convention so audited config identities
+and run corrections continue to match.
+
+Single-node SGLang eval metadata can mirror one aggregate worker into both
+prefill and decode fields. When both roles match the top-level topology, each
+has one worker, and no framework/explicit disaggregation signal is present,
+ingestion normalizes them to one aggregate configuration. Its mirrored config
+columns each hold the same physical count, with zero role-worker counts, matching
+the throughput convention. Asymmetric and explicitly disaggregated pools keep
+their separate roles.
+
+Node placement (`is_multinode`) does not by itself imply disaggregation. A
+prefill-only aggregate deployment can span multiple physical nodes. Actual decode
+worker pools and explicit/framework disaggregation signals determine the split.
+Legacy role-count fallbacks now include worker multiplicity consistently in both
+paths; the old performance fallback omitted it while eval included it.
+
+This corrects mapping of retained artifacts on future ingest; it does not rewrite
+existing database rows. Because topology participates in config identity,
+already-ingested evals require an audited reconciliation rather than a blind
+re-ingest that could leave the incorrect config alongside the corrected one.
+
 ### Power Audit Provenance (`power_invalid_reasons`, `power_audit`)
 
 Producers (`aggregate_power.py`) annotate every aggregate result row with two optional provenance fields alongside the `power_valid` verdict:
@@ -543,100 +579,80 @@ Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns 
 
 ### PowerX Telemetry Storage (`gpu_metric_*`, migration 016)
 
-Every single-node benchmark job (`benchmark-tmpl.yml`) samples `nvidia-smi` /
-`amd-smi` once per second for its whole lifetime and uploads the CSV as
-`gpu_metrics_<suffix>` next to `bmk_<suffix>` (agentic jobs: `bmk_agentic_<suffix>`,
-still paired by the bare suffix). The multinode template uploads no `gpu_metrics_`
-artifact; its telemetry travels inside `power_audit_<suffix>` as
-`LOGS/power/samples.csv`, one deployment-wide CSV written by srt-slurm's
-`dcgm-power` collector (`timestamp_unix, hostname, gpu_index, gpu_uuid, power_w`,
-power only). `etl/multinode-power-samples.ts` regroups it per host and the ingest
-stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
-so multinode and disaggregated points get per-GPU power curves with null clocks,
-temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
-so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
-upload. A bundle that carries readable `gpu_metrics*.csv` SMI files is stored from
-those files; its DCGM `samples.csv` is used only when no SMI CSV in the bundle parses.
-CI ingest stores the telemetry in the same step that links server logs, so readers
-do not depend on GitHub's 90-day artifact retention:
+CI persists telemetry so historical reads survive GitHub artifact expiry.
+`gpu_metric_series` stores CSV identity and sidecars, `gpu_metric_samples` stores
+UTC samples, and `benchmark_result_gpu_metrics` links points to their series.
+Each file/host remains separate; multiple benchmark points can share a series.
+Ingest prefers paired `gpu_metrics_` artifacts and otherwise reads telemetry from
+`power_audit_` bundles. Unchanged inputs only refresh links; changed inputs replace
+samples transactionally. A paired artifact that holds no telemetry file (no
+`gpu_metrics*.csv` series and no `LOGS/**/samples.csv`), such as a sweep run with
+power collection off, marks its points `telemetry_not_collected` rather than
+`ingest_failed`. The telemetry API check skips those points, and the PowerX manifest
+reports them as one `N telemetry artifact(s) held no telemetry` warning. Telemetry
+files that are present but unparseable remain `ingest_failed`.
 
-- `gpu_metric_series` — one row per (workflow run, artifact, CSV path): vendor,
-  CSV sha256, sample count, GPU count, recorded window, median cadence, and the
-  parsed sidecars (`gpu_metrics_context.json`, identity, amd-smi energy counters).
-- `gpu_metric_samples` — full-resolution rows, one per (GPU, sample). NVIDIA
-  fills the six common columns; AMD additionally fills edge/memory temperature,
-  voltages, FCLK/SOCCLK and multimedia activity. Timestamps are UTC; NVIDIA's
-  zone-less `YYYY/MM/DD HH:MM:SS.mmm` is interpreted with the context sidecar's
-  `timestamp_timezone` (the producer writes UTC).
-- `benchmark_result_gpu_metrics` — links each benchmark point to the series that
-  was recorded while it ran (several series per point for multinode artifacts).
+Native `samples.csv` v2 adds optional `gpu_util_pct`, and v3 adds `temperature_c`.
+Ingest stores these readings in the existing GPU sample fields; missing or invalid
+readings stay absent. `sm_active` is a distinct measurement with no stored field and
+is not treated as GPU utilization.
 
-Ingest is idempotent: the same CSV hash, sidecars, and unique sample count refresh
-only the point links. A source change replaces the samples inside one transaction,
-including corrected timezone or identity sidecars. Repeated samples keep the first
-row per (GPU, timestamp), matching the sample table's primary key, so counts and
-statistics see each reading once. Series are stored per artifact, not per point: an
-AgentX per-concurrency job maps to one point, while older fixed-sequence jobs that
-swept several concurrencies in one job share one series across points. Windowing a
-series to the measured serving interval is a reader concern; the raw series
-deliberately includes server start-up and warm-up so both phases can be inspected.
+Run reads use the database when the run has stored telemetry, otherwise GitHub.
+Stored responses report `coverage.status` as `complete`, `partial`, or `unknown`,
+with `missingArtifacts` naming absent artifacts from the retained run inventory.
+Missing files or mismatched sample-count metadata also make coverage partial.
+Older series without inventories remain readable with unknown coverage. A re-ingest
+with no parseable series preserves historical samples but invalidates their inventory
+until a successful repair. Backfill `--all` revisits partial and unknown runs; complete
+runs require `--force` or `--run`.
+Database errors remain errors. Point reads use linked database series and check their
+revision before using cached payloads, so re-ingest needs no manual telemetry-cache
+purge. Readers retry if a series changes while its samples are being loaded.
 
-`bun run admin:db:backfill-gpu-metrics --all --yes` stores telemetry for runs from
-the last 90 days. `--all` skips runs that already have series; target those with
-`--run` or add `--force`. `--force` also replaces the samples of unchanged series,
-which is how a parser fix reaches stored telemetry. The backfill downloads from
-GitHub only; the GCS backup mirrors just `schedule` and `push` runs on `main`, so
-GitHub's 90-day artifact retention bounds the reachable history, including for
-parser fixes: the database keeps only the parsed samples, not the CSV.
+Per-GPU statistics cover the full recording, including startup and warmup, rather
+than the serving window. They preserve zero, skip missing readings per metric, and
+remain empty when the stored sample count is incomplete. Chart downsampling and GPU
+visibility do not change their population. Bump `GPU_STATS_VERSION` when statistical
+semantics change so cached point payloads are refreshed.
 
-`/api/gpu-metrics?runId=` answers each run from one source: a run with stored
-telemetry is read from the database only, and a run without it from its GitHub
-`gpu_metrics_` artifacts only. Database failures return `503 DATABASE_UNAVAILABLE`.
-The GitHub path applies the adjacent context timezone as ingest does. Multi-file
-artifacts keep separate file/host series, and successful reads and storage errors
-use no-store. For a run with stored telemetry, the public GPU metrics view reads
-only its selected file/host series while keeping the complete artifact-name
-inventory; the GitHub path downloads every `gpu_metrics_` artifact of the run.
+#### Migration and targeted recovery
 
-Point and run readers fetch series rows and primary-key pages of samples in separate
-autocommit statements, then return each selected series complete and in time order.
-After loading, they re-read each series' version key (`csv_sha256`, `sample_count`,
-`ingested_at`) and retry the whole read (three attempts at most) when a re-ingest
-committed in between, so a payload never mixes the metadata and samples, and
-therefore the statistics, of two versions.
+The ingest workflows apply pending migrations before ingest; Vercel deploys do not.
+Apply `016_gpu_metrics.sql` before deploying readers if deployment precedes the first
+post-merge ingest, or telemetry reads return 503 until the migration runs. From the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
+process must use the same database.
 
-AgentX nested validation documents get a canonical validation filename alias only
-when their root result and retained window agree; stored sidecars keep the original
-path, result filename and validation hash. A retained window becomes the
-`power_audit` source and window of the single AgentX point at its concurrency, and is
-refused when several points share that concurrency. CI attaches it before the
-benchmark upsert. The backfill writes it only into the run's AgentX rows whose
-`power_audit` is NULL, even when samples are unchanged; metrics and validity stay
-untouched. The backfill refreshes `latest_benchmarks` but not the API cache; refresh
-that as in the [PowerX recovery runbook](./powerx-persistence-recovery.md).
+For a repair, retain the original artifact bytes, sidecars and receipt, and snapshot
+affected rows. With `DATABASE_WRITE_URL` and `GITHUB_TOKEN` set, preview the target,
+then repair it using an absolute receipt path:
 
-`/api/v1/gpu-metrics-point?id=` returns the series linked to one benchmark point with
-their samples and statistics; the CI publication verifier reads it after each ingest.
-Every request checks the point's DB revision before reading its Blob payload cache,
-so re-ingests, sidecar or audit repairs and new or shared point links need no manual
-purge. All responses use no-store; a point without linked series returns 404.
+```sh
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --dry-run
+bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+  --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
+```
 
-Readers compute per-GPU statistics from each series' stored samples on every read
-(`computeStoredGpuMetricStats` in `lib/gpu-metric-stats.ts`); they are not persisted.
-When the loaded samples do not match the series' `sample_count`, statistics stay
-empty while the samples are still returned. Statistics include startup and warmup,
-keep measured zero, and skip missing readings per metric. Mean is sample-weighted,
-percentiles interpolate at `p * (N - 1)`, and standard deviation divides by `N`. The
-public `/api/v1/views/gpu-metrics` projection returns the statistics of its selected
-file/host series; GPU visibility and chart downsampling do not change that
-population. None of these statistics is serving-window power or J/token.
+After a parser fix, add `--force` to replace unchanged stored samples. GitHub recovery
+accepts only the current attempt; older or expired artifacts require retained original
+bytes through `admin:db:ingest:ci`. Never substitute another attempt's artifacts.
+Backfill may fill missing AgentX audits and refreshes `latest_benchmarks`, but those
+benchmark changes also need the app's API cache refreshed. With its `INVALIDATE_SECRET`:
 
-Bump `GPU_STATS_VERSION` whenever metric populations, mappings, units or statistical
-definitions change: the point-cache revision includes it, so a deployment refreshes
-cached payloads for every linked point. Samples are stored as `real` (float32), so
-statistics over stored samples can differ from a computation over the original CSV
-by the float32 rounding of the inputs; compare with a float32 tolerance (e.g. 1e-5
-relative), not bit equality.
+```sh
+bun run admin:cache:invalidate https://TARGET_ORIGIN
+bun run admin:cache:warmup https://TARGET_ORIGIN
+bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
+```
+
+For protected previews, follow the bypass handling in
+`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
+The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+and API values; ingest success alone does not establish complete coverage. To undo a
+repair, restore the snapshotted rows or original bytes under the same identities.
+Do not delete a shared series to repair one point.
 
 ### PowerX publication receipts
 
@@ -644,8 +660,18 @@ The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
 point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
 mapped, override-adjusted metric contract, all configuration dimensions, original
 source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
-their original source identity. Failed or unmapped results at those workloads and
-database errors remain in the manifest; they cannot pass verification.
+their original source identity. Failed or unmapped results at those workloads, and
+failed config writes for their rows, remain in the manifest; they cannot pass
+verification. Other database write failures do not enter the manifest. The ingest
+writes them to the database write receipt (`DATABASE_WRITE_RECEIPT`) as
+`{ kind, subject, message, code }` entries, where `code` is the SQLSTATE or
+postgres.js client code. The workflow step "Check database writes" runs even after
+an earlier step fails, annotates each entry on the run page, fails on errors, and
+adds a short summary to the Slack failure message. Known failures listed in
+`DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
+annotated but not counted or fatal. Today that is only `trace_replay` with SQLSTATE
+`54000`, a `request_timeline` past the Postgres jsonb size limit, until trace storage
+changes.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database

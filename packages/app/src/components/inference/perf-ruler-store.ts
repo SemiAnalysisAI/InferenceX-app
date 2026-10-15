@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { perfRulerAxisMetricKey } from '@/hooks/usePerfRulerAxisReset';
 import {
   EMPTY_PERF_RULER_STATE,

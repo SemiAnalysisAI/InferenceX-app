@@ -12,7 +12,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -20,14 +20,14 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { type CalculatorUrlSeed, profitTargetUrlValue } from '@/components/calculator/url-seed';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
 import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
@@ -42,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
-import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -61,15 +61,15 @@ import { captionControlTriggerClassName, ResultContext } from '@/components/ui/r
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power-basis';
+import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basis';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { exportToCsv } from '@/lib/csv-export';
+import { track } from '@/lib/analytics/analytics';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
   getOpenRouterModelId,
@@ -77,15 +77,16 @@ import {
   Percentile,
   Sequence,
   type Model,
-} from '@/lib/data-mappings';
-import { modelRoutesForTab, type ModelRouteTab } from '@/lib/model-routes';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   applyCacheHitMode,
   clampPercent,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
@@ -220,7 +221,7 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       extrapolated: 'Full-chassis extrapolation',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails:
       'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
     unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
@@ -242,10 +243,10 @@ const STRINGS = {
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
     cacheHitLabel: 'Cache Hit Rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity — an upper-bound revenue estimate.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
@@ -351,7 +352,7 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
       extrapolated: '整机外推',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
     powerDetails:
       'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
     unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
@@ -373,10 +374,10 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     cacheHitLabel: 'Cache 命中率',
     cacheHitTooltip:
-      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theoretical 使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力——一种收入上限估算。',
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theoretical',
+      theoretical: 'Theroticial Roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
@@ -524,15 +525,13 @@ export default function ProfitEstimatorDisplay({
 }) {
   return (
     <GlobalFilterProvider
+      key={`${basis}:${urlSeed?.model}:${urlSeed?.profitTarget}:${urlSeed?.profitRouteKey}`}
       initialModel={urlSeed?.model}
       initialSequence={Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
-      <ProfitEstimatorInner
-        initialPercentile={urlSeed?.percentile ?? Percentile.P90}
-        basis={basis}
-      />
+      <ProfitEstimatorInner initialTarget={urlSeed?.profitTarget} basis={basis} />
     </GlobalFilterProvider>
   );
 }
@@ -564,10 +563,11 @@ function usePercentField(defaultValue: number, eventName: string) {
 }
 
 function ProfitEstimatorInner({
-  initialPercentile,
+  initialTarget,
   basis,
 }: {
-  initialPercentile: Percentile;
+  /** Shared `c_ivtarget`, parsed on the server so the first paint matches the link. */
+  initialTarget?: number;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
@@ -631,10 +631,17 @@ function ProfitEstimatorInner({
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
+  // The server seed belongs to this navigation; the URL store can outlive a model.
   const [targetValue, setTargetValue] = useState<number>(
-    () => profitModelDefaults(selectedModel).interactivity,
+    () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  // Only a target that differs from the model's default is written, so default
+  // views keep unchanged share links. A model switch re-seeds the default below,
+  // which clears the param.
+  useEffect(() => {
+    setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
+  }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year';
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
@@ -643,10 +650,10 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
   }, [getUrlParam]);
-  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
   useEffect(() => {
     const value = getUrlParam('c_chmode');
-    setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
+    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -655,8 +662,8 @@ function ProfitEstimatorInner({
   );
   // Each model has its own operating point, price source, and license fee
   // (Kimi K3: 45 tok/s/user on the Moonshot list price at 30%; GLM 5.2/5.3: 100 tok/s/user
-  // on the Z.ai list price at 10%; MiniMax M3: 83 tok/s/user on the MiniMax
-  // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
+  // on the Z.ai list price at 20%; MiniMax M3: 83 tok/s/user on the MiniMax
+  // list price at 20%; DeepSeek V4 Pro: 35 tok/s/user on the DeepSeek list
   // price at 0%, MIT-licensed; DeepSeek V4.1 Flash: 125 tok/s/user on the
   // DeepSeek Flash list price at 0%, MIT-licensed), so a model switch re-seeds
   // all three. The ref keeps
@@ -678,7 +685,7 @@ function ProfitEstimatorInner({
   // one model and the allow-list swapped it); fall back to the catalog.
   const effectivePriceSource: PriceSource =
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
-  const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
+  const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
 
   const {
@@ -1152,15 +1159,6 @@ function ProfitEstimatorInner({
     [setSelectedModel],
   );
 
-  const handlePercentileChange = useCallback(
-    (value: Percentile) => {
-      setSelectedPercentile(value);
-      setUrlParam('i_pctl', value);
-      track('profit_percentile_selected', { percentile: value });
-    },
-    [setUrlParam],
-  );
-
   const toggleGpuVisibility = useCallback(
     (hwKey: string) => {
       const visibleLegendKeys = legendHwKeys.filter((key) => visibleHwKeys.has(key));
@@ -1601,13 +1599,16 @@ function ProfitEstimatorInner({
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-5">
+              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-4">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-2"
+                  className={cn(
+                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' ? 'xl:col-span-4' : 'xl:col-span-3',
+                  )}
                 >
-                  <div className="min-w-0 md:col-span-2">
+                  <div className="min-w-0">
                     <ModelSelector
                       id="profit-model"
                       data-testid="profit-model-selector"
@@ -1618,17 +1619,7 @@ function ProfitEstimatorInner({
                       availableModels={agenticModels}
                     />
                   </div>
-                  {featureGateUnlocked && (
-                    <div className="min-w-0 md:col-span-2">
-                      <PercentileSelector
-                        id="profit-percentile"
-                        data-testid="profit-percentile-selector"
-                        value={selectedPercentile}
-                        onChange={handlePercentileChange}
-                      />
-                    </div>
-                  )}
-                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-target"
                       label={t.targetAgenticLabel(percentileLabel)}
@@ -1647,7 +1638,7 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-cache-hit"
                       label={t.cacheHitLabel}
@@ -1665,7 +1656,7 @@ function ProfitEstimatorInner({
                           const next = values[0];
                           if (next !== 'actual' && next !== 'theoretical') return;
                           setCacheHitMode(next);
-                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
+                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
                           track('profit_cache_hit_mode_changed', { mode: next });
                         }}
                         open={openDropdown === 'cacheHit'}
@@ -1680,7 +1671,7 @@ function ProfitEstimatorInner({
                     </div>
                   </div>
                   {powerControlsEnabled && (
-                    <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
                         htmlFor="profit-power"
                         label={t.powerLabel}
@@ -1718,7 +1709,10 @@ function ProfitEstimatorInner({
                 <ControlPanel
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-3"
+                  className={cn(
+                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' && 'xl:col-span-4 xl:grid-cols-4',
+                  )}
                 >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
@@ -1762,11 +1756,11 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {/* Custom token prices get their own row so the main controls keep their width. */}
+                  {/* Expand pricing to a full row rather than squeezing three price inputs. */}
                   {effectivePriceSource === 'custom' && (
                     <div
                       data-testid="profit-custom-prices"
-                      className="grid min-w-0 gap-4 md:col-span-2 md:grid-cols-3"
+                      className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
@@ -1832,7 +1826,7 @@ function ProfitEstimatorInner({
                   )}
 
                   {showsTcoBasis && (
-                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                       <LabelWithTooltip
                         label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                         tooltip={
@@ -1848,7 +1842,9 @@ function ProfitEstimatorInner({
               </div>
 
               <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
-                <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                <div
+                  className={cn('grid min-w-0 gap-3', selectedGPUs.length > 0 && 'md:grid-cols-2')}
+                >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-history-gpu"

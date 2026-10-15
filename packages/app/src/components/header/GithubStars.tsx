@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
-import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/star-storage';
-import { track } from '@/lib/analytics';
+import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/github/star-storage';
+import { track } from '@/lib/analytics/analytics';
 
 interface GitHubStarsProps {
   owner: string;

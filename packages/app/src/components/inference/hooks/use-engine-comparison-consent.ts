@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
-import { Sequence } from '@/lib/data-mappings';
-import type { Exclusion } from '@/lib/exclusion';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import type { Exclusion } from '@/lib/benchmarks/exclusion';
 
 export function supportsEngineComparisonConsent(sequence: Sequence): boolean {
   return sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces;

@@ -14,10 +14,10 @@ import {
 } from '@semianalysisai/inferencex-db/lib/encryption';
 
 import { useFeedbackList } from '@/hooks/api/use-feedback-list';
-import type { FeedbackListRow } from '@/lib/api';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { relockFeatureGate } from '@/lib/use-feature-gate';
+import type { FeedbackListRow } from '@/lib/api/api';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { relockFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { searchServerLogs } from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 

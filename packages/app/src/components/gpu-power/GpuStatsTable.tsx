@@ -3,8 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import type { GpuMetricStatRow } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { storedGpuStatsForMetric } from './stored-gpu-stats';
 
 import {

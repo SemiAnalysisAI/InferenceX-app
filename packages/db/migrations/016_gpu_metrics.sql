@@ -13,10 +13,9 @@ create table gpu_metric_series (
   workflow_run_id bigint      not null references workflow_runs(id) on delete cascade,
   -- Full GitHub artifact name, including the runner-pool/attempt suffix.
   artifact_name   text        not null,
-  -- Artifact name with the gpu_metrics_ prefix removed; pairs with bmk_<key>.
+  -- Artifact name without gpu_metrics_ or power_audit_; pairs with bmk_<key>.
   config_key      text        not null,
-  -- CSV path relative to the extracted artifact root (multinode uploads can
-  -- carry one CSV per serving node).
+  -- CSV path relative to the artifact root; native multinode series append #hostname.
   file_name       text        not null,
   vendor          text        not null,
   csv_sha256      text        not null,
@@ -25,8 +24,8 @@ create table gpu_metric_series (
   gpu_count       smallint    not null,
   started_at      timestamptz not null,
   ended_at        timestamptz not null,
-  -- Parsed sidecars: gpu_metrics_context.json, gpu_metrics_identity.*,
-  -- gpu_metrics_energy_{start,end}.csv. Kept verbatim for provenance.
+  -- Parsed collector sidecars, computed seriesInventory, and retained
+  -- validations and powerManifest documents for native power_audit bundles.
   sidecars        jsonb       not null default '{}'::jsonb,
   ingested_at     timestamptz not null default now(),
 

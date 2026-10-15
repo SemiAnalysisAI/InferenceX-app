@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   buildCacheReuse,
@@ -290,6 +290,15 @@ describe('defaultCacheReuseGroup', () => {
 });
 
 describe('recipe identity', () => {
+  it('keeps DWDP variants separate and preserves the legacy default key', () => {
+    const topology = { is_multinode: true, prefill_tp: 1, prefill_num_workers: 2 };
+    const legacy = recipeKeyOf(makePoint({}, topology));
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 1 }, topology))).toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(
+      recipeKeyOf(makePoint({ prefill_dwdp_size: 4 }, topology)),
+    );
+  });
   // Kimi K3 / H200 vLLM, 2026-09: three recipes share concurrency 8 and 10 —
   // 4×DEP8 with offload off and on, and 2×TP16. Keyed on concurrency alone the
   // chart kept whichever row came first and mixed recipes along one sweep.

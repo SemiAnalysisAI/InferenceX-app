@@ -163,9 +163,7 @@ describe('Dataset conversation flamegraph timing', () => {
     cy.get('[data-testid="flamegraph-bar-t-0"]').blur();
     cy.contains('button', 'Explore').click();
     cy.get('[data-rowkey="g-1-c-0"]').should('exist');
-  });
 
-  it('publishes bidirectional hreflang metadata for noindex conversation pages', () => {
     cy.visit('/zh/agentx/test-dataset/conversations/conversation-1', {
       onBeforeLoad: unlockAgenticGate,
     });

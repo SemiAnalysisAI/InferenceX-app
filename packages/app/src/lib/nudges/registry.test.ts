@@ -5,7 +5,11 @@ import {
   AGENTIC_POINT_ACTION_SELECTOR,
 } from './agentic-point-coach-mark';
 import { dismissesOnAction } from './policy';
-import { NUDGE_REGISTRY, TELEMETRY_TUTORIAL_STORAGE_KEY } from './registry';
+import {
+  NUDGE_REGISTRY,
+  TELEMETRY_TUTORIAL_STORAGE_KEY,
+  TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+} from './registry';
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -77,8 +81,9 @@ describe('NUDGE_REGISTRY integrity', () => {
       'filter-hint',
       'gradient-label',
       'reproducibility',
-      'rubin-agentic-inference-banner',
       'star-nudge',
+      'tpuv7-agentx-launch-modal',
+      'tpuv7-qwen-3-5-agentx-banner',
     ]);
   });
 
@@ -102,28 +107,44 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'rubin-agentic-inference-banner');
+    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     // New storage key so visitors who dismissed the previous launch banner
     // see this one; cypress specs seed/clear this key and must stay in sync.
-    expect(banner.storageKey).toBe('inferencex-rubin-banner-dismissed');
-    expect(banner.content.href).toBe('/inference/deepseek-v4');
-    expect(banner.content.title).toBe('Rubin Agentic Inference Performance');
-    expect(banner.content.description).toBe('67x Faster than Blackwell Ultra');
-    expect(banner.content.titleZh).toBe('Rubin 智能体推理性能');
-    expect(banner.content.descriptionZh).toBe('速度达 Blackwell Ultra 的 67 倍');
+    expect(banner.storageKey).toBe('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+    expect(banner.content.href).toBe('/inference/qwen-3-5');
     expect(banner.analytics).toEqual({
-      shown: 'inference_rubin_banner_shown',
-      dismissed: 'inference_rubin_banner_dismissed',
-      action: 'inference_rubin_banner_clicked',
+      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
+      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
+      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
       properties: {
-        banner_id: 'rubin-agentic-inference',
+        banner_id: 'tpuv7-qwen-3-5-agentx',
         destination: 'inference',
       },
     });
     // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/inference/deepseek-v4');
+    expect(location.href).toBe('/zh/inference/qwen-3-5');
+
+    location.href = '';
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
+    modal.content.primaryAction?.onClick();
+    expect(location.href).toBe('/zh/inference/qwen-3-5');
+  });
+
+  it('centers the TPUv7 launch modal on the landing page', () => {
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    expect(modal?.scope).toBe('landing');
+    expect(modal?.content.centered).toBe(true);
+    // cypress/support/e2e.ts seeds this key; a rename has to be mirrored there.
+    expect(modal?.storageKey).toBe(TPUV7_LAUNCH_MODAL_STORAGE_KEY);
+    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe('inferencex-tpuv7-agentx-modal-dismissed');
+    expect(modal?.analytics).toEqual({
+      shown: 'inference_tpuv7_agentx_modal_shown',
+      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
+      action: 'inference_tpuv7_agentx_modal_clicked',
+    });
   });
 
   it('gives every coach mark an anchor to point at', () => {

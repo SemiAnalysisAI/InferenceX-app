@@ -6,9 +6,9 @@ import { InferenceContextsProvider } from '@/components/inference/InferenceConte
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import type { InferenceData } from '@/components/inference/types';
 import { traceKeyForPoint } from '@/components/inference/utils/powerTimeline';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { computeToggle } from '@/lib/toggle-set';
+import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { computeToggle } from '@/lib/shared/toggle-set';
 
 import {
   createMockHardwareConfig,

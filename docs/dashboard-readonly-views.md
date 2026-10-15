@@ -7,6 +7,15 @@ registry.test.ts, including hidden and feature-gated routes.
 
 ## Static editorial content
 
+`/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and
+About FAQ entry points, document running the external `agentx-harness` CLI.
+They add no benchmark data, selectors, calculations, or server-side execution.
+Copy buttons are presentation-only; no API/OpenAPI contract
+changes are needed. `/llms.txt` discovers the guide, and the existing
+`packages/skills/skills/inferencex-api/references/agentx.md` cookbook documents the
+same pinned command and routing flags. Running the harness does not submit or
+publish results through the read-only API.
+
 `/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling
 reproduce the public GLM-5.3 newsletter article, with the September 28, 2026
 benchmark snapshot and original figures. They add no data selectors, calculations,
@@ -15,6 +24,28 @@ handlers discover the post through the shared blog registry. The subscriber-only
 continuation stays on the newsletter and is not included in these feeds.
 Use the existing inference, first-token, and cache-reuse view contracts for live
 data; do not interpret the historical article figures as current API results.
+
+## Standalone ubenchX pages
+
+`/ubenchx` (Beta) is linked from the header navigation and redirects to `/ubenchx/mem-bw`.
+Each test page (`/ubenchx/mem-bw`, `/ubenchx/sm-l2-distance`, `/ubenchx/tpc-skyline`, plus `/zh` siblings) shares a
+header whose Microbenchmark selector navigates between tests; it maps to the view's `test`
+parameter rather than adding a new one. They are not
+dashboard tabs, so they have no `DASHBOARD_API_COVERAGE` entry. Their data is published
+by the `ubenchx` view (`GET /api/v1/views/ubenchx?test=<test>&gpu=<gpu|all>`), which
+runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylineRun` as the pages. The mem-bw
+Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
+already includes all three metrics, so it adds no query parameter.
+
+The profit estimators' responsive control grouping and widths are presentation-only.
+They do not change selectors, URL parameters, calculations, or returned data, so
+the existing profit view API and `inferencex-skills` contracts are unchanged.
+
+## Site search exclusion
+
+The header site search is presentation-only navigation over public page text. It has no
+data selector, filter, unit or calculation and calls no `/api/v1` route, so it needs no view
+API or skills entry. See [Site Search](./site-search.md).
 
 ## Exact query-key inventory
 
@@ -28,7 +59,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                           |
 | `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                                                                                                                                                |
 | `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                                                                                                                                                   |
-| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                                              |
+| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `includeHistory`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                            |
 | `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                                       |
 | `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                                                                                                                                              |
@@ -43,6 +74,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                                                                                                                                               |
 | `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
+| `ubenchx`                       | `gpu`, `test`                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
 Power-control visibility is presentation-only: inference power metrics are
@@ -57,6 +89,28 @@ locked. The existing read-only `gpu-metrics`, `inference` and
 查询参数、计算逻辑和响应格式均不变。
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
+
+### Current image age
+
+The page and view API default to Agentic (`agentic-traces`) and all node types
+(`nodeType=all`). The selected model falls back to its first available active
+scenario when Agentic is unavailable. Explicit node-type and scenario selections
+still override those defaults.
+
+`ageSummary` contains the nearest-rank p90 submission age and configuration count
+for the current filtered image rows. `includeHistory=true` adds `ageHistory`, with
+90 daily UTC points ending on `asOf` (today by default). Every existing image
+filter applies. History uses successful image-bearing submissions, carries the
+latest pre-window observation forward, and never backfills a configuration before
+its first submission. Empty days have a null p90, not zero. Each displayed
+configuration has one vote, including node type in its identity.
+
+These values measure submission freshness, not image build age. Repeated
+submissions of the same tag reset age. Current model/scenario retirement rules
+apply to the whole window; historical retirement states are not stored. The
+current summary uses the latest benchmark snapshot, while the historical series
+uses submission events. Chart hover, keyboard inspection, and retry are
+presentation controls and do not introduce additional data selectors.
 
 ## Source audit and shared computations
 
@@ -91,8 +145,15 @@ locally generated assets do not become public API data. Feedback is sensitive.
 OperatorX is feature-gated in navigation and uses page-owned
 `/api/v1/operatorx/*` routes; it has no published `/api/v1/views/operatorx`
 contract.
+The Agentic Workload Explorer is feature-gated in navigation and reads a frozen,
+anonymized ProxyTrace snapshot from a separate database through page-owned
+`/api/v1/agentic-workload-explorer/*` routes (catalogued as `page-bff`); it has
+no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
-state. GPU interactive downsampling does not alter returned raw data or statistics.
+state. GPU `downsample` sets a renderer hint (`maxInteractivePoints: 2000` or
+`null`); it does not alter returned raw data or statistics. The `artifact` selector
+uses an `artifacts[]` entry: the artifact name, or `<artifact>/<file>` for multi-file
+artifacts.
 Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
 Provisioned, and All in Measured. The last combines measured GPU power with modeled
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
@@ -101,7 +162,12 @@ or calculations. Profit comparison `powerLabel` display text follows the same na
 GPU statistics include startup and warmup for all chips in the selected series,
 regardless of chip visibility. They are separate from serving-window power and
 J/token. Run telemetry comes from one source per run: stored series once the run is
-ingested, otherwise its artifacts. The public view returns private, no-store
+ingested, otherwise its artifacts. Stored `coverage` describes the whole run, even
+when one host is selected: `complete` means the recorded artifact/file inventory
+is present, `partial` means recorded telemetry is missing, and `unknown` means a
+complete inventory was not retained. `missingArtifacts` lists entirely missing
+artifacts; it may be empty when only a file is incomplete.
+GitHub `coverage` is `null` (unassessed). The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`
@@ -145,10 +211,10 @@ toggles and colours. The inference view already returns `comparisons` (one proje
 The per-date toggles are renderer state, not query keys, so no API or OpenAPI contract
 change is required.
 
-Perf Ruler share state (`i_rulers`) also stays in the browser. Both the primary
-scatter chart and date/run comparison chart restore it; run-qualified curve IDs
-retain `~rRUN_ID`. Tooltip scrolling and viewport limits only keep existing actions
-reachable. Neither changes returned values or adds a views API parameter.
+Perf Ruler share state (`i_rulers`) also stays in the browser. The primary scatter
+chart restores it; date/run comparison rulers are not shared. Tooltip scrolling and
+viewport limits only keep existing actions reachable. Neither changes returned values
+or adds a views API parameter.
 
 ## Fixed-sequence service comparisons
 
@@ -245,6 +311,31 @@ power metric) lists the drawn cross-platform frontier with each point's run and
 attempt, and exports it as CSV. The views API has no global-frontier parameter, so
 that table remains dashboard-only.
 
+## Staged-run chart link coverage
+
+The staging callback's links select existing inference controls: `g_model`,
+`i_seq`, `i_prec`, `i_gpus`, and the run-qualified
+`i_dates=YYYY-MM-DD~rRUN_ID`, with throughput/interactivity axes. Their read-only
+counterparts are the existing `/api/v1/views/inference` `model`, `sequence`,
+`precisions`, `gpus`, `dates`, `metric=tpPerGpu` and `xmode=interactivity`
+parameters. `optimal=true&best=false` returns the selected line's Pareto points.
+The `comparisons[].entry` field identifies the requested exact logical snapshot;
+primary `runId` can instead select that snapshot as the main result.
+
+The API already preserves every run-qualified comparison, including one matching
+its primary `runId`: `comparisonSelections` parses entries independently of the
+main run, and the inference handler fetches and projects every comparison scope.
+The frontend correction removes its same-run fetch suppression, bringing it back
+into agreement with that existing contract. No endpoint, query key, response
+shape or calculation changes. The API source digest is refreshed because the
+shared chart-data module changed; the existing OpenAPI exact-run description
+continues to apply.
+
+Line-label visibility (`i_linelabel`) and the callback's descriptive link text are
+presentation-only. Staging ingestion and its callback remain privileged mutations,
+so they do not gain public API endpoints. The companion skill reference documents
+selector translation and preserving the staging deployment origin.
+
 ## Verification scope
 
 Route tests cover baseline views and selected extension behavior, including
@@ -282,6 +373,10 @@ GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取
 存储的有效平均值、窗口内所绘曲线的最大值，以及 GPU 数 × 注册表 TDP。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
+Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面专属的
+`/api/v1/agentic-workload-explorer/*` 接口（在路由目录中归类为 `page-bff`）
+从独立数据库读取冻结的匿名 ProxyTrace 快照；目前没有发布
+`/api/v1/views/agentic-workload-explorer` 契约。
 
 日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式下都使用日期对比图，
 并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
@@ -318,3 +413,14 @@ JSON。散点图的前沿点表（`i_frontier` 开启且为实测功耗
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。
+
+### CollectiveX kernel qualification / Kernel 验证情况
+
+The CollectiveX view also returns `knownSupport` and `knownSupportFootnotes` from
+the same curated source as the website, independently of selected runs. Status
+values are `works`, `broken`, and `na`; read each note to distinguish unavailable
+combinations from pending qualification. Footnotes contain both `en` and `zh`.
+
+CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网站共用人工维护
+的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
+不可用与待验证的配置。注释同时包含 `en` 和 `zh`。

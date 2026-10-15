@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { ChartHover, type HoverItem } from '@/components/inference/agentic-point/chart-hover';
 import type { Distribution } from '@/hooks/api/use-datasets';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, localeNumber } from './format';
 
 const STRINGS = {

@@ -4,24 +4,24 @@
  * Ranking derivation is NOT reimplemented here: rows come from
  * `buildOverviewModelSummary` (the /overview derivation) sorted by
  * `buildRankingRows` — exactly what the `/rankings/<slug>` pages render via
- * `lib/run-rankings-data.server.ts`. This module only widens the page's
+ * `lib/live-seo/run-rankings-data.server.ts`. This module only widens the page's
  * headline-scenario view to an explicit scenario parameter (default: every
  * curated overview scenario for the model) and maps rows to the documented
  * public shape.
  */
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 import {
   buildOverviewModelSummary,
   OVERVIEW_PRIMARY_TIER,
   overviewScenariosForModel,
   type OverviewScenario,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import {
   buildRankingRows,
   type RankingKind,
   type RankingPageEntry,
   type RankingRow,
-} from '@/lib/rankings';
+} from '@/lib/live-seo/rankings';
 
 /** Machine-readable unit for the ranked `value` of each kind. */
 export const RANKING_VALUE_UNITS: Readonly<Record<RankingKind, string>> = {

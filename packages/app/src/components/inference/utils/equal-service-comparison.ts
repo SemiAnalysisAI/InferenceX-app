@@ -1,7 +1,7 @@
 import type { AggDataEntry, InferenceData } from '../types';
-import { getHardwareConfig } from '@/lib/constants';
-import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
-import { getDisplayLabel } from '@/lib/utils';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { isPositive, powerBasisNormalization } from '@/lib/power/power-basis';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { runIdFromUrl } from './powerTimeline';
 import { reconstructedRoleEnergy, type ReconstructedRoleEnergy } from './role-energy';
 import { pointTopologyKey, topologyLabel } from './topology-filter';

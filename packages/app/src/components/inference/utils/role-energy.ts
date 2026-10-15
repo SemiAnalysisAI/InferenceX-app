@@ -1,4 +1,4 @@
-import { isPositive } from '@/lib/power-basis';
+import { isPositive } from '@/lib/power/power-basis';
 
 /**
  * Reconstructs how a disaggregated deployment's request energy splits between

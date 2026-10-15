@@ -6,7 +6,7 @@ import { useMemo } from 'react';
 import { buildComparisonDates } from '@/components/inference/hooks/useChartData';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import { benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
-import type { Model, Sequence } from '@/lib/data-mappings';
+import type { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import { dropCurrentRunEntries, type ProfitHistoryDateRows } from './profit-history';
 

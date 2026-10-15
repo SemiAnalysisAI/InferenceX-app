@@ -46,7 +46,7 @@
  * they are measured.
  */
 
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/calculator/cache-pricing';
 
 /**
  * Assumption defaults the Fleet Lifecycle page seeds its controls with and the

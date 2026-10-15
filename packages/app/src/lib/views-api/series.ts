@@ -33,24 +33,25 @@ import {
   type FixedSequenceStatistic,
 } from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
-import type { BenchmarkRow } from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
+  paretoMaximizesX,
   remapInferencePoint,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 import {
   type TcoBasis,
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesBase,
-} from '@/lib/constants';
+} from '@/lib/catalog/constants';
 
-import { Sequence } from '@/lib/data-mappings';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 
 /**
@@ -301,7 +302,7 @@ export function buildInferenceSeries(
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
   const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
-  const maximizePowerX = chartDef.chartType !== 'e2e';
+  const maximizePowerX = direction !== null && paretoMaximizesX(direction);
   const frontierDirection = isMeasuredPower
     ? maximizePowerX
       ? 'upper_right'
@@ -319,7 +320,7 @@ export function buildInferenceSeries(
     }
     for (const bucket of byHwDate.values()) {
       const frontier = isMeasuredPower
-        ? upperPowerEnvelope(bucket, maximizePowerX)
+        ? upperPowerEnvelope(bucket, direction)
         : frontierFn(bucket.filter(isFrontierEligible));
       for (const point of frontier) {
         frontierPoints.add(point);

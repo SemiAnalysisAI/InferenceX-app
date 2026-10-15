@@ -4,9 +4,9 @@ import { ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 import { collectiveXConclusionLabel, collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import type { CollectiveXRunSummary } from './types';

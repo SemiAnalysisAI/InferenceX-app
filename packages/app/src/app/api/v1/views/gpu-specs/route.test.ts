@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
 }));
 
-import { GPU_CHART_METRICS, GPU_SPECS, parseNumericFromString } from '@/lib/gpu-specs';
+import { GPU_CHART_METRICS, GPU_SPECS, parseNumericFromString } from '@/lib/catalog/gpu-specs';
 
 import { GET } from './route';
 

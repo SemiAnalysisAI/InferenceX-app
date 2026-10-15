@@ -15,13 +15,13 @@
  * every boundary and role publishes on a common axis; everywhere else the
  * comparison yields no series and the control says so.
  */
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 import {
   POWER_BASES,
   POWER_BASIS_FIELDS,
   POWER_BASIS_LABELS,
   type PowerBasis,
-} from '@/lib/power-basis';
+} from '@/lib/power/power-basis';
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { InferenceData, PowerCompare, PowerRole, PowerVariant } from '../types';

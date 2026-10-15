@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 export function ReadingProgressBar({ slug }: { slug: string }) {
   const [progress, setProgress] = useState(0);

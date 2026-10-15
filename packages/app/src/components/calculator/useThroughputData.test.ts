@@ -3,10 +3,10 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { Percentile, Sequence } from '@/lib/data-mappings';
-import { overlayRunIndex } from '@/lib/overlay-run-style';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
 
 import type { GPUDataPoint } from './types';
 import {

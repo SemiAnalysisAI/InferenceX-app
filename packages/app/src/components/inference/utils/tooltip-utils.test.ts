@@ -1,8 +1,13 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/power/system-power-model';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   getPointLabel,
   generateTooltipContent,
@@ -72,17 +77,17 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 const systemPower = {
   status: 'supported',
   hardware: 'h100',
-  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
-  modelPath: 'chassis/H100.py',
+  modelRevision: SYSTEM_POWER_MODEL_REVISION,
+  operatingState: { workload: 'agentic' as const, scaleOut: true },
   gpuCount: 16,
   chassisCount: 2,
-  chassisAcWatts: 12000,
-  chassisAcWattsPerGpu: 750,
+  itWatts: 12000,
+  itWattsPerGpu: 750,
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
   modeledGpuCount: 16,
-  deploymentAcWatts: 12000,
+  deploymentItWatts: 12000,
   deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
@@ -134,7 +139,7 @@ describe('modeled system-power tooltip', () => {
       ...overrides,
     });
 
-  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+  it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
@@ -142,11 +147,11 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('14,400 W');
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -159,9 +164,9 @@ describe('modeled system-power tooltip', () => {
         gpuCount: 4,
         chassisCount: 1,
         modeledGpuCount: 8,
-        chassisAcWatts: 6000,
+        itWatts: 6000,
         facilityWatts: 7200,
-        deploymentAcWatts: 3000,
+        deploymentItWatts: 3000,
         deploymentFacilityWatts: 3600,
         topologyBasis: 'single-node',
         chassisBasis: 'extrapolated',
@@ -219,6 +224,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('0 W/GPU');
   });
 
+  it('sets every system-power line in the 11px tooltip text size', () => {
+    for (const isPinned of [true, false]) {
+      const host = document.createElement('div');
+      host.innerHTML = generateTooltipContent(config({ isPinned }));
+      const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
+      const sizes = new Set<string>();
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        let el = node.parentElement;
+        while (el && el !== host && !el.style.fontSize) el = el.parentElement;
+        sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
+      }
+      expect([...sizes]).toEqual(['11px']);
+    }
+  });
+
   it('keeps hover compact and leaves unrelated metrics unchanged', () => {
     const hover = generateTooltipContent(config({ isPinned: false }));
     expect(hover).toContain('500 W/GPU');
@@ -231,10 +253,10 @@ describe('modeled system-power tooltip', () => {
   it('localizes the measurement boundary and occupancy assumptions', () => {
     const html = generateTooltipContent(config({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
-    expect(html).toContain('整个部署的机箱交流功耗估算');
+    expect(html).toContain('整个部署的 IT 功耗估算');
     expect(html).toContain('数据中心功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('CPU/DRAM 利用率：20%');
+    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });

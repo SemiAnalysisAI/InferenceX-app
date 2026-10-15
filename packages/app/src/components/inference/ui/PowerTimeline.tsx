@@ -41,20 +41,20 @@ import { useComparisonSeries } from '@/components/inference/hooks/useComparisonS
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { computeToggle } from '@/lib/toggle-set';
-import { getModelSortIndex } from '@/lib/constants';
+import { track } from '@/lib/analytics/analytics';
+import { computeToggle } from '@/lib/shared/toggle-set';
+import { getModelSortIndex } from '@/lib/catalog/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
 import { lttbDownsample } from '@/lib/d3-chart/downsample';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   useInferenceActions,

@@ -1,6 +1,6 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 // The website advertises the verified public release, which can lag the source candidate.
-import PUBLISHED_SKILL from '../../src/lib/published-inferencex-skills.json';
+import PUBLISHED_SKILL from '../../src/lib/api/published-inferencex-skills.json';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
@@ -336,9 +336,7 @@ describe('API documentation', () => {
     cy.get('[data-testid="footer-link-api"]')
       .should('have.attr', 'href', '/zh/api')
       .and('have.text', 'API 文档');
-  });
 
-  it('keeps wide schemas locally scrollable without overflowing the Chinese mobile page', () => {
     cy.viewport(375, 844);
     cy.visit('/zh/api');
 

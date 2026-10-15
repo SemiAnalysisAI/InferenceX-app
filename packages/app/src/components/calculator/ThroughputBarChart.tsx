@@ -1,12 +1,12 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -17,11 +17,12 @@ import type {
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
-import { getChartWatermark } from '@/lib/data-mappings';
-import type { Locale } from '@/lib/i18n';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import type { Locale } from '@/lib/i18n/i18n';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
 
 import type {
   BarMetric,
@@ -436,13 +437,32 @@ function positionLabelPairs(
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
       const fitsInside = barEnd > maxW + 24;
+      // On narrow (phone) plots the longest bars can leave too little room to
+      // their right. Pull the label left so it ends at the plot edge instead
+      // of clipping, and give it a background halo where it overlaps the bar.
+      const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
+      const clamped = !fitsInside && outsideX < barEnd + 6;
       const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
-      d3.select(this)
-        .attr('x', fitsInside ? barEnd - 10 : barEnd + 6)
+      const label = d3
+        .select(this)
+        .attr('x', fitsInside ? barEnd - 10 : outsideX)
         .attr('text-anchor', fitsInside ? 'end' : 'start')
         .style('fill', fill)
         .attr('stroke', null)
         .attr('visibility', barEnd < 0 || barEnd > chartWidth ? 'hidden' : 'visible');
+      if (clamped) {
+        label
+          .style('stroke', 'var(--background)')
+          .style('stroke-width', '3px')
+          .style('stroke-linejoin', 'round')
+          .style('paint-order', 'stroke');
+      } else {
+        label
+          .style('stroke', null)
+          .style('stroke-width', null)
+          .style('stroke-linejoin', null)
+          .style('paint-order', null);
+      }
     });
   };
 
@@ -467,7 +487,7 @@ export default function ThroughputBarChart({
   const locale = useLocale();
 
   // Color resolution: unofficial-run overlay bars take the run's palette color
-  // (so they match the banner + legend swatch — see lib/overlay-run-style.ts);
+  // (so they match the banner + legend swatch — see lib/charts/overlay-run-style.ts);
   // official bars prefer the dynamic colorResolver, falling back to static config.
   const resolveBarColor = useCallback(
     (datum: InterpolatedResult) =>
@@ -729,7 +749,23 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  const xAxisConfig = useMemo(() => ({ tickCount: 6 }), []);
+  // Phones: fewer ticks, SI-compact only for large values ("100k") so labels
+  // never collide. Small values (e.g. cost) keep plain decimals: '~s' would
+  // turn 0.1 into "100m".
+  const isMobileViewport = useIsMobileViewport();
+  const xAxisConfig = useMemo(
+    () =>
+      isMobileViewport
+        ? {
+            tickCount: 4,
+            tickFormat: (d: d3.AxisDomain) => {
+              const n = Number(d);
+              return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
+            },
+          }
+        : { tickCount: 6 },
+    [isMobileViewport],
+  );
 
   // ── onRender: x-axis label + initial selection opacities ──
 

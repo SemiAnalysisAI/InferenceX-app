@@ -8,14 +8,30 @@ import {
   type OptimizationHighlight,
   type OptimizationSection,
   type OptimizationsOverview,
-} from '@/lib/agentx-optimizations';
-import { getLocalizedFrameworks, getOptimizationsOverview } from '@/lib/agentx-optimizations-zh';
-import type { Locale } from '@/lib/i18n';
+} from '@/lib/agentx/agentx-optimizations';
+import {
+  getLocalizedFrameworks,
+  getOptimizationsOverview,
+} from '@/lib/agentx/agentx-optimizations-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 
 function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
+}
+
+/** Renders `**text**` spans in section prose as bold; everything else stays plain text. */
+function RichText({ text }: { text: string }) {
+  return text.split(/\*\*(?<bold>.+?)\*\*/u).map((part, index) =>
+    index % 2 === 1 ? (
+      <strong key={index} className="font-semibold text-foreground">
+        {part}
+      </strong>
+    ) : (
+      part
+    ),
+  );
 }
 
 function Highlights({ items }: { items: readonly OptimizationHighlight[] }) {
@@ -66,9 +82,11 @@ function SectionFigure({
         />
         <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
           <span className="block">{figure.caption}</span>
-          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
-            {ui.figureCta} ↗
-          </span>
+          {!figure.hideFullResolutionCta && (
+            <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
+              {ui.figureCta} ↗
+            </span>
+          )}
         </figcaption>
       </figure>
     </AgentXOptimizationsLink>
@@ -98,7 +116,9 @@ function SectionBlock({
       </h2>
       <div className="space-y-4 text-base leading-7 text-muted-foreground">
         {section.paragraphs.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
+          <p key={paragraph}>
+            <RichText text={paragraph} />
+          </p>
         ))}
       </div>
       {section.figure && <SectionFigure figure={section.figure} ui={ui} />}

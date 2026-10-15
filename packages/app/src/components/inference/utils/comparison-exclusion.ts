@@ -4,8 +4,12 @@ import {
   getSequenceExclusion,
   getSequenceExclusionFamilies,
   getSequenceExclusionPolicy,
-} from '@/lib/data-mappings';
-import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
+} from '@/lib/catalog/data-mappings';
+import {
+  buildExclusion,
+  type Exclusion,
+  type ExclusionConflictPolicy,
+} from '@/lib/benchmarks/exclusion';
 
 /**
  * Whether the cross-engine comparability guard should be lifted for the current

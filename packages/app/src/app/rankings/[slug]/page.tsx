@@ -14,8 +14,8 @@ import {
   RankingsDetailContent,
   type RankingsStrings,
 } from '@/components/live-seo/rankings-page-sections';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
 import {
   getRankingPageEntry,
   rankingPageDescription,
@@ -24,8 +24,8 @@ import {
   rankingPageTitle,
   scenarioLabel,
   type RankingPageEntry,
-} from '@/lib/rankings';
-import { getRankingPageData, type RankingPageData } from '@/lib/run-rankings-data.server';
+} from '@/lib/live-seo/rankings';
+import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,7 +1,7 @@
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
-import type { BenchmarkRow } from '@/lib/api';
-import { frameworkFamily } from '@/lib/framework-family';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 
 import type { GPUDataPoint } from './types';
 import type { GroupMeta, OverlayGroupMeta } from './useThroughputData';
@@ -180,14 +180,16 @@ export function cacheReuseRecipeKey(
     | 'num_decode_gpu'
     | 'recipe_fingerprint'
     | 'spec_method'
-  > & { offload_mode: string | null },
+  > & { offload_mode: string | null; metrics?: BenchmarkRow['metrics'] },
 ): string {
+  const dwdp = row.metrics?.prefill_dwdp_size ?? 1;
   return [
     row.disagg ? 'disagg' : 'agg',
     row.is_multinode ? 'mn' : 'sn',
     `p${row.prefill_num_workers}x${row.prefill_tp}/${row.prefill_ep}/${row.prefill_dp_attention ? 'dpa' : '-'}`,
     `d${row.decode_num_workers}x${row.decode_tp}/${row.decode_ep}/${row.decode_dp_attention ? 'dpa' : '-'}`,
     `g${row.num_prefill_gpu}+${row.num_decode_gpu}`,
+    ...(dwdp > 1 ? [`dwdp-${dwdp}`] : []),
     `spec-${row.spec_method || 'none'}`,
     `offload-${row.offload_mode || 'off'}`,
     row.recipe_fingerprint ? `fp-${row.recipe_fingerprint}` : '',
@@ -205,6 +207,7 @@ export function recipeLabelOf(point: GPUDataPoint): string {
     disagg: row.disagg,
     isMultinode: row.is_multinode,
     prefillTp: row.prefill_tp,
+    prefillDwdp: row.metrics.prefill_dwdp_size,
     prefillEp: row.prefill_ep,
     prefillDpAttention: row.prefill_dp_attention,
     prefillNumWorkers: row.prefill_num_workers,

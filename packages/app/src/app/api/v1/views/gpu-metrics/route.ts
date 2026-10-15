@@ -103,6 +103,7 @@ export function GET(request: NextRequest) {
         },
         runInfo: data.runInfo,
         artifacts: artifactNames,
+        coverage: data.coverage ?? null,
         availableMetrics,
         gpuIndices: indices,
         rows: rows.filter((r) => gpus.includes(r.index)),

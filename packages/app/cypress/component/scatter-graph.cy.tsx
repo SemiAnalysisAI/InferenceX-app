@@ -1,10 +1,7 @@
 import { useReducer, useState } from 'react';
-import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
+import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
-import {
-  overlaySelectionReducer,
-  UnofficialRunContext,
-} from '@/components/unofficial-run-provider';
+import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
@@ -18,8 +15,8 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Model, Precision, Sequence } from '@/lib/data-mappings';
-import { buildExclusion, resolveExclusionGroups } from '@/lib/exclusion';
+import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { buildExclusion, resolveExclusionGroups } from '@/lib/benchmarks/exclusion';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
@@ -2574,7 +2571,13 @@ describe('Power envelopes', () => {
     });
   }
 
-  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
+  function PowerHarness({
+    singleConfiguration = false,
+    normalized = false,
+  }: {
+    singleConfiguration?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [gradientLabels, setGradientLabels] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
@@ -2619,7 +2622,7 @@ describe('Power envelopes', () => {
       hwTypesWithData: new Set(['b200_trt']),
     });
     const definition = createMockChartDefinition({
-      chartType: 'interactivity',
+      chartType: normalized ? 'e2e' : 'interactivity',
       [`${metric}_roofline`]: 'lower_right',
     });
     return (
@@ -2918,6 +2921,15 @@ describe('Power envelopes', () => {
     cy.get('#power-sweep .parallelism-label .pl-text')
       .should('have.length', 1)
       .and('have.text', 'TP2');
+  });
+
+  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
+  // flips the corner toward higher x.
+  it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
+    mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
   });
 
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {

@@ -1,10 +1,10 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getModelSortIndex } from '@/lib/constants';
+import { getModelSortIndex } from '@/lib/catalog/constants';
 import { D3Chart, type D3ChartHandle, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import { renderErrorBars } from '@/lib/d3-chart/layers/error-bars';
 import { renderPoints, updatePointsOnZoom } from '@/lib/d3-chart/layers/points';
@@ -24,18 +24,18 @@ import {
   getEvalBenchmarkLabel,
   getChartWatermark,
   getPrecisionLabel,
-} from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+} from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
   useUnofficialRun,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 
 const BASE_MARGIN = { top: 24, right: 24, bottom: 52 };
 const OVERLAY_X_SIZE = 6;

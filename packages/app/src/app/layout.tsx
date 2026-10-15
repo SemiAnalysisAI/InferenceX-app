@@ -1,4 +1,4 @@
-import '@/lib/polyfills';
+import '@/lib/runtime/polyfills';
 import './globals.css';
 
 import { Analytics } from '@vercel/analytics/next';
@@ -9,11 +9,11 @@ import { DM_Sans } from 'next/font/google';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
-import { JsonLd } from '@/components/json-ld';
-import { AutumnLeaves } from '@/components/autumn-leaves';
-import { CircuitBackground } from '@/components/circuit-background';
-import { EasterEggThemeLazy } from '@/components/easter-egg-theme-lazy';
-import { APP_THEMES } from '@/lib/themes';
+import { JsonLd } from '@/components/seo/json-ld';
+import { AutumnLeaves } from '@/components/effects/autumn-leaves';
+import { CircuitBackground } from '@/components/effects/circuit-background';
+import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -25,7 +25,7 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { fetchStarCount } from '@/lib/github-stars.server';
+import { fetchStarCount } from '@/lib/github/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 import { VisitTracker } from '@/providers/visit-tracker';

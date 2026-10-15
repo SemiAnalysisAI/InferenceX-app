@@ -1,4 +1,4 @@
-import type { PowerBasis } from '@/lib/power-basis';
+import type { PowerBasis } from '@/lib/power/power-basis';
 import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
@@ -103,7 +103,7 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
   // Derived boundaries publish one canonical combination per family: whole
-  // deployment, average watts, joules per output token (lib/power-basis.ts).
+  // deployment, average watts, joules per output token (lib/power/power-basis.ts).
   ...(
     [
       ['gpu-provisioned', 'y_gpuProvisionedWatts', 'y_gpuProvisionedJPerOutputToken'],

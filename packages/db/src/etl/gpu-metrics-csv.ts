@@ -35,7 +35,6 @@ export interface ParsedGpuMetricsCsv {
   samples: GpuMetricSample[];
 }
 
-/** Sample columns that per-GPU statistics cover. */
 export const GPU_METRIC_STAT_KEYS = [
   'powerW',
   'temperatureC',
@@ -93,7 +92,6 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   return map;
 }
 
-/** `N/A`, empty, and unparseable cells become null; unit suffixes are ignored. */
 export function parseMetricCell(value: string | undefined): number | null {
   if (value === undefined) return null;
   const trimmed = value.trim();
@@ -127,7 +125,6 @@ export function parseNvidiaTimestamp(raw: string, offsetMinutes = 0): number | n
   return utc - offsetMinutes * 60_000;
 }
 
-/** amd-smi prints Unix epoch seconds; accept fractional and millisecond forms. */
 export function parseAmdTimestamp(raw: string): number | null {
   const trimmed = raw.trim();
   if (/^\d+(?:\.\d+)?$/u.test(trimmed)) {
@@ -296,7 +293,6 @@ function percentile(sorted: readonly number[], p: number): number {
   return sorted[lo]! + (sorted[hi]! - sorted[lo]!) * (idx - lo);
 }
 
-/** Per-GPU, per-metric summary over every non-null sample. */
 export function computeGpuMetricStats(samples: readonly GpuMetricSample[]): GpuMetricStats[] {
   const groups = new Map<
     string,
@@ -346,7 +342,6 @@ export interface GpuMetricSeriesSummary {
   sampleIntervalS: number | null;
 }
 
-/** Window and cadence facts stored on the series row. */
 export function summarizeGpuMetricSamples(
   samples: readonly GpuMetricSample[],
 ): GpuMetricSeriesSummary | null {

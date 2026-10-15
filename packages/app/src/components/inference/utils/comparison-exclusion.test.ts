@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveExclusionGroups, resolveExclusionToggle } from '@/lib/exclusion';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { resolveExclusionGroups, resolveExclusionToggle } from '@/lib/benchmarks/exclusion';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   comparisonDefaultGroup,

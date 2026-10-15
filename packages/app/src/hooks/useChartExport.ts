@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
-import { getExportFooterText } from '@/lib/export-footer';
-import { useLocale } from '@/lib/use-locale';
-import { hasDarkTheme } from '@/lib/themes';
+import { getExportFooterText } from '@/lib/export/export-footer';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { hasDarkTheme } from '@/lib/themes/themes';
 
 const STRINGS = {
   en: { exportFailed: 'Failed to export image. Please try again.' },

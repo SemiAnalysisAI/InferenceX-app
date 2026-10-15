@@ -17,7 +17,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/evaluations', () => ({
   getAllEvalResults: mockGetAllEvalResults,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
@@ -28,8 +28,8 @@ import {
   aggregateEvaluationChartRows,
   buildEvaluationChartRows,
 } from '@/components/evaluation/chart-data';
-import type { EvalRow } from '@/lib/api';
-import { Model } from '@/lib/data-mappings';
+import type { EvalRow } from '@/lib/api/api';
+import { Model } from '@/lib/catalog/data-mappings';
 
 import { GET } from './route';
 

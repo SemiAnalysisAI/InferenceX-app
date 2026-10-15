@@ -4,7 +4,9 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
-- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, icon-only theme picker, dark-chart/export integration, and presentation-only API exclusion.
+- [App Source Organization](./source-organization.md) — Component/provider ownership, library domains, and import/refactor conventions
+
+- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, single-button theme toggle, dark-chart/export integration, and presentation-only API exclusion.
 - [Playable Minecraft](./minecraft-game.md): the opt-in game launched from the Minecraft theme, controls, saves, lifecycle and verification.
 
 - [Dashboard Read-only Views](./dashboard-readonly-views.md): API/filter inventory, source audit and verification scope
@@ -13,7 +15,6 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
 - [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
 - [PowerX Permanent View](./powerx-permanent-view.md) — Power boundaries as gated Measured Energy metrics, `i_metric`/`i_rulers` share links, missing-value states
-- [PowerX Persistence and Recovery](./powerx-persistence-recovery.md) — Telemetry receipts, migration prerequisites, and targeted repair
 - [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
 - [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects
 - [CLI Compatibility](./inferencex-cli-compatibility.md) — Contract 1 schemas, bundle and exit semantics, platform scope, and legacy migration
@@ -27,6 +28,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [TCO Calculator](./tco-calculator.md) — Why interpolation, composite keys, cost matrix, token type bugs, badge logic, state design, Fleet Lifecycle, Profit Estimator, First-Token Limits
 - [Adding Entities](./adding-entities.md) — Step-by-step checklists for adding new models, GPUs, precisions, sequences, frameworks (ingest + constants + frontend), plus featuring a day-0 model (launch banner, modal, Quick Comparisons preset)
 - [Testing](./testing.md) — Requirements, quality standards, pre-commit checklist
+- [Site Search](./site-search.md) — Header search: live-page indexing, llms.txt seeds, progressive crawl, BM25 with concept expansion, lazy chunk, SEO and API-coverage exclusion
 - [Typography](./typography.md) — Type tokens (text-2xs/3xs, named tracking), Heading/Eyebrow components, TS-based chart font sizes, and the check:typography ratchet gate + allowlist burndown
 - [Data Transforms](./data-transforms.md) — Full pipeline from BenchmarkRow to RenderableGraph: type hierarchy, hardware key construction, derived metrics, memoization strategy, prefix-cache tier shares (`/cache-reuse`)
 - [State Ownership](./state-ownership.md) — Which context owns which state, availability filtering cascade, comparison date mechanics, URL param sync
@@ -35,4 +37,5 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
 
+- [Agentic Workload Explorer](./agentic-workload-explorer.md) — feature-gated, read-only explorer over a frozen anonymized ProxyTrace snapshot: separate read replica, Kysely query layer, page-bff routes, bilingual views
 - [OperatorX](./operatorx.md) — hidden GEMM, attention, and routed MoE explorer, per-GPU TFLOPS, raw artifact persistence, and local verification

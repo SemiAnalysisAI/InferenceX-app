@@ -4,7 +4,7 @@ import type { ChartDefinition, InferenceData } from '@/components/inference/type
 import {
   UnofficialRunContext,
   type UnofficialRunContextType,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import { useState, type ReactElement } from 'react';
 import { mountWithProviders } from '../support/test-utils';
 import {
@@ -14,9 +14,9 @@ import {
   createMockInferenceContextValues,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
-import { Precision, Sequence } from '@/lib/data-mappings';
-import { overlayRooflineDasharray, overlayRunColor } from '@/lib/overlay-run-style';
-import { computeToggle } from '@/lib/toggle-set';
+import { Precision, Sequence } from '@/lib/catalog/data-mappings';
+import { overlayRooflineDasharray, overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { computeToggle } from '@/lib/shared/toggle-set';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
@@ -451,10 +451,81 @@ describe('GPUGraph', () => {
     // Legend should show at least one entry (date + GPU combo)
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
   });
+
+  it('places and clears perf rulers across chip history comparison curves', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 32,
+        y: 100,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 64,
+        y: 150,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+      createMockInferenceData({
+        hwKey: 'b200',
+        x: 32,
+        y: 200,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+      createMockInferenceData({
+        hwKey: 'b200',
+        x: 64,
+        y: 300,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+    ];
+
+    mountGpuGraph(
+      <div style={{ width: 800, height: 600 }}>
+        <GPUGraph
+          chartId="test-gpu-ruler"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['h100', 'b200'],
+          selectedDates: ['2025-03-01'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2025-03-01_h100', '2025-03-01_b200']),
+          selectedPrecisions: [Precision.FP4],
+        },
+      },
+    );
+
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    cy.get('#test-gpu-ruler .perf-ruler-hit').should('have.length', 2);
+    cy.get('#test-gpu-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#test-gpu-ruler .perf-ruler-hit').eq(1).click({ force: true });
+    cy.get('#test-gpu-ruler .perf-ruler .pr-text-ratio').should('have.text', '2.00x');
+    cy.get('[data-testid="gpu-clear-perf-rulers"]').click();
+    cy.get('#test-gpu-ruler .perf-ruler').should('not.exist');
+  });
 });
 
 describe('GPU comparison power envelopes', () => {
-  function PowerComparison({ latency = false }: { latency?: boolean }) {
+  function PowerComparison({
+    latency = false,
+    normalized = false,
+  }: {
+    latency?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
@@ -511,7 +582,7 @@ describe('GPU comparison power envelopes', () => {
             xLabel={latency ? 'Latency' : 'Interactivity'}
             yLabel="Power"
             chartDefinition={createMockChartDefinition({
-              chartType: latency ? 'e2e' : 'interactivity',
+              chartType: latency || normalized ? 'e2e' : 'interactivity',
               [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
             })}
           />
@@ -552,10 +623,56 @@ describe('GPU comparison power envelopes', () => {
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     });
     cy.get('#gpu-power-curves .line-label').should('have.length', 2);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').should('exist');
     cy.contains('button', 'Hide older date').click();
     cy.get('#gpu-power-curves .roofline-path').should('have.length', 1);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 3);
     cy.get('#gpu-power-curves .line-label').should('have.length', 1);
+  });
+
+  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
+  // flips the corner toward higher x.
+  it('keeps boundary measurements toward higher E2E Normalized Interactivity', () => {
+    mountGpuGraph(<PowerComparison normalized />);
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+  });
+
+  it('measures power boundaries by comparison date and resets rulers when the metric changes', () => {
+    mountGpuGraph(<PowerComparison />);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    const chartId = 'gpu-power-curves';
+    const placeRuler = () => {
+      cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 2);
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(0).click({ force: true });
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(1).click({ force: true });
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    };
+    placeRuler();
+    cy.get('#gpu-hide-non-optimal').click({ force: true });
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    cy.get('#gpu-power-curves svg').should(($svg) => {
+      const paths = [...$svg[0].querySelectorAll('.roofline-path')].map((path) =>
+        path.getAttribute('d'),
+      );
+      const hits = [...$svg[0].querySelectorAll('.perf-ruler-hit')].map((path) =>
+        path.getAttribute('d'),
+      );
+      expect(hits, 'ruler targets the drawn upper boundaries').to.deep.equal(paths);
+    });
+    cy.contains('button', 'P75').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Energy').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Hide older date').click();
+    cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 1);
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
   });
 
   it('keeps boundary measurements by default toward lower latency', () => {
@@ -735,6 +852,21 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('#gpu-overlay .unofficial-overlay-pt').should('not.exist');
     cy.get('#gpu-overlay .roofline-overlay-run0_b200_fp4').should('not.exist');
     cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL');
+  });
+
+  it('measures an unofficial curve from its point and removes the ruler when hidden', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      DATES.flatMap((date) => [8, 16, 32].map((x) => official(date, x, 300 - x))),
+      [8, 16, 32].map((x) => overlay(x, 2 * (300 - x))),
+    );
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    cy.get('#gpu-overlay .dot-group .visible-shape').first().click({ force: true });
+    cy.get('#gpu-overlay .unofficial-overlay-pt .overlay-x').first().click({ force: true });
+    cy.get('#gpu-overlay .perf-ruler .pr-text-ratio').should('have.text', '2.00x');
+    cy.contains('button', 'Hide overlay hardware').click();
+    cy.get('#gpu-overlay .perf-ruler').should('not.exist');
   });
 
   it('opens the power trace from an official point on the date comparison', () => {

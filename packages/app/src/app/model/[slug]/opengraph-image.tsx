@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 import { renderOgImage, size } from '@/app/blog/[slug]/og-image-render';
-import { getModelPage, getModelPageSlugs } from '@/lib/model-pages';
+import { getModelPage, getModelPageSlugs } from '@/lib/catalog/model-pages';
 
 export const alt = 'InferenceX Model Architecture Deep-Dive';
 export { size };

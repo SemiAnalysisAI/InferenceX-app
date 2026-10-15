@@ -1,13 +1,17 @@
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
-import { getPointHardwareConfig } from '@/lib/inference-labels';
-import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
-import { agenticDetailHref } from '@/lib/agentic-detail-link';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { frameworkFamily } from '@/lib/framework-family';
-import type { Locale } from '@/lib/i18n';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { chartStateHref } from '@/lib/url-state';
-import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
+import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import type { Locale } from '@/lib/i18n/i18n';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { chartStateHref } from '@/lib/routing/url-state';
+import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+  type SystemPowerWorkload,
+} from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
@@ -100,6 +104,7 @@ export const getPointLabel = (d: InferenceData): string => {
     prefillPp: d.prefill_pp,
     prefillDcp: d.prefill_dcp_size,
     prefillPcp: d.prefill_pcp_size,
+    prefillDwdp: d.prefill_dwdp_size,
     prefillDpAttention: asBool(d.prefill_dp_attention),
     prefillNumWorkers: d.prefill_num_workers,
     decodeTp: d.decode_tp,
@@ -238,14 +243,22 @@ const escapeHtml = (s: string): string =>
 
 const SYSTEM_POWER_STRINGS = {
   en: {
-    heading: 'Draft System-Power Model · 8k1k',
+    heading: 'InferenceX Power Model (beta)',
     measuredGpu: 'Measured GPU power',
-    normalizedAc: 'Modeled chassis AC per GPU',
-    deploymentAc: 'Modeled deployment chassis AC',
+    itPerGpu: 'Modeled IT power per GPU',
+    deploymentIt: 'Modeled deployment IT power',
     facility: 'Modeled facility power',
-    assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
-    platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
-    sweep: 'Fixed README inference sweep',
+    state: 'Operating state',
+    workloads: {
+      'fixed-seq-len': 'fixed sequence length',
+      agentic: 'agentic',
+      'agentic-cpu-offloading': 'agentic with KV cache offload',
+    } satisfies Record<SystemPowerWorkload, string>,
+    scaleOut: (on: boolean) => (on ? 'scale-out on' : 'scale-out off'),
+    assumptions:
+      'Host CPU, DRAM, and NIC power follow the operating state; fan power and PSU losses follow chassis load.',
+    network:
+      'IT power adds the chassis share of scale-out switches, at idle power when scale-out is off.',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
@@ -254,12 +267,12 @@ const SYSTEM_POWER_STRINGS = {
       'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
     uniformHosts:
       'No per-host telemetry for this multinode deployment; every chassis is modeled at the deployment-mean GPU power.',
-    normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
+    normalization: 'IT power is divided by all modeled chassis GPUs, including prefill and decode.',
     boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
     reasons: {
-      workload: 'Only non-agentic 8k1k workloads are supported.',
+      workload: 'The power model has no workload state for this benchmark type.',
       hardware: 'No matching chassis model is available for this hardware.',
       telemetry: 'Validated measured GPU power is required.',
       'gpu-count': 'A valid deployment GPU count is required.',
@@ -269,14 +282,20 @@ const SYSTEM_POWER_STRINGS = {
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
   zh: {
-    heading: '系统功耗模型（草案）· 8k1k',
+    heading: 'InferenceX 功耗模型（Beta）',
     measuredGpu: 'GPU 实测功耗',
-    normalizedAc: '每 GPU 分摊的机箱交流功耗估算',
-    deploymentAc: '整个部署的机箱交流功耗估算',
+    itPerGpu: '每 GPU 分摊的 IT 功耗估算',
+    deploymentIt: '整个部署的 IT 功耗估算',
     facility: '数据中心功耗估算',
-    assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
-    platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
-    sweep: 'README 中的固定推理参数扫描',
+    state: '运行状态',
+    workloads: {
+      'fixed-seq-len': '固定序列长度',
+      agentic: '智能体',
+      'agentic-cpu-offloading': '智能体（含 KV cache offload）',
+    } satisfies Record<SystemPowerWorkload, string>,
+    scaleOut: (on: boolean) => (on ? 'scale-out 开启' : 'scale-out 关闭'),
+    assumptions: '主机 CPU、DRAM 和 NIC 功耗取决于运行状态；风扇功耗和 PSU 损耗随机箱负载变化。',
+    network: 'IT 功耗包含该机箱分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
@@ -284,12 +303,12 @@ const SYSTEM_POWER_STRINGS = {
     extrapolation:
       '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
     uniformHosts: '该多节点部署没有逐主机功耗数据；每个机箱按部署平均每卡功耗建模。',
-    normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
+    normalization: 'IT 功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
     boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
     reasons: {
-      workload: '仅支持非智能体 8k1k 工作负载。',
+      workload: '功耗模型没有适用于该基准测试类型的工作负载状态。',
       hardware: '该硬件没有匹配的机箱功耗模型。',
       telemetry: '需要通过验证的 GPU 实测功耗。',
       'gpu-count': '需要有效的部署 GPU 数量。',
@@ -313,20 +332,18 @@ const modeledSystemPowerHTML = (
     if (!isPinned || estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
-  const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
-  const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
-  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
+  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${tooltipLine(t.normalizedAc, `${fmt(estimate.chassisAcWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
     ${
       isPinned
         ? `
-      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
+      ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
+      ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${t.uniformHosts}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
-      <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${t.uniformHosts}` : ''}<br/>${t.assumptions}<br/>${t.network}<br/>${t.normalization}<br/>${t.boundary}</div>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
     }
@@ -700,10 +717,11 @@ const PARALLELISM_STRINGS = {
   },
 } as const;
 
-const contextParallelismParts = (dcp?: number, pcp?: number): string => {
+const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): string => {
   const parts: string[] = [];
   if (dcp !== undefined && dcp > 1) parts.push(`DCP: ${dcp}`);
   if (pcp !== undefined && pcp > 1) parts.push(`PCP: ${pcp}`);
+  if (dwdp !== undefined && Number.isInteger(dwdp) && dwdp > 1) parts.push(`DWDP: ${dwdp}`);
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
@@ -720,7 +738,8 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   if (
     (d.ep === null || d.ep === undefined) &&
-    (d.prefill_ep === null || d.prefill_ep === undefined)
+    (d.prefill_ep === null || d.prefill_ep === undefined) &&
+    !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
     return (
       tooltipLine(t.deployment, deployment) +
@@ -741,7 +760,11 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
-    const prefillContext = contextParallelismParts(d.prefill_dcp_size, d.prefill_pcp_size);
+    const prefillContext = contextParallelismParts(
+      d.prefill_dcp_size,
+      d.prefill_pcp_size,
+      d.prefill_dwdp_size,
+    );
     const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
     return `
       ${tooltipLine(t.deployment, deployment)}
@@ -756,6 +779,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   return `
     ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
+    ${d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? tooltipLine('DWDP', d.prefill_dwdp_size) + tooltipLine(t.workers, d.prefill_num_workers ?? 1) : ''}
     ${d.dp === undefined ? '' : tooltipLine(t.dataParallelism, d.dp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
     ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}

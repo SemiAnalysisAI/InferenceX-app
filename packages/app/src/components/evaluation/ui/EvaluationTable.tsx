@@ -5,12 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
-import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { formatEvaluationDate } from './BarChartD3';
 

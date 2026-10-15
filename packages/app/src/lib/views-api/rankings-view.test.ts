@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { getAllRankingPageEntries } from '@/lib/rankings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 import { buildRankingsViewEntries, newestRowDate, rankingsViewCsvRows } from './rankings-view';
 

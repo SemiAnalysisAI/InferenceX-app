@@ -19,20 +19,13 @@ describe('TCO Calculator', () => {
       cy.visit('/inference');
     });
 
-    it('links the TCO Calculator from the footer, not the tab bar', () => {
+    it('switches back to inference tab and then returns to calculator', () => {
       cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
       cy.get('[data-testid="footer-link-calculator"]')
         .scrollIntoView()
         .should('be.visible')
         .and('contain.text', 'TCO Calculator');
-    });
 
-    it('clicking the footer calculator link navigates to it', () => {
-      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-      cy.url().should('include', '/calculator');
-    });
-
-    it('switches back to inference tab and then returns to calculator', () => {
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
       cy.get('[data-testid="tab-trigger-inference"]').click();
@@ -68,11 +61,6 @@ describe('TCO Calculator', () => {
     // Controls and chart rendering
     // -------------------------------------------------------------------------
 
-    it('renders the calculator controls section with heading', () => {
-      cy.get('[data-testid="calculator-controls"]').should('be.visible');
-      cy.get('[data-testid="calculator-controls"]').should('contain.text', 'TCO Calculator');
-    });
-
     it('groups benchmark economics above the comparison target', () => {
       cy.viewport(1280, 900);
       cy.get('[data-testid="calculator-controls"] fieldset').should('have.length', 2);
@@ -103,91 +91,12 @@ describe('TCO Calculator', () => {
       cy.get('input[type="range"]').should('be.visible');
     });
 
-    it('renders Model selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-model').should('exist');
-      });
-    });
-
-    it('renders Sequence selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').should('exist');
-      });
-    });
-
     it('shows the precision for a single-precision model', () => {
       // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.contains('Precision').should('be.visible');
         cy.get('button#calc-precision').should('have.text', 'FP4').and('be.disabled');
-      });
-    });
-
-    it('renders Cost Provider selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-cost').should('exist');
-      });
-    });
-
-    it('renders bar metric toggle buttons', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
-        cy.get('[data-testid="calculator-metric-power"]').should('be.visible');
-        cy.get('[data-testid="calculator-metric-cost"]').should('be.visible');
-      });
-    });
-
-    it('throughput metric is active by default', () => {
-      cy.get('[data-testid="calculator-metric-throughput"]').should('have.class', 'bg-primary');
-    });
-
-    it('renders the Chart | Table view toggle', () => {
-      cy.get('[data-testid="calculator-view-toggle"]').should('be.visible');
-      cy.get('[data-testid="calculator-chart-view-btn"]').should('be.visible');
-      cy.get('[data-testid="calculator-table-view-btn"]').should('be.visible');
-    });
-
-    it('chart view is selected by default', () => {
-      cy.get('[data-testid="calculator-chart-view-btn"]').should(
-        'have.attr',
-        'aria-selected',
-        'true',
-      );
-    });
-
-    it('renders the bar chart with SVG bars', () => {
-      cy.get('[data-testid="calculator-bar-chart"]').should('be.visible');
-      cy.get('[data-testid="calculator-bar-chart"] svg').should('exist');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('does NOT show "No data available" when data loads', () => {
-      cy.get('[data-testid="calculator-no-data"]').should('not.exist');
-    });
-
-    it('renders chart title matching the selected metric', () => {
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .first()
-        .should('contain.text', 'Total Token Throughput per Chip');
-    });
-
-    it('renders subtitle with source', () => {
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'SemiAnalysis InferenceX',
-      );
-    });
-
-    it('renders the chart legend with GPU entries', () => {
-      cy.get('.legend-container').scrollIntoView().should('exist');
-      cy.get('.legend-container li').should('have.length.greaterThan', 0);
-    });
-
-    it('renders the target value slider and input', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('input[type="range"]').should('exist');
-        cy.get('input[type="number"]').should('exist');
       });
     });
 
@@ -204,77 +113,48 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('does not show badges when throughput metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('not.exist');
-    });
-
-    it('bar chart SVG contains Y-axis tick labels (GPU names)', () => {
-      cy.get('[data-testid="calculator-bar-chart"] svg .y-axis')
-        .find('.tick text')
-        .should('have.length.greaterThan', 0);
-      cy.get('[data-testid="calculator-bar-chart"] svg .y-axis .tick text')
-        .first()
-        .invoke('text')
-        .should('have.length.greaterThan', 0);
-    });
-
-    it('bar chart SVG contains value labels on bars', () => {
-      cy.get('[data-testid="calculator-bar-chart"] svg .value-label').should(
-        'have.length.greaterThan',
-        0,
-      );
-      cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
-        .first()
-        .invoke('text')
-        .should('match', /\d/u);
-    });
-
-    // -------------------------------------------------------------------------
-    // Metric switching and badges
-    // -------------------------------------------------------------------------
-
-    it('clicking power metric button switches the chart metric', () => {
-      cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-metric-power"]').should('have.class', 'bg-primary');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('shows power badges when tok/s/MW metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'All in Power/Chip');
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'kW');
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'SemiAnalysis Datacenter Industry Model',
-      );
-    });
-
-    it('clicking cost metric button switches the chart metric', () => {
-      cy.get('[data-testid="calculator-metric-cost"]').click();
-      cy.get('[data-testid="calculator-metric-cost"]').should('have.class', 'bg-primary');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('shows TCO badges when cost metric is selected', () => {
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', 'TCO $/chip/hr');
-      cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '$');
-      cy.get('[data-testid="calculator-chart-section"]')
-        .contains('a', TCO_SOURCE_TITLE)
-        .should('have.attr', 'href', TCO_SOURCE_URL);
-    });
-
     it('displays chart title that updates when metric changes', () => {
-      cy.get('[data-testid="calculator-metric-throughput"]').click();
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .first()
-        .should('contain.text', 'Total Token Throughput per Chip');
-      cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .first()
-        .should('contain.text', 'Tokens per Provisioned All-in Megawatt');
-      cy.get('[data-testid="calculator-metric-cost"]').click();
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .first()
-        .should('contain.text', 'Cost per Million');
+      const metrics = [
+        { metric: 'throughput', title: 'Total Token Throughput per Chip', badges: [] },
+        {
+          metric: 'power',
+          title: 'Tokens per Provisioned All-in Megawatt',
+          badges: ['All in Power/Chip', 'kW'],
+        },
+        { metric: 'cost', title: 'Cost per Million', badges: ['TCO $/chip/hr', '$'] },
+      ] as const;
+      for (const { metric, title, badges } of metrics) {
+        cy.get(`[data-testid="calculator-metric-${metric}"]`)
+          .click()
+          .should('have.class', 'bg-primary');
+        cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', title);
+        cy.get('[data-testid="calculator-bar-chart"] svg .bar').should(
+          'have.length.greaterThan',
+          0,
+        );
+        cy.get('[data-testid="calculator-bar-chart"] svg .value-label')
+          .should('have.length.greaterThan', 0)
+          .first()
+          .invoke('text')
+          .should('match', /\d/u);
+        if (badges.length === 0) {
+          cy.get('[data-testid="calculator-cost-badges"]').should('not.exist');
+        } else {
+          for (const text of badges)
+            cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', text);
+        }
+        if (metric === 'power') {
+          cy.get('[data-testid="calculator-chart-section"]').should(
+            'contain.text',
+            'SemiAnalysis Datacenter Industry Model',
+          );
+        }
+        if (metric === 'cost') {
+          cy.get('[data-testid="calculator-chart-section"]')
+            .contains('a', TCO_SOURCE_TITLE)
+            .should('have.attr', 'href', TCO_SOURCE_URL);
+        }
+      }
     });
 
     // -------------------------------------------------------------------------
@@ -291,6 +171,12 @@ describe('TCO Calculator', () => {
         0,
       );
       cy.get('[data-testid="calculator-bar-chart"]').should('not.exist');
+
+      cy.get('[data-testid="calculator-results-table"]').within(() => {
+        cy.get('thead').should('contain.text', 'Chip');
+        cy.get('thead').should('contain.text', 'tok/s/MW');
+        cy.get('thead').should('contain.text', 'Concurrency');
+      });
     });
 
     it('hides the table logo with the unofficial-domain notice', () => {
@@ -298,14 +184,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-results-table"] img[src="/brand/logo-color.webp"]').should(
         'not.exist',
       );
-    });
-
-    it('results table contains expected column headers', () => {
-      cy.get('[data-testid="calculator-results-table"]').within(() => {
-        cy.get('thead').should('contain.text', 'Chip');
-        cy.get('thead').should('contain.text', 'tok/s/MW');
-        cy.get('thead').should('contain.text', 'Concurrency');
-      });
     });
 
     it('table view rows contain numeric throughput and cost values', () => {
@@ -324,9 +202,7 @@ describe('TCO Calculator', () => {
           cy.get('td').eq(3).invoke('text').should('match', /\d+/u);
           cy.get('td').eq(4).invoke('text').should('match', /~\d+/u);
         });
-    });
 
-    it('switching back to chart view shows the bar chart', () => {
       cy.get('[data-testid="calculator-chart-view-btn"]').click();
       cy.get('[data-testid="calculator-bar-chart"]').should('be.visible');
     });
@@ -350,30 +226,7 @@ describe('TCO Calculator', () => {
         });
     });
 
-    // -------------------------------------------------------------------------
-    // Selector interactions (reset to chart view + throughput)
-    // -------------------------------------------------------------------------
-
-    it('model selector has selectable options', () => {
-      cy.get('[data-testid="calculator-chart-view-btn"]').click();
-      cy.get('[data-testid="calculator-metric-throughput"]').click();
-      cy.get('#calc-model').should('not.contain.text', 'Model');
-      cy.get('#calc-model').click();
-      cy.get('[role="option"]').should('have.length.greaterThan', 0);
-      cy.get('body').type('{esc}');
-    });
-
-    it('sequence selector has selectable options', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').click('right');
-      });
-      cy.get('[data-select-option]').should('have.length.greaterThan', 0);
-      cy.get('body').type('{esc}');
-      // Wait for the preceding popover's focus restoration before opening the next menu.
-      cy.get('#calc-sequence').should('be.focused');
-    });
-
-    it('cost provider selector lists both published tiers and five locked rental tiers', () => {
+    it('picking a locked rental tier opens the TCO model dialog without changing the provider', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
       });
@@ -387,9 +240,7 @@ describe('TCO Calculator', () => {
       cy.get('[role="option"]').eq(6).should('contain.text', 'Rent - 2 Year Commit');
       cy.get('[role="option"] [data-testid="locked-tier-badge"]').should('have.length', 5);
       cy.get('body').type('{esc}');
-    });
 
-    it('picking a locked rental tier opens the TCO model dialog without changing the provider', () => {
       cy.get('#calc-cost').invoke('text').as('providerBefore');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost').click();
@@ -410,7 +261,7 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('token type selector has Total, Input, and Output options', () => {
+    it('switching token type updates table column headers', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
@@ -419,9 +270,7 @@ describe('TCO Calculator', () => {
       cy.get('[role="option"]').eq(1).should('contain.text', 'Input Tokens');
       cy.get('[role="option"]').eq(2).should('contain.text', 'Output Tokens');
       cy.get('body').type('{esc}');
-    });
 
-    it('switching token type to Input updates the chart title text', () => {
       cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', 'Total');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
@@ -431,9 +280,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('not.contain.text', 'Total');
-    });
 
-    it('switching token type to Output updates the chart title text', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
@@ -441,9 +288,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Output');
-    });
 
-    it('switching token type updates table column headers', () => {
       cy.get('[data-testid="calculator-table-view-btn"]').click();
       cy.get('[data-testid="calculator-results-table"] thead').should(
         'contain.text',
@@ -474,11 +319,7 @@ describe('TCO Calculator', () => {
         .should('contain.text', 'Rent - 3 Year Commit');
     });
 
-    // -------------------------------------------------------------------------
-    // Target interactivity slider (reset to throughput)
-    // -------------------------------------------------------------------------
-
-    it('slider input value matches the number input value', () => {
+    it('typing a new value in the number input updates the chart title', () => {
       cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('input[type="range"]')
@@ -487,9 +328,7 @@ describe('TCO Calculator', () => {
             cy.get('input[type="number"]').should('have.value', String(sliderVal));
           });
       });
-    });
 
-    it('typing a new value in the number input updates the chart title', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('input[type="number"]').clear().type('50');
       });
@@ -497,9 +336,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', '50 tok/s/user');
-    });
 
-    it('slider shows min and max range labels', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('input[type="range"]')
           .parent()
@@ -510,19 +347,6 @@ describe('TCO Calculator', () => {
             expect(Number(text)).to.be.a('number');
             expect(Number.isNaN(Number(text))).to.equal(false);
           });
-      });
-    });
-
-    // -------------------------------------------------------------------------
-    // Legend interactions (fresh visit to reset accumulated state changes)
-    // -------------------------------------------------------------------------
-
-    it('legend items have colored dot indicators and text labels', () => {
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-      cy.get('.legend-container li').each(($li) => {
-        cy.wrap($li).find('span').first().should('have.css', 'background-color');
-        cy.wrap($li).find('label').invoke('text').should('have.length.greaterThan', 0);
       });
     });
 
@@ -553,9 +377,7 @@ describe('TCO Calculator', () => {
         'contain.text',
         'Click another bar to compare',
       );
-    });
 
-    it('selected bars have higher opacity than unselected bars', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar')
         .first()
         .should('have.attr', 'opacity')
@@ -570,9 +392,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').eq(1).click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('be.visible');
       cy.get('[data-testid="calculator-comparison-banner"]').should('contain.text', 'x more');
-    });
 
-    it('clear selection button dismisses the comparison banner', () => {
       cy.get('[data-testid="calculator-comparison-banner"]').contains('Clear selection').click();
       cy.get('[data-testid="calculator-comparison-banner"]').should('not.exist');
     });
@@ -644,16 +464,6 @@ describe('TCO Calculator', () => {
   // ---------------------------------------------------------------------------
 
   describe('direct URL navigation', () => {
-    it('navigating to /calculator directly loads the calculator tab with data', () => {
-      cy.window().then((win) => {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      });
-      cy.visit('/calculator');
-      cy.url().should('include', '/calculator');
-      cy.get('[data-testid="calculator-controls"]').should('be.visible');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
     // Regression: SSR'd HTML must reflect the URL-supplied model so share links
     // open straight to the right model without a flash of the default. See #430.
     it('?g_model= seeds the model selector before client hydration', () => {

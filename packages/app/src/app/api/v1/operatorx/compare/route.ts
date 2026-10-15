@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
+import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
 import {
   errorMessage,
   errorStatus,

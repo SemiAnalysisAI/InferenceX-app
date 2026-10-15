@@ -9,6 +9,7 @@ import type postgres from 'postgres';
 import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
+import { capServerLogText, maxServerLogFileBytes } from './server-log-limits';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -188,6 +189,19 @@ async function insertDeferredServerLogFiles(
       ? primaryText
       : null;
   const kvCachePoolTokens = serverLog ? kvCachePoolTokensFromServerLog(serverLog) : null;
+  // Derive metrics from the full text above, then cap what is stored: PostgreSQL
+  // drops the connection on any value over 1 GB (see server-log-limits.ts).
+  const maxBytes = maxServerLogFileBytes();
+  const storedText = (fileName: string, text: string): string => {
+    const capped = capServerLogText(text, maxBytes);
+    if (capped.truncated) {
+      console.warn(
+        `    [WARN] server_logs ${fileName}: truncated ${capped.originalBytes} bytes to ` +
+          `${capped.storedBytes} (limit ${maxBytes}); full file stays in the artifact`,
+      );
+    }
+    return capped.text;
+  };
 
   await sql.begin(async (tx) => {
     const rows = await tx<{ id: number; server_log_id: number | null }[]>`
@@ -203,7 +217,7 @@ async function insertDeferredServerLogFiles(
     if (unlinked.length > 0) {
       const [{ id: logId }] = await tx<{ id: number }[]>`
         insert into server_logs (server_log, file_name, files_complete)
-        values (${primaryText}, ${primary.fileName}, true)
+        values (${storedText(primary.fileName, primaryText)}, ${primary.fileName}, true)
         returning id
       `;
       bundleIds.add(Number(logId));
@@ -226,8 +240,15 @@ async function insertDeferredServerLogFiles(
             files_complete = true
         where id = ${logId}
       `;
+      // Skip names the bundle already stores so forced backfills do not
+      // re-read and re-send large multinode files only to hit the conflict.
+      const stored = await tx<{ file_name: string }[]>`
+        select file_name from server_log_files where server_log_id = ${logId}
+      `;
+      const storedNames = new Set(stored.map((row) => row.file_name));
       for (const file of additional) {
-        const logText = file.readText();
+        if (storedNames.has(file.fileName)) continue;
+        const logText = storedText(file.fileName, file.readText());
         await tx`
           insert into server_log_files (server_log_id, file_name, log_text)
           values (${logId}, ${file.fileName}, ${logText})

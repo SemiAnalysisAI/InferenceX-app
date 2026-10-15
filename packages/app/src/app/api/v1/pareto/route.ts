@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { cachedJson } from '@/lib/api-cache';
-import { computeParetoResponse, parseParetoRequest } from '@/lib/pareto-api';
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { computeParetoResponse, parseParetoRequest } from '@/lib/api/pareto-api';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import { GET as getBenchmarks } from '../benchmarks/route';
 
 export const dynamic = 'force-dynamic';

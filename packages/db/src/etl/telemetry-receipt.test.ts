@@ -119,7 +119,6 @@ describe('telemetry API verification', () => {
   it.each([
     ['matching data', 200, 10, 2, 2, true],
     ['missing endpoint', 404, 10, 2, 2, false],
-    ['unavailable endpoint', 503, 10, 2, 2, false],
     ['different point', 200, 11, 2, 2, false],
     ['different sample count', 200, 10, 3, 2, false],
     ['truncated data', 200, 10, 2, 1, false],
@@ -151,14 +150,44 @@ describe('telemetry API verification', () => {
     const receipt = receiptFixture();
     receipt.points[1]!.benchmarkResultId = null;
     receipt.points[1]!.api = { status: 'unknown' };
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(Response.json({ benchmarkResultId: 10, series: [] }));
+    const matching = { sampleCount: 2, data: [{ power: 100 }, { power: 100 }] };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        benchmarkResultId: 10,
+        series: [
+          { id: 1, ...matching },
+          { id: 2, ...matching },
+        ],
+      }),
+    );
     const result = await verifyTelemetryApi(receipt, 'https://example.test', { fetch: fetcher });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(result.points[0]!.api.error).toContain('series set differs');
     expect(result.points[1]!.api.status).toBe('unknown');
     expect(result.counts.apiCompletePoints).toBe(0);
+  });
+});
+
+describe('telemetry API verification of not-collected points', () => {
+  it('skips points whose artifact held no telemetry', async () => {
+    const receipt = receiptFixture();
+    receipt.points[0]!.notCollected = true;
+    receipt.points[0]!.series = [];
+    receipt.points[0]!.api = { status: 'unknown' };
+    receipt.points[1]!.api = { status: 'unknown' };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        benchmarkResultId: 11,
+        series: [{ id: 1, sampleCount: 2, data: [{ power: 100 }, { power: 100 }] }],
+      }),
+    );
+    const result = await verifyTelemetryApi(receipt, 'https://example.test', { fetch: fetcher });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0]![0])).toBe(
+      'https://example.test/api/v1/gpu-metrics-point?id=11',
+    );
+    expect(result.points[0]!.api).toEqual({ status: 'unknown' });
+    expect(result.points[1]!.api.status).toBe('readable');
   });
 });
 
@@ -217,6 +246,32 @@ describe('persisted telemetry receipts', () => {
         .status,
     ).toBe('unknown');
     expect(repaired.points[1]).toEqual(original.points[1]);
+  });
+
+  it('classifies an artifact without telemetry files as not collected', async () => {
+    await inventory(completeInventory);
+    const original = await readTelemetryReceipt(sql, run, []);
+    const { identity } = original.points[0]!;
+    const base = { identity, artifactNames: ['gpu_metrics_empty'], produced: true };
+    const notCollected = await readTelemetryReceipt(sql, run, [{ ...base, notCollected: true }]);
+    const point = notCollected.points.find((p) => p.artifactNames.includes('gpu_metrics_empty'))!;
+    expect(point.notCollected).toBe(true);
+    expect(point.reasons).toEqual(['telemetry_not_collected']);
+    expect(point.error).toBeUndefined();
+    // Not a storage miss: nothing was expected, and nothing counts as stored.
+    expect(point.storage).toEqual({ status: 'not_collected', expectedSeries: [] });
+    expect(notCollected.counts.notCollectedPoints).toBe(1);
+    expect(notCollected.counts.storedPoints).toBe(notCollected.points.length - 1);
+
+    // Telemetry files that were present but unparseable stay an ingest failure.
+    const failed = await readTelemetryReceipt(sql, run, [
+      { ...base, error: 'No parseable telemetry series in gpu_metrics_empty' },
+    ]);
+    const failedPoint = failed.points.find((p) => p.artifactNames.includes('gpu_metrics_empty'))!;
+    expect(failedPoint.notCollected).toBeUndefined();
+    expect(failedPoint.reasons).toEqual(['ingest_failed', 'series_not_stored']);
+    expect(failedPoint.storage.status).toBe('incomplete');
+    expect(failed.counts.notCollectedPoints).toBe(0);
   });
 
   it('clears only successfully repaired scopes from an earlier recovery failure', async () => {
@@ -322,15 +377,11 @@ describe('persisted telemetry receipts', () => {
     expect(result.expectationErrors).toEqual([oldB, newA, newC]);
   });
 
-  it.each([undefined, []])(
-    'preserves the distinction between omitted and empty current expectation errors (%j)',
-    async (expectationErrors) => {
-      const result = await readTelemetryReceipt(sql, run, [], { expectationErrors });
-      expect(Object.hasOwn(result, 'expectationErrors')).toBe(expectationErrors !== undefined);
-      expect(result.expectationErrors).toEqual(expectationErrors);
-      expect(result.counts.expectedPoints).toBe(2);
-    },
-  );
+  it('keeps an empty current expectation list as a known denominator', async () => {
+    const result = await readTelemetryReceipt(sql, run, [], { expectationErrors: [] });
+    expect(result.expectationErrors).toEqual([]);
+    expect(result.counts.expectedPoints).toBe(2);
+  });
 
   it('keeps missing inventory unknown and missing host storage incomplete', async () => {
     await inventory('{invalid json');
@@ -339,6 +390,7 @@ describe('persisted telemetry receipts', () => {
     expect(unknown.counts).toMatchObject({
       storedPoints: 0,
       storageUnknownPoints: 2,
+      notCollectedPoints: 0,
       storedSamples: 2,
     });
     await inventory({

@@ -3,7 +3,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
-import { getGpuSpecs } from '@/lib/constants';
+import { getGpuSpecs } from '@/lib/catalog/constants';
 import { createMockInferenceContextValues } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 

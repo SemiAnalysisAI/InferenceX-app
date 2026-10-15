@@ -303,7 +303,7 @@ describe('mapBenchmarkRow', () => {
       expect(result!.config.numDecodeGpu).toBe(8);
     });
 
-    it('defaults num_prefill_gpu to prefillTp*prefillEp when absent', () => {
+    it('includes worker replicas in legacy role GPU count fallbacks', () => {
       const row = makeV2Row();
       delete row.num_prefill_gpu;
       delete row.num_decode_gpu;
@@ -311,7 +311,7 @@ describe('mapBenchmarkRow', () => {
       const result = mapBenchmarkRow(row, tracker);
 
       expect(result!.config.numPrefillGpu).toBe(8); // 4 * 2
-      expect(result!.config.numDecodeGpu).toBe(8); // 2 * 4
+      expect(result!.config.numDecodeGpu).toBe(16); // 2 TP * 4 EP * 2 workers
     });
   });
 
@@ -1450,11 +1450,11 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     [{ num_gpus: 8 }, 8],
     [{ num_gpus: true }, 16],
     [{ is_multinode: undefined }, 16],
-    [{ disagg: true }, 16],
+    [{ disagg: true }, 4],
     [{ framework: 'mori-sglang' }, 4],
     [{ pp: true }, 16],
     [{ pp: null }, 16],
-    [{ request_metrics: undefined }, 16],
+    [{ request_metrics: undefined }, 4],
   ])('counts physical GPUs for the AgentX producer shape %j', (overrides, expected) => {
     // Qwen3.8 H200 run 33038487711 uses TP4/EP4 on four GPUs, not sixteen.
     const result = mapBenchmarkRow(

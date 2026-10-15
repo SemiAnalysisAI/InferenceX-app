@@ -9,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { useLocale } from '@/lib/use-locale';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: { point: 'Benchmark point', concurrency: 'Concurrency' },

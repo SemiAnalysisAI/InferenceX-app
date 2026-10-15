@@ -1,13 +1,16 @@
 import type { InferenceData } from '@/components/inference/types';
-import {
-  parseComparisonEntry,
-  resolveComparisonEntries,
-} from '@/components/inference/utils/comparisonEntry';
+import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import { applyQuickFilters, type QuickFilters } from '@/components/inference/utils/quickFilters';
-import { dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries } from '@/lib/benchmark-run-selection';
-import { GPU_ALIAS_TO_CANONICAL, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
-import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplemental-benchmarks';
+import { dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries } from '@/lib/benchmarks/benchmark-run-selection';
+import { GPU_ALIAS_TO_CANONICAL, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import {
+  overviewServingSeriesKey,
+  type OverviewServingSeriesRow,
+} from '@/lib/overview/overview-data';
+import {
+  supportsChartTokenMetric,
+  type TokenMetricType,
+} from '@/lib/benchmarks/supplemental-benchmarks';
 /**
  * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
@@ -36,17 +39,14 @@ export function buildComparisonDates(
   selectedDates: string[],
   selectedDateRange: { startDate: string; endDate: string },
   selectedRunDate: string | undefined,
-  selectedRunId?: string,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
-  // Range endpoints + individually-added dates/runs (redundant same-day range
-  // endpoints dropped), minus the main date/run which the primary query covers.
-  // Other run-qualified entries on the same day are distinct overlays and stay.
-  return resolveComparisonEntries(selectedDates, selectedDateRange).filter((entry) => {
-    if (entry === selectedRunDate) return false;
-    const { runId } = parseComparisonEntry(entry);
-    return runId === undefined || runId !== selectedRunId;
-  });
+  // The primary query supplies only a plain-date series and may merge results
+  // from other runs. A run-qualified entry always needs its exact snapshot and
+  // date~rRUN series key, even when the run picker selected that same run.
+  return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
+    (entry) => entry !== selectedRunDate,
+  );
 }
 
 /** Filter data by GPU key, resolving aliases to canonical keys. */

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 
 import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
-import { defaultRouteModel } from '@/lib/model-routes';
-import { tabMetadata } from '@/lib/tab-meta';
+import { defaultRouteModel } from '@/lib/routing/model-routes';
+import { tabMetadata } from '@/lib/routing/tab-meta';
 
 export const metadata: Metadata = tabMetadata('profit-estimator-per-gigawatt');
 

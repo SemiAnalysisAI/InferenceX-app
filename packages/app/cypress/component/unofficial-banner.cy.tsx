@@ -1,4 +1,4 @@
-import { UnofficialRunBanner, UnofficialRunContext } from '@/components/unofficial-run-provider';
+import { UnofficialRunBanner, UnofficialRunContext } from '@/providers/unofficial-run-provider';
 import { createMockUnofficialRunContext } from '../support/mock-data';
 
 describe('Standalone unofficial-run banner', () => {

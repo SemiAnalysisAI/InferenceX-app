@@ -23,8 +23,8 @@ import {
   InputGroupText,
 } from '@/components/ui/input-group';
 import { Skeleton } from '@/components/ui/skeleton';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
 // Custom $/chip/hr moved into the chart caption's TCO badges
 // (`InferenceTcoBadges`), so only the power panel remains.

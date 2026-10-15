@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Music, Volume2, VolumeOff } from 'lucide-react';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 const toggleClasses = cn(
   'inline-flex items-center justify-center rounded-md size-11',

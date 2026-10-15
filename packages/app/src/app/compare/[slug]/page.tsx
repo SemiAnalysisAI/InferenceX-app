@@ -4,14 +4,14 @@ import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
+import { JsonLd } from '@/components/seo/json-ld';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { languageAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-scenario-route';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -19,7 +19,7 @@ import {
   compareModelSeoName,
   compareSeoTitle,
   parseCompareSlug,
-} from '@/lib/compare-slug';
+} from '@/lib/compare/compare-slug';
 import {
   AGENTIC_SCENARIO_INTRO,
   buildBreadcrumbJsonLd,
@@ -30,11 +30,11 @@ import {
   KNOWN_PRECISIONS,
   KNOWN_SEQUENCES,
   pickString,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
-} from '@/lib/compare-page-data.server';
+} from '@/lib/compare/compare-page-data.server';
 import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from './page-client';

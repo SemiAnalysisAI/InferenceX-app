@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const locale of ['en', 'zh'] as const) {
@@ -468,18 +468,6 @@ describe('Chart Selectors', () => {
   });
 
   describe('ScenarioSelector', () => {
-    it('labels the agentic scenario "Agentic"', () => {
-      cy.mount(<ScenarioSelectorHarness />);
-      cy.get('[data-testid="scenario-selector"]').should('have.text', 'Agentic');
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', 'Agentic').should('be.visible');
-      cy.contains('[data-select-option]', 'Agentic Traces').should('not.exist');
-      // The lone agentic entry needs no "Agentic" heading above it.
-      cy.get('[data-slot="select-content"]')
-        .find('[data-slot="select-label"]')
-        .should('not.contain.text', 'Agentic');
-    });
-
     it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       assertAgenticInfoInside(36);

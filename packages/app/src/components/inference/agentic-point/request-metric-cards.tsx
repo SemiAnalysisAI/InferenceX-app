@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 
 import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 import { Distribution } from './distribution';

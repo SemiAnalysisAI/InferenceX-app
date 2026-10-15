@@ -7,9 +7,9 @@ import {
   type OverlayGroupMeta,
 } from '@/components/calculator/throughput-data';
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
-import type { BenchmarkRow, EvalRow } from '@/lib/api';
-import { Percentile, Sequence } from '@/lib/data-mappings';
-import { overlayRunIndex } from '@/lib/overlay-run-style';
+import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { NextRequest } from 'next/server';
 import { ViewsApiParamError, ViewsUpstreamError } from './errors';
 import {

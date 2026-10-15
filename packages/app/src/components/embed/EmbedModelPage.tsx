@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 
 import EmbedFrame from '@/components/embed/EmbedFrame';
 import EmbeddedModelDashboard from '@/components/model/EmbeddedModelDashboard';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getCompareModelBySlug } from '@/lib/compare-slug';
-import { parseEmbedOptions } from '@/lib/embed';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getCompareModelBySlug } from '@/lib/compare/compare-slug';
+import { parseEmbedOptions } from '@/lib/embed/embed';
 
 export type EmbedSearchParams = Record<string, string | string[] | undefined>;
 

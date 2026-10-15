@@ -1503,6 +1503,37 @@ const DEFS: [number, Def][] = [
 
 export const BLOCKS: BlockDef[] = [];
 export const BLOCK_BY_KEY: Record<string, BlockDef> = {};
+// Append-only IDs: old saves keep their existing block meanings.
+for (const [id, key, en, zh, tile, hardness] of [
+  [85, 'netherrack', 'Netherrack', '下界岩', 'netherrack', 0.4],
+  [86, 'nether_bricks', 'Nether Bricks', '下界砖块', 'nether_bricks', 2],
+  [87, 'end_stone', 'End Stone', '末地石', 'end_stone', 3],
+  [88, 'end_portal_frame', 'End Portal Frame', '末地传送门框架', 'end_portal_frame_side', -1],
+  [89, 'nether_portal', 'Nether Portal', '下界传送门', 'nether_portal', -1],
+  [90, 'end_portal', 'End Portal', '末地传送门', 'obsidian', -1],
+] as const) {
+  const portal = id === 89 || id === 90;
+  DEFS.push([
+    id,
+    {
+      key,
+      en,
+      zh,
+      tiles: id === 88 ? column('end_portal_frame_side', 'end_portal_frame_top') : all(tile),
+      icon: id === 88 ? 'end_portal_frame_top' : id === 90 ? 'obsidian' : tile,
+      render: portal ? 'box' : 'cube',
+      solid: !portal,
+      opaque: !portal,
+      hardness,
+      tool: 'pickaxe',
+      sound: 'stone',
+      drop: portal || id === 88 ? '' : undefined,
+      light: portal ? 11 : 0,
+      translucent: portal,
+      boxes: id === 89 ? [[0, 0, 7, 16, 16, 9]] : id === 90 ? [[0, 0, 0, 16, 2, 16]] : undefined,
+    },
+  ]);
+}
 for (const [id, def] of DEFS) {
   const block: BlockDef = { ...def, id, icon: (def.icon ?? def.key) as IconName };
   BLOCKS[id] = block;
@@ -1552,6 +1583,8 @@ export const B = {
   sandstone: 34,
   tnt: 36,
   obsidian: 37,
+  glowstone: 38,
+  stoneBricks: 48,
   shortGrass: 39,
   dandelion: 40,
   poppy: 41,
@@ -1580,6 +1613,12 @@ export const B = {
   clay: 50,
   chest: 83,
   fern: 84,
+  netherrack: 85,
+  netherBricks: 86,
+  endStone: 87,
+  endFrame: 88,
+  netherPortal: 89,
+  endPortal: 90,
 } as const;
 
 export const isLiquid = (id: number) => id === B.water || id === B.lava;

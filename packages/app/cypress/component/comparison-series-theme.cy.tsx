@@ -2,7 +2,7 @@ import { useTheme } from 'next-themes';
 
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { ThemeProvider } from '@/components/ui/theme-provider';
-import { APP_THEMES } from '@/lib/themes';
+import { APP_THEMES } from '@/lib/themes/themes';
 
 import { mountWithProviders } from '../support/test-utils';
 

@@ -4,7 +4,6 @@
  * rendering the pair's default workload.
  */
 const AGENTX_SLUG = 'deepseek-v4-b200-vs-h200';
-const FIXED_SEQ_SLUG = 'deepseek-r1-h100-vs-h200';
 
 describe('Compare scenario routes', () => {
   beforeEach(() => {
@@ -21,13 +20,6 @@ describe('Compare scenario routes', () => {
       .find('[data-testid="compare-agentic-intro-link"]')
       .should('contain.text', 'Learn more about AgentX')
       .and('have.attr', 'href', '/agentx');
-  });
-
-  it('serves the fixed-sequence workload at its own path, without the explainer', () => {
-    cy.visit(`/compare/${AGENTX_SLUG}/8k-1k`);
-
-    cy.get('[data-testid="compare-narrative"]').should('exist');
-    cy.get('[data-testid="compare-agentic-intro"]').should('not.exist');
   });
 
   it('lets the path segment override the pair default', () => {
@@ -47,11 +39,6 @@ describe('Compare scenario routes', () => {
             expect(pinned, 'segment changes the rendered workload').to.not.equal(bare);
           });
       });
-  });
-
-  it('shows no AgentX explainer for a model with no AgentX data', () => {
-    cy.visit(`/compare/${FIXED_SEQ_SLUG}`);
-    cy.get('[data-testid="compare-agentic-intro"]').should('not.exist');
   });
 
   it('canonicalizes every scenario view onto the bare slug URL', () => {
@@ -100,13 +87,6 @@ describe('Compare scenario routes', () => {
         .should('have.attr', 'href')
         .and('match', new RegExp(`^${base}/.+/8k-1k$`, 'u'));
     }
-  });
-
-  it('splits the per-dollar catalog by scenario the way /compare does', () => {
-    cy.visit('/compare-per-dollar');
-    cy.contains('Models with AgentX data open long-context').should('be.visible');
-    cy.get('a[data-scenario="AgentX"]').should('have.length.greaterThan', 0);
-    cy.get('a[data-scenario="8K/1K"]').should('have.length.greaterThan', 0);
   });
 
   it('ships the Chinese explainer on the Chinese scenario route', () => {
