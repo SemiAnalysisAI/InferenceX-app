@@ -43,7 +43,7 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
   });
 
-  it('marks only the still-new AgentX models with a NEW pill in the dropdown', () => {
+  it('keeps NEW pills off AgentX models in the model dropdown', () => {
     // The availability fixture predates DeepSeek V4.1 Flash, so splice one
     // agentic row in: the dropdown only lists models with availability rows.
     cy.fixture('api/availability.json').then((rows: Record<string, unknown>[]) => {
@@ -69,12 +69,10 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('[data-testid="model-selector"]').click();
 
-    // A NEW AgentX model carries the pill…
+    // NEW is reserved for the TPUv7 launch, so featured AgentX models…
     cy.contains('[role="option"]', 'DeepSeek V4.1 Flash 552B')
       .find('[data-new-badge="model-option"]')
-      .should('be.visible')
-      .and('have.text', 'NEW');
-    // …featured models whose launch pill has retired render without one…
+      .should('not.exist');
     cy.contains('[role="option"]', 'MiniMax M3 428B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
