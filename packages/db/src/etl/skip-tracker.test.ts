@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSkipTracker } from './skip-tracker';
+import { DB_WRITE_KINDS, createSkipTracker } from './skip-tracker';
 
 describe('createSkipTracker', () => {
   it('initializes with zeroed counters', () => {
@@ -181,5 +181,53 @@ describe('diff', () => {
     const d = tracker.diff(snap);
     expect(d.newModels).toEqual([]);
     expect(d.newHws).toEqual([]);
+  });
+});
+
+const jsonbLimit = () =>
+  Object.assign(
+    new Error('total size of jsonb array elements exceeds the maximum of 268435455 bytes'),
+    { code: '54000' },
+  );
+
+describe('database write warning rules', () => {
+  it('records trace_replay at the Postgres size limit as a warning', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'dsv41flash conc 4096', jsonbLimit());
+    expect(tracker.skips.dbError).toBe(0);
+    expect(tracker.dbWriteErrors).toEqual([]);
+    expect(tracker.dbWriteWarnings).toEqual([
+      {
+        kind: 'trace_replay',
+        subject: 'dsv41flash conc 4096',
+        message: 'total size of jsonb array elements exceeds the maximum of 268435455 bytes',
+        code: '54000',
+      },
+    ]);
+  });
+
+  it.each(DB_WRITE_KINDS.filter((kind) => kind !== 'trace_replay'))(
+    'keeps 54000 on %s an error',
+    (kind) => {
+      const tracker = createSkipTracker();
+      tracker.recordDbError(kind, 'subject', jsonbLimit());
+      expect(tracker.skips.dbError).toBe(1);
+      expect(tracker.dbWriteErrors).toHaveLength(1);
+      expect(tracker.dbWriteWarnings).toEqual([]);
+    },
+  );
+
+  it.each([
+    [
+      'client code',
+      Object.assign(new Error('write CONNECTION_CLOSED'), { code: 'CONNECTION_CLOSED' }),
+    ],
+    ['no code', new Error('Authentication timed out')],
+    ['other SQLSTATE', Object.assign(new Error('statement timeout'), { code: '57014' })],
+  ])('keeps other trace_replay failures errors (%s)', (_label, err) => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'glm5 conc 64', err);
+    expect(tracker.skips.dbError).toBe(1);
+    expect(tracker.dbWriteWarnings).toEqual([]);
   });
 });

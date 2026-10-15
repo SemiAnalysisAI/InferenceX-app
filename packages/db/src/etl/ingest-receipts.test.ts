@@ -52,6 +52,26 @@ describe('ingest receipt routing', () => {
     );
   });
 
+  it('routes the known trace_replay size limit to receipt warnings', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError(
+      'trace_replay',
+      'dsv41flash conc 4096',
+      pgError('total size of jsonb array elements exceeds the maximum', '54000'),
+    );
+    const receipt = buildDatabaseWriteReceipt({
+      runId: 1,
+      runAttempt: 1,
+      points: [],
+      publicationErrors: [],
+      tracker,
+    });
+    expect(receipt.errors).toEqual([]);
+    expect(receipt.warnings.map(({ kind, code }) => ({ kind, code }))).toEqual([
+      { kind: 'trace_replay', code: '54000' },
+    ]);
+  });
+
   it('writes empty receipts for a clean ingest', () => {
     const input = {
       runId: 1,

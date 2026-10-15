@@ -70,6 +70,32 @@ function failureMessage(err: unknown): string {
     : message;
 }
 
+/**
+ * Known database write failures that are reported as warnings: not counted in
+ * `skips.dbError` and not fatal. Every other failure is an error. Remove an
+ * entry once the storage it describes changes.
+ */
+export const DB_WRITE_WARNING_RULES: readonly {
+  kind: DbWriteKind;
+  code: string;
+  reason: string;
+}[] = [
+  {
+    // program_limit_exceeded: request_timeline is stored as one jsonb array and
+    // very large traces pass the 256 MiB jsonb limit until trace storage changes.
+    kind: 'trace_replay',
+    code: '54000',
+    reason: 'trace replay exceeds the Postgres jsonb size limit',
+  },
+];
+
+/** The warning rule matching a failure, or undefined when the failure is an error. */
+export function dbWriteWarningRule(failure: Pick<DbWriteFailure, 'kind' | 'code'>) {
+  return DB_WRITE_WARNING_RULES.find(
+    (rule) => rule.kind === failure.kind && rule.code === failure.code,
+  );
+}
+
 /** Build a failure record from a caught error. */
 export function dbWriteFailure(kind: DbWriteKind, subject: string, err: unknown): DbWriteFailure {
   const code = dbErrorCode(err);
@@ -153,19 +179,29 @@ export function createSkipTracker(): SkipTracker {
   const unmappedPrecisions = new Set<string>();
   const dbWriteErrors: DbWriteFailure[] = [];
   const dbWriteWarnings: DbWriteFailure[] = [];
-  const cappedPrinter = (tag: string, noun: string) => {
+  const cappedPrinter = (tag: string, suppressedNote: string) => {
     let printed = 0;
     return (line: string): void => {
       if (printed >= MAX_DB_ERRORS) return;
       console.error(`  [${tag}] ${line}`);
       printed++;
       if (printed === MAX_DB_ERRORS) {
-        console.error(`  [${tag}] further ${noun} errors suppressed; count included in summary`);
+        console.error(`  [${tag}] ${suppressedNote}`);
       }
     };
   };
-  const printDbError = cappedPrinter('DB ERROR', 'DB');
-  const printTelemetryError = cappedPrinter('TELEMETRY', 'telemetry');
+  const printDbError = cappedPrinter(
+    'DB ERROR',
+    'further DB errors suppressed; all are listed in the database write receipt',
+  );
+  const printTelemetryError = cappedPrinter(
+    'TELEMETRY',
+    'further telemetry errors suppressed; count included in summary',
+  );
+  const printDbWarning = cappedPrinter(
+    'DB WARNING',
+    'further DB warnings suppressed; all are listed in the database write receipt',
+  );
 
   return {
     skips,
@@ -178,11 +214,16 @@ export function createSkipTracker(): SkipTracker {
 
     recordDbError(kind: DbWriteKind, subject: string, err: unknown): void {
       const failure = dbWriteFailure(kind, subject, err);
+      const detail = `${kind} for ${subject}: ${failure.message}${failure.code ? ` (code ${failure.code})` : ''}`;
+      const warning = dbWriteWarningRule(failure);
+      if (warning) {
+        dbWriteWarnings.push(failure);
+        printDbWarning(`${detail}; ${warning.reason}`);
+        return;
+      }
       skips.dbError++;
       dbWriteErrors.push(failure);
-      printDbError(
-        `${kind} for ${subject}: ${failure.message}${failure.code ? ` (code ${failure.code})` : ''}`,
-      );
+      printDbError(detail);
     },
     recordTelemetryError(context: string, err: Error): void {
       skips.telemetryError++;

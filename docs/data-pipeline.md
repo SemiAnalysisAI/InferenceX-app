@@ -662,7 +662,11 @@ writes them to the database write receipt (`DATABASE_WRITE_RECEIPT`) as
 `{ kind, subject, message, code }` entries, where `code` is the SQLSTATE or
 postgres.js client code. The workflow step "Check database writes" runs even after
 an earlier step fails, annotates each entry on the run page, fails on errors, and
-adds a short summary to the Slack failure message.
+adds a short summary to the Slack failure message. Known failures listed in
+`DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
+annotated but not counted or fatal. Today that is only `trace_replay` with SQLSTATE
+`54000`, a `request_timeline` past the Postgres jsonb size limit, until trace storage
+changes.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database
