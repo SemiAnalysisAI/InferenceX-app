@@ -90,6 +90,21 @@ describe('ingest receipt routing', () => {
     ]);
   });
 
+  it('keeps known-failed PowerX results out of the fatal publication errors', () => {
+    const manifest = buildPowerPublicationManifest({
+      runId: 1,
+      runAttempt: 1,
+      points: [],
+      publicationErrors: ['Unmapped 1k1k result: bmk_b/r.json'],
+      publicationWarnings: ['Known-failed 8k1k result excluded: bmk_a/r.json'],
+      tracker: createSkipTracker(),
+    });
+    expect(manifest.ingestErrors).toEqual(['Unmapped 1k1k result: bmk_b/r.json']);
+    expect(manifest.publicationWarnings).toEqual([
+      'Known-failed 8k1k result excluded: bmk_a/r.json',
+    ]);
+  });
+
   it('writes empty receipts for a clean ingest', () => {
     const input = {
       runId: 1,
@@ -104,6 +119,7 @@ describe('ingest receipt routing', () => {
       runAttempt: 2,
       points: [],
       ingestErrors: [],
+      publicationWarnings: [],
       telemetryWarnings: [],
     });
     expect(buildDatabaseWriteReceipt(input)).toEqual({
