@@ -121,6 +121,18 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
  * Parse every CSV in an extracted artifact; refuse a partly readable CSV set.
  * Without usable nvidia-smi/amd-smi CSVs, fall back to the multinode power bundle.
  */
+/**
+ * Whether the artifact holds any telemetry file: a GPU metrics CSV or a
+ * multinode power samples bundle. Sidecars alone (for example a power audit
+ * written by a sweep with power collection off) are not telemetry.
+ */
+export function gpuMetricsArtifactHoldsTelemetry(artifact: GpuMetricsArtifact): boolean {
+  return (
+    walkFiles(artifact.artifactDir, isGpuMetricsCsvPath).length > 0 ||
+    walkFiles(artifact.artifactDir, isMultinodePowerSamplesPath).length > 0
+  );
+}
+
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const unreadable: string[] = [];
