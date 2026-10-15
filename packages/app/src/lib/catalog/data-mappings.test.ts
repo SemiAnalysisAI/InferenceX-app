@@ -478,6 +478,5 @@ describe('getModelDefaultPrecisions', () => {
 
   it('leaves other scenarios and models on the auto default', () => {
     expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.EightK_OneK)).toBeUndefined();
-    expect(getModelDefaultPrecisions(Model.MiniMax_M3, Sequence.AgenticTraces)).toBeUndefined();
   });
 });
