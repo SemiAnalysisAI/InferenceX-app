@@ -52,7 +52,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const RUBIN_MINIMAX_M3_URL = '/inference/minimax-m3';
+const TPUV7_QWEN_3_5_AGENTX_URL = '/inference/qwen-3-5';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -322,7 +322,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
-    id: 'rubin-minimax-m3-banner',
+    id: 'tpuv7-qwen-3-5-agentx-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -333,26 +333,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Rubin vLLM MiniMax M3 Preview is Here',
-      titleZh: 'Rubin vLLM MiniMax M3 预览版现已上线',
-      description: 'Early vLLM results for MiniMax M3 on NVIDIA Rubin',
-      descriptionZh: 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
+      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: RUBIN_MINIMAX_M3_URL,
+      href: TPUV7_QWEN_3_5_AGENTX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(RUBIN_MINIMAX_M3_URL);
+        window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
       },
     },
     analytics: {
-      shown: 'inference_rubin_minimax_m3_banner_shown',
-      dismissed: 'inference_rubin_minimax_m3_banner_dismissed',
-      action: 'inference_rubin_minimax_m3_banner_clicked',
+      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
+      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
+      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
       properties: {
-        banner_id: 'rubin-minimax-m3',
+        banner_id: 'tpuv7-qwen-3-5-agentx',
         destination: 'inference',
       },
     },

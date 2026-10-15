@@ -14,7 +14,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-rubin-minimax-m3-banner-dismissed',
+    'inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -48,14 +48,15 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
-      .and('contain.text', 'Early vLLM results for MiniMax M3 on NVIDIA Rubin')
+      .and('contain.text', 'Google TPUv7 joins AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the three still-new landing ledger
-    // rows — the shared pill must render at the same
+    cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
+    // Banner + header-nav badges, the flashing TPU card badge, plus the three
+    // still-new landing ledger rows — the shared pill must render at the same
     // fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 5)
+      .should('have.length', 6)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -102,14 +103,14 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 
-  it('localizes the Rubin banner title in Chinese', () => {
+  it('localizes the launch banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin vLLM MiniMax M3 预览版现已上线')
-      .and('contain.text', 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果')
+      .and('contain.text', 'Google TPUv7 加入 AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
       .and('contain.text', '查看结果');
   });
 });
@@ -119,12 +120,12 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Landing nudges — banner', { testIsolation: true }, () => {
-  it('wraps the full Rubin title on mobile without clipping', () => {
+  it('wraps the full launch banner title on mobile without clipping', () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
       .first()
-      .should('contain.text', 'Rubin vLLM MiniMax M3 Preview is Here')
+      .should('contain.text', 'Google TPUv7 joins AgentX')
       .and('have.css', 'white-space', 'normal')
       .should(($title) => {
         expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
@@ -151,15 +152,17 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-rubin-minimax-m3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
+        null,
+      );
     });
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/inference/minimax-m3');
+      .and('have.attr', 'href', '/inference/qwen-3-5');
     cy.get('[data-testid="launch-banner"]').click();
 
-    cy.location('pathname').should('eq', '/inference/minimax-m3');
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
 
     // Body click must not write the dismissal key — the banner should still
     // render after returning home and reloading the landing page.
@@ -167,7 +170,9 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-rubin-minimax-m3-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
+        null,
+      );
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -314,7 +319,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
