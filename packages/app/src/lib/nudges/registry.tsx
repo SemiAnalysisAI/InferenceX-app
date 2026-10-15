@@ -54,6 +54,8 @@ function localizedNudgeHref(enPath: string): string {
 
 const TPUV7_QWEN_3_5_AGENTX_URL = '/inference/qwen-3-5';
 
+export const TPUV7_LAUNCH_MODAL_STORAGE_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
 function telemetryTutorialHref(): string {
@@ -321,6 +323,47 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // and covered the footer. The engagement-triggered star-nudge toast on the
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
+  {
+    id: 'tpuv7-agentx-launch-modal',
+    type: 'modal',
+    trigger: { type: 'immediate' },
+    dismissal: { type: 'permanent' },
+    // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
+    // landing UI under test; a rename here has to be mirrored there.
+    storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+    priority: 50,
+    scope: 'landing',
+    content: {
+      icon: Sparkles,
+      iconClassName: 'text-brand',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
+      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
+      testId: 'launch-modal',
+      containerClassName: 'border-brand/40',
+      // Launch announcement — centered with a backdrop so it reads as the
+      // page's headline moment instead of a bottom-right corner card.
+      centered: true,
+      badge: 'New',
+      badgeZh: '最新',
+      dismissLabel: 'Maybe Later',
+      dismissLabelZh: '稍后再看',
+      primaryAction: {
+        label: 'View results',
+        labelZh: '查看结果',
+        icon: <ArrowRight className="size-4" />,
+        onClick: () => {
+          window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        },
+      },
+    },
+    analytics: {
+      shown: 'inference_tpuv7_agentx_modal_shown',
+      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
+      action: 'inference_tpuv7_agentx_modal_clicked',
+    },
+  },
   {
     id: 'tpuv7-qwen-3-5-agentx-banner',
     type: 'banner',

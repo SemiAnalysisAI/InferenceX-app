@@ -525,7 +525,7 @@ function ModalRenderer({
               <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
-                <NewBadge data-new-badge="launch-modal" className="ml-1">
+                <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
                   {localized(locale, content.badge, content.badgeZh)}
                 </NewBadge>
               )}
