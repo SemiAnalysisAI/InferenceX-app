@@ -531,10 +531,13 @@ function ModalRenderer({
       const first = items[0];
       const last = items.at(-1)!;
       const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialogEl.contains(active))) {
+      // The panel itself (focusable via tabIndex=-1 on click) counts as outside
+      // the item cycle, so Tab from it never escapes to the backdrop.
+      const outside = active === dialogEl || !dialogEl.contains(active);
+      if (event.shiftKey && (active === first || outside)) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && (active === last || !dialogEl.contains(active))) {
+      } else if (!event.shiftKey && (active === last || outside)) {
         event.preventDefault();
         first.focus();
       }
@@ -622,6 +625,9 @@ function ModalRenderer({
         <button
           type="button"
           aria-label={rs.close}
+          // Mouse-only dimmer: keyboard users close with Escape or the X, so
+          // it stays out of the Tab order.
+          tabIndex={-1}
           onClick={onDismiss}
           className="absolute inset-0 cursor-default bg-black/50"
         />

@@ -150,6 +150,15 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
   });
 
+  it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible').click('bottomLeft');
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+  });
+
   it('dismisses on Escape', () => {
     cy.visit('/', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]').should('be.visible');
