@@ -108,6 +108,15 @@ This domain owns inference-only selection state. GPU selections and comparison d
 do not belong in global filter state because evaluation and reliability do not use
 them.
 
+Manual legend selections and explicit Best per SKU overrides are model-local.
+Choosing a different model in the model selector restores that model's default
+Best per SKU mode and does not use
+the previous model's sticky engine preference. Changes to axes within the same
+model preserve a manual selection. Initial share-link selections and explicit
+favorite presets retain their existing restoration paths. Compare History GPU
+and date selections, axis settings, and locked embed filters are unchanged. This navigation reset
+does not change the stateless read-only inference API's ranking or parameters.
+
 **`useInferenceDisplay`**
 
 Axis and presentation state:
@@ -134,7 +143,8 @@ interactivity. The store is scoped to one chart id on purpose. The replay chart
 store would render every ruler twice and let the replay's prune pass delete rulers the
 main chart still shows. `ScatterGraph` binds when its `chartId` is `chart-0` (ChartDisplay
 mounts it as the primary chart) and falls back to component-local state when no matching
-store is present; the date-comparison `GPUGraph` draws no rulers.
+store is present; the date-comparison `GPUGraph` keeps its rulers in component-local
+state and never reads or writes `i_rulers`.
 
 `ScatterGraph` reads `state`/`setState` from the store, so the existing reducers, refs,
 and draw passes are unchanged. The one thing that moved is the axis reset:

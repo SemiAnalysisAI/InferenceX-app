@@ -209,7 +209,8 @@ config is `display: 'timeline'`.
   downloaded. `/api/gpu-metrics?series=power` first uses persisted telemetry and returns one-second per-GPU buckets
   (`components/gpu-power/power-series.ts`, ~1 MB for a 25-config run instead of ~27 MB of
   raw rows). Missing stored telemetry falls back to artifacts; database failures are explicit errors.
-  See [persistence and repair](./powerx-persistence-recovery.md) for cache freshness and coverage receipts.
+  See [PowerX telemetry storage](./data-pipeline.md#powerx-telemetry-storage-gpu_metric_-migration-016)
+  for cache freshness, coverage and targeted repair.
   With `series=power` the artifact fallback also downloads `power_audit_*` bundles whose name
   shares the prefix (a bundle names the sweep, so the match runs both ways), reads only
   `LOGS/power/samples.csv`, `LOGS/power/manifest.json` and the top-level

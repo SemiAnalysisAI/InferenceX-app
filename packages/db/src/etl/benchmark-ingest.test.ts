@@ -215,4 +215,31 @@ describe('insertServerLogFiles', () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+  it('caps oversized files before sending them to PostgreSQL', async () => {
+    const previous = process.env.SERVER_LOG_MAX_FILE_BYTES;
+    process.env.SERVER_LOG_MAX_FILE_BYTES = String(128 * 1024);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const big = 'decode worker line\n'.repeat(50_000);
+      const { sql, calls } = fakeTransactionSql(null);
+      await insertServerLogFiles(
+        sql,
+        [42],
+        [
+          { fileName: 'server.log', logText: 'server' },
+          { fileName: 'cn08_decode_w0.out', logText: big },
+        ],
+      );
+
+      const childInsert = calls.find((call) => call.text.includes('insert into server_log_files'));
+      const stored = childInsert?.values[2] as string;
+      expect(Buffer.byteLength(stored, 'utf8')).toBeLessThanOrEqual(128 * 1024);
+      expect(stored).toContain('[InferenceX ingest truncated this log');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cn08_decode_w0.out: truncated'));
+    } finally {
+      warn.mockRestore();
+      if (previous === undefined) delete process.env.SERVER_LOG_MAX_FILE_BYTES;
+      else process.env.SERVER_LOG_MAX_FILE_BYTES = previous;
+    }
+  });
 });

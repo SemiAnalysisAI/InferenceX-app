@@ -57,6 +57,19 @@ canonical home of the default model; alias slugs 308-redirect like `/compare`.
 
 Chart filter state (model, sequence, metric, precisions, date range, GPU selections) is serialized to URL query params. This enables shareable links that reproduce exact chart views.
 
+The two profit estimators use model slugs followed by named route pairs instead,
+including on `/zh`: `/profit-estimator/deepseek-v4/target/24`.
+Their existing query-key state store is adapted at the routing boundary by
+`profit-estimator-routes.ts`. Shallow history replacements keep the address bar
+current; these client-owned writes bypass Next navigation rehydration so it
+cannot overwrite a pending control edit. Legacy query links remain readable.
+Profit dashboards use P90 only and strip legacy percentile parameters.
+Language links retain route state without copying it into the query string;
+the unofficial-run filter reader and cross-tab overlay links use a separate
+route-aware adapter. Tab links encode run IDs in the destination's format:
+route segments for profit estimators, query parameters for other dashboards.
+Other dashboards keep their existing query-state behavior.
+
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) would spam `history.pushState`. Debouncing batches them into a single URL update.
 
 **Why snapshot-and-clear on load?** Initial params are read into the URL-state snapshot, then stripped from the visible address bar with `history.replaceState` while preserving the pathname and hash. Route-owned entry points can also pass typed server seeds. Subsequent debounced writes update the in-memory share state.

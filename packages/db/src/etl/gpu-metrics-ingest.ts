@@ -337,11 +337,37 @@ export async function ingestGpuMetricsArtifact(
     workflowRunId: number;
     artifact: GpuMetricsArtifact;
     benchmarkResultIds: readonly number[];
+    expectedRunArtifacts?: readonly string[];
     replace?: boolean;
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
   const result: GpuMetricsIngestResult = { seriesIds: [], samplesInserted: 0, seriesSkipped: 0 };
+  if (prepared.length === 0) {
+    await sql`
+      update gpu_metric_series
+      set sidecars = sidecars - 'seriesInventory', ingested_at = now()
+      where workflow_run_id = ${input.workflowRunId}
+        and artifact_name = ${input.artifact.artifactName}
+    `;
+    return result;
+  }
+  const expectedArtifacts = new Set(input.expectedRunArtifacts);
+  const previous = await sql<{ inventory: unknown }[]>`
+    select distinct sidecars -> 'runArtifactInventory' as inventory
+    from gpu_metric_series
+    where workflow_run_id = ${input.workflowRunId} and sidecars ? 'runArtifactInventory'
+  `;
+  for (const row of previous) {
+    if (!Array.isArray(row.inventory)) continue;
+    for (const name of row.inventory) {
+      if (typeof name === 'string' && name.length > 0) expectedArtifacts.add(name);
+    }
+  }
+  if (expectedArtifacts.size > 0) {
+    const inventory = [...expectedArtifacts].sort();
+    for (const series of prepared) series.sidecars.runArtifactInventory = inventory;
+  }
   for (const series of prepared) {
     const upserted = await upsertGpuMetricSeries(sql, {
       workflowRunId: input.workflowRunId,
@@ -353,6 +379,14 @@ export async function ingestGpuMetricsArtifact(
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;
     if (upserted.samplesInserted === 0 && !upserted.replaced) result.seriesSkipped++;
+  }
+  if (result.seriesIds.length > 0) {
+    await sql`
+      delete from gpu_metric_series
+      where workflow_run_id = ${input.workflowRunId}
+        and artifact_name = ${input.artifact.artifactName}
+        and not (id = any(${sql.array(result.seriesIds)}::bigint[]))
+    `;
   }
   return result;
 }

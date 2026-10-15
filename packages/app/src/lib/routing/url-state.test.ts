@@ -10,7 +10,7 @@ function setupWindow(search = '', pathname = '/inference', hash = '') {
   };
   const history = { replaceState: vi.fn(), state: { __NA: 1 } };
 
-  vi.stubGlobal('window', { location, history });
+  vi.stubGlobal('window', { location, history, dispatchEvent: vi.fn() });
   return { location, history };
 }
 
@@ -585,6 +585,66 @@ describe('buildShareUrl tab filtering', () => {
     expect(url).not.toContain('r_range');
   });
 
+  for (const pathname of ['/profit-estimator', '/zh/profit-estimator-per-gigawatt/kimi-k3']) {
+    it(`shares the profit target but never a percentile on ${pathname}`, async () => {
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+
+      writeUrlParams({ i_pctl: 'p75', c_ivtarget: '24' });
+      await vi.advanceTimersByTimeAsync(200);
+
+      const shared = new URL(buildShareUrl());
+      const base = pathname.endsWith('/kimi-k3') ? pathname : `${pathname}/kimi-k3`;
+      expect(shared.pathname).toBe(`${base}/target/24`);
+      expect(shared.search).toBe('');
+    });
+  }
+
+  it('drops c_ivtarget from the share link once the target returns to the model default', async () => {
+    setupWindow('?c_ivtarget=24', '/profit-estimator');
+    const { readUrlParams, writeUrlParams, buildShareUrl } =
+      await import('@/lib/routing/url-state');
+    expect(readUrlParams().c_ivtarget).toBe('24');
+
+    // The estimator writes '' when the target equals the selected model's default.
+    writeUrlParams({ c_ivtarget: '' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(buildShareUrl()).toBe('https://example.com/profit-estimator');
+  });
+
+  it('refreshes route state and clears stale values on a fresh estimator navigation', async () => {
+    const { location } = setupWindow('', '/profit-estimator/deepseek-v4/target/24/percentile/p75');
+    const { readUrlParams, refreshUrlParamsOnNavigation, buildShareUrl } =
+      await import('@/lib/routing/url-state');
+    expect(readUrlParams()).toMatchObject({ c_ivtarget: '24' });
+    expect(readUrlParams().i_pctl).toBeUndefined();
+    location.pathname = '/profit-estimator/kimi-k3';
+    refreshUrlParamsOnNavigation(location.pathname);
+    expect(readUrlParams().c_ivtarget).toBeUndefined();
+    expect(readUrlParams().i_pctl).toBeUndefined();
+    expect(buildShareUrl()).toBe('https://example.com/profit-estimator/kimi-k3');
+  });
+
+  it('updates the visible path with pending filters and preserves hash and unrelated queries', async () => {
+    const { history } = setupWindow(
+      '?utm_campaign=test',
+      '/profit-estimator/deepseek-v4',
+      '#chart',
+    );
+    const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+    writeUrlParams({ c_ivtarget: '24', i_pctl: 'p75' });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(history.replaceState).toHaveBeenLastCalledWith(
+      history.state,
+      '',
+      '/profit-estimator/deepseek-v4/target/24?utm_campaign=test#chart',
+    );
+    expect(buildShareUrl()).toBe(
+      'https://example.com/profit-estimator/deepseek-v4/target/24#chart',
+    );
+  });
+
   it('defaults to inference tab prefixes when on root path', async () => {
     setupWindow('', '/');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
@@ -595,6 +655,42 @@ describe('buildShareUrl tab filtering', () => {
     const url = buildShareUrl();
     expect(url).toContain('g_model=x');
     expect(url).not.toContain('r_range');
+  });
+
+  it('does not rehydrate over an edit queued during a client-owned profit route write', async () => {
+    const { location, history } = setupWindow('', '/profit-estimator/deepseek-v4');
+    const state = await import('@/lib/routing/url-state');
+    let firstWrite = true;
+    const nativeReplace = vi.fn((_state, _title, href: string) => {
+      const url = new URL(href, location.origin);
+      location.pathname = url.pathname;
+      location.search = url.search;
+      if (firstWrite) {
+        firstWrite = false;
+        // A control edit lands before React's pathname-driven hydration effect.
+        state.writeUrlParams({ g_tco: 'external', g_runid: '123', i_prec: 'fp8' });
+      }
+    });
+    vi.stubGlobal('History', { prototype: { replaceState: nativeReplace } });
+    history.replaceState.mockImplementation((value, title, href) => {
+      nativeReplace(value, title, String(href));
+      state.refreshUrlParams();
+    });
+
+    state.writeUrlParams({ c_ivtarget: '24' });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(state.readUrlParams()).toMatchObject({
+      c_ivtarget: '24',
+      g_tco: 'external',
+      g_runid: '123',
+      i_prec: 'fp8',
+    });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(location.pathname).toBe(
+      '/profit-estimator/deepseek-v4/target/24/tco-basis/external/run/123/precision/fp8',
+    );
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(nativeReplace).toHaveBeenCalledTimes(2);
   });
 
   it('preserves the exact locale, slug, scenario, and hash for non-dashboard chart routes', async () => {

@@ -24,6 +24,18 @@ function row(timestamp: string, index: number, power: number): GpuMetricRow {
 }
 
 describe('bucketPowerSeries', () => {
+  it('omits missing power readings while retaining measured zero', () => {
+    const timestamp = '2026-09-12T20:20:41.000Z';
+    expect(
+      bucketPowerSeries('gpu_metrics_test', [{ timestamp, index: 0, temperature: 40 }]),
+    ).toBeNull();
+    const series = bucketPowerSeries('gpu_metrics_test', [
+      { timestamp, index: 0, temperature: 40 },
+      { timestamp, index: 0, power: 0 },
+    ]);
+    expect(series?.power).toEqual([[0]]);
+  });
+
   it('aligns every GPU on one-second buckets and marks missing samples null', () => {
     const rows = [
       row('2026/09/12 20:20:41.817', 0, 194.4),
@@ -39,14 +51,14 @@ describe('bucketPowerSeries', () => {
     expect(series!.startMs).toBe(Date.UTC(2026, 8, 12, 20, 20, 41));
     expect(series!.bucketSeconds).toBe(1);
     expect(series!.gpus).toEqual([0, 1]);
-    expect(series!.t).toEqual([0, 1, 2]);
+    expect(series!.t).toEqual([0.819, 1.816, 2.844]);
     expect(series!.power).toEqual([
       [194.4, 300, 450],
       [192.4, null, 350],
     ]);
     expect(meanPowerAt(series!, 1)).toBe(300);
     expect(meanPowerAt(series!, 2)).toBe(400);
-    expect(bucketTimeMs(series!, 2)).toBe(Date.UTC(2026, 8, 12, 20, 20, 43));
+    expect(bucketTimeMs(series!, 2)).toBe(Date.UTC(2026, 8, 12, 20, 20, 43, 844));
   });
 });
 

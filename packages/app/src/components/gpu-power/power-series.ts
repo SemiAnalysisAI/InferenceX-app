@@ -42,7 +42,11 @@ export interface GpuPowerSeries {
   bucketSeconds: number;
   /** GPU indices, one per row of `power`, ascending. */
   gpus: number[];
-  /** Seconds since `startMs` for each bucket, ascending. */
+  /**
+   * Seconds since `startMs` for each bucket, ascending: the mean time of the
+   * samples in the bucket, so window membership and x position use when the
+   * scrape happened, not the start of its second.
+   */
   t: number[];
   /** Watts per GPU (outer) per bucket (inner); `null` when no sample landed in the bucket. */
   power: (number | null)[][];
@@ -106,7 +110,8 @@ export function bucketPowerSeries(
   const parsed: { ms: number; gpu: number; power: number }[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    if (!Number.isFinite(row.power) || !Number.isInteger(row.index)) continue;
+    if (row.power === undefined || !Number.isFinite(row.power) || !Number.isInteger(row.index))
+      continue;
     const ms = parseTelemetryTimestampUtc(row.timestamp);
     if (ms === null) continue;
     const key = `${row.index}:${ms}`;
@@ -120,26 +125,27 @@ export function bucketPowerSeries(
 
   const gpus = [...new Set(parsed.map((sample) => sample.gpu))].toSorted((a, b) => a - b);
   const gpuRow = new Map(gpus.map((gpu, row) => [gpu, row]));
-  // bucket index -> per GPU [sum, count]
-  const buckets = new Map<number, [number, number][]>();
+  // bucket index -> per GPU [sum, count], plus the summed sample offsets
+  const buckets = new Map<number, { cells: [number, number][]; offsetMs: number; count: number }>();
   for (const sample of parsed) {
     const bucket = Math.floor((sample.ms - startMs) / bucketMs);
-    let cells = buckets.get(bucket);
-    if (!cells) {
-      cells = gpus.map(() => [0, 0]);
-      buckets.set(bucket, cells);
+    let entry = buckets.get(bucket);
+    if (!entry) {
+      entry = { cells: gpus.map(() => [0, 0]), offsetMs: 0, count: 0 };
+      buckets.set(bucket, entry);
     }
-    const cell = cells[gpuRow.get(sample.gpu)!];
+    const cell = entry.cells[gpuRow.get(sample.gpu)!];
     cell[0] += sample.power;
     cell[1] += 1;
+    entry.offsetMs += sample.ms - startMs;
+    entry.count += 1;
   }
   const bucketIndices = [...buckets.keys()].toSorted((a, b) => a - b);
   const power: (number | null)[][] = gpus.map(() =>
     Array.from({ length: bucketIndices.length }, (): number | null => null),
   );
   bucketIndices.forEach((bucket, column) => {
-    const cells = buckets.get(bucket)!;
-    cells.forEach(([sum, count], row) => {
+    buckets.get(bucket)!.cells.forEach(([sum, count], row) => {
       power[row][column] = count > 0 ? Math.round((sum / count) * 100) / 100 : null;
     });
   });
@@ -148,7 +154,10 @@ export function bucketPowerSeries(
     startMs,
     bucketSeconds,
     gpus,
-    t: bucketIndices.map((bucket) => bucket * bucketSeconds),
+    t: bucketIndices.map((bucket) => {
+      const { offsetMs, count } = buckets.get(bucket)!;
+      return Math.round(offsetMs / count) / 1000;
+    }),
     power,
   };
 }

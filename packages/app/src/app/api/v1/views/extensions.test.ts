@@ -1,7 +1,9 @@
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
+import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api/api';
+import { Model } from '@/lib/catalog/data-mappings';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -105,6 +107,7 @@ describe('new dashboard projections', () => {
     expect(result.headers.get('cache-control')).toContain('no-store');
     const body = await result.json();
     expect(body.rows).toEqual(metricRows.filter((r) => r.index === 1));
+    expect(body.coverage).toBeNull();
     expect(body.chart).toEqual(
       Object.fromEntries(buildGroupedData(metricRows, new Set([1]), 'temperature')),
     );
@@ -120,6 +123,26 @@ describe('new dashboard projections', () => {
     expect(corr.chart).toEqual(
       buildCorrelationData(metricRows, new Set([0]), 'temperature', 'power'),
     );
+  });
+  it('preserves run-wide partial coverage when selecting one stored host', async () => {
+    const coverage = { status: 'partial', missingArtifacts: ['gpu_metrics_missing_host'] };
+    const artifact = 'gpu_metrics_run/host-a/gpu_metrics.csv';
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        coverage,
+        artifactNames: [artifact, 'gpu_metrics_run/host-b/gpu_metrics.csv'],
+        artifacts: [{ name: artifact, data: metricRows }],
+      }),
+    );
+    const response = await gpu(
+      req('gpu-metrics', `runId=123&artifact=${encodeURIComponent(artifact)}`),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.coverage).toEqual(coverage);
+    expect(body.params.artifact).toBe(artifact);
+    expect(body.artifacts).toHaveLength(2);
   });
   it('rejects invalid GPU indices, artifacts and unsafe IDs', async () => {
     for (const query of [
@@ -255,6 +278,87 @@ describe('new dashboard projections', () => {
       if (view === 'cache-reuse') expect(body.data).toBeNull();
     }
   });
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
+    async (view, handler) => {
+      const row = agenticRow();
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          row,
+          agenticRow({
+            id: 2,
+            conc: 32,
+            metrics: {
+              ...row.metrics,
+              p90_itl: 1 / 20,
+              tput_per_gpu: 9000,
+              input_tput_per_gpu: 8100,
+              output_tput_per_gpu: 900,
+            },
+          }),
+        ]),
+      );
+      const response = await handler(req(view, 'model=DeepSeek-V4-Pro'));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params).toMatchObject({ target: 35, priceSource: 'list', labCut: 0 });
+      expect(body.params.target).toBe(profitModelDefaults(Model.DeepSeek_V4_Pro).interactivity);
+      expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+
+      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=35'));
+      expect(explicit.status).toBe(200);
+      const explicitBody = await explicit.json();
+      expect(explicitBody.data).toEqual(body.data);
+
+      const custom = await handler(req(view, 'model=DeepSeek-V4-Pro&target=24'));
+      expect(custom.status).toBe(200);
+      const customBody = await custom.json();
+      expect(customBody.params.target).toBe(24);
+      expect(customBody.data).not.toEqual(body.data);
+    },
+  );
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s defaults to theoretical cache pricing but honors actual',
+    async (view, handler) => {
+      const row = agenticRow();
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          {
+            ...row,
+            metrics: { ...row.metrics, theoretical_cache_hit_rate: 0.98 },
+          },
+        ]),
+      );
+      const query = 'model=DeepSeek-V4-Pro&target=45';
+      const read = async (suffix = '') => {
+        const response = await handler(req(view, query + suffix));
+        expect(response.status).toBe(200);
+        return response.json();
+      };
+      const implicit = await read();
+      const theoretical = await read('&cacheHitMode=theoretical');
+      const actual = await read('&cacheHitMode=actual');
+      expect(implicit.params.cacheHitMode).toBe('theoretical');
+      expect(implicit.data.rows.length).toBeGreaterThan(0);
+      expect(implicit.data).toEqual(theoretical.data);
+      expect(actual.params.cacheHitMode).toBe('actual');
+      expect(actual.data).not.toEqual(implicit.data);
+
+      mocks.benchmarks.mockImplementation(() => Response.json([row]));
+      const fallback = await read();
+      const measured = await read('&cacheHitMode=actual');
+      expect(fallback.data).toEqual(measured.data);
+      const invalid = await handler(req(view, `${query}&cacheHitMode=unknown`));
+      expect(invalid.status).toBe(400);
+    },
+  );
+
   it('exact-run and public-overlay selectors are forwarded only to fixed GET handlers', async () => {
     await first(
       req(

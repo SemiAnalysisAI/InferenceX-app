@@ -79,6 +79,7 @@ import {
   TraceReplayWorkerPool,
 } from './etl/trace-replay-worker-pool';
 import { AsyncSemaphore } from './etl/async-semaphore';
+import { withTransientDbRetry } from './etl/db-retry';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import {
@@ -542,6 +543,17 @@ async function main(): Promise<void> {
     }
 
     const files = benchmarkFiles();
+    const expectedRunArtifacts = [
+      ...new Set(
+        files.flatMap((file) => {
+          const parentDir = path.posix.basename(path.posix.dirname(file.path));
+          const artifact =
+            gpuMetricsArtifacts.get(parentDir.replace(/^bmk_/u, '')) ??
+            gpuMetricsArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
+          return artifact ? [artifact.artifactName] : [];
+        }),
+      ),
+    ].sort();
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${files.length} benchmark JSON file(s)`);
 
@@ -745,7 +757,9 @@ async function main(): Promise<void> {
                 console.log(
                   `    server_logs ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
                 );
-                await insertServerLogFiles(sql, insertedIds, logFiles);
+                await withTransientDbRetry(`server_logs for ${configKey}`, () =>
+                  insertServerLogFiles(sql, insertedIds, logFiles),
+                );
                 console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
                 tracker.recordDbError(`server_logs for ${configKey}`, error);
@@ -756,11 +770,14 @@ async function main(): Promise<void> {
             if (gpuMetricsArtifact) {
               try {
                 const gpuMetricsStart = Date.now();
-                const ingested = await ingestGpuMetricsArtifact(sql, {
-                  workflowRunId,
-                  artifact: gpuMetricsArtifact,
-                  benchmarkResultIds: insertedIds,
-                });
+                const ingested = await withTransientDbRetry(`gpu_metrics for ${configKey}`, () =>
+                  ingestGpuMetricsArtifact(sql, {
+                    workflowRunId,
+                    artifact: gpuMetricsArtifact,
+                    benchmarkResultIds: insertedIds,
+                    expectedRunArtifacts,
+                  }),
+                );
                 if (ingested.seriesIds.length === 0)
                   throw new Error(
                     `No parseable telemetry series in ${gpuMetricsArtifact.artifactName}`,
@@ -846,9 +863,11 @@ async function main(): Promise<void> {
                             `(${(prepared.computeMs / 1000).toFixed(1)}s)`,
                         );
                         const linked = await traceUploadLimiter.run(() =>
-                          persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
-                            progressLabel: suffix,
-                          }),
+                          withTransientDbRetry(`trace_replay for ${suffix}`, () =>
+                            persistPreparedTraceReplay(sql, unlinkedIds, prepared, {
+                              progressLabel: suffix,
+                            }),
+                          ),
                         );
                         totalTraceReplayLinked += linked;
                         console.log(`    trace_replay ${suffix}: done (${elapsed(traceStart)})`);

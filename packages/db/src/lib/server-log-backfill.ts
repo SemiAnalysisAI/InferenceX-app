@@ -44,8 +44,3 @@ export function pairServerLogArtifacts(
     ({ artifact, benchmarks }) => ({ serverLogs: artifact, benchmarks }),
   );
 }
-
-/** True when `gh api` reported HTTP 404: the token cannot see the repository or run. */
-export function isGithubNotFound(error: unknown): boolean {
-  return /\(HTTP 404\)/u.test(error instanceof Error ? error.message : String(error));
-}

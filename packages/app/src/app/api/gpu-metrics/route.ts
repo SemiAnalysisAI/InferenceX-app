@@ -66,6 +66,7 @@ export type GpuMetricsSource = 'database' | 'github';
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
   artifactNames?: string[];
+  coverage?: GpuMetricsRunPayload['coverage'];
 }
 
 /** Shape stored series like the GitHub payload so readers are source-agnostic. */
@@ -77,6 +78,7 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   }
   return {
     source: 'database',
+    coverage: payload.coverage,
     ...(payload.artifactNames ? { artifactNames: payload.artifactNames } : {}),
     runInfo: {
       id: run.githubRunId,
@@ -135,11 +137,11 @@ function powerSeriesResponse(
 }
 
 async function fetchGpuMetricsFromDatabase(
-  runId: string,
+  runId: number,
   selection: GpuMetricsRunSelection,
 ): Promise<GpuMetricsRouteResponse | null> {
   if (!process.env.DATABASE_READONLY_URL) return null;
-  const payload = await getGpuMetricsForRun(getDb(), Number(runId), selection);
+  const payload = await getGpuMetricsForRun(getDb(), runId, selection);
   return payload ? databasePayloadToResponse(payload) : null;
 }
 
@@ -213,8 +215,9 @@ async function readGpuMetrics(
 ) {
   const params = request.nextUrl.searchParams;
   const runId = params.get('runId');
+  const numericRunId = Number(runId);
 
-  if (!runId || !/^\d+$/u.test(runId)) {
+  if (!runId || !/^\d+$/u.test(runId) || !Number.isSafeInteger(numericRunId) || numericRunId <= 0) {
     return NextResponse.json({ error: 'runId must be a numeric workflow run ID' }, { status: 400 });
   }
   const prefix = params.get('prefix');
@@ -231,7 +234,7 @@ async function readGpuMetrics(
 
   let stored: GpuMetricsRouteResponse | null;
   try {
-    stored = await fetchGpuMetricsFromDatabase(runId, {
+    stored = await fetchGpuMetricsFromDatabase(numericRunId, {
       prefix,
       sourceResults:
         sources?.map((source) => source.slice('power_validation_'.length, -'.json'.length)) ?? null,

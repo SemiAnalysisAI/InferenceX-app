@@ -6,6 +6,7 @@ import {
 } from '@/components/calculator/first-token-limits';
 import {
   applyCacheHitMode,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   profitModelDefaults,
@@ -149,7 +150,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       search.get('cacheHitMode'),
       'cacheHitMode',
       ['actual', 'theoretical'],
-      'actual',
+      DEFAULT_CACHE_HIT_MODE,
     );
     const priceSource = parseEnumParam(
       search.get('priceSource'),

@@ -1,4 +1,6 @@
 /** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
+import { isRecord } from '@semianalysisai/inferencex-db/lib/records';
+
 import type { GpuMetricRow, GpuPowerRunInfo } from '@/components/gpu-power/types';
 import {
   cutPowerAuditBundle,
@@ -78,9 +80,7 @@ async function downloadArtifact(
     const base = name.slice(name.lastIndexOf('/') + 1);
     if (!base.includes('gpu_metrics') || !base.toLowerCase().endsWith('_context.json')) return [];
     const context: unknown = JSON.parse(contents);
-    return context && typeof context === 'object' && !Array.isArray(context)
-      ? [{ name, context: context as Record<string, unknown> }]
-      : [];
+    return isRecord(context) ? [{ name, context }] : [];
   });
   // Ingest uses code-unit filename order, not archive order or the host locale.
   contextFiles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

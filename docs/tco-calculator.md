@@ -1136,16 +1136,20 @@ and the two can be collapsed into one once both are on master.
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
   H100, H200, MI300X, and MI325X curves top out below it and are omitted at that target.
-  GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on 20%; Kimi K3
-  opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user,
-  the speed DeepSeek's own API serves at, DeepSeek's peak-hour list price for
+  GLM 5.2/5.3 and MiniMax M3 open on a 20% model license fee; Kimi K3
+  opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 35 tok/s/user,
+  an editable operating assumption chosen on 2026-10-13 using the early-October
+  [OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
+  as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
+  These unweighted P50 summaries are not a measured P90-equivalent target.
+  It retains DeepSeek's peak-hour list price for
   `deepseek-v4-pro-0813` ($1.32 input / $0.044 cached / $3.96 output per M tok;
   the off-peak rate is half that, and the OpenRouter aggregate sits below both),
-  and a 0% model license fee, since the weights ship under the MIT license. At 24
-  tok/s/user the B200, B300, and MI355X agentic curves are priced; the
-  GB200, GB300, and H200 curves bottom out above it (their lowest measured
-  points sit at roughly 40, 30, and 27 tok/s/user) and are omitted until
-  a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,
+  and a 0% model license fee, since the weights ship under the MIT license.
+  Curves that do not bracket the selected target remain unpriced.
+  Both profit views, their English/Chinese pages, and their read-only APIs
+  share this default; explicit user targets remain unchanged.
+  DeepSeek V4.1 Flash opens on 125 tok/s/user,
   the speed DeepSeek's own API serves the Flash tier at, DeepSeek's peak-hour
   list price for `deepseek-flash` ($0.30 input / $0.006 cached / $1.20 output
   per M tok; off-peak is half that), and a 0% model license fee, since the
@@ -1156,6 +1160,27 @@ and the two can be collapsed into one once both are on master.
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom
   seeds the three fields from whichever price is in force.
+- **Share state lives in the route.** Both profit estimators and their `/zh`
+  siblings use `/<tab>/<model>/<name>/<value>` pairs, for example
+  `/profit-estimator/deepseek-v4/target/24`.
+  `profit-estimator-routes.ts` owns the names and deterministic ordering:
+  `target`, `cache-hit-mode`, `power`, `tco-basis`, `date`, `run`,
+  `precision`, `chips`, `dates`, `start`, `end`, and `unofficial-runs`.
+  Values are URI-encoded once. All previously shareable profit parameters use
+  the route; no chart state is emitted as a query. The pinned AgentX sequence
+  and other tabs' parameters are omitted. Controls update history in place,
+  using native history replacement without rehydrating the URL into controls.
+  Actual navigations still rehydrate their own state.
+  Both profit dashboards are P90-only, including behind the feature gate.
+  Percentile is never emitted in a query or path. Old `/percentile/p75` and
+  percentile query links resolve to the corresponding P90 view without that
+  parameter. Other legacy queries remain readable, with path values taking precedence.
+  The target is server-seeded, defaults are omitted, and a model switch resets
+  its target. A fresh navigation must not reuse the previous page's target.
+  Filtered pages retain the model page's canonical/hreflang metadata rather
+  than indexing every combination. The read-only API still uses its existing
+  query contract (`target`, `percentile`, etc.). The retired fixed-8k/1k
+  `c_profit_target` remains ignored.
 - **Two-line x labels when they fit, slanted when they do not.** `xLabelLayout`
   estimates the widest label against the room per tick. With room, each SKU stands
   upright as two lines, name over framework and precision (`splitAxisLabel`), and

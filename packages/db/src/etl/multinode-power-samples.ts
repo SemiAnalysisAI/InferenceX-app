@@ -3,15 +3,15 @@
  *
  * `benchmark-multinode-tmpl.yml` uploads no `gpu_metrics_` artifact; its
  * telemetry travels inside `power_audit_<suffix>` as one CSV for the whole
- * deployment, written by `srt-slurm.dcgm-power` (DCGM scraped on every host
- * once per second):
+ * deployment, written by `srt-slurm.dcgm-power` for native NVIDIA or AMD
+ * telemetry:
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
- * Only power is scraped, so every other `GpuMetricSample` field stays null and
- * per-GPU statistics cover `powerW` alone. Rows are regrouped per host so each
- * host becomes its own series, the shape the reader already uses for multinode
- * staging ("one CSV per node"). Pure module: no I/O.
+ * Version 2 adds optional GPU utilization and version 3 adds temperature in
+ * Celsius. Uncollected readings retain null. Rows are regrouped per host so
+ * each host becomes its own series, the shape the reader already uses for
+ * multinode staging ("one CSV per node"). Pure module: no I/O.
  */
 
 import {
@@ -23,7 +23,7 @@ import {
 
 export interface MultinodePowerHost {
   hostname: string;
-  /** Host-local GPU indices, as DCGM reports them. */
+  /** Host-local GPU indices, as the collector reports them. */
   samples: GpuMetricSample[];
   /** gpu_index → gpu_uuid for the identity sidecar. */
   gpuUuids: Record<number, string>;
@@ -31,7 +31,6 @@ export interface MultinodePowerHost {
 
 const REQUIRED_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'power_w'] as const;
 
-/** `samples.csv` under `LOGS/` is the producer's only time-series file. */
 export function isMultinodePowerSamplesPath(relativePath: string): boolean {
   const posix = relativePath.split('\\').join('/');
   return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
@@ -52,6 +51,14 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
   const column = new Map(header.map((name, index) => [name, index] as const));
   if (REQUIRED_COLUMNS.some((name) => !column.has(name))) return null;
   const at = (cells: string[], name: string): string | undefined => cells[column.get(name)!];
+  const readInRange = (cells: string[], name: string, min: number, max: number): number | null => {
+    const text = at(cells, name);
+    const value = text ? Number(text) : Number.NaN;
+    // DCGM reserves INT32_BLANK and larger values for unavailable readings.
+    return Number.isFinite(value) && value < 2147483632 && value >= min && value <= max
+      ? value
+      : null;
+  };
 
   const hosts = new Map<string, MultinodePowerHost>();
   for (const line of lines.slice(1)) {
@@ -74,7 +81,13 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push({ ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW });
+    const sample = {
+      ...emptySample(Math.round(seconds * 1000), gpuIndex),
+      powerW,
+      temperatureC: readInRange(cells, 'temperature_c', -273.15, 2147483632),
+      gpuUtilPct: readInRange(cells, 'gpu_util_pct', 0, 100),
+    };
+    host.samples.push(sample);
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }
@@ -82,12 +95,8 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
   return [...hosts.values()].toSorted((a, b) => a.hostname.localeCompare(b.hostname));
 }
 
-/**
- * The producer manifest names its source metric; DCGM means NVIDIA. Anything
- * naming AMD tooling maps to 'amd', and an absent manifest defaults to NVIDIA
- * because only the DCGM producer writes this layout today.
- */
 export function multinodePowerVendor(manifest: Record<string, unknown> | null): GpuMetricsVendor {
+  if (manifest?.source_metric === 'gpu_power_usage') return 'amd';
   const source = [manifest?.source_metric, manifest?.producer]
     .filter((value): value is string => typeof value === 'string')
     .join(' ')

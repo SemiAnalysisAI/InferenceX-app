@@ -13,7 +13,7 @@
  * must list it under "Not priced" rather than extrapolate a bar for it. The
  * wide curve reaches 130 tok/s/user so GLM's 100 and MiniMax M3's 83 tok/s/user
  * defaults are reads, not clamps, on every other SKU. Both curves start below
- * DeepSeek V4 Pro's 24 tok/s/user default, so every SKU, H200 included, is
+ * DeepSeek V4 Pro's 35 tok/s/user default, so every SKU, H200 included, is
  * priced there. DeepSeek V4.1 Flash's 125 tok/s/user default sits just inside
  * the wide curve's 130 tok/s/user top, so the four wide-curve SKUs are priced
  * and H200 is not, as on the Kimi, GLM, and MiniMax defaults.

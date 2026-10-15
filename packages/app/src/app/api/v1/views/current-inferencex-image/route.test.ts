@@ -2,8 +2,13 @@ import type { LatestImageRow } from '@/lib/api/api';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
+import { imageAgeHistory, imageAgeSummary } from '@/components/latest-image/image-age';
 
-const mocks = vi.hoisted(() => ({ images: vi.fn(), releases: vi.fn() }));
+const mocks = vi.hoisted(() => ({ images: vi.fn(), releases: vi.fn(), history: vi.fn() }));
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+vi.mock('@semianalysisai/inferencex-db/queries/latest-images', () => ({
+  getImageAgeObservations: mocks.history,
+}));
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
 vi.mock('@/lib/cache/api-cache', () => ({
@@ -35,9 +40,57 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.images.mockImplementation(() => Response.json([image, { ...image, disagg: true }]));
   mocks.releases.mockImplementation(() => Response.json({ sglang: 'v2' }));
+  mocks.history.mockResolvedValue([
+    image,
+    { ...image, date: '2026-09-18' },
+    { ...image, hardware: 'h200' },
+  ]);
 });
 
 describe('current image selector normalization', () => {
+  it('defaults to Agentic and all node types when both scenarios are available', async () => {
+    mocks.images.mockImplementation(() =>
+      Response.json([
+        { ...image, model: 'qwen3.5', benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
+        image,
+        { ...image, disagg: true },
+      ]),
+    );
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.params).toMatchObject({ sequence: 'agentic-traces', nodeType: 'all' });
+    expect(body.rows).toHaveLength(2);
+    expect(body.rows.map((row: typeof image) => row.disagg)).toEqual([false, true]);
+  });
+
+  it('matches the UI p90 helper and omits history unless requested', async () => {
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.ageSummary).toEqual(
+      imageAgeSummary([image, { ...image, disagg: true }], '2026-09-19'),
+    );
+    expect(body.ageHistory).toBeUndefined();
+    expect(mocks.history).not.toHaveBeenCalled();
+  });
+
+  it('returns the same filtered 90-day series as the UI helper', async () => {
+    const response = await GET(request({ hardware: 'b200', includeHistory: 'true' }));
+    const body = await response.json();
+    expect(body.ageHistory).toEqual(
+      imageAgeHistory([image, { ...image, date: '2026-09-18' }], '2026-09-19'),
+    );
+    expect(body.ageHistory).toHaveLength(90);
+    expect(body.ageHistory.at(-1)).toMatchObject({ p90AgeDays: 1, configurationCount: 1 });
+    expect(body.params.includeHistory).toBe(true);
+    expect(mocks.history).toHaveBeenCalledWith({}, '2026-09-19');
+  });
+
+  it('rejects invalid history selectors', async () => {
+    const response = await GET(request({ includeHistory: 'yes' }));
+    expect(response.status).toBe(400);
+    expect(mocks.history).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['model', 'deepseek-v4', 'DeepSeek-V4-Pro'],
     ['model', ' dEePsEeK-v4-pRo ', 'DeepSeek-V4-Pro'],
@@ -49,7 +102,7 @@ describe('current image selector normalization', () => {
     const expected = await GET(request({ [key]: canonical }));
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.rows).toHaveLength(1);
+    expect(body.rows).toHaveLength(2);
     expect(body.params[key]).toBe(canonical);
     expect(body).toEqual(await expected.json());
   });
@@ -66,7 +119,7 @@ describe('current image selector normalization', () => {
       precision: 'all',
       spec: 'all',
     });
-    expect(body.rows).toHaveLength(1);
+    expect(body.rows).toHaveLength(2);
     expect(body.rows[0]).toMatchObject({
       ...image,
       displayModel: 'DeepSeek-V4-Pro',
@@ -82,6 +135,16 @@ describe('current image selector normalization', () => {
     expect(body.params.model).toBe('Future-Model');
     expect(body.rows).toHaveLength(1);
     expect(body.rows[0].model).toBe('Future-Model');
+  });
+
+  it.each([
+    ['single', false],
+    ['disagg', true],
+  ] as const)('still filters explicit nodeType=%s', async (nodeType, disagg) => {
+    const response = await GET(request({ nodeType }));
+    const body = await response.json();
+    expect(body.rows).toHaveLength(1);
+    expect(body.rows[0].disagg).toBe(disagg);
   });
 
   it('rejects an unknown model instead of returning an empty successful projection', async () => {

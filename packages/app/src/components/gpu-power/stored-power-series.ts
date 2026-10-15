@@ -113,6 +113,7 @@ function storedBundle(artifact: string, series: readonly GpuMetricSeries[]): Gpu
           artifact,
           `device identity is missing for ${entry.fileName} GPU ${row.index}`,
         );
+      if (row.power === undefined) continue;
       samples.push({ deviceId, time: Date.parse(row.timestamp) / 1000, power: row.power });
     }
   }
