@@ -78,7 +78,13 @@ import {
   bulkUpsertAvailability,
   insertServerLogFiles,
 } from './etl/benchmark-ingest';
-import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
+import { benchmarkCandidateKey, selectBenchmarkMeasurements } from './etl/benchmark-candidates';
+import {
+  findUnlinkedTraceReplayIds,
+  persistPreparedTraceReplay,
+  reconcileHistoricalBenchmarkTrace,
+  verifyHistoricalC24TraceSources,
+} from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
   TraceReplayWorkerPool,
@@ -547,6 +553,7 @@ async function main(): Promise<void> {
     const traceWorkerPool = new TraceReplayWorkerPool(traceWorkerCount);
     const traceUploadLimiter = new AsyncSemaphore(Math.min(2, traceWorkerCount));
     const traceTasks: Promise<void>[] = [];
+    const historicalRepairErrors: unknown[] = [];
     if (traceReplayPaths.size > 0) {
       console.log(
         `  Trace preparation: ${traceWorkerCount} worker(s) across ${os.availableParallelism()} vCPU(s), ` +
@@ -555,9 +562,22 @@ async function main(): Promise<void> {
     }
 
     const files = benchmarkFiles();
+    const selected = selectBenchmarkMeasurements(files, {
+      githubRunId: runIdNum,
+      runAttempt: runAttemptNum,
+    });
+    const historicalPoints = new Set(
+      selected.decisions
+        .filter((decision) => decision.reason === 'historical-c24')
+        .map((decision) => decision.pointKey),
+    );
+    for (const decision of selected.decisions) {
+      console.log(`    AgentX selection: ${JSON.stringify(decision)}`);
+    }
     const expectedRunArtifacts = [
       ...new Set(
-        files.flatMap((file) => {
+        selected.sources.flatMap(({ file, rows }) => {
+          if (rows.length === 0) return [];
           const parentDir = path.posix.basename(path.posix.dirname(file.path));
           const artifact =
             gpuMetricsArtifacts.get(parentDir.replace(/^bmk_/u, '')) ??
@@ -569,7 +589,7 @@ async function main(): Promise<void> {
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${files.length} benchmark JSON file(s)`);
 
-    for (const [fileIndex, file] of files.entries()) {
+    for (const [fileIndex, { file, rows: selectedRows }] of selected.sources.entries()) {
       const fileStart = Date.now();
       const relativeFile = file.path;
       console.log(
@@ -585,7 +605,7 @@ async function main(): Promise<void> {
       }
       console.log(`    raw rows: ${file.rows.length + file.nonObjectRows}`);
 
-      for (const { raw } of file.rows) {
+      for (const { raw } of selectedRows) {
         const datasetSlug = datasetSlugFromBenchmarkRow(raw);
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
@@ -593,8 +613,8 @@ async function main(): Promise<void> {
       // Known failed benchmarks are intentionally excluded; non-object entries
       // and unmappable rows leave an unknown number of attachment expectations.
       let fileExpectationsUnknown = file.nonObjectRows > 0;
-      const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
-        if (mapped) return [mapped];
+      for (const { raw, mapped, failed } of file.rows) {
+        if (mapped) continue;
         if (!failed) fileExpectationsUnknown = true;
         // An unmapped PowerX-workload row is a hole in the published curve, so
         // it fails the receipt. A row the benchmark marked failed is excluded
@@ -602,8 +622,8 @@ async function main(): Promise<void> {
         const issue = unmappedPowerResultIssue(raw, failed, relativeFile);
         if (issue && 'error' in issue) powerPublicationErrors.push(issue.error);
         else if (issue) powerPublicationWarnings.push(issue.warning);
-        return [];
-      });
+      }
+      const rows = selectedRows.flatMap(({ mapped }) => (mapped ? [mapped] : []));
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -721,12 +741,46 @@ async function main(): Promise<void> {
       if (toInsert.length > 0) {
         try {
           const insertStart = Date.now();
-          const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
+          const ordinaryRows = [];
+          const repairedIds: number[] = [];
+          for (const point of toInsert) {
+            if (!historicalPoints.has(benchmarkCandidateKey(point))) {
+              ordinaryRows.push(point);
+              continue;
+            }
+            const trace = await verifyHistoricalC24TraceSources(
+              traceReplayPaths.get(`${suffix}|${point.conc}`) ?? traceReplayPaths.get(suffix),
+            );
+            const repairedId = await reconcileHistoricalBenchmarkTrace(
+              sql,
+              point,
+              workflowRunId,
+              (consume) =>
+                traceWorkerPool.run(
+                  {
+                    profileExportJsonl: trace.profileJsonl,
+                    serverMetricsCsv: trace.serverMetricsCsv,
+                    serverMetricsJson: trace.serverMetricsJson,
+                    metricsContext: {
+                      framework: point.config.framework,
+                      disagg: point.config.disagg,
+                    },
+                  },
+                  consume,
+                ),
+            );
+            if (repairedId === null) ordinaryRows.push(point);
+            else repairedIds.push(repairedId);
+          }
+          const benchmarkInsert = await bulkIngestBenchmarkRows(
             sql,
-            toInsert,
+            ordinaryRows,
             workflowRunId,
             date,
           );
+          const { newCount } = benchmarkInsert;
+          const dupCount = benchmarkInsert.dupCount + repairedIds.length;
+          const insertedIds = [...benchmarkInsert.insertedIds, ...repairedIds];
           console.log(
             `    benchmark rows: +${newCount} new, ${dupCount} dup, ` +
               `${insertedIds.length} id(s) (${elapsed(insertStart)})`,
@@ -917,6 +971,8 @@ async function main(): Promise<void> {
           }
         } catch (error: any) {
           tracker.recordDbError('benchmark', path.posix.basename(file.path), error);
+          if (toInsert.some((point) => historicalPoints.has(benchmarkCandidateKey(point))))
+            historicalRepairErrors.push(error);
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
@@ -926,6 +982,8 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
+    if (historicalRepairErrors.length > 0)
+      throw new AggregateError(historicalRepairErrors, 'Historical AgentX repair failed');
     if (requiredPower)
       assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);

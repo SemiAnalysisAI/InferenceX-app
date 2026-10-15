@@ -51,6 +51,32 @@ concurrency, offload mode, and the nullable recipe fingerprint), not surrogate k
 
 ### AgentX Curve Replacement Scope
 
+AgentX ingestion selects one measurement per complete point identity across the
+whole run before metric or attachment writes. Identical raw copies collapse to
+their per-job source when available; a unique legacy measurement remains valid.
+Explicit failed outcomes are excluded from selection and retained as publication
+warnings. New attempt outcomes require a nonempty attempt ID and a boolean
+finalization field; passed attempts must be finalized. Malformed outcomes are
+refused, and two different eligible measurements fail ingestion. Passed status does not outrank
+conflicting legacy content. Different recipe fingerprints remain separate points.
+The raw reader's rows and file hashes remain unchanged for PowerX verification.
+
+One historical exception pins run `38451594384`, attempt 3, its complete c24
+identity, both original row digests, and the successful per-job filename/file
+SHA-256 in `benchmark-candidates.ts`. Row digests use `JSON.stringify` with
+recursively sorted object keys and unchanged array order, then UTF-8 SHA-256.
+Selection logs include all source hashes and the winner. Replaying this point
+requires all three selected trace inputs, each verified against its original
+uncompressed SHA-256 before preparation. Existing rows are snapshotted before trace
+preparation and checked under a row lock. Metrics, power provenance, and the trace
+link change in one transaction only when the old trace is absent, its profile
+matches the pinned failed source, or its complete payload already matches the
+selected trace. Unknown traces, missing or changed inputs, and concurrent row
+changes fail the command after worker cleanup and receipt recording. Old trace
+objects remain, and repeat replay reuses the selected trace ID. Ordinary AgentX upserts
+preserve missing trace-owned metric fields only while a trace link exists;
+fresh artifact values remain authoritative.
+
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
 and workload (benchmark type and sequence lengths). AGG/disagg, parallelism,
 speculative decoding, offload mode, and recipe fingerprint describe individual
