@@ -115,7 +115,7 @@ import {
   isEngineGuardLifted,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
-import { bestSeriesPerSku } from './utils/best-series-per-sku';
+import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -1298,12 +1298,11 @@ export function InferenceProvider({
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
     if (!graph) return hwTypesWithData;
     // All in Measured can have GPU-valid table rows without a numeric estimate to rank.
-    const unrankedHwTypes = graph.tableData
-      ? new Set(
-          graph.tableData
-            .filter((point) => effectivePrecisions.includes(point.precision))
-            .map(extractHwKey),
-        )
+    const tableCandidates = graph.tableData?.filter((point) =>
+      effectivePrecisions.includes(point.precision),
+    );
+    const unrankedHwTypes = tableCandidates
+      ? new Set(tableCandidates.map(extractHwKey))
       : hwTypesWithData;
     const direction =
       graph.chartDefinition[
@@ -1318,8 +1317,9 @@ export function InferenceProvider({
       return unrankedHwTypes;
     }
     const best = bestSeriesPerSku(graph.data, direction);
-    if (best.size > 0) return best;
-    return unrankedHwTypes;
+    if (best.size === 0) return unrankedHwTypes;
+    // Rankable SKUs keep their winner; table-only SKUs stay visible.
+    return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
   }, [
     graphs,
     hwTypesWithData,
