@@ -7,7 +7,7 @@ import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 const mocks = vi.hoisted(() => ({
   availability: {
-    data: [] as unknown[],
+    data: [] as unknown[] | undefined,
     error: null as Error | null,
     isError: false,
     isPending: false,
@@ -52,6 +52,7 @@ import {
   useGlobalFilterWorkflow,
   type GlobalFilterActionsContextType,
   type GlobalFilterAvailabilityContextType,
+  type GlobalFilterSelectionContextType,
 } from './GlobalFilterContext';
 
 let root: Root | undefined;
@@ -63,9 +64,10 @@ let actionRenders = 0;
 let workflowRenders = 0;
 const actionSnapshots: GlobalFilterActionsContextType[] = [];
 let availabilitySnapshot: GlobalFilterAvailabilityContextType | undefined;
+let selectionSnapshot: GlobalFilterSelectionContextType | undefined;
 
 const SelectionProbe = memo(() => {
-  useGlobalFilterSelection();
+  selectionSnapshot = useGlobalFilterSelection();
   selectionRenders += 1;
   return null;
 });
@@ -137,6 +139,7 @@ beforeEach(() => {
   workflowRenders = 0;
   actionSnapshots.length = 0;
   availabilitySnapshot = undefined;
+  selectionSnapshot = undefined;
 });
 
 afterEach(() => {
@@ -213,14 +216,37 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(mocks.availability.refetch).toHaveBeenCalledOnce();
   });
 
-  it('keeps the pending Muse preview selectable when other models have data', () => {
+  it('does not offer the pending Muse preview in shared data-dependent selectors', () => {
     mocks.availability.data = [
       { model: 'kimik3', precision: 'fp4', sequence: 'agentic-traces' },
     ] as unknown[];
     mountProvider();
 
-    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
     expect(availabilitySnapshot?.availableModels).toContain(Model.Kimi_K3);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.DeepSeek_V4_Pro);
   });
+
+  it('offers Muse in shared selectors once measurements exist', () => {
+    mocks.availability.data = [
+      { model: 'musespark', precision: 'fp4', sequence: 'agentic-traces' },
+    ] as unknown[];
+    mountProvider();
+
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+  });
+
+  it.each([undefined, []])(
+    'offers only AgentX for Muse before measurements exist (%j)',
+    (availability) => {
+      mocks.availability.data = availability;
+      mountProvider();
+      act(() => selectModel?.(Model.Muse_Spark_Open));
+
+      expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
+      expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+      expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+      expect(selectionSnapshot?.sequenceResolved).toBe(true);
+    },
+  );
 });

@@ -39,6 +39,31 @@ function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3
 
 const TARGET = '/inference/kimi-k3';
 
+describe('Muse Spark Open preview', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`opens the AgentX-only preview from ${prefix || '/'} with the mascot`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
+        .should('contain.text', prefix ? '结果待发布' : 'Results pending')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
+      cy.location('pathname', { timeout: 30000 }).should(
+        'eq',
+        `${prefix}/inference/muse-spark-open`,
+      );
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark Open 816B')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="scenario-selector"]')
+        .should('contain.text', prefix ? '智能体' : 'Agentic')
+        .and('be.disabled');
+      cy.get('[data-testid="scatter-empty-state"]').should('be.visible');
+    });
+  }
+});
+
 interface HistoryWrite {
   kind: 'push' | 'replace';
   pathname: string;

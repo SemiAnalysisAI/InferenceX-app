@@ -264,6 +264,7 @@ describe('compareModelSeoName', () => {
   // Single, natural, current-version search name per model — no version-group
   // slashes, no param-count suffix, no fully-qualified checkpoint id.
   const EXPECTED: Record<string, string> = {
+    'muse-spark-open': 'Muse Spark Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
     'deepseek-r1': 'DeepSeek R1',

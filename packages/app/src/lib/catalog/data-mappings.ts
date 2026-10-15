@@ -583,6 +583,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
  * coding only, so their 8K/1K rows are not offered.
  */
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Muse_Spark_Open]: new Set(
+    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+  ),
   [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 

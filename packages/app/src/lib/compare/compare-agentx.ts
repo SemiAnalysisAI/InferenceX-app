@@ -73,6 +73,11 @@ export const PENDING_AGENTX_MODEL_DISPLAY_NAMES: ReadonlySet<string> = new Set(
   FEATURED_AGENTX_MODELS.filter((model) => model.resultsPending).map((model) => model.displayName),
 );
 
+/** Only inference previews may include models without measurements. */
+export function inferenceModelsWithPreviews(availableModels: readonly string[]): string[] {
+  return [...new Set([...availableModels, ...PENDING_AGENTX_MODEL_DISPLAY_NAMES])];
+}
+
 const AGENTX_NEW_MODEL_SLUG_SET: ReadonlySet<string> = new Set(AGENTX_NEW_MODEL_SLUGS);
 
 /** Whether a featured ledger row carries the NEW pill. */
@@ -97,8 +102,8 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
   // registered inference page (none of the featured set today) fall back to
   // the query form.
   //
-  // No `i_seq` / `i_optimal` params: every model here has AgentX data, and the
-  // dashboard already defaults such models to the Agentic scenario
+  // No `i_seq` / `i_optimal` params: these models have AgentX data or an explicit
+  // pending AgentX contract. The dashboard defaults to the Agentic scenario
   // (resolveEffectiveSequence) with "Optimal Only" on (i_optimal !== '0'), so
   // the bare model page IS the AgentX optimal-only view — and the canonical,
   // shareable address for it.

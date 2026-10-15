@@ -467,12 +467,12 @@ export function GlobalFilterProvider({
     [availabilityRows, dbModelKeys],
   );
 
-  // Published/unofficial data, plus explicitly registered pre-publication previews.
+  // Shared calculator/TCO selectors require data. Inference adds previews locally.
   const availableModels = useMemo(() => {
-    if (!availabilityRows) return MODEL_OPTIONS;
+    if (!availabilityRows)
+      return MODEL_OPTIONS.filter((model) => !PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(model));
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
-      if (PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(m)) return true;
       if (unofficialModels.has(m)) return true;
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return availabilityRows.some((r) => keys.includes(r.model));
@@ -508,27 +508,29 @@ export function GlobalFilterProvider({
     const unofficialSeqs = unofficialAvailable
       .filter((a) => a.model === selectedModel)
       .map((a) => a.sequence as Sequence);
-    if (!availabilityRows) {
-      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : [...SEQUENCE_OPTIONS];
-    }
     const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
     const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
       (s) => !isSequenceHiddenForModel(selectedModel, s),
     );
-    return merged.length > 0 ? merged : [...SEQUENCE_OPTIONS];
-  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
+    return merged.length > 0
+      ? merged
+      : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
+  }, [modelRows, unofficialAvailable, selectedModel]);
 
   // Whether we actually know the selected model's sequences yet. Availability
   // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
   // (`unofficialAvailable` for this model) — either source lets us resolve a
-  // trustworthy effectiveSequence. Until then `availableSequences` is the static
-  // SEQUENCE_OPTIONS fallback (which contains every scenario), so resolving
+  // trustworthy effectiveSequence. Pending AgentX previews have an explicit
+  // scenario contract even before measurements arrive. Other models use the
+  // static fallback while loading, so resolving
   // eagerly would honor a selection the model may not have (e.g. agentic-traces
   // from a shared link on a fixed-seq-only model), fetch it, then snap once
   // availability lands (flash + wasted request).
   const availabilityLoaded = useMemo(
     () =>
-      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
+      availabilityRows !== undefined ||
+      PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(selectedModel) ||
+      unofficialAvailable.some((a) => a.model === selectedModel),
     [availabilityRows, unofficialAvailable, selectedModel],
   );
 

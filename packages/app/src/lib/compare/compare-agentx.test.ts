@@ -7,12 +7,20 @@ import {
   comparisonScenarioForModel,
   FEATURED_AGENTX_MODELS,
   isNewAgentxModel,
+  inferenceModelsWithPreviews,
 } from './compare-agentx';
 import { COMPARE_MODEL_SLUGS } from './compare-slug';
 import { Model } from '../catalog/data-mappings';
 import { overviewScenariosForModel } from '../overview/overview-data';
 
 describe('AgentX comparison links', () => {
+  it('adds the pending model only for the inference selector without duplicates', () => {
+    expect(inferenceModelsWithPreviews([Model.Kimi_K3])).toEqual([
+      Model.Kimi_K3,
+      Model.Muse_Spark_Open,
+    ]);
+    expect(inferenceModelsWithPreviews([Model.Muse_Spark_Open])).toEqual([Model.Muse_Spark_Open]);
+  });
   it('keeps the featured AgentX models in the editorial order', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
       'kimi-k3',

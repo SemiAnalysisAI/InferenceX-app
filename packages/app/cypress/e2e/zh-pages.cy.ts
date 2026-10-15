@@ -27,7 +27,7 @@ describe('Chinese (/zh) pages', () => {
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 4);
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
           'not.exist',
         );
