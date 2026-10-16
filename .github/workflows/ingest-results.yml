@@ -63,6 +63,10 @@ on:
         description: InferenceX Actions run ID to ingest
         required: true
         type: string
+      source-run-id:
+        description: Optional source of reused artifacts; run-id retains the merge changelog
+        required: false
+        type: string
       require-power:
         description: Require the versioned PowerX manifest and all declared evidence
         required: false
@@ -253,7 +257,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id ||
-            github.event.client_payload.run-id || inputs.run-id }}
+            inputs.source-run-id || github.event.client_payload.run-id || inputs.run-id }}
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
             github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
