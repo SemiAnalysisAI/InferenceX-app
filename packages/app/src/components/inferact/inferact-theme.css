@@ -1,0 +1,311 @@
+@font-face {
+  font-family: 'Inferact Display';
+  src: url('/decorative/inferact/instrument-serif-regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+/* Visual reference: https://inferact.ai, inspected 2026-10-16. */
+.inferact {
+  /* next-themes classifies custom names using its dark default. */
+  color-scheme: light !important;
+  --background: #fafafd;
+  --foreground: #16181a;
+  --card: #fafafd;
+  --card-foreground: #16181a;
+  --popover: #fafafd;
+  --popover-foreground: #16181a;
+  --primary: #315b86;
+  --primary-foreground: #fafafd;
+  --brand: #315b86;
+  --secondary: #315b86;
+  --secondary-foreground: #fafafd;
+  --muted: #eaf0f5;
+  --muted-foreground: #53606b;
+  --accent: #c4b5fd;
+  --accent-foreground: #16181a;
+  --border: #bbd7ef;
+  --input: #aecde5;
+  --ring: #315b86;
+  --radius: 0;
+  --inferact-serif: 'Inferact Display', Georgia, serif;
+  --inferact-mono: ui-monospace, monospace;
+}
+.inferact body {
+  font-family: var(--font-dm-sans), Arial, sans-serif;
+}
+.inferact .bg-brand {
+  background: #f0ee82;
+  color: #16181a;
+}
+.inferact header {
+  background: #fafafdf5;
+  border-block: 1px solid var(--border);
+  backdrop-filter: none;
+}
+.inferact header nav a {
+  font-family: var(--inferact-mono);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+.inferact
+  :is(
+    [data-slot='card'],
+    [data-slot='tabs-list'],
+    [data-slot='select-trigger'],
+    [data-slot='popover-content']
+  ) {
+  border-radius: 0;
+  box-shadow: none;
+}
+.inferact [data-slot='card'] {
+  border-color: var(--border);
+}
+.inferact :is(header, main, footer) {
+  border-inline: 1px solid var(--border);
+}
+.inferact .halloween-wordmark,
+.inferact .halloween-wordmark-x {
+  color: #16181a;
+  font-family: var(--inferact-serif);
+}
+.inferact .halloween-wordmark {
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+}
+.inferact .halloween-wordmark-pumpkin,
+.inferact .autumn-leaves,
+.inferact .circuit-bg {
+  display: none;
+}
+.inferact a:hover {
+  text-decoration-color: #3b9eff;
+}
+.inferact [data-slot='dashboard-navigation'] [data-tab-active='true'] {
+  background: #c4b5fd;
+  color: #16181a;
+}
+.inferact :is(button, a, input, textarea, [role='combobox']):focus-visible {
+  outline: 2px solid #315b86;
+  outline-offset: 3px;
+}
+.inferact-theme-banner {
+  width: min(100% - 2rem, 1248px);
+  margin: 0 auto 2rem;
+  border-inline: 1px solid #bbd7ef;
+  overflow: hidden;
+}
+.inferact-title-block {
+  padding: 4rem 0 0;
+}
+.inferact-eyebrow {
+  display: table;
+  padding: 0.75rem 1.25rem;
+  color: #fff;
+  background: #606b75;
+  font-family: var(--inferact-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.inferact-display {
+  max-width: 880px;
+  font-family: var(--inferact-serif);
+  font-size: clamp(3.2rem, 6vw, 5.2rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  color: #16181a;
+}
+.inferact-display span {
+  background: #c4b5fd;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding-inline: 1rem;
+}
+.inferact-collage {
+  position: relative;
+  height: 360px;
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: 70% 30%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.inferact-blueprint {
+  overflow: hidden;
+  position: relative;
+  background: #78bde9;
+}
+.inferact-rack-field {
+  position: absolute;
+  inset: -12% -8%;
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  transform: perspective(700px) rotateY(-19deg) rotateX(12deg) rotateZ(-12deg) scale(1.15);
+}
+.inferact-rack {
+  flex: 1;
+  height: calc(65% + var(--rack) * 5%);
+  min-width: 75px;
+  border: 4px solid #125688;
+  background: #286b9b;
+  padding: 9px;
+  box-shadow: 12px 8px 0 #397da9;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.inferact-rack i {
+  height: 8%;
+  border: 1px solid #8cc9ec;
+  background: repeating-linear-gradient(90deg, #164b75 0 4px, #5fa5d0 4px 5px);
+  box-shadow: 0 2px 0 #153f60;
+}
+.inferact-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.9' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  mix-blend-mode: screen;
+}
+.inferact-code-panel {
+  position: relative;
+  overflow: hidden;
+  background: #323842;
+  color: #a9cce5;
+  padding: 4rem 2rem;
+  font: 12px/1.8 var(--inferact-mono);
+}
+.inferact-code-panel pre {
+  margin-top: 1rem;
+  opacity: 0.65;
+}
+.inferact-code-panel > span {
+  color: #f0ee82;
+}
+.inferact-orbit {
+  width: 440px;
+  height: 230px;
+  border: 1px solid #3b9eff;
+  border-radius: 50%;
+  position: absolute;
+  bottom: -80px;
+  left: -120px;
+  transform: rotate(-35deg);
+  animation: inferact-orbit 18s linear infinite;
+}
+.inferact-orbit.second {
+  --orbit-angle: 35deg;
+  transform: rotate(35deg);
+  animation-direction: reverse;
+}
+.inferact-pixel {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: #f0ee82;
+  left: calc(70% - 100px);
+  top: 0;
+  animation: inferact-pixel 12s steps(1, end) infinite;
+}
+.inferact-pixel.pixel-two {
+  top: 100px;
+  opacity: 0.45;
+  animation-delay: -5s;
+}
+.inferact-crosshair {
+  position: absolute;
+  font: 36px var(--inferact-mono);
+  color: #f0ee82;
+}
+.inferact-crosshair.crosshair-one {
+  left: 20%;
+  top: 65%;
+}
+.inferact-crosshair.crosshair-two {
+  left: 60%;
+  top: 25%;
+}
+.inferact-theme-banner.is-compact .inferact-title-block {
+  padding-top: 1rem;
+}
+.inferact-theme-banner.is-compact .inferact-display {
+  font-size: 2.5rem;
+}
+.inferact-theme-banner.is-compact .inferact-eyebrow {
+  display: none;
+}
+.inferact-theme-banner[data-motion='paused'] * {
+  animation-play-state: paused;
+}
+@keyframes inferact-pixel {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-100px, 100px);
+  }
+  50% {
+    transform: translate(100px, 0);
+  }
+  75% {
+    transform: translate(0, 200px);
+  }
+}
+@keyframes inferact-orbit {
+  from {
+    transform: rotate(var(--orbit-angle, -35deg));
+  }
+  to {
+    transform: rotate(calc(var(--orbit-angle, -35deg) + 360deg));
+  }
+}
+@media (max-width: 640px) {
+  .inferact-theme-banner {
+    width: calc(100% - 2rem);
+  }
+  .inferact-title-block {
+    padding-top: 2.5rem;
+  }
+  .inferact-display {
+    font-size: 3.2rem;
+  }
+  .inferact-collage {
+    height: 280px;
+    grid-template-columns: 70% 30%;
+  }
+  .inferact-code-panel {
+    padding: 2rem 0.75rem;
+  }
+  .inferact-code-panel pre,
+  .inferact-code-panel > span {
+    display: none;
+  }
+  .inferact-pixel {
+    width: 56px;
+    height: 56px;
+    left: calc(70% - 56px);
+  }
+  .inferact-pixel.pixel-two {
+    top: 56px;
+  }
+  .inferact-eyebrow {
+    font-size: 12px;
+    padding: 0.75rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inferact-theme-banner * {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .inferact-collage {
+    display: none;
+  }
+}

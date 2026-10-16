@@ -10,6 +10,8 @@ const themes = {
   gta: lazy(() => import('../gta/gta-theme')),
   doom: lazy(() => import('../doom/doom-theme')),
   halo: lazy(() => import('../halo/halo-theme')),
+  inferact: lazy(() => import('../inferact/inferact-theme')),
+  radixark: lazy(() => import('../radixark/radixark-theme')),
 };
 
 export function EasterEggThemeLazy() {
