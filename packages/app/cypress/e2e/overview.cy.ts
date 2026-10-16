@@ -4,6 +4,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 // row order within each scenario group — AgentX rows lead the matrix, 8K/1K
 // rows follow.
 const MODEL_LABELS = [
+  'Muse Spark Open 816B',
   'DeepSeek V4 Pro 0813 1.6T',
   'DeepSeek V4.1 Flash 552B',
   'Kimi K3 2.8T',
@@ -23,13 +24,13 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Seven models: one with both a single-turn and an AgentX row (Qwen3.5),
- *  four curated AgentX-only (Kimi K3, GLM 5.2, Qwen3.8-Flash-Next, and
+/** Eight models: one with both a single-turn and an AgentX row (Qwen3.5),
+ *  five curated AgentX-only (Muse Spark Open, Kimi K3, GLM 5.2, Qwen3.8-Flash-Next, and
  *  DeepSeek V4.1 Flash, which entered the fleet on AgentX only in
  *  InferenceX#2961), and two AgentX-only by retirement: MiniMax M3's 8k1k
  *  sweep stopped on 2026-08-04 (InferenceX#2493) and DeepSeek V4 Pro's on
  *  2026-09-08 (InferenceX#2728). */
-const MATRIX_ROWS = 8;
+const MATRIX_ROWS = 9;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -1171,7 +1172,7 @@ describe('Overview page', () => {
             expect(getComputedStyle(header).fontSize).to.equal('14px');
           }
         });
-        // One row per curated (model, scenario) pair: six models, one of
+        // One row per curated (model, scenario) pair: eight models, one of
         // which (Qwen3.5) carries a second single-turn row.
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
