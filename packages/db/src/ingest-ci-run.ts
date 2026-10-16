@@ -67,6 +67,12 @@ import {
 } from './etl/reused-ingest-metadata';
 import type { BenchmarkParams } from './etl/benchmark-mapper';
 import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './etl/benchmark-artifacts';
+import {
+  benchmarkPointKey,
+  describeRetryCopySelection,
+  dropSupersededJobCopies,
+  perJobPointKeys,
+} from './etl/retry-copies';
 import { preflightRequiredPowerCurves } from './etl/required-power-curve';
 import {
   assertRequiredPowerPointsRetained,
@@ -228,6 +234,11 @@ if (isDownloadMode) {
   }
 
   console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
+  for (const line of describeRetryCopySelection(
+    dropSupersededJobCopies(artifactsDir, byLogical.values(), runIdStr),
+  )) {
+    console.log(line);
+  }
 } else {
   // CI mode — read from env vars
   for (const key of [
@@ -568,6 +579,8 @@ async function main(): Promise<void> {
     ].sort();
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${files.length} benchmark JSON file(s)`);
+    // The aggregate repeats every attempt's per-job rows; the selected per-job copy wins.
+    const perJobPoints = perJobPointKeys(files);
 
     for (const [fileIndex, file] of files.entries()) {
       const fileStart = Date.now();
@@ -593,7 +606,13 @@ async function main(): Promise<void> {
       // Known failed benchmarks are intentionally excluded; non-object entries
       // and unmappable rows leave an unknown number of attachment expectations.
       let fileExpectationsUnknown = file.nonObjectRows > 0;
+      const aggregateFile = !file.path.startsWith('bmk_');
+      let coveredRows = 0;
       const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
+        if (mapped && aggregateFile && perJobPoints.has(benchmarkPointKey(mapped))) {
+          coveredRows++;
+          return [];
+        }
         if (mapped) return [mapped];
         if (!failed) fileExpectationsUnknown = true;
         // An unmapped PowerX-workload row is a hole in the published curve, so
@@ -607,6 +626,9 @@ async function main(): Promise<void> {
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
+      if (coveredRows > 0) {
+        console.log(`    skipped ${coveredRows} row(s) already held by per-job files`);
+      }
       if (rows.length === 0) {
         console.log(`    skipped; no mappable rows (${elapsed(fileStart)})`);
         continue;
@@ -802,6 +824,7 @@ async function main(): Promise<void> {
                     artifact: gpuMetricsArtifact,
                     benchmarkResultIds: insertedIds,
                     expectedRunArtifacts,
+                    replacePointLinks: true,
                   }),
                 );
                 if (ingested.seriesIds.length === 0)
