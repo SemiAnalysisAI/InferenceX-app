@@ -1,6 +1,6 @@
 /** Artifact identity rules shared by stored selection and the live GitHub listing. */
 export const ARTIFACT_PREFIX = 'gpu_metrics_';
-const BUNDLE_PREFIX = 'power_audit_';
+export const BUNDLE_PREFIX = 'power_audit_';
 
 /**
  * A bundle names a whole sweep, while the client's prefix (the longest common

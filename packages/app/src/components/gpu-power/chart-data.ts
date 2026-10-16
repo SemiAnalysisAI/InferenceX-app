@@ -3,6 +3,7 @@ export interface ParsedPoint {
   seconds: number;
   /** Absolute sample time in ms; smoothing and alignment work in this space. */
   ms: number;
+  /** NaN marks an unavailable reading so chart lines retain the gap. */
   value: number;
   gpuIndex: number;
   /** The raw sample behind this point; null once the value has been averaged. */
@@ -40,9 +41,7 @@ export function buildTelemetryData(
 
   const groups = new Map<number, ParsedPoint[]>();
   for (const { row, ms } of parsed) {
-    const value = row[metricKey];
-    // A metric the collector never sampled has no point, not a zero.
-    if (value === undefined) continue;
+    const value = row[metricKey] ?? NaN;
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
@@ -65,9 +64,14 @@ export function buildGroupedData(
   metricKey: GpuMetricKey,
 ) {
   const { groups } = buildTelemetryData(data, visibleGpus, metricKey);
-  return new Map(
-    [...groups].map(([index, points]) => [index, points.map(({ ms: _ms, ...point }) => point)]),
-  );
+  const measuredGroups = new Map<number, Omit<ParsedPoint, 'ms'>[]>();
+  for (const [index, points] of groups) {
+    const measured = points
+      .filter((point) => Number.isFinite(point.value))
+      .map(({ ms: _ms, ...point }) => point);
+    if (measured.length > 0) measuredGroups.set(index, measured);
+  }
+  return measuredGroups;
 }
 
 export function buildCorrelationData(

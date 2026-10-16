@@ -7,6 +7,7 @@
 export interface TimedSample {
   /** Absolute timestamp in milliseconds since the Unix epoch. */
   ms: number;
+  /** NaN preserves an explicitly unavailable reading in the timeline. */
   value: number;
 }
 
@@ -42,7 +43,8 @@ export const DEFAULT_TELEMETRY_DISPLAY: TelemetryDisplayState = {
  * smoothed line stays time-aligned with the raw one instead of lagging by half
  * a window as a trailing average would. Window edges are inclusive on both
  * sides; samples near the start or end of the series average over the shorter
- * one-sided neighbourhood that exists.
+ * one-sided neighbourhood that exists. Missing values do not contribute, and
+ * missing centers stay missing rather than being filled from nearby readings.
  *
  * `samples` must be sorted by `ms` ascending. O(n) via prefix sums.
  */
@@ -55,7 +57,13 @@ export function rollingTimeAverage(
   const half = windowMs / 2;
   const n = samples.length;
   const prefix = new Float64Array(n + 1);
-  for (let i = 0; i < n; i += 1) prefix[i + 1] = prefix[i]! + samples[i]!.value;
+  const counts = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i += 1) {
+    const value = samples[i]!.value;
+    const measured = Number.isFinite(value);
+    prefix[i + 1] = prefix[i]! + (measured ? value : 0);
+    counts[i + 1] = counts[i]! + (measured ? 1 : 0);
+  }
 
   const out: TimedSample[] = Array.from({ length: n });
   let lo = 0;
@@ -64,8 +72,11 @@ export function rollingTimeAverage(
     const center = samples[i]!.ms;
     while (samples[lo]!.ms < center - half) lo += 1;
     while (hi < n && samples[hi]!.ms <= center + half) hi += 1;
-    const count = hi - lo;
-    out[i] = { ms: center, value: (prefix[hi]! - prefix[lo]!) / count };
+    const count = counts[hi]! - counts[lo]!;
+    out[i] = {
+      ms: center,
+      value: Number.isFinite(samples[i]!.value) ? (prefix[hi]! - prefix[lo]!) / count : NaN,
+    };
   }
   return out;
 }
@@ -94,7 +105,8 @@ export function estimateSampleIntervalMs(
  * with the most samples, first on ties). For every reference sample each other
  * chip contributes its nearest sample if that sample lies within
  * `toleranceMs`; chips with no sample that close are left out of that mean
- * rather than interpolated, and `count` records how many contributed.
+ * rather than interpolated, and `count` records how many contributed. Missing
+ * readings are excluded; a timestamp with no contributors remains a gap.
  *
  * Every inner array must be sorted by `ms` ascending.
  */
@@ -111,8 +123,8 @@ export function meanAcrossSeries(
   const tolerance = Math.max(0, toleranceMs);
 
   return reference.map((ref) => {
-    let sum = ref.value;
-    let count = 1;
+    let sum = Number.isFinite(ref.value) ? ref.value : 0;
+    let count = Number.isFinite(ref.value) ? 1 : 0;
     for (let k = 0; k < others.length; k += 1) {
       const other = others[k]!;
       let cursor = cursors[k]!;
@@ -124,12 +136,12 @@ export function meanAcrossSeries(
       }
       cursors[k] = cursor;
       const candidate = other[cursor]!;
-      if (Math.abs(candidate.ms - ref.ms) <= tolerance) {
+      if (Number.isFinite(candidate.value) && Math.abs(candidate.ms - ref.ms) <= tolerance) {
         sum += candidate.value;
         count += 1;
       }
     }
-    return { ms: ref.ms, value: sum / count, count };
+    return { ms: ref.ms, value: count > 0 ? sum / count : NaN, count };
   });
 }
 
