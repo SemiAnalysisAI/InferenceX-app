@@ -46,6 +46,8 @@ const NON_METRIC_KEYS = new Set([
   'conc',
   'image',
   'recipe_fingerprint',
+  // producer provenance; used to pick one retry copy, never a metric
+  'run_attempt',
   'recipe-fingerprint',
   'disagg',
   'is_multinode',

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
 import { verifyRequiredPowerArtifacts } from './etl/required-power-publication.js';
+import { describeRetryCopySelection, dropSupersededJobCopies } from './etl/retry-copies.js';
 import { isRunAttemptPurged } from './etl/run-overrides.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
@@ -149,6 +150,12 @@ function main(): void {
   for (const artifact of plan.artifacts) {
     console.log(`Downloading artifact: ${artifact.name}`);
     downloadWithRetries(artifact, artifactsPath);
+  }
+  // Re-run attempts keep their artifacts; ingest only the latest copy of each point.
+  for (const line of describeRetryCopySelection(
+    dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
+  )) {
+    console.log(line);
   }
   // This command precedes migrations: malformed required input must not reach any DB write.
   if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {

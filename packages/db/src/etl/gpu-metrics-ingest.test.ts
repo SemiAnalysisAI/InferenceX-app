@@ -346,6 +346,44 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(replay.samplesInserted).toBe(0);
   });
 
+  it("replaces a retried point's links with the latest copy's series", async () => {
+    const older = writeArtifact(NVIDIA_CSV);
+    const retry = writeArtifact(NVIDIA_CSV);
+    const newer = {
+      artifactName: `${retry.artifactName}_retry`,
+      artifactDir: `${retry.artifactDir}_retry`,
+    };
+    fs.renameSync(retry.artifactDir, newer.artifactDir);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: older,
+      benchmarkResultIds: [10, 11],
+    });
+
+    // Without replacement a second copy adds its series next to the first.
+    const appended = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: newer,
+      benchmarkResultIds: [10],
+    });
+    const mixed = await getGpuMetricsForPoint(sql, 10);
+    expect(mixed?.series).toHaveLength(2);
+
+    await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: newer,
+      benchmarkResultIds: [10],
+      replacePointLinks: true,
+    });
+    const point = await getGpuMetricsForPoint(sql, 10);
+    expect(point?.series.map((series) => series.artifactName)).toEqual([newer.artifactName]);
+    const kept = await storedSeries(appended.seriesIds[0]!);
+    expect(kept.links).toHaveLength(1);
+    // Other points keep their own links.
+    const dropped = await storedSeries(first.seriesIds[0]!);
+    expect(dropped.links).toMatchObject([{ benchmark_result_id: 11 }]);
+  });
+
   it('stores series, samples and point links; reruns are no-ops', async () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const first = await ingestGpuMetricsArtifact(sql, {

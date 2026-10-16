@@ -99,6 +99,14 @@ Required energy must be finite and positive, with physical evidence for both rol
 in disaggregated deployments. Successful earlier attempts of the same run/head may
 supply retained evidence when failed jobs are rerun.
 
+GitHub keeps artifacts from every attempt, so a point that passed on several attempts
+arrives as several job copies with unrelated hashed names. Preparation keeps the copy
+whose benchmark artifact is newest, which is the latest attempt that produced the
+point, and removes every sibling artifact of older copies (power audit, telemetry,
+traces, server logs). Ingest skips `results_*` aggregate rows for points that a
+per-job file already holds, and replaces a point's telemetry links instead of adding
+to them, so the row, its power series and the publication receipt share one copy.
+
 These checks are preflight, not atomic publication: concurrent writers and partial
 import failures remain possible. The publication receipt verifies DB and exact-run
 API values after ingest; it does not prove latest-curve visibility or browser rendering.
