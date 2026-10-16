@@ -35,7 +35,6 @@ export interface CompareModelSlug {
    *  written the way people actually search rather than the fully-qualified
    *  HF checkpoint id. See `compareModelSeoName`. */
   seoName: string;
-  unofficialRun?: string;
 }
 
 // Order matches the master /compare and /compare-per-dollar index display:
@@ -53,7 +52,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     dbKeys: ['musespark'],
     label: 'Muse Spark Open 816B',
     seoName: 'Muse Spark Open',
-    unofficialRun: '38825822770',
   },
   {
     slug: 'deepseek-v4',

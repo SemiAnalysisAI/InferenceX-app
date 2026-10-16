@@ -48,20 +48,24 @@ describe('Muse Spark Open results', () => {
     });
   });
   for (const prefix of ['', '/zh']) {
-    it(`opens the supplied AgentX run from ${prefix || '/'} with the mascot`, () => {
+    it(`opens the canonical Muse dashboard from ${prefix || '/'} with the mascot`, () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
         .should('contain.text', prefix ? '查看结果' : 'View results')
         .and('not.contain.text', prefix ? '预览' : 'Preview')
         .find('img')
         .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should(
+        'have.attr',
+        'href',
+        `${prefix}/inference/muse-spark-open`,
+      );
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
       cy.location('pathname', { timeout: 30000 }).should(
         'eq',
         `${prefix}/inference/muse-spark-open`,
       );
-      cy.wait('@museRun');
-      cy.location('search').should('match', /unofficialruns?=38825822770/iu);
+      cy.location('search').should('eq', '');
       cy.get('[data-testid="model-selector"]')
         .should('contain.text', 'Muse Spark Open 816B')
         .find('img')
@@ -69,6 +73,14 @@ describe('Muse Spark Open results', () => {
       cy.get('[data-testid="scenario-selector"]')
         .should('contain.text', prefix ? '智能体' : 'Agentic')
         .and('be.disabled');
+      cy.get('[data-slot="unofficial-banner"]').should('not.exist');
+      cy.get('@museRun.all').should('have.length', 0);
+    });
+
+    it(`still opens an explicitly requested Muse unofficial run under ${prefix || '/'}`, () => {
+      cy.visit(`${prefix}/inference/muse-spark-open?unofficialRun=38825822770`);
+      cy.wait('@museRun');
+      cy.location('search').should('match', /unofficialruns?=38825822770/iu);
       cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
         'have.length.greaterThan',
         0,
@@ -98,8 +110,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
             ['kimi-k3', 'muse-spark-open', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
-              (slug) =>
-                `${prefix}/inference/${slug}${slug === 'muse-spark-open' ? '?unofficialRun=38825822770' : ''}`,
+              (slug) => `${prefix}/inference/${slug}`,
             ),
           );
         });

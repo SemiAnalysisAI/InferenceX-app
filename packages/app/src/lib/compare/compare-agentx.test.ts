@@ -52,12 +52,13 @@ describe('AgentX comparison links', () => {
     expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[3])).toBe('/zh/inference/deepseek-v4');
   });
 
-  it('routes every featured model to its registered page and optional unofficial run', () => {
+  it('routes every featured model to its registered page without query parameters', () => {
     for (const model of FEATURED_AGENTX_MODELS) {
-      const url = new URL(agentxDashboardHref('en', model), 'https://example.com');
-      expect(url.pathname).toBe(`/inference/${model.slug}`);
-      expect(url.searchParams.get('unofficialRun')).toBe(model.unofficialRun ?? null);
-      expect([...url.searchParams.keys()]).toEqual(model.unofficialRun ? ['unofficialRun'] : []);
+      for (const locale of ['en', 'zh'] as const) {
+        const url = new URL(agentxDashboardHref(locale, model), 'https://example.com');
+        expect(url.pathname).toBe(`${locale === 'zh' ? '/zh' : ''}/inference/${model.slug}`);
+        expect(url.search).toBe('');
+      }
     }
   });
 
@@ -79,15 +80,10 @@ describe('AgentX comparison links', () => {
     expect(agentxDashboardHref('en', flash)).toBe('/inference/deepseek-v41-flash');
   });
 
-  it('routes Muse results to the supplied unofficial run in both locales', () => {
+  it('routes Muse results to the canonical AgentX dashboard in both locales', () => {
     const muse = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'muse-spark-open')!;
-    expect(muse.unofficialRun).toBe('38825822770');
-    expect(agentxDashboardHref('en', muse)).toBe(
-      '/inference/muse-spark-open?unofficialRun=38825822770',
-    );
-    expect(agentxDashboardHref('zh', muse)).toBe(
-      '/zh/inference/muse-spark-open?unofficialRun=38825822770',
-    );
+    expect(agentxDashboardHref('en', muse)).toBe('/inference/muse-spark-open');
+    expect(agentxDashboardHref('zh', muse)).toBe('/zh/inference/muse-spark-open');
     expect(comparisonScenarioForModel(muse)).toEqual({
       label: 'AgentX',
       sequence: 'agentic-traces',
