@@ -597,8 +597,24 @@ export function renderLineLabels(
      * pass `null` to skip the constraint (charts that clip nothing).
      */
     bounds?: RectBounds | null;
+    /**
+     * `'pill'` (default) fills a rounded box in the series colour behind white
+     * text. `'text'` draws the name itself in the series colour with a halo in
+     * the chart background and no box, so the label reads as part of the line
+     * rather than a tooltip floating over the plot. The `.ll-bg` rect is still
+     * sized (transparent) because layout and collision use it as the label's
+     * footprint.
+     */
+    appearance?: 'pill' | 'text';
+    /**
+     * Resolved halo colour for `appearance: 'text'` — pass the chart
+     * background as a concrete colour, since CSS variables do not survive the
+     * PNG export. Falls back to `var(--card)` on screen.
+     */
+    halo?: string;
   },
 ): void {
+  const plainText = options.appearance === 'text';
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
@@ -638,7 +654,17 @@ export function renderLineLabels(
     const text = labelGroup.select<SVGTextElement>('.ll-text');
     // Shift the text right to leave room for the icon chip; the background
     // sizing pass below expands the pill back over that space.
-    const space = iconSpace(options.iconFor?.(label));
+    const space = plainText ? 0 : iconSpace(options.iconFor?.(label));
+    if (plainText) {
+      // Halo in the chart background keeps coloured text legible where it
+      // crosses a line or a marker; stroke is painted under the fill.
+      text
+        .style('fill', label.color)
+        .style('stroke', options.halo ?? 'var(--card)')
+        .style('stroke-width', '4px')
+        .style('stroke-linejoin', 'round')
+        .style('paint-order', 'stroke');
+    }
     if (space > 0) text.attr('x', space);
     else text.attr('x', null);
     if (options.configureText) options.configureText(text, label);
@@ -652,7 +678,7 @@ export function renderLineLabels(
   });
   for (const { node, label, bbox } of measured) {
     const labelGroup = d3.select(node);
-    const icon = options.iconFor?.(label);
+    const icon = plainText ? undefined : options.iconFor?.(label);
     const space = iconSpace(icon);
     labelGroup
       .select('.ll-bg')
@@ -660,7 +686,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', label.color);
+      .attr('fill', plainText ? 'transparent' : label.color);
 
     // Full-color mark drawn directly on the pill — transparent background, so
     // the icon shares the label's own fill shade (including gradient fills).

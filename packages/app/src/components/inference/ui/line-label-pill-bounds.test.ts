@@ -520,3 +520,32 @@ describe('leastOverlapping', () => {
     expect(leastOverlapping([first, second], placed).id).toBe('first');
   });
 });
+
+describe("appearance: 'text'", () => {
+  it('draws the run name in the series colour with a halo and no filled box or logo', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b200', 200, 150, 'B200 (SGLang)')], {
+      seriesAttribute: 'data-hw-key',
+      appearance: 'text',
+      halo: '#131416',
+      iconFor: () => ({ href: 'data:image/svg+xml,', width: 12, height: 12 }),
+    });
+    const group = zoomGroup.select('.line-label[data-line-key="b200"]');
+    expect(group.select('.ll-bg').attr('fill')).toBe('transparent');
+    const text = group.select<SVGTextElement>('.ll-text').node()!;
+    expect(text.style.fill).toBe('rgb(0, 255, 0)');
+    expect(text.style.stroke).toBe('rgb(19, 20, 22)');
+    expect(text.style.paintOrder).toBe('stroke');
+    expect(group.selectAll('.ll-logo').size()).toBe(0);
+    // The transparent box is still the label's footprint for layout.
+    expect(Number(group.select('.ll-bg').attr('width'))).toBeGreaterThan(0);
+  });
+
+  it('keeps the filled pill by default', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b200', 200, 150, 'B200 (SGLang)')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    expect(zoomGroup.select('.line-label .ll-bg').attr('fill')).toBe('#0f0');
+  });
+});
