@@ -49,6 +49,39 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
 concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
 
+### Historical AgentX c24 recovery
+
+Normal ingestion refuses the conflicting legacy records in source run `38451594384`
+(attempt 3). Recovery is an explicit command, never an automatic ingest exception.
+After deploying the recovery code, capture a read-only snapshot of the existing
+benchmark row and trace, then obtain separate authorization to update production.
+
+Use the original successful benchmark JSON from artifact `11874035970` and the
+uncompressed `profile_export.jsonl`, `server_metrics_export.csv`, and
+`server_metrics_export.json` from trace artifact `11874120780`:
+
+```sh
+bun run --cwd packages/db db:recover-agentx-c24 \
+  --benchmark-file /path/to/successful-benchmark.json \
+  --trace-dir /path/to/successful-trace
+```
+
+The command uses `DATABASE_WRITE_URL` and prompts before writing (`--yes` skips the
+prompt). All four source files must match pinned SHA-256 hashes. It updates only
+an existing point with the complete c24 identity in the source run. Metrics and
+trace linkage change atomically after checking the row has not changed during
+preparation. Existing trace data must be absent, match the known failed profile,
+or match the complete successful payload. Unknown data is refused. Old trace
+objects and unrelated points remain unchanged; repeating the command reuses the
+successful trace. Existing log-derived KV capacity and absent provenance fields
+are preserved. No workflow, artifact, or configuration row is created.
+
+The command refreshes `latest_benchmarks`. Verify c24 duration `3620.60178` seconds,
+output throughput `688.70374` tokens/s, successful trace contents, and the other
+eight points before invalidating application caches. A merge alone does not
+execute recovery. Ordinary re-ingestion of the ambiguous legacy artifact still
+fails after recovery; do not use it as a replacement for this command.
+
 ### AgentX Curve Replacement Scope
 
 AgentX ingestion selects one measurement per complete point identity across the

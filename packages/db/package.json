@@ -33,6 +33,7 @@
     "db:backfill-request-timeline": "bun --env-file=../../.env src/backfill-request-timeline.ts",
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
+    "db:recover-agentx-c24": "bun --env-file=../../.env src/recover-agentx-c24.ts",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",

@@ -235,6 +235,86 @@ export async function prepareTraceReplay(
   };
 }
 
+export async function stagePreparedTraceReplay(
+  tx: postgres.TransactionSql,
+  prepared: PreparedTraceReplay,
+  log: (message: string) => void,
+): Promise<void> {
+  const {
+    profileGz,
+    profileSize,
+    serverMetricsCsv,
+    serverMetricsCsvSize,
+    serverMetricsJsonGz,
+    serverMetricsJsonSize,
+    aggregateStatsJson,
+    chartSeriesJson,
+    requestTimelineJson,
+  } = prepared;
+  await tx`
+      create temporary table trace_replay_upload_parts (
+        field text not null,
+        part integer not null,
+        data bytea not null,
+        primary key (field, part)
+      ) on commit drop
+    `;
+
+  const payloads: [TraceReplayUploadField, Buffer | null][] = [
+    ['profile_export_jsonl_gz', profileGz],
+    ['server_metrics_csv', serverMetricsCsv],
+    ['server_metrics_json_gz', serverMetricsJsonGz],
+    ['aggregate_stats', aggregateStatsJson],
+    ['chart_series', chartSeriesJson],
+    ['request_timeline', requestTimelineJson],
+  ];
+  for (const [field, payload] of payloads) {
+    const uploadStart = Date.now();
+    const parts = await uploadTraceReplayPayloadChunks(tx, field, payload);
+    log(
+      `uploaded ${field}=${formatBytes(payload?.length)} in ${parts} part(s) ` +
+        `(${elapsed(uploadStart)})`,
+    );
+  }
+
+  await tx`
+      create temporary table trace_replay_payload on commit drop as select
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'profile_export_jsonl_gz'
+        ) as profile_export_jsonl_gz,
+        ${profileSize}::bigint as profile_export_uncompressed_size,
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'server_metrics_csv'
+        ) as server_metrics_csv,
+        ${serverMetricsCsvSize}::bigint as server_metrics_csv_size,
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'server_metrics_json_gz'
+        ) as server_metrics_json_gz,
+        ${serverMetricsJsonSize}::bigint as server_metrics_json_uncompressed_size,
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'aggregate_stats'
+        ) as aggregate_stats,
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'chart_series'
+        ) as chart_series,
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'request_timeline'
+        ) as request_timeline
+    `;
+}
+
 /**
  * Persist a prepared trace atomically. Rows are locked and rechecked here so
  * concurrent ingest attempts cannot both attach different trace sidecars.
@@ -251,19 +331,7 @@ export async function persistPreparedTraceReplay(
   };
   if (benchmarkResultIds.length === 0) return 0;
 
-  const {
-    profileGz,
-    profileSize,
-    serverMetricsCsv,
-    serverMetricsCsvSize,
-    serverMetricsJsonGz,
-    serverMetricsJsonSize,
-    aggregateStatsJson,
-    chartSeriesJson,
-    requestTimelineJson,
-    cacheHitRates,
-    fullResponseMetrics,
-  } = prepared;
+  const { cacheHitRates, fullResponseMetrics } = prepared;
 
   let linkedCount = 0;
   const insertStart = Date.now();
@@ -280,81 +348,13 @@ export async function persistPreparedTraceReplay(
       return;
     }
 
-    await tx`
-      create temporary table trace_replay_upload_parts (
-        field text not null,
-        part integer not null,
-        data bytea not null,
-        primary key (field, part)
-      ) on commit drop
-    `;
-
-    const payloads: [TraceReplayUploadField, Buffer | null][] = [
-      ['profile_export_jsonl_gz', profileGz],
-      ['server_metrics_csv', serverMetricsCsv],
-      ['server_metrics_json_gz', serverMetricsJsonGz],
-      ['aggregate_stats', aggregateStatsJson],
-      ['chart_series', chartSeriesJson],
-      ['request_timeline', requestTimelineJson],
-    ];
-    for (const [field, payload] of payloads) {
-      const uploadStart = Date.now();
-      const parts = await uploadTraceReplayPayloadChunks(tx, field, payload);
-      log(
-        `uploaded ${field}=${formatBytes(payload?.length)} in ${parts} part(s) ` +
-          `(${elapsed(uploadStart)})`,
-      );
-    }
-
-    log('assembling trace_replay blob row');
+    await stagePreparedTraceReplay(tx, prepared, log);
     const [{ id: traceReplayId }] = await tx<{ id: number }[]>`
       insert into agentic_trace_replay (
-        profile_export_jsonl_gz,
-        profile_export_uncompressed_size,
-        server_metrics_csv,
-        server_metrics_csv_size,
-        server_metrics_json_gz,
-        server_metrics_json_uncompressed_size,
-        aggregate_stats,
-        chart_series,
-        request_timeline
-      )
-      values (
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'profile_export_jsonl_gz'
-        ),
-        ${profileSize},
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'server_metrics_csv'
-        ),
-        ${serverMetricsCsvSize},
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'server_metrics_json_gz'
-        ),
-        ${serverMetricsJsonSize},
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'aggregate_stats'
-        ),
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'chart_series'
-        ),
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'request_timeline'
-        )
-      )
-      returning id
+        profile_export_jsonl_gz, profile_export_uncompressed_size, server_metrics_csv,
+        server_metrics_csv_size, server_metrics_json_gz, server_metrics_json_uncompressed_size,
+        aggregate_stats, chart_series, request_timeline
+      ) select * from pg_temp.trace_replay_payload returning id
     `;
     log(`assembled trace_replay_id=${traceReplayId}`);
 
