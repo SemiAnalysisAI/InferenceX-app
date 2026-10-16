@@ -240,7 +240,7 @@ export async function prepareTraceReplay(
  * concurrent ingest attempts cannot both attach different trace sidecars.
  */
 export async function persistPreparedTraceReplay(
-  sql: Sql | postgres.TransactionSql,
+  sql: Sql,
   benchmarkResultIds: number[],
   prepared: PreparedTraceReplay,
   options: Pick<TraceReplayIngestOptions, 'progressLabel'> = {},
@@ -268,7 +268,7 @@ export async function persistPreparedTraceReplay(
   let linkedCount = 0;
   const insertStart = Date.now();
   log(`uploading trace_replay payloads in ${formatBytes(TRACE_REPLAY_UPLOAD_CHUNK_BYTES)} chunks`);
-  const persist = async (tx: postgres.TransactionSql) => {
+  await sql.begin(async (tx) => {
     const unlinked = await tx<{ id: number }[]>`
       select id from benchmark_results
       where id = any(${tx.array(benchmarkResultIds)}::bigint[])
@@ -401,8 +401,7 @@ export async function persistPreparedTraceReplay(
       unlinked.map((row) => row.id),
       prepared.atomKvCacheBlocks ?? null,
     );
-  };
-  await ('begin' in sql ? sql.begin(persist) : persist(sql));
+  });
   if (linkedCount > 0) log(`inserted trace_replay payload (${elapsed(insertStart)})`);
   return linkedCount;
 }
