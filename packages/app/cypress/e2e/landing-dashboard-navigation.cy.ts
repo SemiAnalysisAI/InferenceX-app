@@ -66,10 +66,10 @@ describe('Muse Spark Open results', () => {
         `${prefix}/inference/muse-spark-open`,
       );
       cy.location('search').should('eq', '');
-      cy.get('[data-testid="model-selector"]')
-        .should('contain.text', 'Muse Spark Open 816B')
-        .find('img')
-        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="model-selector"]').should(($selector) => {
+        // Without published availability, the selector falls back to the model ID.
+        expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
+      });
       cy.get('[data-testid="scenario-selector"]')
         .should('contain.text', prefix ? '智能体' : 'Agentic')
         .and('be.disabled');
@@ -81,6 +81,10 @@ describe('Muse Spark Open results', () => {
       cy.visit(`${prefix}/inference/muse-spark-open?unofficialRun=38825822770`);
       cy.wait('@museRun');
       cy.location('search').should('match', /unofficialruns?=38825822770/iu);
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark Open 816B')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
       cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
         'have.length.greaterThan',
         0,
