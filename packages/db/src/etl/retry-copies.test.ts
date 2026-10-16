@@ -95,6 +95,27 @@ describe('dropSupersededJobCopies', () => {
     expect(left.filter((name) => name.endsWith('conc48-old'))).toEqual(['eval_conc48-old']);
   });
 
+  it('prefers the producer run_attempt over artifact timestamps', () => {
+    const dir = tempRoot();
+    writeCopy(dir, 'attempt3', { ...goldenRow, run_attempt: 3 });
+    writeCopy(dir, 'attempt2', { ...goldenRow, run_attempt: 2 });
+    const selection = dropSupersededJobCopies(
+      dir,
+      metas([
+        ['attempt3', '2026-10-13T00:00:00Z', 1],
+        ['attempt2', '2026-10-14T00:00:00Z', 2],
+      ]),
+    );
+    expect(selection.superseded.map((copy) => copy.suffix)).toEqual(['attempt2']);
+  });
+
+  it('does not store run_attempt as a metric', () => {
+    const dir = tempRoot();
+    writeCopy(dir, 'attempt3', { ...goldenRow, run_attempt: 3 });
+    const [file] = readBenchmarkArtifacts(dir, { runId: 1, tracker: createSkipTracker() });
+    expect(file!.rows[0]!.mapped!.metrics).not.toHaveProperty('run_attempt');
+  });
+
   it('breaks equal timestamps by artifact id', () => {
     const dir = tempRoot();
     writeCopy(dir, 'a', goldenRow);

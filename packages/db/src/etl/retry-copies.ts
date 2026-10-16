@@ -7,8 +7,9 @@
  * a choice, every copy writes the same benchmark row and links its own GPU
  * telemetry, so the stored point mixes attempts.
  *
- * The newest benchmark artifact wins. Attempts run one after another, so the
- * newest copy is the latest attempt that produced the point. Every sibling
+ * The latest attempt wins: the producer's `run_attempt` when both copies carry
+ * one, otherwise the newest benchmark artifact. Attempts run one after another,
+ * so for older runs the newest copy is the latest attempt that produced it. Every sibling
  * artifact of an older copy (power audit, GPU telemetry, traces, server logs)
  * is removed before ingest reads the directory, so all consumers see the same
  * copy.
@@ -92,7 +93,14 @@ function jobSuffix(dir: string): string | null {
   return prefix ? dir.slice(prefix.length) : null;
 }
 
-function newer(a: RetryArtifactMeta, b: RetryArtifactMeta): boolean {
+interface CopyOrder extends RetryArtifactMeta {
+  /** `run_attempt` stamped by the producer, when every row carries one. */
+  runAttempt?: number;
+}
+
+function newer(a: CopyOrder, b: CopyOrder): boolean {
+  if (a.runAttempt !== undefined && b.runAttempt !== undefined && a.runAttempt !== b.runAttempt)
+    return a.runAttempt > b.runAttempt;
   const at = Date.parse(a.created_at);
   const bt = Date.parse(b.created_at);
   return at === bt ? (a.id ?? 0) > (b.id ?? 0) : at > bt;
@@ -113,13 +121,18 @@ export function dropSupersededJobCopies(
 
   // suffix -> point keys produced by that job copy
   const pointsBySuffix = new Map<string, Set<string>>();
-  const metaBySuffix = new Map<string, RetryArtifactMeta>();
+  const metaBySuffix = new Map<string, CopyOrder>();
   for (const file of readBenchmarkArtifacts(root, { runId, tracker: createSkipTracker() })) {
     const dir = file.path.split('/')[0]!;
     const suffix = benchmarkSuffix(dir);
     if (suffix === null) continue;
     const meta = metaByName.get(dir);
-    if (meta) metaBySuffix.set(suffix, meta);
+    const attempts = file.rows.map(({ raw }) => raw.run_attempt);
+    const runAttempt =
+      attempts.length > 0 && attempts.every((value) => Number.isInteger(value))
+        ? Math.max(...(attempts as number[]))
+        : undefined;
+    if (meta) metaBySuffix.set(suffix, { ...meta, runAttempt });
     const points = pointsBySuffix.get(suffix) ?? new Set<string>();
     for (const row of file.rows) if (row.mapped) points.add(benchmarkPointKey(row.mapped));
     pointsBySuffix.set(suffix, points);
