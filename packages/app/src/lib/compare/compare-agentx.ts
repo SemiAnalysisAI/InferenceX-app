@@ -25,14 +25,10 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
  * the /inference model selector. Presence in the ledger and the NEW badge are
  * separate editorial decisions: a model stays featured for as long as its
  * AgentX results matter, while the pill retires once the launch is old news.
- * DeepSeek V4 Pro, MiniMax M3, and Qwen 3.5 keep their rows without the pill.
+ * Every featured row is currently pill-free: NEW is reserved for the TPUv7
+ * launch (banner, modal, and landing TPU card).
  */
-const AGENTX_NEW_MODEL_SLUGS = [
-  'kimi-k3',
-  'deepseek-v41-flash',
-  'glm-5-3',
-  'qwen-3-8-flash-next',
-] as const satisfies readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][];
+const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
 /**
  * AgentX-only models that are NOT part of the editorial featured set above.

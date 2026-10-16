@@ -195,20 +195,10 @@ describe('First-load navigation', () => {
         );
         expect(slugs).to.deep.equal(['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3']);
       });
-      // Only the still-new rows carry the NEW pill — see AGENTX_NEW_MODEL_SLUGS.
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-        .should('have.length', 3)
-        .each(($badge) => expect($badge.text()).to.equal('NEW'));
-      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('exist');
-      }
-      for (const slug of ['minimax-m3', 'qwen-3-5']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('not.exist');
-      }
+      // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
+      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
+        'not.exist',
+      );
       cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
         .should('have.attr', 'href', '/inference/deepseek-v41-flash')
         .and('contain.text', 'DeepSeek V4.1 Flash 552B');
