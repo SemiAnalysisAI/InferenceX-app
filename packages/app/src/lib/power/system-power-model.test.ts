@@ -1,50 +1,90 @@
 import { describe, expect, it } from 'vitest';
 
+import { create_power_model } from './power_model';
 import {
+  AIR_COOLED_SYSTEM_PUE,
   estimateChassisPower,
-  SUPPORTED_SYSTEM_POWER_HARDWARE,
+  estimateRackPower,
+  isRackPowerHardware,
+  isSystemPowerHardware,
+  LIQUID_COOLED_RACK_PUE,
+  rackComputeTrayCount,
   SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
 } from './system-power-model';
-import reference from './system-power-model.reference.json';
 
-describe('fixed 8k1k chassis model', () => {
-  it('matches the pinned Python implementation across platforms, fan/PSU boundaries, and PUE', () => {
-    expect(reference.modelRevision).toBe(SYSTEM_POWER_MODEL_REVISION);
-    expect(new Set(reference.cases.map((row) => row.hardware))).toEqual(
-      new Set(SUPPORTED_SYSTEM_POWER_HARDWARE),
-    );
-    for (const row of reference.cases) {
-      const actual = estimateChassisPower(row.hardware, row.measuredGpuWatts, row.pue);
-      const context = `${row.hardware}: GPU=${row.measuredGpuWatts} W, PUE=${row.pue}`;
-      if (row.expected === null) {
-        expect(actual, context).toBeNull();
-      } else {
-        expect(actual, context).toMatchObject(row.expected);
-      }
-    }
+const STATE = { workload: 'agentic', scaleOut: true } as const;
+
+/** The port's own one-system estimate: the value the adapter must reproduce. */
+function upstream(system: string, gpuWattsPerGpu: number, socketWatts: number | null = null) {
+  const estimate = create_power_model({
+    system,
+    workload_state: STATE.workload,
+    using_scale_out: STATE.scaleOut,
+  }).estimate_breakdown(gpuWattsPerGpu, { cpu_and_dram_measured_power_per_socket: socketWatts });
+  return {
+    itWatts: estimate.it_power_w,
+    facilityWatts: estimate.facility_power_w,
+    pue: estimate.pue,
+  };
+}
+
+describe('system power model adapter', () => {
+  it('pins the ported upstream revision', () => {
+    expect(SYSTEM_POWER_MODEL_REVISION).toMatch(/^[0-9a-f]{40}$/);
+    expect(SYSTEM_POWER_MODEL_SOURCE_URL).toContain(SYSTEM_POWER_MODEL_REVISION);
   });
 
-  it('rejects unavailable measurements, PUE, and unmatched chassis rather than substituting watts', () => {
-    for (const watts of [0, -1, NaN, Infinity, -Infinity, Number.MAX_VALUE]) {
-      expect(estimateChassisPower('b200', watts)).toBeNull();
-    }
-    for (const pue of [0, 0.99, NaN, Infinity, -Infinity, Number.MAX_VALUE]) {
-      expect(estimateChassisPower('b200', 4000, pue)).toBeNull();
-    }
-    for (const hardware of ['gb200', 'gb300', 'h100-pcie', 'b200-dgx', '', 'toString']) {
-      expect(estimateChassisPower(hardware, 4000)).toBeNull();
-    }
+  it.each([
+    ['h100', 'hopper'],
+    ['h200', 'hopper'],
+    ['b200', 'b200'],
+    ['b300', 'b300'],
+    ['mi300x', 'mi300'],
+    ['mi325x', 'mi325'],
+    ['mi355x', 'mi355'],
+  ] as const)(
+    'models %s as the upstream %s chassis at chassis GPU watts / 8',
+    (hardware, system) => {
+      expect(isSystemPowerHardware(hardware)).toBe(true);
+      expect(estimateChassisPower(hardware, 8 * 612.5, STATE)).toEqual(upstream(system, 612.5));
+    },
+  );
+
+  it.each([
+    ['gb200', 'gb200-nvl72'],
+    ['gb300', 'gb300-nvl72'],
+  ] as const)(
+    'models %s as the upstream %s rack, measured or modeled Grace',
+    (hardware, system) => {
+      expect(isRackPowerHardware(hardware)).toBe(true);
+      expect(isSystemPowerHardware(hardware)).toBe(false);
+      expect(estimateRackPower(hardware, 900, 98.066, STATE)).toEqual(
+        upstream(system, 900, 98.066),
+      );
+      expect(estimateRackPower(hardware, 900, null, STATE)).toEqual(upstream(system, 900));
+      expect(rackComputeTrayCount(hardware)).toBe(18);
+    },
+  );
+
+  it('quotes the upstream cooling PUEs', () => {
+    expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, STATE)!.pue);
+    expect(LIQUID_COOLED_RACK_PUE).toBe(estimateRackPower('gb300', 700, null, STATE)!.pue);
   });
 
-  it('keeps measured input, modeled chassis AC, and post-AC facility power separate', () => {
-    const chassis = estimateChassisPower('H100', 4000, 1)!;
-    const facility = estimateChassisPower('h100', 4000, 1.2)!;
-    expect(chassis.measuredGpuWatts).toBe(4000);
-    expect(chassis.chassisAcWatts).toBe(6228.2);
-    expect(chassis.facilityWatts).toBe(chassis.chassisAcWatts);
-    expect(facility.chassisAcWatts).toBe(chassis.chassisAcWatts);
-    expect(facility.facilityWatts).toBe(7473.8);
-    // Fixed chassis overhead and nonlinear fan/PSU behavior forbid proportional GPU scaling.
-    expect(estimateChassisPower('h100', 8000)!.chassisAcWatts).not.toBe(chassis.chassisAcWatts * 2);
+  it('returns null where the upstream model rejects the input', () => {
+    // Negative and non-finite watts.
+    expect(estimateChassisPower('h100', -8, STATE)).toBeNull();
+    expect(estimateChassisPower('h100', Number.NaN, STATE)).toBeNull();
+    expect(estimateRackPower('gb200', 700, Number.POSITIVE_INFINITY, STATE)).toBeNull();
+    // 2400 W/GPU exceeds the modeled Hopper PSU and the NVL72 power shelves.
+    expect(estimateChassisPower('h100', 8 * 2400, STATE)).toBeNull();
+    expect(estimateRackPower('gb300', 2400, null, STATE)).toBeNull();
+  });
+
+  it('rejects unknown hardware names at the type level only', () => {
+    expect(isSystemPowerHardware('gb200')).toBe(false);
+    expect(isRackPowerHardware('h100')).toBe(false);
+    expect(isSystemPowerHardware('constructor')).toBe(false);
   });
 });

@@ -1,10 +1,16 @@
 import type { GpuMetricKey, GpuMetricRow } from './types';
 export interface ParsedPoint {
   seconds: number;
+  /** Absolute sample time in ms; smoothing and alignment work in this space. */
+  ms: number;
   value: number;
   gpuIndex: number;
-  raw: GpuMetricRow;
+  /** The raw sample behind this point; null once the value has been averaged. */
+  raw: GpuMetricRow | null;
+  /** For the mean line: how many chips contributed at this timestamp. */
+  count?: number;
 }
+
 function parseTimestamp(raw: string): Date | null {
   const isoDate = new Date(raw);
   if (!isNaN(isoDate.getTime())) return isoDate;
@@ -15,11 +21,11 @@ function parseTimestamp(raw: string): Date | null {
   return null;
 }
 
-export function buildGroupedData(
+export function buildTelemetryData(
   data: GpuMetricRow[],
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
-): Map<number, ParsedPoint[]> {
+): { t0Ms: number; groups: Map<number, ParsedPoint[]> } {
   // t=0 is the first sample of the whole series, not of the visible chips, so
   // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
@@ -40,6 +46,7 @@ export function buildGroupedData(
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
+      ms,
       value,
       gpuIndex: row.index,
       raw: row,
@@ -48,7 +55,19 @@ export function buildGroupedData(
   for (const points of groups.values()) {
     points.sort((a, b) => a.seconds - b.seconds);
   }
-  return groups;
+  return { t0Ms: minTime, groups };
+}
+
+/** Keep the read-only view's serialized point shape while sharing chart preparation. */
+export function buildGroupedData(
+  data: GpuMetricRow[],
+  visibleGpus: Set<number>,
+  metricKey: GpuMetricKey,
+) {
+  const { groups } = buildTelemetryData(data, visibleGpus, metricKey);
+  return new Map(
+    [...groups].map(([index, points]) => [index, points.map(({ ms: _ms, ...point }) => point)]),
+  );
 }
 
 export function buildCorrelationData(

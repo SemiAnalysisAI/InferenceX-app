@@ -9,6 +9,7 @@ import {
   type RooflineDirection,
 } from '@/components/inference/hooks/chart-data-core';
 import chartDefinitions, {
+  isAllInMeasuredConfigKey,
   METRIC_REGISTRY,
   tokenMetricTypeForConfigKey,
   type MetricConfigKey,
@@ -24,13 +25,21 @@ import type {
   TokenRevenuePricing,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import {
-  isMeasuredPowerCurveMetric,
-  upperPowerEnvelope,
-} from '@/components/inference/utils/powerCurves';
+  bestSeriesPerSku,
+  withUnrankedSkus,
+} from '@/components/inference/utils/best-series-per-sku';
+import {
+  allInMeasuredTableData,
+  allInMeasuredUnavailableReason,
+} from '@/components/inference/utils/inference-table-data';
+import { isPowerCurveMetric, upperPowerEnvelope } from '@/components/inference/utils/powerCurves';
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
@@ -72,6 +81,8 @@ export interface InferenceSeriesOptions {
   readonly precisions: readonly string[];
   readonly metricConfigKey: MetricConfigKey;
   readonly xmode: SeriesXMode;
+  /** Fixed-sequence service-axis statistic; ignored for Agentic. */
+  readonly fixedSequenceStatistic?: FixedSequenceStatistic;
   /** TTFT x metric override (e.g. `p90_ttft`); used by `ttft` mode and input metrics. */
   readonly xmetric: string;
   /** Explicit hwKey / bare-GPU selection; empty = all. */
@@ -95,6 +106,7 @@ export interface InferenceSeriesPoint {
   readonly x: number;
   readonly y: number;
   readonly concurrency: number;
+  readonly topologyKey: string;
   readonly tp: number;
   readonly date: string;
   readonly runId?: number;
@@ -116,6 +128,22 @@ export interface InferenceSeriesEntry {
   readonly points: readonly InferenceSeriesPoint[];
 }
 
+export interface InferenceTableRow extends Omit<InferenceSeriesPoint, 'x' | 'y'> {
+  readonly hwKey: string;
+  readonly gpu: string;
+  readonly framework: string;
+  readonly specMethod: string;
+  readonly label: string;
+  readonly vendor?: string;
+  readonly deployment: string;
+  readonly kvOffload: boolean;
+  readonly x: number | null;
+  readonly y: number | null;
+  readonly measuredGpuWatts: number;
+  readonly status: 'available' | 'unavailable';
+  readonly unavailableReason: ReturnType<typeof allInMeasuredUnavailableReason>;
+}
+
 export interface InferenceSeriesMetricMeta {
   readonly key: MetricKey;
   readonly configKey: MetricConfigKey;
@@ -128,10 +156,14 @@ export interface InferenceSeriesMetricMeta {
 
 export interface InferenceSeriesResult {
   readonly series: readonly InferenceSeriesEntry[];
+  /** All in Measured table population, including unavailable system estimates. */
+  readonly tableRows?: readonly InferenceTableRow[];
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
-  readonly xAxis: { mode: SeriesXMode; field: string; label: string };
+  readonly xAxis: { mode: SeriesXMode; field: string; label: string; statistic: string };
+  /** Scoped observed points before frontier/best-only pruning; not a public raw-row payload. */
+  readonly observedPoints: readonly InferenceData[];
   readonly count: number;
 }
 
@@ -172,6 +204,7 @@ function resolveXAxisLabel(
   effectiveXMetric: string | null,
   isAgentic: boolean,
   percentile: string,
+  xAxisField: string,
 ): string {
   let label = chartDef.x_label;
   if (branch === 'e2e-ttft-override') {
@@ -179,9 +212,10 @@ function resolveXAxisLabel(
     const pctlWord = pctl === 'median' ? 'Median' : pctl.toUpperCase();
     label = `${pctlWord} Time To First Token (s)`;
   }
-  if (isAgentic) {
-    label = applyAgenticPercentileToXLabel(label, percentile.toUpperCase());
-  }
+  label = applyAgenticPercentileToXLabel(
+    label,
+    isAgentic ? percentile.toUpperCase() : xAxisField.startsWith('mean_') ? 'Mean' : 'Median',
+  );
   return label;
 }
 
@@ -222,6 +256,7 @@ export function buildInferenceSeries(
     isAgentic,
     percentile,
     xAxisMode: xmode,
+    fixedSequenceStatistic: options.fixedSequenceStatistic,
   });
 
   // 4. Precision + scope filters (GPU picks and vendor/framework/deployment/spec pills).
@@ -260,10 +295,15 @@ export function buildInferenceSeries(
   const remapped = scoped
     .filter((point) => metricKey in point && supportsPointTokenMetric(point, tokenType))
     .map((point) => remapInferencePoint(point, metricKey, resolved.xAxisField));
-  const partition = partitionChartDataByLimits(remapped, chartDef, metricConfigKey, {
-    isTtftX: resolved.xAxisField.endsWith('_ttft'),
-    isAgentic,
-  });
+  const partition = partitionChartDataByLimits(
+    remapped,
+    { ...chartDef, x_scale_field: resolved.xAxisField },
+    metricConfigKey,
+    {
+      isTtftX: resolved.xAxisField.endsWith('_ttft'),
+      isAgentic,
+    },
+  );
   let mapped = options.allPoints ? remapped : partition.data;
   if (xmode === 'e2e-normalized-interactivity')
     mapped = mapped.flatMap((point) => {
@@ -287,7 +327,7 @@ export function buildInferenceSeries(
 
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
-  const isMeasuredPower = isMeasuredPowerCurveMetric(metricConfigKey);
+  const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
   const maximizePowerX = direction !== null && paretoMaximizesX(direction);
   const frontierDirection = isMeasuredPower
     ? maximizePowerX
@@ -364,6 +404,7 @@ export function buildInferenceSeries(
           x: point.x,
           y: point.y,
           concurrency: point.conc ?? 0,
+          topologyKey: pointTopologyKey(point),
           tp: point.tp ?? 0,
           date: point.date ?? '',
           ...(runIdFromUrl(point.run_url) === undefined
@@ -377,9 +418,66 @@ export function buildInferenceSeries(
   }
 
   const count = series.reduce((total, entry) => total + entry.points.length, 0);
+  // Remapping retains nested metric objects, including for transient rows without IDs.
+  const frontierMetrics = new Set([...frontierPoints].map((point) => point[metricKey]));
+  const allInRows = isAllInMeasuredConfigKey(metricConfigKey)
+    ? allInMeasuredTableData(scoped, metricKey, resolved.xAxisField)
+    : undefined;
+  // Match the dashboard: ranked SKUs keep their winner and table-only SKUs stay.
+  const tableHwKeys =
+    allInRows && best && bestHwKeys.size > 0
+      ? withUnrankedSkus(bestHwKeys, mapped, allInRows)
+      : undefined;
+  const tableRows = allInRows
+    ? allInRows
+        .filter((point) => !tableHwKeys || tableHwKeys.has(point.hwKey))
+        .map((point): InferenceTableRow => {
+          const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
+          const x =
+            xmode === 'e2e-normalized-interactivity'
+              ? percentile === 'p75'
+                ? derived?.p75_e2e_norm_intvty
+                : derived?.p90_e2e_norm_intvty
+              : point.x;
+          const unavailableReason = allInMeasuredUnavailableReason(point, metricKey);
+          return {
+            id: point.id ?? null,
+            precision: point.precision,
+            hwKey: point.hwKey,
+            gpu: point.hwKey.split('_')[0],
+            framework: point.framework ?? '',
+            specMethod: point.spec_decoding ?? 'none',
+            label: hardwareLegendLabel(point.hwKey, point.model),
+            vendor: GPU_VENDORS[point.hwKey.split('_')[0]],
+            deployment: pointDeploymentMode(point),
+            kvOffload: isKvOffloadEnabled(point),
+            x:
+              typeof x === 'number' &&
+              Number.isFinite(x) &&
+              (xmode !== 'e2e-normalized-interactivity' || x > 0)
+                ? x
+                : null,
+            y: Number.isFinite(point.y) ? point.y : null,
+            concurrency: point.conc ?? 0,
+            topologyKey: pointTopologyKey(point),
+            tp: point.tp ?? 0,
+            date: point.date ?? '',
+            ...(runIdFromUrl(point.run_url) === undefined
+              ? {}
+              : { runId: runIdFromUrl(point.run_url) }),
+            frontier: unavailableReason === null && frontierMetrics.has(point[metricKey]),
+            bestPerSku: bestHwKeys.has(point.hwKey),
+            metrics: pointMetrics(point, metricKey),
+            measuredGpuWatts: point.measuredAvgPower!.y,
+            status: unavailableReason === null ? 'available' : 'unavailable',
+            unavailableReason,
+          };
+        })
+    : undefined;
 
   return {
     series,
+    ...(tableRows === undefined ? {} : { tableRows }),
     hardware: series.map((entry) => ({
       key: entry.hwKey,
       label: entry.label,
@@ -397,6 +495,7 @@ export function buildInferenceSeries(
     },
     xAxis: {
       mode: xmode,
+      statistic: isAgentic ? percentile : (options.fixedSequenceStatistic ?? 'median'),
       field:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile}_e2e_norm_intvty`
@@ -404,8 +503,16 @@ export function buildInferenceSeries(
       label:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile.toUpperCase()} E2E Normalized Interactivity (tok/s/user)`
-          : resolveXAxisLabel(chartDef, resolved.branch, effectiveXMetric, isAgentic, percentile),
+          : resolveXAxisLabel(
+              chartDef,
+              resolved.branch,
+              effectiveXMetric,
+              isAgentic,
+              percentile,
+              String(resolved.xAxisField),
+            ),
     },
+    observedPoints: mapped,
     count,
   };
 }

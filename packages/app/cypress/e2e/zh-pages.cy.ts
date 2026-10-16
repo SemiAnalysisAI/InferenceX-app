@@ -26,11 +26,11 @@ describe('Chinese (/zh) pages', () => {
           .should('have.text', '仪表板')
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-        // Ledger NEW pills localize to 新 on the Chinese landing page.
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 4);
-        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-          .should('have.length', 3)
-          .each(($badge) => expect($badge.text()).to.equal('新'));
+        // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
+          'not.exist',
+        );
       });
     });
 

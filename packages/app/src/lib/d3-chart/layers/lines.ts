@@ -9,6 +9,8 @@ export interface LineConfig {
   /** Optional per-series SVG dash pattern; return `none` for a solid line. */
   getStrokeDasharray?: (key: string) => string;
   strokeWidth?: number;
+  /** Optional per-series stroke width; falls back to `strokeWidth`, then 2. */
+  getStrokeWidth?: (key: string) => number;
   curve?: d3.CurveFactory;
   /** Return false to create gaps in the line (e.g., missing data points). */
   isDefined?: (d: { x: number; y: number }) => boolean;
@@ -61,7 +63,7 @@ export function renderLines(
     .attr('class', (d) => `line-path line-${d.key}`)
     .attr('stroke', (d) => config.getColor(d.key))
     .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
-    .attr('stroke-width', config.strokeWidth ?? 2)
+    .attr('stroke-width', (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2)
     .attr('d', (d) => lineGenerator(d.points));
 }
 

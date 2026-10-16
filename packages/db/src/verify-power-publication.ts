@@ -3,6 +3,7 @@ import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import { createAdminSql } from './etl/db-utils';
 import { verifyTelemetryApi } from './etl/telemetry-receipt';
 import {
+  powerVerificationReceipt,
   verifyPowerPublication,
   type PowerPublicationManifest,
   type PublishedPowerRow,
@@ -75,25 +76,7 @@ try {
     manifest.telemetry = await verifyTelemetryApi(manifest.telemetry, origin, { headers });
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   }
-  const counts = { strict: 0, invalid: 0, other: 0 };
-  for (const point of manifest.points) {
-    if (point.metrics.power_valid === 1 && point.metrics.power_metric_schema_version === 2)
-      counts.strict++;
-    else if (point.metrics.power_valid === 0) counts.invalid++;
-    else counts.other++;
-  }
-  const receipt = {
-    runId: manifest.runId,
-    runAttempt: manifest.runAttempt,
-    checkedAt: new Date().toISOString(),
-    points: manifest.points.length,
-    counts,
-    status:
-      errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
-    errors,
-    telemetryWarnings: manifest.telemetryWarnings ?? [],
-    ...(manifest.telemetry ? { telemetry: manifest.telemetry } : {}),
-  };
+  const receipt = powerVerificationReceipt(manifest, errors);
   fs.writeFileSync(`${manifestPath}.verification.json`, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));
   if (errors.length > 0) process.exitCode = 1;

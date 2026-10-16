@@ -5,11 +5,22 @@ import { getGpuSpecs, type TcoBasis } from '@/lib/catalog/constants';
  * For Pareto front calculations, see @/lib/charts/chart-utils
  */
 
-import chartDefinitions from '@/components/inference/metric-registry';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import chartDefinitions, { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
-import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+import type {
+  ChartDefinition,
+  ClippedInferenceData,
+  InferenceData,
+  PowerCompare,
+  YAxisMetricKey,
+} from './types';
 import type { XAxisMode } from './hooks/useChartData';
 
 /**
@@ -30,6 +41,7 @@ export function selectUnofficialOverlayForMode<T>(
 export interface ProcessedChartData {
   data: InferenceData[];
   clippedData: ClippedInferenceData[];
+  tableData?: InferenceData[];
 }
 
 /**
@@ -143,8 +155,10 @@ export function processOverlayChartData(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
+    powerCompare?: PowerCompare;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -169,8 +183,11 @@ export function processOverlayChartDataWithClipping(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
+    /** Sibling boundary / role series, mirroring the official path in useChartData. */
+    powerCompare?: PowerCompare;
   },
 ): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
@@ -216,15 +233,20 @@ export function processOverlayChartDataWithClipping(
     isAgentic,
     percentile: selectedPercentile,
     xAxisMode: options?.selectedXAxisMode,
+    fixedSequenceStatistic: options?.fixedSequenceStatistic,
   });
 
   // The latency limit targets overload outliers on the TTFT axis only; skip it
   // for the natural axis and for agentic (long TTFTs are normal there).
   const isTtftX = xAxisField.endsWith('_ttft');
 
-  const processedData = sourceData
-    .filter((d) => metricKey in d)
-    .map((d) => remapInferencePoint(d, metricKey, xAxisField));
+  const processedData = expandPowerCompareSeries(
+    sourceData
+      .filter((d) => metricKey in d)
+      .map((d) => remapInferencePoint(d, metricKey, xAxisField)),
+    selectedYAxisMetric,
+    options?.powerCompare ?? 'none',
+  );
 
   // The normalized metric is derived from persisted request traces, which an
   // unofficial overlay does not have. An all-false canonical stamp prevents a
@@ -237,8 +259,25 @@ export function processOverlayChartDataWithClipping(
     }
   }
 
-  return partitionChartDataByLimits(processedData, chartDef, selectedYAxisMetric, {
-    isTtftX,
-    isAgentic,
-  });
+  const partition = partitionChartDataByLimits(
+    processedData,
+    { ...chartDef, x_scale_field: xAxisField },
+    selectedYAxisMetric,
+    {
+      isTtftX,
+      isAgentic,
+    },
+  );
+  return {
+    ...partition,
+    ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+      ? {
+          tableData: expandPowerCompareSeries(
+            allInMeasuredTableData(sourceData, metricKey, xAxisField),
+            selectedYAxisMetric,
+            options?.powerCompare ?? 'none',
+          ),
+        }
+      : {}),
+  };
 }

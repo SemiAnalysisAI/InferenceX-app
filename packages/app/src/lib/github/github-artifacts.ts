@@ -120,6 +120,24 @@ export function downloadGithubArtifact(url: string, token: string): Promise<Resp
   });
 }
 
+/**
+ * Decodes only the entries `predicate` selects, keyed by entry name. The rest
+ * of the archive stays compressed, so picking a few small files out of a
+ * multi-hundred-megabyte bundle costs the central directory, not the payload.
+ */
+export function readZipEntries(
+  buffer: Buffer,
+  predicate: (entryName: string) => boolean,
+): Map<string, string> {
+  const zip = new AdmZip(buffer);
+  const files = new Map<string, string>();
+  for (const entry of zip.getEntries()) {
+    if (entry.isDirectory || !predicate(entry.entryName)) continue;
+    files.set(entry.entryName, entry.getData().toString('utf8'));
+  }
+  return files;
+}
+
 export function extractZipEntries<T>(
   buffer: Buffer,
   extension: string,

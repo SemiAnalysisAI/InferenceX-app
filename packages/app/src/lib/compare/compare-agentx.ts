@@ -4,11 +4,11 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/infer
 
 /**
  * Editorial ordering of the AgentX hero ledger on `/compare` and the landing
- * page. Every model here has AgentX data and a registered `/inference/<slug>`
- * page; the order is a product call, not alphabetical or by launch date.
+ * page. Links open each model's canonical dashboard.
  */
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
+  'muse-spark-open',
   // V4.1 Flash sits directly under Kimi K3, ahead of the V4 Pro flagship it
   // post-dates (InferenceX#2961).
   'deepseek-v41-flash',
@@ -25,14 +25,10 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
  * the /inference model selector. Presence in the ledger and the NEW badge are
  * separate editorial decisions: a model stays featured for as long as its
  * AgentX results matter, while the pill retires once the launch is old news.
- * DeepSeek V4 Pro, MiniMax M3, and Qwen 3.5 keep their rows without the pill.
+ * Every featured row is currently pill-free: NEW is reserved for the TPUv7
+ * launch (banner, modal, and landing TPU card).
  */
-const AGENTX_NEW_MODEL_SLUGS = [
-  'kimi-k3',
-  'deepseek-v41-flash',
-  'glm-5-3',
-  'qwen-3-8-flash-next',
-] as const satisfies readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][];
+const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
 /**
  * AgentX-only models that are NOT part of the editorial featured set above.
@@ -96,17 +92,17 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
   // registered inference page (none of the featured set today) fall back to
   // the query form.
   //
-  // No `i_seq` / `i_optimal` params: every model here has AgentX data, and the
-  // dashboard already defaults such models to the Agentic scenario
+  // No `i_seq` / `i_optimal` params: these models have AgentX data.
+  // The dashboard defaults to the Agentic scenario
   // (resolveEffectiveSequence) with "Optimal Only" on (i_optimal !== '0'), so
   // the bare model page IS the AgentX optimal-only view — and the canonical,
   // shareable address for it.
   const entry = getInferenceModelBySlug(model.slug);
   const path = entry ? inferenceModelPath(entry.slug) : '/inference';
   const localizedPath = locale === 'zh' ? `/zh${path}` : path;
-  if (entry) return localizedPath;
-  const query = new URLSearchParams({ g_model: model.displayName });
-  return `${localizedPath}?${query}`;
+  const query = new URLSearchParams();
+  if (!entry) query.set('g_model', model.displayName);
+  return query.size > 0 ? `${localizedPath}?${query}` : localizedPath;
 }
 
 export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonScenario {

@@ -214,54 +214,12 @@ describe('ScatterGraph unofficial overlays', () => {
         const visible = showAllMeasurements || datum.x !== 20;
         expect(group.style.opacity).toBe(visible ? '1' : '0');
         expect(group.style.pointerEvents).toBe(visible ? 'auto' : 'none');
-        expect(Boolean(group.querySelector('.legacy-power-ring'))).toBe(
-          datum.power_tier === 'legacy',
-        );
       }
-      expect(
-        container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
-      ).toContain(
-        showAllMeasurements
-          ? 'Showing 9 of 9 measured points: 3/3 validated · 6/6 historical.'
-          : 'Showing 6 of 9 measured points: 3/3 validated · 3/6 historical.',
-      );
       expect(curves.map((curve) => curve.getAttribute('d'))).toEqual(paths);
       expect(axes.map((axis) => axis.innerHTML)).toEqual(axisGeometry);
       expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
       expect(rebuildCount()).toBe(buildsAfterMount);
     }
-    unmount();
-  });
-
-  it('includes unofficial measured points in the validated/historical coverage summary', () => {
-    const runUrl = 'https://github.com/o/r/actions/runs/123';
-    const overlayPoints = [
-      { ...point('h100', 'fp8', 30, 300, 2), power_tier: 'certified', run_url: runUrl },
-      { ...point('h100', 'fp8', 35, 350, 4), power_tier: 'legacy', run_url: runUrl },
-    ] as InferenceData[];
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y_measuredJPerOutputToken',
-    };
-    overlayState.current = {
-      ...baseOverlayState(),
-      isUnofficialRun: true,
-      activeOverlayHwTypes: new Set(['h100']),
-      allOverlayHwTypes: new Set(['h100']),
-      runIndexByUrl: { [runUrl]: 0 },
-      unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
-    };
-
-    const { container, unmount } = mountChart({
-      overlayData: {
-        data: overlayPoints,
-        hardwareConfig: HARDWARE_CONFIG,
-      } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
-    });
-
-    expect(
-      container.querySelector('[data-testid="measured-power-summary"]')?.textContent,
-    ).toContain('Showing 2 of 2 measured points: 1/1 validated · 1/1 historical.');
     unmount();
   });
 

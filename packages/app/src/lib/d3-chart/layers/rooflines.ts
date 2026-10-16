@@ -8,7 +8,13 @@ export interface RooflineConfig {
   isVisible?: (key: string) => boolean;
   strokeWidth?: number;
   strokeDasharray?: string;
+  /** Per-curve dash pattern; `null` draws a solid line. Takes precedence over `strokeDasharray`. */
+  getDasharray?: (key: string) => string | null;
   curve?: d3.CurveFactory;
+}
+
+function dasharrayFor(config: RooflineConfig, key: string): string | null {
+  return config.getDasharray ? config.getDasharray(key) : (config.strokeDasharray ?? null);
 }
 
 interface RooflineEntry<T> {
@@ -27,7 +33,14 @@ export function renderRooflines<T extends { x: number; y: number }>(
   yScale: ContinuousScale,
   config: RooflineConfig,
 ): void {
-  const { getColor, getOpacity, isVisible, strokeWidth = 2, strokeDasharray } = config;
+  const {
+    getColor,
+    getOpacity,
+    isVisible,
+    strokeWidth = 2,
+    strokeDasharray,
+    getDasharray,
+  } = config;
   const lineGenerator = d3
     .line<T>()
     .x((d) => xScale(d.x))
@@ -60,7 +73,9 @@ export function renderRooflines<T extends { x: number; y: number }>(
     .attr('stroke-width', strokeWidth)
     .attr('d', (d) => lineGenerator(d.points) ?? '');
 
-  if (strokeDasharray) {
+  if (getDasharray) {
+    merged.attr('stroke-dasharray', (d) => getDasharray(d.key));
+  } else if (strokeDasharray) {
     merged.attr('stroke-dasharray', strokeDasharray);
   }
 
@@ -78,12 +93,12 @@ export function updateRooflinesForDisplay(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   config: RooflineConfig,
 ): void {
-  const { getColor, getOpacity, strokeWidth = 2, strokeDasharray } = config;
+  const { getColor, getOpacity, strokeWidth = 2 } = config;
   zoomGroup
     .selectAll<SVGPathElement, RooflineEntry<{ x: number; y: number }>>('.roofline-path')
     .attr('stroke', (d) => getColor(d.key))
     .attr('stroke-width', strokeWidth)
-    .attr('stroke-dasharray', strokeDasharray ?? null)
+    .attr('stroke-dasharray', (d) => dasharrayFor(config, d.key))
     .each(function (d) {
       const opacity = getOpacity?.(d.key);
       if (opacity !== undefined) d3.select(this).style('opacity', opacity);

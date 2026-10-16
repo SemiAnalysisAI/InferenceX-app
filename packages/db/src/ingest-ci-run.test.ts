@@ -13,10 +13,11 @@ describe('purged CI ingestion', () => {
     { runId: 25199291771, runAttempt: 2, reused: false },
     { runId: 25199291771, runAttempt: 2, reused: true },
   ])(
-    'writes an empty publication manifest for $runId/$runAttempt (reused=$reused)',
+    'writes empty publication and write receipts for $runId/$runAttempt (reused=$reused)',
     ({ runId, runAttempt, reused }) => {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'purged-ingest-'));
       const manifestPath = path.join(dir, 'power-publication.json');
+      const writeReceiptPath = path.join(dir, 'database-writes.json');
       try {
         if (reused) {
           const metadataDir = path.join(dir, 'reused-ingest-metadata');
@@ -41,6 +42,7 @@ describe('purged CI ingestion', () => {
               INGEST_ARTIFACTS_PATH: dir,
               INGEST_REPO: 'SemiAnalysisAI/InferenceX',
               POWER_PUBLICATION_MANIFEST: manifestPath,
+              DATABASE_WRITE_RECEIPT: writeReceiptPath,
             },
             encoding: 'utf8',
             timeout: 10_000,
@@ -55,11 +57,65 @@ describe('purged CI ingestion', () => {
           runAttempt,
           points: [],
           ingestErrors: [],
+          publicationWarnings: [],
           telemetryWarnings: [],
+        });
+        expect(JSON.parse(fs.readFileSync(writeReceiptPath, 'utf8'))).toEqual({
+          version: 1,
+          runId,
+          runAttempt,
+          errors: [],
+          warnings: [],
         });
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
       }
     },
   );
+});
+
+describe('database write receipt on a failed ingest', () => {
+  // The finalizer writes this receipt before its telemetry read, which queries
+  // the database; nothing after a failed ingest may skip it.
+  it('is written when the ingest itself fails', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'failed-ingest-'));
+    const writeReceiptPath = path.join(dir, 'database-writes.json');
+    try {
+      const result = spawnSync(
+        'bun',
+        [fileURLToPath(new URL('ingest-ci-run.ts', import.meta.url))],
+        {
+          cwd: dir,
+          env: {
+            PATH: process.env.PATH,
+            NODE_ENV: 'test',
+            // Unreachable, so the ingest fails before writing anything.
+            DATABASE_WRITE_URL: 'postgres://unused:unused@127.0.0.1:1/unused',
+            GITHUB_TOKEN: 'unused',
+            // Fail GitHub lookups fast and offline.
+            HTTPS_PROXY: 'http://127.0.0.1:1',
+            HTTP_PROXY: 'http://127.0.0.1:1',
+            INGEST_RUN_ID: '99999999998',
+            INGEST_RUN_ATTEMPT: '1',
+            INGEST_ARTIFACTS_PATH: dir,
+            INGEST_REPO: 'SemiAnalysisAI/InferenceX',
+            POWER_PUBLICATION_MANIFEST: path.join(dir, 'power-publication.json'),
+            DATABASE_WRITE_RECEIPT: writeReceiptPath,
+          },
+          encoding: 'utf8',
+          timeout: 20_000,
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status).not.toBe(0);
+      expect(fs.existsSync(writeReceiptPath), result.stderr).toBe(true);
+      expect(JSON.parse(fs.readFileSync(writeReceiptPath, 'utf8'))).toMatchObject({
+        version: 1,
+        runId: 99999999998,
+        runAttempt: 1,
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

@@ -4509,6 +4509,14 @@
       ]
     },
     {
+      "spec": "cypress/e2e/powerx-compare.cy.ts",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/e2e/powerx-timeline.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 36031,
       "tests": [
@@ -5016,6 +5024,10 @@
           "attempts": 1
         }
       ]
+    },
+    {
+      "spec": "cypress/e2e/profit-power-curves.cy.ts",
+      "duration": 3568
     },
     {
       "spec": "cypress/e2e/reliability-chart.cy.ts",

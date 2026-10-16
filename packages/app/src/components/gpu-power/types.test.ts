@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_METRIC_OPTIONS,
   computeGpuStats,
+  detectTdpFromArtifactName,
   getAvailableMetrics,
   type GpuMetricRow,
   parseCsvData,
@@ -240,6 +241,28 @@ describe('getAvailableMetrics', () => {
     expect(keys).toContain('memTemp');
     expect(keys).not.toContain('gfxVoltage');
     expect(keys).not.toContain('fclk');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectTdpFromArtifactName
+// ---------------------------------------------------------------------------
+
+describe('detectTdpFromArtifactName', () => {
+  it('detects H200 from real artifact name', () => {
+    const result = detectTdpFromArtifactName(
+      'gpu_metrics_dsr1_1k8k_fp8_sglang_tp8-ep1-dpafalse_disagg_none_conc64_h200-nb_0',
+    );
+    expect(result).toEqual({ sku: 'H200', tdp: 700 });
+  });
+
+  it('detects GB200 without matching B200', () => {
+    const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_gb200-nvl72_0');
+    expect(result).toEqual({ sku: 'GB200', tdp: 1200 });
+  });
+
+  it('returns null for unrecognized GPU', () => {
+    expect(detectTdpFromArtifactName('gpu_metrics_model_fp8_unknown_0')).toBeNull();
   });
 });
 

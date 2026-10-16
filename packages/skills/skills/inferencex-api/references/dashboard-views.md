@@ -112,17 +112,17 @@ there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 
 All paths below are relative to `/api/v1/views/`. The maintained exhaustive
 query-key list is in the app's OpenAPI contract. The following groups explain
-which controls belong together.
+which API selectors belong together.
 
 | View                            | Selection and calculation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xmetric, percentile, optimal/best/allPoints; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                                                                                                                        |
+| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare and powerFit panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                                           |
 | `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                                                                                                                                                                                                                                                               |
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                                                                                                                                                                                                                              |
-| `cache-reuse`                   | AgentX selection plus `config` from configurations and `recipe` from data.recipes. See recipe selection below.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO and provisioned/modeled/compare power. USD/chip-hour.                                                                                                                                                                                                                                                                                                                                      |
+| `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations and `recipe` from data.recipes. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                                                                                                                                                                                                                                                                                 |
+| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO, actual/theoretical cache-hit mode and provisioned/modeled/compare power. USD/chip-hour.                                                                                                                                                                                                                                                                                                   |
 | `profit-estimator-per-gigawatt` | Same selectors; USD/GW-year basis and owning-cost default.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `fleet`                         | Model/sequence/precision/GPUs, target/percentile, TCO/token type/cost provider, MW, input/output prices, ramp, cache discount, MTBI, recovery, horizon and metric. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                  |
 | `evaluation`                    | Model, task, date, precision and GPU selection; public unofficial runs remain separately labeled and independent of the official date cutoff. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -133,8 +133,8 @@ which controls belong together.
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                                                                                                                                                                                                                                                      |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                                                                                                                                                                                                                                                           |
-| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Responses are no-store.                                                                                                                                                                                                                                                                                                |
+| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                               |
+| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                                                                                                                                                                                                                                     |
 | `ubenchx`                       | Test selector (`test`: `mem-bw`, `sm-l2-distance`, `tpc-skyline`, or `all`) plus GPU selector (`all` or one GPU). `mem-bw` returns static device-memory copy bandwidth rows with derived MBU and latency. `sm-l2-distance` returns SM-to-SM L2 latency difference matrix with GPC/die topology and summary statistics. `tpc-skyline` returns measured TPCs per GPC (sorted descending) with GPC, TPC, and SM counts, defaulting to every GPU. `all` (default) returns every test. The Y-axis selector on `/ubenchx/mem-bw` is presentation-only. |
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                                                                                                                                                                                                                           |
 
@@ -204,10 +204,121 @@ day. Date-only comparisons select that day's exact logical snapshot; the primary
 source observations inclusively.
 Public unofficial overlays must not be relabeled as official results.
 
+`i_rulers` belongs to browser share links for the primary inference chart;
+date-comparison rulers are not shared. It is not a views API parameter. Tooltip
+scrolling and viewport limits only affect access to existing actions; neither
+changes API data or calculations.
+
 For measured-power gauges, `optimal=true` keeps the chart's higher-power outer
 envelope. `frontier.direction` describes that boundary; `metric.direction` retains
 the optimization direction used by `best=true`. Interpret the envelope as a load
 boundary, not evidence that those points are more energy efficient.
+
+The dashboard names its four boundaries GPU Level Measured, GPU Level Provisioned
+(TDP), All in Provisioned, and All in Measured. All in Measured combines measured
+GPU power with modeled unmeasured components and PUE; do not describe it as measured
+wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis`
+still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
+Expanding assumptions or unavailable-estimate details does not change returned data.
+
+All in Measured watts and energy accept validated `single_turn` and AgentX rows
+through the shared chart/API transform, including historical and unofficial rows.
+AgentX uses the power model's agentic workload state without independent workload
+calibration. Telemetry and topology gates still apply.
+
+For All in Measured, `tableRows` retains every GPU-valid observation in the selected
+scope and best-series selection, including axis-clipped and non-frontier points.
+Missing system estimates use `y: null`, `status: "unavailable"`, and
+`unavailableReason`; `measuredGpuWatts` remains available. CSV exports these rows
+with blank missing values. Numeric `series` and `count` are unchanged. Each date
+comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
+
+NVL72 rows need valid GPU power and take an equal compute-tray share of the InferenceX
+`power_model` rack at PUE 1.1. Validated Grace-socket power with complete socket
+coverage replaces the modeled Grace CPU and memory; otherwise (including CPU-rail-only
+and module readings) the rack's modeled Grace profile is used. Read `powerSource` for
+topology, `cpu` (measured or modeled), PUE and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
+valid measurements after deployment; they do not require telemetry backfill. For
+GW-year estimates, `modeled` first selects
+points with valid system-power inputs, then builds the curve at the requested target.
+It does not extrapolate or substitute historical snapshots. `compare` uses the same
+valid-curve throughput for both budgets; if no valid curve covers the target, it keeps
+the original provisioned estimate. `provisioned` alone retains the original performance
+curve. Official, comparison and unofficial scopes are evaluated independently.
+`skipped.reason` distinguishes missing CPU power and incompatible power bases;
+modeled estimates never substitute provisioned watts.
+
+Prefer equal-service comparisons for article-facing hardware analysis. Use
+`xstat=mean` only for fixed-sequence service axes when that statistic is intended:
+streaming speed then means **1 / mean TPOT**, not arithmetic mean request speed.
+TTFT/E2E use recorded means. Default is median; absent means are not replaced.
+AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
+`params.xstat` and `xAxis.statistic`, not the requested parameter alone.
+
+Equal-service and matched-concurrency analysis are API-only. The dashboard keeps role and
+power-fit panels, but has no service-comparison control, source selector, target input or
+matched-concurrency table. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
+`serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
+
+`serviceCompare=true` returns exact opaque `serviceSources` keys, an
+`equalServiceCurve`, and an optional `equalServiceComparison` at `serviceTarget`.
+Use returned keys verbatim for `serviceBaseline` and `serviceComparator` via
+`URLSearchParams`; never substitute bare GPU names. Each `label` is display text
+(hardware and date, plus precision, topology or run only where two sources would
+otherwise look alike); select and join by `key`, never by label. Omitted keys select the first
+two sources; unknown explicit keys stay unavailable. Omitted target means no
+selected-target result. Targets are tok/s/user for streaming speed, seconds for
+TTFT/E2E. Concurrency is unsupported for equal-service interpolation.
+
+A source groups one logical curve snapshot and configuration. Stitched points retain
+their original producer provenance; differing telemetry producer/exporter hashes do not
+split the snapshot. Recipe, image and topology remain distinct. Rows without a snapshot
+retain their own run, measured date and telemetry producer/exporter hashes in the source key.
+
+The API uses scoped observed points before frontier/best
+pruning, with no power-comparison clones. It interpolates raw quantities
+linearly only inside each exact source range, then reports signed
+`100 × (comparator / baseline − 1)`. Metrics are measured GPU W/GPU,
+whole-deployment output tokens/s, and validated GPU J/output token. Negative energy
+change means lower comparator energy. Preserve bracket endpoint identities,
+`interpolated`, missing reasons and nulls. Never call interpolated points new
+measurements or bridge different sources, recipes, topologies or missing endpoints.
+
+`serviceCompare=true` also returns `matchedConcurrency`: the two selected sources
+paired at each concurrency either observed. Sides are `observed`, `missing`, or
+`ambiguous` (disagreeing duplicates, none chosen); `changePercent` needs both
+observed. It is a same-load diagnostic: speeds usually differ, so never present it
+as an equal-service result.
+
+`roleShare=true` returns validated disaggregated prefill/decode J/output and their
+shares of reconstructed total energy. It converts prefill J/input using the
+same-window aggregate J/output-to-J/input ratio; it does not compare unlike token
+denominators. Missing roles are omitted. `rolePoints` adds per-observation role
+W/GPU, role-local J/input and J/output (different denominators, never add them)
+and the output-token reconstruction, with nulls for missing figures.
+
+`powerFit=true` returns `powerFits`: per source, an OLS line of measured mean W/GPU
+against output tok/s per allocated GPU, with `P₀`, slope `m` (J/output token), R²,
+n, x-range, registry `tdpWatts` and point identities. Fewer than three distinct
+rates return `fit: null`, `reason: "too-few-points"`. Call `P₀` an extrapolated
+intercept, not idle power, and do not read the line outside its x-range.
+
+These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
+
+同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
+`serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
+同并发表格或分享参数。角色分析和功耗拟合面板仍在仪表板中提供，分别对应 `roleShare` 和
+`powerFit`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
+
+Concurrency is not an `xmode`: GPU count varies across configurations, so
+concurrency alone is not comparable between them. Each point still reports its
+`concurrency`. Filter `topologies` with one or more exact `point.topologyKey`
+values from a first response (encode with `URLSearchParams`). This selects the same GPU count,
+parallelism, role-pool split and offload mode across hardware without removing
+loads. Unknown metadata stays unknown, not equivalent to an explicit setting.
+Keep hardware, precision, recipe, run/date and software provenance separate;
+matching topology alone does not establish a controlled hardware comparison.
+Missing concurrency points must remain absent, not interpolated or extrapolated.
 
 Fleet lifecycle defaults (ramp, cached-input percent, MTBI, recovery) follow the
 dashboard's lifecycle panel; read the current values from `/api/v1/views/options`

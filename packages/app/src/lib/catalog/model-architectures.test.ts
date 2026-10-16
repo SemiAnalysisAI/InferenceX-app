@@ -22,14 +22,16 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced date for every model the user can select', () => {
+  it('has a sourced date for every model except Muse, whose release date is unverified', () => {
     // Without a date the Fleet Lifecycle axis falls back to the model's first
     // benchmark run, which reads as "this is when the model appeared" when it is
     // really "this is when we got to it" — for gpt-oss that gap is five weeks.
     // A model whose release date genuinely cannot be sourced belongs in an
     // explicit allowlist here, so the gap stays visible; do not delete the test.
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
-    expect(missing).toEqual([]);
+    // Spark Open's weights-publication date has not been verified. Do not use
+    // the hosted Spark launch date or this UI registration date as a proxy.
+    expect(missing).toEqual([Model.Muse_Spark_Open]);
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {
