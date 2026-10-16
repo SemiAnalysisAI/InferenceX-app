@@ -107,7 +107,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
     id: 'faq-old-runs',
     question: '历史运行记录是否保留？',
     answer:
-      '是的。GitHub Actions 保留工作流运行日志和产物 90 天。为了更长期的可审计性，我们还会每周发布完整基准测试数据库的快照作为公开的 GitHub Release，任何人都可以下载历史数据集并复现或重新分析仪表板中的任何图表。',
+      '是的。GitHub Actions 保留工作流运行日志和产物 90 天。之后基准测试结果仍保存在 InferenceX 数据库中，仪表板图表和公开 API 依然可以查询历史运行记录。',
   },
   {
     id: 'faq-data-use',

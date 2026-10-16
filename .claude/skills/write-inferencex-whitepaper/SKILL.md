@@ -30,7 +30,7 @@ Ask for whichever of these are missing; do not invent them.
 
 Reproduce the number the estimator shows at `/profit-estimator-per-gigawatt`; the paper must match what a reader sees when they open the dashboard link.
 
-1. Pull the AgentX rows for the exact configuration with the `inferencex-data` skill (latest run per config, correct ISL/OSL/trace, P90 interactivity, tok/s/GPU, input/output split, cache hit rate, avg power).
+1. Pull the AgentX rows for the exact configuration with the `inferencex` skill (latest run per config, correct ISL/OSL/trace, P90 interactivity, tok/s/GPU, input/output split, cache hit rate, avg power).
 2. Interpolate the operating point on the upper-left Pareto frontier with the Steffen monotone cubic Hermite spline, never linear. Use `.claude/skills/write-inferencex-blog/iso_interactivity.py`; it is the Python port of `packages/app/src/components/calculator/profit-estimator.ts` and the chart code, and it refuses to extrapolate.
 3. Apply the estimator formulas (`profit-estimator.ts`):
    - GPU-hours per GW-year = 1,000,000 kW / all-in kW per GPU x 8,760 h (`gpuHoursPerGwYear`). All-in kW comes from the TCO model (2.09 kW for MI355X), not the board TDP.

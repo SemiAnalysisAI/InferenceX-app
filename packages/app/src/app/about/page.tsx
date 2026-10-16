@@ -117,9 +117,7 @@ export default function AboutPage() {
                 <div>
                   <strong className="text-foreground">Artifacts uploaded.</strong> Request
                   latencies, token counts, chip power telemetry, and evaluation samples are attached
-                  to the run page. GitHub Actions retains them for 90 days, and a weekly snapshot of
-                  the full benchmark database is published as a public GitHub Release for longer
-                  auditability.
+                  to the run page. GitHub Actions retains them for 90 days.
                 </div>
               </li>
               <li className="flex gap-3">
@@ -150,14 +148,6 @@ export default function AboutPage() {
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 View benchmark recipes
-              </Link>
-              <Link
-                href="https://github.com/SemiAnalysisAI/InferenceX-app/releases?q=db-dump"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
-              >
-                Weekly DB dumps
               </Link>
               <Link
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`}

@@ -113,9 +113,7 @@ export default function AboutPageZh() {
                 </span>
                 <div>
                   <strong className="text-foreground">上传产物。</strong> 请求延迟、token 计数、芯片
-                  功耗遥测数据和评估样本均附加到运行页面。GitHub Actions 保留这些产物 90
-                  天，同时每周发布完整基准测试数据库的快照作为公开的 GitHub
-                  Release，以实现更长期的可审计性。
+                  功耗遥测数据和评估样本均附加到运行页面。GitHub Actions 保留这些产物 90 天。
                 </div>
               </li>
               <li className="flex gap-3">
@@ -145,14 +143,6 @@ export default function AboutPageZh() {
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
               >
                 查看测试配置
-              </Link>
-              <Link
-                href="https://github.com/SemiAnalysisAI/InferenceX-app/releases?q=db-dump"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
-              >
-                每周数据库快照
               </Link>
               <Link
                 href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`}
