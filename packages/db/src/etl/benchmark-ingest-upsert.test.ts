@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { bulkIngestBenchmarkRows, type BenchmarkPersistenceInput } from './benchmark-ingest';
+import { persistPreparedTraceReplay, prepareTraceReplay } from './trace-replay-ingest';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -61,6 +62,43 @@ async function ingest(...rows: BenchmarkPersistenceInput[]) {
   );
   return stored.rows.map((r) => r.power_audit);
 }
+
+it.each([false, true])(
+  'keeps metrics and trace in the caller transaction (rollback=%s)',
+  async (rollback) => {
+    await sql`delete from agentic_trace_replay`;
+    await ingest(row({ metrics: { output_tput_tps: 0 } }));
+    const [{ id }] = await sql<{ id: number }[]>`select id from benchmark_results`;
+    const prepared = {
+      ...(await prepareTraceReplay(null, null)),
+      serverMetricsCsv: Buffer.from('trace,csv'),
+    };
+    const operation = sql.begin(async (tx) => {
+      await tx`update benchmark_results set metrics = '{"output_tput_tps":42}'::jsonb where id = ${id}`;
+      await persistPreparedTraceReplay(tx, [id], prepared);
+      if (rollback) throw new Error('abort recovery');
+    });
+    await (rollback ? expect(operation).rejects.toThrow('abort recovery') : operation);
+    const [stored] = await sql<
+      { metrics: Record<string, number>; trace_replay_id: number | null }[]
+    >`
+    select metrics, trace_replay_id from benchmark_results where id = ${id}
+  `;
+    const traces = await sql<
+      { server_metrics_csv: Buffer }[]
+    >`select server_metrics_csv from agentic_trace_replay`;
+    expect(stored.metrics.output_tput_tps).toBe(rollback ? 0 : 42);
+    if (rollback) {
+      expect(stored.trace_replay_id).toBeNull();
+      expect(traces).toHaveLength(0);
+    } else {
+      expect(stored.trace_replay_id).not.toBeNull();
+      expect(traces.map((trace) => Buffer.from(trace.server_metrics_csv).toString())).toEqual([
+        'trace,csv',
+      ]);
+    }
+  },
+);
 
 /**
  * AgentX provenance is derived from the telemetry bundle and attached to the
