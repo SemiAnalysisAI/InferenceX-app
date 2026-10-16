@@ -27,6 +27,7 @@ import {
   avoidPointLabelCollisions,
   parallelismLabelBoxes,
   placeLineLabels,
+  relayoutLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
@@ -2925,6 +2926,9 @@ const ScatterGraph = React.memo(
               anchors: lineLabelAnchorRef.current,
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
+              // Name each curve at its own peak, where the frontiers are
+              // furthest apart, rather than where they converge.
+              preferPeak: true,
             });
 
             // Keep hidden data-join entries for precision/date curves that lost
@@ -3232,6 +3236,7 @@ const ScatterGraph = React.memo(
               anchors: lineLabelAnchorRef.current,
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(zoomGroup.node()),
+              preferPeak: true,
             });
             updateRenderedLineLabels(zoomGroup, zoomLabels);
           }
@@ -3695,7 +3700,7 @@ const ScatterGraph = React.memo(
 
       // Annotations/colors resolve through the interaction ref so visibility
       // toggles can redraw this layer without recreating the chart.
-      const knownIssueLayer = createKnownIssueLayer(() => {
+      const knownIssueCallouts = createKnownIssueLayer(() => {
         const current = interactionRef.current;
         return {
           chartId,
@@ -3711,6 +3716,27 @@ const ScatterGraph = React.memo(
             }),
         };
       });
+
+      // The callouts draw after the run-name labels, so once they are on the
+      // plot, move any label they cover (a name at a curve's peak sits near
+      // the top, where the callouts stack).
+      const afterCallouts =
+        <C,>(
+          hook:
+            | ((zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: C) => unknown)
+            | null
+            | undefined,
+        ) =>
+        (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: C): void => {
+          hook?.(zoomGroup, ctx);
+          relayoutLineLabels(zoomGroup);
+        };
+      const knownIssueLayer: CustomLayerConfig = {
+        ...knownIssueCallouts,
+        render: afterCallouts(knownIssueCallouts.render),
+        onZoom: afterCallouts(knownIssueCallouts.onZoom),
+        onDisplayUpdate: afterCallouts(knownIssueCallouts.onDisplayUpdate),
+      };
 
       // ── Perf ruler (opt-in iso-x measurement between two curves) ──
       // Mode and measurement are read through refs, so this layer needs
