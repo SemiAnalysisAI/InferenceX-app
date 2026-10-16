@@ -19,7 +19,7 @@ import {
   splitCsvLine,
   type GpuMetricSample,
   type GpuMetricsVendor,
-} from './gpu-metrics-csv.js';
+} from './gpu-metrics-csv';
 
 export interface MultinodePowerHost {
   hostname: string;

@@ -10,11 +10,12 @@ const rows: GpuMetricRow[] = [
 ];
 
 describe('shared telemetry chart preparation', () => {
-  it('keeps the whole-series time origin when a chip is hidden and skips missing readings', () => {
+  it('keeps the whole-series time origin and missing-reading gaps when a chip is hidden', () => {
     const { t0Ms, groups } = buildTelemetryData(rows, new Set([1]), 'temperature');
     expect(t0Ms).toBe(Date.parse(rows[0].timestamp));
     expect(groups.get(1)?.map(({ seconds, ms, value }) => ({ seconds, ms, value }))).toEqual([
       { seconds: 2, ms: t0Ms + 2000, value: 40 },
+      { seconds: 3, ms: t0Ms + 3000, value: NaN },
       { seconds: 4, ms: t0Ms + 4000, value: 0 },
     ]);
     expect(groups.has(0)).toBe(false);
@@ -22,6 +23,10 @@ describe('shared telemetry chart preparation', () => {
       { seconds: 2, value: 40, gpuIndex: 1, raw: rows[1] },
       { seconds: 4, value: 0, gpuIndex: 1, raw: rows[3] },
     ]);
+  });
+
+  it('keeps entirely missing metrics out of the serialized view', () => {
+    expect(buildGroupedData(rows, new Set([0]), 'temperature').size).toBe(0);
   });
 
   it('omits unsampled correlation metrics while retaining measured zeros', () => {

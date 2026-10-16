@@ -97,6 +97,53 @@ describe('PowerX telemetry interactions', () => {
     registerAnalyticsClient({ capture: cy.stub().as('capture') });
   });
 
+  for (const [locale, width, label] of [
+    ['en', 1280, 'Temperature'],
+    ['zh', 390, '温度'],
+  ] as const) {
+    it(`renders Celsius gaps on the ${locale} point chart`, () => {
+      cy.viewport(width, 900);
+      const native = {
+        ...payload,
+        series: [
+          {
+            ...payload.series[0],
+            sampleCount: 3,
+            gpuCount: 1,
+            data: [
+              { timestamp: '2026-09-21T00:00:00Z', index: 0, power: 400, temperature: 65.5 },
+              { timestamp: '2026-09-21T00:00:01Z', index: 0, power: 410 },
+              { timestamp: '2026-09-21T00:00:02Z', index: 0, power: 420, temperature: 0 },
+            ],
+          },
+        ],
+      };
+      cy.intercept('GET', endpoint, { body: native });
+      mountPoint(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/${ID}`);
+      cy.get('[data-testid="power-telemetry-metric-select"]').click();
+      cy.get('[role="option"]').contains(label).click();
+      cy.get(chart).find('svg').should('contain.text', `${label} (°C)`);
+      cy.get(chart).find('svg .point').should('have.length', 2);
+      cy.get(chart)
+        .find('svg .line-0')
+        .should(($paths) => {
+          expect($paths).to.have.length(1);
+          const path = $paths.attr('d')!;
+          expect(path.match(/M/g)).to.have.length(2);
+          expect(path).not.to.match(/[LC]|NaN/u);
+        });
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
+      cy.get(chart).find('svg .point').should('have.length', 2);
+      cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
+        expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
+      });
+      cy.get('[data-testid="power-telemetry-view"]').screenshot(
+        `native-temperature-${locale}-${width}`,
+      );
+    });
+  }
+
   it('changes display, window and chip aggregation independently and tracks each action', () => {
     cy.mount(<Controls />);
     cy.get('[data-testid="display-mode-points"]').click();

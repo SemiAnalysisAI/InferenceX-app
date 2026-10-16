@@ -695,6 +695,9 @@ readings stay absent. `sm_active` is a distinct measurement with no stored field
 is not treated as GPU utilization.
 
 Run reads use the database when the run has stored telemetry, otherwise GitHub.
+The live GitHub read uses native `power_audit_` samples when no matching
+`gpu_metrics_` CSV exists; missing temperatures stay unavailable and GPU indices
+remain host-local.
 Stored responses report `coverage.status` as `complete`, `partial`, or `unknown`,
 with `missingArtifacts` naming absent artifacts from the retained run inventory.
 Missing files or mismatched sample-count metadata also make coverage partial.

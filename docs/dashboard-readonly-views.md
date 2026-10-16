@@ -186,6 +186,11 @@ missing artifacts; it may be empty when only a file is incomplete. GitHub `cover
 `null` (unassessed). The public view returns private, no-store responses and preserves
 upstream 503 failures.
 
+GPU telemetry lines retain gaps at explicitly missing metric readings, including
+rolling averages and chip means with no contributors. Gap markers are internal
+renderer state: the API still returns measured chart points only, while `rows`
+preserves timestamps with unavailable fields. Statistics and raw data are unchanged.
+
 Run-specific recognition labels are also presentation-only. Runs `35879254139`
 and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
