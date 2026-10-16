@@ -5,6 +5,24 @@ The implementation reuses the existing @semianalysisai/inferencex-skills package
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
 registry.test.ts, including hidden and feature-gated routes.
 
+## Replay presentation controls
+
+The inference chart's Export → MP4 dialog replays the existing historical rows.
+For a two-curve comparison, retain those two series in its shared chart legend.
+The bottom date rail, snapshot seek control, playback speed, and fixed-axis switch
+are presentation-only: they add no API selector or data calculation. The rail uses
+elapsed UTC calendar days, and appears in exported videos as well as the dialog.
+Intermediate frames are explicitly illustrative interpolations, not new measurements.
+Configurations appear only at their first observation and carry forward afterward.
+Keyboard arrows seek observed dates; reduced-motion playback steps between snapshots.
+The history-backed replay does not invent historical snapshots for unofficial-run
+overlays, which are not part of the historical API response.
+
+Coverage: replay frame unit tests verify irregular date spacing and no future
+configuration leakage; the replay browser spec checks seek/reset, calendar tick
+positions, and the rail's inclusion in the export capture. Raw historical reads remain
+`/api/v1/benchmarks/history`; no OpenAPI or route-catalog contract changes are needed.
+
 ## Static editorial content
 
 `/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and

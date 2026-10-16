@@ -6,7 +6,9 @@ import type { ReplayTimeline } from '../buildReplayTimeline';
 import {
   FRACTION_COMMIT_QUANTUM,
   buildFrameData,
+  calendarStepAtFraction,
   dateAtFraction,
+  fractionAtDateIndex,
   shouldCommitFraction,
   spanMs,
   stepFloatAtFraction,
@@ -42,10 +44,7 @@ function makeTimeline(): ReplayTimeline {
         hwKey: 'h100',
         precision: 'fp8',
         template: { ...baseTemplate, hwKey: 'h100', date: '2025-08-20' } as InferenceData,
-        // Stays invisible across the first two steps so a true "omits invisible
-        // configs" assertion is meaningful — `interpolateAtStep` pops a config
-        // in for the *whole* invisible→visible segment, so we need both
-        // bracketing steps invisible for the config to actually be skipped.
+        // A new configuration must remain absent until its first observed date.
         stepValues: [
           { visible: false, x: 0, y: 0 },
           { visible: false, x: 0, y: 0 },
@@ -88,6 +87,41 @@ describe('stepFloatAtFraction', () => {
   it('clamps out-of-range fractions', () => {
     expect(stepFloatAtFraction(-1, 3)).toBe(0);
     expect(stepFloatAtFraction(2, 3)).toBe(2);
+  });
+});
+
+describe('calendar replay positions', () => {
+  const dates = ['2026-08-12', '2026-08-13', '2026-08-22'];
+
+  it('spaces dates by elapsed days, not snapshot count', () => {
+    expect(fractionAtDateIndex(dates, 0)).toBe(0);
+    expect(fractionAtDateIndex(dates, 1)).toBe(0.1);
+    expect(fractionAtDateIndex(dates, 2)).toBe(1);
+    expect(calendarStepAtFraction(dates, 0.1)).toBe(1);
+    expect(calendarStepAtFraction(dates, 0.55)).toBeCloseTo(1.5);
+  });
+
+  it('round-trips every observed date through the playback clock', () => {
+    for (let i = 0; i < dates.length; i++) {
+      expect(calendarStepAtFraction(dates, fractionAtDateIndex(dates, i))).toBe(i);
+    }
+    expect(calendarStepAtFraction([], 0.5)).toBe(0);
+    expect(calendarStepAtFraction([dates[0]], 0.5)).toBe(0);
+    expect(fractionAtDateIndex([], 1)).toBe(0);
+    expect(calendarStepAtFraction(dates, -1)).toBe(0);
+    expect(calendarStepAtFraction(dates, 2)).toBe(2);
+  });
+
+  it('keeps the label, morph and future-configuration visibility on the same calendar clock', () => {
+    const timeline = { ...makeTimeline(), dates };
+    expect(dateAtFraction(timeline, 0.1)).toBe(dates[1]);
+    const middle = buildFrameData(timeline, 0.55);
+    expect(middle).toHaveLength(1);
+    expect(middle[0].x).toBeCloseTo(15);
+    expect(middle[0].y).toBeCloseTo(250);
+    expect(middle[0].date).toBe(dates[1]);
+    expect(buildFrameData(timeline, 0.999).some((point) => point.hwKey === 'h100')).toBe(false);
+    expect(buildFrameData(timeline, 1)).toHaveLength(2);
   });
 });
 
@@ -215,7 +249,7 @@ describe('buildFrameData', () => {
   it('emits one InferenceData per visible config at the given fraction', () => {
     const t = makeTimeline();
     const out = buildFrameData(t, 0);
-    // At fraction 0 only config "a" is visible (config "b" pops in at step 1).
+    // At fraction 0 only config "a" is visible (config "b" first appears at step 2).
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ hwKey: 'b200', x: 0, y: 100 });
   });
