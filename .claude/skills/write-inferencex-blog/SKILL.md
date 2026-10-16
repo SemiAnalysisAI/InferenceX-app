@@ -25,16 +25,16 @@ If the user gives you only the chart, ask for the CSV — the chart is for the f
 
 ## Step 1: Verify the numbers
 
-When chart, CSV, and the InferenceX data dump disagree, use this priority:
+When the chart, the CSV and the InferenceX public API disagree, use this priority:
 
 1. **CSV the user pasted in chat** — they exported it from the dashboard, it matches whatever they saw
 2. **Chart image the user shared** — read points off the curves visually; use it only when no CSV is available
-3. **InferenceX data dump** (via the `inferencex-data` skill) — useful for sanity-check and for fields not in the CSV (TPOT, run IDs, image tags), but the dump can lag the chart by a week or more
+3. **InferenceX public API** (via the `inferencex` skill) is useful as a sanity check and for fields not in the CSV (TPOT, run IDs, image tags).
 
 Common gotchas:
 
 - **Workload mismatch**: chart headers can mislead. Verify ISL/OSL from the data itself — 1k/1k and 8k/1k give wildly different `tok/s/GPU` and `$/M tokens` numbers. The blog title, lede, tables, and chart caption must all use the same ISL/OSL.
-- **Latest run only**: filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`. See the `inferencex-data` skill for the exact filter.
+- **Latest run only**: `/api/v1/benchmarks` already returns the latest result per point. When you work from history, filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`.
 - **Model spec verification**: never invent parameter counts. Always `WebSearch` the model's released specs (total params, active params, expert count, attention type) before writing the architecture paragraph. Cite sources. GLM-5 is _not_ GLM-4.5 — the numbers changed.
 - **TCO values**: pull from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/). Current values (verify if older than a quarter):
   - H100 $1.30, H200 $1.41, B200 $1.95, B300 $2.34, GB200 $2.21, GB300 $2.652

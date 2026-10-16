@@ -26,9 +26,6 @@ const STRINGS = {
     openRecipesTitle: 'Open recipes',
     openRecipesDesc:
       'Every model, framework, precision, and parallelism setting is committed to the public repo as a shell script.',
-    dbSnapshotsTitle: 'Weekly DB snapshots',
-    dbSnapshotsDesc:
-      'The full benchmark database is published as a public GitHub Release every week so the historical dataset stays auditable.',
     browseSubmissions: 'Browse submissions',
     viewRuns: 'View benchmark runs on GitHub Actions',
     howItWorks: 'How it works',
@@ -47,9 +44,6 @@ const STRINGS = {
     actionsRunsDesc: '每次基准测试都通过 GitHub Actions 执行，运行期间即可查看完整日志。',
     openRecipesTitle: '公开测试配置',
     openRecipesDesc: '每个模型、框架、精度和并行配置都以 shell 脚本形式保存在公开仓库中。',
-    dbSnapshotsTitle: '每周数据库快照',
-    dbSnapshotsDesc:
-      '完整的基准测试数据库每周都会作为公开的 GitHub Release 发布，方便任何人核查历史数据。',
     browseSubmissions: '浏览提交记录',
     viewRuns: '查看 GitHub Actions 运行记录',
     howItWorks: '了解复现流程',
@@ -104,7 +98,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
                 </span>{' '}
                 {t.reproStatTail}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <Reveal delayMs={100} className="rounded-md border border-border bg-card p-3">
                   <div className="text-sm font-semibold text-foreground">{t.actionsRunsTitle}</div>
                   <div className="text-xs text-muted-foreground mt-1">{t.actionsRunsDesc}</div>
@@ -112,10 +106,6 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
                 <Reveal delayMs={170} className="rounded-md border border-border bg-card p-3">
                   <div className="text-sm font-semibold text-foreground">{t.openRecipesTitle}</div>
                   <div className="text-xs text-muted-foreground mt-1">{t.openRecipesDesc}</div>
-                </Reveal>
-                <Reveal delayMs={240} className="rounded-md border border-border bg-card p-3">
-                  <div className="text-sm font-semibold text-foreground">{t.dbSnapshotsTitle}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{t.dbSnapshotsDesc}</div>
                 </Reveal>
               </div>
               <div className="flex flex-wrap gap-3 text-sm">
