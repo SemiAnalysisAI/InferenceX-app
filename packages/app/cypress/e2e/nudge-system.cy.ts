@@ -6,6 +6,8 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
+import { interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -142,6 +144,7 @@ function showLaunchModal(win: Cypress.AUTWindow) {
 
 describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
   it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
+    interceptTpuLaunchData();
     cy.visit('/', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -192,6 +195,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   });
 
   it('localizes the modal and keeps the Chinese route tree', () => {
+    interceptTpuLaunchData();
     cy.visit('/zh', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -235,6 +239,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
+    interceptTpuLaunchData();
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });

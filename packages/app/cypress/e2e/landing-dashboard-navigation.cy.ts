@@ -17,6 +17,7 @@
  */
 
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
+import { interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
 
 // The landing Rubin card links to MiniMax M3; reuse the synthetic Rubin curve under its DB key.
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
@@ -196,6 +197,7 @@ describe('landing model curation', () => {
     });
 
     it(`opens the Qwen3.5 AgentX TPU view from ${prefix || '/'} and retains it on reload`, () => {
+      interceptTpuLaunchData();
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
@@ -258,6 +260,7 @@ describe('landing model curation', () => {
           })),
       ];
       interceptMinimaxM3RubinData(rubinRows);
+      interceptTpuLaunchData();
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       assertTpuView();
