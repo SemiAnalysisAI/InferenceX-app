@@ -1,3 +1,4 @@
+import { gzipSync, gunzipSync } from 'node:zlib';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock next/cache before importing the module under test
@@ -16,7 +17,7 @@ vi.mock('./blob-cache', () => ({
   blobPurge: vi.fn(),
 }));
 
-import { cachedQuery, purgeAll, purgeCollectiveX, cachedJson } from './api-cache';
+import { cachedQuery, purgeAll, purgeCollectiveX, cachedJson, cachedGzipJson } from './api-cache';
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { blobGet, blobSet, blobPurge } from './blob-cache';
 
@@ -330,5 +331,51 @@ describe('cachedJson', () => {
     const decompressed = res.body!.pipeThrough(new DecompressionStream('gzip'));
     const text = await new Response(decompressed).text();
     expect(JSON.parse(text)).toEqual(data);
+  });
+});
+
+describe('cachedGzipJson', () => {
+  it('preserves complete gzip bytes and the existing CDN headers', async () => {
+    const data = { requests: [{ cid: 'trace-é', cancelled: false, ttftMs: null }] };
+    const gzip = gzipSync(JSON.stringify(data));
+    async function* chunks() {
+      yield gzip.subarray(0, 13);
+      yield gzip.subarray(13);
+    }
+    const response = cachedGzipJson(chunks());
+    expect(Object.fromEntries(response.headers)).toEqual(
+      Object.fromEntries(cachedJson(data).headers),
+    );
+    const received = Buffer.from(await response.arrayBuffer());
+    expect(received.equals(gzip)).toBe(true);
+    expect(JSON.parse(gunzipSync(received).toString())).toEqual(data);
+    expect(mockBlobGet).not.toHaveBeenCalled();
+    expect(mockBlobSet).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch ahead and stops fetching after cancellation', async () => {
+    const next = vi.fn().mockResolvedValue({ done: false, value: new Uint8Array([1]) });
+    const cleanup = vi.fn().mockResolvedValue({ done: true });
+    const response = cachedGzipJson({ [Symbol.asyncIterator]: () => ({ next, return: cleanup }) });
+    await Promise.resolve();
+    expect(next).not.toHaveBeenCalled();
+    const reader = response.body!.getReader();
+    await reader.read();
+    expect(next).toHaveBeenCalledTimes(1);
+    await reader.cancel();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails the response stream rather than silently truncating on read errors', async () => {
+    const cleanup = vi.fn().mockResolvedValue({ done: true });
+    const response = cachedGzipJson({
+      [Symbol.asyncIterator]: () => ({
+        next: () => Promise.reject(new Error('chunk failed')),
+        return: cleanup,
+      }),
+    });
+    await expect(response.arrayBuffer()).rejects.toThrow('chunk failed');
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

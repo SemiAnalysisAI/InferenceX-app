@@ -268,3 +268,36 @@ export function cachedJson<T>(
 export function purgeOperatorX(): void {
   revalidateTag(operatorXCacheTag(), { expire: 0 });
 }
+
+/** Serve existing gzip bytes with the same CDN contract, pulling only on demand. */
+export function cachedGzipJson(chunks: AsyncIterable<Uint8Array>): Response {
+  const iterator = chunks[Symbol.asyncIterator]();
+  let cancelled = false;
+  const body = new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        try {
+          const next = await iterator.next();
+          if (cancelled) return;
+          if (next.done) controller.close();
+          else controller.enqueue(next.value);
+        } catch (error) {
+          if (!cancelled) controller.error(error);
+          await iterator.return?.();
+        }
+      },
+      async cancel() {
+        cancelled = true;
+        await iterator.return?.();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Encoding': 'gzip',
+      ...cdnHeaders(),
+    },
+  });
+}

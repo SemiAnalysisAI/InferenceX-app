@@ -98,6 +98,49 @@ export async function readRequestTimelineGz(
 }
 
 /**
+ * Stream the exact stored JSON gzip without expanding the full request array.
+ * Return null for legacy/stale rows so callers retain the existing fallback.
+ */
+export async function getStoredRequestTimelineGz(
+  sql: DbClient,
+  benchmarkResultId: number,
+  sliceBytes = 1024 * 1024,
+): Promise<AsyncGenerator<Buffer> | null> {
+  if (!Number.isSafeInteger(sliceBytes) || sliceBytes <= 0) {
+    throw new Error('Invalid timeline slice size');
+  }
+  const [row] = await sql`
+    select atr.id as trace_replay_id, octet_length(atr.request_timeline_gz) as gz_bytes
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = ${benchmarkResultId}
+      and atr.request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+      and atr.request_timeline_gz is not null
+  `;
+  if (!row) return null;
+  const size = Number(row.gz_bytes);
+  if (!Number.isSafeInteger(size) || size <= 0) throw new Error('Invalid stored timeline size');
+  const traceReplayId = Number(row.trace_replay_id);
+  return (async function* () {
+    for (let offset = 0; offset < size; offset += sliceBytes) {
+      const length = Math.min(sliceBytes, size - offset);
+      const [part] = await sql`
+        select substring(request_timeline_gz from ${offset + 1}::int for ${length}::int) as slice
+        from agentic_trace_replay
+        where id = ${traceReplayId}
+          and request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+          and octet_length(request_timeline_gz) = ${size}
+      `;
+      const bytes = part?.slice;
+      if (!(bytes instanceof Uint8Array) || bytes.length !== length) {
+        throw new Error(`Stored timeline changed or ended at byte ${offset} of ${size}`);
+      }
+      yield Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+  })();
+}
+
+/**
  * Yield a legacy `request_timeline` JSONB as text in bounded chunks. Throws
  * when the timeline is missing or longer than the chunk limit.
  */
