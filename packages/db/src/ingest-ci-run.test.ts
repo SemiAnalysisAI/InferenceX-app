@@ -119,3 +119,69 @@ describe('database write receipt on a failed ingest', () => {
     }
   });
 });
+
+function ingest(rows: unknown[]) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agentx-cli-'));
+  const artifact = path.join(dir, 'bmk_agentic_point');
+  fs.mkdirSync(artifact);
+  fs.writeFileSync(path.join(artifact, 'agg.json'), JSON.stringify(rows));
+  const result = spawnSync(
+    'bun',
+    [
+      '--preload',
+      fileURLToPath(new URL('etl/fixtures/ingest-cli-preload.mjs', import.meta.url)),
+      fileURLToPath(new URL('ingest-ci-run.ts', import.meta.url)),
+    ],
+    {
+      cwd: dir,
+      env: {
+        PATH: process.env.PATH,
+        NODE_ENV: 'test',
+        DATABASE_WRITE_URL: 'postgres://unused:unused@127.0.0.1:1/unused',
+        GITHUB_TOKEN: 'unused',
+        INGEST_RUN_ID: '123',
+        INGEST_RUN_ATTEMPT: '1',
+        INGEST_ARTIFACTS_PATH: dir,
+        INGEST_REPO: 'SemiAnalysisAI/InferenceX',
+        POWER_PUBLICATION_MANIFEST: path.join(dir, 'publication.json'),
+      },
+      encoding: 'utf8',
+      timeout: 20_000,
+    },
+  );
+  return { dir, result };
+}
+
+describe('AgentX retry ingest command', () => {
+  const golden = JSON.parse(
+    fs.readFileSync(
+      new URL('etl/fixtures/powerx-manifest-v2/bmk_agentic_golden/agg.json', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  it.each([false, true])(
+    'preserves a failed attempt warning with winner=%s',
+    (withWinner) => {
+      const { dir, result } = ingest([
+        {
+          ...golden,
+          benchmark_outcome: { status: 'failed', attempt_id: 'failure', finalized: false },
+        },
+        ...(withWinner ? [golden] : []),
+      ]);
+      try {
+        expect(result.status, result.stderr).toBe(0);
+        const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'publication.json'), 'utf8'));
+        expect(manifest.ingestErrors).toEqual([]);
+        expect(manifest.publicationWarnings).toEqual([
+          'Known-failed agentic result excluded: bmk_agentic_point/agg.json',
+        ]);
+        expect(manifest.points).toHaveLength(withWinner ? 1 : 0);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
+});

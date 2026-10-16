@@ -10,6 +10,7 @@ import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './serv
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 import { capServerLogText, maxServerLogFileBytes } from './server-log-limits';
+import { TRACE_DERIVED_METRIC_KEYS } from './trace-replay-ingest';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -129,7 +130,15 @@ export async function bulkIngestBenchmarkRows(
       -- upsert from the aggregated results_bmk artifact would silently wipe it.
       metrics = excluded.metrics || jsonb_strip_nulls(
         jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
-      ),
+      ) || case
+        when excluded.benchmark_type = 'agentic_traces' and benchmark_results.trace_replay_id is not null
+        then coalesce((
+          select jsonb_object_agg(key, value) from jsonb_each(benchmark_results.metrics)
+          where key = any(${sql.array(TRACE_DERIVED_METRIC_KEYS)}::text[])
+            and not (excluded.metrics ? key)
+        ), '{}'::jsonb)
+        else '{}'::jsonb
+      end,
       image = excluded.image,
       workers = excluded.workers,
       -- Like workers, the fresh artifact is authoritative for provenance: a

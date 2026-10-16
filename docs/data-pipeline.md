@@ -51,6 +51,21 @@ concurrency, offload mode, and the nullable recipe fingerprint), not surrogate k
 
 ### AgentX Curve Replacement Scope
 
+AgentX ingestion selects one measurement per complete point identity across the
+whole run before metric or attachment writes. Identical raw copies collapse to
+their per-job source when available; a unique legacy measurement remains valid.
+Explicit failed outcomes are excluded from selection and retained as publication
+warnings. New attempt outcomes require a nonempty attempt ID and a boolean
+finalization field; passed attempts must be finalized. Malformed outcomes are
+refused, and two different eligible measurements fail ingestion. Passed status does not outrank
+conflicting legacy content. Different recipe fingerprints remain separate points.
+The raw reader's rows and file hashes remain unchanged for PowerX verification.
+
+Selection logs include source hashes and the winner. Ordinary AgentX upserts
+preserve missing trace-owned metric fields only while a trace link exists;
+fresh artifact values remain authoritative. Historical conflicting artifacts
+require a separate explicit recovery; ordinary ingestion has no run-specific exceptions.
+
 For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
 and workload (benchmark type and sequence lengths). AGG/disagg, parallelism,
 speculative decoding, offload mode, and recipe fingerprint describe individual

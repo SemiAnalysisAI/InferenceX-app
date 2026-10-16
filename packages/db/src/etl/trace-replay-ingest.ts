@@ -16,10 +16,24 @@ import type postgres from 'postgres';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
-import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
+import {
+  FULL_RESPONSE_STAT_KEYS,
+  fullResponseMetricsFromGzip,
+} from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
+
+export const TRACE_DERIVED_METRIC_KEYS = [
+  'server_gpu_cache_hit_rate',
+  'server_cpu_cache_hit_rate',
+  ...[...FULL_RESPONSE_STAT_KEYS, 'std'].flatMap((statistic) => [
+    `${statistic}_full_response_itl`,
+    `${statistic}_full_response_intvty`,
+    `${statistic}_itl`,
+    `${statistic}_intvty`,
+  ]),
+];
 
 export type TraceReplayInput = Buffer | string | null;
 
