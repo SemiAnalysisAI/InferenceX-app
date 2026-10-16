@@ -99,10 +99,19 @@ interface HistoryWrite {
   pathname: string;
 }
 
-// The TPU card opens the bare Qwen3.5 page so it lands on the AgentX defaults.
+const TPU_RESULTS_HREF =
+  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+
 function assertTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-  cy.location('search').should('not.contain', 'i_seq=');
+  cy.get('[data-testid="scenario-selector"]')
+    .invoke('text')
+    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="precision-multiselect"]')
+    .should('contain.text', 'FP8')
+    .and('not.contain.text', 'FP4');
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
+  cy.location('search').should('contain', 'i_prec=fp8');
   cy.location('search').should('not.contain', 'i_spec=');
 }
 
@@ -138,7 +147,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
           .and('contain.text', 'Qwen3.5 · AgentX')
-          .and('have.attr', 'href', `${prefix}/inference/qwen-3-5`);
+          .and('have.attr', 'href', `${prefix}${TPU_RESULTS_HREF}`);
         cy.get('[data-new-badge="landing-tpu"]')
           .should('contain.text', prefix ? '新' : 'NEW')
           .and('have.class', 'new-badge-flash');
