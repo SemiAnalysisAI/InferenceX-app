@@ -6,6 +6,7 @@ import {
   getModelLabel,
   getOpenRouterModelId,
   MODEL_OPTIONS,
+  SEQUENCE_OPTIONS,
   getModelExclusion,
   getSequenceDefaultExclusionGroup,
   getSequenceExclusion,
@@ -389,8 +390,13 @@ describe('getModelLabel', () => {
 });
 
 describe('getOpenRouterModelId', () => {
-  it('maps every selectable dashboard model to an exact OpenRouter catalog id', () => {
+  it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
+      if (model === Model.Muse_Spark_Open) {
+        // Do not substitute the hosted Spark model for Spark Open.
+        expect(getOpenRouterModelId(model)).toBeNull();
+        continue;
+      }
       expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
     }
     expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
@@ -451,6 +457,13 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
+  it('only offers AgentX for Muse Spark Open', () => {
+    expect(
+      SEQUENCE_OPTIONS.filter(
+        (sequence) => !isSequenceHiddenForModel(Model.Muse_Spark_Open, sequence),
+      ),
+    ).toEqual([Sequence.AgenticTraces]);
+  });
   it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);

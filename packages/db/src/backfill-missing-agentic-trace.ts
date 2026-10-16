@@ -1,3 +1,4 @@
+import { readTraceProfileChunks } from './lib/trace-profile-storage';
 import { createHash } from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { createAdminSql } from './etl/db-utils.js';
@@ -81,8 +82,16 @@ async function main(): Promise<void> {
   prepared.fullResponseMetrics = {};
   prepared.atomKvCacheBlocks = null;
   await persistPreparedTraceReplay(sql, [row.id], prepared);
-  const [after] = await sql<{ fingerprint: string; profile_hash: string; server_hash: string }[]>`
-    select md5((to_jsonb(br)-'trace_replay_id')::text) as fingerprint,
+  const [after] = await sql<
+    {
+      fingerprint: string;
+      profile_hash: string | null;
+      server_hash: string;
+      trace_id: number;
+      chunk_count: number;
+    }[]
+  >`
+    select md5((to_jsonb(br)-'trace_replay_id')::text) as fingerprint, a.id as trace_id, a.profile_export_chunk_count as chunk_count,
       md5(a.profile_export_jsonl_gz) as profile_hash, md5(a.server_metrics_json_gz) as server_hash
     from benchmark_results br join agentic_trace_replay a on a.id=br.trace_replay_id
     where br.id=${row.id}
@@ -90,10 +99,16 @@ async function main(): Promise<void> {
   if (
     !after ||
     after.fingerprint !== row.fingerprint ||
-    after.profile_hash !== hash(prepared.profileGz!) ||
+    (after.chunk_count === 0 && after.profile_hash !== hash(prepared.profileGz!)) ||
     after.server_hash !== hash(prepared.serverMetricsJsonGz!)
   ) {
     throw new Error('Recovered trace failed source/benchmark integrity verification');
+  }
+  if (after.chunk_count > 0) {
+    const digest = createHash('md5');
+    for await (const chunk of readTraceProfileChunks(sql, after.trace_id)) digest.update(chunk);
+    if (digest.digest('hex') !== hash(prepared.profileGz!))
+      throw new Error('Recovered chunked profile differs from source');
   }
   console.log(
     `PASS: restored point ${row.id} from artifact ${recovery.artifactId}; benchmark fields unchanged`,

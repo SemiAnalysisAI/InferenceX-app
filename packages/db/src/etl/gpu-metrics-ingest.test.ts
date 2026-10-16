@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { computeGpuMetricStats } from './gpu-metrics-csv';
 import {
+  gpuMetricsArtifactHoldsTelemetry,
   ingestGpuMetricsArtifact,
   prepareGpuMetricsArtifact,
   type GpuMetricsIngestResult,
@@ -120,6 +121,35 @@ function writePowerAuditArtifact(
   fs.writeFileSync(path.join(artifactDir, 'agg_kimik3_conc8.json'), '{}');
   return { artifactName, artifactDir };
 }
+
+describe('gpuMetricsArtifactHoldsTelemetry', () => {
+  function sidecarOnlyArtifact() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
+    roots.push(root);
+    const artifactName = 'power_audit_dsv41flash_conc4096_gb300';
+    const artifactDir = path.join(root, artifactName);
+    fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
+    fs.writeFileSync(path.join(artifactDir, 'power_audit.json'), '{}');
+    fs.writeFileSync(path.join(artifactDir, 'gpu_metrics_identity.csv'), 'gpu_index,uuid\n');
+    fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'manifest.json'), '{}');
+    return { artifactName, artifactDir };
+  }
+
+  it('is false when the artifact holds only sidecars', () => {
+    expect(gpuMetricsArtifactHoldsTelemetry(sidecarOnlyArtifact())).toBe(false);
+  });
+
+  it('is true for a GPU metrics CSV, even an unparseable one', () => {
+    const artifact = sidecarOnlyArtifact();
+    fs.writeFileSync(path.join(artifact.artifactDir, 'gpu_metrics.csv'), 'not,a,metrics,csv\n');
+    expect(gpuMetricsArtifactHoldsTelemetry(artifact)).toBe(true);
+    expect(prepareGpuMetricsArtifact(artifact)).toEqual([]);
+  });
+
+  it('is true for multinode power samples', () => {
+    expect(gpuMetricsArtifactHoldsTelemetry(writePowerAuditArtifact())).toBe(true);
+  });
+});
 
 describe('prepareGpuMetricsArtifact', () => {
   it('falls back to the multinode power bundle, one power-only series per host', () => {
@@ -314,6 +344,44 @@ describe('ingestGpuMetricsArtifact', () => {
       benchmarkResultIds: [10],
     });
     expect(replay.samplesInserted).toBe(0);
+  });
+
+  it("replaces a retried point's links with the latest copy's series", async () => {
+    const older = writeArtifact(NVIDIA_CSV);
+    const retry = writeArtifact(NVIDIA_CSV);
+    const newer = {
+      artifactName: `${retry.artifactName}_retry`,
+      artifactDir: `${retry.artifactDir}_retry`,
+    };
+    fs.renameSync(retry.artifactDir, newer.artifactDir);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: older,
+      benchmarkResultIds: [10, 11],
+    });
+
+    // Without replacement a second copy adds its series next to the first.
+    const appended = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: newer,
+      benchmarkResultIds: [10],
+    });
+    const mixed = await getGpuMetricsForPoint(sql, 10);
+    expect(mixed?.series).toHaveLength(2);
+
+    await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: newer,
+      benchmarkResultIds: [10],
+      replacePointLinks: true,
+    });
+    const point = await getGpuMetricsForPoint(sql, 10);
+    expect(point?.series.map((series) => series.artifactName)).toEqual([newer.artifactName]);
+    const kept = await storedSeries(appended.seriesIds[0]!);
+    expect(kept.links).toHaveLength(1);
+    // Other points keep their own links.
+    const dropped = await storedSeries(first.seriesIds[0]!);
+    expect(dropped.links).toMatchObject([{ benchmark_result_id: 11 }]);
   });
 
   it('stores series, samples and point links; reruns are no-ops', async () => {

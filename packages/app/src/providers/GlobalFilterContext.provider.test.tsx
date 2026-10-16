@@ -7,7 +7,7 @@ import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 const mocks = vi.hoisted(() => ({
   availability: {
-    data: [] as unknown[],
+    data: [] as unknown[] | undefined,
     error: null as Error | null,
     isError: false,
     isPending: false,
@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     isLoading: false,
     error: null as Error | null,
   },
-  unofficialAvailable: [],
+  unofficialAvailable: [] as { model: string; sequence: string; precision: string }[],
   getUrlParam: vi.fn(() => undefined),
   setUrlParams: vi.fn(),
 }));
@@ -52,6 +52,7 @@ import {
   useGlobalFilterWorkflow,
   type GlobalFilterActionsContextType,
   type GlobalFilterAvailabilityContextType,
+  type GlobalFilterSelectionContextType,
 } from './GlobalFilterContext';
 
 let root: Root | undefined;
@@ -63,9 +64,10 @@ let actionRenders = 0;
 let workflowRenders = 0;
 const actionSnapshots: GlobalFilterActionsContextType[] = [];
 let availabilitySnapshot: GlobalFilterAvailabilityContextType | undefined;
+let selectionSnapshot: GlobalFilterSelectionContextType | undefined;
 
 const SelectionProbe = memo(() => {
-  useGlobalFilterSelection();
+  selectionSnapshot = useGlobalFilterSelection();
   selectionRenders += 1;
   return null;
 });
@@ -127,6 +129,7 @@ beforeEach(() => {
   mocks.workflow.data = undefined;
   mocks.workflow.isLoading = false;
   mocks.workflow.error = null;
+  mocks.unofficialAvailable = [];
   mocks.getUrlParam.mockReset();
   mocks.getUrlParam.mockReturnValue(undefined);
   mocks.setUrlParams.mockReset();
@@ -137,6 +140,7 @@ beforeEach(() => {
   workflowRenders = 0;
   actionSnapshots.length = 0;
   availabilitySnapshot = undefined;
+  selectionSnapshot = undefined;
 });
 
 afterEach(() => {
@@ -211,5 +215,44 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(availabilitySnapshot?.availabilityIsError).toBe(true);
     availabilitySnapshot?.retryAvailability();
     expect(mocks.availability.refetch).toHaveBeenCalledOnce();
+  });
+
+  it('does not offer Muse in shared selectors without its measurements', () => {
+    mocks.availability.data = [
+      { model: 'kimik3', precision: 'fp4', sequence: 'agentic-traces' },
+    ] as unknown[];
+    mountProvider();
+
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Kimi_K3);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.DeepSeek_V4_Pro);
+  });
+
+  it('offers Muse in shared selectors once measurements exist', () => {
+    mocks.availability.data = [
+      { model: 'musespark', precision: 'fp4', sequence: 'agentic-traces' },
+    ] as unknown[];
+    mountProvider();
+
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+  });
+
+  it('offers Muse from an unofficial AgentX run without a special selector exception', () => {
+    mocks.unofficialAvailable = [
+      { model: Model.Muse_Spark_Open, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
+    ];
+    mountProvider();
+    act(() => selectModel?.(Model.Muse_Spark_Open));
+
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+    expect(selectionSnapshot?.sequenceResolved).toBe(true);
+  });
+
+  it('keeps the no-data Muse sequence fallback AgentX-only', () => {
+    mountProvider();
+    act(() => selectModel?.(Model.Muse_Spark_Open));
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
   });
 });

@@ -14,17 +14,12 @@ interface Point {
   y: number;
 }
 
-const series = (
-  key: string,
-  points: Point[],
-  keepVisibleOnCollision = false,
-): LineLabelSeries<Point> => ({
+const series = (key: string, points: Point[]): LineLabelSeries<Point> => ({
   key,
   seriesId: key,
   label: key,
   color: '#000',
   points,
-  keepVisibleOnCollision,
 });
 
 const identity = (value: number) => value;

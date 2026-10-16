@@ -124,7 +124,10 @@ describe('Landing page performance', () => {
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
-        [...landingLogos].filter((name) => !new URL(name).pathname.endsWith('-color.svg')),
+        [...landingLogos].filter((name) => {
+          const pathname = new URL(name).pathname;
+          return !pathname.endsWith('-color.svg') && pathname !== '/logos/muse-mascot.webp';
+        }),
       ).to.deep.eq([]);
       expect(
         resourceNames.some(

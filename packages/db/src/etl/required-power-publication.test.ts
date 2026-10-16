@@ -317,14 +317,22 @@ describe('required power publication contract', () => {
       'hash',
     );
   });
-  it('accepts identical aggregate copies but rejects conflicting duplicate rows', () => {
+  it('uses the per-job copy over aggregate rows from other attempts', () => {
     const dir = fixture();
     fs.mkdirSync(path.join(dir, 'results_bmk'));
     fs.copyFileSync(path.join(dir, benchmarkPath), path.join(dir, 'results_bmk/agg.json'));
     expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
+    const older = json(dir, benchmarkPath);
+    older.avg_power_w = 501;
+    write(dir, 'results_bmk/agg.json', [older, json(dir, benchmarkPath)]);
+    const [point] = verifyRequiredPowerArtifacts(dir, source)!.points;
+    expect(point!.metrics.avg_power_w).toBe(json(dir, benchmarkPath).avg_power_w);
+  });
+  it('still rejects conflicting per-job copies of one point', () => {
+    const dir = fixture();
     const rows = json(dir, benchmarkPath);
-    rows.avg_power_w = 501;
-    write(dir, 'results_bmk/agg.json', rows);
+    fs.mkdirSync(path.join(dir, 'bmk_agentic_golden_retry'));
+    write(dir, 'bmk_agentic_golden_retry/agg.json', { ...rows, avg_power_w: 501 });
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
   it('names the stage when a required identity is missing or a power field differs', () => {

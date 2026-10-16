@@ -7,15 +7,23 @@ const before: BackfillState = {
   benchmark_hash: 'benchmark',
   profile_hash: 'requests',
   server_hash: 'metrics',
+  timeline_format: 'jsonb',
   timeline_hash: 'timeline',
   chart_version: 15,
   stats_version: 8,
   timeline_version: 6,
+  timeline_requests: 459_630,
   chart_counts: { kvCacheUsage: 200 },
   stats_present: { isl: true },
 };
 const versions = { chart: 20, stats: 10, timeline: 6 };
 const after = { ...before, chart_version: 20, stats_version: 10 };
+/** The same point after its JSONB timeline was converted to gzip. */
+const converted: BackfillState = {
+  ...after,
+  timeline_format: 'gzip',
+  timeline_hash: 'gzip-bytes',
+};
 
 describe('verifyBackfillState', () => {
   it('accepts a derived-data upgrade without changing source data', () => {
@@ -27,6 +35,19 @@ describe('verifyBackfillState', () => {
       expect(() => verifyBackfillState(before, { ...after, [key]: 'changed' }, versions)).toThrow();
     },
   );
+  it('accepts a JSONB-to-gzip conversion that keeps the version and request count', () => {
+    expect(() => verifyBackfillState(before, converted, versions)).not.toThrow();
+  });
+  it('rejects a conversion that changes the request count', () => {
+    expect(() =>
+      verifyBackfillState(before, { ...converted, timeline_requests: 459_629 }, versions),
+    ).toThrow('already-current request timeline changed');
+  });
+  it('rejects rewritten gzip bytes when the container did not change', () => {
+    expect(() =>
+      verifyBackfillState(converted, { ...converted, timeline_hash: 'rewritten' }, versions),
+    ).toThrow('already-current request timeline changed');
+  });
   it('rejects a nominally current but empty replacement chart', () => {
     expect(() => verifyBackfillState(before, { ...after, chart_counts: {} }, versions)).toThrow(
       'became empty',

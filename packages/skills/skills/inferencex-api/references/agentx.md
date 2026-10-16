@@ -47,6 +47,15 @@ operation.
 
 ## Read published benchmark results
 
+Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
+`musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
+Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
+with `sequence=agentic-traces` for the latter. Landing-page and comparison results
+links open the canonical dashboard without an `unofficialRun` parameter.
+Unofficial runs remain available through explicitly supplied overlay links; they
+do not populate the published benchmark API. Preserve empty API responses as no
+published data; do not substitute another model.
+
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or
 `DO_NOT_TRACK=1` to omit attribution; use `INFERENCEX_TRAFFIC=validation` for demos

@@ -101,7 +101,10 @@ function fingerprint(prepared: PreparedTraceReplay) {
     serverMetricsJsonSize: prepared.serverMetricsJsonSize,
     aggregateStatsJson: sha256(prepared.aggregateStatsJson),
     chartSeriesJson: sha256(prepared.chartSeriesJson),
-    requestTimelineJson: sha256(prepared.requestTimelineJson),
+    requestTimelineGz: sha256(prepared.requestTimelineGz),
+    requestTimelineRaw: prepared.requestTimelineGz
+      ? sha256(gunzipSync(prepared.requestTimelineGz))
+      : null,
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,
@@ -179,9 +182,13 @@ describe('TraceReplayWorkerPool', () => {
     const expectedFingerprint = fingerprint(expected);
     expect(result.direct).toEqual({
       ...expectedFingerprint,
+      // Gzip bytes depend on the runtime's zlib (Bun spawns the smoke, Node runs
+      // vitest), so compare the decompressed payload hashes instead.
       profileGz: result.direct.profileGz,
       serverMetricsJsonGz: result.direct.serverMetricsJsonGz,
+      requestTimelineGz: result.direct.requestTimelineGz,
     });
+    expect(result.direct.requestTimelineRaw).not.toBeNull();
     expect(result.rejectedMissingInput).toBe(true);
     expect(result.recoveredTimelineRequests).toBe(1);
   }, 15_000);

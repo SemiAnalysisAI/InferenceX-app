@@ -11,6 +11,7 @@ import { createSkipTracker } from './skip-tracker';
 import { configCacheKey } from './config-cache';
 import { powerWorkloadForScenario } from './power-publication';
 import { CHANGELOG_ARTIFACT_NAME, REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
+import { benchmarkPointKey, perJobPointKeys } from './retry-copies';
 
 type JsonRow = Record<string, unknown>;
 export interface RequiredPowerSource {
@@ -207,10 +208,14 @@ function verifyRequiredPowerBundle(
     throw new Error('Required power: manifest has no required benchmark points');
 
   const seen = new Map<string, { row: JsonRow; path: string; point: BenchmarkParams }>();
+  // Aggregate rows repeat every attempt; the selected per-job copy is the evidence.
+  const perJobPoints = perJobPointKeys(files);
   for (const file of files) {
     const inFile = new Set<string>();
+    const aggregate = !file.path.startsWith('bmk_');
     for (const { raw, mapped } of file.rows) {
       if (!mapped) continue;
+      if (aggregate && perJobPoints.has(benchmarkPointKey(mapped))) continue;
       const fingerprint = mapped.recipeFingerprint;
       // A missing fingerprint cannot match a required point; the missing-point check fails below.
       if (typeof fingerprint !== 'string' || !/^[a-f0-9]{64}$/u.test(fingerprint)) continue;

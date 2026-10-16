@@ -363,6 +363,7 @@ export function overviewScenarioForModel(
  * both get one matrix row each, in OVERVIEW_SCENARIOS order.
  */
 const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
+  [Model.Muse_Spark_Open]: ['agentx'],
   // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
   // 2026-09-08 (InferenceX#2728, MODELS.md Deprecation Notice). Historical
   // 8K/1K rows stay queryable, but the matrix must not keep a fixed-sequence

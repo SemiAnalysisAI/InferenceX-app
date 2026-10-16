@@ -466,7 +466,7 @@ export function GlobalFilterProvider({
     [availabilityRows, dbModelKeys],
   );
 
-  // Models that have any data (DB ∪ unofficial run)
+  // Models that have data in the database or a loaded unofficial run.
   const availableModels = useMemo(() => {
     if (!availabilityRows) return MODEL_OPTIONS;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
@@ -506,21 +506,20 @@ export function GlobalFilterProvider({
     const unofficialSeqs = unofficialAvailable
       .filter((a) => a.model === selectedModel)
       .map((a) => a.sequence as Sequence);
-    if (!availabilityRows) {
-      return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : [...SEQUENCE_OPTIONS];
-    }
     const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
     const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
       (s) => !isSequenceHiddenForModel(selectedModel, s),
     );
-    return merged.length > 0 ? merged : [...SEQUENCE_OPTIONS];
-  }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
+    return merged.length > 0
+      ? merged
+      : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
+  }, [modelRows, unofficialAvailable, selectedModel]);
 
   // Whether we actually know the selected model's sequences yet. Availability
   // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
   // (`unofficialAvailable` for this model) — either source lets us resolve a
-  // trustworthy effectiveSequence. Until then `availableSequences` is the static
-  // SEQUENCE_OPTIONS fallback (which contains every scenario), so resolving
+  // trustworthy effectiveSequence. Other models use the static fallback while
+  // loading, so resolving
   // eagerly would honor a selection the model may not have (e.g. agentic-traces
   // from a shared link on a fixed-seq-only model), fetch it, then snap once
   // availability lands (flash + wasted request).

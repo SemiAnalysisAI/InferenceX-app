@@ -14,6 +14,8 @@
  */
 
 import type { DbClient } from '../connection.js';
+import type { RequestTimeline } from '../etl/compute-request-timeline';
+import { gzipRequestTimeline } from '../etl/request-timeline-codec';
 
 import {
   buildTokenLengthSketch,
@@ -175,7 +177,7 @@ export async function fetchAggregateStatsRows<Stats>(
 }
 
 /** Trace-replay JSONB columns the read path may self-heal after a recompute. */
-export type WriteBackColumn = 'aggregate_stats' | 'chart_series' | 'request_timeline';
+export type WriteBackColumn = 'aggregate_stats' | 'chart_series';
 
 /** Logged once per process so a read-only connection doesn't spam the console. */
 let writeBackWarned = false;
@@ -183,6 +185,18 @@ let writeBackWarned = false;
 /** Reset the once-per-process warning latch (test-only). */
 export function _resetWriteBackWarned(): void {
   writeBackWarned = false;
+}
+
+/** Warn once per process. A failed write-back never fails the read. */
+function warnWriteBackFailure(target: string, error: unknown): void {
+  if (writeBackWarned) return;
+  writeBackWarned = true;
+  console.warn(
+    `[agentic write-back] could not persist ${target} (read-only connection?). ` +
+      `Serving the recomputed result without caching. ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+  );
 }
 
 /**
@@ -208,9 +222,6 @@ function updateJsonbColumn(
     }
     case 'chart_series': {
       return sql`update agentic_trace_replay set chart_series = ${value}::jsonb where id = ${traceReplayId}`;
-    }
-    case 'request_timeline': {
-      return sql`update agentic_trace_replay set request_timeline = ${value}::jsonb where id = ${traceReplayId}`;
     }
   }
 }
@@ -239,14 +250,35 @@ export function writeBackTraceReplayJsonb(
   // data only — matches `jsonbParam` in the backfill runner.
   const value = structuredClone(payload);
   void updateJsonbColumn(sql, column, traceReplayId, value).catch((error: unknown) => {
-    if (!writeBackWarned) {
-      writeBackWarned = true;
-      console.warn(
-        `[agentic write-back] could not persist ${column} (read-only connection?) — ` +
-          `serving recomputed result without caching. ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-      );
-    }
+    warnWriteBackFailure(column, error);
   });
+}
+
+/**
+ * Best-effort persist of a freshly recomputed request timeline in its storage
+ * form: `request_timeline_gz` plus the `request_timeline_version` and
+ * `request_count` scalars the readers route on. Same read-only contract as
+ * {@link writeBackTraceReplayJsonb}. The legacy `request_timeline` JSONB is
+ * never written, and a newer stored version is never replaced. The returned
+ * promise never rejects; the read path discards it with `void` so compression
+ * and the UPDATE never delay a response.
+ */
+export async function writeBackRequestTimeline(
+  sql: DbClient,
+  traceReplayId: number,
+  timeline: RequestTimeline,
+): Promise<void> {
+  try {
+    const gz = await gzipRequestTimeline(timeline);
+    await sql`
+      update agentic_trace_replay
+      set request_timeline_gz = ${gz},
+          request_timeline_version = ${timeline.version},
+          request_count = ${timeline.requests.length}
+      where id = ${traceReplayId}
+        and coalesce(request_timeline_version, -1) <= ${timeline.version}
+    `;
+  } catch (error) {
+    warnWriteBackFailure('request_timeline_gz', error);
+  }
 }

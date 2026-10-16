@@ -39,6 +39,7 @@ function D3ChartInner<T>(
     legendElement,
     noDataOverlay,
     caption,
+    scrollablePlot,
     onRender,
     onDisplayUpdate,
   }: D3ChartProps<T>,
@@ -160,6 +161,7 @@ function D3ChartInner<T>(
       legendElement={legendElement}
       noDataOverlay={noDataOverlay}
       caption={caption}
+      scrollablePlot={scrollablePlot}
     />
   );
 }

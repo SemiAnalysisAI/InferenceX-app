@@ -19,6 +19,7 @@ export enum Model {
   GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
   DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
+  Muse_Spark_Open = 'Muse-Spark-Open',
 }
 
 export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
@@ -139,6 +140,12 @@ const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
 // already part of the canonical name (Llama 3.3 70B, gpt-oss 120B) so no
 // duplication needed.
 const MODEL_CONFIG: Record<Model, ModelConfig> = {
+  [Model.Muse_Spark_Open]: {
+    label: 'Muse Spark Open 816B',
+    prefix: 'musespark',
+    category: 'default',
+    logo: 'muse-mascot.webp',
+  },
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
@@ -576,6 +583,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
  * coding only, so their 8K/1K rows are not offered.
  */
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Muse_Spark_Open]: new Set(
+    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+  ),
   [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 

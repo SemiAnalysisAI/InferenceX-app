@@ -1135,7 +1135,7 @@ and the two can be collapsed into one once both are on master.
   input / $0.06 cached / $1.20 output per M tok, the permanent 50%-off rate on its
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
-  H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
+  H100, H200, MI300X, and MI325X curves top out below it and are omitted at that target.
   GLM 5.2/5.3 and MiniMax M3 open on a 20% model license fee; Kimi K3
   opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 35 tok/s/user,
   an editable operating assumption chosen on 2026-10-13 using the early-October
@@ -1155,7 +1155,7 @@ and the two can be collapsed into one once both are on master.
   per M tok; off-peak is half that), and a 0% model license fee, since the
   weights ship under the MIT license. It entered the fleet on AgentX only (InferenceX#2961), so the page is
   wired ahead of the first published rows; SKUs whose agentic curves stop short
-  of 125 tok/s/user list as not priced rather than extrapolated. A
+  of 125 tok/s/user are omitted rather than extrapolated. A
   model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom

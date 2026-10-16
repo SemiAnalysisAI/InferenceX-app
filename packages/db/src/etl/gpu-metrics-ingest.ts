@@ -121,6 +121,18 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
  * Parse every CSV in an extracted artifact; refuse a partly readable CSV set.
  * Without usable nvidia-smi/amd-smi CSVs, fall back to the multinode power bundle.
  */
+/**
+ * Whether the artifact holds any telemetry file: a GPU metrics CSV or a
+ * multinode power samples bundle. Sidecars alone (for example a power audit
+ * written by a sweep with power collection off) are not telemetry.
+ */
+export function gpuMetricsArtifactHoldsTelemetry(artifact: GpuMetricsArtifact): boolean {
+  return (
+    walkFiles(artifact.artifactDir, isGpuMetricsCsvPath).length > 0 ||
+    walkFiles(artifact.artifactDir, isMultinodePowerSamplesPath).length > 0
+  );
+}
+
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const unreadable: string[] = [];
@@ -339,6 +351,8 @@ export async function ingestGpuMetricsArtifact(
     benchmarkResultIds: readonly number[];
     expectedRunArtifacts?: readonly string[];
     replace?: boolean;
+    /** Drop links from these points to series outside this artifact. */
+    replacePointLinks?: boolean;
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
@@ -387,6 +401,14 @@ export async function ingestGpuMetricsArtifact(
         and artifact_name = ${input.artifact.artifactName}
         and not (id = any(${sql.array(result.seriesIds)}::bigint[]))
     `;
+    if (input.replacePointLinks && input.benchmarkResultIds.length > 0) {
+      // A re-ingest or an older retry copy may have linked other series.
+      await sql`
+        delete from benchmark_result_gpu_metrics
+        where benchmark_result_id = any(${sql.array([...input.benchmarkResultIds])}::bigint[])
+          and not (series_id = any(${sql.array(result.seriesIds)}::bigint[]))
+      `;
+    }
   }
   return result;
 }

@@ -7,9 +7,13 @@
  * plotted x/y axes.
  */
 
-import { METRIC_REGISTRY } from '@/components/inference/metric-registry';
+import { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import {
+  allInMeasuredStatusLabel,
+  inferenceTableYValue,
+} from '@/components/inference/utils/inference-table-data';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
-import { chipCounts } from '@/lib/benchmarks/chip-counts';
+import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -30,9 +34,9 @@ function nestedMetric(point: InferenceData, path: string): number | '' {
   const value = point[key as keyof InferenceData];
   if (nestedKey && typeof value === 'object' && value !== null && nestedKey in value) {
     const nestedValue = (value as Record<string, unknown>)[nestedKey];
-    return typeof nestedValue === 'number' ? nestedValue : '';
+    return typeof nestedValue === 'number' && Number.isFinite(nestedValue) ? nestedValue : '';
   }
-  return typeof value === 'number' ? value : '';
+  return typeof value === 'number' && Number.isFinite(value) ? value : '';
 }
 
 /** Preserve a real zero while leaving source metrics that were not measured blank. */
@@ -55,8 +59,13 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
-  const showModeledPower =
-    displayedMetrics?.yPath === METRIC_REGISTRY.modeledChassisPowerPerGpu.field;
+  // A power comparison (`i_pcompare`) appends boundary / role clones of the
+  // plotted points; name each row's series so the export stays unambiguous.
+  const allPoints = [...data, ...overlayData];
+  const powerCompare = inferPowerCompare(allPoints);
+  const showPowerSeries = powerCompare !== 'none';
+  const plottedMetric = displayedMetrics ? `y_${displayedMetrics.yPath.split('.')[0]}` : '';
+  const showAllInMeasured = isAllInMeasuredConfigKey(plottedMetric);
   const headers = [
     'Model',
     'ISL',
@@ -110,16 +119,23 @@ export function inferenceChartToCsv(
     'Run URL',
     'Physical Chips',
     'DP',
-    ...(showModeledPower ? ['Configured Chip Count'] : []),
+    ...(showPowerSeries ? ['Power Series'] : []),
+    ...(showAllInMeasured ? ['Measured GPU Power (W/chip)', 'All-in Estimate Status'] : []),
   ];
 
   const displayedColumns = displayedMetrics
     ? [
         {
           header: displayedMetrics.yHeader,
-          value: (point: InferenceData) => nestedMetric(point, displayedMetrics.yPath),
+          value: (point: InferenceData) =>
+            point.powerVariant
+              ? (inferenceTableYValue(point) ?? '')
+              : nestedMetric(point, displayedMetrics.yPath),
         },
-        { header: displayedMetrics.xHeader, value: (point: InferenceData) => point.x },
+        {
+          header: displayedMetrics.xHeader,
+          value: (point: InferenceData) => (Number.isFinite(point.x) ? point.x : ''),
+        },
       ].filter(
         (column, index, columns) =>
           !headers.includes(column.header) &&
@@ -128,10 +144,9 @@ export function inferenceChartToCsv(
     : [];
   headers.splice(10, 0, ...displayedColumns.map((column) => column.header));
 
-  const rows = [...data, ...overlayData]
+  const rows = allPoints
     .filter((d) => !d.hidden)
     .map((d) => {
-      const chips = chipCounts(d, showModeledPower);
       const row = [
         model,
         islOsl?.isl ?? '',
@@ -174,9 +189,12 @@ export function inferenceChartToCsv(
         d.dp_attention ?? '',
         d.is_multinode ?? '',
         d.run_url ?? '',
-        chips.physical,
+        d.physicalChips ?? d.tp,
         d.dp ?? '',
-        ...(showModeledPower ? [chips.configured] : []),
+        ...(showPowerSeries ? [powerSeriesLabel(d, plottedMetric, powerCompare, 'en')] : []),
+        ...(showAllInMeasured
+          ? [d.measuredAvgPower?.y ?? '', allInMeasuredStatusLabel(d, plottedMetric.slice(2), 'en')]
+          : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;

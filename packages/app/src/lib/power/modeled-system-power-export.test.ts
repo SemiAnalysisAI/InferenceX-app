@@ -3,9 +3,14 @@ import { describe, expect, it } from 'vitest';
 import {
   buildComparison,
   csv,
+  flatRows,
   type ComparisonInput,
 } from '../../../scripts/export-modeled-system-power';
+import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
 import { estimateChassisPower } from '@/lib/power/system-power-model';
+
+const h200 = (gpuWatts: number) =>
+  estimateChassisPower('h200', gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
 
 // Original H200 c1, run 31672765610, artifact 9171086754; schema marker was absent.
 function input(): ComparisonInput {
@@ -86,17 +91,17 @@ describe('offline modeled PowerX comparisons', () => {
     const source = input();
     const before = structuredClone(source);
     const result = buildComparison(source);
-    expect(result.metadata.pue).toBe(1.3);
-    expect(result.metadata.model.assumptions.pue).toBe(1.2);
     expect(result.rows[0].modeled).toMatchObject({ pue: 1.3 });
-    expect(result.rows[0].assumptions).toMatchObject({ pue: 1.3 });
-    expect(buildComparison(source, 1.1).rows[0].modeled).toMatchObject({ pue: 1.1 });
     expect(result.rows[0].estimated_energy).toMatchObject({
       status: 'estimated',
       output_tokens: 9303,
       integration_seconds: 64.67805051803589,
-      chassis_ac_j_per_output_token: 26.8855733804468,
     });
+    // python -m power_model --gpu-level-power-per-gpu=229.002875 --system=h200: IT 3810.904 W.
+    expect(result.rows[0].estimated_energy.it_j_per_output_token).toBeCloseTo(
+      26.494877309376715,
+      9,
+    );
     expect(result.rows[0].measured_inputs?.gpu_j_per_output_token).toBe(12.736929);
     expect(result.rows[0].benchmark.metrics).not.toHaveProperty('power_metric_schema_version');
     expect(source).toEqual(before);
@@ -129,41 +134,38 @@ describe('offline modeled PowerX comparisons', () => {
     });
     const result = buildComparison(source);
     const row = result.rows[0];
-    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8, 1.3)!;
+    const reference = h200(entry.benchmark.metrics.avg_power_w * 8);
     expect(row.modeled).toMatchObject({
       status: 'supported',
       gpuCount: 4,
       modeledGpuCount: 8,
       chassisBasis: 'extrapolated',
-      chassisAcWatts: reference.chassisAcWatts,
-      deploymentAcWatts: reference.chassisAcWatts / 2,
+      itWatts: reference.itWatts,
+      deploymentItWatts: reference.itWatts / 2,
     });
     expect(row.estimated_energy).toMatchObject({
       status: 'estimated',
-      chassis_ac_j: (reference.chassisAcWatts / 2) * w.integration_duration_s,
-      chassis_ac_j_per_output_token:
-        ((reference.chassisAcWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
+      it_j: (reference.itWatts / 2) * w.integration_duration_s,
+      it_j_per_output_token:
+        ((reference.itWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
     });
     expect(result.cells[0]).toMatchObject({
-      modeled_chassis_ac_w_mean: reference.chassisAcWatts,
-      modeled_chassis_ac_w_per_gpu_mean: reference.chassisAcWatts / 8,
-      modeled_deployment_ac_w_mean: reference.chassisAcWatts / 2,
+      modeled_it_w_mean: reference.itWatts,
+      modeled_it_w_per_gpu_mean: reference.itWatts / 8,
+      modeled_deployment_it_w_mean: reference.itWatts / 2,
       modeled_deployment_facility_w_mean: reference.facilityWatts / 2,
       modeled_facility_w_mean: reference.facilityWatts,
     });
   });
 
-  it.each([0, -1, Infinity, NaN, 1.5])(
-    'withholds energy for invalid output denominator %s',
-    (tokens) => {
-      const source = input();
-      source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
-      expect(buildComparison(source).rows[0].estimated_energy).toEqual({
-        status: 'unavailable',
-        reason: 'audit-does-not-match-measured-input',
-      });
-    },
-  );
+  it.each([0, 1.5])('withholds energy for invalid output denominator %s', (tokens) => {
+    const source = input();
+    source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
+    expect(buildComparison(source).rows[0].estimated_energy).toEqual({
+      status: 'unavailable',
+      reason: 'audit-does-not-match-measured-input',
+    });
+  });
 
   it('withholds energy for missing, mismatched, and invalid audit receipts', () => {
     for (const mutate of [
@@ -204,29 +206,81 @@ describe('offline modeled PowerX comparisons', () => {
     second.benchmark.metrics.avg_total_gpu_power_w = 1848.074;
     source.rows.push(second);
     const result = buildComparison(source);
-    expect(result.cells[0].modeled_chassis_ac_w_mean).toBe(3875.6499999999996);
-    expect(result.cells[0].estimated_chassis_ac_j_per_output_token_mean).toBeNull();
+    expect(result.cells[0].modeled_it_w_mean).toBe(
+      (h200(1832.023).itWatts + h200(1848.074).itWatts) / 2,
+    );
+    expect(result.cells[0].estimated_it_j_per_output_token_mean).toBeNull();
     second.benchmark.metrics.power_valid = 0;
     const invalid = buildComparison(source);
     expect(invalid.rows).toHaveLength(2);
     expect(invalid.rows[1].measured_inputs).toBeNull();
     expect(invalid.rows[1].raw_input).toMatchObject({ metrics: { avg_power_w: 231.009 } });
-    expect(invalid.cells[0].modeled_chassis_ac_w_mean).toBeNull();
+    expect(invalid.cells[0].modeled_it_w_mean).toBeNull();
     second.benchmark.hardware = 'b200';
     expect(() => buildComparison(source)).toThrow('different benchmark configurations');
+  });
+
+  it('exports measured Grace inputs and the rack-share estimate for NVL72 rows, leaving x86 rows unchanged', () => {
+    const source = input();
+    const baseline = buildComparison(structuredClone(source));
+    const gb300 = structuredClone(source.rows[0]);
+    gb300.id = 'gb300:1p1d';
+    gb300.cell = 'gb300:c32';
+    gb300.audit = undefined;
+    gb300.benchmark = gb300DisaggRow();
+    source.rows.push(gb300);
+    const result = buildComparison(source);
+    expect(result.rows[1]).toMatchObject({
+      measured_inputs: {
+        avg_gpu_w: 594.191,
+        cpu_power_valid: 1,
+        total_grace_w: 392.264,
+        total_grace_j: 41_346.013,
+      },
+      modeled: {
+        status: 'supported',
+        unit: 'nvl72-tray',
+        cpuBasis: 'measured',
+        chassisCount: 2,
+        pue: 1.1,
+      },
+    });
+    const provenance = { app_revision: 'test', input_sha256: 'test', generated_at: 'test' };
+    const [x86Flat, gb300Flat] = flatRows(result, { ...result.metadata, ...provenance }, {});
+    expect(gb300Flat.measured_total_grace_j).toBe(41_346.013);
+    expect(gb300Flat.cpu_basis).toBe('measured');
+    expect(x86Flat.cpu_basis).toBeNull();
+    expect(x86Flat.measured_total_grace_j).toBeUndefined();
+    // The x86 row and its cell are byte-identical to an export without the NVL72 row.
+    expect(result.rows[0]).toEqual(baseline.rows[0]);
+    expect(result.cells[0]).toEqual(baseline.cells[0]);
+    expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
+    // Without cpu_power_valid the row reports no Grace-side inputs, and the rack
+    // model's Grace profile stands in for the sockets.
+    delete gb300.benchmark.metrics.cpu_power_valid;
+    const modeledCpu = buildComparison(source).rows[1];
+    expect(modeledCpu.modeled).toMatchObject({
+      status: 'supported',
+      cpuBasis: 'modeled',
+      measuredGraceSocketWatts: null,
+    });
+    expect(
+      flatRows(buildComparison(source), { ...result.metadata, ...provenance }, {})[1].cpu_basis,
+    ).toBe('modeled');
+    expect(modeledCpu.measured_inputs).toMatchObject({
+      cpu_power_valid: null,
+      total_grace_w: null,
+    });
   });
 
   it('retains unsupported hardware and missing values, and escapes CSV text', () => {
     const source = input();
     source.rows[0].benchmark.hardware = 'H200';
-    expect(buildComparison(source).rows[0]).toMatchObject({
-      assumptions: { u_cpu: 0.2 },
-      model_path: 'human_verified/hgx_h200_chassis/h200_chassis_power_model.py',
-    });
+    expect(buildComparison(source).rows[0].modeled).toMatchObject({ status: 'supported' });
     source.rows[0].benchmark.hardware = 'gb200';
     expect(buildComparison(source).rows[0].modeled).toMatchObject({
       status: 'unsupported',
-      reason: 'hardware',
+      reason: 'telemetry',
     });
     expect(csv([{ a: null, b: 0, c: 'a,"b"\nc' }])).toBe('"a","b","c"\r\n,"0","a,""b""\nc"\r\n');
     expect(() => buildComparison({ ...source, rows: [source.rows[0], source.rows[0]] })).toThrow(

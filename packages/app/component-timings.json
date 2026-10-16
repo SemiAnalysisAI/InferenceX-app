@@ -659,6 +659,10 @@
       ]
     },
     {
+      "spec": "cypress/component/comparison-series-theme.cy.tsx",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/component/component-css.cy.tsx",
       "duration": 4323,
       "tests": [
@@ -1452,6 +1456,10 @@
           "attempts": 1
         }
       ]
+    },
+    {
+      "spec": "cypress/component/frontier-points-panel.cy.tsx",
+      "duration": 4000
     },
     {
       "spec": "cypress/component/gpu-graph.cy.tsx",
@@ -2359,6 +2367,10 @@
       ]
     },
     {
+      "spec": "cypress/component/measured-metric-controls.cy.tsx",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/component/mode-toggle.cy.tsx",
       "duration": 263,
       "tests": [
@@ -2498,31 +2510,20 @@
       ]
     },
     {
-      "spec": "cypress/component/power-metric-availability.cy.tsx",
-      "duration": 523,
-      "tests": [
-        {
-          "title": [
-            "PowerX metric availability",
-            "explains missing GB and withheld AMD data, exposes source links, and switches metrics"
-          ],
-          "duration": 352,
-          "attempts": 1
-        },
-        {
-          "title": ["PowerX metric availability", "uses Chinese copy for the same coverage states"],
-          "duration": 117,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "PowerX metric availability",
-            "counts filtered unofficial rows before the metric filter and respects hidden overlay hardware"
-          ],
-          "duration": 40,
-          "attempts": 1
-        }
-      ]
+      "spec": "cypress/component/power-analysis-panels.cy.tsx",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/component/power-compare.cy.tsx",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/component/power-telemetry.cy.tsx",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/component/power-timeline.cy.tsx",
+      "duration": 4000
     },
     {
       "spec": "cypress/component/profit-estimator-chart.cy.tsx",

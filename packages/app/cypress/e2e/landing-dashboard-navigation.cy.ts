@@ -39,6 +39,61 @@ function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3
 
 const TARGET = '/inference/kimi-k3';
 
+describe('Muse Spark Open results', () => {
+  beforeEach(() => {
+    // Normalized conc=32 bmk artifact 12019076285 from run 38825822770.
+    // This is a measured B200 row, not a synthetic performance sample.
+    cy.fixture('api/muse-spark-unofficial-run.json').then((body) => {
+      cy.intercept('GET', '/api/unofficial-run*', { body }).as('museRun');
+    });
+  });
+  for (const prefix of ['', '/zh']) {
+    it(`opens the canonical Muse dashboard from ${prefix || '/'} with the mascot`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
+        .should('contain.text', prefix ? '查看结果' : 'View results')
+        .and('not.contain.text', prefix ? '预览' : 'Preview')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should(
+        'have.attr',
+        'href',
+        `${prefix}/inference/muse-spark-open`,
+      );
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
+      cy.location('pathname', { timeout: 30000 }).should(
+        'eq',
+        `${prefix}/inference/muse-spark-open`,
+      );
+      cy.location('search').should('eq', '');
+      cy.get('[data-testid="model-selector"]').should(($selector) => {
+        // Without published availability, the selector falls back to the model ID.
+        expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
+      });
+      cy.get('[data-testid="scenario-selector"]')
+        .should('contain.text', prefix ? '智能体' : 'Agentic')
+        .and('be.disabled');
+      cy.get('[data-slot="unofficial-banner"]').should('not.exist');
+      cy.get('@museRun.all').should('have.length', 0);
+    });
+
+    it(`still opens an explicitly requested Muse unofficial run under ${prefix || '/'}`, () => {
+      cy.visit(`${prefix}/inference/muse-spark-open?unofficialRun=38825822770`);
+      cy.wait('@museRun');
+      cy.location('search').should('match', /unofficialruns?=38825822770/iu);
+      cy.get('[data-testid="model-selector"]')
+        .should('contain.text', 'Muse Spark Open 816B')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
+        'have.length.greaterThan',
+        0,
+      );
+      cy.get('[data-slot="unofficial-banner"]').should('be.visible');
+    });
+  }
+});
+
 interface HistoryWrite {
   kind: 'push' | 'replace';
   pathname: string;
@@ -58,11 +113,17 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
+            ['kimi-k3', 'muse-spark-open', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
               (slug) => `${prefix}/inference/${slug}`,
             ),
           );
         });
+        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
+          .should('contain.text', 'Muse Spark Open 816B')
+          .and('contain.text', prefix ? '查看结果' : 'View results')
+          .and('not.contain.text', prefix ? '结果待发布' : 'Results pending')
+          .find('img')
+          .should('have.attr', 'src', '/logos/muse-mascot.webp');
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
         // Qwen 3.5 is reached through the TPU card, and the hardware cards sit above the ledger.
@@ -114,7 +175,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
         for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
