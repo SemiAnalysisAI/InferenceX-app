@@ -79,15 +79,7 @@ export const DB_WRITE_WARNING_RULES: readonly {
   kind: DbWriteKind;
   code: string;
   reason: string;
-}[] = [
-  {
-    // program_limit_exceeded: request_timeline is stored as one jsonb array and
-    // very large traces pass the 256 MiB jsonb limit until trace storage changes.
-    kind: 'trace_replay',
-    code: '54000',
-    reason: 'trace replay exceeds the Postgres jsonb size limit',
-  },
-];
+}[] = [];
 
 /** The warning rule matching a failure, or undefined when the failure is an error. */
 export function dbWriteWarningRule(failure: Pick<DbWriteFailure, 'kind' | 'code'>) {

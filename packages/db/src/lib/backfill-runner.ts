@@ -110,18 +110,19 @@ export async function confirmProceed(candidatesLabel: string): Promise<boolean> 
 
 /**
  * Iterate candidate row ids one at a time (the recomputed blobs can be
- * hundreds of MB decompressed — serial processing keeps memory bounded),
+ * hundreds of MB decompressed, and serial processing keeps memory bounded),
  * logging per-row progress and a final summary. `processRow` returns 'ok'
- * (counts toward the ✓ log) or 'skipped' (e.g. row vanished — the callback
- * logs its own warning); throwing marks the row failed. Sets
- * `process.exitCode = 1` when any row failed.
+ * (counts toward the ✓ log) or 'skipped' (for example a vanished row, whose
+ * callback logs its own warning). A throw marks the row failed without
+ * stopping the run. The summary lists every failed id, and
+ * `process.exitCode = 1` is set when any row failed.
  */
 export async function runPerIdBackfill(
   ids: readonly number[],
   processRow: (id: number) => Promise<'ok' | 'skipped'>,
 ): Promise<void> {
   let ok = 0;
-  let failed = 0;
+  const failedIds: number[] = [];
   const t0 = Date.now();
   for (const id of ids) {
     const start = Date.now();
@@ -132,13 +133,16 @@ export async function runPerIdBackfill(
       const elapsedTotal = Math.round((Date.now() - t0) / 1000);
       console.log(`  ✓ id=${id} (${elapsed}s, ${ok}/${ids.length} done, ${elapsedTotal}s total)`);
     } catch (error) {
-      failed++;
+      failedIds.push(id);
       console.error(`  ✗ id=${id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   const totalSec = Math.round((Date.now() - t0) / 1000);
-  console.log(`\n=== backfill complete: ${ok} ok, ${failed} failed in ${totalSec}s ===`);
-  if (failed > 0) process.exitCode = 1;
+  console.log(`\n=== backfill complete: ${ok} ok, ${failedIds.length} failed in ${totalSec}s ===`);
+  if (failedIds.length > 0) {
+    console.error(`  failed ids: ${failedIds.join(', ')}`);
+    process.exitCode = 1;
+  }
 }
 
 /**

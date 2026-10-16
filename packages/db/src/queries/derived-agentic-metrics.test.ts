@@ -157,7 +157,9 @@ describe('getDerivedAgenticMetrics write-back', () => {
       // fetchAggregateStatsRows
       [{ benchmark_result_id: 7, stats: staleStats }],
       // fallback profile-blob query
-      [{ benchmark_result_id: 7, trace_replay_id: 870, blob }],
+      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      [{ parts: 0, inline_size: blob.length }],
+      [{ data: blob }],
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
@@ -167,9 +169,9 @@ describe('getDerivedAgenticMetrics write-back', () => {
     expect(result[7]?.p75_e2e_norm_intvty).toBeCloseTo(1 / 0.035, 6);
 
     // 3 calls: stats read, blob read, write-back UPDATE.
-    expect(calls).toHaveLength(3);
-    expect(calls[2]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-    expect(calls[2]!.text).toContain('::jsonb where id');
+    expect(calls).toHaveLength(5);
+    expect(calls[4]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+    expect(calls[4]!.text).toContain('::jsonb where id');
 
     // The write-back binds a COMPLETE, version-stamped bundle at the new version,
     // recomputing profile fields and carrying server fields forward untouched.
@@ -182,7 +184,7 @@ describe('getDerivedAgenticMetrics write-back', () => {
       kvCacheUtil: unknown;
       e2elPerOsl: { p75: number; p90: number; n: number } | null;
     }
-    const [written, traceReplayId] = calls[2]!.values as [WrittenStats, number];
+    const [written, traceReplayId] = calls[4]!.values as [WrittenStats, number];
     expect(traceReplayId).toBe(870);
     expect(written.version).toBe(STATS_VERSION);
     expect(written.e2elPerOsl?.n).toBe(2);
@@ -211,7 +213,9 @@ describe('getDerivedAgenticMetrics write-back', () => {
       // fetchAggregateStatsRows — no stored bundle at all
       [{ benchmark_result_id: 7, stats: null }],
       // fallback profile-blob query
-      [{ benchmark_result_id: 7, trace_replay_id: 870, blob }],
+      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      [{ parts: 0, inline_size: blob.length }],
+      [{ data: blob }],
     ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
@@ -219,7 +223,7 @@ describe('getDerivedAgenticMetrics write-back', () => {
     // Caller still gets the freshly computed metric (1 / 0.02 s-per-token).
     expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(50, 6);
     // Stats read + blob read only — no write-back UPDATE.
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(4);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });
 

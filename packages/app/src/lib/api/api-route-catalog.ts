@@ -1565,7 +1565,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/compute-request-timeline.ts',
-    sourceSha256: '377d6f6cab10d6d7d59e7021d16e2ca872a2bfff6d28030966e1b36189d6bbc0',
+    // Reviewed for gzip request-timeline storage (migration 017): only the
+    // module comment changed to name request_timeline_gz. Same version,
+    // record fields and timing semantics, so the docs stand.
+    sourceSha256: '01a1cb2448ae599cc5802af9a014468982d70a8d7be53ff57d2fc37eaacc49b7',
     reviewArea: {
       en: 'Request timeline contract version, replay identity, source provenance, and event timing semantics.',
       zh: '请求时间线契约版本、重放标识、来源溯源和事件计时语义。',
@@ -1573,7 +1576,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: '8d23f65dfb77565120f23207729ed66e6ce55f53acf6bf0cf51e377c41120d6b',
+    sourceSha256: '390d9ed94bf8f1712612a979ec29316f5a98b8faee34c71b77142e960103eeb2',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',
@@ -1637,7 +1640,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/request-timeline.ts',
-    sourceSha256: 'e27e2c421d94d55f8178756d31e9791d4143d33e4086f767e4ea15132a7ad708',
+    // Reviewed for gzip request-timeline storage (migration 017): the reader
+    // prefers request_timeline_gz and falls back to legacy JSONB, and logs a
+    // stored timeline it cannot read. It returns the same RequestTimeline
+    // document, nullability, 404 and caching, so the docs stand.
+    sourceSha256: 'c3bb72c5af3771667542f7676255fe32f8e3e28c3e5800298b663d22f45c5f2a',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',
@@ -1661,7 +1668,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-availability.ts',
-    sourceSha256: '838fb261a153e560b4c488b770deb47e57dd3ab3bfd5b98d32b2ec6fba79873e',
+    sourceSha256: '9a4363a57ae319cadae4780b2ac584798b16580755aae0a61f9b7a686848ceec',
     reviewArea: {
       en: 'Trace availability ID-keyed boolean response shape.',
       zh: '跟踪可用性按 ID 索引的布尔响应结构。',
@@ -1669,7 +1676,11 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-histograms.ts',
-    sourceSha256: 'ec3b7358046ca2acdaaa56d8ecde2829ba8fe4f4b2b31c3795838ac85f59ca89',
+    // Reviewed for gzip request-timeline storage (migration 017): gzip rows
+    // stream the same ISL/OSL arrays in Node. Unreadable points are now logged
+    // and, as before, omitted. The ID-keyed response shape is unchanged, so
+    // the docs stand.
+    sourceSha256: 'a2f774da33065ca89703e41bf7d59f288281f0ad319e662319cbbb7d402d86b3',
     reviewArea: {
       en: 'Trace histogram input/output token arrays and ID-keyed response shape.',
       zh: '跟踪直方图输入/输出 token 数组和按 ID 索引的响应结构。',

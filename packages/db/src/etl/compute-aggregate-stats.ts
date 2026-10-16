@@ -76,7 +76,10 @@ async function extractProfileSamples(
   osl: number[];
   e2elPerOsl: number[];
 }> {
-  const input = Readable.from(compressedChunks).pipe(createGunzip());
+  const source = Readable.from(compressedChunks);
+  const input = createGunzip();
+  source.on('error', (error) => input.destroy(error));
+  source.pipe(input);
   const lines = createInterface({ input, crlfDelay: Infinity });
   const isl: number[] = [];
   const osl: number[] = [];

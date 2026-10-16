@@ -62,7 +62,7 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database. It contains ML inference
 - **workflow_runs**, **changelog_entries**, and **run_stats** store GitHub run metadata, reviewed changelog metadata, and hardware reliability counts.
 - **availability** is the denormalized model/config/scenario/date index used by selectors.
 - **eval_results** and **eval_samples** store aggregate and per-prompt evaluation results.
-- **agentic_trace_replay** stores compressed trace exports and precomputed aggregate, chart, and request-timeline JSONB.
+- **agentic_trace_replay** stores compressed trace exports, precomputed aggregate and chart JSONB, and each point's request timeline as gzip-compressed JSON (\`request_timeline_gz\`). Rows not yet converted still hold the legacy \`request_timeline\` JSONB.
 - **datasets**, **dataset_conversations**, and **run_datasets** store agentic dataset metadata, conversation structures, and workflow-to-dataset links.
 - **server_logs** stores benchmark server logs. **user_feedback** stores encrypted feedback fields.
 
@@ -80,7 +80,7 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database. It contains ML inference
 - **availability**: model, isl, osl, precision, hardware, framework, spec_method, disagg, date, benchmark_type (unique natural key, NULLS NOT DISTINCT)
 - **eval_results**: id, workflow_run_id (FK), config_id (FK), task, date, isl, osl, conc, lm_eval_version, metrics (JSONB)
 - **eval_samples**: id, eval_result_id (FK), doc_id, prompt, target, response, passed, score, metrics (JSONB), data (JSONB)
-- **agentic_trace_replay**: id, profile_export_jsonl_gz, profile_export_uncompressed_size, server_metrics_csv, server_metrics_csv_size, created_at, server_metrics_json_gz, server_metrics_json_uncompressed_size, aggregate_stats (JSONB), chart_series (JSONB), request_timeline (JSONB)
+- **agentic_trace_replay**: id, profile_export_jsonl_gz, profile_export_uncompressed_size, server_metrics_csv, server_metrics_csv_size, created_at, server_metrics_json_gz, server_metrics_json_uncompressed_size, aggregate_stats (JSONB), chart_series (JSONB), request_timeline (legacy JSONB), request_timeline_gz (gzip JSON bytea), request_timeline_version, request_count
 - **datasets**: id, slug, label, variant, description, hf_url, license, conversation_count, summary (JSONB), chart_data (JSONB), dataset_version, ingested_at
 - **dataset_conversations**: id, dataset_id (FK), conv_id, models (text[]), num_turns, num_subagent_groups, total_in, total_out, total_cached, structure (JSONB)
 - **run_datasets**: workflow_run_id (FK), dataset_slug, created_at

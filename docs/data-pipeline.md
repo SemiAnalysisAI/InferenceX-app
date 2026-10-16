@@ -391,25 +391,114 @@ lane's first dispatch.
 The request-timeline frontend groups by `(conversation_id, ri)`, keeping all
 main-agent, subagent, warmup, and profiling requests from one replay together.
 Legacy timelines without correlation metadata omit `ri` and retain the older
-conversation-only grouping. `REQUEST_TIMELINE_VERSION` invalidates derived
-JSONB when this extraction changes; `db:backfill-request-timeline` recomputes it
-from the raw gzipped `profile_export.jsonl` already stored in Neon, so no GitHub
-artifact refetch or schema migration is required.
+conversation-only grouping. `REQUEST_TIMELINE_VERSION` invalidates stored
+timelines when this extraction changes; `db:backfill-request-timeline`
+recomputes them from the raw gzipped `profile_export.jsonl` already stored in
+Neon, so no GitHub artifact refetch or schema migration is required.
 
 Timeline extraction reads the gzip stream twice instead of materializing the
 entire JSONL. The first pass retains only timeline bounds and one first-dispatch
 timestamp per replay; the second emits compact request records. This bounds
 peak memory for high-throughput traces whose decompressed profiles exceed
 400 MB, at the cost of a second sequential decompression pass during ingest or
-backfill. The backfill also downloads the stored gzip and uploads the derived
-JSONB in 4 MiB chunks, matching trace ingest and avoiding single-value transport
-limits for oversized runs. The request-timeline reader checks only compact
-metadata inline, then reconstructs every current timeline from bounded text
-chunks. It deliberately does not choose by compressed JSONB storage size, so a
-highly compressible timeline cannot cross Neon's 64 MiB response limit or force
-the database to materialize the serialized size just to select a read path.
+backfill. The backfill also downloads the stored profile gzip in 4 MiB chunks
+and uploads the derived timeline through the same chunked protocol as trace
+ingest, avoiding single-value transport limits for oversized runs.
+
+### Agentic Request-Timeline Storage
+
+Each trace row stores its timeline in `request_timeline_gz`, gzip of the same
+versioned JSON document, with `request_timeline_version` and `request_count`
+beside it (migration 017). The original `request_timeline` JSONB column failed
+at AgentX scale in two ways. PostgreSQL rejects a JSONB array whose elements
+exceed 268,435,455 bytes (SQLSTATE 54000), which ingest hit at roughly 500,000
+requests, and the largest stored documents could not be read back through
+Neon's 64 MiB HTTP response limit. A gzip byte string has no element limit, and
+the column uses `EXTERNAL` storage so PostgreSQL neither recompresses it nor
+reads more TOAST chunks than one `substring()` slice needs.
+
+Ingest workers and the backfill stream the JSON text into gzip, so neither
+holds the serialized document. Readers pick a path from the scalar columns
+without detoasting a payload. A current gzip timeline is read in 16 MiB
+`substring()` slices (about 32 MiB each once Neon hex-encodes them) and
+concatenated. `request-timeline` returns the whole document, so it decompresses
+and parses all of it. `request-chart-data` and `trace-histograms` need a few
+fields per request and follow the bounded decode convention of
+`etl/gzip-json-stream.ts`: a timeline of up to 16 MiB of JSON is parsed in one
+piece, and a larger one is gunzipped and tokenized with stream-json, keeping
+only the chart fields or the ISL/OSL values of one request at a time. The
+ceiling is lower than the 128 MiB that ingest uses for server metrics because
+these reads run in request-serving functions. A stored timeline that cannot be
+read (the value changed during the read, corrupt gzip, or malformed JSON) is
+logged with its `trace_replay_id` and served as missing data. When no current
+timeline is stored, the slow path recomputes it from the profile and writes
+back only the gzip form.
+
+Rows ingested before migration 017 keep their JSONB timeline until it is
+converted, and readers fall back to it whenever `request_timeline_gz` is null.
+That legacy reader reads every current timeline as bounded text chunks and
+deliberately does not choose by compressed JSONB storage size, so a highly
+compressible timeline cannot cross the response limit or force the database to
+materialize the serialized size just to select a read path. `request-chart-data`
+still projects a legacy timeline of up to 250,000 requests
+(`jsonb_array_length`) in SQL. The projection costs about 155 bytes per request:
+trace row 3811's 459,630 requests projected to 71.5 MB, past the response
+limit. A larger legacy timeline streams its text chunks through the same
+bounded scan instead.
+
+`db:backfill-request-timeline` fills `request_timeline_gz` for every row whose
+gzip copy is missing or stale. A row that still holds a current-version JSONB
+timeline is converted without reading its profile blob. The script reads the
+document header and `jsonb_array_length`, fetches requests in index ranges of
+25,000 with `jsonb_path_query_array`, and writes the gzip only when the streamed
+count matches the array length before and after streaming. Other rows are
+recomputed from the profile. A failed row does not stop the run. It appears in
+the closing failure list and makes the script exit nonzero. The opt-in
+`--drop-legacy-jsonb` flag sets `request_timeline` to null only when it equals
+the gzip copy. The script uploads the decompressed gzip JSON in 4 MiB parts
+and lets PostgreSQL compare `request_timeline` with
+`convert_from(<uploaded bytes>, 'UTF8')::jsonb`, so neither document crosses the
+network whole. A legacy timeline of another version, another request count, or
+other content is kept and reported as a failed row. A default run never clears
+legacy data.
+
+#### Migration order
+
+Migration 017 ships in its own change and must reach a database before the
+readers that select its columns. The ingest workflows and Recompute Agentic
+Metrics apply pending migrations before they run; Vercel deploys do not. Apply
+`017_request_timeline_gz.sql` to every database the app reads (from the
+repository root, with credentials for the reviewed target database, run
+`bun run admin:db:migrate --yes` after checking pending migrations), then
+deploy the readers. Without the columns, the timeline, chart, and histogram
+reads fail until the migration runs. The migration only adds columns and is
+idempotent, so the code that predates it keeps working and a repeated run
+changes nothing.
+
+The Recompute Agentic Metrics workflow applies pending migrations in one job
+before its shards start, so the run triggered by merging the readers converts
+stale rows only after the columns exist. Its integrity check accepts the
+JSONB-to-gzip conversion when a timeline keeps its version and request count,
+and still requires identical stored bytes when the container is unchanged. A
+later migration drops `request_timeline` once every row has been converted and
+its JSONB cleared.
 
 ### Agentic Full-Response Interactivity
+
+Large raw AgentX profiles use `agentic_trace_profile_chunks` (migration 018).
+Profiles over 16 MiB compressed are stored in ordered 4 MiB binary rows; smaller
+and historical profiles retain the inline `profile_export_jsonl_gz` column.
+The trace row records the chunk count, compressed size and SHA-256 checksum.
+All parts, metadata and benchmark links commit in the same transaction. Readers
+verify each part's size and the complete checksum while streaming the original
+gzip bytes. No requests, metrics or timing samples are removed or approximated.
+This avoids PostgreSQL's single-value limit even for profiles over 1 GiB.
+
+Apply migrations 017 and 018 before deploying the readers and writer. Chart
+availability recognizes both inline and chunked profiles. After deployment,
+re-ingest failed traces from their existing benchmark artifacts; already-linked
+traces remain unchanged. Trace storage size failures are errors rather than
+warnings, so an incomplete chart import cannot produce a green ingestion run.
 
 Agentic charts use full-response inter-token latency as their canonical ITL and
 define each interactivity percentile as the reciprocal of the matching ITL
