@@ -153,13 +153,23 @@ export function dropSupersededJobCopies(
     winnerByPoint.set(point, winner);
   }
 
-  // A copy is dropped only when a newer copy won every point it produced.
+  // Retries of one job produce the same points, so a copy either wins all of
+  // its ordered points or none. A partial loss cannot be ingested without
+  // mixing attempts, so it fails instead.
   const dropped = new Map<string, string>();
   for (const [suffix, points] of pointsBySuffix) {
-    if (points.size === 0) continue;
-    const winners = [...points].map((point) => winnerByPoint.get(point));
-    if (winners.some((winner) => winner === undefined || winner === suffix)) continue;
-    dropped.set(suffix, winners[0]!);
+    const winners = [...points]
+      .map((point) => winnerByPoint.get(point))
+      .filter((winner) => winner !== undefined);
+    const lost = winners.filter((winner) => winner !== suffix);
+    if (lost.length === 0) continue;
+    if (lost.length !== points.size) {
+      throw new Error(
+        `Retry copy ${suffix} lost only some of its points to newer copies; ` +
+          'cannot choose one attempt for the whole file',
+      );
+    }
+    dropped.set(suffix, lost[0]!);
   }
   if (dropped.size === 0) return { superseded: [], unordered };
 

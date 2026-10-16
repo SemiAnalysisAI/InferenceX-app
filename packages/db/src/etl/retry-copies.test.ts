@@ -124,6 +124,26 @@ describe('dropSupersededJobCopies', () => {
     expect(fs.existsSync(path.join(dir, 'power_audit_passed'))).toBe(true);
   });
 
+  it('fails when an older copy loses only some of its points', () => {
+    const dir = tempRoot();
+    writeCopy(dir, 'old', goldenRow);
+    fs.writeFileSync(
+      path.join(dir, 'bmk_agentic_old', 'result.json'),
+      JSON.stringify([goldenRow, { ...goldenRow, conc: 56, users: 56 }]),
+    );
+    writeCopy(dir, 'new', goldenRow);
+    expect(() =>
+      dropSupersededJobCopies(
+        dir,
+        metas([
+          ['old', '2026-10-13T00:00:00Z', 1],
+          ['new', '2026-10-14T00:00:00Z', 2],
+        ]),
+      ),
+    ).toThrow('lost only some of its points');
+    expect(fs.readdirSync(dir)).toHaveLength(SIBLINGS.length * 2);
+  });
+
   it('keeps every copy and reports the point when artifact metadata is missing', () => {
     const dir = tempRoot();
     writeCopy(dir, 'a', goldenRow);
