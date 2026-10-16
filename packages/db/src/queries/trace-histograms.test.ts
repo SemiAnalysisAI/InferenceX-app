@@ -136,7 +136,7 @@ describe('getTraceHistograms', () => {
     ]);
     await expect(getTraceHistograms(sql, [1])).resolves.toEqual({});
     expect(calls).toHaveLength(2);
-    expect(calls[1]).toContain('profile_export_jsonl_gz as blob');
+    expect(calls[1]).toContain('profile_export_chunk_count as parts');
   });
 
   it('yields empty arrays when a timeline has no isl/osl at all', async () => {

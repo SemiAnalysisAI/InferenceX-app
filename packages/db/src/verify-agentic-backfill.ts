@@ -26,7 +26,7 @@ async function states(ids: string[]): Promise<BackfillState[]> {
     const result = await sql<BackfillState[]>`
       select br.id::text, a.id::text as trace_id,
         md5(row_to_json(br)::text) as benchmark_hash,
-        md5(a.profile_export_jsonl_gz) as profile_hash,
+        case when a.profile_export_chunk_count > 0 then (select md5(string_agg(md5(p.data), '' order by p.part)) from agentic_trace_profile_chunks p where p.trace_replay_id = a.id) else md5(a.profile_export_jsonl_gz) end as profile_hash,
         md5(a.server_metrics_json_gz) as server_hash,
         case
           when a.request_timeline_gz is not null then 'gzip'

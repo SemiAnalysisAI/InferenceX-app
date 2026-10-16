@@ -293,7 +293,7 @@ export async function getRequestChartData(
   const rows = (await sql`
     select
       atr.id as trace_replay_id,
-      (atr.profile_export_jsonl_gz is not null) as has_blob,
+      (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob,
       octet_length(atr.request_timeline_gz) as gz_bytes,
       case
         when atr.request_timeline_gz is not null then atr.request_timeline_version::int

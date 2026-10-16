@@ -240,7 +240,13 @@ describe('getRequestTimeline', () => {
       ...gzipMeta(512),
       timeline_version: REQUEST_TIMELINE_VERSION - 1,
     };
-    const { sql, log } = mockSql([[staleHeader], [{ blob }]]);
+    const { sql, log } = mockSql([
+      [staleHeader],
+      [{ parts: 0, inline_size: blob.length }],
+      [{ data: blob }],
+      [{ parts: 0, inline_size: blob.length }],
+      [{ data: blob }],
+    ]);
 
     const result = await getRequestTimeline(sql, 422991);
 
@@ -248,7 +254,7 @@ describe('getRequestTimeline', () => {
     expect(result?.requests).toHaveLength(1);
     // A stale gzip copy is never sliced; the blob is read instead. The
     // PostgreSQL test in request-timeline-db.test.ts checks what is stored.
-    expect(log[1]!.text).toContain('profile_export_jsonl_gz as blob');
+    expect(log[1]!.text).toContain('profile_export_chunk_count as parts');
     expect(agenticShared.writeBackRequestTimeline).toHaveBeenCalledWith(sql, 870, result);
   });
 

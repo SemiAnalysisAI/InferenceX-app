@@ -8,6 +8,8 @@ import type postgres from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { PROFILE_INLINE_BYTES, readTraceProfileGz } from '../lib/trace-profile-storage';
+import { getTraceAvailability } from '../queries/trace-availability';
 import {
   REQUEST_TIMELINE_VERSION,
   computeRequestTimeline,
@@ -316,7 +318,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
       VALUES (1, 'dsv4', 'b200', 'vllm', 'fp4', 'none', false, false, 8, 8, 8, 8);
       INSERT INTO benchmark_results (id, workflow_run_id, config_id, benchmark_type, date, conc, metrics)
       VALUES (41, 1, 1, 'agentic_traces', '2026-10-01', 16, '{}'),
-             (42, 1, 1, 'agentic_traces', '2026-10-01', 32, '{}');
+             (42, 1, 1, 'agentic_traces', '2026-10-01', 32, '{}'),
+             (43, 1, 1, 'agentic_traces', '2026-10-01', 64, '{}');
     `);
   }, 30_000);
 
@@ -383,5 +386,28 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.request_count).toBeNull();
     expect(row.request_timeline).toBeNull();
     expect(row.chart_series).toEqual({ version: 12 });
+  });
+
+  it('round-trips a chunked profile and exposes charts without a single oversized value', async () => {
+    const profile = Buffer.alloc(PROFILE_INLINE_BYTES + 17);
+    for (let i = 0; i < profile.length; i++) profile[i] = i % 251;
+    const prepared = {
+      ...preparedFixture(),
+      profileGz: profile,
+      profileSize: profile.length * 3,
+      requestTimelineGz: await gzipRequestTimeline(persistedTimeline),
+      timelineRequests: persistedTimeline.requests.length,
+    };
+    expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(1);
+    const row = await storedTrace(43);
+    expect(row.profile_export_jsonl_gz).toBeNull();
+    const restored = await readTraceProfileGz(pg, row.trace_replay_id!);
+    expect(restored?.equals(profile)).toBe(true);
+    expect(await getTraceAvailability(pg, [41, 43])).toEqual({ 41: true, 43: true });
+    expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
+    // Re-ingestion leaves the linked trace and its immutable chunks untouched.
+    expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(0);
+    const after = await storedTrace(43);
+    expect(after.trace_replay_id).toBe(row.trace_replay_id);
   });
 });

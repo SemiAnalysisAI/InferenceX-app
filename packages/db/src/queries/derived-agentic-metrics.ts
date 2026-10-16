@@ -21,7 +21,7 @@
  *   WORST request's effective token rate.
  */
 
-import { gunzipSync } from 'node:zlib';
+import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import type { DbClient } from '../connection.js';
 import {
@@ -141,6 +141,30 @@ export function computeDerivedFromBlob(jsonl: string): {
   return { e2el_per_osl: percentilesOf(ratios) };
 }
 
+/** Same legacy fallback calculations, with bounded profile reads and JSONL decoding. */
+export async function computeStoredProfileDistributions(sql: DbClient, traceReplayId: number) {
+  const isl: number[] = [];
+  const osl: number[] = [];
+  const ratios: number[] = [];
+  for await (const line of readTraceProfileLines(sql, traceReplayId)) {
+    const lengths = extractIslOsl(line);
+    isl.push(...lengths.isl);
+    osl.push(...lengths.osl);
+    if (!line) continue;
+    let record: ProfileRecord;
+    try {
+      record = JSON.parse(line) as ProfileRecord;
+    } catch {
+      continue;
+    }
+    if (record.metadata?.benchmark_phase && record.metadata.benchmark_phase !== 'profiling')
+      continue;
+    const turn = extractTurn(record);
+    if (turn) ratios.push(turn.request_latency_ms / 1000 / turn.osl);
+  }
+  return { isl, osl, e2el_per_osl: percentilesOf(ratios) };
+}
+
 export async function getDerivedAgenticMetrics(
   sql: DbClient,
   benchmarkResultIds: number[],
@@ -184,28 +208,28 @@ export async function getDerivedAgenticMetrics(
   const rows: {
     benchmark_result_id: number;
     trace_replay_id: number;
-    blob: Buffer;
   }[] = [];
   for (let i = 0; i < idsNeedingBlob.length; i += QUERY_CHUNK_SIZE) {
     const chunk = idsNeedingBlob.slice(i, i + QUERY_CHUNK_SIZE);
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
-        atr.id as trace_replay_id,
-        atr.profile_export_jsonl_gz as blob
+        atr.id as trace_replay_id
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
-        and atr.profile_export_jsonl_gz is not null
-    `) as { benchmark_result_id: number; trace_replay_id: number; blob: Buffer }[];
+        and (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
+    `) as { benchmark_result_id: number; trace_replay_id: number }[];
     rows.push(...chunkRows);
   }
 
   for (const row of rows) {
     const id = Number(row.benchmark_result_id);
     try {
-      const jsonl = gunzipSync(row.blob).toString('utf8');
-      const { e2el_per_osl } = computeDerivedFromBlob(jsonl);
+      const { isl, osl, e2el_per_osl } = await computeStoredProfileDistributions(
+        sql,
+        Number(row.trace_replay_id),
+      );
       result[id] = {
         id,
         p75_e2e_norm_intvty: invertRatio(e2el_per_osl?.p75),
@@ -228,7 +252,6 @@ export async function getDerivedAgenticMetrics(
       const prior = staleStatsById.get(id) ?? null;
       const canPreserveServerFields = Boolean(prior?.kvCacheUtil || prior?.prefixCacheHitRate);
       if (canPreserveServerFields) {
-        const { isl, osl } = extractIslOsl(jsonl);
         const merged: StoredAggregateStats = {
           version: STATS_VERSION,
           isl: percentilesOf(isl),

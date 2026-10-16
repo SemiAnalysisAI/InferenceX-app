@@ -14,6 +14,8 @@ import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
+import { PROFILE_INLINE_BYTES, writeTraceProfileChunks } from '../lib/trace-profile-storage';
+
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
@@ -257,6 +259,7 @@ export async function persistPreparedTraceReplay(
   } = prepared;
 
   let linkedCount = 0;
+  const chunkedProfile = profileGz !== null && profileGz.length > PROFILE_INLINE_BYTES;
   const insertStart = Date.now();
   log(`uploading trace_replay payloads in ${formatBytes(TRACE_REPLAY_UPLOAD_CHUNK_BYTES)} chunks`);
   await sql.begin(async (tx) => {
@@ -281,7 +284,7 @@ export async function persistPreparedTraceReplay(
     `;
 
     const payloads: [TraceReplayUploadField, Buffer | null][] = [
-      ['profile_export_jsonl_gz', profileGz],
+      ['profile_export_jsonl_gz', chunkedProfile ? null : profileGz],
       ['server_metrics_csv', serverMetricsCsv],
       ['server_metrics_json_gz', serverMetricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
@@ -352,6 +355,11 @@ export async function persistPreparedTraceReplay(
       returning id
     `;
     log(`assembled trace_replay_id=${traceReplayId}`);
+
+    if (chunkedProfile && profileGz) {
+      await writeTraceProfileChunks(tx, traceReplayId, profileGz);
+      log(`stored profile=${formatBytes(profileGz.length)} in permanent chunks`);
+    }
 
     const updateStart = Date.now();
     log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);

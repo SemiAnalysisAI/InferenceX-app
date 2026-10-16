@@ -253,7 +253,9 @@ describe('getAgenticAggregates write-back', () => {
       // fetchAggregateStatsRows
       [{ benchmark_result_id: 7, stats: staleStats }],
       // Pass 1: profile blob (+ trace_replay_id for write-back)
-      [{ benchmark_result_id: 7, trace_replay_id: 870, profile_blob: profileBlob }],
+      [{ benchmark_result_id: 7, trace_replay_id: 870, has_profile: true }],
+      [{ parts: 0, inline_size: profileBlob.length }],
+      [{ data: profileBlob }],
       // Pass 2: server blob
       [{ benchmark_result_id: 7, server_blob: serverBlob }],
     ]);
@@ -265,13 +267,13 @@ describe('getAgenticAggregates write-back', () => {
     expect(result[7]?.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
 
     // 4 calls: stats read, profile read, server read, write-back UPDATE.
-    expect(calls).toHaveLength(4);
-    expect(calls[3]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-    expect(calls[3]!.text).toContain('::jsonb where id');
+    expect(calls).toHaveLength(6);
+    expect(calls[5]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+    expect(calls[5]!.text).toContain('::jsonb where id');
 
     // The payload OBJECT is bound directly (not stringified — that would
     // double-encode into a JSONB string).
-    const [written, traceReplayId] = calls[3]!.values as [WrittenStats, number];
+    const [written, traceReplayId] = calls[5]!.values as [WrittenStats, number];
     expect(traceReplayId).toBe(870);
     expect(written.version).toBe(STATS_VERSION);
     // Server field FRESHLY recomputed (0.25), not the stale 0.9 carried forward.

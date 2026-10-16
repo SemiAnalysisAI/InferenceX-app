@@ -1,3 +1,4 @@
+import { readTraceProfileChunks } from './lib/trace-profile-storage';
 /**
  * Backfill `agentic_trace_replay.request_timeline_gz` (gzip JSON plus the
  * `request_timeline_version` and `request_count` scalars) for rows whose gzip
@@ -29,7 +30,6 @@ import {
 } from './etl/compute-request-timeline.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { gzipRequestTimeline } from './etl/request-timeline-codec.js';
-import { TRACE_REPLAY_UPLOAD_CHUNK_BYTES } from './etl/trace-replay-ingest.js';
 import {
   parseLimitForceFlags,
   parseRunIdFlag,
@@ -48,48 +48,15 @@ const flags = parseLimitForceFlags();
 const githubRunId = parseRunIdFlag();
 const dropLegacyJsonb = process.argv.includes('--drop-legacy-jsonb');
 
-const PROFILE_DOWNLOAD_CHUNK_BYTES = TRACE_REPLAY_UPLOAD_CHUNK_BYTES;
-
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
   max: 1,
   onnotice: () => {},
 });
 
-/** Avoid Neon's encoded-response limit and postgres.js's large-value copies. */
-async function readProfileBlob(id: number): Promise<Buffer | null> {
-  const [sizeRow] = await sql<{ size: number | null }[]>`
-    select octet_length(profile_export_jsonl_gz)::int as size
-    from agentic_trace_replay
-    where id = ${id}
-  `;
-  const size = sizeRow?.size;
-  if (size === null || size === undefined) return null;
-
-  const chunks: Buffer[] = [];
-  for (let offset = 0; offset < size; offset += PROFILE_DOWNLOAD_CHUNK_BYTES) {
-    const [chunkRow] = await sql<{ data: Buffer }[]>`
-      select substring(
-        profile_export_jsonl_gz
-        from ${offset + 1}
-        for ${PROFILE_DOWNLOAD_CHUNK_BYTES}
-      ) as data
-      from agentic_trace_replay
-      where id = ${id}
-    `;
-    if (!chunkRow) return null;
-    chunks.push(chunkRow.data);
-  }
-  return Buffer.concat(chunks, size);
-}
-
 async function recomputeFromProfile(id: number): Promise<RequestTimelineGzRow> {
-  const profileBlob = await readProfileBlob(id);
-  if (profileBlob === null) {
-    throw new Error('no profile blob or current legacy request_timeline to build from');
-  }
   const timeline = requireBackfillPayload(
-    await computeRequestTimeline(profileBlob),
+    await computeRequestTimeline(() => readTraceProfileChunks(sql, id)),
     'request_timeline_gz',
   );
   return {
@@ -162,7 +129,7 @@ async function main(): Promise<void> {
       ? await sql<{ id: number }[]>`
           select id
           from agentic_trace_replay
-          where profile_export_jsonl_gz is not null
+          where (profile_export_jsonl_gz is not null or profile_export_chunk_count > 0)
             and mod(id, ${flags.shardCount}) = ${flags.shardIndex}
             ${runFilter}
           order by id
@@ -180,7 +147,7 @@ async function main(): Promise<void> {
                   or coalesce(request_timeline_version, -1) < ${REQUEST_TIMELINE_VERSION}
                 )
                 and (
-                  profile_export_jsonl_gz is not null
+                  (profile_export_jsonl_gz is not null or profile_export_chunk_count > 0)
                   or (request_timeline->>'version')::int = ${REQUEST_TIMELINE_VERSION}
                 )
               )

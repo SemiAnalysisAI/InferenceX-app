@@ -1,3 +1,4 @@
+import { readTraceProfileChunks } from '../lib/trace-profile-storage';
 /**
  * Per-request timeline for the agentic detail page's Gantt view.
  *
@@ -31,10 +32,6 @@ interface RawMetaRow {
   /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
   gz_bytes: number | null;
   timeline_version: number | null;
-}
-
-interface RawBlobRow {
-  blob: Buffer | null;
 }
 
 interface RawTimelineChunkRow {
@@ -160,7 +157,7 @@ export async function getRequestTimeline(
   const rows = (await sql`
     select
       atr.id as trace_replay_id,
-      (atr.profile_export_jsonl_gz is not null) as has_blob,
+      (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob,
       octet_length(atr.request_timeline_gz) as gz_bytes,
       case
         when atr.request_timeline_gz is not null then atr.request_timeline_version::int
@@ -196,12 +193,9 @@ export async function getRequestTimeline(
   // pre-computed timeline is stale or missing. Long trace runs can have blobs
   // large enough to exceed Neon's 64 MiB encoded-response limit, so the fast
   // path must never select the blob alongside the stored timeline.
-  const blobRows = (await sql`
-    select profile_export_jsonl_gz as blob
-    from agentic_trace_replay
-    where id = ${row.trace_replay_id}
-  `) as unknown as RawBlobRow[];
-  const timeline = await computeRequestTimeline(blobRows[0]?.blob ?? null);
+  const timeline = await computeRequestTimeline(() =>
+    readTraceProfileChunks(sql, row.trace_replay_id),
+  );
 
   // Self-heal the stored gzip timeline so the next request (and the
   // trace-histograms and request-chart-data routes, which read the same

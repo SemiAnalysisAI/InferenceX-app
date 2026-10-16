@@ -130,6 +130,10 @@ export function fullResponseMetricsFromProfile(jsonl: string): Record<string, nu
       // A malformed record does not invalidate the remaining profile.
     }
   }
+  return fullResponseMetricsFromSamples(samples);
+}
+
+function fullResponseMetricsFromSamples(samples: number[]): Record<string, number> {
   if (samples.length === 0) return {};
 
   const stats = percentileStats(samples);
@@ -142,6 +146,23 @@ export function fullResponseMetricsFromProfile(jsonl: string): Record<string, nu
   patch.std_full_response_itl = populationStd(samples);
   patch.std_full_response_intvty = populationStd(samples.map((value) => 1 / value));
   return preferFullResponseMetrics(patch);
+}
+
+/** Exact same samples and statistics as the string helper, without a whole JSONL string. */
+export async function fullResponseMetricsFromLines(
+  lines: AsyncIterable<string>,
+): Promise<Record<string, number>> {
+  const samples: number[] = [];
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const sample = fullResponseItlSample(JSON.parse(line) as ProfileRecord);
+      if (sample !== undefined && Number.isFinite(sample) && sample > 0) samples.push(sample);
+    } catch {
+      // Preserve the legacy malformed-record handling.
+    }
+  }
+  return fullResponseMetricsFromSamples(samples);
 }
 
 export function fullResponseMetricsFromGzip(blob: Buffer | null): Record<string, number> {

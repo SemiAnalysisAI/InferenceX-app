@@ -485,6 +485,21 @@ its JSONB cleared.
 
 ### Agentic Full-Response Interactivity
 
+Large raw AgentX profiles use `agentic_trace_profile_chunks` (migration 018).
+Profiles over 16 MiB compressed are stored in ordered 4 MiB binary rows; smaller
+and historical profiles retain the inline `profile_export_jsonl_gz` column.
+The trace row records the chunk count, compressed size and SHA-256 checksum.
+All parts, metadata and benchmark links commit in the same transaction. Readers
+verify each part's size and the complete checksum while streaming the original
+gzip bytes. No requests, metrics or timing samples are removed or approximated.
+This avoids PostgreSQL's single-value limit even for profiles over 1 GiB.
+
+Apply migrations 017 and 018 before deploying the readers and writer. Chart
+availability recognizes both inline and chunked profiles. After deployment,
+re-ingest failed traces from their existing benchmark artifacts; already-linked
+traces remain unchanged. Trace storage size failures are errors rather than
+warnings, so an incomplete chart import cannot produce a green ingestion run.
+
 Agentic charts use full-response inter-token latency as their canonical ITL and
 define each interactivity percentile as the reciprocal of the matching ITL
 percentile. Current aggregate artifacts provide the namespaced

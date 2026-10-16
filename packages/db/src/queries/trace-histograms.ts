@@ -15,7 +15,7 @@
  * however it wants.
  */
 
-import { gunzipSync } from 'node:zlib';
+import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline';
 import { scanRequestTimelineGz } from '../etl/request-timeline-codec';
@@ -35,11 +35,6 @@ export interface TraceHistogramPoint {
 export type TraceHistogramMap = Record<number, TraceHistogramPoint>;
 
 const QUERY_CHUNK_SIZE = 12;
-// Bytea values expand in Neon's JSON-over-HTTP response. Keep raw fallback
-// reads comfortably below its 64 MiB response cap; current ingests store a
-// request timeline and never need this path.
-const MAX_FALLBACK_BLOB_BYTES = 24 * 1024 * 1024;
-
 /** The only request fields a histogram needs from a scanned gzip timeline. */
 const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
 
@@ -104,7 +99,7 @@ export async function getTraceHistograms(
           from jsonb_array_elements(atr.request_timeline->'requests') with ordinality x(r, ord)
           where jsonb_typeof(r->'osl') = 'number'
         ) end as osl,
-        (atr.profile_export_jsonl_gz is not null) as has_blob
+        (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
@@ -146,23 +141,13 @@ export async function getTraceHistograms(
     result[id] = { id, isl, osl };
   }
 
-  // Compatibility fallback for pre-timeline rows. Fetch one small blob at a
-  // time; oversized legacy rows are omitted instead of turning the whole API
-  // response into a 507.
+  // Compatibility fallback for pre-timeline rows. Stream one profile at a
+  // time through bounded queries, including profiles kept in permanent chunks.
   for (const row of fallbackRows) {
-    const blobRows = (await sql`
-      select profile_export_jsonl_gz as blob
-      from agentic_trace_replay
-      where id = ${row.trace_replay_id}
-        and octet_length(profile_export_jsonl_gz) <= ${MAX_FALLBACK_BLOB_BYTES}
-    `) as unknown as { blob: Buffer }[];
-    const blob = blobRows[0]?.blob;
-    if (!blob) continue;
     try {
-      const jsonl = gunzipSync(blob).toString('utf8');
       const isl: number[] = [];
       const osl: number[] = [];
-      for (const line of jsonl.split('\n')) {
+      for await (const line of readTraceProfileLines(sql, row.trace_replay_id)) {
         if (!line) continue;
         let rec: { metrics?: Record<string, { value?: number } | number> };
         try {
