@@ -9,7 +9,7 @@ import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 
 import * as agenticShared from './agentic-shared';
 import { encodeRequestChartData, getRequestChartData } from './request-chart-data';
-import { getRequestTimeline } from './request-timeline';
+import { getRequestTimeline, getStoredRequestTimelineGz } from './request-timeline';
 import { getTraceHistograms } from './trace-histograms';
 
 // Expose the self-heal promise so the test can await the real write-back.
@@ -190,5 +190,37 @@ describe('request timeline storage on PostgreSQL', () => {
     // The next read takes the gzip fast path instead of recomputing.
     await expect(getRequestTimeline(sql, 104)).resolves.toEqual(result);
     expect(writeBack).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('stored gzip timeline streaming', () => {
+  it('returns the exact complete document in bounded slices without decoding', async () => {
+    const chunks = await getStoredRequestTimelineGz(sql, 102, 23);
+    expect(chunks).not.toBeNull();
+    const bytes: Buffer[] = [];
+    for await (const chunk of chunks!) {
+      expect(chunk.length).toBeLessThanOrEqual(23);
+      bytes.push(chunk);
+    }
+    expect(bytes.length).toBeGreaterThan(1);
+    expect(gunzipRequestTimeline(Buffer.concat(bytes))).toEqual(gzipOnly);
+  });
+
+  it('leaves legacy and missing points to the existing fallback', async () => {
+    expect(await getStoredRequestTimelineGz(sql, 101)).toBeNull();
+    expect(await getStoredRequestTimelineGz(sql, 999999)).toBeNull();
+  });
+
+  it('rejects a disappearing row instead of completing a truncated response', async () => {
+    const chunks = await getStoredRequestTimelineGz(sql, 102, 23);
+    const first = await chunks!.next();
+    expect(first.value).toHaveLength(23);
+    const [row] = await sql`select request_timeline_gz from agentic_trace_replay where id = 12`;
+    await sql`update agentic_trace_replay set request_timeline_gz = null where id = 12`;
+    try {
+      await expect(chunks!.next()).rejects.toThrow('Stored timeline changed');
+    } finally {
+      await sql`update agentic_trace_replay set request_timeline_gz = ${row.request_timeline_gz} where id = 12`;
+    }
   });
 });

@@ -2385,8 +2385,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/request-timeline',
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
-      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing.',
-      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。',
+      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved; legacy timelines retain the same response shape.',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录；旧版时间线的响应结构不变。',
     ),
     audience: 'public',
     stability: 'beta',

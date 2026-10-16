@@ -880,7 +880,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-request-timeline',
-    sourceSha256: 'f707e6e2f4d2eccf46882a89d73d26ba34ac4fa58e8bad925461aa7956e5a018',
+    sourceSha256: '792f054fc06e9e1cf59ce897cfc2b661f34eb54e501c72923409c4a05cc6973a',
   },
   {
     source: 'src/app/api/v1/resident-sequence-lengths/route.ts',
@@ -1439,7 +1439,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
+    sourceSha256: 'd2564d306c7794d0fb79a8996991783c6b7ef2d1780e1fff31c08b81cfbb03b9',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1643,8 +1643,9 @@ export const apiContractSourceDigests = [
     // Reviewed for gzip request-timeline storage (migration 017): the reader
     // prefers request_timeline_gz and falls back to legacy JSONB, and logs a
     // stored timeline it cannot read. It returns the same RequestTimeline
-    // document, nullability, 404 and caching, so the docs stand.
-    sourceSha256: 'c3bb72c5af3771667542f7676255fe32f8e3e28c3e5800298b663d22f45c5f2a',
+    // document; current stored gzip can also stream directly with unchanged
+    // CDN headers, bypassing the parsed-object Blob cache to bound memory.
+    sourceSha256: '3dc8d83421ac5b468aad7914f19fe8c9f081713dad86222ec395d01df28b3cb2',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',

@@ -781,3 +781,11 @@ empty receipt says `no_power_points`, never that power coverage was validated.
 The workflow retains both the input manifest and verification receipt. Cache
 invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
 ledger edits trigger the existing reviewed override workflow.
+
+### Serving large request timelines
+
+The request-timeline API streams current-version `request_timeline_gz` directly
+in bounded 1 MiB database reads. It preserves every request and the existing JSON
+contract and CDN headers, without expanding the full document or putting it through
+the parsed-object Blob cache. Reads follow response backpressure and stop on
+cancellation. Legacy or stale timelines use the existing computation/cache path.
