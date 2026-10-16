@@ -11,6 +11,7 @@ import {
 } from '@/components/inference/metric-registry';
 import {
   applyTokenRevenuePricing,
+  cacheAffectsPrice,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
   tokenRevenueFromRatesPerGpuHour,
@@ -27,7 +28,12 @@ import {
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import {
+  type CacheRatePolicy,
+  DEFAULT_CACHE_RATE_POLICY,
+  frontierCacheUnavailableReason,
+  selectPricingCacheBasis,
+} from '@/lib/calculator/cache-pricing';
 import {
   buildDerivedChartFields,
   getHardwareKey,
@@ -51,6 +57,7 @@ export function rowToLightweightPoint(
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  cacheRatePolicy: CacheRatePolicy = DEFAULT_CACHE_RATE_POLICY,
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
@@ -85,11 +92,21 @@ export function rowToLightweightPoint(
     server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
     theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
+    benchmark_type: entry.benchmark_type,
+    server_overall_cache_hit_rate: entry.server_overall_cache_hit_rate,
+    server_cache_core_schema_version: entry.server_cache_core_schema_version,
+    server_cache_detail_schema_code: entry.server_cache_detail_schema_code,
+    server_cache_status_class_code: entry.server_cache_status_class_code,
+    server_cache_published: entry.server_cache_published,
+    server_cache_pricing_eligible: entry.server_cache_pricing_eligible,
+    server_cache_basis_code: entry.server_cache_basis_code,
+    server_cache_overall_source_code: entry.server_cache_overall_source_code,
+    server_cache_invalid_rate_fields: entry.server_cache_invalid_rate_fields,
     ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics, tcoBasis),
   } as InferenceData;
 
   return requestedMetrics.includes('tokenRevenuePerGpuHour')
-    ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]!
+    ? applyTokenRevenuePricing([point], tokenRevenuePricing, cacheRatePolicy)[0]!
     : point;
 }
 
@@ -179,6 +196,7 @@ export function interpolateMetricAtInteractivity(
   targetInteractivity: number,
   metricKey: YAxisMetricKey,
   tokenRevenuePricing?: TokenRevenuePricing | null,
+  cacheRatePolicy: CacheRatePolicy = DEFAULT_CACHE_RATE_POLICY,
 ): number | null {
   if (points.length === 0) return null;
 
@@ -238,7 +256,16 @@ export function interpolateMetricAtInteractivity(
     };
     const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
     const inputShares = sorted.map(inputTokenShareForRevenue);
-    const cacheHitRates = sorted.map(pricingCacheHitRate);
+    const cacheBases = sorted.map((p) => selectPricingCacheBasis(p, cacheRatePolicy));
+    // An unproven knot, or a verified knot beside one without a rate, makes the
+    // operating point unpriceable; splining around it would bill hits as zero.
+    if (
+      frontierCacheUnavailableReason(cacheBases) !== undefined &&
+      cacheAffectsPrice(tokenRevenuePricing)
+    ) {
+      return null;
+    }
+    const cacheHitRates = cacheBases.map((cache) => cache.rate);
     const inputShare = inputShares.every((share): share is number => share !== null)
       ? interpolateBounded(inputShares)
       : null;

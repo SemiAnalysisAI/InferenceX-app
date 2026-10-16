@@ -1,5 +1,10 @@
 import { isDeepStrictEqual } from 'node:util';
 
+import {
+  CACHE_RATE_METRIC_KEYS,
+  CACHE_VALIDITY_TRACE_KEYS,
+} from '@semianalysisai/inferencex-constants';
+
 import type { BenchmarkPointBackfill } from '../etl/run-overrides.js';
 import { isRecord } from './records.js';
 
@@ -23,6 +28,36 @@ export function matchesExpectedBackfillMetrics(
   return (
     metrics !== null &&
     Object.entries(backfill.expectedMetrics).every(([key, expected]) => metrics[key] === expected)
+  );
+}
+
+const VALIDATED_CACHE_KEYS: ReadonlySet<string> = new Set([
+  ...CACHE_RATE_METRIC_KEYS,
+  // Decides whether a combined overall is actual, so it is protected on a
+  // validated row; on its own it does not make a row validated.
+  'server_cache_overall_source_code',
+  ...CACHE_VALIDITY_TRACE_KEYS,
+]);
+
+/**
+ * Refuse a backfill that would rewrite cache-hit metrics, their overall
+ * source, or the validity fields vouching for them, on a row carrying a
+ * producer validity contract: the producer's eligibility covers its own
+ * values, not borrowed ones. Rows without a contract (every donor target
+ * today) are unaffected.
+ */
+export function assertBackfillKeepsValidatedCache(
+  metrics: Record<string, unknown>,
+  backfill: BenchmarkPointBackfill,
+): void {
+  const touched = [
+    ...Object.keys(backfill.set.metricsMerge ?? {}),
+    ...(backfill.set.metricsRemove ?? []),
+  ].filter((key) => VALIDATED_CACHE_KEYS.has(key));
+  if (touched.length === 0) return;
+  if (!CACHE_VALIDITY_TRACE_KEYS.some((key) => Object.hasOwn(metrics, key))) return;
+  throw new Error(
+    `${backfill.id}: refusing to rewrite ${touched.join(', ')} on a row whose cache validity the producer vouched for`,
   );
 }
 
@@ -74,6 +109,8 @@ export function planBenchmarkPointBackfill(
   if (!matchesExpectedBackfillMetrics(row.metrics, backfill)) {
     throw new Error(`${backfill.id}: benchmark source metrics differ from the audited measurement`);
   }
+  const currentMetrics = asMetricsRecord(row.metrics);
+  if (currentMetrics) assertBackfillKeepsValidatedCache(currentMetrics, backfill);
   if (isApplied(row, backfill)) return null;
 
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;

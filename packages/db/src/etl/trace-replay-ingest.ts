@@ -12,6 +12,7 @@ import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createGzip, gzipSync } from 'node:zlib';
 
+import { CACHE_VALIDITY_TRACE_KEYS } from '@semianalysisai/inferencex-constants';
 import type postgres from 'postgres';
 
 import { PROFILE_INLINE_BYTES, writeTraceProfileChunks } from '../lib/trace-profile-storage';
@@ -371,6 +372,9 @@ export async function persistPreparedTraceReplay(
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
     if (cacheHitRates) {
+      // Rows carrying a producer validity contract keep the producer's rates:
+      // its eligibility vouches for those values, not for this chart-series
+      // recomputation.
       await tx`
         update benchmark_results
         set metrics = jsonb_set(
@@ -386,6 +390,7 @@ export async function persistPreparedTraceReplay(
           to_jsonb(${cacheHitRates.gpu}::numeric)
         )
         where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+          and not (metrics ?| ${tx.array([...CACHE_VALIDITY_TRACE_KEYS])}::text[])
       `;
       log('updated cache-hit metrics from chart series');
     }

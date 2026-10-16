@@ -7,6 +7,17 @@
  * API / frontend consume, so the rest of the mapper stays version-agnostic.
  */
 
+import {
+  CACHE_BASES,
+  CACHE_DETAIL_SCHEMAS,
+  CACHE_OVERALL_SOURCES,
+  CACHE_RATE_METRIC_KEYS,
+  CACHE_STATUS_CLASSES,
+  cacheCoreSchemaVersion,
+  cacheVocabularyCode,
+  strictBooleanCode,
+} from '@semianalysisai/inferencex-constants';
+
 import { parseNum } from './normalizers';
 
 /**
@@ -71,9 +82,10 @@ const V3_SCALAR_PATHS: [string[], string][] = [
   [['server_metrics', 'tokens', 'prompt_total'], 'total_prompt_tokens'],
   [['server_metrics', 'tokens', 'generation_total'], 'total_generation_tokens'],
   [['server_metrics', 'tokens', 'requests_completed'], 'total_requests_completed'],
-  // Deliberately NOT mapped (yet): cache.overall/prefix_cache_hits/queries,
+  // Deliberately NOT mapped (yet): cache.prefix_cache_hits/queries,
   // kv_cache.cpu_*, tokens.prompt_by_source, sources[] — new v3 detail we don't
-  // consume anywhere; add here + METRIC_KEYS when a view needs them.
+  // consume anywhere; add here + METRIC_KEYS when a view needs them. The
+  // overall rate and the validity core go through `flattenCacheValidity`.
 ];
 
 /** Walk a nested object path; returns undefined on any non-object hop. */
@@ -93,6 +105,60 @@ function flattenStatBlock(block: unknown, suffix: string, out: Record<string, nu
     const n = parseNum((block as Record<string, unknown>)[stat]);
     if (n !== undefined) out[`${canonical}_${suffix}`] = n;
   }
+}
+
+/** `server_metrics.cache` rate fields, in `CACHE_RATE_METRIC_KEYS` order. */
+const CACHE_RATE_FIELDS = [
+  'gpu_cache_hit_rate',
+  'cpu_cache_hit_rate',
+  'external_cache_hit_rate',
+  'overall_cache_hit_rate',
+] as const;
+
+/**
+ * Encode the producer's cache-validity core and overall rate as numeric
+ * metrics. Only what consumers price from is kept; adapter statuses, reasons
+ * and raw diagnostics stay in the artifact. Absent fields stay absent so a
+ * pre-core row is distinguishable from a core that says "not evaluated", and
+ * a field that is present but invalid is recorded as such rather than dropped.
+ */
+function flattenCacheValidity(row: Record<string, any>, out: Record<string, number>): void {
+  const cache = (field: string) => atPath(row, ['server_metrics', 'cache', field]);
+  const core = (field: string) => atPath(row, ['server_metrics', 'cache_validity', field]);
+  const validity = atPath(row, ['server_metrics', 'cache_validity']);
+  const overall = cache('overall_cache_hit_rate');
+  const fields = Object.entries({
+    server_overall_cache_hit_rate:
+      typeof overall === 'number' && Number.isFinite(overall) ? overall : undefined,
+    server_cache_overall_source_code: cacheVocabularyCode(
+      CACHE_OVERALL_SOURCES,
+      cache('overall_source'),
+    ),
+    server_cache_core_schema_version: cacheCoreSchemaVersion(core('core_schema')),
+    server_cache_detail_schema_code: cacheVocabularyCode(CACHE_DETAIL_SCHEMAS, core('schema')),
+    server_cache_status_class_code: cacheVocabularyCode(CACHE_STATUS_CLASSES, core('status_class')),
+    server_cache_published: strictBooleanCode(core('published')),
+    server_cache_pricing_eligible: strictBooleanCode(core('pricing_eligible')),
+    server_cache_basis_code: cacheVocabularyCode(CACHE_BASES, core('basis')),
+  });
+  for (const [key, value] of fields) {
+    if (value !== undefined) out[key] = value;
+  }
+
+  // On a row with a validity contract, a rate that is present but not a finite
+  // number must not reach pricing as `parseNum`'s coercion (`false` -> 0) under
+  // the producer's eligibility. Pre-core rows keep the existing parse.
+  if (!validity || typeof validity !== 'object' || Array.isArray(validity)) return;
+  let invalid = 0;
+  for (const [bit, field] of CACHE_RATE_FIELDS.entries()) {
+    const raw = cache(field);
+    if (raw === null || raw === undefined || (typeof raw === 'number' && Number.isFinite(raw))) {
+      continue;
+    }
+    invalid |= 1 << bit;
+    delete out[CACHE_RATE_METRIC_KEYS[bit]];
+  }
+  if (invalid !== 0) out.server_cache_invalid_rate_fields = invalid;
 }
 
 /**
@@ -134,6 +200,7 @@ export function flattenAgenticAggRow(row: Record<string, any>): Record<string, a
     const n = parseNum(atPath(row, path));
     if (n !== undefined) flat[key] = n;
   }
+  flattenCacheValidity(row, flat);
 
   return { ...row, ...flat };
 }

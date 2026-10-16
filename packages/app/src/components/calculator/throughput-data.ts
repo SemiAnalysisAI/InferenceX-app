@@ -3,7 +3,11 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import {
+  type CacheRatePolicy,
+  DEFAULT_CACHE_RATE_POLICY,
+  selectPricingCacheBasis,
+} from '@/lib/calculator/cache-pricing';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 import {
   DEFAULT_TCO_BASIS,
@@ -180,6 +184,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
+    /** How strictly actual cache pricing follows the producer's validity core. */
+    cacheRatePolicy?: CacheRatePolicy;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -194,6 +200,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile = Percentile.P90,
     tokenType = 'total',
     tcoBasis = DEFAULT_TCO_BASIS,
+    cacheRatePolicy = DEFAULT_CACHE_RATE_POLICY,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -220,7 +227,10 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const cache = selectPricingCacheBasis(
+      { ...m, hw: row.hardware, benchmark_type: row.benchmark_type },
+      cacheRatePolicy,
+    );
     const theoreticalRate =
       typeof m.theoretical_cache_hit_rate === 'number' &&
       Number.isFinite(m.theoretical_cache_hit_rate)
@@ -252,7 +262,14 @@ export function buildGpuGroups<M extends GroupMeta>(
       throughput: tput,
       outputThroughput: outputTput,
       inputThroughput: inputTput,
-      ...(cacheHitRate === null ? {} : { cacheHitRate }),
+      ...(cache.rate === null ? {} : { cacheHitRate: cache.rate }),
+      ...(cache.source === 'unavailable' ? { cacheHitUnavailable: true } : {}),
+      ...(cacheRatePolicy === 'legacy'
+        ? {}
+        : {
+            cacheHitSource: cache.source,
+            ...(cache.reason ? { cacheHitReason: cache.reason } : {}),
+          }),
       ...(theoreticalRate === null ? {} : { theoreticalCacheHitRate: theoreticalRate }),
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,

@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
+import type { CacheValidityMetrics } from '@/lib/calculator/cache-pricing';
 import type { HardwareEntry } from '@/lib/catalog/constants';
 import type { Model, Sequence } from '@/lib/catalog/data-mappings';
 import type { PowerTier } from '@/lib/power/power-tier';
@@ -58,7 +59,7 @@ export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
  * @property {number} std_e2el - Standard deviation of End-to-End Latency.
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
-export interface AggDataEntry {
+export interface AggDataEntry extends CacheValidityMetrics {
   /** Numeric data-parallel replica count, distinct from DP Attention. */
   /** Metric keys present in the source row before missing values are normalized to zero. */
   rawMetricKeys?: string[];

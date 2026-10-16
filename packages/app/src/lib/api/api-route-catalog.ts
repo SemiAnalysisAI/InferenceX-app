@@ -1240,7 +1240,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: 'a2968b195179c6da79ea09d9f8c22614ca939bf746e0dc1f5f82c3a526449ced',
+    sourceSha256: 'b837e9ff66ca76285ca2853bc81af179a0d16db4edb613d8d4031b7f05d0c12c',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1280,7 +1280,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'f91b42f1d75182660c0879801c02f3c0f760bc9a1e53f95a9b84e417df8d4eb3',
+    sourceSha256: 'ace1007b02755fd067008b0b13b0283d445e7e3cbe985a89ae8bad817374d02c',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1333,7 +1333,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '86ef873a7c7f5542a7e88960c43172e8d29ff648b0404265bf0db6a215568cce',
+    sourceSha256: 'd56ab550f2edb11e7c3db1b6f14a4def6edfa15ac17bb32877f3b524808febb1',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1360,7 +1360,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '9dbf3e828140b50023724ce129e25db90ce358ceed1e4051871d43a62ec267ef',
+    sourceSha256: 'bc113ba6e580e457bdbb0b6733687d038f926c465185b5633c02180fc97dc9e8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
