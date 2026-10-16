@@ -11,6 +11,12 @@
  * avg_total_module_power_w / total_module_energy_j: whole compute module
  *                           (Grace + GPUs + HBM + LPDDR5X + regulator loss), only when
  *                           the module sensor exists on every socket
+ * avg_total_cpu_rail_power_w / total_cpu_rail_energy_j: CPU core rail ("CPU Power
+ *                           Socket", no SysIO), summed over sockets
+ * avg_total_cpu_sysio_power_w / total_cpu_sysio_energy_j: SysIO rail, summed over sockets
+ *                           Both rail pairs are breakdowns inside the Grace socket
+ *                           total, emitted only when every socket reports a gap-free rail;
+ *                           never add them to it.
  */
 export const CPU_SIDE_POWER_METRIC_KEY_LIST = [
   'avg_cpu_socket_power_w',
@@ -18,6 +24,10 @@ export const CPU_SIDE_POWER_METRIC_KEY_LIST = [
   'total_cpu_energy_j',
   'avg_total_module_power_w',
   'total_module_energy_j',
+  'avg_total_cpu_rail_power_w',
+  'total_cpu_rail_energy_j',
+  'avg_total_cpu_sysio_power_w',
+  'total_cpu_sysio_energy_j',
 ] as const;
 
 export const CPU_SIDE_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(

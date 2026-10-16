@@ -294,6 +294,8 @@ export interface D3ChartProps<T = any> {
   legendElement?: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
+  /** Keep the SVG mounted so D3 retains its layout when scrolling toggles. */
+  scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 
   /** Called after all layers render. Useful for one-off DOM manipulations. */
   onRender?: (ctx: RenderContext) => void;

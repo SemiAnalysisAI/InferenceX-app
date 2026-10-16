@@ -5026,6 +5026,10 @@
       ]
     },
     {
+      "spec": "cypress/e2e/profit-power-curves.cy.ts",
+      "duration": 3568
+    },
+    {
       "spec": "cypress/e2e/reliability-chart.cy.ts",
       "duration": 3433,
       "tests": [

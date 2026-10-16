@@ -124,3 +124,26 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
 
   return selected;
 }
+
+/**
+ * Keep SKUs that the ranking could not score.
+ *
+ * All in Measured can have GPU-valid table rows for a SKU (for example NVL72
+ * without complete Grace telemetry) but no numeric estimate to rank. Those SKUs
+ * have no winner in `best`, so every candidate series for them is kept instead
+ * of letting a ranked SKU elsewhere in the selection hide them.
+ */
+export function withUnrankedSkus(
+  best: ReadonlySet<string>,
+  rankedPoints: readonly InferenceData[],
+  candidates: readonly InferenceData[],
+): Set<string> {
+  const selected = new Set(best);
+  const rankedSkus = new Set(
+    [...rankedPoints, ...candidates].filter((point) => best.has(String(point.hwKey))).map(baseSku),
+  );
+  for (const point of candidates) {
+    if (!rankedSkus.has(baseSku(point))) selected.add(String(point.hwKey));
+  }
+  return selected;
+}

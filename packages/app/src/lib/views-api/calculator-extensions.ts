@@ -4,7 +4,6 @@ import {
   parseFirstTokenCaps,
   selectFirstTokenWinners,
 } from '@/components/calculator/first-token-limits';
-import { interpolateForGPU } from '@/components/calculator/interpolation';
 import {
   applyCacheHitMode,
   DEFAULT_CACHE_HIT_MODE,
@@ -13,7 +12,10 @@ import {
   profitModelDefaults,
   type CacheHitMode,
 } from '@/components/calculator/profit-estimator';
-import { estimateProfitByPower } from '@/components/calculator/profit-power';
+import {
+  estimateProfitByPower,
+  interpolateProfitForGPU,
+} from '@/components/calculator/profit-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { cachedJson } from '@/lib/cache/api-cache';
@@ -194,11 +196,12 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
     } as const;
     function estimate(group: typeof groups.official) {
       const raw = Object.entries(group.grouped).flatMap(([key, points]) => {
-        const result = interpolateForGPU(
+        const result = interpolateProfitForGPU(
           points,
           target,
           'interactivity_to_throughput',
           costProvider === 'custom' ? 'costh' : costProvider,
+          basis === 'gw-year' ? powerBasis : 'provisioned',
         );
         return result && result.value > 0
           ? [{ ...result, ...group.groupMeta[key], resultKey: key }]

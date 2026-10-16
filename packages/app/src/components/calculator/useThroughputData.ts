@@ -24,6 +24,7 @@ import {
   sign,
 } from './interpolation';
 import type { CostProvider, CostType, GPUDataPoint, InterpolatedResult } from './types';
+import { interpolateProfitForGPU, type ProfitPowerBasis } from './profit-power';
 
 // Re-export pure functions so existing imports from this module keep working.
 export {
@@ -261,6 +262,7 @@ export function useThroughputData(
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -270,7 +272,7 @@ export function useThroughputData(
         // Skip GPUs that are not visible (legend filters by hwKey)
         if (visibleHwKeys && !visibleHwKeys.has(hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
@@ -305,6 +307,7 @@ export function useThroughputData(
       visibleHwKeys?: Set<string>,
       runInfoByIndex?: Record<number, { branch: string; url: string }>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -313,7 +316,7 @@ export function useThroughputData(
         if (!meta) continue;
         if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,

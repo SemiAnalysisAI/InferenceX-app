@@ -5,6 +5,7 @@ import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unoff
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
+import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 import {
@@ -463,6 +464,7 @@ describe('ScatterGraph', () => {
   });
 
   it('explains why All in Measured has no points', () => {
+    cy.viewport(1280, 720);
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
         <ScatterGraph
@@ -489,9 +491,14 @@ describe('ScatterGraph', () => {
       'be.visible',
     );
     cy.contains('No measurements to plot for this selection.').should('not.exist');
+    cy.contains('eight-GPU HGX/OAM systems, or whole GB200/GB300 NVL72 compute trays').should(
+      'be.visible',
+    );
+    cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
   });
 
   it('localizes the All in Measured explanation', () => {
+    cy.viewport(390, 720);
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">
         <div style={{ width: 375, height: 600 }}>
@@ -518,6 +525,8 @@ describe('ScatterGraph', () => {
 
     cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
     cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
+    cy.contains('八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray').should('be.visible');
+    cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
   });
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
@@ -1781,6 +1790,64 @@ describe('ScatterGraph', () => {
     expectCurvesIntact();
     placeRuler();
   });
+});
+
+describe('ChartDisplay modeled power disclosures', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`states the chassis and NVL72 PUEs and the NVL72 Grace input without overflow (${locale})`, () => {
+      const point = createMockInferenceData({
+        hwKey: 'gb200',
+        hw: 'NVIDIA GB200',
+        model: Model.Qwen3_5,
+        y: 1000,
+        utilityModeledWatts: { y: 1000, roof: false },
+      });
+      mountWithProviders(
+        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <div className="p-4">
+            <ChartDisplay />
+          </div>
+        </PathnameContext.Provider>,
+        {
+          inference: {
+            selectedModel: Model.Qwen3_5,
+            selectedYAxisMetric: 'y_utilityModeledWatts',
+            activeHwTypes: new Set(['gb200']),
+            hwTypesWithData: new Set(['gb200']),
+            hardwareConfig: { gb200: { name: 'gb200', label: 'GB200', suffix: '', gpu: 'GB200' } },
+            graphs: [
+              {
+                model: Model.Qwen3_5,
+                sequence: Sequence.EightK_OneK,
+                chartDefinition: chartDefinitions[0],
+                data: [point],
+              },
+            ],
+          },
+          globalFilters: { selectedModel: Model.Qwen3_5 },
+          unofficial: {},
+        },
+      );
+      for (const width of [1280, 390]) {
+        cy.viewport(width, 900);
+        cy.get('[data-testid="power-basis-assumptions"]')
+          .should('be.visible')
+          .and('contain.text', 'PUE 1.3')
+          .and('contain.text', 'PUE 1.1')
+          .and(
+            'contain.text',
+            locale === 'en'
+              ? 'measured Grace-socket power replaces the modeled CPU and memory when the run has validated socket telemetry'
+              : '以实测功耗代替 CPU 和内存的估算值（否则二者均按模型估算）',
+          )
+          .should(($note) => {
+            expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
+          });
+        cy.get('.dot-group .visible-shape').should('exist');
+        cy.screenshot(`all-in-measured-boundary-${locale}-${width}`, { overwrite: true });
+      }
+    });
+  }
 });
 
 describe('ChartDisplay responsive status notes', () => {

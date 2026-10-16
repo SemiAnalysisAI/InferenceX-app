@@ -60,7 +60,10 @@ responses. A later API request is separate evidence and may return different dat
 ## NVL72 CPU measurements
 
 Raw benchmark responses may include `cpu_power_valid`, `avg_cpu_socket_power_w`,
-`avg_total_cpu_power_w`, `total_cpu_energy_j`, and optional module power/energy.
+`avg_total_cpu_power_w`, `total_cpu_energy_j`, optional module power/energy, and
+optional CPU core and SysIO rail breakdowns (`avg_total_cpu_rail_power_w`,
+`avg_total_cpu_sysio_power_w` and their energies). The rails are inside the Grace
+socket total; never add them to it.
 CPU measurements require `cpu_power_valid === 1`, independently of GPU validity.
 `powerValid=strictV2` filters GPU measurements only. Read `power_audit.cpu` for
 sensor type, collector, socket coverage, and validation reasons. Grace socket

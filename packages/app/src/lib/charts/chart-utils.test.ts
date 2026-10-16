@@ -941,6 +941,7 @@ describe('createChartDataPoint power-boundary fields', () => {
   // Every other numerator/denominator pairing gives a different number.
   const supportedModel = {
     status: 'supported' as const,
+    unit: 'chassis' as const,
     hardware: 'h100',
     modelRevision: 'test',
     operatingState: { workload: 'agentic' as const, scaleOut: true },

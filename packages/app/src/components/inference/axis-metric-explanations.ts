@@ -506,10 +506,11 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       en:
         'Modeled facility power per allocated accelerator: the InferenceX power model carries measured ' +
         'GPU power to IT power for the run’s workload state and scale-out, then multiplies once by PUE. ' +
-        'Only hardware with an eight-GPU HGX/OAM chassis model is supported; NVL72 systems show no value.',
+        'Supports eight-GPU HGX/OAM chassis and GB200/GB300 NVL72, where measured Grace-socket power ' +
+        'is a second input and every compute tray takes an equal share of a modeled rack.',
       zh:
         '每已分配加速器的整体实测功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
-        '仅支持具有八卡 HGX/OAM 机箱模型的硬件；NVL72 系统不显示数值。',
+        '支持八卡 HGX/OAM 机箱和 GB200/GB300 NVL72；NVL72 另以 Grace socket 实测功耗为输入，每个计算 tray 平均分摊建模机架的功耗。',
     },
     formula: {
       en: 'W/GPU = modeled IT power (W) × PUE ÷ allocated GPUs',
