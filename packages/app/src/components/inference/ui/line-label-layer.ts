@@ -150,9 +150,10 @@ interface PillLayoutItem {
  * mirror image below/above its anchor, the mirror image on the other side of
  * its anchor, and both mirrors together. Every candidate is clamped into
  * `bounds` before the overlap test, so nothing leaves the plot. When every
- * mirrored candidate collides, nearby rows are tried before the default spot
- * is kept: an overlapped label is still better than a missing one, and the
- * fallback matches what the anchor pass already tolerates.
+ * mirrored candidate collides, rows further above and below are tried (with a
+ * leader line back to the anchor once the pill is far from it), and if all of
+ * those collide too the least-overlapping slot is kept: an overlapped label is
+ * still better than a missing one.
  *
  * With no bounds — a chart that clips nothing — the anchor offset is applied
  * unchanged and the collision pass is skipped, preserving that chart's
@@ -177,6 +178,7 @@ function layoutPills(
     const local = bounds ? pillLocalBox(node) : null;
     if (!bounds || !local || !label.visible) {
       node.setAttribute('transform', `translate(${tx0},${ty0})`);
+      updatePillLeader(node, label, tx0, ty0, null);
       continue;
     }
 
@@ -191,9 +193,10 @@ function layoutPills(
       [mirrorX, mirrorY],
     ];
     // Larger labels can fill both mirrored slots in a dense cluster. Try
-    // nearby rows using the measured pill height before accepting overlap.
+    // nearby rows using the measured pill height before accepting overlap;
+    // a pill that ends up rows away keeps a leader line to its anchor.
     const rowHeight = local.bottom - local.top + 4;
-    for (let row = 1; row <= 3; row++) {
+    for (let row = 1; row <= PILL_SEARCH_ROWS; row++) {
       for (const cx of [tx0, mirrorX]) {
         candidates.push([cx, ty0 - row * rowHeight], [cx, ty0 + row * rowHeight]);
       }
@@ -207,14 +210,108 @@ function layoutPills(
     });
     // Pills that merely share an edge are fine: the anchor pass spaces rows
     // exactly one collision height apart, so touching is its normal output.
+    // When every slot collides, take the one that covers the least of its
+    // neighbours rather than the default spot, which in a dense cluster is
+    // usually the worst one (it is where the neighbour's own anchor sits).
     const chosen =
       clamped.find(
         (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
-      ) ?? clamped[0];
+      ) ?? leastOverlapping(clamped, placed);
 
     node.setAttribute('transform', `translate(${chosen.tx},${chosen.ty})`);
+    updatePillLeader(node, label, chosen.tx, chosen.ty, chosen.box);
     placed.push(chosen.box);
   }
+}
+
+/**
+ * Rows above and below its anchor a pill may move to before the layout
+ * accepts an overlap. Six rows of a 13px label is roughly 140px, enough to
+ * clear the stacked bottom-right cluster of a dense agentic chart on a phone.
+ */
+const PILL_SEARCH_ROWS = 6;
+
+/** Area two boxes share; 0 when they only touch or are apart. */
+function overlapArea(a: RectBounds, b: RectBounds): number {
+  const width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
+}
+
+/** The candidate covering the least area of the boxes already placed (first wins ties). */
+export function leastOverlapping<T extends { box: RectBounds }>(
+  candidates: readonly T[],
+  placed: readonly RectBounds[],
+): T {
+  let best = candidates[0];
+  let bestArea = Infinity;
+  for (const candidate of candidates) {
+    const area = placed.reduce((sum, other) => sum + overlapArea(candidate.box, other), 0);
+    if (area < bestArea) {
+      best = candidate;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
+/**
+ * How far (px) a pill's nearest edge may sit from its anchor point before a
+ * leader line is drawn back to it. The default spot (offset up and to the
+ * right) leaves the pill's corner a few pixels from the anchor, so only pills
+ * the collision pass actually moved away get a leader.
+ */
+export const PILL_LEADER_MIN_GAP = 12;
+
+/**
+ * Point on `box` nearest to (`x`, `y`) — the leader's pill end, so the line
+ * meets the pill edge facing its anchor instead of crossing the text.
+ */
+function nearestPointOnBox(box: RectBounds, x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(x, box.left), box.right),
+    y: Math.min(Math.max(y, box.top), box.bottom),
+  };
+}
+
+/**
+ * Show, move or hide the thin series-coloured leader line inside a pill
+ * group. A pill pushed off its line by a neighbour would otherwise read as
+ * naming whichever curve it landed next to; the leader ties it back to the
+ * point it labels. `box` is the pill's placed box in zoom-group coordinates,
+ * or `null` when the pill sits at its default spot (or is hidden), where no
+ * leader is needed.
+ */
+function updatePillLeader(
+  node: SVGGElement,
+  label: LineLabelPlacement,
+  tx: number,
+  ty: number,
+  box: RectBounds | null,
+): void {
+  let leader = node.querySelector<SVGLineElement>('.ll-leader');
+  const end = box ? nearestPointOnBox(box, label.x, label.y) : null;
+  const gap = end ? Math.hypot(end.x - label.x, end.y - label.y) : 0;
+  if (!end || !label.visible || gap <= PILL_LEADER_MIN_GAP) {
+    leader?.setAttribute('display', 'none');
+    return;
+  }
+  if (!leader) {
+    leader = node.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'line');
+    leader.setAttribute('class', 'll-leader');
+    leader.setAttribute('stroke-width', '1');
+    leader.setAttribute('stroke-opacity', '0.8');
+    leader.setAttribute('stroke-linecap', 'round');
+    // Behind the pill, so the line runs under its edge rather than over it.
+    node.prepend(leader);
+  }
+  leader.removeAttribute('display');
+  leader.setAttribute('stroke', label.color);
+  // The group is translated to (tx, ty); the leader is drawn in its space.
+  leader.setAttribute('x1', String(label.x - tx));
+  leader.setAttribute('y1', String(label.y - ty));
+  leader.setAttribute('x2', String(end.x - tx));
+  leader.setAttribute('y2', String(end.y - ty));
 }
 
 /**
@@ -500,8 +597,24 @@ export function renderLineLabels(
      * pass `null` to skip the constraint (charts that clip nothing).
      */
     bounds?: RectBounds | null;
+    /**
+     * `'pill'` (default) fills a rounded box in the series colour behind white
+     * text. `'text'` draws the name itself in the series colour with a halo in
+     * the chart background and no box, so the label reads as part of the line
+     * rather than a tooltip floating over the plot. The `.ll-bg` rect is still
+     * sized (transparent) because layout and collision use it as the label's
+     * footprint.
+     */
+    appearance?: 'pill' | 'text';
+    /**
+     * Resolved halo colour for `appearance: 'text'` — pass the chart
+     * background as a concrete colour, since CSS variables do not survive the
+     * PNG export. Falls back to `var(--card)` on screen.
+     */
+    halo?: string;
   },
 ): void {
+  const plainText = options.appearance === 'text';
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
   const offsetY = options.offsetY ?? -14;
@@ -541,7 +654,17 @@ export function renderLineLabels(
     const text = labelGroup.select<SVGTextElement>('.ll-text');
     // Shift the text right to leave room for the icon chip; the background
     // sizing pass below expands the pill back over that space.
-    const space = iconSpace(options.iconFor?.(label));
+    const space = plainText ? 0 : iconSpace(options.iconFor?.(label));
+    if (plainText) {
+      // Halo in the chart background keeps coloured text legible where it
+      // crosses a line or a marker; stroke is painted under the fill.
+      text
+        .style('fill', label.color)
+        .style('stroke', options.halo ?? 'var(--card)')
+        .style('stroke-width', '4px')
+        .style('stroke-linejoin', 'round')
+        .style('paint-order', 'stroke');
+    }
     if (space > 0) text.attr('x', space);
     else text.attr('x', null);
     if (options.configureText) options.configureText(text, label);
@@ -555,7 +678,7 @@ export function renderLineLabels(
   });
   for (const { node, label, bbox } of measured) {
     const labelGroup = d3.select(node);
-    const icon = options.iconFor?.(label);
+    const icon = plainText ? undefined : options.iconFor?.(label);
     const space = iconSpace(icon);
     labelGroup
       .select('.ll-bg')
@@ -563,7 +686,7 @@ export function renderLineLabels(
       .attr('y', bbox.y - 3)
       .attr('width', bbox.width + space + 10)
       .attr('height', bbox.height + 6)
-      .attr('fill', label.color);
+      .attr('fill', plainText ? 'transparent' : label.color);
 
     // Full-color mark drawn directly on the pill — transparent background, so
     // the icon shares the label's own fill shade (including gradient fills).

@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  leastOverlapping,
   pillShiftIntoBounds,
   rectsStrictlyOverlap,
   renderLineLabels,
@@ -174,6 +175,23 @@ describe('clamped pills do not stack on their neighbours', () => {
       { seriesAttribute: 'data-hw-key' },
     );
     const boxes = ['a', 'b', 'c', 'd', 'e'].map((key) => pillBox(zoomGroup, key));
+    for (const [index, box] of boxes.entries()) {
+      expectInsidePlot(box);
+      for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
+    }
+  });
+
+  it('clears a cluster too dense for the nearest rows instead of stacking pills', () => {
+    // Sixteen run names ending on the same spot, as at the bottom-right of a
+    // dense agentic chart on a phone: the nearest three rows cannot hold them.
+    const keys = Array.from({ length: 16 }, (_, index) => `series-${index}`);
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const boxes = keys.map((key) => pillBox(zoomGroup, key));
     for (const [index, box] of boxes.entries()) {
       expectInsidePlot(box);
       for (const other of boxes.slice(index + 1)) expect(overlaps(box, other)).toBe(false);
@@ -383,5 +401,151 @@ describe('line-label pills stay inside the plot bounding box', () => {
     });
 
     expect(pillBox(zoomGroup, 'b300').right).toBe(200);
+  });
+});
+
+const leaderOf = (
+  zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  key: string,
+): SVGLineElement | null =>
+  zoomGroup.select<SVGLineElement>(`.line-label[data-line-key="${key}"] .ll-leader`).node();
+const isShown = (leader: SVGLineElement | null) =>
+  leader !== null && leader.getAttribute('display') !== 'none';
+
+/** The leader's two ends in zoom-group coordinates. */
+function leaderEnds(zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, key: string) {
+  const box = pillBox(zoomGroup, key);
+  const leader = leaderOf(zoomGroup, key)!;
+  const num = (name: string) => Number(leader.getAttribute(name));
+  return {
+    anchor: { x: box.tx + num('x1'), y: box.ty + num('y1') },
+    edge: { x: box.tx + num('x2'), y: box.ty + num('y2') },
+    box,
+  };
+}
+
+describe('displaced pills keep a leader line to their anchor', () => {
+  it('draws no leader for a pill sitting at its default spot', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('solo', 200, 150, 'B300 (vLLM)')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    expect(isShown(leaderOf(zoomGroup, 'solo'))).toBe(false);
+  });
+
+  it('ties a pill pushed off a crowded anchor back to the point it names', () => {
+    const { zoomGroup } = renderChart();
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+
+    const led = keys.filter((key) => isShown(leaderOf(zoomGroup, key)));
+    // The first pill keeps its default spot; the ones moved rows away do not.
+    expect(led).not.toContain('a');
+    expect(led.length).toBeGreaterThan(0);
+    for (const key of led) {
+      const { anchor, edge, box } = leaderEnds(zoomGroup, key);
+      expect(anchor).toEqual({ x: 200, y: 150 });
+      // The pill end lands on the pill's edge, not across its text.
+      expect(edge.x).toBeGreaterThanOrEqual(box.left);
+      expect(edge.x).toBeLessThanOrEqual(box.right);
+      expect([box.top, box.bottom]).toContain(edge.y);
+      expect(leaderOf(zoomGroup, key)!.getAttribute('stroke')).toBe('#0f0');
+      // Drawn behind the pill background.
+      expect(leaderOf(zoomGroup, key)!.nextElementSibling?.getAttribute('class')).toBe('ll-bg');
+    }
+  });
+
+  it('hides the leader again once a zoom gives the pill its default spot back', () => {
+    const { zoomGroup } = renderChart();
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    expect(keys.some((key) => isShown(leaderOf(zoomGroup, key)))).toBe(true);
+
+    // Zooming in spreads the anchors far enough apart that every pill fits
+    // at its default spot again.
+    updateRenderedLineLabels(
+      zoomGroup,
+      keys.map((key, index) => placement(key, 40 + index * 10, 30 + index * 50, 'MI355X (SGLang)')),
+    );
+    expect(keys.filter((key) => isShown(leaderOf(zoomGroup, key)))).toEqual([]);
+  });
+
+  it('hides the leader of a hidden pill', () => {
+    const { zoomGroup } = renderChart();
+    const keys = ['a', 'b', 'c', 'd', 'e'];
+    renderLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)')),
+      { seriesAttribute: 'data-hw-key' },
+    );
+    const led = keys.filter((key) => isShown(leaderOf(zoomGroup, key)));
+    expect(led.length).toBeGreaterThan(0);
+
+    updateRenderedLineLabels(
+      zoomGroup,
+      keys.map((key) => placement(key, 200, 150, 'MI355X (SGLang)', !led.includes(key))),
+    );
+    for (const key of led) expect(isShown(leaderOf(zoomGroup, key))).toBe(false);
+  });
+});
+
+const box = (left: number, top: number, width = 20, height = 10): RectBounds => ({
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+});
+
+describe('leastOverlapping', () => {
+  it('picks the slot that covers the least of the placed pills, not the first', () => {
+    const placed = [box(0, 0), box(100, 0)];
+    const onTop = { box: box(0, 0), id: 'default' };
+    const grazing = { box: box(18, 0), id: 'grazing' };
+    const half = { box: box(10, 0), id: 'half' };
+    expect(leastOverlapping([onTop, half, grazing], placed).id).toBe('grazing');
+  });
+
+  it('keeps the earlier candidate on a tie', () => {
+    const placed = [box(0, 0)];
+    const first = { box: box(10, 0), id: 'first' };
+    const second = { box: box(-10, 0), id: 'second' };
+    expect(leastOverlapping([first, second], placed).id).toBe('first');
+  });
+});
+
+describe("appearance: 'text'", () => {
+  it('draws the run name in the series colour with a halo and no filled box or logo', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b200', 200, 150, 'B200 (SGLang)')], {
+      seriesAttribute: 'data-hw-key',
+      appearance: 'text',
+      halo: '#131416',
+      iconFor: () => ({ href: 'data:image/svg+xml,', width: 12, height: 12 }),
+    });
+    const group = zoomGroup.select('.line-label[data-line-key="b200"]');
+    expect(group.select('.ll-bg').attr('fill')).toBe('transparent');
+    const text = group.select<SVGTextElement>('.ll-text').node()!;
+    expect(text.style.fill).toBe('rgb(0, 255, 0)');
+    expect(text.style.stroke).toBe('rgb(19, 20, 22)');
+    expect(text.style.paintOrder).toBe('stroke');
+    expect(group.selectAll('.ll-logo').size()).toBe(0);
+    // The transparent box is still the label's footprint for layout.
+    expect(Number(group.select('.ll-bg').attr('width'))).toBeGreaterThan(0);
+  });
+
+  it('keeps the filled pill by default', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('b200', 200, 150, 'B200 (SGLang)')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    expect(zoomGroup.select('.line-label .ll-bg').attr('fill')).toBe('#0f0');
   });
 });

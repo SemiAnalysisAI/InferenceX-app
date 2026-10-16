@@ -158,13 +158,16 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'P90 Interactivity (tok/s/user)',
     );
 
-    // Line labels name the curve and point labels name the point, so the
-    // agentic view turns on both — it differs from fixed-seq only in the
-    // parallelism and point labels.
+    // The agentic view opens like fixed-seq: line labels name each curve,
+    // and per-point parallelism chips stay off until the user asks for them.
     expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(($labels) => {
+      const visible = [...$labels].filter((label) => label.style.opacity !== '0');
+      expect(visible, 'visible parallelism chips').to.have.length(0);
+    });
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {
