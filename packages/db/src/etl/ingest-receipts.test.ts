@@ -52,7 +52,7 @@ describe('ingest receipt routing', () => {
     );
   });
 
-  it('routes the known trace_replay size limit to receipt warnings', () => {
+  it('reports trace storage size limits as fatal receipt errors', () => {
     const tracker = createSkipTracker();
     tracker.recordDbError(
       'trace_replay',
@@ -66,8 +66,8 @@ describe('ingest receipt routing', () => {
       publicationErrors: [],
       tracker,
     });
-    expect(receipt.errors).toEqual([]);
-    expect(receipt.warnings.map(({ kind, code }) => ({ kind, code }))).toEqual([
+    expect(receipt.warnings).toEqual([]);
+    expect(receipt.errors.map(({ kind, code }) => ({ kind, code }))).toEqual([
       { kind: 'trace_replay', code: '54000' },
     ]);
   });
