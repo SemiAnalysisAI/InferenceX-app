@@ -8,22 +8,19 @@
  * duplicate the sibling blob.
  */
 
-import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { createGzip, gzipSync, gunzipSync } from 'node:zlib';
+import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
-import type { BenchmarkPersistenceInput } from './benchmark-ingest';
 import {
   FULL_RESPONSE_STAT_KEYS,
   fullResponseMetricsFromGzip,
 } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
-import type { TraceReplayArtifactPaths } from './trace-artifact-discovery';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -37,94 +34,6 @@ export const TRACE_DERIVED_METRIC_KEYS = [
     `${statistic}_intvty`,
   ]),
 ];
-
-export async function verifyHistoricalC24TraceSources(trace: TraceReplayArtifactPaths | undefined) {
-  const { profileJsonl, serverMetricsCsv, serverMetricsJson } = trace ?? {};
-  if (!profileJsonl || !serverMetricsCsv || !serverMetricsJson)
-    throw new Error(
-      'Historical c24 repair requires its winning profile JSONL, server CSV and server JSON',
-    );
-  const sources = [
-    [
-      profileJsonl,
-      'profile_export.jsonl',
-      '07570e229b02f4fa6dac9eb40f06ea494dadd7710e3ae6ba9ef309f3105897b0',
-    ],
-    [
-      serverMetricsCsv,
-      'server_metrics_export.csv',
-      '85b417132bfcd1013c3f786ab76bf7baca2e66774c6b714212ad7d62728c7c32',
-    ],
-    [
-      serverMetricsJson,
-      'server_metrics_export.json',
-      'e9a2c7f39f872c5cafd7cccb48c71bca91c4fbec975e65ad60b9d5ceb88d7a69',
-    ],
-  ] as const;
-  for (const [source, name, expected] of sources) {
-    const hash = createHash('sha256');
-    for await (const chunk of createReadStream(source)) hash.update(chunk);
-    if (hash.digest('hex') !== expected)
-      throw new Error(`Historical c24 repair source hash mismatch: ${name}`);
-  }
-  return { profileJsonl, serverMetricsCsv, serverMetricsJson };
-}
-
-export async function reconcileHistoricalBenchmarkTrace(
-  sql: Sql,
-  winner: BenchmarkPersistenceInput,
-  workflowRunId: number,
-  prepareAndConsume: (
-    consume: (prepared: PreparedTraceReplay) => Promise<number>,
-  ) => Promise<number>,
-): Promise<number | null> {
-  const [expected] = await sql<{ id: number; snapshot: Record<string, unknown> }[]>`
-    select id, to_jsonb(br) as snapshot from benchmark_results br
-    where workflow_run_id = ${workflowRunId} and config_id = ${winner.configId}
-      and benchmark_type = ${winner.benchmarkType}
-      and isl is not distinct from ${winner.isl}::int
-      and osl is not distinct from ${winner.osl}::int
-      and conc = ${winner.conc} and offload_mode = ${winner.offloadMode}
-      and recipe_fingerprint is not distinct from ${winner.recipeFingerprint}::text
-  `;
-  if (!expected) return null;
-  return prepareAndConsume(async (prepared) => {
-    if (!prepared.profileGz) throw new Error('Historical c24 repair requires the selected profile');
-    await sql.begin(async (tx) => {
-      const [current] = await tx<{ trace_replay_id: number | null; unchanged: boolean }[]>`
-        select trace_replay_id, to_jsonb(br) = ${JSON.stringify(expected.snapshot)}::jsonb as unchanged
-        from benchmark_results br where id = ${expected.id} for update
-      `;
-      if (!current?.unchanged)
-        throw new Error('Historical c24 benchmark changed during trace preparation');
-      const traceId = await storePreparedTraceReplay(
-        tx,
-        prepared,
-        () => {},
-        current.trace_replay_id,
-      );
-      const metrics = { ...winner.metrics };
-      if (prepared.cacheHitRates) {
-        metrics.server_gpu_cache_hit_rate = prepared.cacheHitRates.gpu;
-        if (prepared.cacheHitRates.cpu !== null)
-          metrics.server_cpu_cache_hit_rate = prepared.cacheHitRates.cpu;
-      }
-      // Aggregate full-response measurements remain authoritative when already present.
-      if (!('median_full_response_itl' in metrics))
-        Object.assign(metrics, prepared.fullResponseMetrics);
-      await tx`
-        update benchmark_results set metrics = ${tx.json(metrics)}, image = ${winner.image},
-          workers = ${winner.workers ? JSON.stringify(winner.workers) : null}::jsonb,
-          power_invalid_reasons = ${winner.powerInvalidReasons ? tx.json(winner.powerInvalidReasons) : null},
-          power_audit = ${winner.powerAudit ? JSON.stringify(winner.powerAudit) : null}::jsonb,
-          trace_replay_id = ${traceId}
-        where id = ${expected.id}
-      `;
-      await updateAtomKvCachePoolTokens(tx, [expected.id], prepared.atomKvCacheBlocks ?? null);
-    });
-    return expected.id;
-  });
-}
 
 export type TraceReplayInput = Buffer | string | null;
 
@@ -326,115 +235,6 @@ export async function prepareTraceReplay(
   };
 }
 
-async function storePreparedTraceReplay(
-  tx: postgres.TransactionSql,
-  prepared: PreparedTraceReplay,
-  log: (message: string) => void,
-  replacingTraceId?: number | null,
-): Promise<number> {
-  const {
-    profileGz,
-    profileSize,
-    serverMetricsCsv,
-    serverMetricsCsvSize,
-    serverMetricsJsonGz,
-    serverMetricsJsonSize,
-    aggregateStatsJson,
-    chartSeriesJson,
-    requestTimelineJson,
-  } = prepared;
-  await tx`
-      create temporary table trace_replay_upload_parts (
-        field text not null,
-        part integer not null,
-        data bytea not null,
-        primary key (field, part)
-      ) on commit drop
-    `;
-
-  const payloads: [TraceReplayUploadField, Buffer | null][] = [
-    ['profile_export_jsonl_gz', profileGz],
-    ['server_metrics_csv', serverMetricsCsv],
-    ['server_metrics_json_gz', serverMetricsJsonGz],
-    ['aggregate_stats', aggregateStatsJson],
-    ['chart_series', chartSeriesJson],
-    ['request_timeline', requestTimelineJson],
-  ];
-  for (const [field, payload] of payloads) {
-    const uploadStart = Date.now();
-    const parts = await uploadTraceReplayPayloadChunks(tx, field, payload);
-    log(
-      `uploaded ${field}=${formatBytes(payload?.length)} in ${parts} part(s) ` +
-        `(${elapsed(uploadStart)})`,
-    );
-  }
-
-  await tx`
-      create temporary table trace_replay_payload on commit drop as select
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'profile_export_jsonl_gz'
-        ) as profile_export_jsonl_gz,
-        ${profileSize}::bigint as profile_export_uncompressed_size,
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'server_metrics_csv'
-        ) as server_metrics_csv,
-        ${serverMetricsCsvSize}::bigint as server_metrics_csv_size,
-        (
-          select string_agg(data, ''::bytea order by part)
-          from pg_temp.trace_replay_upload_parts
-          where field = 'server_metrics_json_gz'
-        ) as server_metrics_json_gz,
-        ${serverMetricsJsonSize}::bigint as server_metrics_json_uncompressed_size,
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'aggregate_stats'
-        ) as aggregate_stats,
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'chart_series'
-        ) as chart_series,
-        (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
-          from pg_temp.trace_replay_upload_parts
-          where field = 'request_timeline'
-        ) as request_timeline
-    `;
-
-  if (replacingTraceId !== undefined && replacingTraceId !== null) {
-    const current = await tx<{ profile_export_jsonl_gz: Buffer | null; matches: boolean }[]>`
-        select t.profile_export_jsonl_gz,
-          row(t.profile_export_jsonl_gz, t.profile_export_uncompressed_size, t.server_metrics_csv, t.server_metrics_csv_size, t.server_metrics_json_gz, t.server_metrics_json_uncompressed_size, t.aggregate_stats, t.chart_series, t.request_timeline) is not distinct from
-          row(p.profile_export_jsonl_gz, p.profile_export_uncompressed_size, p.server_metrics_csv, p.server_metrics_csv_size, p.server_metrics_json_gz, p.server_metrics_json_uncompressed_size, p.aggregate_stats, p.chart_series, p.request_timeline) as matches
-        from agentic_trace_replay t cross join pg_temp.trace_replay_payload p
-        where t.id = ${replacingTraceId}
-        for share of t
-      `;
-    if (current[0]?.matches) return replacingTraceId;
-    const profile = current[0]?.profile_export_jsonl_gz;
-    if (
-      !profile ||
-      createHash('sha256').update(gunzipSync(profile)).digest('hex') !==
-        '2a1102469ce231e13c14b604fdb8eab929e46ab22ff1596d049c9ff9fa200699'
-    ) {
-      throw new Error('Refusing historical c24 repair with an unknown existing trace');
-    }
-  }
-  const [{ id }] = await tx<{ id: number }[]>`
-      insert into agentic_trace_replay (
-        profile_export_jsonl_gz, profile_export_uncompressed_size, server_metrics_csv, server_metrics_csv_size, server_metrics_json_gz, server_metrics_json_uncompressed_size, aggregate_stats, chart_series, request_timeline
-      ) select * from pg_temp.trace_replay_payload
-      returning id
-    `;
-  log(`assembled trace_replay_id=${id}`);
-  return id;
-}
-
 /**
  * Persist a prepared trace atomically. Rows are locked and rechecked here so
  * concurrent ingest attempts cannot both attach different trace sidecars.
@@ -451,7 +251,19 @@ export async function persistPreparedTraceReplay(
   };
   if (benchmarkResultIds.length === 0) return 0;
 
-  const { cacheHitRates, fullResponseMetrics } = prepared;
+  const {
+    profileGz,
+    profileSize,
+    serverMetricsCsv,
+    serverMetricsCsvSize,
+    serverMetricsJsonGz,
+    serverMetricsJsonSize,
+    aggregateStatsJson,
+    chartSeriesJson,
+    requestTimelineJson,
+    cacheHitRates,
+    fullResponseMetrics,
+  } = prepared;
 
   let linkedCount = 0;
   const insertStart = Date.now();
@@ -468,7 +280,83 @@ export async function persistPreparedTraceReplay(
       return;
     }
 
-    const traceReplayId = await storePreparedTraceReplay(tx, prepared, log);
+    await tx`
+      create temporary table trace_replay_upload_parts (
+        field text not null,
+        part integer not null,
+        data bytea not null,
+        primary key (field, part)
+      ) on commit drop
+    `;
+
+    const payloads: [TraceReplayUploadField, Buffer | null][] = [
+      ['profile_export_jsonl_gz', profileGz],
+      ['server_metrics_csv', serverMetricsCsv],
+      ['server_metrics_json_gz', serverMetricsJsonGz],
+      ['aggregate_stats', aggregateStatsJson],
+      ['chart_series', chartSeriesJson],
+      ['request_timeline', requestTimelineJson],
+    ];
+    for (const [field, payload] of payloads) {
+      const uploadStart = Date.now();
+      const parts = await uploadTraceReplayPayloadChunks(tx, field, payload);
+      log(
+        `uploaded ${field}=${formatBytes(payload?.length)} in ${parts} part(s) ` +
+          `(${elapsed(uploadStart)})`,
+      );
+    }
+
+    log('assembling trace_replay blob row');
+    const [{ id: traceReplayId }] = await tx<{ id: number }[]>`
+      insert into agentic_trace_replay (
+        profile_export_jsonl_gz,
+        profile_export_uncompressed_size,
+        server_metrics_csv,
+        server_metrics_csv_size,
+        server_metrics_json_gz,
+        server_metrics_json_uncompressed_size,
+        aggregate_stats,
+        chart_series,
+        request_timeline
+      )
+      values (
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'profile_export_jsonl_gz'
+        ),
+        ${profileSize},
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'server_metrics_csv'
+        ),
+        ${serverMetricsCsvSize},
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'server_metrics_json_gz'
+        ),
+        ${serverMetricsJsonSize},
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'aggregate_stats'
+        ),
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'chart_series'
+        ),
+        (
+          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          from pg_temp.trace_replay_upload_parts
+          where field = 'request_timeline'
+        )
+      )
+      returning id
+    `;
+    log(`assembled trace_replay_id=${traceReplayId}`);
 
     const updateStart = Date.now();
     log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);

@@ -78,13 +78,8 @@ import {
   bulkUpsertAvailability,
   insertServerLogFiles,
 } from './etl/benchmark-ingest';
-import { benchmarkCandidateKey, selectBenchmarkMeasurements } from './etl/benchmark-candidates';
-import {
-  findUnlinkedTraceReplayIds,
-  persistPreparedTraceReplay,
-  reconcileHistoricalBenchmarkTrace,
-  verifyHistoricalC24TraceSources,
-} from './etl/trace-replay-ingest';
+import { selectBenchmarkMeasurements } from './etl/benchmark-candidates';
+import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
   TraceReplayWorkerPool,
@@ -553,7 +548,6 @@ async function main(): Promise<void> {
     const traceWorkerPool = new TraceReplayWorkerPool(traceWorkerCount);
     const traceUploadLimiter = new AsyncSemaphore(Math.min(2, traceWorkerCount));
     const traceTasks: Promise<void>[] = [];
-    const historicalRepairErrors: unknown[] = [];
     if (traceReplayPaths.size > 0) {
       console.log(
         `  Trace preparation: ${traceWorkerCount} worker(s) across ${os.availableParallelism()} vCPU(s), ` +
@@ -562,15 +556,7 @@ async function main(): Promise<void> {
     }
 
     const files = benchmarkFiles();
-    const selected = selectBenchmarkMeasurements(files, {
-      githubRunId: runIdNum,
-      runAttempt: runAttemptNum,
-    });
-    const historicalPoints = new Set(
-      selected.decisions
-        .filter((decision) => decision.reason === 'historical-c24')
-        .map((decision) => decision.pointKey),
-    );
+    const selected = selectBenchmarkMeasurements(files);
     for (const decision of selected.decisions) {
       console.log(`    AgentX selection: ${JSON.stringify(decision)}`);
     }
@@ -741,46 +727,12 @@ async function main(): Promise<void> {
       if (toInsert.length > 0) {
         try {
           const insertStart = Date.now();
-          const ordinaryRows = [];
-          const repairedIds: number[] = [];
-          for (const point of toInsert) {
-            if (!historicalPoints.has(benchmarkCandidateKey(point))) {
-              ordinaryRows.push(point);
-              continue;
-            }
-            const trace = await verifyHistoricalC24TraceSources(
-              traceReplayPaths.get(`${suffix}|${point.conc}`) ?? traceReplayPaths.get(suffix),
-            );
-            const repairedId = await reconcileHistoricalBenchmarkTrace(
-              sql,
-              point,
-              workflowRunId,
-              (consume) =>
-                traceWorkerPool.run(
-                  {
-                    profileExportJsonl: trace.profileJsonl,
-                    serverMetricsCsv: trace.serverMetricsCsv,
-                    serverMetricsJson: trace.serverMetricsJson,
-                    metricsContext: {
-                      framework: point.config.framework,
-                      disagg: point.config.disagg,
-                    },
-                  },
-                  consume,
-                ),
-            );
-            if (repairedId === null) ordinaryRows.push(point);
-            else repairedIds.push(repairedId);
-          }
-          const benchmarkInsert = await bulkIngestBenchmarkRows(
+          const { newCount, dupCount, insertedIds } = await bulkIngestBenchmarkRows(
             sql,
-            ordinaryRows,
+            toInsert,
             workflowRunId,
             date,
           );
-          const { newCount } = benchmarkInsert;
-          const dupCount = benchmarkInsert.dupCount + repairedIds.length;
-          const insertedIds = [...benchmarkInsert.insertedIds, ...repairedIds];
           console.log(
             `    benchmark rows: +${newCount} new, ${dupCount} dup, ` +
               `${insertedIds.length} id(s) (${elapsed(insertStart)})`,
@@ -971,8 +923,6 @@ async function main(): Promise<void> {
           }
         } catch (error: any) {
           tracker.recordDbError('benchmark', path.posix.basename(file.path), error);
-          if (toInsert.some((point) => historicalPoints.has(benchmarkCandidateKey(point))))
-            historicalRepairErrors.push(error);
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
@@ -982,8 +932,6 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    if (historicalRepairErrors.length > 0)
-      throw new AggregateError(historicalRepairErrors, 'Historical AgentX repair failed');
     if (requiredPower)
       assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);

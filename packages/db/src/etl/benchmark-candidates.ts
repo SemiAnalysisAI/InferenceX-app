@@ -1,5 +1,3 @@
-import path from 'node:path';
-
 import {
   sha256Hex,
   type BenchmarkArtifactFile,
@@ -31,21 +29,6 @@ export function benchmarkCandidateKey(point: BenchmarkParams): string {
   ]);
 }
 
-const HISTORICAL_C24_KEY = JSON.stringify([
-  'mi355x:vllm:kimik3:fp4:mtp:false:false:8:1:false:0:8:1:false:0:8:8',
-  'agentic_traces',
-  null,
-  null,
-  24,
-  'on',
-  '44a49a20b029e398ab8b1830347e6cb2fa428b8517abcc6b6de0fa449c9f91f2',
-]);
-const C24_GOOD_DIGEST = 'e07f7fc80dd2b4819184d59eed6ebb36b05e4d31489ba3b13a6f23eceb6ebc17';
-const C24_BAD_DIGEST = 'fd1286ee71ac2966df4ed7036b7c0309bea389db252828d1f22bc58510fff1ac';
-const C24_GOOD_FILE =
-  'kimik3_tp8_conc24_kvdram-vllm-simple_spec-mtp_fp4_vllm_tp8-pp1-dcp8-pcp1-ep1-dpafalse_disagg-false_-d3c2150a569a6bd8df31.json';
-const C24_GOOD_FILE_SHA = 'd45872ec3b26dcefebc296d52f9b3b76bbd6de58d3fdb35eafe660729692a9d5';
-
 interface Candidate {
   file: BenchmarkArtifactFile;
   row: BenchmarkArtifactRow;
@@ -56,7 +39,7 @@ export interface BenchmarkSelectionDecision {
   pointKey: string;
   sources: { path: string; fileSha256: string; rowDigest: string }[];
   winner: { path: string; fileSha256: string; rowDigest: string };
-  reason: 'unique' | 'identical-copies' | 'historical-c24';
+  reason: 'unique' | 'identical-copies';
 }
 
 function sourceReceipt(candidate: Candidate): BenchmarkSelectionDecision['winner'] {
@@ -67,10 +50,7 @@ function sourceReceipt(candidate: Candidate): BenchmarkSelectionDecision['winner
   };
 }
 
-export function selectBenchmarkMeasurements(
-  files: readonly BenchmarkArtifactFile[],
-  context: { githubRunId: number; runAttempt: number },
-): {
+export function selectBenchmarkMeasurements(files: readonly BenchmarkArtifactFile[]): {
   sources: { file: BenchmarkArtifactFile; rows: BenchmarkArtifactRow[] }[];
   decisions: BenchmarkSelectionDecision[];
 } {
@@ -124,33 +104,11 @@ export function selectBenchmarkMeasurements(
         a.file.path.localeCompare(b.file.path),
     );
     const digests = new Set(candidates.map((candidate) => candidate.digest));
-    let winner = candidates[0];
+    const winner = candidates[0];
     if (!winner) continue;
-    let reason: BenchmarkSelectionDecision['reason'] =
+    const reason: BenchmarkSelectionDecision['reason'] =
       candidates.length === 1 ? 'unique' : 'identical-copies';
-    if (
-      context.githubRunId === 38451594384 &&
-      context.runAttempt === 3 &&
-      pointKey === HISTORICAL_C24_KEY
-    ) {
-      const historical = candidates.find(
-        (candidate) =>
-          candidate.digest === C24_GOOD_DIGEST &&
-          candidate.file.path.startsWith('bmk_agentic_') &&
-          path.posix.basename(candidate.file.path) === C24_GOOD_FILE &&
-          candidate.file.sha256 === C24_GOOD_FILE_SHA,
-      );
-      if (
-        !historical ||
-        [...digests].some((digest) => digest !== C24_GOOD_DIGEST && digest !== C24_BAD_DIGEST)
-      ) {
-        throw new Error(
-          `Unrecognized historical AgentX c24 candidates: ${JSON.stringify(candidates.map(sourceReceipt))}`,
-        );
-      }
-      winner = historical;
-      reason = 'historical-c24';
-    } else if (digests.size > 1) {
+    if (digests.size > 1) {
       throw new Error(
         `Conflicting AgentX measurements for ${pointKey}: ${JSON.stringify(candidates.map(sourceReceipt))}`,
       );

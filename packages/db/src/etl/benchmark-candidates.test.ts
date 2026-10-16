@@ -25,14 +25,13 @@ function read(rows: Record<string, unknown[]>) {
 afterEach(() => {
   for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
-const context = { githubRunId: 123, runAttempt: 1 };
 
 describe('selectBenchmarkMeasurements', () => {
   it('selects identical per-job copies in both orders without changing raw evidence', () => {
     const files = read({ results_bmk: [golden, golden], bmk_agentic_point: [golden] });
     const before = structuredClone(files);
     for (const inputs of [files, files.toReversed()]) {
-      const result = selectBenchmarkMeasurements(inputs, context);
+      const result = selectBenchmarkMeasurements(inputs);
       const selected = result.sources.flatMap((source) => source.rows);
       expect(selected).toHaveLength(1);
       expect(result.decisions[0]?.winner.path).toBe('bmk_agentic_point/agg.json');
@@ -43,7 +42,7 @@ describe('selectBenchmarkMeasurements', () => {
 
   it('accepts unique aggregate-only legacy measurements and distinct fingerprints', () => {
     const other = { ...golden, recipe_fingerprint: 'b'.repeat(64), duration_seconds: 100 };
-    const result = selectBenchmarkMeasurements(read({ results_bmk: [golden, other] }), context);
+    const result = selectBenchmarkMeasurements(read({ results_bmk: [golden, other] }));
     expect(result.sources.flatMap((source) => source.rows)).toHaveLength(2);
   });
 
@@ -53,9 +52,7 @@ describe('selectBenchmarkMeasurements', () => {
       results_bmk: [{ ...golden, duration_seconds: 100 }],
     });
     for (const inputs of [files, files.toReversed()]) {
-      expect(() => selectBenchmarkMeasurements(inputs, context)).toThrow(
-        'Conflicting AgentX measurements',
-      );
+      expect(() => selectBenchmarkMeasurements(inputs)).toThrow('Conflicting AgentX measurements');
     }
   });
 
@@ -63,7 +60,7 @@ describe('selectBenchmarkMeasurements', () => {
     const files = read({
       results_bmk: [golden, { ...golden, benchmark_outcome: { status: 'failed' } }],
     });
-    const selected = selectBenchmarkMeasurements(files, context);
+    const selected = selectBenchmarkMeasurements(files);
     expect(selected.sources[0]?.rows).toHaveLength(1);
     expect(files[0]?.rows).toHaveLength(2);
     expect(files[0]?.rows[1]?.failed).toBe(true);
@@ -79,17 +76,14 @@ describe('selectBenchmarkMeasurements', () => {
     { status: 'failed', attempt_id: 'one', finalized: 'true' },
   ])('refuses malformed outcomes', (benchmark_outcome) => {
     expect(() =>
-      selectBenchmarkMeasurements(
-        read({ results_bmk: [{ ...golden, benchmark_outcome }] }),
-        context,
-      ),
+      selectBenchmarkMeasurements(read({ results_bmk: [{ ...golden, benchmark_outcome }] })),
     ).toThrow('Malformed AgentX');
   });
 
   it('leaves fixed-sequence ordering and duplicates unchanged', () => {
     const single = { ...golden, scenario_type: 'single-turn', isl: 1024, osl: 1024 };
     const files = read({ results_bmk: [single, { ...single, duration_seconds: 9 }] });
-    expect(selectBenchmarkMeasurements(files, context).sources[0]?.rows).toEqual(files[0]?.rows);
+    expect(selectBenchmarkMeasurements(files).sources[0]?.rows).toEqual(files[0]?.rows);
   });
 
   it('canonicalizes object keys recursively while preserving array order', () => {
