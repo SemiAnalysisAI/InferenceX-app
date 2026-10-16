@@ -41,6 +41,7 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // V4.1-Flash is a separate CED/CSA2 architecture (552B backbone, 8B prefill /
   // 16B decode active), not a V4-Pro point release, so it gets its own bucket.
   dsv41flash: 'DeepSeek-V4.1-Flash',
+  musespark: 'Muse-Spark-Open',
 };
 
 /**

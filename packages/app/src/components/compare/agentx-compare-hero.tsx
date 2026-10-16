@@ -18,6 +18,7 @@ import { CompareIndexTrackedLink } from './compare-index-tracked-link';
  * without one instead of breaking the row.
  */
 const MODEL_LOGOS: Record<string, string> = {
+  'muse-spark-open': '/logos/muse-mascot.webp',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',

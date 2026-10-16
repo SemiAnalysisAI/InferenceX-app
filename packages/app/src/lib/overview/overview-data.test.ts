@@ -1347,6 +1347,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     // the matrix must not keep rows that never refresh. AgentX rows group
     // above the 8K/1K row, each group in MODEL_CONFIG declaration order.
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
+      `${Model.Muse_Spark_Open}/agentx`,
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
       `${Model.Kimi_K3}/agentx`,

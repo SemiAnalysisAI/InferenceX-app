@@ -187,13 +187,19 @@ describe('First-load navigation', () => {
         .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 4);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
       // Landing curation preserves the relative editorial order.
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
         );
-        expect(slugs).to.deep.equal(['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3']);
+        expect(slugs).to.deep.equal([
+          'kimi-k3',
+          'muse-spark-open',
+          'deepseek-v41-flash',
+          'glm-5-3',
+          'minimax-m3',
+        ]);
       });
       // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(

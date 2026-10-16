@@ -1522,7 +1522,8 @@ export const apiContractSourceDigests = [
     // Reviewed for the DeepSeek-V4.1-Flash addition (InferenceX#2961): the
     // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
     // data, no parameter or OverviewPageData shape change, so the docs stand.
-    sourceSha256: '992d2325c9ff168cb25c19fbcb930d42d575cd6f634f9d994b8e427735d7ce2b',
+    // Muse uses the existing AgentX scenario and response shape.
+    sourceSha256: '5cd3d652bc845bf5f1e51aa29f2f4295bb1d229218d6c1f6542d5b2c4d0b60c1',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1547,7 +1548,8 @@ export const apiContractSourceDigests = [
     // Reviewed for the GLM-5.3 DB key (InferenceX#3330): one new key, `glm5.3`,
     // mapped to the existing GLM-5.2 display name (as glm5.1 -> GLM-5). No
     // published parameter enum or endpoint changes, so the docs stand.
-    sourceSha256: 'bdc8e287f57107cdf0772c50ad4abc0278757b20db78844cc6cf02e88ea66717',
+    // Muse-Spark-Open / musespark added; API docs and AgentX cookbook updated.
+    sourceSha256: '3bf6725fa92e48d225e097d41431018e52732a355548d7cfb14d15f4dc9ac329',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

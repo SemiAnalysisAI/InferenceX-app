@@ -43,6 +43,7 @@ export { getCachedBenchmarks };
 // ---------------------------------------------------------------------------
 
 export const KNOWN_MODELS = new Set([
+  'Muse-Spark-Open',
   'Llama-3.3-70B-Instruct-FP8',
   'Llama-3.1-70B-Instruct-FP8-KV',
   'DeepSeek-R1-0528',

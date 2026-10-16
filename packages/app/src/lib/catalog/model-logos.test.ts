@@ -15,6 +15,12 @@ const MODELS_DIR = path.join(process.cwd(), 'content', 'models');
 const LOGOS_DIR = path.join(process.cwd(), 'public', 'logos');
 
 describe('model developer logos', () => {
+  it('uses the full-color Muse mascot rather than the Meta mark', () => {
+    expect(getModelLogo(Model.Muse_Spark_Open)).toBe('muse-mascot.webp');
+    expect(isMonochromeLogo('muse-mascot.webp')).toBe(false);
+    expect(getModelLogo(Model.Llama3_3_70B)).toBe('meta-color.svg');
+  });
+
   it('maps every model-page developer to a logo', () => {
     const developers = new Set(
       fs
