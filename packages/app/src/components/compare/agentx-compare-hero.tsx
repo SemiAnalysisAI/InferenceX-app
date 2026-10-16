@@ -670,16 +670,12 @@ export function AgentXCompareHero({
                         )}
                       </span>
                       <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                        {model.resultsPending
-                          ? locale === 'zh'
-                            ? 'AgentX · 结果待发布'
-                            : 'AgentX · Results pending'
-                          : 'AgentX'}
+                        AgentX
                       </span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                    {model.resultsPending ? (locale === 'zh' ? '预览' : 'Preview') : t.modelAction}
+                    {t.modelAction}
                     <ArrowRight
                       aria-hidden="true"
                       className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"

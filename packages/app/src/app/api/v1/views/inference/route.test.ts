@@ -397,7 +397,7 @@ describe('GET /api/v1/views/inference', () => {
     expect(h200.points[0].runId).toBe(777);
   });
 
-  it('accepts the pending Muse model without fabricating results', async () => {
+  it('accepts Muse without fabricating published results when only an unofficial run exists', async () => {
     mockGetLatestBenchmarks.mockResolvedValue([]);
     const res = await GET(
       request('/api/v1/views/inference?model=Muse-Spark-Open&sequence=agentic-traces'),

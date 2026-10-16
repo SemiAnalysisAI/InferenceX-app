@@ -129,6 +129,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   // DeepSeek-V4.1-Flash
   'deepseek-ai/DeepSeek-V4.1-Flash': 'dsv41flash',
   'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4': 'musespark',
+  'meta-models/Muse-Spark-Open-816B-A42B-NVFP4': 'musespark',
 };
 
 /**

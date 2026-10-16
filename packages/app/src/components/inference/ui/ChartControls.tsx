@@ -7,10 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
-import {
-  AGENTX_NEW_MODEL_DISPLAY_NAMES,
-  inferenceModelsWithPreviews,
-} from '@/lib/compare/compare-agentx';
+import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
 import { inferenceModelRouteForSelection } from '@/lib/routing/inference-model-slug';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
@@ -484,7 +481,7 @@ export default function ChartControls({
                 onChange={handleModelChange}
                 open={openDropdown === 'model'}
                 onOpenChange={handleDropdownOpenChange('model')}
-                availableModels={inferenceModelsWithPreviews(availableModels)}
+                availableModels={availableModels}
                 data-testid="model-selector"
                 trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}

@@ -22,7 +22,7 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced date for every model except the pre-registered Muse preview', () => {
+  it('has a sourced date for every model except Muse, whose release date is unverified', () => {
     // Without a date the Fleet Lifecycle axis falls back to the model's first
     // benchmark run, which reads as "this is when the model appeared" when it is
     // really "this is when we got to it" — for gpt-oss that gap is five weeks.

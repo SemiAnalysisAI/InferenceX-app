@@ -54,7 +54,6 @@ import {
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
-import { PENDING_AGENTX_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -467,10 +466,9 @@ export function GlobalFilterProvider({
     [availabilityRows, dbModelKeys],
   );
 
-  // Shared calculator/TCO selectors require data. Inference adds previews locally.
+  // Models that have data in the database or a loaded unofficial run.
   const availableModels = useMemo(() => {
-    if (!availabilityRows)
-      return MODEL_OPTIONS.filter((model) => !PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(model));
+    if (!availabilityRows) return MODEL_OPTIONS;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
       if (unofficialModels.has(m)) return true;
@@ -520,17 +518,14 @@ export function GlobalFilterProvider({
   // Whether we actually know the selected model's sequences yet. Availability
   // may arrive from the DB (`availabilityRows`) OR from a loaded unofficial run
   // (`unofficialAvailable` for this model) — either source lets us resolve a
-  // trustworthy effectiveSequence. Pending AgentX previews have an explicit
-  // scenario contract even before measurements arrive. Other models use the
-  // static fallback while loading, so resolving
+  // trustworthy effectiveSequence. Other models use the static fallback while
+  // loading, so resolving
   // eagerly would honor a selection the model may not have (e.g. agentic-traces
   // from a shared link on a fixed-seq-only model), fetch it, then snap once
   // availability lands (flash + wasted request).
   const availabilityLoaded = useMemo(
     () =>
-      availabilityRows !== undefined ||
-      PENDING_AGENTX_MODEL_DISPLAY_NAMES.has(selectedModel) ||
-      unofficialAvailable.some((a) => a.model === selectedModel),
+      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
     [availabilityRows, unofficialAvailable, selectedModel],
   );
 

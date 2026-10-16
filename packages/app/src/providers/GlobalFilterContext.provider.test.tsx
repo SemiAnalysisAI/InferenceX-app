@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     isLoading: false,
     error: null as Error | null,
   },
-  unofficialAvailable: [],
+  unofficialAvailable: [] as { model: string; sequence: string; precision: string }[],
   getUrlParam: vi.fn(() => undefined),
   setUrlParams: vi.fn(),
 }));
@@ -129,6 +129,7 @@ beforeEach(() => {
   mocks.workflow.data = undefined;
   mocks.workflow.isLoading = false;
   mocks.workflow.error = null;
+  mocks.unofficialAvailable = [];
   mocks.getUrlParam.mockReset();
   mocks.getUrlParam.mockReturnValue(undefined);
   mocks.setUrlParams.mockReset();
@@ -216,7 +217,7 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(mocks.availability.refetch).toHaveBeenCalledOnce();
   });
 
-  it('does not offer the pending Muse preview in shared data-dependent selectors', () => {
+  it('does not offer Muse in shared selectors without its measurements', () => {
     mocks.availability.data = [
       { model: 'kimik3', precision: 'fp4', sequence: 'agentic-traces' },
     ] as unknown[];
@@ -236,17 +237,22 @@ describe('GlobalFilterProvider context isolation', () => {
     expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
   });
 
-  it.each([undefined, []])(
-    'offers only AgentX for Muse before measurements exist (%j)',
-    (availability) => {
-      mocks.availability.data = availability;
-      mountProvider();
-      act(() => selectModel?.(Model.Muse_Spark_Open));
+  it('offers Muse from an unofficial AgentX run without a special selector exception', () => {
+    mocks.unofficialAvailable = [
+      { model: Model.Muse_Spark_Open, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
+    ];
+    mountProvider();
+    act(() => selectModel?.(Model.Muse_Spark_Open));
 
-      expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
-      expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
-      expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
-      expect(selectionSnapshot?.sequenceResolved).toBe(true);
-    },
-  );
+    expect(availabilitySnapshot?.availableModels).toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+    expect(selectionSnapshot?.sequenceResolved).toBe(true);
+  });
+
+  it('keeps the no-data Muse sequence fallback AgentX-only', () => {
+    mountProvider();
+    act(() => selectModel?.(Model.Muse_Spark_Open));
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+  });
 });

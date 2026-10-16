@@ -391,10 +391,10 @@ describe('getModelLabel', () => {
 });
 
 describe('getOpenRouterModelId', () => {
-  it('maps published models to exact OpenRouter ids without inventing one for the Muse preview', () => {
+  it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
       if (model === Model.Muse_Spark_Open) {
-        // Spark Open is pre-registered; do not substitute the hosted Spark model.
+        // Do not substitute the hosted Spark model for Spark Open.
         expect(getOpenRouterModelId(model)).toBeNull();
         continue;
       }

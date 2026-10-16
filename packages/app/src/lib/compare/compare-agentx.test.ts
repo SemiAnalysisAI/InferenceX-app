@@ -7,20 +7,12 @@ import {
   comparisonScenarioForModel,
   FEATURED_AGENTX_MODELS,
   isNewAgentxModel,
-  inferenceModelsWithPreviews,
 } from './compare-agentx';
 import { COMPARE_MODEL_SLUGS } from './compare-slug';
 import { Model } from '../catalog/data-mappings';
 import { overviewScenariosForModel } from '../overview/overview-data';
 
 describe('AgentX comparison links', () => {
-  it('adds the pending model only for the inference selector without duplicates', () => {
-    expect(inferenceModelsWithPreviews([Model.Kimi_K3])).toEqual([
-      Model.Kimi_K3,
-      Model.Muse_Spark_Open,
-    ]);
-    expect(inferenceModelsWithPreviews([Model.Muse_Spark_Open])).toEqual([Model.Muse_Spark_Open]);
-  });
   it('keeps the featured AgentX models in the editorial order', () => {
     expect(FEATURED_AGENTX_MODELS.map((model) => model.slug)).toEqual([
       'kimi-k3',
@@ -60,9 +52,12 @@ describe('AgentX comparison links', () => {
     expect(agentxDashboardHref('zh', FEATURED_AGENTX_MODELS[3])).toBe('/zh/inference/deepseek-v4');
   });
 
-  it('routes every featured model to a registered inference page without query params', () => {
+  it('routes every featured model to its registered page and optional unofficial run', () => {
     for (const model of FEATURED_AGENTX_MODELS) {
-      expect(agentxDashboardHref('en', model)).toBe(`/inference/${model.slug}`);
+      const url = new URL(agentxDashboardHref('en', model), 'https://example.com');
+      expect(url.pathname).toBe(`/inference/${model.slug}`);
+      expect(url.searchParams.get('unofficialRun')).toBe(model.unofficialRun ?? null);
+      expect([...url.searchParams.keys()]).toEqual(model.unofficialRun ? ['unofficialRun'] : []);
     }
   });
 
@@ -84,11 +79,15 @@ describe('AgentX comparison links', () => {
     expect(agentxDashboardHref('en', flash)).toBe('/inference/deepseek-v41-flash');
   });
 
-  it('routes Muse previews to their own bilingual AgentX view', () => {
+  it('routes Muse results to the supplied unofficial run in both locales', () => {
     const muse = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'muse-spark-open')!;
-    expect(muse.resultsPending).toBe(true);
-    expect(agentxDashboardHref('en', muse)).toBe('/inference/muse-spark-open');
-    expect(agentxDashboardHref('zh', muse)).toBe('/zh/inference/muse-spark-open');
+    expect(muse.unofficialRun).toBe('38825822770');
+    expect(agentxDashboardHref('en', muse)).toBe(
+      '/inference/muse-spark-open?unofficialRun=38825822770',
+    );
+    expect(agentxDashboardHref('zh', muse)).toBe(
+      '/zh/inference/muse-spark-open?unofficialRun=38825822770',
+    );
     expect(comparisonScenarioForModel(muse)).toEqual({
       label: 'AgentX',
       sequence: 'agentic-traces',

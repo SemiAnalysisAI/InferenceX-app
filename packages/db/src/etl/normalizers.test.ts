@@ -19,6 +19,7 @@ describe('Muse Spark Open ingestion', () => {
     { infmax_model_prefix: 'musespark' },
     { model_prefix: 'musespark' },
     { model: 'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4' },
+    { model: 'meta-models/Muse-Spark-Open-816B-A42B-NVFP4' },
   ])('resolves the recipe identity %j', (row) => {
     expect(resolveModelKey(row)).toBe('musespark');
   });

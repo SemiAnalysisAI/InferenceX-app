@@ -143,7 +143,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.Muse_Spark_Open]: {
     label: 'Muse Spark Open 816B',
     prefix: 'musespark',
-    category: 'experimental',
+    category: 'default',
     logo: 'muse-mascot.webp',
   },
   [Model.DeepSeek_V4_Pro]: {
