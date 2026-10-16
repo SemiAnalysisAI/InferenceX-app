@@ -4,7 +4,7 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/infer
 
 /**
  * Editorial ordering of the AgentX hero ledger on `/compare` and the landing
- * page. Models with an unofficial run link directly to that run's results.
+ * page. Links open each model's canonical dashboard.
  */
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'kimi-k3',
@@ -102,7 +102,6 @@ export function agentxDashboardHref(locale: 'en' | 'zh', model: CompareModelSlug
   const localizedPath = locale === 'zh' ? `/zh${path}` : path;
   const query = new URLSearchParams();
   if (!entry) query.set('g_model', model.displayName);
-  if (model.unofficialRun) query.set('unofficialRun', model.unofficialRun);
   return query.size > 0 ? `${localizedPath}?${query}` : localizedPath;
 }
 
