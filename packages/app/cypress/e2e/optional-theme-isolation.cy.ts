@@ -1,5 +1,5 @@
 import { APP_THEMES } from '../../src/lib/themes/themes';
-import { cycleToTheme } from '../support/theme';
+import { selectTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
@@ -68,8 +68,7 @@ describe('optional themes stay off the default page', () => {
       cy.get('[data-testid="theme-option-kart"]').should('not.exist');
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       expectNoOptionalResources(requests);
-      // The regular rotation intentionally visits optional themes on the way to light.
-      cycleToTheme('light');
+      selectTheme('light');
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.reload();
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
@@ -115,11 +114,10 @@ describe('optional themes stay off the default page', () => {
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
       cy.document().then((doc) => {
-        // Light → dark stays on the default path. Dark's next click selects Minecraft.
+        // Light → dark stays on the default path.
         if (theme !== 'light') return;
         const baseline = seo(doc);
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get('html').should('have.class', 'dark');
+        selectTheme('dark');
         cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
         expectNoOptionalResources(requests);
@@ -181,7 +179,7 @@ describe('optional themes stay off the default page', () => {
     }
   });
 
-  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
+  it('reaches optional themes from the menu and preserves default-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
@@ -195,11 +193,11 @@ describe('optional themes stay off the default page', () => {
     cy.document().then((doc) => {
       const baseline = seo(doc);
       for (const theme of optionalThemes) {
-        cycleToTheme(theme);
+        selectTheme(theme);
         if (theme === 'minecraft') cy.get('canvas').should('exist');
         else cy.get(`[data-testid="${theme}-theme-banner"]`).should('be.visible');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        cycleToTheme('dark');
+        selectTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
       }
@@ -239,7 +237,7 @@ describe('optional themes stay off the default page', () => {
         cy.intercept('GET', '**/_next/static/chunks/*.js*', { forceNetworkError: true }).as(
           'optionalChunk',
         );
-        cycleToTheme('minecraft');
+        selectTheme('minecraft');
         cy.wait('@optionalChunk');
         cy.get('@caughtThemeError').should(
           'have.been.calledWithMatch',
@@ -247,8 +245,8 @@ describe('optional themes stay off the default page', () => {
         );
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
         // The shared header remains interactive even after a rejected lazy import.
-        cycleToTheme('light');
-        cycleToTheme('dark');
+        selectTheme('light');
+        selectTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
       });

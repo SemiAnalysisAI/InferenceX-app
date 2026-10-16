@@ -110,6 +110,7 @@ describe('Splash text', () => {
     cy.get('[data-testid="theme-toggle"]')
       .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
       .click();
+    cy.get('[data-testid="theme-option-dark"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -125,6 +126,7 @@ describe('Theme Toggle', () => {
     cy.get('[data-testid="theme-toggle"]')
       .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
       .click();
+    cy.get('[data-testid="theme-option-dark"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

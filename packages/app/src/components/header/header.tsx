@@ -268,7 +268,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
               <MinecraftTogglesLazy />
               <HaloTogglesLazy />
             </span>
-            <ModeToggle />
+            <ModeToggle isZh={isZh} />
 
             {/* Mobile hamburger */}
             <div ref={menuRef} className="relative xl:hidden">

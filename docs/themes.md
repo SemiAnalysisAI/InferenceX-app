@@ -6,10 +6,10 @@
 
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`
 to persist a theme and apply its class to `<html>` before hydration. The
-header's `ModeToggle` is a single icon button: each ordinary click advances
-through `APP_THEMES` (`light, dark, minecraft, csgo, gta, doom, halo`) and wraps
-from Halo back to light. No modifier key is required. The icon shows the active
-theme, and each change emits `theme_toggled`. There is no dropdown.
+header's `ModeToggle` is an icon button that opens a menu listing every entry in
+`APP_THEMES` (`light, dark, minecraft, csgo, gta, doom, halo`). Picking an option
+applies it directly and closes the menu. The icon shows the active theme, and
+each change emits `theme_toggled`.
 The existing default remains dark; the system setting remains supported.
 
 The root `EasterEggThemeLazy` boundary imports only the selected optional theme.
@@ -18,10 +18,9 @@ that boundary's content. The shared activation hook checks both the embed
 pathname and the pre-paint attribute so a saved optional theme cannot start
 loading while a streamed embed is waiting for its boot markup.
 
-The performance boundary is the selected theme, not the rotation: landing on
-light/dark and switching from light to dark must not fetch optional resources.
-Cycling from dark to light intentionally selects the optional themes in between,
-so their resources may load while selected. Returning to a default theme unmounts
+The performance boundary is the selected theme: landing on light/dark and
+switching between them must not fetch optional resources. Optional theme
+resources load only while that theme is selected. Returning to a default theme unmounts
 the decorations and players; already downloaded resources may remain cached.
 
 Each optional lazy subtree (theme, header toggles and random splash) has a
@@ -158,10 +157,10 @@ The GTA banner also launches the optional [Bay Area heist game](./gta-heist.md).
 The game loads on demand and does not alter benchmark controls or data.
 
 The trigger keeps `data-testid="theme-toggle"` and its
-`Switch theme (currently <theme> mode)` label. It is a native button with
-Enter/Space activation and a 44px target on desktop and mobile. Keyboard focus
-stays on the button after each change. An unknown or system preference advances
-to light; saved optional themes remain supported in the ordinary rotation.
+`Switch theme (currently <theme> mode)` label. It is a native button with a 44px
+target. The menu (`theme-menu`) is a radio group of `theme-option-<theme>`
+buttons with roving focus, arrow/Home/End navigation and Escape to close. Focus
+returns to the trigger after a selection.
 
 ## Data/API coverage
 

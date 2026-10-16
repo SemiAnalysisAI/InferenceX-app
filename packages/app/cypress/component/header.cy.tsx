@@ -238,6 +238,7 @@ describe('Header', () => {
       });
       if (theme === 'light') {
         cy.get('[data-testid="theme-toggle"]').click();
+        cy.get('[data-testid="theme-option-dark"]').click();
       }
     }
   });
