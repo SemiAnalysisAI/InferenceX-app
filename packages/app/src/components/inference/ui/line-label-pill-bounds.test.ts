@@ -588,4 +588,21 @@ describe('labels clear the in-plot callouts', () => {
     expect(overlaps(after, callout)).toBe(false);
     expectInsidePlot(after);
   });
+
+  it('keeps labels a zoom pass hid hidden when it re-runs the layout', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [placement('kept', 40, 60, 'Kept run'), placement('dropped', 200, 120, 'Dropped run')],
+      { seriesAttribute: 'data-hw-key' },
+    );
+    // The zoom pass no longer places `dropped` (its line left the view).
+    updateRenderedLineLabels(zoomGroup, [placement('kept', 60, 80, 'Kept run')]);
+    relayoutLineLabels(zoomGroup);
+
+    const opacityOf = (key: string) =>
+      zoomGroup.select<SVGGElement>(`.line-label[data-line-key="${key}"]`).style('opacity');
+    expect(opacityOf('dropped')).toBe('0');
+    expect(opacityOf('kept')).toBe('1');
+  });
 });

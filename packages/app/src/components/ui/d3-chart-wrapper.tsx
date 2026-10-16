@@ -171,6 +171,8 @@ export interface D3ChartWrapperProps {
   legendElement: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
+  /** See `D3ChartProps.accessibility`. */
+  accessibility?: { label: string; description: string };
   instructions?: string;
   /** Whether d3-zoom is attached; gates the touch-device hint swap. */
   zoomEnabled?: boolean;
@@ -192,6 +194,7 @@ export function D3ChartWrapper({
   legendElement,
   noDataOverlay,
   caption,
+  accessibility,
   instructions,
   zoomEnabled = false,
   testId,
@@ -200,6 +203,7 @@ export function D3ChartWrapper({
 }: D3ChartWrapperProps) {
   const locale = useLocale();
   const isTouchPrimary = useMediaQuery(TOUCH_PRIMARY_QUERY);
+  const summaryId = `${chartId.replaceAll(/[^\w-]/g, '-')}-summary`;
   const resolvedInstructions = resolveChartInstructions(
     instructions,
     locale,
@@ -220,6 +224,9 @@ export function D3ChartWrapper({
           <svg
             ref={svgRef}
             data-testid="d3-chart-svg"
+            role={accessibility ? 'img' : undefined}
+            aria-label={accessibility?.label}
+            aria-describedby={accessibility ? summaryId : undefined}
             width="100%"
             height={dimensions.height}
             // pan-y lets one-finger swipes scroll the page while d3-zoom handles two-finger gestures.
@@ -245,6 +252,11 @@ export function D3ChartWrapper({
               }
             }}
           />
+          {accessibility && (
+            <p id={summaryId} className="sr-only" data-testid="chart-summary">
+              {accessibility.description}
+            </p>
+          )}
           {/* Tooltip is portalled to <body> with position:fixed so it can
                 rise above sibling chart cards' stacking contexts. The d3 layer
                 writes viewport-coords into style.left/top — see

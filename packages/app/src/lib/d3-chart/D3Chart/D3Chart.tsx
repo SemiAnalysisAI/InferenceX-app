@@ -39,6 +39,7 @@ function D3ChartInner<T>(
     legendElement,
     noDataOverlay,
     caption,
+    accessibility,
     scrollablePlot,
     onRender,
     onDisplayUpdate,
@@ -161,6 +162,7 @@ function D3ChartInner<T>(
       legendElement={legendElement}
       noDataOverlay={noDataOverlay}
       caption={caption}
+      accessibility={accessibility}
       scrollablePlot={scrollablePlot}
     />
   );

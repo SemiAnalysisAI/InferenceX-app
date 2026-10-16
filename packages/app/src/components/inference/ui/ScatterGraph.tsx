@@ -63,6 +63,7 @@ import {
   OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -121,6 +122,7 @@ import {
   paretoMaximizesX,
   type ParetoDirection,
 } from '@/lib/charts/chart-utils';
+import { buildChartSummary } from '@/components/inference/utils/chart-summary';
 import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
 import {
   globalParetoFrontier,
@@ -986,6 +988,35 @@ const ScatterGraph = React.memo(
           activeOverlayHwTypes.has(String(point.hwKey)),
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+
+    // Screen-reader overview of what is on the plot: chart type, both axes
+    // and their ranges, then each configuration by name with its highest
+    // point. The SVG itself is exposed as one image so assistive tech reads
+    // this instead of every tick label.
+    const chartSummary = useMemo(() => {
+      const groups = new Map<string, InferenceData[]>();
+      for (const point of filteredData) {
+        const key = `${point.hwKey}\u0000${point.precision}`;
+        const group = groups.get(key);
+        if (group) group.push(point);
+        else groups.set(key, [point]);
+      }
+      return buildChartSummary({
+        locale,
+        xLabel,
+        yLabel,
+        series: [...groups.values()].map((points) => ({
+          name: lineLabelText(
+            String(points[0].hwKey),
+            points[0].precision,
+            true,
+            modelLabel,
+            points,
+          ),
+          points,
+        })),
+      });
+    }, [filteredData, locale, xLabel, yLabel, modelLabel]);
 
     const processedOverlayClippedData = useMemo(() => {
       if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
@@ -2981,6 +3012,9 @@ const ScatterGraph = React.memo(
                 .attr('opacity', 0.95);
             },
             configureText: (text, label) => {
+              // The name keeps its line's hue, made lighter or darker where
+              // needed to stay readable (WCAG AA) on the chart background.
+              const nameColor = readableTextColor(label.color, ir.getCssColor('--card'));
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
               // Parse the hardware part without the variant suffix, which gets
               // its own segment so the engine is still matched at the end.
@@ -3007,7 +3041,7 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const markerSegments = marker
-                ? [{ className: 'll-marker', text: marker, fill: label.color, weight: '600' }]
+                ? [{ className: 'll-marker', text: marker, fill: nameColor, weight: '600' }]
                 : [];
               const runSegments = runTag
                 ? [
@@ -3020,18 +3054,18 @@ const ScatterGraph = React.memo(
                   ]
                 : [];
               const variantSegments = suffix
-                ? [{ className: 'll-variant', text: suffix, fill: label.color, weight: '500' }]
+                ? [{ className: 'll-variant', text: suffix, fill: nameColor, weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
                     ...markerSegments,
-                    { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
+                    { className: 'll-gpu', text: config.label, fill: nameColor, weight: '700' },
                     ...(precisionLabel
                       ? [
                           {
                             className: 'll-precision',
                             text: precisionLabel,
-                            fill: label.color,
+                            fill: nameColor,
                             weight: '600',
                           },
                         ]
@@ -3054,7 +3088,7 @@ const ScatterGraph = React.memo(
                     {
                       className: 'll-plain',
                       text: coreLabel,
-                      fill: label.color,
+                      fill: nameColor,
                       weight: '600',
                     },
                     ...runSegments,
@@ -4242,6 +4276,7 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
+          accessibility={chartSummary}
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}

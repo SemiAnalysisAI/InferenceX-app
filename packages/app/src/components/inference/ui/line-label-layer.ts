@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -636,6 +637,7 @@ export function renderLineLabels(
     halo?: string;
   },
 ): void {
+  rememberLayout(group, labels, options);
   const plainText = options.appearance === 'text';
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
@@ -681,7 +683,7 @@ export function renderLineLabels(
       // Halo in the chart background keeps coloured text legible where it
       // crosses a line or a marker; stroke is painted under the fill.
       text
-        .style('fill', label.color)
+        .style('fill', options.halo ? readableTextColor(label.color, options.halo) : label.color)
         .style('stroke', options.halo ?? 'var(--card)')
         .style('stroke-width', '4px')
         .style('stroke-linejoin', 'round')
@@ -750,6 +752,7 @@ export function updateRenderedLineLabels(
     bounds?: RectBounds | null;
   } = {},
 ): void {
+  rememberLayout(group, labels, options);
   const byKey = new Map(labels.map((label) => [label.key, label]));
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
@@ -764,9 +767,6 @@ export function updateRenderedLineLabels(
       return;
     }
     element.style('opacity', label.visible ? opacity : 0);
-    // Keep the bound datum current so `relayoutLineLabels` can re-run this
-    // pass later from the DOM alone.
-    element.datum(label);
     items.push({ node: this, label });
   });
   // The pills keep the size they were given on render, so the zoom pass only
@@ -1002,16 +1002,37 @@ export function annotationObstacles(
   return boxes;
 }
 
+interface LastLayout {
+  labels: readonly LineLabelPlacement[];
+  options: { opacity?: number; offsetX?: number; offsetY?: number; bounds?: RectBounds | null };
+}
+
 /**
- * Re-run the label layout in place, from the placements bound to the
- * rendered labels. Called after a layer that adds obstacles (the in-plot
- * callouts) draws, since it draws after the labels.
+ * The placements (in layout order) and options of the most recent render or
+ * zoom pass for each label group, so a later re-layout replays exactly that
+ * pass: labels it hid stay hidden and ties resolve in the same order.
+ */
+const lastLayouts = new WeakMap<SVGGElement, LastLayout>();
+
+function rememberLayout(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  labels: readonly LineLabelPlacement[],
+  { opacity, offsetX, offsetY, bounds }: LastLayout['options'],
+): void {
+  const node = group.node();
+  if (node) lastLayouts.set(node, { labels, options: { opacity, offsetX, offsetY, bounds } });
+}
+
+/**
+ * Re-run the most recent label layout in place. Called after a layer that
+ * adds obstacles (the in-plot callouts) draws, since it draws after the
+ * labels.
  */
 export function relayoutLineLabels(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
-  options: { opacity?: number; bounds?: RectBounds | null } = {},
 ): void {
-  const labels = group.selectAll<SVGGElement, LineLabelPlacement>('.line-label').data();
-  if (labels.length === 0) return;
-  updateRenderedLineLabels(group, labels, options);
+  const node = group.node();
+  const last = node ? lastLayouts.get(node) : undefined;
+  if (!last || last.labels.length === 0) return;
+  updateRenderedLineLabels(group, last.labels, last.options);
 }

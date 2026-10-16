@@ -126,6 +126,25 @@ describe('Inference Chart', () => {
     );
   });
 
+  it('gives screen readers an overview of the chart instead of its tick labels', () => {
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]')
+      .first()
+      .should('have.attr', 'role', 'img')
+      .and('have.attr', 'aria-label')
+      .and('match', / versus /);
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]')
+      .first()
+      .invoke('attr', 'aria-describedby')
+      .then((id) => {
+        cy.get(`[id="${id}"]`)
+          .invoke('text')
+          .should('match', /^Line chart with \d+ configurations?/)
+          .and('match', /X axis: .+, values from .+ to .+\./)
+          .and('match', /Y axis: .+, values from .+ to .+\./)
+          .and('match', /highest Y value [\d,.]+ at X value [\d,.]+\./);
+      });
+  });
+
   it('leads the chart heading with the model and workload, without the cost tier', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
