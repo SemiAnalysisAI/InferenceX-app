@@ -21,7 +21,7 @@ import {
   getAgenticPointAnchorRect,
   resolveAgenticPointAnchor,
 } from '@/lib/nudges/agentic-point-coach-mark';
-import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
+import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
@@ -51,8 +51,6 @@ function localizedNudgeHref(enPath: string): string {
   if (typeof window === 'undefined') return enPath;
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
-
-const TPUV7_QWEN_3_5_AGENTX_URL = '/inference/qwen-3-5';
 
 export const TPUV7_LAUNCH_MODAL_STORAGE_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
 

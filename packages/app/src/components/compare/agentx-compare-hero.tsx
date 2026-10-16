@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
+import { TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 import {
   agentxDashboardHref,
   FEATURED_AGENTX_MODELS,
@@ -409,7 +410,7 @@ const LANDING_HARDWARE_RESULTS = [
     title: 'TPU Results',
     titleZh: 'TPU 结果',
     subtitle: 'Qwen3.5 · AgentX',
-    href: '/inference/qwen-3-5',
+    href: TPUV7_QWEN_3_5_AGENTX_URL,
     model: 'qwen-3-5',
     analyticsEvent: 'landing_tpu_results_clicked',
     isNew: true,

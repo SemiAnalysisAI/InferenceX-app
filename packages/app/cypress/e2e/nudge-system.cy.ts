@@ -6,6 +6,8 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
+import { interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -119,6 +121,19 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+const TPU_RESULTS_HREF =
+  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+
+function assertTpuResultsFilters() {
+  cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+  cy.get('[data-testid="scenario-selector"]')
+    .invoke('text')
+    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="precision-multiselect"]')
+    .should('contain.text', 'FP8')
+    .and('not.contain.text', 'FP4');
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
+}
 
 // cypress/support/e2e.ts seeds the modal key on every load; clearing it here
 // runs after that hook, so only these visits see the modal.
@@ -129,6 +144,7 @@ function showLaunchModal(win: Cypress.AUTWindow) {
 
 describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
   it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
+    interceptTpuLaunchData();
     cy.visit('/', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -147,6 +163,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
     cy.get('[data-testid="launch-modal-action"]').click();
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuResultsFilters();
   });
 
   it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
@@ -178,6 +195,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   });
 
   it('localizes the modal and keeps the Chinese route tree', () => {
+    interceptTpuLaunchData();
     cy.visit('/zh', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
@@ -186,6 +204,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .and('contain.text', '稍后再看');
     cy.get('[data-testid="launch-modal-action"]').should('contain.text', '查看结果').click();
     cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
+    assertTpuResultsFilters();
   });
 });
 
@@ -220,6 +239,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
+    interceptTpuLaunchData();
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
@@ -233,10 +253,11 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/inference/qwen-3-5');
+      .and('have.attr', 'href', TPU_RESULTS_HREF);
     cy.get('[data-testid="launch-banner"]').click();
 
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuResultsFilters();
 
     // Body click must not write the dismissal key — the banner should still
     // render after returning home and reloading the landing page.
