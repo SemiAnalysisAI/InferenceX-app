@@ -173,6 +173,7 @@ import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
+  metricAxisCeiling,
 } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
@@ -1482,12 +1483,25 @@ const ScatterGraph = React.memo(
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
 
+      const ceiling = metricAxisCeiling(selectedYAxisMetric);
+      const yMax =
+        ceiling !== undefined && ext[1] <= ceiling
+          ? Math.min(ext[1] * 1.05, ceiling)
+          : ext[1] * 1.05;
+
       return {
         type: (useLog ? 'log' : 'linear') as 'log' | 'linear',
-        domain: [yMin, ext[1] * 1.05] as [number, number],
+        domain: [yMin, yMax] as [number, number],
         nice: niceAxes,
       };
-    }, [visiblePoints, isInputTputMetric, logScale, niceAxes, yExtentOverride]);
+    }, [
+      visiblePoints,
+      isInputTputMetric,
+      logScale,
+      niceAxes,
+      yExtentOverride,
+      selectedYAxisMetric,
+    ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
     const dataIdentity = useMemo(
