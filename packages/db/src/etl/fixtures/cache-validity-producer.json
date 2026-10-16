@@ -1,0 +1,305 @@
+{
+  "scope": "Synthetic producer outputs for consumer-contract tests; not historical results.",
+  "producer_commit": "9e3c706b3661f03dd12fdb0cd4e3e7e226cba96e",
+  "generator": "lp_fxi_cpu_kvcache/tools/x1i_make_fixtures.py",
+  "cases": {
+    "atom_complete": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.1,
+        "external_cache_hit_rate": 0.1,
+        "overall_cache_hit_rate": 0.7,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "VALID_COMPLETE",
+        "status_class": "VALID_COMPLETE",
+        "pricing_eligible": true,
+        "published": true,
+        "basis": "tiers",
+        "reasons": []
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom_zero": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.0,
+        "cpu_cache_hit_rate": 0.0,
+        "external_cache_hit_rate": 0.0,
+        "overall_cache_hit_rate": 0.0,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "VALID_ZERO",
+        "status_class": "VALID_ZERO",
+        "pricing_eligible": true,
+        "published": true,
+        "basis": "tiers",
+        "reasons": []
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom_partial_component": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": null,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "PARTIAL_COMPONENT",
+        "status_class": "PARTIAL",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "tiers",
+        "reasons": ["CPU reuse counter missing and no confirmed absence of a CPU tier"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom_request_scope_unresolved": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.1,
+        "external_cache_hit_rate": 0.1,
+        "overall_cache_hit_rate": 0.7,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "REQUEST_SCOPE_UNRESOLVED",
+        "status_class": "UNRESOLVED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "tiers",
+        "reasons": [
+          "server window admissions/prompt tokens do not match the successful profiling requests (5.0 vs 5; 1000.0 vs 1000)"
+        ]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "trt_conditional_interval": {
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": 0.9,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "CONDITIONAL_INTERVAL",
+        "status_class": "VALID_INTERVAL",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "combined",
+        "reasons": ["request_scope_not_bound", "expected_instances_not_verified"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "CONDITIONAL_INTERVAL",
+          "reasons": ["request_scope_not_bound", "expected_instances_not_verified"],
+          "raw_rate": 0.9
+        }
+      }
+    },
+    "trt_rejected_cached_exceeds_prompt": {
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": null,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "REJECTED",
+        "status_class": "INVALID",
+        "pricing_eligible": false,
+        "published": false,
+        "basis": null,
+        "reasons": [
+          "cached_exceeds_prompt",
+          "request_scope_not_bound",
+          "expected_instances_not_verified"
+        ]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "REJECTED",
+          "reasons": [
+            "cached_exceeds_prompt",
+            "request_scope_not_bound",
+            "expected_instances_not_verified"
+          ],
+          "raw_rate": 1.0475999999999999
+        }
+      }
+    },
+    "sglang_three_tiers": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.2,
+        "external_cache_hit_rate": 0.3,
+        "overall_cache_hit_rate": 0.9,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "NOT_EVALUATED",
+        "status_class": "NOT_EVALUATED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "tiers",
+        "reasons": ["adapter_does_not_assess_cache_rate"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "dynamo_frontend": {
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": 0.8,
+        "overall_source": "frontend",
+        "role_scope": "combined"
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "NOT_EVALUATED",
+        "status_class": "NOT_EVALUATED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "combined",
+        "reasons": ["adapter_does_not_assess_cache_rate"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "dynamo_router_estimate": {
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": 0.7,
+        "overall_source": "router_estimate",
+        "role_scope": "combined"
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "NOT_EVALUATED",
+        "status_class": "NOT_EVALUATED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "combined",
+        "reasons": ["adapter_does_not_assess_cache_rate"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "vllm_decode_only": {
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": 1.0,
+        "external_cache_hit_rate": 1.0,
+        "overall_cache_hit_rate": 1.0,
+        "overall_source": "worker_counters",
+        "role_scope": "combined"
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "NOT_EVALUATED",
+        "status_class": "NOT_EVALUATED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "tiers",
+        "reasons": ["adapter_does_not_assess_cache_rate"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "vllm_conditional_denominator": {
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.5,
+        "external_cache_hit_rate": 0.5,
+        "overall_cache_hit_rate": 0.6,
+        "overall_source": "worker_counters",
+        "role_scope": "prefill"
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "NOT_EVALUATED",
+        "status_class": "NOT_EVALUATED",
+        "pricing_eligible": false,
+        "published": true,
+        "basis": "tiers",
+        "reasons": ["adapter_does_not_assess_cache_rate"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    }
+  }
+}

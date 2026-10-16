@@ -1,7 +1,9 @@
 import type { InferenceData, TokenRevenuePricing } from './types';
 import {
+  type CacheRatePolicy,
+  DEFAULT_CACHE_RATE_POLICY,
   DEFAULT_CACHED_INPUT_PRICE_RATIO,
-  pricingCacheHitRate,
+  selectPricingCacheBasis,
 } from '@/lib/calculator/cache-pricing';
 
 const SECONDS_PER_HOUR = 3_600;
@@ -26,6 +28,15 @@ export function cachedInputPricePerMillion(pricing: TokenRevenuePricing): number
   return typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0
     ? explicit
     : pricing.inputPerMillion * DEFAULT_CACHED_INPUT_PRICE_RATIO;
+}
+
+/**
+ * Whether the cache hit rate can change revenue at all. With the cached-input
+ * price equal to the input price, (1 - h) * in + h * cached = in for every h,
+ * so an unproven actual rate does not block pricing.
+ */
+export function cacheAffectsPrice(pricing: TokenRevenuePricing): boolean {
+  return cachedInputPricePerMillion(pricing) !== pricing.inputPerMillion;
 }
 
 /**
@@ -95,11 +106,13 @@ export function tokenRevenueFromRatesPerGpuHour(
 export function tokenRevenuePerGpuHour(
   point: InferenceData,
   pricing: TokenRevenuePricing,
+  cacheRatePolicy: CacheRatePolicy = DEFAULT_CACHE_RATE_POLICY,
 ): number | null {
   const total = point.tput_per_gpu ?? 0;
-  const cacheHitRate = pricingCacheHitRate(point);
+  const cache = selectPricingCacheBasis(point, cacheRatePolicy);
+  if (cache.source === 'unavailable' && cacheAffectsPrice(pricing)) return null;
   const inputShare = inputTokenShareForRevenue(point);
-  return tokenRevenueFromRatesPerGpuHour(total, inputShare, cacheHitRate, pricing);
+  return tokenRevenueFromRatesPerGpuHour(total, inputShare, cache.rate, pricing);
 }
 
 /** Whether a Y-axis option depends on the selected normalized or OpenRouter token prices. */
@@ -115,13 +128,14 @@ export function usesTokenSalePricing(metricConfigKey: string): boolean {
 export function applyTokenRevenuePricing(
   points: InferenceData[],
   pricing: TokenRevenuePricing | null,
+  cacheRatePolicy: CacheRatePolicy = DEFAULT_CACHE_RATE_POLICY,
 ): InferenceData[] {
   return points.map((point) => {
     const next = { ...point };
     delete next.tokenRevenuePerGpuHour;
     if (!pricing) return next;
 
-    const revenue = tokenRevenuePerGpuHour(point, pricing);
+    const revenue = tokenRevenuePerGpuHour(point, pricing, cacheRatePolicy);
     if (revenue !== null) {
       next.tokenRevenuePerGpuHour = { y: revenue, roof: false };
     }

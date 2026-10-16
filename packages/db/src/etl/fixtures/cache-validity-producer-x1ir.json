@@ -1,0 +1,141 @@
+{
+  "scope": "Synthetic producer outputs for the X1-IR consumer closeout tests; not historical results.",
+  "generators": [
+    "lp_fxi_cpu_kvcache/tools/x1ir_make_fixtures.py --tree prb",
+    "lp_fxi_cpu_kvcache/tools/x1ir_make_fixtures.py --tree 3964"
+  ],
+  "cases": {
+    "missing_server_metrics": {
+      "producer_commit": "9e3c706b3661f03dd12fdb0cd4e3e7e226cba96e",
+      "present": false,
+      "cache": {
+        "gpu_cache_hit_rate": null,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": null,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "infx-cache-validity-core/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "MISSING_OBSERVATION",
+        "status_class": "MISSING",
+        "pricing_eligible": false,
+        "published": false,
+        "basis": null,
+        "reasons": ["server_metrics_missing"]
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom_no_cpu_tier": {
+      "producer_commit": "9e3c706b3661f03dd12fdb0cd4e3e7e226cba96e",
+      "present": true,
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.0,
+        "external_cache_hit_rate": 0.0,
+        "overall_cache_hit_rate": 0.6,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "VALID_COMPLETE",
+        "status_class": "VALID_COMPLETE",
+        "pricing_eligible": true,
+        "published": true,
+        "basis": "tiers",
+        "reasons": []
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom_complete": {
+      "producer_commit": "9e3c706b3661f03dd12fdb0cd4e3e7e226cba96e",
+      "present": true,
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.1,
+        "external_cache_hit_rate": 0.1,
+        "overall_cache_hit_rate": 0.7,
+        "overall_source": null,
+        "role_scope": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "core_schema": "infx-cache-validity-core/1",
+        "status": "VALID_COMPLETE",
+        "status_class": "VALID_COMPLETE",
+        "pricing_eligible": true,
+        "published": true,
+        "basis": "tiers",
+        "reasons": []
+      },
+      "validity": {
+        "cache_rate": {
+          "status": "NOT_EVALUATED",
+          "reasons": ["adapter_does_not_assess_cache_rate"]
+        }
+      }
+    },
+    "atom3964_complete": {
+      "producer_commit": "0842d829",
+      "present": true,
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": 0.1,
+        "external_cache_hit_rate": 0.1,
+        "overall_cache_hit_rate": 0.7
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "status": "VALID_COMPLETE",
+        "pricing_eligible": true,
+        "reasons": []
+      }
+    },
+    "atom3964_zero": {
+      "producer_commit": "0842d829",
+      "present": true,
+      "cache": {
+        "gpu_cache_hit_rate": 0.0,
+        "cpu_cache_hit_rate": 0.0,
+        "external_cache_hit_rate": 0.0,
+        "overall_cache_hit_rate": 0.0
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "status": "VALID_ZERO",
+        "pricing_eligible": true,
+        "reasons": []
+      }
+    },
+    "atom3964_partial_component": {
+      "producer_commit": "0842d829",
+      "present": true,
+      "cache": {
+        "gpu_cache_hit_rate": 0.6,
+        "cpu_cache_hit_rate": null,
+        "external_cache_hit_rate": null,
+        "overall_cache_hit_rate": null
+      },
+      "cache_validity": {
+        "schema": "atom-cache-validity/1",
+        "status": "PARTIAL_COMPONENT",
+        "pricing_eligible": false,
+        "reasons": ["CPU reuse counter missing and no confirmed absence of a CPU tier"]
+      }
+    }
+  }
+}
