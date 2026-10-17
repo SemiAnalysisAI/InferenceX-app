@@ -139,6 +139,15 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
   });
 
+  it.each(['tpuv7-agentx-launch-modal', 'tpuv7-qwen-3-5-agentx-banner'])(
+    '%s uses the announcement title without a breaking-news prefix in either locale',
+    (id) => {
+      const nudge = NUDGE_REGISTRY.find((entry) => entry.id === id);
+      expect(nudge?.content.title).toBe('Google TPUv7 joins AgentX');
+      expect(nudge?.content.titleZh).toBe('Google TPUv7 加入 AgentX');
+    },
+  );
+
   it('centers the TPUv7 launch modal on the landing page', () => {
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     expect(modal?.scope).toBe('landing');

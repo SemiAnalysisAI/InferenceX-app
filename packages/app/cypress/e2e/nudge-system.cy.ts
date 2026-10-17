@@ -50,7 +50,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Breaking News 🚨: Google TPUv7 joins AgentX')
+      .and('contain.text', 'Google TPUv7 joins AgentX')
       .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
@@ -110,7 +110,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', '突发新闻 🚨：Google TPUv7 加入 AgentX')
+      .and('contain.text', 'Google TPUv7 加入 AgentX')
       .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
       .and('contain.text', '查看结果');
   });
