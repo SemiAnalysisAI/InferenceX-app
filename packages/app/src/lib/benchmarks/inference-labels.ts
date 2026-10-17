@@ -46,8 +46,6 @@ export function inferenceFrameworkLabelOverride(
   return override && Date.now() < override.expiresAt ? override.label : undefined;
 }
 
-/** Leads every unofficial-run label, in line labels and legend rows alike. */
-export const OVERLAY_LABEL_MARKER = '✕ ';
 const RUN_TAG_MAX = 20;
 const RUN_TAG_TAIL = 17;
 
@@ -78,14 +76,15 @@ export function overlayRunTag(run: OverlayRunIdentity): string {
  * Line-label text for an unofficial-run curve. Pills name the hardware, not the
  * branch: branch names run to 70+ characters and the legend already carries
  * them. The run tag is added only when several overlay runs draw the same
- * hardware, so the pills stay distinguishable.
+ * hardware, so the pills stay distinguishable. No ✕ prefix: inside the plot it
+ * reads as a data point; the dashed run-colored curve already marks the run.
  */
 export function getOverlayLineLabel(
   hardwareLabel: string,
   run: OverlayRunIdentity,
   sharesHardware: boolean,
 ): string {
-  return `${OVERLAY_LABEL_MARKER}${hardwareLabel}${sharesHardware ? overlayRunTag(run) : ''}`;
+  return `${hardwareLabel}${sharesHardware ? overlayRunTag(run) : ''}`;
 }
 
 /** Keep unofficial-run identity/markers while making its special engine visible. */

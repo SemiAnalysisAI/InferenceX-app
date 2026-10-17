@@ -59,7 +59,6 @@ import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
   getOverlayLineLabel,
-  OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -2999,10 +2998,6 @@ const ScatterGraph = React.memo(
               const runTag = meta?.runTag ?? '';
               let coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
               if (runTag) coreLabel = coreLabel.slice(0, -runTag.length);
-              // Overlay pills lead with the run marker; the hardware behind it is
-              // parsed like an official pill so the GPU name stays bold.
-              const marker = coreLabel.startsWith(OVERLAY_LABEL_MARKER) ? OVERLAY_LABEL_MARKER : '';
-              coreLabel = coreLabel.slice(marker.length);
               const hardwareLabel = getDisplayLabel(config);
               const isHardwareLabel =
                 coreLabel === hardwareLabel || coreLabel.startsWith(`${config.label} `);
@@ -3016,9 +3011,6 @@ const ScatterGraph = React.memo(
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
-              const markerSegments = marker
-                ? [{ className: 'll-marker', text: marker, fill: label.color, weight: '600' }]
-                : [];
               const runSegments = runTag
                 ? [
                     {
@@ -3034,7 +3026,6 @@ const ScatterGraph = React.memo(
                 : [];
               const segments = isHardwareLabel
                 ? [
-                    ...markerSegments,
                     { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
                     ...(precisionLabel
                       ? [
@@ -3060,7 +3051,6 @@ const ScatterGraph = React.memo(
                     ...variantSegments,
                   ]
                 : [
-                    ...markerSegments,
                     {
                       className: 'll-plain',
                       text: coreLabel,
