@@ -841,7 +841,11 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('.sidebar-legend')
       .should('contain.text', 'UNOFFICIAL: feat/power-sweep')
       .and('contain.text', '✕ B200');
-    cy.get('#gpu-overlay .line-label').should('have.length', 3).and('contain.text', '✕ B200');
+    // Line-label pills drop the ✕ so they do not read as X data points.
+    cy.get('#gpu-overlay .line-label')
+      .should('have.length', 3)
+      .and('contain.text', 'B200')
+      .and('not.contain.text', '✕');
 
     // A date toggle hides that official series; the unofficial run stays.
     cy.get('.sidebar-legend label').contains('2025-03-15').click();

@@ -989,10 +989,10 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The pill names the hardware behind the ✕ marker, parsed like an official
-    // pill; the long branch that crashed the production page stays in the legend.
+    // The pill names the hardware (no ✕, which read as an X data point), parsed
+    // like an official pill; the long branch that crashed the production page stays in the legend.
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
-      .should('have.text', '✕ B200 (TRTLLM)')
+      .should('have.text', 'B200 (TRTLLM)')
       .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
@@ -1163,7 +1163,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('have.text', '✕ B200 (TRTLLM)');
+      .should('have.text', 'B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
