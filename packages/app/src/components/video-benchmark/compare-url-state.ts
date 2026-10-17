@@ -57,11 +57,24 @@ export function resolveCompareSelection(
   const defaults = defaultComparePair(points);
   const find = (key: string | null) =>
     key === null ? null : (measured.find((point) => point.hardwareKey === key) ?? null);
-  return {
-    baseline: find(selection.baseline) ?? find(defaults.baseline),
-    candidate: find(selection.candidate) ?? find(defaults.candidate),
-    caseIndex: selection.caseIndex,
-  };
+  const chosen = { baseline: find(selection.baseline), candidate: find(selection.candidate) };
+  let baseline = chosen.baseline ?? find(defaults.baseline);
+  let candidate = chosen.candidate ?? find(defaults.candidate);
+  if (baseline && candidate && baseline.hardwareKey === candidate.hardwareKey) {
+    // Choosing the other side's hardware in the panel swaps the two sides, so a side that
+    // defaulted onto the chosen hardware moves to the other default; two equal explicit sides
+    // keep the baseline. Any still-equal pair takes the first other measured hardware.
+    const shared = baseline.hardwareKey;
+    const differing = (point: VideoPoint | null) =>
+      point && point.hardwareKey !== shared ? point : null;
+    const other = measured.find((point) => point.hardwareKey !== shared) ?? null;
+    if (chosen.candidate && !chosen.baseline)
+      baseline = differing(find(defaults.candidate)) ?? other;
+    else
+      candidate =
+        differing(find(defaults.candidate)) ?? differing(find(defaults.baseline)) ?? other;
+  }
+  return { baseline, candidate, caseIndex: selection.caseIndex };
 }
 
 /** Returns a new URL with defaults omitted; the input URL is not mutated. */

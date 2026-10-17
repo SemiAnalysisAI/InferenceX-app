@@ -125,7 +125,7 @@ const CHIP = {
 /** The stored artifact of one side, or null when the deployment publishes no media (HTTP 204). */
 async function fetchSide(point: VideoPoint, signal: AbortSignal): Promise<CompareSide | null> {
   const response = await fetch(
-    `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=media`,
+    `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=published`,
     { signal },
   );
   if (response.status === 204) return null;

@@ -215,7 +215,7 @@ function sourceSide(
 }
 
 /**
- * Resolve a dashboard point inside its stored artifact (`format=media`): the
+ * Resolve a dashboard point inside its stored artifact (`format=media` or `format=published`): the
  * observation source whose manifest SHA the point id names, else the first
  * source that publishes the point's cell. A malformed source is skipped so a
  * readable sibling still resolves (as `videoHistoryEntry` isolates sources);

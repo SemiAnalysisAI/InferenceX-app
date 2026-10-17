@@ -12,6 +12,11 @@ import { videoPoints } from './points';
 
 const points = videoPoints([history as unknown as VideoHistoryPage]);
 
+const keys = (resolved: ReturnType<typeof resolveCompareSelection>) => [
+  resolved.baseline?.hardwareKey,
+  resolved.candidate?.hardwareKey,
+];
+
 describe('video compare URL selection', () => {
   it('defaults to the slowest measured C1 hardware as baseline and the fastest as candidate', () => {
     expect(defaultComparePair(points)).toEqual({ baseline: 'h100', candidate: 'b200' });
@@ -52,6 +57,25 @@ describe('video compare URL selection', () => {
       candidate: null,
       caseIndex: 0,
     });
+  });
+  it('keeps the two sides distinct when the URL lands both on one hardware', () => {
+    // v_cand on the default baseline swaps the sides, as choosing it in the panel does.
+    expect(
+      keys(resolveCompareSelection({ baseline: null, candidate: 'h100', caseIndex: 0 }, points)),
+    ).toEqual(['b200', 'h100']);
+    // v_base on the default candidate moves the candidate to the default baseline.
+    expect(
+      keys(resolveCompareSelection({ baseline: 'b200', candidate: null, caseIndex: 0 }, points)),
+    ).toEqual(['b200', 'h100']);
+    // Two explicit equal sides keep the baseline and take the default candidate.
+    expect(
+      keys(resolveCompareSelection({ baseline: 'h200', candidate: 'h200', caseIndex: 0 }, points)),
+    ).toEqual(['h200', 'b200']);
+    // Only the shared hardware left: the candidate becomes the first other measured hardware.
+    const twoFast = points.filter((p) => p.hardwareKey !== 'h100');
+    expect(
+      keys(resolveCompareSelection({ baseline: 'b200', candidate: 'b200', caseIndex: 0 }, twoFast)),
+    ).toEqual(['b200', 'h200']);
   });
   it('writes only non-default params, keeps unrelated params and leaves the input alone', () => {
     const defaults = defaultComparePair(points);

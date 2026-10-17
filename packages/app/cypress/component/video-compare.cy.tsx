@@ -20,7 +20,7 @@ const colorFor = (key: string) => COLORS[key] ?? 'rgb(0, 0, 0)';
 const OWNING: MetricOptions = { tier: 'h' };
 
 const mediaUrl = (point: VideoPoint) =>
-  `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=media`;
+  `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`;
 function media(point: VideoPoint, hardware: string, alias: string) {
   cy.intercept(
     'GET',
