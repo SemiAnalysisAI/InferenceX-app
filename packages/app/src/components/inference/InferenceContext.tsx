@@ -627,6 +627,13 @@ export function InferenceProvider({
     const raw = getUrlParam('i_best');
     return raw === '0' ? false : raw === '1' ? true : null;
   });
+  // Soft navigation can commit its URL after render. Read again after the
+  // global provider's layout effect refreshes the share-link snapshot.
+  useEffect(() => {
+    if (activeTab !== 'inference') return;
+    const raw = getUrlParam('i_best');
+    if (raw === '0' || raw === '1') setBestPerSku(raw === '1');
+  }, [activeTab, getUrlParam]);
   const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
   const labelScenarioKind = sequenceKind(effectiveSequence);
