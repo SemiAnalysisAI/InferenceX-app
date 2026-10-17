@@ -450,6 +450,13 @@ describe('GPUGraph', () => {
     cy.get('.sidebar-legend').should('exist');
     // Legend should show at least one entry (date + GPU combo)
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="legend-advanced-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('#gpu-parallelism-labels')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'unchecked');
+    cy.get('#gpu-parallelism-labels')
+      .parents('[data-testid="legend-advanced-controls"]')
+      .should('not.exist');
   });
 
   it('places and clears perf rulers across chip history comparison curves', () => {

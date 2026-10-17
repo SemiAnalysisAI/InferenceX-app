@@ -1771,7 +1771,6 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-parallelism-labels',
                 label: legendT.parallelismLabels,
-                advanced: true,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);

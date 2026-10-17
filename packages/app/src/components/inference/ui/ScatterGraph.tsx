@@ -4416,7 +4416,6 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-parallelism-labels',
                   label: legendT.parallelismLabels,
-                  advanced: true,
                   checked: useAdvancedLabels,
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);

@@ -114,6 +114,41 @@ const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
+describe('Parallelism labels in standard controls', () => {
+  for (const width of [1280, 375]) {
+    it(`toggles agentic parallelism labels with Advanced closed at ${width}px`, () => {
+      cy.viewport(width, 900);
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference?i_seq=agentic-traces', {
+        onBeforeLoad(win) {
+          unlockAgenticGate(win);
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+      cy.get('#scatter-parallelism-labels')
+        .should('be.visible')
+        .and('have.attr', 'data-state', 'unchecked')
+        .click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] g.parallelism-label').should('be.visible');
+      cy.get('#scatter-parallelism-labels').click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+    });
+  }
+});
+
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
