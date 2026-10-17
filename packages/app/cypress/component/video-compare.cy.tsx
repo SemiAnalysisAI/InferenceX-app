@@ -190,6 +190,19 @@ describe('Video compare panel (retained fixture)', () => {
       .and('contain', 'HTTP 404');
     cy.contains('button', 'Retry').should('exist');
   });
+  it('keeps a restored, repaired pair when one side changes', () => {
+    // v_cand on the default baseline makes restore swap the baseline to B200; that repair must
+    // stay explicit, so a later candidate change cannot re-default the baseline to H100.
+    mount('/video', '?v_cand=h100');
+    cy.wait(['@b200', '@h100']);
+    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'B200');
+    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
+    pick('Candidate', 'H200');
+    cy.wait('@h200');
+    cy.get('[data-testid="video-compare-baseline"]').should('contain', 'B200');
+    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
+    cy.location('search').should('contain', 'v_base=b200').and('contain', 'v_cand=h200');
+  });
   it('says when a run publishes no clips and keeps the metric deltas', () => {
     mount('/video', '', cells, OWNING, () => {
       cy.intercept('GET', mediaUrl(c1('b200')), { statusCode: 204 }).as('unpublished');

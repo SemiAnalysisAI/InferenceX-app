@@ -250,21 +250,27 @@ export default function VideoCompare({
   const paneColor = (role: Role) => colorFor(sideOf[role]?.hardwareKey ?? '');
 
   const update = (patch: Partial<VideoCompareSelection>) => {
-    const next = { ...selection, ...patch };
+    // Start from the pair on screen, not the stored selection: a side repaired on restore or by
+    // a collision is explicit from then on, as the URL already records it.
+    const resolved = resolveCompareSelection(
+      {
+        baseline: baseline?.hardwareKey ?? null,
+        candidate: candidate?.hardwareKey ?? null,
+        caseIndex,
+        ...patch,
+      },
+      points,
+    );
+    const next = {
+      baseline: resolved.baseline?.hardwareKey ?? null,
+      candidate: resolved.candidate?.hardwareKey ?? null,
+      caseIndex: resolved.caseIndex,
+    };
     setSelection(next);
-    const resolved = resolveCompareSelection(next, points);
     history.replaceState(
       null,
       '',
-      writeVideoCompareSelection(
-        new URL(location.href),
-        {
-          baseline: resolved.baseline?.hardwareKey ?? null,
-          candidate: resolved.candidate?.hardwareKey ?? null,
-          caseIndex: next.caseIndex,
-        },
-        defaults,
-      ),
+      writeVideoCompareSelection(new URL(location.href), next, defaults),
     );
   };
   const choose = (side: Role, hardware: string) => {
