@@ -1,4 +1,10 @@
-import type { PowerBasis } from '@/lib/power/power-basis';
+import {
+  POWER_BASES,
+  POWER_BASIS_FIELDS,
+  POWER_QUANTITIES,
+  type PowerBasis,
+  type PowerQuantity,
+} from '@/lib/power/power-basis';
 import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
@@ -13,7 +19,10 @@ export type MeasuredPowerDisplay = 'watts' | 'tdp' | 'timeline';
 export type MeasuredMetricConfig =
   | {
       family: 'power';
-      /** Power boundary the key plots; only `gpu-measured` publishes the other dimensions. */
+      /**
+       * Power boundary the key plots. Derived boundaries publish only the
+       * `POWER_BASIS_FIELDS` quantities; `gpu-measured` publishes every variant.
+       */
       basis: PowerBasis;
       scope: MeasuredScope;
       statistic: 'average' | 'p75' | 'p90';
@@ -43,6 +52,13 @@ export const MEASURED_METRIC_DEFAULTS = {
 } as const satisfies Record<MeasuredMetricFamily, MetricConfigKey>;
 
 const measured = { basis: 'gpu-measured' } as const;
+
+/** Control settings that plot each `POWER_QUANTITIES` entry for the whole deployment. */
+const POWER_QUANTITY_CONFIGS = {
+  watts: { family: 'power', scope: 'all', statistic: 'average', display: 'watts' },
+  joulesPerOutputToken: { family: 'energy', scope: 'all', denominator: 'output', unit: 'joules' },
+  joulesPerTotalToken: { family: 'energy', scope: 'all', denominator: 'total', unit: 'joules' },
+} as const satisfies Record<PowerQuantity, MeasuredMetricConfigChange>;
 
 // Presentation settings resolve to existing metrics; they do not own chart state.
 const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetricConfig])[] = [
@@ -102,18 +118,12 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     'y_measuredWhPerSuccessfulQuery',
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
-  // Derived boundaries publish one canonical combination per family: whole
-  // deployment, average watts, joules per output token (lib/power/power-basis.ts).
-  ...(
-    [
-      ['gpu-provisioned', 'y_gpuProvisionedWatts', 'y_gpuProvisionedJPerOutputToken'],
-      ['utility-provisioned', 'y_utilityProvisionedWatts', 'y_utilityProvisionedJPerOutputToken'],
-      ['utility-modeled', 'y_utilityModeledWatts', 'y_utilityModeledJPerOutputToken'],
-    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey, MetricConfigKey])[]
-  ).flatMap(([basis, watts, energy]): (readonly [MetricConfigKey, MeasuredMetricConfig])[] => [
-    [watts, { family: 'power', basis, scope: 'all', statistic: 'average', display: 'watts' }],
-    [energy, { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' }],
-  ]),
+  ...POWER_BASES.filter((basis) => basis !== 'gpu-measured').flatMap((basis) =>
+    POWER_QUANTITIES.map((quantity): readonly [MetricConfigKey, MeasuredMetricConfig] => [
+      `y_${POWER_BASIS_FIELDS[basis][quantity]}`,
+      { ...POWER_QUANTITY_CONFIGS[quantity], basis },
+    ]),
+  ),
 ];
 
 export function getMeasuredMetricConfig(metric: string): MeasuredMetricConfig | undefined {

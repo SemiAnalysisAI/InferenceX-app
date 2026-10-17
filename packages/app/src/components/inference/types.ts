@@ -372,15 +372,18 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
    */
   powerVariant?: PowerVariant;
 
-  // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
-  // W per allocated GPU plus J per successful output token, normalized by every
-  // allocated GPU (prefill + decode for disaggregation). Emitted only when the
-  // value is finite and positive; see lib/power/power-basis.ts and
-  // docs/data-transforms.md "Power boundaries".
+  // Power boundaries beyond the GPU-measured telemetry above (B1). Each is
+  // W per allocated GPU plus J per successful output token and J per total
+  // (input + output) token, normalized by every allocated GPU (prefill +
+  // decode for disaggregation). Emitted only when the value is finite and
+  // positive; see lib/power/power-basis.ts and docs/data-transforms.md
+  // "Power boundaries".
   /** B2 W/GPU: HW_REGISTRY tdp. */
   gpuProvisionedWatts?: { y: number; roof: boolean };
   /** B2 J/out: tdp × N_alloc ÷ total output tok/s. */
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B2 J/total: tdp ÷ `tput_per_gpu` (total tokens over every allocated GPU). */
+  gpuProvisionedJPerTotalToken?: { y: number; roof: boolean };
   /** B3 W/GPU: HW_REGISTRY all-in power (kW × 1000). */
   utilityProvisionedWatts?: { y: number; roof: boolean };
   /**
@@ -389,10 +392,14 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
    * allocated GPU, so it is (P + D) / D × `jOutput` on disaggregated rows.
    */
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B3 J/total: all-in W ÷ `tput_per_gpu`; equals `jTotal` wherever both exist. */
+  utilityProvisionedJPerTotalToken?: { y: number; roof: boolean };
   /** B4 W/GPU: modeled deployment facility watts (IT × PUE, applied once) ÷ measured GPUs. */
   utilityModeledWatts?: { y: number; roof: boolean };
   /** B4 J/out: B1 `joules_per_output_token` × (B4 W ÷ B1 W); inherits B1's token denominator. */
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
+  /** B4 J/total: B1 `joules_per_total_token` × (B4 W ÷ B1 W). */
+  utilityModeledJPerTotalToken?: { y: number; roof: boolean };
 }
 
 /**
@@ -410,10 +417,13 @@ export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; i
 export type PowerBasisFieldKey =
   | 'gpuProvisionedWatts'
   | 'gpuProvisionedJPerOutputToken'
+  | 'gpuProvisionedJPerTotalToken'
   | 'utilityProvisionedWatts'
   | 'utilityProvisionedJPerOutputToken'
+  | 'utilityProvisionedJPerTotalToken'
   | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken';
+  | 'utilityModeledJPerOutputToken'
+  | 'utilityModeledJPerTotalToken';
 
 export type { PowerBasis } from '@/lib/power/power-basis';
 

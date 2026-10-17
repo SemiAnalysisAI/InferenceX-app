@@ -1192,7 +1192,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/inference-table-data.ts',
-    sourceSha256: '69b7c57385575177fc942b6be1f30856ad1298bb3d0c72edcdcf873f09529975',
+    sourceSha256: 'fd572d70ece1589268e457e5b2a941488b5a6bba1f07305974f3de06eb660959',
     reviewArea: {
       en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
       zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',

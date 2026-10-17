@@ -26,7 +26,7 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(20);
+    expect(grouped).toHaveLength(23);
     expect(new Set(grouped)).toEqual(
       new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
     );
