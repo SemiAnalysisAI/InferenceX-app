@@ -114,6 +114,91 @@ const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
+describe('Parallelism labels in standard controls', () => {
+  for (const width of [1280, 375]) {
+    it(`toggles agentic parallelism labels with Advanced closed at ${width}px`, () => {
+      cy.viewport(width, 900);
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference?i_seq=agentic-traces', {
+        onBeforeLoad(win) {
+          unlockAgenticGate(win);
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+      cy.get('#scatter-parallelism-labels')
+        .should('be.visible')
+        .and('have.attr', 'data-state', 'unchecked')
+        .click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .find('tspan')
+        .should('have.length', 1);
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+      expandLegendAdvanced();
+      cy.get('label[for="scatter-point-labels"]').should('have.text', '# of GPUs Label');
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked').click();
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .find('tspan')
+        .should('have.length', 2);
+      cy.get('#scatter-parallelism-labels').click();
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .invoke('text')
+        .should('match', /^\d+$/);
+      cy.get('#scatter-point-labels').click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .should('have.length', 0);
+    });
+  }
+
+  for (const gpuCount of [false, true]) {
+    for (const parallelism of [false, true]) {
+      it(`loads independent shared-link settings: GPUs=${gpuCount}, parallelism=${parallelism}`, () => {
+        interceptAgenticData();
+        interceptDerivedAgenticMetrics();
+        cy.visit(
+          `/inference?i_seq=agentic-traces&i_label=${Number(gpuCount)}&i_advlabel=${Number(parallelism)}`,
+          {
+            onBeforeLoad(win) {
+              unlockAgenticGate(win);
+            },
+          },
+        );
+        expandLegendAdvanced();
+        cy.get('#scatter-point-labels').should(
+          'have.attr',
+          'data-state',
+          gpuCount ? 'checked' : 'unchecked',
+        );
+        cy.get('#scatter-parallelism-labels').should(
+          'have.attr',
+          'data-state',
+          parallelism ? 'checked' : 'unchecked',
+        );
+      });
+    }
+  }
+});
+
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
@@ -158,13 +243,16 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'P90 Interactivity (tok/s/user)',
     );
 
-    // Line labels name the curve and point labels name the point, so the
-    // agentic view turns on both — it differs from fixed-seq only in the
-    // parallelism and point labels.
+    // The agentic view opens like fixed-seq: line labels name each curve,
+    // and per-point parallelism chips stay off until the user asks for them.
     expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(($labels) => {
+      const visible = [...$labels].filter((label) => label.style.opacity !== '0');
+      expect(visible, 'visible parallelism chips').to.have.length(0);
+    });
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {

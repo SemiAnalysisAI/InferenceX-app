@@ -3,11 +3,15 @@ import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 
 export function pointLabelText(
   point: InferenceData,
+  showGpuCount: boolean,
   advanced: boolean,
   showConcurrency: boolean,
 ): string {
-  const base = advanced ? getPointLabel(point) : `${point.physicalChips ?? point.tp}`;
-  // Concurrency is opt-in via the advanced "# Concurrent Sessions" toggle so
-  // the default labels stay light-weight.
-  return showConcurrency ? `${base}\nC=${point.conc}` : base;
+  return [
+    showGpuCount ? `${point.physicalChips ?? point.tp}` : '',
+    advanced ? getPointLabel(point) : '',
+    showConcurrency ? `C=${point.conc}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
