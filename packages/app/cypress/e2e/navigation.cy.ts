@@ -234,7 +234,7 @@ describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
         .should(
           'have.attr',
           'href',
-          `${locale}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+          `${locale}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0`,
         )
         .and('contain.text', locale ? 'Google TPUv7 加入 AgentX' : 'Google TPUv7 joins AgentX')
         .and(

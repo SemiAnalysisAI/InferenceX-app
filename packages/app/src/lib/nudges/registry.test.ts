@@ -113,7 +113,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     // see this one; cypress specs seed/clear this key and must stay in sync.
     expect(banner.storageKey).toBe('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
     expect(banner.content.href).toBe(
-      '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
+      '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0',
     );
     expect(banner.analytics).toEqual({
       shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
@@ -127,7 +127,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
     expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
+      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0',
     );
 
     location.href = '';
@@ -135,7 +135,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
     modal.content.primaryAction?.onClick();
     expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
+      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0',
     );
   });
 

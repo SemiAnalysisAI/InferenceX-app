@@ -122,7 +122,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 
 const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
 const TPU_RESULTS_HREF =
-  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0';
 
 function assertTpuResultsFilters() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
@@ -133,6 +133,10 @@ function assertTpuResultsFilters() {
     .should('contain.text', 'FP8')
     .and('not.contain.text', 'FP4');
   cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
+  cy.location('search').should('contain', 'i_best=0');
+  cy.get('[data-testid="scatter-quick-filters"]').click();
+  cy.get('[data-testid="quick-filter-best-per-sku"]').should('have.attr', 'aria-checked', 'false');
+  cy.get('body').type('{esc}');
 }
 
 // cypress/support/e2e.ts seeds the modal key on every load; clearing it here

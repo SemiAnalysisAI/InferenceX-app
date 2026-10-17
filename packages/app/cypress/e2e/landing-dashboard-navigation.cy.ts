@@ -101,7 +101,7 @@ interface HistoryWrite {
 }
 
 const TPU_RESULTS_HREF =
-  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_prec=fp8&i_xmode=interactivity&i_best=0';
 
 function assertTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
@@ -113,6 +113,10 @@ function assertTpuView() {
     .and('not.contain.text', 'FP4');
   cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
   cy.location('search').should('contain', 'i_prec=fp8');
+  cy.location('search').should('contain', 'i_best=0');
+  cy.get('[data-testid="scatter-quick-filters"]').click();
+  cy.get('[data-testid="quick-filter-best-per-sku"]').should('have.attr', 'aria-checked', 'false');
+  cy.get('body').type('{esc}');
   cy.location('search').should('not.contain', 'i_spec=');
 }
 
