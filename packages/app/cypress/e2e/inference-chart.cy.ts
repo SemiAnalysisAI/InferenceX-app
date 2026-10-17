@@ -1022,6 +1022,22 @@ describe('Qwen3.5 chart defaults', () => {
     expectGpuSelection(newerGpus, true);
   });
 
+  for (const axisSource of ['URL', 'manual']) {
+    it(`switches to E2EL when entering Qwen after a ${axisSource} axis selection`, () => {
+      const axisParam = axisSource === 'URL' ? '&i_xmode=ttft' : '';
+      cy.visit(`/inference?g_model=DeepSeek-R1-0528&i_prec=fp8${axisParam}`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      if (axisSource === 'manual') selectXAxisMode('ttft');
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      expectGpuSelection(olderGpus, false);
+      expectGpuSelection(newerGpus, true);
+    });
+  }
+
   it('does not count the default E2EL axis as a changed control on mobile', () => {
     cy.viewport(375, 900);
     cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });

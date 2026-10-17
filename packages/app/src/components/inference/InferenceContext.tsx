@@ -83,6 +83,7 @@ import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
+  Model,
   MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
@@ -975,8 +976,11 @@ export function InferenceProvider({
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
       // Reset deliberate model changes, not initial URL hydration or presets.
-      // Axis preferences and Compare History remain intact.
+      // Entering Qwen resets the axis; direct links still keep their explicit mode.
       if (v !== selectedModel) {
+        if (activeTab === 'inference' && v === Model.Qwen3_5) {
+          setRequestedXAxisMode(null);
+        }
         setBestPerSku(activeTab === 'inference' ? null : false);
         setPendingActiveHwTypes(null);
         setHardwareDefaultsOverridden(Boolean(initialActiveHwTypes?.length || autoSelectAllGpus));
