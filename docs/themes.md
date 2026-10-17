@@ -7,8 +7,8 @@
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`
 to persist a theme and apply its class to `<html>` before hydration. The
 header's `ModeToggle` is a single icon button: each ordinary click advances
-through `APP_THEMES` (`light, dark, minecraft, csgo, gta, doom, halo`) and wraps
-from Halo back to light. No modifier key is required. The icon shows the active
+through `APP_THEMES` (`light, dark, minecraft, csgo, gta, doom, halo, inferact, radixark`) and wraps
+from RadixArk back to light. No modifier key is required. The icon shows the active
 theme, and each change emits `theme_toggled`. There is no dropdown.
 The existing default remains dark; the system setting remains supported.
 
@@ -54,7 +54,7 @@ contrast branch.
 ## CS:GO implementation
 
 `src/lib/themes/themes.ts` centralizes toggle order
-(`light, dark, minecraft, csgo, gta, doom, halo`), dark-background classification, and the
+(`light, dark, minecraft, csgo, gta, doom, halo, inferact, radixark`), dark-background classification, and the
 chart-palette alias used by CS:GO, GTA, DOOM and Halo. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
@@ -162,6 +162,58 @@ The trigger keeps `data-testid="theme-toggle"` and its
 Enter/Space activation and a 44px target on desktop and mobile. Keyboard focus
 stays on the button after each change. An unknown or system preference advances
 to light; saved optional themes remain supported in the ordinary rotation.
+
+## Inferact and RadixArk
+
+The optional rotation includes Inferact and RadixArk after Halo. Both themes
+retain InferenceX branding, navigation, page content, and benchmark data. Their
+hero appears on `/` and `/zh`; other routes get a compact wordmark banner.
+
+- Inferact follows the [Inferact site](https://inferact.ai) inspected on
+  2026-10-16: off-white paper, blue rules, lavender headline highlights,
+  square corners, yellow blocks, and a blue technical collage. The moving
+  blocks and orbit outlines are original CSS; the server racks are original
+  markup rather than copied photography. Instrument Serif substitutes for
+  the reference's commercial STK Bureau Serif. Shared DM Sans substitutes
+  for STK Bureau Sans, and the mono labels use the system monospace stack.
+- RadixArk follows the [RadixArk site](https://radixark.ai) inspected on
+  2026-10-16: warm black, amber smoke and a thin luminous horizon, a large
+  silver/orange wordmark, letterspaced tagline, and rounded outlined controls.
+  Its original CSS smoke/flare approximates the reference's Rive animation;
+  no Rive binary, company logo, or proprietary artwork is copied. Hanken
+  Grotesk matches the reference's heading face; body copy retains DM Sans.
+
+Font files and their OFL licenses live under
+`public/decorative/{inferact,radixark}/`. Their `@font-face` declarations,
+decorative CSS, and markup load only from the selected theme's lazy module.
+The shared theme registry aliases Inferact to the light chart seed and
+RadixArk to the dark seed, preserving vendor and overlay palettes.
+Decorative timelines pause offscreen or in a hidden tab and stop for
+reduced-motion preferences. Decorative artwork ignores pointer input.
+Embeds never mount either module.
+
+These are visual interpretations, not pixel-identical copies of the reference
+sites: proprietary fonts, photography, logos, and the Rive file are not included.
+No theme feature tests are added, per the easter-egg policy; the existing import
+and browser resource-isolation checks include the new themes.
+
+### 中文说明
+
+主题轮换在 Halo 后增加 Inferact 和 RadixArk，保留 InferenceX 品牌、导航、
+页面内容和基准测试数据。首页 `/` 和 `/zh` 展示完整装饰，其他页面展示紧凑横幅。
+参考网站于 2026-10-16 检查。
+
+Inferact 主题参考其官网的浅色背景、蓝色细线、紫色文字高亮、黄色方块和蓝色技术
+拼贴。服务器机架和动画均为新实现；Instrument Serif 替代商业字体 STK Bureau
+Serif，正文沿用 DM Sans。RadixArk 主题参考其官网的暖黑色背景、琥珀色烟雾、
+光带和双色字标，使用同款 Hanken Grotesk 标题字体；CSS 动画近似还原官网的
+Rive 效果，不包含原始 Rive 文件、公司标识或专有图片。
+
+两个主题均按需加载字体和装饰，离屏或页面进入后台后暂停动画，并遵循减少动态效果
+偏好。嵌入页面不加载这两个主题。主题仅改变展示方式，不改变筛选、指标、计算或
+返回数据，因此按展示控件例外处理，无需修改 API 或 `packages/skills`。
+这两个主题只是对官网风格的视觉诠释，并非像素级复制；专有字体、照片、标识和
+Rive 文件均未包含。
 
 ## Data/API coverage
 
