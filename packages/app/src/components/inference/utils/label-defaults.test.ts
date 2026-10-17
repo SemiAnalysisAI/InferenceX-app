@@ -11,15 +11,37 @@ describe('resolveLabelState', () => {
     });
   });
 
-  it('turns on parallelism labels for agentic scenarios, and keeps line labels', () => {
-    // Line labels name the curve, point labels name the point — the agentic
-    // view wants both, so it differs from fixed-seq only in the point labels.
+  it('opens agentic scenarios with curve names but without per-point parallelism chips', () => {
     expect(resolveLabelState('agentic', {})).toEqual({
+      showPointLabels: false,
+      useAdvancedLabels: false,
+      showLineLabels: true,
+    });
+  });
+
+  it('restores agentic parallelism chips from a shared link', () => {
+    expect(resolveLabelState('agentic', { i_advlabel: '1' })).toEqual({
       showPointLabels: true,
       useAdvancedLabels: true,
       showLineLabels: true,
     });
+    expect(resolveLabelState('agentic', { i_label: '1' })).toEqual({
+      showPointLabels: true,
+      useAdvancedLabels: false,
+      showLineLabels: true,
+    });
   });
+
+  it.each([{ i_label: '0' }, { i_nolabel: '1' }])(
+    'preserves explicit label suppression over an advanced-label override: %j',
+    (params) => {
+      expect(resolveLabelState('agentic', { ...params, i_advlabel: '1' })).toEqual({
+        showPointLabels: false,
+        useAdvancedLabels: true,
+        showLineLabels: true,
+      });
+    },
+  );
 
   it('preserves explicit and legacy URL overrides', () => {
     expect(
@@ -48,13 +70,13 @@ describe('serializeLabelState', () => {
   it('serializes deviations from agentic defaults', () => {
     expect(
       serializeLabelState('agentic', {
-        showPointLabels: false,
-        useAdvancedLabels: false,
+        showPointLabels: true,
+        useAdvancedLabels: true,
         showLineLabels: false,
       }),
     ).toEqual({
-      i_label: '0',
-      i_advlabel: '0',
+      i_label: '1',
+      i_advlabel: '1',
       i_linelabel: '0',
     });
   });
