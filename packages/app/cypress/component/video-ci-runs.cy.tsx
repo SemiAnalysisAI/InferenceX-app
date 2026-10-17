@@ -2,12 +2,87 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
 import ResultPower from '@/components/video-benchmark/ResultPower';
 import VideoSelect from '@/components/video-benchmark/VideoSelect';
+import { videoHistoryEntry } from '@/components/video-benchmark/history';
 import { servingArtifact, videoRun as run } from '../support/video-artifacts';
 
 describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
   beforeEach(() => {
     cy.intercept('GET', '**/api/video-runs*format=media', { statusCode: 204 });
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
+    });
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?view=results`),
+    );
+  });
+  it('defaults to published history and keeps filters and source selection in the shared URL', () => {
+    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [entry],
+      nextPage: null,
+    }).as('history');
+    cy.intercept('GET', '/api/video-runs?page=1', () => {
+      throw new Error('Published discovery must not scan recent Actions');
+    });
+    cy.intercept('GET', '/api/video-runs?run=123', {
+      run: run(123, 'success'),
+      artifacts: [entry.artifact],
+    });
+    cy.intercept('GET', '**/api/video-runs*format=media', servingArtifact());
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@history');
+    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+    cy.get('[data-testid="video-history"]').should('contain', 'no matched version baseline');
+    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('[role="option"]', 'C4').click();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', '300 / —');
+    cy.location('search').should('contain', 'history-concurrency=4');
+    cy.get('[data-testid="video-history-observation"] button').click();
+    cy.get('[data-testid="serving-selected-metrics"]').should('be.visible').and('contain', 'C4');
+    cy.location('search').should('contain', 'cell=c4').and('contain', 'history-concurrency=4');
+    cy.contains('button', 'Performance history').click();
+    cy.get('[data-testid="video-history-observation"]').should('have.length', 1);
+  });
+  it('renders retained metrics and missing data in Chinese within a mobile viewport', () => {
+    cy.viewport(390, 844);
+    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
+    cy.window().then((win) =>
+      win.history.replaceState(
+        null,
+        '',
+        `${win.location.pathname}?view=history&history-concurrency=1`,
+      ),
+    );
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [entry],
+      nextPage: null,
+    });
+    cy.mount(
+      <PathnameContext.Provider value="/zh/video">
+        <VideoCIRuns />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', '120 / —')
+      .and('contain', '168')
+      .and('contain', '已完成');
+    cy.contains('尚未选择匹配的版本基线').should('be.visible');
+    cy.get('[data-testid="video-history"]').then(($history) =>
+      expect($history[0].getBoundingClientRect().right).to.be.at.most(390),
+    );
   });
   it('keeps an open long-label menu within mobile bounds and supports keyboard selection', () => {
     cy.viewport(390, 844);
@@ -38,7 +113,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
     cy.get('[role="listbox"]').should('not.exist');
     cy.get('[role="combobox"]').should('have.focus');
   });
-  it('loads the newest run automatically and switches to a failed run without inventing media', () => {
+  it('browses CI runs explicitly and switches to a failed run without inventing media', () => {
     cy.intercept('GET', '/api/video-runs?page=1', {
       runs: [run(20, 'success'), run(10, 'failure')],
       nextPage: null,
@@ -54,6 +129,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.wait('@latest');
     cy.contains('No result artifact for this run yet').should('be.visible');
     cy.get('[role="combobox"][aria-label="CI run"]').click();
@@ -212,6 +288,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.wrap(null).should(() => expect(releaseList).to.be.a('function'));
     cy.contains('summary', 'Run details and artifact selection').click();
     cy.get('input[aria-label="GitHub run ID"]').type('30');
@@ -283,6 +360,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.get('[data-testid="result-summary"]')
       .should('contain', 'Media stored for direct playback')
       .and('contain', 'uncalibrated');
@@ -396,6 +474,7 @@ describe('H3 automatic CI viewer (synthetic API fixtures)', () => {
         <VideoCIRuns />
       </PathnameContext.Provider>,
     );
+    cy.contains('button', 'Browse CI runs').click();
     cy.get('[role="alert"]').should('contain', 'Expired');
     cy.get('video').should('not.exist');
     cy.get('[role="combobox"][aria-label="Result artifact"]').should(
