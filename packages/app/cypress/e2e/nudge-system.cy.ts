@@ -6,7 +6,7 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
-import { interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,6 +125,7 @@ const TPU_RESULTS_HREF =
   '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
 
 function assertTpuResultsFilters() {
+  assertTpuGb300Selected();
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
   cy.get('[data-testid="scenario-selector"]')
     .invoke('text')
