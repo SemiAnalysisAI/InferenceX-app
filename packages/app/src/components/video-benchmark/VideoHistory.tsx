@@ -39,6 +39,9 @@ const STRINGS = {
     qualification: 'Release qualification',
     no: 'Not qualified',
     yes: 'Qualified by recorded policy',
+    power: 'GPU power',
+    measured: 'Measured',
+    notMeasured: 'Not measured',
     unavailable: 'Unavailable',
     details: 'Evidence and limitations',
     counts: 'Valid / completed / scheduled',
@@ -82,6 +85,9 @@ const STRINGS = {
     qualification: '发布验收',
     no: '未经验证',
     yes: '已按记录策略通过',
+    power: 'GPU 功率',
+    measured: '已测得',
+    notMeasured: '未测得',
     unavailable: '无数据',
     details: '证据与局限',
     counts: '有效 / 已完成 / 计划',
@@ -284,6 +290,12 @@ export default function VideoHistory() {
                   : source.releaseQualified
                     ? s.yes
                     : s.no}
+                {typeof source.powerVerified === 'boolean' && (
+                  <span data-testid="video-history-power">
+                    {' '}
+                    · {s.power}: {source.powerVerified ? s.measured : s.notMeasured}
+                  </span>
+                )}
               </p>
               {source.error && (
                 <p role="alert" className="break-words text-sm">

@@ -1,7 +1,8 @@
 import { at, number, text } from './bundle';
 import type { CIArtifact } from './archive';
+import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
-import { servingCells } from './serving';
+import { isNativeH3, servingCells } from './serving';
 import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
@@ -54,6 +55,8 @@ export interface VideoHistorySource {
   fidelity: string | null;
   calibration: string | null;
   releaseQualified: boolean | null;
+  /** Whether every cell's GPU power was measured and valid; null when the matrix records no verdict. */
+  powerVerified?: boolean | null;
   error: string | null;
 }
 export interface VideoHistoryEntry {
@@ -88,6 +91,7 @@ export function videoHistoryEntry(
       fidelity: null,
       calibration: null,
       releaseQualified: null,
+      powerVerified: null,
       error: null,
     };
     try {
@@ -105,7 +109,9 @@ export function videoHistoryEntry(
         result.sha256 = bundle.manifestSha256;
         result.sourceSha = text(at(bundle.manifest, 'git_commit'));
         result.observedAt = text(at(bundle.ci, 'started_at')) || null;
-        result.hardware = text(at(bundle.ci, 'site', 'gpu_model'));
+        result.hardware = isNativeH3(bundle.manifest)
+          ? nativeHardware(bundle.ci)
+          : text(at(bundle.ci, 'site', 'gpu_model'));
         result.execution = text(at(bundle.ci, 'phase'));
         result.fidelity = text(at(bundle.result, 'paired_fidelity', 'overall_status')) || null;
         result.calibration =
@@ -114,6 +120,8 @@ export function videoHistoryEntry(
           null;
         const qualified = at(bundle.ci, 'release_qualified');
         result.releaseQualified = typeof qualified === 'boolean' ? qualified : null;
+        const verified = at(bundle.documents.get('serving-smoke.json') ?? null, 'power_verified');
+        result.powerVerified = typeof verified === 'boolean' ? verified : null;
         const cells = servingCells(bundle);
         result.observations = tradeoffPoints({
           bundle,
@@ -124,7 +132,7 @@ export function videoHistoryEntry(
           return {
             id: point.id,
             cell: point.cellId ?? null,
-            hardware: point.hardware || text(at(bundle.ci, 'site', 'gpu_model')),
+            hardware: point.hardware || result.hardware,
             concurrency: point.concurrency,
             runtime: point.revision,
             workload: point.workloadLabel,
@@ -135,7 +143,7 @@ export function videoHistoryEntry(
             completed: point.completed,
             scheduled: point.scheduled ?? number(at(cell?.cell, 'completion', 'scheduled')),
             failed: point.failed ?? number(at(cell?.cell, 'completion', 'failed')),
-            samples: point.latencies.length,
+            samples: point.samples,
             p50: latencyValue(point, 'median'),
             p90: latencyValue(point, 'p90'),
             clipsGpuHour: efficiencyValue(point, 'clipsGpu'),

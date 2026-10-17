@@ -304,6 +304,32 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('mi355x').find('[data-testid="video-kpi-unavailable"]').should('exist');
     cy.get('[data-testid="video-idle-note"]').should('have.text', IDLE_NOTE);
   });
+  it('states each published source’s GPU power verdict in the history list', () => {
+    // Native srt-slurm sources record power_verified; retained supervisor sources do not.
+    cy.fixture('api/video-history.json').then((page) => {
+      page.entries[0].sources[0].powerVerified = true;
+      page.entries[2].sources[0].powerVerified = false;
+      cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('verdicts');
+    });
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?history-query=`),
+    );
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@verdicts');
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 6);
+    cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
+      expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal([
+        '· GPU power: Measured',
+        '· GPU power: Not measured',
+      ]);
+    });
+  });
   it('renders Chinese copy on /zh/video', () => {
     mount('/zh/video');
     cy.get('[data-testid="video-chart-card"]')
