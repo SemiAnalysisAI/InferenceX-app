@@ -143,20 +143,22 @@ export function changeMeasuredMetricConfig(
     current?.family === family
       ? current
       : getMeasuredMetricConfig(MEASURED_METRIC_DEFAULTS[family])!;
-  // Choosing a derived boundary snaps the other dimensions to its canonical
-  // combination. Changing any of those dimensions while on a derived boundary
-  // returns to GPU-measured telemetry, the only basis that publishes variants,
-  // so every control change lands on a real key. A family switch keeps the
-  // boundary: the metric key is what carries it.
-  const changesOtherDimension = OTHER_DIMENSIONS.some((key) => change[key] !== undefined);
-  const basis =
-    change.basis ?? (changesOtherDimension ? 'gpu-measured' : (current ?? config).basis);
+  // A family switch keeps the boundary: the metric key is what carries it.
+  const basis = change.basis ?? (current ?? config).basis;
   if (basis !== 'gpu-measured') {
-    return (
-      MEASURED_METRIC_CONFIGS.find(
-        ([, candidate]) => candidate.family === family && candidate.basis === basis,
-      )?.[0] ?? MEASURED_METRIC_DEFAULTS[family]
+    // A derived boundary keeps any requested combination it publishes, so Per
+    // moves between output and total tokens on it. Choosing the boundary
+    // otherwise snaps to its first combination; any other change returns to
+    // GPU-measured telemetry, so every control change lands on a real key.
+    const unchanged: MeasuredMetricConfigChange = config;
+    const onBasis = MEASURED_METRIC_CONFIGS.filter(
+      ([, candidate]) => candidate.family === family && candidate.basis === basis,
     );
+    const published = onBasis.find(([, candidate]: readonly [string, MeasuredMetricConfigChange]) =>
+      OTHER_DIMENSIONS.every((key) => candidate[key] === (change[key] ?? unchanged[key])),
+    );
+    if (published) return published[0];
+    if (change.basis !== undefined) return onBasis[0]?.[0] ?? MEASURED_METRIC_DEFAULTS[family];
   }
   let scope = change.scope ?? config.scope;
 

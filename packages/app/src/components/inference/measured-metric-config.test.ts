@@ -122,4 +122,31 @@ describe('measured metric configuration', () => {
       changeMeasuredMetricConfig('y_measuredPrefillJPerInputToken', { unit: 'wattHours' }),
     ).toBe('y_measuredPrefillJPerInputToken');
   });
+
+  it.each([
+    ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken', 'y_gpuProvisionedJPerTotalToken'],
+    [
+      'utility-provisioned',
+      'y_utilityProvisionedJPerOutputToken',
+      'y_utilityProvisionedJPerTotalToken',
+    ],
+    ['utility-modeled', 'y_utilityModeledJPerOutputToken', 'y_utilityModeledJPerTotalToken'],
+  ] as const)(
+    'keeps the %s boundary across output and total tokens',
+    (basis, perOutput, perTotal) => {
+      expect(changeMeasuredMetricConfig(perOutput, { denominator: 'total' })).toBe(perTotal);
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'output' })).toBe(perOutput);
+      expect(changeMeasuredMetricConfig('y_measuredJPerTotalToken', { basis })).toBe(perTotal);
+      expect(changeMeasuredMetricConfig('y_measuredJPerInputToken', { basis })).toBe(perOutput);
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'input' })).toBe(
+        'y_measuredJPerInputToken',
+      );
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'query' })).toBe(
+        'y_measuredJPerSuccessfulQuery',
+      );
+      expect(changeMeasuredMetricConfig(perOutput, { scope: 'decode' })).toBe(
+        'y_measuredDecodeJPerOutputToken',
+      );
+    },
+  );
 });
