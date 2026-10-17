@@ -1,5 +1,6 @@
 import type { ChartDefinition } from './types';
 import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
+import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
@@ -398,9 +399,9 @@ export const METRIC_REGISTRY = {
     polarity: 'lower',
   },
   // Power boundaries beyond GPU-measured telemetry (`lib/power/power-basis.ts`).
-  // Each boundary publishes W per allocated GPU and J per output token; the
-  // Boundary select in the Measured controls resolves to these keys, so the
-  // metric key alone carries the boundary in share links. Keys deliberately
+  // Each boundary publishes W per allocated GPU and J per output and per total
+  // token; the Boundary select in the Measured controls resolves to these keys,
+  // so the metric key alone carries the boundary in share links. Keys deliberately
   // lack the `measured` prefix: they are spec constants or model output, not
   // telemetry, so the telemetry-only decorations must not treat them as such.
   gpuProvisionedWatts: {
@@ -417,6 +418,14 @@ export const METRIC_REGISTRY = {
     labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
     title: 'GPU Level Provisioned Joules per Output Token (TDP)',
     titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
+    polarity: 'lower',
+  },
+  gpuProvisionedJPerTotalToken: {
+    field: 'gpuProvisionedJPerTotalToken.y',
+    label: 'GPU Level Provisioned J per Total Token (TDP, J/tok)',
+    labelZh: '每总 token GPU 额定能耗（TDP，J/tok）',
+    title: 'GPU Level Provisioned Joules per Total Token (TDP)',
+    titleZh: '每总 token GPU 额定焦耳能耗（TDP）',
     polarity: 'lower',
   },
   utilityProvisionedWatts: {
@@ -437,6 +446,16 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
     polarity: 'lower',
   },
+  // Same value as the ungated `jTotal` wherever both exist: total tokens are
+  // already counted over every allocated GPU.
+  utilityProvisionedJPerTotalToken: {
+    field: 'utilityProvisionedJPerTotalToken.y',
+    label: 'All in Provisioned J per Total Token (J/tok)',
+    labelZh: '每总 token 整体预配能耗（J/tok）',
+    title: 'All in Provisioned Joules per Total Token',
+    titleZh: '每总 token 整体预配焦耳能耗',
+    polarity: 'lower',
+  },
   // Names follow POWER_BASIS_LABELS (lib/power/power-basis.ts) so the Table, export
   // titles and API docs read the same as the Boundary select: All in Provisioned
   // / 整体预配功耗 and All in Measured / 整体实测功耗.
@@ -454,6 +473,14 @@ export const METRIC_REGISTRY = {
     labelZh: '每输出 token 整体实测能耗（J/tok）',
     title: 'All in Measured Joules per Output Token',
     titleZh: '每输出 token 整体实测焦耳能耗',
+    polarity: 'lower',
+  },
+  utilityModeledJPerTotalToken: {
+    field: 'utilityModeledJPerTotalToken.y',
+    label: 'All in Measured J per Total Token (J/tok)',
+    labelZh: '每总 token 整体实测能耗（J/tok）',
+    title: 'All in Measured Joules per Total Token',
+    titleZh: '每总 token 整体实测焦耳能耗',
     polarity: 'lower',
   },
 } as const satisfies Record<string, MetricDefinition>;
@@ -705,10 +732,13 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
   'y_gpuProvisionedWatts',
   'y_gpuProvisionedJPerOutputToken',
+  'y_gpuProvisionedJPerTotalToken',
   'y_utilityProvisionedWatts',
   'y_utilityProvisionedJPerOutputToken',
+  'y_utilityProvisionedJPerTotalToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',
+  'y_utilityModeledJPerTotalToken',
 ] as const satisfies readonly MetricConfigKey[];
 
 const POWER_BASIS_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
@@ -720,9 +750,13 @@ export function isPowerBasisConfigKey(configKey: string): boolean {
   return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
-/** The two All in Measured (utility-modeled) axes; they alone need the chassis power model. */
+const ALL_IN_MEASURED_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  Object.values(POWER_BASIS_FIELDS['utility-modeled']).map((field) => `y_${field}`),
+);
+
+/** The All in Measured (utility-modeled) axes; they alone need the chassis power model. */
 export function isAllInMeasuredConfigKey(configKey: string): boolean {
-  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
+  return ALL_IN_MEASURED_CONFIG_KEY_SET.has(configKey);
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [

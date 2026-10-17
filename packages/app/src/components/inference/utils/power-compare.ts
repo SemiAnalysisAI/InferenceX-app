@@ -10,17 +10,22 @@
  * base point with `y` remapped and `powerVariant` set; base points are left
  * untouched so a chart without comparison is byte-identical to before.
  *
- * Variants exist only where the metric names a whole-deployment average
- * (W per chip) or J per output token, because those are the only quantities
- * every boundary and role publishes on a common axis; everywhere else the
- * comparison yields no series and the control says so.
+ * Boundary variants exist where the metric is one of the quantities every
+ * boundary publishes (`POWER_BASIS_FIELDS`: whole-deployment average W per
+ * chip, J per output token, J per total token). Role variants exist on
+ * average W per chip and J per output token, the only axes every worker pool
+ * shares. Everywhere else the comparison yields no series and the control
+ * says so.
  */
 import type { Locale } from '@/lib/i18n/i18n';
 import {
   POWER_BASES,
   POWER_BASIS_FIELDS,
   POWER_BASIS_LABELS,
+  POWER_QUANTITIES,
   type PowerBasis,
+  type PowerBasisField,
+  type PowerQuantity,
 } from '@/lib/power/power-basis';
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
@@ -39,18 +44,11 @@ export function parsePowerCompare(value: string | null | undefined): PowerCompar
 /** Point fields a comparison series can plot; each is a `{ y, roof }` pair. */
 export type PowerSeriesField = keyof Pick<
   InferenceData,
-  | 'measuredAvgPower'
+  | PowerBasisField
   | 'measuredPrefillAvgPower'
   | 'measuredDecodeAvgPower'
-  | 'measuredJPerOutputToken'
   | 'measuredDecodeJPerOutputToken'
   | 'reconstructedPrefillJPerOutputToken'
-  | 'gpuProvisionedWatts'
-  | 'gpuProvisionedJPerOutputToken'
-  | 'utilityProvisionedWatts'
-  | 'utilityProvisionedJPerOutputToken'
-  | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken'
 >;
 
 export interface PowerCompareSeries {
@@ -91,21 +89,12 @@ const VARIANT_DASH: Record<string, string> = {
   decode: '2 3',
 };
 
-/**
- * The quantity a metric key plots on the comparison's common axis, or null
- * when the key is not a whole-deployment average W/chip or J per output token.
- */
-function comparableQuantity(metric: string): 'watts' | 'energy' | null {
-  const config = getMeasuredMetricConfig(metric);
-  if (!config) return null;
-  if (config.family === 'power') {
-    return config.scope === 'all' && config.statistic === 'average' && config.display === 'watts'
-      ? 'watts'
-      : null;
-  }
-  return config.scope === 'all' && config.denominator === 'output' && config.unit === 'joules'
-    ? 'energy'
-    : null;
+/** The quantity `metric` plots at its own boundary, or null when it is no `POWER_BASIS_FIELDS` cell. */
+function boundaryQuantity(metric: string, basis: PowerBasis): PowerQuantity | null {
+  return (
+    POWER_QUANTITIES.find((quantity) => metric === `y_${POWER_BASIS_FIELDS[basis][quantity]}`) ??
+    null
+  );
 }
 
 /**
@@ -117,7 +106,7 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
   const config = getMeasuredMetricConfig(metric);
   if (!config || mode === 'none') return null;
   if (mode === 'boundaries') {
-    return comparableQuantity(metric) ? { kind: 'basis', id: config.basis } : null;
+    return boundaryQuantity(metric, config.basis) ? { kind: 'basis', id: config.basis } : null;
   }
   if (config.basis !== 'gpu-measured') return null;
   if (config.family === 'power') {
@@ -138,16 +127,11 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
   const config = getMeasuredMetricConfig(metric);
   if (!base || !config) return [];
   if (base.kind === 'basis') {
-    const quantity = comparableQuantity(metric);
+    const quantity = boundaryQuantity(metric, base.id);
     if (!quantity) return [];
     return POWER_BASES.filter((basis) => basis !== base.id).map((basis) => ({
       variant: { kind: 'basis', id: basis },
-      field:
-        basis === 'gpu-measured'
-          ? quantity === 'watts'
-            ? 'measuredAvgPower'
-            : 'measuredJPerOutputToken'
-          : POWER_BASIS_FIELDS[basis][quantity],
+      field: POWER_BASIS_FIELDS[basis][quantity],
     }));
   }
   const fields = config.family === 'power' ? ROLE_WATT_FIELDS : ROLE_ENERGY_FIELDS;

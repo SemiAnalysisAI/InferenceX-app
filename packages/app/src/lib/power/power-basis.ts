@@ -3,15 +3,17 @@
  * utility meter. Pure numbers only — no React, DOM, or registry imports — so
  * the derived-field builder, overlays, and tests share one formula set.
  *
- * | Basis                  | W / GPU                                          | J / output token                          |
- * | ---------------------- | ------------------------------------------------ | ----------------------------------------- |
- * | B1 gpu-measured        | `avg_power_w` (existing `measuredAvgPower`)      | `joules_per_output_token` (existing)      |
- * | B2 gpu-provisioned     | `HW_REGISTRY.tdp`                                | W × N_alloc ÷ total output tok/s          |
- * | B3 utility-provisioned | `HW_REGISTRY.power` × 1000                       | W × N_alloc ÷ total output tok/s          |
- * | B4 utility-modeled     | modeled `deploymentFacilityWatts` ÷ `gpuCount`   | B1 J/out × (B4 W ÷ B1 W)                  |
+ * | Basis                  | W / GPU                                          | J / output token                 | J / total token                   |
+ * | ---------------------- | ------------------------------------------------ | -------------------------------- | --------------------------------- |
+ * | B1 gpu-measured        | `avg_power_w` (existing `measuredAvgPower`)      | `joules_per_output_token`        | `joules_per_total_token`          |
+ * | B2 gpu-provisioned     | `HW_REGISTRY.tdp`                                | W × N_alloc ÷ total output tok/s | W ÷ `tput_per_gpu`                |
+ * | B3 utility-provisioned | `HW_REGISTRY.power` × 1000                       | W × N_alloc ÷ total output tok/s | W ÷ `tput_per_gpu`                |
+ * | B4 utility-modeled     | modeled `deploymentFacilityWatts` ÷ `gpuCount`   | B1 J/out × (B4 W ÷ B1 W)         | B1 J/total × (B4 W ÷ B1 W)        |
  *
  * N_alloc counts every allocated GPU (prefill + decode for disaggregation);
- * total output tok/s is the whole deployment's. B4 reuses the estimate that
+ * total output tok/s is the whole deployment's. `tput_per_gpu` is input +
+ * output tokens over every allocated GPU for aggregate and disaggregated rows
+ * alike, so N_alloc cancels in J / total token. B4 reuses the estimate that
  * `modelSystemPower` already attached to the entry — PUE is applied exactly
  * once inside that model, never here — and is withheld wherever B1 is.
  * Unavailable values are `null`; callers omit the field rather than plotting 0.
@@ -25,7 +27,8 @@ export const POWER_BASES = [
   'utility-modeled',
 ] as const;
 export type PowerBasis = (typeof POWER_BASES)[number];
-export type PowerQuantity = 'watts' | 'energy';
+export const POWER_QUANTITIES = ['watts', 'joulesPerOutputToken', 'joulesPerTotalToken'] as const;
+export type PowerQuantity = (typeof POWER_QUANTITIES)[number];
 
 export const POWER_BASIS_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
   'gpu-measured': { en: 'GPU Level Measured', zh: 'GPU 实测功耗' },
@@ -49,38 +52,51 @@ export const ALL_IN_MEASURED_EMPTY = {
   zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray）。可切换到其他功耗边界以保留数据点。',
 };
 
-/** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
-export const POWER_BASIS_FIELDS: Record<
-  Exclude<PowerBasis, 'gpu-measured'>,
-  Record<PowerQuantity, PowerBasisFieldKey>
-> = {
+/**
+ * InferenceData field per basis and quantity. Every boundary publishes all
+ * three quantities, so a comparison or a Boundary change on any of them has a
+ * sibling at every other boundary.
+ */
+export const POWER_BASIS_FIELDS = {
+  'gpu-measured': {
+    watts: 'measuredAvgPower',
+    joulesPerOutputToken: 'measuredJPerOutputToken',
+    joulesPerTotalToken: 'measuredJPerTotalToken',
+  },
   'gpu-provisioned': {
     watts: 'gpuProvisionedWatts',
-    energy: 'gpuProvisionedJPerOutputToken',
+    joulesPerOutputToken: 'gpuProvisionedJPerOutputToken',
+    joulesPerTotalToken: 'gpuProvisionedJPerTotalToken',
   },
   'utility-provisioned': {
     watts: 'utilityProvisionedWatts',
-    energy: 'utilityProvisionedJPerOutputToken',
+    joulesPerOutputToken: 'utilityProvisionedJPerOutputToken',
+    joulesPerTotalToken: 'utilityProvisionedJPerTotalToken',
   },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
-    energy: 'utilityModeledJPerOutputToken',
+    joulesPerOutputToken: 'utilityModeledJPerOutputToken',
+    joulesPerTotalToken: 'utilityModeledJPerTotalToken',
   },
-};
+} as const satisfies Record<PowerBasis, Record<PowerQuantity, keyof InferenceData>>;
+
+export type PowerBasisField = (typeof POWER_BASIS_FIELDS)[PowerBasis][PowerQuantity];
 
 export interface PowerBasisInput {
   /** B2 W/GPU: HW_REGISTRY tdp. 0 means the spec is not yet available. */
   tdpWatts: number | null;
   /** B3 W/GPU: HW_REGISTRY all-in power, already in watts. */
   utilityWatts: number | null;
-  /** Every GPU the deployment occupies (prefill + decode for disaggregation). */
-  allocatedGpus: number | null;
-  /** Whole-deployment successful output tokens per second. */
-  totalOutputTokPerSec: number | null;
+  /** GPU-seconds the whole deployment spends per output token: N_alloc ÷ total output tok/s. */
+  gpuSecondsPerOutputToken: number | null;
+  /** GPU-seconds per input + output token: 1 ÷ `tput_per_gpu`. */
+  gpuSecondsPerTotalToken: number | null;
   /** B1 W/GPU from validated telemetry. */
   measuredWatts: number | null;
   /** B1 J/output token from the same telemetry window. */
   measuredJPerOutputToken: number | null;
+  /** B1 J/total token from the same telemetry window. */
+  measuredJPerTotalToken: number | null;
   /**
    * B4 W/GPU: modeled facility watts (PUE already applied) per measured GPU.
    * B4 is a scaling of B1, so it is withheld whenever `measuredWatts` is null.
@@ -103,9 +119,6 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
   const tdp = isPositive(input.tdpWatts) ? input.tdpWatts : null;
   const utility = isPositive(input.utilityWatts) ? input.utilityWatts : null;
   const measuredWatts = isPositive(input.measuredWatts) ? input.measuredWatts : null;
-  const measuredJ = isPositive(input.measuredJPerOutputToken)
-    ? input.measuredJPerOutputToken
-    : null;
   // B4 is B1 carried out to the utility meter, so it follows B1's availability:
   // no measured watts, no modeled boundary (B3 ≥ B4 ≥ B1 needs its anchor).
   const modeled =
@@ -113,36 +126,33 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       ? input.modeledFacilityWattsPerGpu
       : null;
 
-  // Provisioned energy: GPU-seconds spent per output token by the whole
-  // deployment (N_alloc ÷ total tok/s) × W per GPU = J per output token.
-  const gpuSecondsPerOutputToken =
-    isPositive(input.allocatedGpus) && isPositive(input.totalOutputTokPerSec)
-      ? input.allocatedGpus / input.totalOutputTokPerSec
-      : null;
-  const provisionedEnergy = (watts: number | null) =>
-    watts !== null && gpuSecondsPerOutputToken !== null
-      ? orNull(watts * gpuSecondsPerOutputToken)
-      : null;
+  // Provisioned energy: W per GPU × GPU-seconds the deployment spends per token.
+  const provisionedEnergy = (watts: number | null, gpuSecondsPerToken: number | null) =>
+    watts !== null && isPositive(gpuSecondsPerToken) ? orNull(watts * gpuSecondsPerToken) : null;
 
   // Modeled energy scales the producer's same-window E/N by modeled ÷ measured W,
   // so it inherits B1's token denominator instead of re-deriving one.
-  const modeledEnergy =
-    modeled !== null && measuredWatts !== null && measuredJ !== null
+  const modeledEnergy = (measuredJ: number | null) =>
+    modeled !== null && measuredWatts !== null && isPositive(measuredJ)
       ? orNull((measuredJ * modeled) / measuredWatts)
       : null;
 
   return {
     gpuProvisionedWatts: tdp,
-    gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
+    gpuProvisionedJPerOutputToken: provisionedEnergy(tdp, input.gpuSecondsPerOutputToken),
+    gpuProvisionedJPerTotalToken: provisionedEnergy(tdp, input.gpuSecondsPerTotalToken),
     utilityProvisionedWatts: utility,
-    utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
+    utilityProvisionedJPerOutputToken: provisionedEnergy(utility, input.gpuSecondsPerOutputToken),
+    utilityProvisionedJPerTotalToken: provisionedEnergy(utility, input.gpuSecondsPerTotalToken),
     utilityModeledWatts: modeled,
-    utilityModeledJPerOutputToken: modeledEnergy,
+    utilityModeledJPerOutputToken: modeledEnergy(input.measuredJPerOutputToken),
+    utilityModeledJPerTotalToken: modeledEnergy(input.measuredJPerTotalToken),
   };
 }
 
 type PowerBasisEntry = Pick<
   AggDataEntry,
+  | 'tput_per_gpu'
   | 'output_tput_per_gpu'
   | 'disagg'
   | 'benchmark_type'
@@ -150,8 +160,16 @@ type PowerBasisEntry = Pick<
   | 'num_decode_gpu'
   | 'avg_power_w'
   | 'joules_per_output_token'
+  | 'joules_per_total_token'
   | 'modeledSystemPower'
 >;
+
+interface PowerBasisNormalization {
+  /** Every GPU the deployment occupies (prefill + decode for disaggregation). */
+  allocatedGpus: number | null;
+  /** Whole-deployment successful output tokens per second. */
+  totalOutputTokPerSec: number | null;
+}
 
 /**
  * Whole-deployment normalization for the provisioned energies. Aggregate rows
@@ -168,7 +186,7 @@ export function powerBasisNormalization(
     PowerBasisEntry,
     'output_tput_per_gpu' | 'disagg' | 'benchmark_type' | 'num_prefill_gpu' | 'num_decode_gpu'
   >,
-): Pick<PowerBasisInput, 'allocatedGpus' | 'totalOutputTokPerSec'> {
+): PowerBasisNormalization {
   const perGpu = entry.output_tput_per_gpu;
   const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
   if (!isPositive(perGpu)) return unavailable;
@@ -178,6 +196,24 @@ export function powerBasisNormalization(
   const decode = entry.num_decode_gpu;
   if (!count(prefill) || !count(decode)) return unavailable;
   return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * decode };
+}
+
+/**
+ * GPU-seconds per token behind the provisioned energies. Total-token energy
+ * keeps the output normalization's availability, so a boundary publishes
+ * J / total token exactly where it publishes J / output token.
+ */
+function provisionedGpuSecondsPerToken(
+  entry: PowerBasisEntry,
+): Pick<PowerBasisInput, 'gpuSecondsPerOutputToken' | 'gpuSecondsPerTotalToken'> {
+  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
+  if (!isPositive(allocatedGpus) || !isPositive(totalOutputTokPerSec)) {
+    return { gpuSecondsPerOutputToken: null, gpuSecondsPerTotalToken: null };
+  }
+  return {
+    gpuSecondsPerOutputToken: allocatedGpus / totalOutputTokPerSec,
+    gpuSecondsPerTotalToken: isPositive(entry.tput_per_gpu) ? 1 / entry.tput_per_gpu : null,
+  };
 }
 
 /**
@@ -213,9 +249,10 @@ export function buildPowerBasisChartFields(
   const values = computePowerBasisFields({
     tdpWatts: specs.tdp ?? null,
     utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
-    ...powerBasisNormalization(entry),
+    ...provisionedGpuSecondsPerToken(entry),
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,
+    measuredJPerTotalToken: entry.joules_per_total_token ?? null,
     modeledFacilityWattsPerGpu: modeledFacilityWattsPerGpu(entry),
   });
   const fields: PowerBasisChartFields = {};

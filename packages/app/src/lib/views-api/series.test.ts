@@ -207,6 +207,12 @@ describe('buildInferenceSeries', () => {
     expect(
       buildInferenceSeries([row], {
         ...BASE_OPTIONS,
+        metricConfigKey: 'y_utilityModeledJPerTotalToken',
+      }).tableRows,
+    ).toMatchObject([{ id: row.id, y: null, status: 'unavailable', unavailableReason: 'energy' }]);
+    expect(
+      buildInferenceSeries([row], {
+        ...BASE_OPTIONS,
         metricConfigKey: 'y_utilityModeledWatts',
         gpus: ['gb200'],
       }).tableRows,

@@ -7,7 +7,7 @@ sit in the existing ↑↑↓↓-gated **Measured Energy** metric group.
 ## Purpose
 
 The article compares one deployment's power at four boundaries, from the GPU board to the
-utility meter, both as W per GPU and as J per output token. The dashboard already had
+utility meter, as W per GPU, as J per output token and as J per total (input + output) token. The dashboard already had
 GPU-measured telemetry (`measured*` metrics) and an ungated all-in provisioned energy
 (`jOutput`). This view adds the other boundaries as ordinary y-axis metrics so every chart
 feature (zoom, tooltip, Perf Ruler, Optimal Only, Table, CSV, PNG, `?unofficialrun=` overlay,
@@ -23,12 +23,12 @@ group stays out of the selector otherwise. The boundary metrics are members of t
 
 ## Boundaries
 
-| Basis (`PowerBasis`)  | Selector label              | W / GPU metric                               | J / output token metric                           | Source                                                                                           |
-| --------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `gpu-measured`        | GPU Level Measured          | `y_measuredAvgPower` (+P75/P90, roles, %TDP) | `y_measuredJPerOutputToken` (+ input/total/query) | runner telemetry; existing metrics, unchanged                                                    |
-| `gpu-provisioned`     | GPU Level Provisioned (TDP) | `y_gpuProvisionedWatts`                      | `y_gpuProvisionedJPerOutputToken`                 | `HW_REGISTRY.tdp`                                                                                |
-| `utility-provisioned` | All in Provisioned          | `y_utilityProvisionedWatts`                  | `y_utilityProvisionedJPerOutputToken`             | `HW_REGISTRY.power` (all-in kW per GPU)                                                          |
-| `utility-modeled`     | All in Measured             | `y_utilityModeledWatts`                      | `y_utilityModeledJPerOutputToken`                 | `modelSystemPower` IT power × system PUE (1.3 chassis, 1.1 NVL72; applied once), ÷ measured GPUs |
+| Basis (`PowerBasis`)  | Selector label              | W / GPU metric                               | J / output token metric                     | J / total token metric               | Source                                                                                           |
+| --------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `gpu-measured`        | GPU Level Measured          | `y_measuredAvgPower` (+P75/P90, roles, %TDP) | `y_measuredJPerOutputToken` (+ input/query) | `y_measuredJPerTotalToken`           | runner telemetry; existing metrics, unchanged                                                    |
+| `gpu-provisioned`     | GPU Level Provisioned (TDP) | `y_gpuProvisionedWatts`                      | `y_gpuProvisionedJPerOutputToken`           | `y_gpuProvisionedJPerTotalToken`     | `HW_REGISTRY.tdp`                                                                                |
+| `utility-provisioned` | All in Provisioned          | `y_utilityProvisionedWatts`                  | `y_utilityProvisionedJPerOutputToken`       | `y_utilityProvisionedJPerTotalToken` | `HW_REGISTRY.power` (all-in kW per GPU)                                                          |
+| `utility-modeled`     | All in Measured             | `y_utilityModeledWatts`                      | `y_utilityModeledJPerOutputToken`           | `y_utilityModeledJPerTotalToken`     | `modelSystemPower` IT power × system PUE (1.3 chassis, 1.1 NVL72; applied once), ÷ measured GPUs |
 
 Formulas, the all-GPU normalization (`N_alloc` = prefill + decode GPUs for disaggregated
 rows) and the null rules are specified in
@@ -58,9 +58,13 @@ control change to the nearest registered key. Consequences:
   surface (share button, Historical Trends hand-off, Table, CSV header).
 - Existing links are byte-identical: all `measured*` keys carry `basis: 'gpu-measured'`, and
   `MEASURED_METRIC_DEFAULTS` did not change.
-- Choosing a derived boundary snaps to its canonical combination (whole deployment, average
-  watts, joules per output token). Changing any telemetry-only setting while on a derived
-  boundary returns to GPU measured, so no control ever points at a key that does not exist.
+- A derived boundary publishes the `POWER_BASIS_FIELDS` quantities for the whole deployment:
+  average watts, joules per output token and joules per total token. Per moves between output
+  and total tokens on it, and choosing it keeps the current combination when it publishes
+  that combination (GPU measured J per total token goes to the boundary's J per total token);
+  otherwise the choice snaps to its first combination (average watts or joules per output
+  token). Changing any other setting while on a derived boundary returns to GPU measured, so
+  no control ever points at a key that does not exist.
 - A gated metric selected through a shared URL keeps its Measured controls, as the
   `measured*` siblings already do.
 - The Y-axis dropdown's collapsed "Measured Power" / "Measured Energy" option for the other
@@ -97,6 +101,7 @@ selection. Append:
 | ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2      | H200 W/GPU, all four boundaries on one chart  | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` (one boundary at a time: `&i_metric=y_gpuProvisionedWatts` / `y_utilityProvisionedWatts` / `y_utilityModeledWatts`) |
 | 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                       |
+| 3b     | H200 J/total token, all four boundaries       | `&i_metric=y_measuredJPerTotalToken&i_pcompare=boundaries` (single boundary: the matching `…JPerTotalToken` key)                                                         |
 | 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                 |
 | 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                          |
 | 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                            |
@@ -126,14 +131,15 @@ untouched, so a chart without a comparison is byte-identical to before. A point 
 sibling's value contributes nothing to that series (never a 0), so each boundary's and
 role's availability rules carry through unchanged.
 
-| Mode         | Base series                                       | Siblings                   | Fields                                                                                                                                                                               |
-| ------------ | ------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `boundaries` | the selected boundary (`basis` of the metric key) | the other three boundaries | `measuredAvgPower` / `POWER_BASIS_FIELDS[*].watts`, or `measuredJPerOutputToken` / `POWER_BASIS_FIELDS[*].energy`                                                                    |
-| `roles`      | the selected scope (`all`, `prefill`, `decode`)   | the other two worker pools | W: `measuredAvgPower`, `measuredPrefillAvgPower`, `measuredDecodeAvgPower`; J/out: `measuredJPerOutputToken`, `reconstructedPrefillJPerOutputToken`, `measuredDecodeJPerOutputToken` |
+| Mode         | Base series                                       | Siblings                   | Fields                                                                                                                                                                                  |
+| ------------ | ------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `boundaries` | the selected boundary (`basis` of the metric key) | the other three boundaries | `POWER_BASIS_FIELDS[basis][quantity]`, where the quantity (`watts`, `joulesPerOutputToken`, `joulesPerTotalToken`) is the one the selected key plots; the table includes `gpu-measured` |
+| `roles`      | the selected scope (`all`, `prefill`, `decode`)   | the other two worker pools | W: `measuredAvgPower`, `measuredPrefillAvgPower`, `measuredDecodeAvgPower`; J/out: `measuredJPerOutputToken`, `reconstructedPrefillJPerOutputToken`, `measuredDecodeJPerOutputToken`    |
 
-Siblings exist only where the metric names the whole-deployment **average W/chip** or **J per
-output token** (the only quantities every boundary and role publishes on one axis); role
-energy additionally excludes the prefill J per input token scope. Elsewhere
+Boundary siblings exist where the metric is a `POWER_BASIS_FIELDS` cell: whole-deployment
+**average W/chip**, **J per output token** or **J per total token**, the quantities every
+boundary publishes. Role siblings exist on average W/chip and J per output token, the only axes
+every worker pool shares, and exclude the prefill J per input token scope. Elsewhere
 `powerCompareVariants` returns nothing and the Compare select disables the option. A link that
 arrives with an inapplicable mode keeps the parameter, so switching back to an applicable
 setting resumes it.
@@ -341,8 +347,12 @@ see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-ser
 
 ## Tests
 
-- `lib/power-basis.test.ts` and `lib/chart-utils.test.ts` — the six boundary values through
-  the real builder, and the same fields on `?unofficialrun=` overlay rows.
+- `lib/power-basis.test.ts` and `lib/chart-utils.test.ts` — the nine boundary values through
+  the real builder, J per output ÷ J per total token equal to the measured token mix on
+  aggregate and disaggregated rows, and the same fields and total-token boundary siblings on
+  `?unofficialrun=` overlay rows.
+- `utils/power-compare.test.ts` and `measured-metric-config.test.ts` — boundary siblings on J
+  per total token, no role siblings there, and Per output ↔ total staying on a derived boundary.
 - `gpu-power/power-series.test.ts`, `power-audit-bundle.test.ts` — one-second buckets with
   `null` gaps, a partial pool is a gap rather than a lower sum, and bundle rows stay on their
   host/device and role inside the padded window.
