@@ -1,7 +1,6 @@
 'use client';
 
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
-import { defaultInferenceXAxisMode } from '../utils/model-defaults';
 
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
@@ -234,6 +233,7 @@ export default function ChartControls({
     openRouterPricingError,
     selectedXAxisMetric,
     selectedXAxisMode,
+    defaultXAxisMode,
     scaleType,
     powerCompare,
   } = useInferenceDisplay();
@@ -457,7 +457,7 @@ export default function ChartControls({
 
   const secondaryCount =
     (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
-    (showXAxisMode && selectedXAxisMode !== defaultInferenceXAxisMode(selectedModel) ? 1 : 0) +
+    (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +

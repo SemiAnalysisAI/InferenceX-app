@@ -1030,7 +1030,8 @@ describe('Qwen3.5 chart defaults', () => {
       });
       if (axisSource === 'manual') selectXAxisMode('ttft');
       cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
-      cy.get('[data-testid="model-selector"]').click();
+      cy.scrollTo('top');
+      cy.get('[data-testid="model-selector"]').click().should('have.attr', 'aria-expanded', 'true');
       cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
       expectGpuSelection(olderGpus, false);
@@ -1047,5 +1048,18 @@ describe('Qwen3.5 chart defaults', () => {
     cy.document().then((document) => {
       expect(document.documentElement.scrollWidth).to.be.at.most(375);
     });
+  });
+
+  it('uses the comparison view default for the mobile changed-control indicator', () => {
+    cy.viewport(375, 900);
+    cy.visit('/compare/qwen-3-5-b200-vs-h200?i_prec=fp8', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
   });
 });

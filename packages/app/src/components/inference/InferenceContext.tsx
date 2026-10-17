@@ -503,9 +503,10 @@ export function InferenceProvider({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const defaultXAxisMode =
+    activeTab === 'inference' ? defaultInferenceXAxisMode(selectedModel) : 'interactivity';
   const selectedXAxisMode = resolveEffectiveXAxisMode(
-    requestedXAxisMode ??
-      (activeTab === 'inference' ? defaultInferenceXAxisMode(selectedModel) : 'interactivity'),
+    requestedXAxisMode ?? defaultXAxisMode,
     effectiveSequence,
     sequenceResolved,
   );
@@ -2062,6 +2063,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      defaultXAxisMode,
       scaleType,
       powerCompare,
       isLegendExpanded,
@@ -2088,6 +2090,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      defaultXAxisMode,
       scaleType,
       powerCompare,
       isLegendExpanded,
