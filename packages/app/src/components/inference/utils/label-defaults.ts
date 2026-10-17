@@ -1,6 +1,7 @@
 import type { ScenarioKind } from '@/lib/catalog/data-mappings';
 
 export interface LabelState {
+  /** GPU-count annotation only; parallelism is independently controlled. */
   showPointLabels: boolean;
   useAdvancedLabels: boolean;
   showLineLabels: boolean;
@@ -24,7 +25,6 @@ export function resolveLabelState(_kind: ScenarioKind, params: LabelUrlParams): 
   let showPointLabels = false;
   if (params.i_nolabel === '1' || params.i_label === '0') showPointLabels = false;
   else if (params.i_label === '1') showPointLabels = true;
-  else if (params.i_advlabel === '1') showPointLabels = true;
 
   return {
     showPointLabels,

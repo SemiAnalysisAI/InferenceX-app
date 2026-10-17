@@ -139,15 +139,63 @@ describe('Parallelism labels in standard controls', () => {
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
       cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
         .filter(':visible')
-        .should('have.length.greaterThan', 0);
-      cy.get('#scatter-parallelism-labels').click();
-      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+        .first()
+        .find('tspan')
+        .should('have.length', 1);
       cy.get('[data-testid="legend-advanced-toggle"]').should(
         'have.attr',
         'aria-expanded',
         'false',
       );
+      expandLegendAdvanced();
+      cy.get('label[for="scatter-point-labels"]').should('have.text', '# of GPUs Label');
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked').click();
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .find('tspan')
+        .should('have.length', 2);
+      cy.get('#scatter-parallelism-labels').click();
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .invoke('text')
+        .should('match', /^\d+$/);
+      cy.get('#scatter-point-labels').click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .should('have.length', 0);
     });
+  }
+
+  for (const gpuCount of [false, true]) {
+    for (const parallelism of [false, true]) {
+      it(`loads independent shared-link settings: GPUs=${gpuCount}, parallelism=${parallelism}`, () => {
+        interceptAgenticData();
+        interceptDerivedAgenticMetrics();
+        cy.visit(
+          `/inference?i_seq=agentic-traces&i_label=${Number(gpuCount)}&i_advlabel=${Number(parallelism)}`,
+          {
+            onBeforeLoad(win) {
+              unlockAgenticGate(win);
+            },
+          },
+        );
+        expandLegendAdvanced();
+        cy.get('#scatter-point-labels').should(
+          'have.attr',
+          'data-state',
+          gpuCount ? 'checked' : 'unchecked',
+        );
+        cy.get('#scatter-parallelism-labels').should(
+          'have.attr',
+          'data-state',
+          parallelism ? 'checked' : 'unchecked',
+        );
+      });
+    }
   }
 });
 

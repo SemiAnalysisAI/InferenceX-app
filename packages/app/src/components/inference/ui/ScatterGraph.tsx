@@ -71,7 +71,11 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
-import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  computeTooltipPosition,
+  syncPointLabel,
+  syncPointShape,
+} from '@/lib/d3-chart/layers/scatter-points';
 import {
   EMPTY_PERF_RULER_STATE,
   clampIsoX,
@@ -461,7 +465,7 @@ const SCATTER_STRINGS = {
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
@@ -496,7 +500,7 @@ const SCATTER_STRINGS = {
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
@@ -2305,9 +2309,11 @@ const ScatterGraph = React.memo(
     // Render context from the last D3 render — lets the decoration effect
     // restyle with the same layout/scales the chart was drawn with.
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
-    const labelDisplayRef = useRef({ showPointLabels, showGradientLabels, showLineLabels });
-    labelDisplayRef.current = { showPointLabels, showGradientLabels, showLineLabels };
-    const pointLabelsVisible = showPointLabels && !showGradientLabels;
+    const pointLabelsVisible =
+      (showPointLabels || useAdvancedLabels || showConcurrencyLabels) && !showGradientLabels;
+    const labelDisplayRef = useRef({ pointLabelsVisible, showGradientLabels, showLineLabels });
+    labelDisplayRef.current = { pointLabelsVisible, showGradientLabels, showLineLabels };
+    const lastShowGpuCountRef = useRef(showPointLabels);
     const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
     const lastShowLineLabelsRef = useRef(showLineLabels);
     const lastShowGradientLabelsRef = useRef(showGradientLabels);
@@ -2437,19 +2443,12 @@ const ScatterGraph = React.memo(
               d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
             );
           }
-          if (showPointLabels && !showGradientLabels) {
+          if (pointLabelsVisible) {
             avoidPointLabelCollisions(ctx.layout.zoomGroup);
           }
         },
       }),
-      [
-        zoomResetEventName,
-        eventPrefix,
-        xScaleConfig._isLog,
-        yScaleConfig.type,
-        showPointLabels,
-        showGradientLabels,
-      ],
+      [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
     // --- Tooltip config ---
@@ -3249,10 +3248,11 @@ const ScatterGraph = React.memo(
           getOpacity: (d) =>
             interactionRef.current.isPointVisible(d) ? pointOpacityForVariant(d) : 0,
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
-          hideLabels: !showPointLabels || showGradientLabels,
+          hideLabels: !pointLabelsVisible,
           // Concurrency (C=) is appended only when the advanced
           // "# Concurrent Sessions" toggle is on.
-          getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+          getLabelText: (d) =>
+            pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
@@ -3275,12 +3275,12 @@ const ScatterGraph = React.memo(
           '.unofficial-overlay-pt',
         );
         const powerLabels = showPowerEnvelope && showGradientLabels;
-        const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
+        const showLabels = powerLabels || pointLabelsVisible;
         overlayPoints.each(function (d) {
           const lines = (
             powerLabels
               ? getParetoLabel(d)
-              : pointLabelText(d, useAdvancedLabels, showConcurrencyLabels)
+              : pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels)
           ).split('\n');
           const text = d3
             .select(this)
@@ -3319,7 +3319,7 @@ const ScatterGraph = React.memo(
         ? {
             type: 'custom',
             key: 'overlay',
-            displayIdentity: `${showPointLabels}:${showGradientLabels}`,
+            displayIdentity: `${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showGradientLabels}`,
             render: (zoomGroup, ctx) => {
               const xScale = ctx.xScale as ContinuousScale;
               const yScale = ctx.yScale as ContinuousScale;
@@ -3757,6 +3757,7 @@ const ScatterGraph = React.memo(
       chartId,
       pointsData,
       showPointLabels,
+      pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
       buildPointId,
@@ -3973,20 +3974,27 @@ const ScatterGraph = React.memo(
     // owned by the overlay custom layer's matching selective display callback.
     useLayoutEffect(() => {
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
+      const gpuCountChanged = lastShowGpuCountRef.current !== showPointLabels;
       const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
       const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
-      if (!visibilityChanged && !lineLabelsChanged && !gradientLabelsChanged) return;
+      if (!visibilityChanged && !gpuCountChanged && !lineLabelsChanged && !gradientLabelsChanged)
+        return;
+      lastShowGpuCountRef.current = showPointLabels;
       lastPointLabelsVisibleRef.current = pointLabelsVisible;
       lastShowLineLabelsRef.current = showLineLabels;
       lastShowGradientLabelsRef.current = showGradientLabels;
       const display = getDisplaySelection();
       if (!display) return;
       const { svg, ctx, zoomGroup } = display;
-      if (visibilityChanged) {
-        zoomGroup
-          .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
-          .style('display', pointLabelsVisible ? '' : 'none')
-          .style('opacity', pointLabelsVisible ? 1 : 0);
+      if (visibilityChanged || gpuCountChanged) {
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+          syncPointLabel(
+            this,
+            pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
+            'var(--foreground)',
+            !pointLabelsVisible,
+          );
+        });
       }
       if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
         const entranceInFlight = zoomGroup
@@ -3999,7 +4007,15 @@ const ScatterGraph = React.memo(
         }
       }
       if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
-    }, [getDisplaySelection, pointLabelsVisible, showGradientLabels, showLineLabels]);
+    }, [
+      getDisplaySelection,
+      pointLabelsVisible,
+      showPointLabels,
+      useAdvancedLabels,
+      showConcurrencyLabels,
+      showGradientLabels,
+      showLineLabels,
+    ]);
 
     // Visibility and palette changes can alter label collision placement and
     // line-label colors. Label mode changes are handled by each custom layer's
@@ -4020,7 +4036,7 @@ const ScatterGraph = React.memo(
           rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
         }
       }
-      if (labelDisplay.showPointLabels && !labelDisplay.showGradientLabels) {
+      if (labelDisplay.pointLabelsVisible) {
         avoidPointLabelCollisions(zoomGroup);
       }
     }, [
@@ -4420,9 +4436,6 @@ const ScatterGraph = React.memo(
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);
                     track('latency_advanced_labels_toggled', { enabled: checked });
-                    // Parallelism labels are point labels; turning them on is
-                    // pointless if labels are hidden, so auto-enable Labels.
-                    if (checked && !showPointLabels) setShowPointLabels(true);
                     if (checked && !showGradientLabels) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
@@ -4487,9 +4500,6 @@ const ScatterGraph = React.memo(
                   onCheckedChange: (checked: boolean) => {
                     setShowConcurrencyLabels(checked);
                     track('latency_concurrency_labels_toggled', { enabled: checked });
-                    // Concurrency is a point-label annotation; turning it on is
-                    // pointless if labels are hidden, so auto-enable Labels.
-                    if (checked && !showPointLabels) setShowPointLabels(true);
                   },
                 },
               ]}

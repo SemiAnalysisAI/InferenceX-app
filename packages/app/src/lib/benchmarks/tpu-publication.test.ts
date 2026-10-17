@@ -28,8 +28,9 @@ describe('TPU publication paths', () => {
       expect(point.physicalChips).toBe(4);
       expect(point.dp).toBe(8);
       expect(getPointLabel(point)).toBe('TP1/DP8');
-      expect(pointLabelText(point, false, false)).toBe('4');
-      expect(pointLabelText(point, true, false)).toBe('TP1/DP8');
+      expect(pointLabelText(point, true, false, false)).toBe('4');
+      expect(pointLabelText(point, false, true, false)).toBe('TP1/DP8');
+      expect(pointLabelText(point, true, true, false)).toBe('4\nTP1/DP8');
       expect(point.tput_per_gpu).toBeCloseTo(3674.8418266267754);
       expect(point.tpPerMw!.y).toBeCloseTo((3674.8418266267754 * 1000) / 1.207);
       expect(point.jTotal!.y).toBeCloseTo(1207 / 3674.8418266267754);

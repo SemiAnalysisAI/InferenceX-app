@@ -30,6 +30,64 @@ const mountGpuGraph = (
 ) => mountWithProviders(tree, { unofficial: {}, ...overrides });
 
 describe('GPUGraph', () => {
+  it('keeps GPU-count and parallelism labels independent', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 64,
+        y: 210,
+        tp: 8,
+        ep: 1,
+        physicalChips: 4,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+    ];
+    function IndependentLabels() {
+      const [showPointLabels, setShowPointLabels] = useState(false);
+      const [useAdvancedLabels, setUseAdvancedLabels] = useState(false);
+      const value = createMockInferenceContextValues({
+        hardwareConfig: hwConfig,
+        selectedGPUs: ['h100'],
+        selectedDates: ['2025-03-01'],
+        activeDates: new Set(['2025-03-01_h100']),
+        selectedPrecisions: [Precision.FP4],
+        showPointLabels,
+        setShowPointLabels,
+        useAdvancedLabels,
+        setUseAdvancedLabels,
+        showConcurrencyLabels: false,
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1000, height: 600 }}>
+            <GPUGraph
+              chartId="gpu-independent-labels"
+              modelLabel="DeepSeek R1"
+              data={data}
+              xLabel="Interactivity"
+              yLabel="Throughput"
+              chartDefinition={defaultChartDef}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountGpuGraph(<IndependentLabels />);
+    const labels = '[data-testid="gpu-graph"] .dot-group .point-label';
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get(labels).filter(':visible').first().should('have.text', 'TP8');
+    cy.get('#gpu-point-labels').click();
+    cy.get(labels).filter(':visible').first().should('have.text', '4TP8');
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('#gpu-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get(labels).filter(':visible').first().should('have.text', '4');
+    cy.get('#gpu-point-labels').click();
+    cy.get(labels).filter(':visible').should('have.length', 0);
+  });
+
   it('renders SVG within chart container', () => {
     const data = [
       createMockInferenceData({

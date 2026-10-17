@@ -21,7 +21,7 @@ describe('resolveLabelState', () => {
 
   it('restores agentic parallelism chips from a shared link', () => {
     expect(resolveLabelState('agentic', { i_advlabel: '1' })).toEqual({
-      showPointLabels: true,
+      showPointLabels: false,
       useAdvancedLabels: true,
       showLineLabels: true,
     });
@@ -33,7 +33,7 @@ describe('resolveLabelState', () => {
   });
 
   it.each([{ i_label: '0' }, { i_nolabel: '1' }])(
-    'preserves explicit label suppression over an advanced-label override: %j',
+    'keeps GPU-count suppression independent of parallelism: %j',
     (params) => {
       expect(resolveLabelState('agentic', { ...params, i_advlabel: '1' })).toEqual({
         showPointLabels: false,
@@ -59,6 +59,20 @@ describe('resolveLabelState', () => {
 });
 
 describe('serializeLabelState', () => {
+  it.each(['agentic', 'fixed-seq'] as const)(
+    'round-trips independent GPU-count and parallelism settings for %s',
+    (kind) => {
+      for (const showPointLabels of [false, true]) {
+        for (const useAdvancedLabels of [false, true]) {
+          for (const showLineLabels of [false, true]) {
+            const state = { showPointLabels, useAdvancedLabels, showLineLabels };
+            expect(resolveLabelState(kind, serializeLabelState(kind, state))).toEqual(state);
+          }
+        }
+      }
+    },
+  );
+
   it('omits the scenario defaults', () => {
     expect(serializeLabelState('agentic', resolveLabelState('agentic', {}))).toEqual({
       i_label: '',
