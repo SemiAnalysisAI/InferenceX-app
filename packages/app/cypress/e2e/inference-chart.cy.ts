@@ -1039,6 +1039,53 @@ describe('Qwen3.5 chart defaults', () => {
     });
   }
 
+  for (const { chart, path, expectedAxis } of [
+    { chart: 'Qwen inference', path: '/inference/qwen-3-5', expectedAxis: 'e2e' },
+    { chart: 'another model', path: '/inference?g_model=DeepSeek-R1-0528', expectedAxis: 'ttft' },
+    { chart: 'Qwen comparison', path: '/compare/qwen-3-5-b200-vs-h200', expectedAxis: 'ttft' },
+  ]) {
+    it(`applies the correct axis when adding and removing precisions on ${chart}`, () => {
+      const precisionRows = rows.flatMap((row) => [
+        row,
+        { ...row, id: row.id + 1000, precision: 'fp4' },
+      ]);
+      cy.intercept('GET', '/api/v1/availability*', {
+        body: precisionRows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: precisionRows });
+      cy.visit(`${path}${path.includes('?') ? '&' : '?'}i_prec=fp8&i_xmode=ttft`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+      cy.scrollTo('top');
+      cy.get('[data-testid="precision-multiselect"]').should('not.be.disabled').click('right');
+      cy.contains('[role="option"]', 'FP4').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('contain.text', 'FP8');
+      cy.get('[data-testid="x-axis-mode-selector"]').should(
+        'have.attr',
+        'data-value',
+        expectedAxis,
+      );
+
+      selectXAxisMode('ttft');
+      cy.scrollTo('top');
+      cy.get('[data-testid="precision-multiselect"]').click('right');
+      cy.contains('[role="option"]', 'FP8').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('not.contain.text', 'FP8');
+      cy.get('[data-testid="x-axis-mode-selector"]').should(
+        'have.attr',
+        'data-value',
+        expectedAxis,
+      );
+    });
+  }
+
   it('does not count the default E2EL axis as a changed control on mobile', () => {
     cy.viewport(375, 900);
     cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });

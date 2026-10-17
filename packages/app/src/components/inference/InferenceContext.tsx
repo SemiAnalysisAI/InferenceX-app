@@ -1007,10 +1007,13 @@ export function InferenceProvider({
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
+      if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
+        setRequestedXAxisMode(null);
+      }
       setSelectedPrecisions(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedPrecisions, clearScopedSelectionOnChange],
+    [activeTab, selectedModel, setSelectedPrecisions, clearScopedSelectionOnChange],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
