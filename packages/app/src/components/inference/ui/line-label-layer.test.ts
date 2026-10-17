@@ -122,6 +122,63 @@ describe('line-label placement', () => {
     });
   });
 
+  it('names each curve at its own peak when preferPeak is set', () => {
+    // Three frontiers that converge on the right but peak at different
+    // heights on the left (screen y grows downward, so the identity scale
+    // treats the largest y as the peak).
+    const curves = [
+      series('top', [
+        { x: 0, y: 300 },
+        { x: 100, y: 40 },
+        { x: 200, y: 10 },
+      ]),
+      series('middle', [
+        { x: 0, y: 200 },
+        { x: 100, y: 35 },
+        { x: 200, y: 12 },
+      ]),
+      series('low', [
+        { x: 0, y: 100 },
+        { x: 100, y: 30 },
+        { x: 200, y: 14 },
+      ]),
+    ];
+    const labels = placeLineLabels(curves, identity, identity, {
+      collisionWidth: 60,
+      preferPeak: true,
+    });
+    const at = (key: string) => labels.find((label) => label.key === key);
+    expect(at('top')).toMatchObject({ x: 0, y: 300 });
+    expect(at('middle')).toMatchObject({ x: 0, y: 200 });
+    expect(at('low')).toMatchObject({ x: 0, y: 100 });
+
+    // Without it the labels land along the converging tails instead.
+    const spread = placeLineLabels(curves, identity, identity, { collisionWidth: 60 });
+    expect(spread.every((label) => label.x > 0)).toBe(true);
+  });
+
+  it('falls back to the spread slots when a peak is taken', () => {
+    const labels = placeLineLabels(
+      [
+        series('first', [
+          { x: 0, y: 100 },
+          { x: 50, y: 50 },
+          { x: 100, y: 10 },
+        ]),
+        series('second', [
+          { x: 0, y: 100 },
+          { x: 50, y: 60 },
+          { x: 100, y: 20 },
+        ]),
+      ],
+      identity,
+      identity,
+      { collisionWidth: 40, collisionHeight: 15, preferPeak: true },
+    );
+    const keys = labels.map((label) => `${label.x},${label.y}`);
+    expect(new Set(keys).size).toBe(2);
+  });
+
   it('keeps pinned data-space anchors stable while scales change', () => {
     const anchors = new Map<string, number>();
     const input = [

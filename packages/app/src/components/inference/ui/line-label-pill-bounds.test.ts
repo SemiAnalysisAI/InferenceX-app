@@ -3,7 +3,9 @@ import * as d3 from 'd3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  annotationObstacles,
   leastOverlapping,
+  relayoutLineLabels,
   pillShiftIntoBounds,
   rectsStrictlyOverlap,
   renderLineLabels,
@@ -547,5 +549,60 @@ describe("appearance: 'text'", () => {
       seriesAttribute: 'data-hw-key',
     });
     expect(zoomGroup.select('.line-label .ll-bg').attr('fill')).toBe('#0f0');
+  });
+});
+
+describe('labels clear the in-plot callouts', () => {
+  /** A callout box drawn into the plot group, like the preview notice. */
+  function addCallout(svg: SVGSVGElement, area: RectBounds) {
+    const callout = document.createElementNS(SVG_NS, 'g');
+    callout.setAttribute('class', 'known-issue-annotation');
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', String(area.left));
+    rect.setAttribute('y', String(area.top));
+    rect.setAttribute('width', String(area.right - area.left));
+    rect.setAttribute('height', String(area.bottom - area.top));
+    callout.append(rect);
+    svg.querySelector('.chart-root')!.append(callout);
+  }
+
+  it('reads callout boxes as obstacles', () => {
+    const { svg, zoomGroup } = renderChart();
+    addCallout(svg, box(100, 20, 150, 30));
+    expect(annotationObstacles(zoomGroup)).toEqual([box(100, 20, 150, 30)]);
+  });
+
+  it('moves a label out from under a callout drawn after it', () => {
+    const { svg, zoomGroup } = renderChart();
+    renderLineLabels(zoomGroup, [placement('vr', 120, 60, 'Vera Rubin NVL72 (TRTLLM)')], {
+      seriesAttribute: 'data-hw-key',
+    });
+    const before = pillBox(zoomGroup, 'vr');
+    // The callout lands squarely on the label's default spot.
+    const callout = box(before.left - 4, before.top - 4, before.right - before.left + 8, 30);
+    addCallout(svg, callout);
+    expect(overlaps(pillBox(zoomGroup, 'vr'), callout)).toBe(true);
+
+    relayoutLineLabels(zoomGroup);
+    const after = pillBox(zoomGroup, 'vr');
+    expect(overlaps(after, callout)).toBe(false);
+    expectInsidePlot(after);
+  });
+
+  it('keeps labels a zoom pass hid hidden when it re-runs the layout', () => {
+    const { zoomGroup } = renderChart();
+    renderLineLabels(
+      zoomGroup,
+      [placement('kept', 40, 60, 'Kept run'), placement('dropped', 200, 120, 'Dropped run')],
+      { seriesAttribute: 'data-hw-key' },
+    );
+    // The zoom pass no longer places `dropped` (its line left the view).
+    updateRenderedLineLabels(zoomGroup, [placement('kept', 60, 80, 'Kept run')]);
+    relayoutLineLabels(zoomGroup);
+
+    const opacityOf = (key: string) =>
+      zoomGroup.select<SVGGElement>(`.line-label[data-line-key="${key}"]`).style('opacity');
+    expect(opacityOf('dropped')).toBe('0');
+    expect(opacityOf('kept')).toBe('1');
   });
 });

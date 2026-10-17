@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
+import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -421,6 +422,13 @@ function lineCandidates<TPoint extends CartesianPoint>(
   return candidates;
 }
 
+/** The point with the largest y (first one wins ties). */
+function peakPoint<TPoint extends CartesianPoint>(points: readonly TPoint[]): TPoint {
+  let best = points[0];
+  for (const point of points) if (point.y > best.y) best = point;
+  return best;
+}
+
 /**
  * Anchor one pill per series along its line.
  *
@@ -447,6 +455,13 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     pinAnchors?: boolean;
     /** Pill boxes already on the plot that labels must not cover. */
     obstacles?: readonly PlacedBox[];
+    /**
+     * Try each line's peak (highest-y point) before the spread slots. On a
+     * Pareto chart every frontier peaks at a different height, so names
+     * placed there fan out down the plot instead of crowding the region where
+     * the curves converge. Collisions fall back to the usual slots.
+     */
+    preferPeak?: boolean;
   },
 ): LineLabelPlacement[] {
   const collisionHeight = options.collisionHeight ?? CHART_TYPE.lineLabel + 8;
@@ -496,6 +511,14 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
   for (const [seriesIndex, entry] of sorted.entries()) {
     if (entry.points.length === 0) continue;
     const candidates = lineCandidates(entry.points, seriesIndex);
+    if (options.preferPeak) {
+      const peak = peakPoint(entry.points);
+      const index = candidates.indexOf(peak);
+      if (index !== 0) {
+        if (index > 0) candidates.splice(index, 1);
+        candidates.unshift(peak);
+      }
+    }
 
     if (options.pinAnchors && options.anchors) {
       let anchorX = options.anchors.get(entry.key);
@@ -614,6 +637,7 @@ export function renderLineLabels(
     halo?: string;
   },
 ): void {
+  rememberLayout(group, labels, options);
   const plainText = options.appearance === 'text';
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
@@ -659,7 +683,7 @@ export function renderLineLabels(
       // Halo in the chart background keeps coloured text legible where it
       // crosses a line or a marker; stroke is painted under the fill.
       text
-        .style('fill', label.color)
+        .style('fill', options.halo ? readableTextColor(label.color, options.halo) : label.color)
         .style('stroke', options.halo ?? 'var(--card)')
         .style('stroke-width', '4px')
         .style('stroke-linejoin', 'round')
@@ -713,7 +737,7 @@ export function renderLineLabels(
     offsetX,
     offsetY,
     bounds,
-    bounds ? pillObstacles(group, '.parallelism-label') : [],
+    bounds ? [...pillObstacles(group, '.parallelism-label'), ...annotationObstacles(group)] : [],
   );
 }
 
@@ -728,6 +752,7 @@ export function updateRenderedLineLabels(
     bounds?: RectBounds | null;
   } = {},
 ): void {
+  rememberLayout(group, labels, options);
   const byKey = new Map(labels.map((label) => [label.key, label]));
   const opacity = options.opacity ?? 1;
   const offsetX = options.offsetX ?? 8;
@@ -755,7 +780,7 @@ export function updateRenderedLineLabels(
     offsetX,
     offsetY,
     bounds,
-    bounds ? pillObstacles(group, '.parallelism-label') : [],
+    bounds ? [...pillObstacles(group, '.parallelism-label'), ...annotationObstacles(group)] : [],
   );
 }
 
@@ -949,4 +974,65 @@ export function keepPointLabelsInPlot(
   bounds?: RectBounds | null,
 ): void {
   placePointLabels(zoomGroup, { bounds, avoidCollisions: false });
+}
+
+/**
+ * Boxes of the in-plot warning and preview callouts
+ * (`.known-issue-annotation`), in the coordinate space of `group`'s parent
+ * plot group. Run-name labels must not hide under them: a name placed at a
+ * curve's peak lands near the top of the plot, where the callouts stack.
+ */
+export function annotationObstacles(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+): RectBounds[] {
+  const node = group.node();
+  const root = node?.closest('svg');
+  if (!node || !root) return [];
+  const boxes: RectBounds[] = [];
+  for (const callout of root.querySelectorAll<SVGGraphicsElement>('.known-issue-annotation')) {
+    const rect = callout.querySelector<SVGRectElement>('rect');
+    if (!rect) continue;
+    const x = Number(rect.getAttribute('x'));
+    const y = Number(rect.getAttribute('y'));
+    const width = Number(rect.getAttribute('width'));
+    const height = Number(rect.getAttribute('height'));
+    if (![x, y, width, height].every((value) => Number.isFinite(value))) continue;
+    boxes.push({ left: x, top: y, right: x + width, bottom: y + height });
+  }
+  return boxes;
+}
+
+interface LastLayout {
+  labels: readonly LineLabelPlacement[];
+  options: { opacity?: number; offsetX?: number; offsetY?: number; bounds?: RectBounds | null };
+}
+
+/**
+ * The placements (in layout order) and options of the most recent render or
+ * zoom pass for each label group, so a later re-layout replays exactly that
+ * pass: labels it hid stay hidden and ties resolve in the same order.
+ */
+const lastLayouts = new WeakMap<SVGGElement, LastLayout>();
+
+function rememberLayout(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  labels: readonly LineLabelPlacement[],
+  { opacity, offsetX, offsetY, bounds }: LastLayout['options'],
+): void {
+  const node = group.node();
+  if (node) lastLayouts.set(node, { labels, options: { opacity, offsetX, offsetY, bounds } });
+}
+
+/**
+ * Re-run the most recent label layout in place. Called after a layer that
+ * adds obstacles (the in-plot callouts) draws, since it draws after the
+ * labels.
+ */
+export function relayoutLineLabels(
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+): void {
+  const node = group.node();
+  const last = node ? lastLayouts.get(node) : undefined;
+  if (!last || last.labels.length === 0) return;
+  updateRenderedLineLabels(group, last.labels, last.options);
 }

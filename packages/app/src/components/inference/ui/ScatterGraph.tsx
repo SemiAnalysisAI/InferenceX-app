@@ -27,6 +27,7 @@ import {
   avoidPointLabelCollisions,
   parallelismLabelBoxes,
   placeLineLabels,
+  relayoutLineLabels,
   updateRenderedLineLabels,
   renderLineLabels,
   type LineLabelPlacement,
@@ -62,6 +63,9 @@ import {
   OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
+import { boxTextColors, readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { WIDE_CHART_QUERY } from '@/components/inference/utils/label-defaults';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -120,6 +124,7 @@ import {
   paretoMaximizesX,
   type ParetoDirection,
 } from '@/lib/charts/chart-utils';
+import { buildChartSummary } from '@/components/inference/utils/chart-summary';
 import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
 import {
   globalParetoFrontier,
@@ -628,6 +633,8 @@ const ScatterGraph = React.memo(
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
+    // Wide screens show run names in coloured boxes (see WIDE_CHART_QUERY).
+    const wideChart = useMediaQuery(WIDE_CHART_QUERY);
     // Comparison series (`i_pcompare`) switched off from the legend. Chart-local,
     // like Optimal Only's point set: the URL carries the comparison, not which
     // of its rows a reader hid while looking.
@@ -985,6 +992,35 @@ const ScatterGraph = React.memo(
           activeOverlayHwTypes.has(String(point.hwKey)),
       );
     }, [overlayData, selectedPrecisions, quickFilters, activeOverlayHwTypes]);
+
+    // Screen-reader overview of what is on the plot: chart type, both axes
+    // and their ranges, then each configuration by name with its highest
+    // point. The SVG itself is exposed as one image so assistive tech reads
+    // this instead of every tick label.
+    const chartSummary = useMemo(() => {
+      const groups = new Map<string, InferenceData[]>();
+      for (const point of filteredData) {
+        const key = `${point.hwKey}\u0000${point.precision}`;
+        const group = groups.get(key);
+        if (group) group.push(point);
+        else groups.set(key, [point]);
+      }
+      return buildChartSummary({
+        locale,
+        xLabel,
+        yLabel,
+        series: [...groups.values()].map((points) => ({
+          name: lineLabelText(
+            String(points[0].hwKey),
+            points[0].precision,
+            true,
+            modelLabel,
+            points,
+          ),
+          points,
+        })),
+      });
+    }, [filteredData, locale, xLabel, yLabel, modelLabel]);
 
     const processedOverlayClippedData = useMemo(() => {
       if (!overlayData?.clippedData) return EMPTY_CLIPPED_DATA;
@@ -2925,6 +2961,9 @@ const ScatterGraph = React.memo(
               anchors: lineLabelAnchorRef.current,
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(ctx.layout.zoomGroup.node()),
+              // Name each curve at its own peak, where the frontiers are
+              // furthest apart, rather than where they converge.
+              preferPeak: true,
             });
 
             // Keep hidden data-join entries for precision/date curves that lost
@@ -2962,9 +3001,11 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
-            // Plain coloured run names next to their lines, not boxes over the plot.
-            appearance: 'text',
-            halo: ir.getCssColor('--card'),
+            // Wide screens have room for the run names in coloured boxes;
+            // phones get plain coloured names next to their lines so the
+            // labels do not cover the curves.
+            appearance: wideChart ? 'pill' : 'text',
+            halo: wideChart ? undefined : ir.getCssColor('--card'),
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2977,6 +3018,13 @@ const ScatterGraph = React.memo(
                 .attr('opacity', 0.95);
             },
             configureText: (text, label) => {
+              // Inside a box: white or near-black, whichever reads on the
+              // box's colour. As plain text: the line's hue, made lighter or
+              // darker where needed. Both meet WCAG AA (4.5:1).
+              const boxInk = wideChart ? boxTextColors(label.color) : null;
+              const nameColor =
+                boxInk?.primary ?? readableTextColor(label.color, ir.getCssColor('--card'));
+              const mutedColor = boxInk?.secondary ?? ir.getCssColor('--muted-foreground');
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
               // Parse the hardware part without the variant suffix, which gets
               // its own segment so the engine is still matched at the end.
@@ -3003,31 +3051,31 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const markerSegments = marker
-                ? [{ className: 'll-marker', text: marker, fill: label.color, weight: '600' }]
+                ? [{ className: 'll-marker', text: marker, fill: nameColor, weight: '600' }]
                 : [];
               const runSegments = runTag
                 ? [
                     {
                       className: 'll-run',
                       text: runTag,
-                      fill: ir.getCssColor('--muted-foreground'),
+                      fill: mutedColor,
                       weight: '400',
                     },
                   ]
                 : [];
               const variantSegments = suffix
-                ? [{ className: 'll-variant', text: suffix, fill: label.color, weight: '500' }]
+                ? [{ className: 'll-variant', text: suffix, fill: nameColor, weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
                     ...markerSegments,
-                    { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
+                    { className: 'll-gpu', text: config.label, fill: nameColor, weight: '700' },
                     ...(precisionLabel
                       ? [
                           {
                             className: 'll-precision',
                             text: precisionLabel,
-                            fill: label.color,
+                            fill: nameColor,
                             weight: '600',
                           },
                         ]
@@ -3037,7 +3085,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: ir.getCssColor('--muted-foreground'),
+                            fill: mutedColor,
                             weight: '400',
                           },
                         ]
@@ -3050,7 +3098,7 @@ const ScatterGraph = React.memo(
                     {
                       className: 'll-plain',
                       text: coreLabel,
-                      fill: label.color,
+                      fill: nameColor,
                       weight: '600',
                     },
                     ...runSegments,
@@ -3232,6 +3280,7 @@ const ScatterGraph = React.memo(
               anchors: lineLabelAnchorRef.current,
               pinAnchors: pinLineLabels,
               obstacles: parallelismLabelBoxes(zoomGroup.node()),
+              preferPeak: true,
             });
             updateRenderedLineLabels(zoomGroup, zoomLabels);
           }
@@ -3695,7 +3744,7 @@ const ScatterGraph = React.memo(
 
       // Annotations/colors resolve through the interaction ref so visibility
       // toggles can redraw this layer without recreating the chart.
-      const knownIssueLayer = createKnownIssueLayer(() => {
+      const knownIssueCallouts = createKnownIssueLayer(() => {
         const current = interactionRef.current;
         return {
           chartId,
@@ -3711,6 +3760,27 @@ const ScatterGraph = React.memo(
             }),
         };
       });
+
+      // The callouts draw after the run-name labels, so once they are on the
+      // plot, move any label they cover (a name at a curve's peak sits near
+      // the top, where the callouts stack).
+      const afterCallouts =
+        <C,>(
+          hook:
+            | ((zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: C) => unknown)
+            | null
+            | undefined,
+        ) =>
+        (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: C): void => {
+          hook?.(zoomGroup, ctx);
+          relayoutLineLabels(zoomGroup);
+        };
+      const knownIssueLayer: CustomLayerConfig = {
+        ...knownIssueCallouts,
+        render: afterCallouts(knownIssueCallouts.render),
+        onZoom: afterCallouts(knownIssueCallouts.onZoom),
+        onDisplayUpdate: afterCallouts(knownIssueCallouts.onDisplayUpdate),
+      };
 
       // ── Perf ruler (opt-in iso-x measurement between two curves) ──
       // Mode and measurement are read through refs, so this layer needs
@@ -3757,6 +3827,7 @@ const ScatterGraph = React.memo(
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      wideChart,
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
@@ -4216,6 +4287,7 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
+          accessibility={chartSummary}
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}

@@ -294,6 +294,12 @@ export interface D3ChartProps<T = any> {
   legendElement?: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
+  /**
+   * Screen-reader overview. When set, the SVG is exposed as one image named
+   * `label` and described by `description`, so assistive tech gets a summary
+   * of the chart instead of every axis tick and mark.
+   */
+  accessibility?: { label: string; description: string };
   /** Keep the SVG mounted so D3 retains its layout when scrolling toggles. */
   scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 

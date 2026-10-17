@@ -21,6 +21,23 @@ describe('resolveLabelState', () => {
     });
   });
 
+  it('opens wide agentic charts with parallelism chips on every point', () => {
+    expect(resolveLabelState('agentic', {}, { wide: true })).toEqual({
+      showPointLabels: true,
+      useAdvancedLabels: true,
+      showLineLabels: true,
+    });
+    // Fixed-sequence charts stay uncluttered at every width.
+    expect(resolveLabelState('fixed-seq', {}, { wide: true })).toMatchObject({
+      showPointLabels: false,
+      useAdvancedLabels: false,
+    });
+    // An explicit link still wins on a wide screen.
+    expect(
+      resolveLabelState('agentic', { i_label: '0', i_advlabel: '0' }, { wide: true }),
+    ).toMatchObject({ showPointLabels: false, useAdvancedLabels: false });
+  });
+
   it('restores agentic parallelism chips from a shared link', () => {
     expect(resolveLabelState('agentic', { i_advlabel: '1' })).toEqual({
       showPointLabels: true,
@@ -54,6 +71,22 @@ describe('serializeLabelState', () => {
       i_advlabel: '',
       i_linelabel: '',
     });
+  });
+
+  it('omits the wide agentic defaults and records turning the chips off', () => {
+    const wide = { wide: true };
+    expect(serializeLabelState('agentic', resolveLabelState('agentic', {}, wide), wide)).toEqual({
+      i_label: '',
+      i_advlabel: '',
+      i_linelabel: '',
+    });
+    expect(
+      serializeLabelState(
+        'agentic',
+        { showPointLabels: false, useAdvancedLabels: false, showLineLabels: true },
+        wide,
+      ),
+    ).toEqual({ i_label: '0', i_advlabel: '0', i_linelabel: '' });
   });
 
   it('serializes deviations from agentic defaults', () => {
