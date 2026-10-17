@@ -50,6 +50,8 @@ export interface MetricDefinition {
   xLabel?: string;
   xLabelZh?: string;
   heading?: string;
+  /** The y-axis stops here instead of padding past it, unless a value exceeds it. */
+  axisCeiling?: number;
 }
 
 export const METRIC_REGISTRY = {
@@ -377,6 +379,7 @@ export const METRIC_REGISTRY = {
     title: 'Measured Average Power as Percent of TDP',
     titleZh: '实测平均功耗占 TDP 百分比',
     polarity: 'lower',
+    axisCeiling: 100,
   },
   // The per-second telemetry behind `measuredAvgPower`. The field aliases the
   // same average so the table view, availability panel, and share links keep
@@ -583,6 +586,13 @@ export function metricOptionTitle(metricKey: MetricKey, locale: 'en' | 'zh'): st
   return locale === 'zh'
     ? `${title}（${COST_TIER_LABELS[tier].optionZh}）`
     : `${title} (${COST_TIER_LABELS[tier].option})`;
+}
+
+export function metricAxisCeiling(metricConfigKey: string): number | undefined {
+  const metricKey = metricConfigKey.slice(2);
+  if (!isMetricKey(metricKey)) return undefined;
+  const metric: MetricDefinition = METRIC_REGISTRY[metricKey];
+  return metric.axisCeiling;
 }
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
