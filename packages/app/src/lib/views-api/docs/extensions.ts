@@ -402,12 +402,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '以逗号分隔的隐藏硬件键，仅接受视频硬件列表中的键；默认空，排序去重，忽略未知键。只筛选图表和表格，不改变 KPI、Compare 或 Evidence。',
   ],
   v_base: [
-    'Baseline hardware key; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment).',
-    '基线硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。',
+    'Baseline hardware key; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '基线硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_cand: [
-    'Candidate hardware key; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment).',
-    '候选硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。',
+    'Candidate hardware key; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '候选硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_case: [
     'Zero-based matched-case index, 0–9999 (default 0). view=compare clamps it to the available pairs and returns cases.resolvedCaseIndex; dashboard leaves media not-requested.',
