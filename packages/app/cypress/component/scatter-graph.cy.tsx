@@ -1250,12 +1250,7 @@ describe('ScatterGraph', () => {
       '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
     )
       .should('have.text', ' (TileRT, MTP)')
-      // Muted next to the series-coloured GPU name.
-      .and(($engine) => {
-        const gpu = $engine.siblings('.ll-gpu')[0] as unknown as SVGTSpanElement;
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal('');
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal(gpu.style.fill);
-      });
+      .and('have.attr', 'fill', '#d1d5db');
 
     expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();
@@ -1353,12 +1348,7 @@ describe('ScatterGraph', () => {
       .and('have.attr', 'font-weight', '700');
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
       .should('contain.text', 'EAGLE')
-      // Muted next to the series-coloured GPU name.
-      .and(($engine) => {
-        const gpu = $engine.siblings('.ll-gpu')[0] as unknown as SVGTSpanElement;
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal('');
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal(gpu.style.fill);
-      });
+      .and('have.attr', 'fill', '#d1d5db');
     // No label should show the generic MTP token for M3.
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });

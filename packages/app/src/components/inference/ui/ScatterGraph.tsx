@@ -2975,9 +2975,6 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
-            // Plain coloured run names next to their lines, not boxes over the plot.
-            appearance: 'text',
-            halo: ir.getCssColor('--card'),
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -3012,27 +3009,20 @@ const ScatterGraph = React.memo(
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
               const runSegments = runTag
-                ? [
-                    {
-                      className: 'll-run',
-                      text: runTag,
-                      fill: ir.getCssColor('--muted-foreground'),
-                      weight: '400',
-                    },
-                  ]
+                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
                 : [];
               const variantSegments = suffix
-                ? [{ className: 'll-variant', text: suffix, fill: label.color, weight: '500' }]
+                ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
-                    { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
+                    { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
                     ...(precisionLabel
                       ? [
                           {
                             className: 'll-precision',
                             text: precisionLabel,
-                            fill: label.color,
+                            fill: 'white',
                             weight: '600',
                           },
                         ]
@@ -3042,7 +3032,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: ir.getCssColor('--muted-foreground'),
+                            fill: '#d1d5db',
                             weight: '400',
                           },
                         ]
@@ -3054,7 +3044,7 @@ const ScatterGraph = React.memo(
                     {
                       className: 'll-plain',
                       text: coreLabel,
-                      fill: label.color,
+                      fill: 'white',
                       weight: '600',
                     },
                     ...runSegments,
@@ -3065,7 +3055,7 @@ const ScatterGraph = React.memo(
                 .data(segments, (segment) => segment.className)
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
-                .style('fill', (segment) => segment.fill)
+                .attr('fill', (segment) => segment.fill)
                 .attr('font-weight', (segment) => segment.weight)
                 .attr('x', null)
                 .attr('dy', null)

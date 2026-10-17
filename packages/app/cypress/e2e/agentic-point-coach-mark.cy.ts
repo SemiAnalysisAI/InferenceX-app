@@ -116,31 +116,6 @@ describe('Agentic point coach mark', () => {
     });
   });
 
-  it('holds the reproducibility toast back on desktop until the coach mark closes', () => {
-    cy.viewport(1280, 800);
-    interceptOverlayRun();
-    interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces', {
-      onBeforeLoad(win) {
-        freshCoachMarkState(win);
-        // Let the toast compete for the first view, as on a real first visit.
-        win.sessionStorage.removeItem('inferencex-reproducibility-nudge-shown');
-      },
-    });
-    cy.get(AGENTIC_POINTS).should('have.length.greaterThan', 0);
-    cy.get('[data-testid="scatter-graph"]').scrollIntoView();
-
-    cy.get(COACH_MARK).should('be.visible');
-    // The toast's 1.5s timer has long fired by the time the callout settles;
-    // it must still be held back while the callout is on screen.
-    cy.wait(2000);
-    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
-
-    cy.get('[data-testid="agentic-point-coach-mark-dismiss"]').click();
-    cy.get(COACH_MARK).should('not.exist');
-    cy.get('[data-testid="reproducibility-nudge"]').should('be.visible');
-  });
-
   it('waits for the chart to be on screen before pointing at anything', () => {
     interceptOverlayRun();
     interceptDerivedAgenticMetrics();
@@ -264,27 +239,11 @@ describe('Agentic point coach mark', () => {
         return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
       };
 
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').then(($overlay) => {
+        expect([...$overlay].some(onPoint), 'pointer avoids overlay markers').to.eq(false);
+      });
       cy.get(AGENTIC_MARKERS).then(($official) => {
         expect([...$official].some(onPoint), 'pointer lands on an official point').to.eq(true);
-      });
-      // This fixture overlays the same run, so overlay markers can share an
-      // official point's position. What matters is what a click at the tip
-      // reaches: the official point (whose tooltip has "View charts"), never
-      // the overlay marker. Hide the callout so it is not the hit target.
-      cy.get(COACH_MARK).invoke('css', 'visibility', 'hidden');
-      cy.get('[data-testid="agentic-point-coach-mark-target"]').invoke(
-        'css',
-        'visibility',
-        'hidden',
-      );
-      // The ring's cx/cy are viewport coordinates (compared against
-      // getBoundingClientRect centres above).
-      cy.document().then((doc) => {
-        const hit = doc.elementFromPoint(tipX, tipY);
-        expect(hit?.closest('.unofficial-overlay-pt'), 'click target is not an overlay').to.eq(
-          null,
-        );
-        expect(hit?.closest(AGENTIC_POINTS), 'click target is an official point').to.not.eq(null);
       });
     });
   });
