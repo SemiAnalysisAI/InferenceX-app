@@ -334,8 +334,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Breaking News 🚨: Google TPUv7 joins AgentX',
-      titleZh: '突发新闻 🚨：Google TPUv7 加入 AgentX',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
       description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
       descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
       testId: 'launch-modal',
@@ -374,8 +374,8 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Breaking News 🚨: Google TPUv7 joins AgentX',
-      titleZh: '突发新闻 🚨：Google TPUv7 加入 AgentX',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
       description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
       descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
       testId: 'launch-banner',
