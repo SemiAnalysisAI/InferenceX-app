@@ -17,8 +17,8 @@ import { captionControlTriggerClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ShareButton } from '@/components/ui/share-button';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { isQueueing, layoutLabel, leadCell } from './deployment';
 import { costPerGpuHour, hardwareLabel, VIDEO_HARDWARE_ROSTER, type CostTier } from './hardware';
 import {

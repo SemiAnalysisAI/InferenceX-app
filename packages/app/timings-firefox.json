@@ -4972,6 +4972,10 @@
       ]
     },
     {
+      "spec": "cypress/e2e/profit-power-curves.cy.ts",
+      "duration": 3568
+    },
+    {
       "spec": "cypress/e2e/profit-route-params.cy.ts",
       "duration": 12889,
       "tests": [
@@ -5024,10 +5028,6 @@
           "attempts": 1
         }
       ]
-    },
-    {
-      "spec": "cypress/e2e/profit-power-curves.cy.ts",
-      "duration": 3568
     },
     {
       "spec": "cypress/e2e/reliability-chart.cy.ts",
@@ -6037,6 +6037,68 @@
             "i_hc=1&i_advlabel=1 enables both high contrast and parallelism labels on load"
           ],
           "duration": 582,
+          "attempts": 1
+        }
+      ]
+    },
+    {
+      "spec": "cypress/e2e/video-dashboard.cy.ts",
+      "duration": 6559,
+      "tests": [
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "keeps hardware visibility after reload and on a shared Chinese URL"
+          ],
+          "duration": 2283,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "leads with the cross-hardware chart and restores v_ params from the URL"
+          ],
+          "duration": 91,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "lists only the measured deployments in the table view, without a concurrency column"
+          ],
+          "duration": 163,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "prices the API list reference from v_api and resets it to the dated default"
+          ],
+          "duration": 236,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "compares the slowest lead deployment against the fastest with time, cost and energy deltas"
+          ],
+          "duration": 283,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "opens the history section for history deep links and renders the Chinese dashboard"
+          ],
+          "duration": 124,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (E2E fixtures)",
+            "fits a phone viewport without horizontal page scroll in both locales"
+          ],
+          "duration": 3357,
           "attempts": 1
         }
       ]

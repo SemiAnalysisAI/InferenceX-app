@@ -1,4 +1,4 @@
-import { GPU_SPECS } from '@/lib/gpu-specs';
+import { GPU_SPECS } from '@/lib/catalog/gpu-specs';
 import { evidenceComparisonKey, sharedLayoutCells } from './deployment';
 import { hardwareSort } from './hardware';
 import { metricValue, type MetricOptions, type VideoPoint } from './metrics';

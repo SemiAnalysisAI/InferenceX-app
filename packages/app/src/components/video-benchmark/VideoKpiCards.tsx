@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { leadCell } from './deployment';
 import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
 import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';

@@ -2,8 +2,8 @@
 
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 import {
   concurrencyPlateau,
   evidenceFacts,

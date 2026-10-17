@@ -1,7 +1,7 @@
 'use client';
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
 import { hardwareLabel } from './hardware';
 import { formatMetric, metricLabel, metricValue, type MetricId, type VideoPoint } from './metrics';

@@ -1102,7 +1102,7 @@ describe('buildShareUrl on the video dashboard', () => {
 
   it('shares the live v_ params and nothing else', async () => {
     setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/video');
-    const { buildShareUrl } = await import('@/lib/url-state');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
     const url = new URL(buildShareUrl());
     expect(url.pathname).toBe('/video');
     expect(url.searchParams.get('v_y')).toBe('kjPerVideo');
@@ -1113,7 +1113,7 @@ describe('buildShareUrl on the video dashboard', () => {
 
   it('keeps live v_ params out of inference share links', async () => {
     setupWindow('?v_y=kjPerVideo', '/inference');
-    const { buildShareUrl } = await import('@/lib/url-state');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
     expect(buildShareUrl()).not.toContain('v_y');
   });
 });

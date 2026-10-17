@@ -3,8 +3,8 @@
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
 import { parseApiPrice } from './video-url-state';
 

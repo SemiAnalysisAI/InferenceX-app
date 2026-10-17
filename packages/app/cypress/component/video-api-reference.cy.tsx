@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import VideoApiReference from '@/components/video-benchmark/VideoApiReference';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 /** Owns the price like VideoDashboard does and exposes it, plus an external setter. */
 function Harness({ initial, pathname = '/video' }: { initial: number; pathname?: string }) {
