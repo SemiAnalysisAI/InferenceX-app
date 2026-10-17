@@ -631,16 +631,12 @@ function verifiedAudit(
   return audit;
 }
 
-/**
- * Which collector produced the evidence. Only native per-node SMI audits name
- * their kind; central DCGM (multinode) and per-job SMI (single node) audits
- * carry none. Any other kind is a collector this verifier does not know.
- */
-type TelemetryKind = 'native_multinode' | 'central_multinode' | 'single_node';
+type TelemetryKind = 'native_multinode' | 'central' | 'single_node';
 
 function telemetryKind(audit: JsonRow, isMultinode: boolean): TelemetryKind {
   const kind = audit.telemetry_kind;
-  if (kind === undefined || kind === null) return isMultinode ? 'central_multinode' : 'single_node';
+  if (kind === undefined || kind === null)
+    return isMultinode || audit.selected_window !== undefined ? 'central' : 'single_node';
   if (kind === 'native_multinode_smi' && isMultinode) return 'native_multinode';
   throw new Error(
     `Required power: unsupported telemetry_kind ${JSON.stringify(kind)} for a ${isMultinode ? 'multinode' : 'single-node'} point`,
@@ -658,7 +654,7 @@ function verifyTelemetryEvidence(
       oneEvidence(evidence, 'gpu_metrics.csv');
       break;
     }
-    case 'central_multinode': {
+    case 'central': {
       oneEvidence(evidence, 'samples.csv');
       oneEvidence(evidence, 'manifest.json');
       if (
@@ -707,12 +703,6 @@ function verifyNativeNodeReceipts(evidence: ReadonlyMap<string, Evidence>, audit
   }
 }
 
-/**
- * The audit's per-GPU energy as `{ node, gpu_uuid, role, energy_j }`. Single-node
- * audits key energy by GPU index and name the node and UUIDs in sibling files.
- * Multinode audits key it by `node/uuid` with `per_gpu_role`, or by UUID alone for
- * native collection, whose receipts name each UUID's node.
- */
 function auditDevices(
   kind: TelemetryKind,
   audit: JsonRow,
@@ -854,7 +844,17 @@ function verifyDeviceEnergy(
     if (!audited.some((actual) => isDeepStrictEqual(actual, device)))
       throw new Error(`Required power: physical GPU evidence differs from audit for ${key}`);
   }
-  if (nodes.size !== (matrix['node-count'] ?? 1))
+  const scheduledNodes = positive(matrix['node-count'] ?? 1, 'scheduled node count');
+  const computeNodes =
+    matrix['compute-node-count'] === undefined
+      ? scheduledNodes
+      : positive(matrix['compute-node-count'], 'compute node count');
+  if (
+    !Number.isSafeInteger(scheduledNodes) ||
+    !Number.isSafeInteger(computeNodes) ||
+    computeNodes > scheduledNodes ||
+    nodes.size !== computeNodes
+  )
     throw new Error(
       `Required power: participating node count differs from required matrix for ${key}`,
     );
