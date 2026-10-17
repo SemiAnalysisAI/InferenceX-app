@@ -1,6 +1,7 @@
 import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
-import { servingCells } from './serving';
+import { isNativeH3, servingCells } from './serving';
 import { allocatedGpus } from './allocation';
+import { nativeHardware } from './hardware';
 import { powerLimitComparison } from './power-limit';
 import { serverTimingSummary } from './server-timing';
 
@@ -108,6 +109,36 @@ function measurementInfo(
   };
 }
 
+/**
+ * The harness summary stands in for the per-request population only when the
+ * run recorded no client latency at all (srt-client records without timings).
+ * A partially recorded population still yields nothing, never a fast subset.
+ */
+function summaryMetrics(run: Json, complete: boolean) {
+  const records = rows(at(run, 'records')).filter((r) => at(r, 'phase') === 'measurement');
+  if (
+    !complete ||
+    records.length === 0 ||
+    records.some((r) => number(at(r, 'submit_to_media_seconds')) !== null)
+  )
+    return null;
+  const perSecond = positive(at(run, 'summary', 'valid_clips_per_second'));
+  return {
+    median: positive(at(run, 'summary', 'latency_median_seconds')),
+    rate: perSecond === null ? null : perSecond * 3600,
+  };
+}
+
+/** InferenceX's aggregate and window sidecars, when published, must not contradict the power document. */
+const agreesPowerValid = (document: Json) => {
+  const valid = at(document, 'power_valid');
+  return valid === null || valid === true || valid === 1;
+};
+const energyPerClip = (document: Json) => {
+  const normalization = at(document, 'energy_normalization');
+  return normalization === null || normalization === 'clips';
+};
+
 function pairedTradeoffPoints(run: TradeoffRun) {
   const b = run.bundle,
     result = b.result;
@@ -119,6 +150,12 @@ function pairedTradeoffPoints(run: TradeoffRun) {
   return ROLES.map((role) => {
     const metrics = at(result, 'roles', role, 'metrics');
     const phase = at(result, 'roles', role, 'power', 'phases', 'measurement');
+    const measurement = measurementInfo(
+      at(result, 'roles', role, 'records'),
+      at(metrics, 'completion'),
+      at(metrics, 'measurement'),
+      at(metrics, 'status') === 'valid',
+    );
     const energy =
       at(phase, 'valid') === true
         ? positive(at(phase, 'aggregate', 'joules_per_valid_clip'))
@@ -141,12 +178,9 @@ function pairedTradeoffPoints(run: TradeoffRun) {
         boundary: at(metrics, 'measurement', 'boundary'),
         mode: 'paired_serial',
       }),
-      ...measurementInfo(
-        at(result, 'roles', role, 'records'),
-        at(metrics, 'completion'),
-        at(metrics, 'measurement'),
-        at(metrics, 'status') === 'valid',
-      ),
+      ...measurement,
+      medianSeconds: null,
+      samples: measurement.latencies.length,
       sourceId: text(at(b.manifest, 'run_id')),
       hardware: [...new Set(devices.map((d) => text(at(d, 'name'))).filter(Boolean))].join(', '),
       revision: text(at(result, 'execution', 'runtime', role, 'revision')),
@@ -154,6 +188,7 @@ function pairedTradeoffPoints(run: TradeoffRun) {
       boundary: text(at(metrics, 'measurement', 'boundary')),
       allocated: positive(at(result, 'hardware', 'reserved_gpu_count')),
       participating: positive(at(result, 'hardware', 'selected_gpu_count')),
+      replicas: positive(at(result, 'execution', 'deployment', 'replica_count')),
       energy,
       powerLimit,
       timing: serverTimingSummary(null, false),
@@ -168,12 +203,14 @@ function pairedTradeoffPoints(run: TradeoffRun) {
 function servingTradeoffPoints(run: TradeoffRun) {
   const b = run.bundle;
   if (!b.documents || !b.checksums) return [];
+  const documents = b.documents;
   const cells = servingCells({
-    documents: b.documents,
+    documents,
     checksums: b.checksums,
     manifest: b.manifest,
     ci: b.ci ?? null,
   });
+  const native = isNativeH3(b.manifest);
   const allocated = allocatedGpus(b);
   return cells.map((item) => {
     const measurement = at(item.run, 'measurement');
@@ -190,9 +227,27 @@ function servingTradeoffPoints(run: TradeoffRun) {
       measurement,
       complete,
     );
+    const summary = native ? summaryMetrics(item.run, complete) : null;
+    const latencies = complete ? metrics.latencies : [];
+    const median = summary?.median ?? null;
     const phase = at(item.power, 'phases', 'measurement');
+    const aggregate = native ? (documents.get(`gpu/${item.id}/aggregate.json`) ?? null) : null;
+    const recordedHardware = native
+      ? nativeHardware(b.ci ?? null, text(at(aggregate, 'cluster')))
+      : '';
+    const window = native
+      ? (documents.get(`gpu/${item.id}/benchmark_concurrency_${item.concurrency}.json`) ?? null)
+      : null;
+    // Native power carries its verdict in three places; any dissent reads as not measured.
     const powerValid =
-      complete && at(phase, 'valid') === true && number(at(phase, 'valid_clips')) === metrics.valid;
+      complete &&
+      at(phase, 'valid') === true &&
+      number(at(phase, 'valid_clips')) === metrics.valid &&
+      (!native ||
+        (at(item.power, 'valid') === true &&
+          at(item.job, 'power', 'valid') === true &&
+          agreesPowerValid(aggregate) &&
+          agreesPowerValid(window)));
     const uuids = rows(at(item.spec, 'gpu_uuids')).map(text).filter(Boolean);
     const devices = rows(at(item.job, 'roles', 'baseline', 'gpu_before', 'gpus')).filter((d) =>
       uuids.includes(text(at(d, 'uuid'))),
@@ -220,20 +275,34 @@ function servingTradeoffPoints(run: TradeoffRun) {
       run,
       ...info,
       ...metrics,
-      latencies: complete ? metrics.latencies : [],
+      latencies,
+      medianSeconds: median,
+      rate: metrics.rate ?? summary?.rate ?? null,
+      // The summary median describes every valid clip, so that count is its sample size.
+      samples: latencies.length > 0 ? latencies.length : median === null ? 0 : (metrics.valid ?? 0),
       completeWorkload:
         info.completeWorkload &&
         complete &&
         mode === 'closed_loop' &&
         boundary === 'submit_to_downloaded_media',
       sourceId: text(at(b.manifest, 'run_id')),
-      hardware: [...new Set(devices.map((d) => text(at(d, 'name'))).filter(Boolean))].join(', '),
-      revision: text(at(item.run, 'configuration', 'runtime_revision')),
+      hardware:
+        [...new Set(devices.map((d) => text(at(d, 'name'))).filter(Boolean))].join(', ') ||
+        recordedHardware,
+      // The receipt's spec seals the served runtime; the client record names it only on the legacy path.
+      revision:
+        (native ? text(at(item.spec, 'baseline', 'revision')) : '') ||
+        text(at(item.run, 'configuration', 'runtime_revision')),
       concurrency: item.concurrency,
       boundary: text(boundary),
-      allocated,
+      // srt-slurm plans telemetry for every GPU the job holds, so the expected count is the allocation.
+      allocated: allocated ?? (native ? positive(at(item.power, 'expected_gpu_count')) : null),
       participating: uuids.length > 0 && new Set(uuids).size === uuids.length ? uuids.length : null,
-      energy: powerValid ? positive(at(phase, 'aggregate', 'joules_per_valid_clip')) : null,
+      replicas: positive(at(b.result, 'execution', 'deployment', 'replica_count')),
+      energy:
+        powerValid && energyPerClip(aggregate) && energyPerClip(window)
+          ? positive(at(phase, 'aggregate', 'joules_per_valid_clip'))
+          : null,
       power: powerValid ? number(at(phase, 'aggregate', 'avg_power_w')) : null,
       powerWindow: powerValid ? number(at(phase, 'duration_seconds')) : null,
       powerLimit: powerValid
@@ -294,7 +363,7 @@ export function latencyValue(point: TradeoffPoint, axis: LatencyAxis): number | 
   const a = point.latencies;
   // Ten samples is a display floor, not statistical or release qualification.
   if (axis === 'p90') return a.length >= 10 ? a[Math.ceil(a.length * 0.9) - 1] : null;
-  if (a.length === 0) return null;
+  if (a.length === 0) return point.medianSeconds;
   const middle = Math.floor(a.length / 2);
   return a.length % 2 ? a[middle] : (a[middle - 1] + a[middle]) / 2;
 }
