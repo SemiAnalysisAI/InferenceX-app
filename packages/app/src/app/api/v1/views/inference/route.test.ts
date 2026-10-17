@@ -323,6 +323,36 @@ describe('GET /api/v1/views/inference', () => {
     expect(invalidBody.param).toBe('xstat');
   });
 
+  it('defaults Qwen to E2EL and newer GPUs, with explicit axis and hardware overrides', async () => {
+    const hardware = ['mi300x', 'mi325x', 'h100', 'h200', 'mi355x', 'b200'];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      hardware.map((gpu) => makeRow({ model: 'qwen3.5', hardware: gpu, framework: 'sglang' })),
+    );
+    const url = '/api/v1/views/inference?model=Qwen-3.5-397B-A17B&metric=tpPerGpu';
+    const defaultResponse = await GET(request(url));
+    const defaults = await defaultResponse.json();
+    expect(defaults.params.xmode).toBe('e2e');
+    expect(defaults.xAxis.field).toBe('median_e2el');
+    expect(defaults.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual([
+      'b200',
+      'mi355x',
+    ]);
+
+    const overriddenResponse = await GET(request(`${url}&xmode=interactivity&gpus=h100,h200`));
+    const overridden = await overriddenResponse.json();
+    expect(overridden.params.xmode).toBe('interactivity');
+    expect(overridden.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual([
+      'h100',
+      'h200',
+    ]);
+
+    const allResponse = await GET(request(`${url}&gpus=`));
+    const all = await allResponse.json();
+    expect(all.series.map((series: { gpu: string }) => series.gpu).sort()).toEqual(
+      hardware.toSorted(),
+    );
+  });
+
   it('defaults Qwen to the cross-framework winner while best=false keeps both engines', async () => {
     const rows = ['vllm', 'sglang'].flatMap((framework) =>
       [16, 64].map((conc) =>

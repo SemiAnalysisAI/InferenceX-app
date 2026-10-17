@@ -82,10 +82,10 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
+      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
     ),
-    schema: { type: 'string', enum: X_MODE_ENUM, default: 'interactivity' },
+    schema: { type: 'string', enum: X_MODE_ENUM },
     example: 'e2e',
   },
   {
@@ -155,8 +155,8 @@ const parameters: readonly ApiParameter[] = [
   listParam(
     'gpus',
     text(
-      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey).',
-      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。',
+      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey). When omitted, Qwen3.5 excludes MI300X, MI325X, H100, and H200. An explicit list overrides this default; gpus= includes all hardware.',
+      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。省略时，Qwen3.5 排除 MI300X、MI325X、H100 和 H200。显式列表覆盖此默认值；gpus= 包含所有硬件。',
     ),
     'h200,mi355x',
   ),

@@ -1,4 +1,8 @@
 import { GET as derived } from '@/app/api/v1/derived-agentic-metrics/route';
+import {
+  defaultInferenceHardware,
+  defaultInferenceXAxisMode,
+} from '@/components/inference/utils/model-defaults';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from '@/components/inference/default-run-preference';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import {
@@ -30,7 +34,7 @@ import type { TcoBasis } from '@/lib/catalog/constants';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
-  type Model,
+  Model,
   Percentile,
   PERCENTILE_OPTIONS,
   Sequence,
@@ -66,7 +70,7 @@ import {
 } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
@@ -307,7 +311,7 @@ export function GET(request: NextRequest) {
       search.get('xmode'),
       'xmode',
       X_AXIS_MODES,
-      'interactivity',
+      defaultInferenceXAxisMode(displayName),
     );
     // The trace-derived mode has no server-side data source; resolve it to the
     // interactivity chart (the dashboard applies the same fallback on fixed-seq).
@@ -325,7 +329,10 @@ export function GET(request: NextRequest) {
     );
     const date = parseDateParam(search.get('date'), 'date');
     const runId = parseRunIdParam(search.get('runId'));
-    const gpus = parseFreeListParam(search.get('gpus'));
+    const gpus =
+      !search.has('gpus') && displayName === Model.Qwen3_5
+        ? [...defaultInferenceHardware(displayName, new Set(Object.keys(HW_REGISTRY)))]
+        : parseFreeListParam(search.get('gpus'));
     const vendors = parseVendorsParam(search.get('vendors'));
     const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
     const deployment = parseDeploymentParam(search.get('deployment'));
