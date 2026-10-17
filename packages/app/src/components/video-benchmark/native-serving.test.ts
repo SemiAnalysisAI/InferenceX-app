@@ -146,6 +146,9 @@ describe('native srt-slurm H3 bundle', () => {
       nativeHardware({ site: { gpu_model: 'NVIDIA H200' }, ci: { runner_name: 'b200-x' } }),
     ).toBe('NVIDIA H200');
     expect(nativeHardware({ ci: { runner_name: 'h200-dgxc-gha-01' } })).toBe('H200');
+    // The sealed aggregate's cluster outranks the runner's name.
+    expect(nativeHardware({ ci: { runner_name: 'runner-07' } }, 'b200-nscale')).toBe('B200');
+    expect(nativeHardware({ ci: { runner_name: 'h200-dgxc-gha-01' } }, 'b200-nscale')).toBe('B200');
     expect(nativeHardware({ ci: { runner_name: 'gb200-nvl72-02' } })).toBe('GB200 NVL72');
     expect(nativeHardware({ ci: { runner_name: 'runner-07' } })).toBe('');
     expect(nativeHardware({ ci: { runner_name: null } })).toBe('');
@@ -155,6 +158,11 @@ describe('native srt-slurm H3 bundle', () => {
     const source = videoHistoryEntry(stored(b), null).sources[0];
     expect(source.hardware).toBe('H200');
     expect(source.observations.map((point) => point.hardware)).toEqual(['H200', 'H200', 'H200']);
+    for (const concurrency of [1, 2, 4])
+      set(b.documents.get(`gpu/c${concurrency}/aggregate.json`)!, 'cluster', 'b200-nscale');
+    const sealed = videoHistoryEntry(stored(b), null).sources[0];
+    expect(sealed.hardware).toBe('B200');
+    expect(sealed.observations.map((point) => point.hardware)).toEqual(['B200', 'B200', 'B200']);
   });
 
   it('renders invalid power as not measured and withholds the unverified cell', async () => {

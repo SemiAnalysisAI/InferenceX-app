@@ -212,7 +212,6 @@ function servingTradeoffPoints(run: TradeoffRun) {
   });
   const native = isNativeH3(b.manifest);
   const allocated = allocatedGpus(b);
-  const recordedHardware = native ? nativeHardware(b.ci ?? null) : '';
   return cells.map((item) => {
     const measurement = at(item.run, 'measurement');
     const server = at(item.spec, 'server');
@@ -233,6 +232,9 @@ function servingTradeoffPoints(run: TradeoffRun) {
     const median = summary?.median ?? null;
     const phase = at(item.power, 'phases', 'measurement');
     const aggregate = native ? (documents.get(`gpu/${item.id}/aggregate.json`) ?? null) : null;
+    const recordedHardware = native
+      ? nativeHardware(b.ci ?? null, text(at(aggregate, 'cluster')))
+      : '';
     const window = native
       ? (documents.get(`gpu/${item.id}/benchmark_concurrency_${item.concurrency}.json`) ?? null)
       : null;

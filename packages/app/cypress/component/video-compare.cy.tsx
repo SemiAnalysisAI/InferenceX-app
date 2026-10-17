@@ -1,14 +1,16 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { MetricOptions, VideoPoint } from '@/components/video-benchmark/metrics';
-import { videoPoints } from '@/components/video-benchmark/points';
+import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import VideoCompare from '@/components/video-benchmark/VideoCompare';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
-const c1 = (key: string) => points.find((p) => p.hardwareKey === key && p.concurrency === 1)!;
+// The dashboard hands Compare its cells, so the retained native H200 run under the sample floor never becomes a side.
+const cells = dashboardCells(points).cells;
+const c1 = (key: string) => cells.find((p) => p.hardwareKey === key && p.concurrency === 1)!;
 const COLORS: Record<string, string> = {
   h100: 'rgb(10, 20, 30)',
   h200: 'rgb(40, 50, 60)',
@@ -31,7 +33,7 @@ function media(point: VideoPoint, hardware: string, alias: string) {
 function mount(
   pathname = '/video',
   search = '',
-  data: VideoPoint[] = points,
+  data: VideoPoint[] = cells,
   options: MetricOptions = OWNING,
   beforeMount?: () => void,
 ) {
@@ -175,7 +177,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('@h200.all').should('have.length', 1);
   });
   it('restores v_base and v_cand from the URL and reports a failed media read with a retry', () => {
-    mount('/video', '?v_base=h200&v_cand=h100', points, OWNING, () => {
+    mount('/video', '?v_base=h200&v_cand=h100', cells, OWNING, () => {
       cy.intercept('GET', mediaUrl(c1('h200')), { statusCode: 404, body: { error: 'gone' } }).as(
         'missing',
       );
@@ -189,7 +191,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.contains('button', 'Retry').should('exist');
   });
   it('says when a run publishes no clips and keeps the metric deltas', () => {
-    mount('/video', '', points, OWNING, () => {
+    mount('/video', '', cells, OWNING, () => {
       cy.intercept('GET', mediaUrl(c1('b200')), { statusCode: 204 }).as('unpublished');
     });
     cy.wait(['@h100', '@unpublished']);
@@ -204,7 +206,7 @@ describe('Video compare panel (retained fixture)', () => {
     mount(
       '/video',
       '',
-      points.filter((p) => p.hardwareKey === 'h200'),
+      cells.filter((p) => p.hardwareKey === 'h200'),
     );
     cy.get('[data-testid="video-compare-controls"]').should('have.attr', 'disabled');
     cy.get('[data-testid="video-compare"]').should(
@@ -214,7 +216,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-table"]').should('not.exist');
   });
   it('renders Chinese copy on /zh/video', () => {
-    mount('/zh/video', '', points, { tier: 'r' });
+    mount('/zh/video', '', cells, { tier: 'r' });
     cy.wait(['@h100', '@b200']);
     cy.get('[data-testid="video-compare"]')
       .should('contain', '基线')

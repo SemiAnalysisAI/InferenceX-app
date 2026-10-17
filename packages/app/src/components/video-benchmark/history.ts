@@ -1,4 +1,4 @@
-import { at, number, text } from './bundle';
+import { at, type Json, number, text } from './bundle';
 import type { CIArtifact } from './archive';
 import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
@@ -74,6 +74,13 @@ export interface VideoHistoryPage {
 }
 
 /** A read-only projection of published H3 artifacts, not a new benchmark result contract. */
+/** Cluster the first sealed per-cell aggregate of a native bundle names; '' when none is sealed. */
+function sealedCluster(documents: ReadonlyMap<string, Json>): string {
+  for (const [path, document] of documents)
+    if (/^gpu\/c\d+\/aggregate\.json$/u.test(path)) return text(at(document, 'cluster'));
+  return '';
+}
+
 export function videoHistoryEntry(
   saved: StoredArtifact,
   publishedAt: string | null,
@@ -110,7 +117,7 @@ export function videoHistoryEntry(
         result.sourceSha = text(at(bundle.manifest, 'git_commit'));
         result.observedAt = text(at(bundle.ci, 'started_at')) || null;
         result.hardware = isNativeH3(bundle.manifest)
-          ? nativeHardware(bundle.ci)
+          ? nativeHardware(bundle.ci, sealedCluster(bundle.documents))
           : text(at(bundle.ci, 'site', 'gpu_model'));
         result.execution = text(at(bundle.ci, 'phase'));
         result.fidelity = text(at(bundle.result, 'paired_fidelity', 'overall_status')) || null;

@@ -11,14 +11,16 @@ import {
   type CaseRecord,
 } from './compare';
 import type { VideoHistoryPage } from './history';
-import { videoPoints } from './points';
+import { dashboardCells, videoPoints } from './points';
 import { servingCells } from './serving';
 import { servingFixture } from './serving.fixture';
 import type { StoredArtifact, StoredSource } from './stored';
 
 // Retained H100/H200/B200 C1/C2/C4 observations of the 2026-09-09 campaign.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
-const c1 = (key: string) => comparablePoints(points).find((p) => p.hardwareKey === key)!;
+// Compare reads the dashboard's cells, so a retained smoke run under the sample floor never becomes a side.
+const c1 = (key: string) =>
+  comparablePoints(dashboardCells(points).cells).find((p) => p.hardwareKey === key)!;
 const opts = { tier: 'h' } as const;
 const row = (rows: ReturnType<typeof compareMetrics>, id: string) =>
   rows.find((item) => item.id === id)!;

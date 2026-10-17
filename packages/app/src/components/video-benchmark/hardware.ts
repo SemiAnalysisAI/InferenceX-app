@@ -22,14 +22,15 @@ export const hardwareLabel = (key: string): string => HW_REGISTRY[key]?.label ??
 
 /**
  * Hardware a native srt-slurm bundle names. Its producer records no GPU model
- * and no device inventory, so the site record is honoured when present, else
- * the SKU the CI runner's name carries (`h200-dgxc-…` → H200). Nothing
- * recognisable reads as empty, never as a guess.
+ * and no device inventory, so the site record is honoured when present, then
+ * the cluster the sealed per-cell aggregate identifies (`h200-dgxc` → H200),
+ * then the SKU the CI runner's name carries. Nothing recognisable reads as
+ * empty, never as a guess.
  */
-export function nativeHardware(ci: Json): string {
+export function nativeHardware(ci: Json, cluster = ''): string {
   const site = text(at(ci, 'site', 'gpu_model'));
   if (site) return site;
-  const key = hardwareKey(text(at(ci, 'ci', 'runner_name')));
+  const key = hardwareKey(cluster) ?? hardwareKey(text(at(ci, 'ci', 'runner_name')));
   return key === null ? '' : hardwareLabel(key);
 }
 

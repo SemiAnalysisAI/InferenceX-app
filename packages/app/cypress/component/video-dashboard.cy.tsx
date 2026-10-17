@@ -86,7 +86,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
         'ModelMiniMaxAI/MiniMax-H3 @ 42ed227ee7df',
-        'Workload1344 × 768 · 8 s · 24 fps · 50 steps',
+        // The native H200 run (#39002901777) measures a 4 s plan with four clips per cell, so it stays a hidden workload.
+        'Workload1344 × 768 · 8 s · 24 fps · 50 steps (1 other workloads hidden)',
         'Deployment4 GPU · TP2 × Ulysses 2',
       ]);
     });
@@ -322,11 +323,13 @@ describe('Video hardware dashboard (retained fixture)', () => {
       </PathnameContext.Provider>,
     );
     cy.wait('@verdicts');
-    cy.get('[data-testid="video-history-entry"]').should('have.length', 6);
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
     cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
       expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal([
         '· GPU power: Measured',
         '· GPU power: Not measured',
+        // The retained native H200 run records its own verdict.
+        '· GPU power: Measured',
       ]);
     });
   });
@@ -351,7 +354,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
         '模型MiniMaxAI/MiniMax-H3 @ 42ed227ee7df',
-        '工作负载1344 × 768 · 8 s · 24 fps · 50 steps',
+        '工作负载1344 × 768 · 8 s · 24 fps · 50 steps（另有 1 个工作负载未显示）',
         '部署4 张 GPU · TP2 × Ulysses 2',
       ]);
     });
