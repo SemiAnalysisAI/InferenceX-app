@@ -400,9 +400,8 @@ export const METRIC_REGISTRY = {
   },
   // Power boundaries beyond GPU-measured telemetry (`lib/power/power-basis.ts`).
   // Each boundary publishes W per allocated GPU and J per output and per total
-  // token; the
-  // Boundary select in the Measured controls resolves to these keys, so the
-  // metric key alone carries the boundary in share links. Keys deliberately
+  // token; the Boundary select in the Measured controls resolves to these keys,
+  // so the metric key alone carries the boundary in share links. Keys deliberately
   // lack the `measured` prefix: they are spec constants or model output, not
   // telemetry, so the telemetry-only decorations must not treat them as such.
   gpuProvisionedWatts: {
