@@ -4,8 +4,7 @@ export interface PerStepValue {
   y: number;
 }
 
-// invisible→visible pops in at destination so new dots land on the frontier
-// instead of dragging across from (0,0).
+// A new configuration appears only at its first observed snapshot, never early.
 export function interpolateAtStep(
   stepValues: readonly PerStepValue[],
   idxFloat: number,
@@ -22,7 +21,7 @@ export function interpolateAtStep(
   if (idxLow === idxHigh) return { visible: a.visible, x: a.x, y: a.y };
   if (!a.visible && !b.visible) return { visible: false, x: 0, y: 0 };
   if (a.visible && !b.visible) return { visible: true, x: a.x, y: a.y };
-  if (!a.visible && b.visible) return { visible: true, x: b.x, y: b.y };
+  if (!a.visible && b.visible) return { visible: false, x: 0, y: 0 };
 
   const frac = clamped - idxLow;
   return {

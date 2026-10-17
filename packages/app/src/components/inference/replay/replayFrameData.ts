@@ -4,7 +4,7 @@ import type { ReplayTimeline } from './buildReplayTimeline';
 import { interpolateAtStep } from './interpolateAtTime';
 
 export function buildFrameData(timeline: ReplayTimeline, fraction: number): InferenceData[] {
-  const idxFloat = stepFloatAtFraction(fraction, timeline.dates.length);
+  const idxFloat = calendarStepAtFraction(timeline.dates, fraction);
   // A replay frame is a single point in time, so every point gets the
   // playhead's date. Each template keeps its config's first-observation date,
   // and ScatterGraph scopes Pareto frontiers and line paths per date — leaving
@@ -18,6 +18,30 @@ export function buildFrameData(timeline: ReplayTimeline, fraction: number): Infe
     out.push({ ...c.template, x: r.x, y: r.y, date: frameDate });
   }
   return out;
+}
+
+/** Position an observed snapshot on an elapsed-calendar-time rail. */
+export function fractionAtDateIndex(dates: readonly string[], index: number): number {
+  if (dates.length < 2) return 0;
+  const first = Date.parse(dates[0]);
+  const last = Date.parse(dates.at(-1)!);
+  const date = Date.parse(dates[Math.max(0, Math.min(dates.length - 1, index))]);
+  return last > first ? (date - first) / (last - first) : 0;
+}
+
+/** Calendar spacing, with the existing easing applied inside each observed interval. */
+export function calendarStepAtFraction(dates: readonly string[], fraction: number): number {
+  if (dates.length < 2) return 0;
+  const clamped = Math.max(0, Math.min(1, fraction));
+  if (clamped === 1) return dates.length - 1;
+  let low = 0;
+  while (low + 1 < dates.length && fractionAtDateIndex(dates, low + 1) <= clamped + 1e-12) {
+    low++;
+  }
+  if (low === dates.length - 1) return low;
+  const start = fractionAtDateIndex(dates, low);
+  const end = fractionAtDateIndex(dates, low + 1);
+  return low + stepFloatAtFraction((clamped - start) / (end - start), 2);
 }
 
 // Cubic ease-in-out per segment: playhead settles on observed dates, accelerates between them.
@@ -53,6 +77,6 @@ export function shouldCommitFraction(prev: number, next: number): boolean {
 export function dateAtFraction(timeline: ReplayTimeline, fraction: number): string {
   const dates = timeline.dates;
   if (dates.length === 0) return '';
-  const step = Math.floor(stepFloatAtFraction(fraction, dates.length));
+  const step = Math.floor(calendarStepAtFraction(dates, fraction));
   return dates[Math.max(0, Math.min(dates.length - 1, step))] ?? '';
 }

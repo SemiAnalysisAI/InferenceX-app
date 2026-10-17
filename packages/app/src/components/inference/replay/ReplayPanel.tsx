@@ -42,8 +42,16 @@ import {
   type StepDomain,
 } from './buildReplayTimeline';
 import type { Mp4ExportError, Mp4ExportStage } from './exportMp4';
-import { buildFrameData, dateAtFraction, shouldCommitFraction, spanMs } from './replayFrameData';
+import {
+  buildFrameData,
+  calendarStepAtFraction,
+  dateAtFraction,
+  fractionAtDateIndex,
+  shouldCommitFraction,
+  spanMs,
+} from './replayFrameData';
 import { useReducedMotion } from './useReducedMotion';
+import ReplayDateTimeline from './ReplayDateTimeline';
 
 type Mp4ExportGuard = (value: unknown) => value is Mp4ExportError;
 
@@ -80,6 +88,8 @@ const REPLAY_STRINGS = {
     play: 'Play',
     reset: 'Reset to start',
     timeline: 'Replay timeline',
+    snapshotDate: 'Jump to snapshot',
+    compareHint: 'Use the chart legend to keep the two curves you want to compare.',
     speed: 'Playback speed',
     fixedAxes: 'Fixed axes',
     fixedAxesTitle:
@@ -108,6 +118,8 @@ const REPLAY_STRINGS = {
     play: '播放',
     reset: '重置到起点',
     timeline: '回放时间线',
+    snapshotDate: '跳转到快照',
+    compareHint: '在图例中只保留需要对比的两条曲线。',
     speed: '播放速度',
     fixedAxes: '固定坐标轴',
     fixedAxesTitle:
@@ -399,9 +411,10 @@ function ReplayPanelContent({
       const n = timeline.dates.length;
       const intervalId = window.setInterval(() => {
         if (!playingRef.current) return;
-        const cur = Math.round(fractionRef.current * (n - 1));
+        if (document.hidden) return;
+        const cur = Math.floor(calendarStepAtFraction(timeline.dates, fractionRef.current));
         const nextStep = Math.min(n - 1, cur + 1);
-        const next = nextStep / (n - 1);
+        const next = fractionAtDateIndex(timeline.dates, nextStep);
         commitFraction(next, { force: true });
         if (nextStep === n - 1) setPlaying(false);
       }, stepMs);
@@ -441,7 +454,7 @@ function ReplayPanelContent({
       if (rafId !== 0) cancelAnimationFrame(rafId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [playing, timeline, prefersReducedMotion]);
+  }, [playing, timeline, prefersReducedMotion, speed]);
 
   const frameData = useMemo(
     () => (timeline ? buildFrameData(timeline, fraction) : []),
@@ -452,6 +465,8 @@ function ReplayPanelContent({
     () => (timeline ? dateAtFraction(timeline, fraction) : ''),
     [timeline, fraction],
   );
+  const currentStep = timeline ? calendarStepAtFraction(timeline.dates, fraction) : 0;
+  const isBetweenSnapshots = currentStep - Math.floor(currentStep) > 1e-9;
 
   const handlePlayPause = useCallback(() => {
     if (playing) {
@@ -478,12 +493,13 @@ function ReplayPanelContent({
       if (!timeline) return;
       const n = timeline.dates.length;
       if (n <= 1) return;
-      const cur = Math.round(fraction * (n - 1));
+      const step = calendarStepAtFraction(timeline.dates, fraction);
+      const cur = Math.floor(step);
       let nextStep: number;
       switch (e.key) {
         case 'ArrowLeft':
         case 'ArrowDown': {
-          nextStep = Math.max(0, cur - 1);
+          nextStep = Math.max(0, Math.ceil(step) - 1);
           break;
         }
         case 'ArrowRight':
@@ -503,9 +519,8 @@ function ReplayPanelContent({
           return;
         }
       }
-      if (nextStep === cur) return;
       e.preventDefault();
-      handleScrub(nextStep / (n - 1));
+      handleScrub(fractionAtDateIndex(timeline.dates, nextStep));
     },
     [timeline, fraction, handleScrub],
   );
@@ -676,7 +691,11 @@ function ReplayPanelContent({
   }
 
   return (
-    <div ref={panelRef} className="p-4 sm:p-6" data-testid={`replay-panel-${parentChartId}`}>
+    <div
+      ref={panelRef}
+      className="min-w-0 w-full p-4 sm:p-6"
+      data-testid={`replay-panel-${parentChartId}`}
+    >
       <div className="flex flex-wrap items-baseline gap-3 mb-3 pr-8">
         <h3 className="text-base font-semibold">{t.heading}</h3>
         <p className="text-xs text-muted-foreground">
@@ -685,8 +704,9 @@ function ReplayPanelContent({
           • {t.configs(timeline.configs.length)}
         </p>
       </div>
+      <p className="no-export mb-2 text-xs text-muted-foreground">{t.compareHint}</p>
 
-      <div className="relative" ref={setChartWrapperEl}>
+      <div className="relative min-w-0 w-full" ref={setChartWrapperEl}>
         <ScatterGraph
           chartId={`replay-${parentChartId}`}
           modelLabel={selectedModel}
@@ -709,6 +729,8 @@ function ReplayPanelContent({
         </div>
       </div>
 
+      <ReplayDateTimeline dates={timeline.dates} fraction={fraction} locale={locale} />
+
       <div
         className={cn(
           'no-export mt-4 flex flex-wrap items-center gap-3 px-1',
@@ -719,6 +741,7 @@ function ReplayPanelContent({
           size="sm"
           variant="outline"
           onClick={handlePlayPause}
+          disabled={isExporting}
           aria-label={playing ? t.pauseReplay : t.playReplay}
           data-testid="replay-play-pause"
           className="gap-1"
@@ -730,6 +753,7 @@ function ReplayPanelContent({
           size="icon"
           variant="ghost"
           onClick={handleReset}
+          disabled={isExporting}
           aria-label={t.reset}
           data-testid="replay-reset"
         >
@@ -737,6 +761,7 @@ function ReplayPanelContent({
         </Button>
         <input
           type="range"
+          disabled={isExporting}
           min={0}
           max={1000}
           value={Math.round(fraction * 1000)}
@@ -751,7 +776,30 @@ function ReplayPanelContent({
         <span className="text-xs tabular-nums text-muted-foreground min-w-[5.5rem] text-right">
           {formatReplayDate(currentDate, locale)}
         </span>
-        <Select value={String(speed)} onValueChange={(v) => handleSpeedChange(Number(v))}>
+        <select
+          aria-label={t.snapshotDate}
+          data-testid="replay-snapshot-select"
+          disabled={isExporting}
+          value={isBetweenSnapshots ? '' : currentDate}
+          onChange={(e) =>
+            handleScrub(fractionAtDateIndex(timeline.dates, timeline.dates.indexOf(e.target.value)))
+          }
+          className="h-8 max-w-full rounded-md border bg-background px-2 text-xs"
+        >
+          <option value="" disabled>
+            {t.snapshotDate}
+          </option>
+          {timeline.dates.map((date) => (
+            <option key={date} value={date}>
+              {formatReplayDate(date, locale)}
+            </option>
+          ))}
+        </select>
+        <Select
+          disabled={isExporting}
+          value={String(speed)}
+          onValueChange={(v) => handleSpeedChange(Number(v))}
+        >
           <SelectTrigger
             className="h-8 w-[5.5rem]"
             aria-label={t.speed}
@@ -772,6 +820,7 @@ function ReplayPanelContent({
             id="replay-fixed-axes"
             data-testid="replay-fixed-axes"
             checked={fixedAxes}
+            disabled={isExporting}
             onCheckedChange={(checked) => {
               setFixedAxes(checked);
               track('inference_replay_fixed_axes_toggled', { enabled: checked });

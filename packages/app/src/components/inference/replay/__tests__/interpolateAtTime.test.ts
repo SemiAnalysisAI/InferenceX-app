@@ -21,10 +21,12 @@ describe('interpolateAtStep', () => {
     expect(r).toEqual({ visible: true, x: 50, y: 50 });
   });
 
-  it('pops in at the destination during an invisible→visible segment', () => {
+  it('does not show a future observation before its destination snapshot', () => {
     const steps = [v(false, 0, 0), v(true, 200, 75)];
-    const r = interpolateAtStep(steps, 0.25);
-    expect(r).toEqual({ visible: true, x: 200, y: 75 });
+    for (const fraction of [0, 0.25, 0.5, 0.999]) {
+      expect(interpolateAtStep(steps, fraction)).toEqual({ visible: false, x: 0, y: 0 });
+    }
+    expect(interpolateAtStep(steps, 1)).toEqual({ visible: true, x: 200, y: 75 });
   });
 
   it('keeps both endpoints invisible across an invisible→invisible segment', () => {

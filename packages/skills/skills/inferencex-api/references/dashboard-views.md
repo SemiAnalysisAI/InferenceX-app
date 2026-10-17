@@ -20,6 +20,15 @@ results or treat its interpolated values as separately measured operating points
 
 ## Capture and select
 
+The inference chart's Export → MP4 replay is presentation-only over
+`/api/v1/benchmarks/history`. Use the shared legend to retain the two curves for a
+comparison. Its bottom rail and snapshot selector use elapsed UTC calendar days;
+the rail is also captured in exported videos. Intermediate animation frames are
+illustrative interpolations, not measured results. Configurations appear at their
+first observed snapshot and carry forward afterward. Playback, seeking and fixed
+axes add no API parameters. Unofficial-run overlays have no history in that response
+and must not be presented as historical observations.
+
 1. Resolve the view and missing selectors from the table below. Read `options`
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for

@@ -105,6 +105,70 @@ describe('Inference Replay', () => {
       });
   });
 
+  it('seeks observed snapshots on an export-visible calendar rail and restarts', () => {
+    cy.get('[data-testid="replay-date-timeline"]')
+      .should('be.visible')
+      .and(($rail) => {
+        expect($rail.closest('.no-export')).to.have.length(0);
+      });
+    cy.get('[data-testid="replay-snapshot-select"] option:not([disabled])').then(($options) => {
+      const dates = [...$options].map((option) => (option as HTMLOptionElement).value);
+      expect(dates.length).to.be.greaterThan(1);
+      const first = dates[0];
+      const last = dates.at(-1)!;
+      cy.get('[data-testid="replay-snapshot-select"]').select(last);
+      cy.get('[data-testid="replay-date-overlay"]').should('have.text', last);
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+      cy.get('[data-testid="replay-date-playhead"]')
+        .should('have.attr', 'style')
+        .and('contain', '100%');
+      cy.get('[data-testid="replay-date-tick"]').each(($tick, i) => {
+        const expected =
+          ((Date.parse(dates[i]) - Date.parse(first)) / (Date.parse(last) - Date.parse(first))) *
+          100;
+        expect(parseFloat(($tick[0] as HTMLElement).style.left)).to.be.closeTo(expected, 0.001);
+      });
+      cy.get('[data-testid="replay-scrubber"]').focus().type('{home}');
+      cy.get('[data-testid="replay-date-overlay"]').should('have.text', first);
+      cy.get('[data-testid="replay-scrubber"]').type('{rightarrow}');
+      cy.get('[data-testid="replay-date-overlay"]').should('have.text', dates[1]);
+      cy.get('[data-testid="replay-reset"]').click();
+      cy.get('[data-testid="replay-snapshot-select"]').should('have.value', first);
+      cy.get('[data-testid="replay-snapshot-status"]').should('contain.text', 'Observed');
+      // Between snapshots the select offers an explicit placeholder, so choosing
+      // the lower snapshot still emits change and seeks instead of doing nothing.
+      setReplayScrubber(1);
+      cy.get('[data-testid="replay-snapshot-select"]')
+        .should(($select) => {
+          expect(($select[0] as HTMLSelectElement).value).to.equal('');
+        })
+        .select(first);
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+      cy.viewport(375, 900);
+      cy.get('[data-testid="replay-panel-chart-0"]').should(($panel) => {
+        const dialog = $panel[0].closest('[role="dialog"]')!.getBoundingClientRect();
+        const panel = $panel[0].getBoundingClientRect();
+        const rail = $panel[0]
+          .querySelector('[data-testid="replay-date-timeline"]')!
+          .getBoundingClientRect();
+        expect(panel.width).to.be.at.most(dialog.width);
+        expect(rail.right).to.be.at.most(dialog.right);
+      });
+      cy.get('[data-testid="replay-date-timeline"]').then(($rail) => {
+        const snapshotHeight = $rail[0].getBoundingClientRect().height;
+        setReplayScrubber(1);
+        cy.get('[data-testid="replay-date-timeline"]').should(($transitionRail) => {
+          expect($transitionRail[0].getBoundingClientRect().height).to.equal(snapshotHeight);
+        });
+      });
+      cy.viewport(1280, 720);
+      cy.get('[data-testid="replay-date-timeline"]').should(($rail) => {
+        expect($rail[0].getBoundingClientRect().width).to.be.greaterThan(375);
+      });
+      cy.get('[data-testid="replay-reset"]').click();
+    });
+  });
+
   it('re-renders the replay frame when a parent-chart toggle changes', () => {
     cy.get('body').then(($body) => {
       if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
