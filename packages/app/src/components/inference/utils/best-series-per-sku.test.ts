@@ -19,6 +19,21 @@ function frameworkPoint(
 }
 
 describe('bestSeriesPerSku', () => {
+  it('ranks only selected precisions so an FP4 winner cannot hide the FP8 SKU', () => {
+    const rows = [
+      { ...point('gb300-nvl72', 'gb300_dynamo-trt', 10, 1000), precision: 'fp4' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-trt', 20, 800), precision: 'fp4' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-sglang', 10, 100), precision: 'fp8' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-sglang', 20, 80), precision: 'fp8' },
+    ] as InferenceData[];
+
+    expect(bestSeriesPerSku(rows, 'upper_left', ['fp8'])).toEqual(new Set(['gb300_dynamo-sglang']));
+    expect(bestSeriesPerSku(rows, 'upper_left', ['fp4', 'fp8'])).toEqual(
+      new Set(['gb300_dynamo-trt']),
+    );
+    expect(bestSeriesPerSku(rows, 'upper_left', ['bf16'])).toEqual(new Set());
+  });
+
   it('selects the highest normalized frontier AUC within each SKU', () => {
     const selected = bestSeriesPerSku(
       [

@@ -610,8 +610,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return { official: officialScope, overlay: overlayScope };
     }
     const overlay = overlayDataByChartType[wantedType];
-    const officialBest = bestSeriesPerSku(graph.data, direction);
-    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction);
+    const officialBest = bestSeriesPerSku(graph.data, direction, selectedPrecisions);
+    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction, selectedPrecisions);
     return {
       official: officialBest.size > 0 ? officialBest : officialScope,
       overlay: overlayBest.size > 0 ? overlayBest : overlayScope,
@@ -624,6 +624,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     overlayScope,
     selectedXAxisMode,
     selectedYAxisMetric,
+    selectedPrecisions,
   ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',

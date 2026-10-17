@@ -17,7 +17,7 @@
  */
 
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
-import { interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
 
 // The landing Rubin card links to MiniMax M3; reuse the synthetic Rubin curve under its DB key.
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
@@ -114,6 +114,7 @@ function assertTpuView() {
   cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
   cy.location('search').should('contain', 'i_prec=fp8');
   cy.location('search').should('not.contain', 'i_spec=');
+  assertTpuGb300Selected();
 }
 
 describe('landing model curation', () => {

@@ -36,10 +36,16 @@ interface ScoredSeries {
  * operating points can be exceptional even when a broader serving curve wins
  * the AUC comparison, so every eligible TileRT series remains visible.
  */
-export function bestSeriesPerSku(points: InferenceData[], direction: Direction): Set<string> {
+export function bestSeriesPerSku(
+  points: InferenceData[],
+  direction: Direction,
+  precisions?: readonly string[],
+): Set<string> {
   const bySku = new Map<string, Map<string, InferenceData[]>>();
   const featured = new Set<string>();
   for (const point of points) {
+    // Rank within the visible precision scope, before picking a winner.
+    if (precisions && !precisions.includes(point.precision)) continue;
     // Comparison clones re-plot the same configs at another boundary or role;
     // the best series per SKU is judged on the selected metric alone.
     if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;

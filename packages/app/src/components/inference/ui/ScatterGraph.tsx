@@ -786,8 +786,8 @@ const ScatterGraph = React.memo(
               direction === 'lower_left' ||
               direction === 'lower_right'
             ) {
-              const selection = bestSeriesPerSku(data, direction);
-              for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+              const selection = bestSeriesPerSku(data, direction, selectedPrecisions);
+              for (const key of bestSeriesPerSku(overlayData.data, direction, selectedPrecisions)) {
                 selection.add(`overlay:${key}`);
               }
               commitUnifiedSelection(selection);
@@ -803,6 +803,7 @@ const ScatterGraph = React.memo(
         overlayData,
         chartDefinition,
         selectedYAxisMetric,
+        selectedPrecisions,
         data,
         commitUnifiedSelection,
         resetUnifiedSelection,

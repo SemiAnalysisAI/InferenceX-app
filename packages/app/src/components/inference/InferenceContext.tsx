@@ -1337,7 +1337,7 @@ export function InferenceProvider({
     ) {
       return unrankedHwTypes;
     }
-    const best = bestSeriesPerSku(graph.data, direction);
+    const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
     if (best.size === 0) return unrankedHwTypes;
     // Rankable SKUs keep their winner; table-only SKUs stay visible.
     return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
