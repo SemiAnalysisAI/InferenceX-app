@@ -114,7 +114,8 @@ import {
   comparisonExclusion as resolveComparisonExclusion,
   isEngineGuardLifted,
 } from './utils/comparison-exclusion';
-import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
+import { resolveLabelState, serializeLabelState, WIDE_CHART_QUERY } from './utils/label-defaults';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
@@ -630,6 +631,8 @@ export function InferenceProvider({
   const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
   const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
   const labelScenarioKind = sequenceKind(effectiveSequence);
+  // Wide viewports open the agentic chart with its full detail view.
+  const wideChart = useMediaQuery(WIDE_CHART_QUERY);
   const initialLabelState = useMemo(
     () =>
       resolveLabelState('fixed-seq', {
@@ -943,16 +946,20 @@ export function InferenceProvider({
 
   useEffect(() => {
     if (!sequenceResolved) return;
-    const labelState = resolveLabelState(labelScenarioKind, {
-      i_label: getUrlParam('i_label'),
-      i_nolabel: getUrlParam('i_nolabel'),
-      i_advlabel: getUrlParam('i_advlabel'),
-      i_linelabel: getUrlParam('i_linelabel'),
-    });
+    const labelState = resolveLabelState(
+      labelScenarioKind,
+      {
+        i_label: getUrlParam('i_label'),
+        i_nolabel: getUrlParam('i_nolabel'),
+        i_advlabel: getUrlParam('i_advlabel'),
+        i_linelabel: getUrlParam('i_linelabel'),
+      },
+      { wide: wideChart },
+    );
     setShowPointLabels(labelState.showPointLabels);
     setUseAdvancedLabels(labelState.useAdvancedLabels);
     setShowLineLabels(labelState.showLineLabels);
-  }, [labelScenarioKind, sequenceResolved, getUrlParam]);
+  }, [labelScenarioKind, sequenceResolved, getUrlParam, wideChart]);
 
   // Ref guard: when true, filter changes don't clear the active preset.
   // FavoritePresetsDropdown sets this while applying a preset so its own
@@ -1719,11 +1726,11 @@ export function InferenceProvider({
     return [...activeHwTypes].toSorted().join(',');
   }, [activeHwTypes, selectableHwTypes, bestHwTypes, bestPerSku]);
 
-  const serializedLabelState = serializeLabelState(labelScenarioKind, {
-    showPointLabels,
-    useAdvancedLabels,
-    showLineLabels,
-  });
+  const serializedLabelState = serializeLabelState(
+    labelScenarioKind,
+    { showPointLabels, useAdvancedLabels, showLineLabels },
+    { wide: wideChart },
+  );
 
   useUrlStateSync(
     {

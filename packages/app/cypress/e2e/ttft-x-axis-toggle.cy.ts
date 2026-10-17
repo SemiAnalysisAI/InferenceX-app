@@ -158,16 +158,15 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'P90 Interactivity (tok/s/user)',
     );
 
-    // The agentic view opens like fixed-seq: line labels name each curve,
-    // and per-point parallelism chips stay off until the user asks for them.
+    // At desktop width (1280px) the agentic view opens with the full detail
+    // view: run names in coloured boxes and a parallelism chip on every point.
     expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(($labels) => {
-      const visible = [...$labels].filter((label) => label.style.opacity !== '0');
-      expect(visible, 'visible parallelism chips').to.have.length(0);
-    });
+    cy.get('[data-testid="scatter-graph"] svg .line-label .ll-bg')
+      .first()
+      .should('not.have.attr', 'fill', 'transparent');
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {
@@ -277,6 +276,33 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
+  });
+});
+
+describe('Agentic label density on a phone', () => {
+  it('opens with plain run names and no parallelism chips at 393px', () => {
+    cy.viewport(393, 852);
+    interceptAgenticData();
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?i_seq=agentic-traces', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="scatter-graph"] svg .line-label').should('have.length.at.least', 1);
+    // Names are drawn as plain text next to their lines, not boxes.
+    cy.get('[data-testid="scatter-graph"] svg .line-label .ll-bg').each(($bg) => {
+      expect($bg.attr('fill')).to.equal('transparent');
+    });
+    cy.get('[data-testid="scatter-graph"] svg').first().should(($svg) => {
+      const visible = [...$svg[0].querySelectorAll<SVGGElement>('g.parallelism-label')].filter(
+        (label) => label.style.opacity !== '0',
+      );
+      expect(visible, 'visible parallelism chips').to.have.length(0);
+    });
+    // Defaults are not written into the URL.
+    cy.location('search').should('not.contain', 'i_label').and('not.contain', 'i_advlabel');
   });
 });
 

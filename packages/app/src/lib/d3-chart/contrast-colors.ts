@@ -118,3 +118,27 @@ export function readableTextColor(color: string, background: string, minRatio = 
   const out = adjustForContrast(fg, bg, minRatio);
   return out === fg ? color : `rgb(${out[0]}, ${out[1]}, ${out[2]})`;
 }
+
+const WHITE: Rgb = [255, 255, 255];
+const INK: Rgb = [17, 17, 19];
+const rgbString = ([r, g, b]: Rgb) => `rgb(${r}, ${g}, ${b})`;
+
+/**
+ * Text colours for a label drawn inside a filled box: `primary` is white or
+ * near-black, whichever contrasts more with `background`; `secondary` is a
+ * softer tone of it for supporting text (the serving engine), still at
+ * least 4.5:1 so it reads at body size.
+ */
+export function boxTextColors(background: string): { primary: string; secondary: string } {
+  const bg = parseRgb(background);
+  if (!bg) return { primary: 'white', secondary: '#d1d5db' };
+  const { primary, secondary } = boxTextRgb(bg);
+  return { primary: rgbString(primary), secondary: rgbString(secondary) };
+}
+
+/** `boxTextColors` on parsed sRGB channels. */
+export function boxTextRgb(bg: Rgb): { primary: Rgb; secondary: Rgb } {
+  const primary = contrastRatio(WHITE, bg) >= contrastRatio(INK, bg) ? WHITE : INK;
+  const soft = primary.map((c, i) => Math.round(c * 0.75 + bg[i] * 0.25)) as Rgb;
+  return { primary, secondary: adjustForContrast(soft, bg) };
+}

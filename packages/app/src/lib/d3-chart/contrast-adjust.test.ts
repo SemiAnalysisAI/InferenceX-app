@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { adjustForContrast, contrastRatio } from './contrast-colors';
+import { adjustForContrast, boxTextRgb, contrastRatio } from './contrast-colors';
 
 // Chart backgrounds (`--card`) and series colours measured on the agentic
 // chart, converted from their OKLCH tokens to sRGB.
@@ -39,5 +39,17 @@ describe('adjustForContrast', () => {
   it('leaves a colour that already passes untouched', () => {
     const white: [number, number, number] = [255, 255, 255];
     expect(adjustForContrast(white, DARK_CARD)).toBe(white);
+  });
+});
+
+describe('box text colours', () => {
+  it('uses dark text on light boxes and white on dark boxes, both at least 4.5:1', () => {
+    for (const box of [VERA_RUBIN_LIGHT, H200_DARK, [234, 235, 236] as [number, number, number]]) {
+      const { primary, secondary } = boxTextRgb(box);
+      expect(contrastRatio(primary, box)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(secondary, box)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(boxTextRgb(VERA_RUBIN_LIGHT).primary[0]).toBeLessThan(50);
+    expect(boxTextRgb(H200_DARK).primary[0]).toBe(255);
   });
 });

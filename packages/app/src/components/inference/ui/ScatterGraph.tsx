@@ -63,7 +63,9 @@ import {
   OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
-import { readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { boxTextColors, readableTextColor } from '@/lib/d3-chart/contrast-colors';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { WIDE_CHART_QUERY } from '@/components/inference/utils/label-defaults';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -631,6 +633,8 @@ const ScatterGraph = React.memo(
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
+    // Wide screens show run names in coloured boxes (see WIDE_CHART_QUERY).
+    const wideChart = useMediaQuery(WIDE_CHART_QUERY);
     // Comparison series (`i_pcompare`) switched off from the legend. Chart-local,
     // like Optimal Only's point set: the URL carries the comparison, not which
     // of its rows a reader hid while looking.
@@ -2997,9 +3001,11 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
-            // Plain coloured run names next to their lines, not boxes over the plot.
-            appearance: 'text',
-            halo: ir.getCssColor('--card'),
+            // Wide screens have room for the run names in coloured boxes;
+            // phones get plain coloured names next to their lines so the
+            // labels do not cover the curves.
+            appearance: wideChart ? 'pill' : 'text',
+            halo: wideChart ? undefined : ir.getCssColor('--card'),
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -3012,9 +3018,13 @@ const ScatterGraph = React.memo(
                 .attr('opacity', 0.95);
             },
             configureText: (text, label) => {
-              // The name keeps its line's hue, made lighter or darker where
-              // needed to stay readable (WCAG AA) on the chart background.
-              const nameColor = readableTextColor(label.color, ir.getCssColor('--card'));
+              // Inside a box: white or near-black, whichever reads on the
+              // box's colour. As plain text: the line's hue, made lighter or
+              // darker where needed. Both meet WCAG AA (4.5:1).
+              const boxInk = wideChart ? boxTextColors(label.color) : null;
+              const nameColor =
+                boxInk?.primary ?? readableTextColor(label.color, ir.getCssColor('--card'));
+              const mutedColor = boxInk?.secondary ?? ir.getCssColor('--muted-foreground');
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
               // Parse the hardware part without the variant suffix, which gets
               // its own segment so the engine is still matched at the end.
@@ -3048,7 +3058,7 @@ const ScatterGraph = React.memo(
                     {
                       className: 'll-run',
                       text: runTag,
-                      fill: ir.getCssColor('--muted-foreground'),
+                      fill: mutedColor,
                       weight: '400',
                     },
                   ]
@@ -3075,7 +3085,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: ir.getCssColor('--muted-foreground'),
+                            fill: mutedColor,
                             weight: '400',
                           },
                         ]
@@ -3817,6 +3827,7 @@ const ScatterGraph = React.memo(
       allPointLabelsByKey,
       showGradientLabels,
       showLineLabels,
+      wideChart,
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
