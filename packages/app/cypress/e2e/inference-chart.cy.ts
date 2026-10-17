@@ -926,6 +926,14 @@ describe('Staged Pareto deep links', () => {
   });
 });
 
+function expectGpuSelection(gpus: string[], checked: boolean) {
+  for (const gpu of gpus) {
+    cy.get(`[data-testid="chart-legend"] input[id^="checkbox-${gpu}_"]`)
+      .should('have.length.at.least', 1)
+      .each(($input) => cy.wrap($input).should(checked ? 'be.checked' : 'not.be.checked'));
+  }
+}
+
 describe('Qwen3.5 chart defaults', () => {
   const olderGpus = ['mi300x', 'mi325x', 'h100', 'h200'];
   const newerGpus = ['mi355x', 'b200'];
@@ -957,14 +965,6 @@ describe('Qwen3.5 chart defaults', () => {
       })),
     ),
   );
-
-  function expectGpuSelection(gpus: string[], checked: boolean) {
-    for (const gpu of gpus) {
-      cy.get(`[data-testid="chart-legend"] input[id^="checkbox-${gpu}_"]`)
-        .should('have.length.at.least', 1)
-        .each(($input) => cy.wrap($input).should(checked ? 'be.checked' : 'not.be.checked'));
-    }
-  }
 
   beforeEach(() => {
     cy.intercept('GET', '/api/v1/availability*', {
