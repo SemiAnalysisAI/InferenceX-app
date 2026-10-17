@@ -45,6 +45,10 @@ are stateless: omit `best` for the default ranking, or send `best=false` explici
 for each model to retain all selected series. Do not infer a destination model's
 default from a manual engine selection made on another model.
 
+Qwen3.5 defaults to `xmode=e2e` and excludes MI300X, MI325X, H100, and H200
+when `gpus` is omitted. An explicit `xmode` or `gpus` overrides its model default;
+use `gpus=` to include all hardware.
+
 Example URLs (check deployed availability before use):
 
 ```text
