@@ -1,5 +1,6 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import VideoDashboard from '@/components/video-benchmark/VideoDashboard';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 
 // Retained H100/H200/B200 C1/C2/C4 observations (cypress/fixtures/api/video-history.json).
 function mount(pathname = '/video', search = '') {
@@ -305,6 +306,40 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('mi355x').find('[data-testid="video-kpi-unavailable"]').should('exist');
     cy.get('[data-testid="video-idle-note"]').should('have.text', IDLE_NOTE);
   });
+  for (const width of [1440, 390]) {
+    it(`keeps unknown allocation readable in cards and history at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
+        for (const entry of page.entries)
+          for (const source of entry.sources)
+            for (const observation of source.observations) observation.allocated = null;
+        cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('allocation');
+      });
+      cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+      cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+      cy.window().then((win) =>
+        win.history.replaceState(null, '', `${win.location.pathname}?history-hardware=H200`),
+      );
+      cy.mount(
+        <PathnameContext.Provider value="/video">
+          <VideoDashboard />
+        </PathnameContext.Provider>,
+      );
+      cy.wait('@allocation');
+      kpi('h200').should('contain', '4 of — GPUs').and('contain', '5.97');
+      cy.get('[data-testid="video-idle-note"]').should('not.exist');
+      cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
+      cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+      cy.get('[data-testid="video-history"] input').clear().type('71de97b264b0');
+      cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+      cy.get('[data-testid="video-history-observation"]').first().should('contain', 'n=4');
+      cy.get('[data-testid="video-history-power"]').should('contain', 'Measured');
+      cy.get('[data-testid="video-history"]').should(($history) => {
+        expect($history[0].getBoundingClientRect().width).to.be.at.most(width);
+      });
+      cy.screenshot(`video-unknown-allocation-${width}`);
+    });
+  }
   it('states each published source’s GPU power verdict in the history list', () => {
     // Native srt-slurm sources record power_verified; retained supervisor sources do not.
     cy.fixture('api/video-history.json').then((page) => {

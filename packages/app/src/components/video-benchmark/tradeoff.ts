@@ -295,8 +295,7 @@ function servingTradeoffPoints(run: TradeoffRun) {
         text(at(item.run, 'configuration', 'runtime_revision')),
       concurrency: item.concurrency,
       boundary: text(boundary),
-      // srt-slurm plans telemetry for every GPU the job holds, so the expected count is the allocation.
-      allocated: allocated ?? (native ? positive(at(item.power, 'expected_gpu_count')) : null),
+      allocated,
       participating: uuids.length > 0 && new Set(uuids).size === uuids.length ? uuids.length : null,
       replicas: positive(at(b.result, 'execution', 'deployment', 'replica_count')),
       energy:

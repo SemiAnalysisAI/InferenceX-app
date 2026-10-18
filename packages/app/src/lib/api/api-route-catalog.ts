@@ -1295,6 +1295,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/video-benchmark/tradeoff.ts',
+    sourceSha256: '7d41923b24813a8c5d511c964bf86d9360ee9bc3fa6047bac575c21208f01af9',
+    reviewArea: {
+      en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
+      zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',
+    },
+  },
+  {
     source: 'src/components/video-benchmark/history.ts',
     sourceSha256: 'c57714065521100046c4d9e452f1890b41ba73d1f857aa12e7f8903dba46d778',
     reviewArea: {
