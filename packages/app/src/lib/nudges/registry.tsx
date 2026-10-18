@@ -15,6 +15,7 @@ import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
+import { GoogleIcon } from '@/components/ui/google-icon';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
@@ -276,8 +277,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     priority: 50,
     scope: 'landing',
     content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
+      icon: GoogleIcon,
       title: 'TPUv7 prelimary results across multiple models',
       titleZh: 'TPUv7 多模型初步结果',
       description: 'AgentX Preview Submissions',

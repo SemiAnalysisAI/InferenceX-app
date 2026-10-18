@@ -249,6 +249,8 @@ html[data-inferencex-embed] .autumn-leaves {
      font-size and inherited line-height, and dense tables depend on that. */
   --text-2xs: 0.6875rem; /* 11px */
   --text-3xs: 0.625rem; /* 10px */
+  --text-dialog-title: 1.375rem; /* 22px */
+  --text-dialog-title--line-height: 1.875rem; /* 30px */
 
   /* Named letter-spacing for the recurring uppercase-eyebrow and
      tightened-heading recipes. */
