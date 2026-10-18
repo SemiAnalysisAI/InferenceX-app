@@ -593,6 +593,10 @@ describe('getFrameworkLabel', () => {
     expect(getFrameworkLabel('mori-sglang')).toBe('MoRI SGLang');
   });
 
+  it('maps "vllm-disagg" to "MoRI vLLM"', () => {
+    expect(getFrameworkLabel('vllm-disagg')).toBe('MoRI vLLM');
+  });
+
   it('maps "atom" to its label string', () => {
     expect(getFrameworkLabel('atom')).toBe('ATOM¹');
   });

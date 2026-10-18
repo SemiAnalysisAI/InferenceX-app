@@ -361,6 +361,11 @@ returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
 Keep using `mori-sglang` for API selectors and raw CSV output throughout.
 This display-only exception changes no API data or OpenAPI contract.
 
+`MoRI vLLM` is the display label for `vllm-disagg` in charts and read-only
+views. Keep using `vllm-disagg` as the raw framework key and
+`mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
+stored data or API selectors.
+
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
