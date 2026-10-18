@@ -144,6 +144,51 @@ function showLaunchModal(win: Cypress.AUTWindow) {
 }
 
 describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
+  for (const prefix of ['', '/zh']) {
+    for (const width of [1280, 375]) {
+      it(`centers each button row and loads model logos at ${width}px on ${prefix || '/'}`, () => {
+        cy.viewport(width, 812);
+        cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
+        cy.get('[data-testid="launch-modal"]')
+          .should('be.visible')
+          .then(($modal) => {
+            const modal = $modal[0];
+            const panel = modal.getBoundingClientRect();
+            const rows = new Map<number, DOMRect[]>();
+            modal.querySelectorAll('button[data-testid]').forEach((button) => {
+              const rect = button.getBoundingClientRect();
+              const top = Math.round(rect.top);
+              rows.set(top, [...(rows.get(top) ?? []), rect]);
+            });
+            expect(modal.querySelectorAll('button[data-testid]')).to.have.length(3);
+            for (const row of rows.values()) {
+              const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
+              const right = panel.right - Math.max(...row.map((rect) => rect.right));
+              expect(left).to.be.greaterThan(0);
+              expect(
+                Math.abs(left - right),
+                'equal space on both sides of each row',
+              ).to.be.lessThan(2);
+            }
+          });
+        for (const [action, logo] of [
+          ['action', 'qwen-color.svg'],
+          ['secondary-action', 'kimi-color.svg'],
+        ]) {
+          cy.get(`[data-testid="launch-modal-${action}"] img`)
+            .should('have.attr', 'src', `/logos/${logo}`)
+            .and('have.attr', 'alt', '')
+            .and('have.attr', 'aria-hidden', 'true')
+            .and('be.visible')
+            .should(($img) => {
+              expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+            });
+          cy.get(`[data-testid="launch-modal-${action}"] svg`).should('not.exist');
+        }
+      });
+    }
+  }
+
   it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
     interceptTpuLaunchData();
     cy.visit('/', { onBeforeLoad: showLaunchModal });
