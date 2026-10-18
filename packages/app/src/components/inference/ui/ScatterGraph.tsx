@@ -11,7 +11,6 @@ import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import {
   useInferenceActions,
@@ -3802,10 +3801,6 @@ const ScatterGraph = React.memo(
 
         avoidPointLabelCollisions(zoomGroup);
 
-        // Tell the nudge engine the chart has painted, so an anchored coach
-        // mark can retry resolving a point to point at. This fires once per
-        // full render, never per zoom frame.
-        window.dispatchEvent(new CustomEvent(SCATTER_RENDERED_EVENT));
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
