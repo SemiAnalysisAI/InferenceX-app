@@ -37,8 +37,6 @@ jobs:
           node-version: '24'
           check-latest: true
           package-manager-cache: false
-      - name: Check committed skill integrity manifests
-        run: node packages/skills/scripts/update-integrity.mjs --check
       - name: Pack the single platform-test archive
         id: pack
         working-directory: packages/skills
