@@ -130,11 +130,11 @@ Cypress.on('fail', (err) => {
       (c) => `${c.tagName}#${c.id}.${String(c.className).slice(0, 20)}`,
     ),
     overlays: [...doc.querySelectorAll('div.fixed.inset-0')].map(
-      (o) => `${desc(o)} state=${o.dataset.state} parent=${desc(o.parentElement)}`,
+      (o) => `${desc(o)} state=${o.getAttribute("data-state")} parent=${desc(o.parentElement)}`,
     ),
     dialogs: [...doc.querySelectorAll('[role=dialog],[role=alertdialog]')].map((d) => {
       const r = d.getBoundingClientRect();
-      return `${desc(d)} state=${d.dataset.state} rect=${r.top | 0},${r.left | 0},${r.bottom | 0},${r.right | 0} sh=${d.scrollHeight} ch=${d.clientHeight} st=${(d as HTMLElement).scrollTop} op=${win.getComputedStyle(d).opacity} anims=${d.getAnimations().length}`;
+      return `${desc(d)} state=${d.getAttribute("data-state")} rect=${r.top | 0},${r.left | 0},${r.bottom | 0},${r.right | 0} sh=${d.scrollHeight} ch=${d.clientHeight} st=${(d as HTMLElement).scrollTop} op=${win.getComputedStyle(d).opacity} anims=${d.getAnimations().length}`;
     }),
     done: done.map((b) => {
       const r = b.getBoundingClientRect();
