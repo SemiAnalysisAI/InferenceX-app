@@ -4,7 +4,7 @@
  * Kept free of DOM APIs so the placement rules are unit-testable: callers pass
  * plain rects measured with `getBoundingClientRect()` and get viewport
  * coordinates back. The DOM-facing half — which element to point at — lives
- * next to each nudge (see `agentic-point-coach-mark.ts`).
+ * in the nudge's anchor resolver.
  */
 
 export interface AnchorRect {
