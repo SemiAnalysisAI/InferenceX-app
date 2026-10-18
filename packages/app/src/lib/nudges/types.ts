@@ -110,6 +110,8 @@ export interface NudgeContent {
   /** Label for the dismiss button (default "Maybe Later"). */
   dismissLabel?: string;
   dismissLabelZh?: string;
+  /** Hide the footer dismiss button; the close control and Escape remain available. */
+  hideDismissButton?: boolean;
   /** Label + handler for the primary CTA (modals only). */
   primaryAction?: NudgeAction;
   /** Optional second CTA, rendered after the primary action (modals only). */

@@ -289,8 +289,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       centered: true,
       badge: 'New',
       badgeZh: '最新',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
+      hideDismissButton: true,
       primaryAction: {
         label: 'Qwen3.5',
         labelZh: 'Qwen3.5',
