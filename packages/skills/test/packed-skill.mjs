@@ -7,8 +7,6 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { after, before } from 'node:test';
 
-import { checkIntegrity } from '../scripts/update-integrity.mjs';
-
 export const packageRoot = resolve(import.meta.dirname, '..');
 export const packageInfo = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'));
 
@@ -69,8 +67,9 @@ export function packedSkillSuite() {
     return join(cwd, target === 'codex' ? '.agents' : '.claude', 'skills/inferencex-api');
   }
   const suite = { temporaryRoot, environment, project, node, run, query, install };
-  before(async () => {
-    await checkIntegrity();
+  // Downstream setup hooks consume the archive synchronously.
+  before(() => {
+    succeeded(node([join(packageRoot, 'scripts/update-integrity.mjs'), '--check']));
     const suppliedArchive = process.env.INFERENCEX_SKILLS_ARCHIVE;
     const suppliedHash = process.env.INFERENCEX_SKILLS_ARCHIVE_SHA256;
     assert.equal(
