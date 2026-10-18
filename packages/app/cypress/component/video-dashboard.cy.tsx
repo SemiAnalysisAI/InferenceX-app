@@ -316,7 +316,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
     mount();
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
-        'Workload1344 × 768 · 8 s · 24 fps · 50 steps',
+        // The native H200 run (#39002901777) measures a 4 s plan with four clips per cell, so it stays a hidden workload.
+        'Workload1344 × 768 · 8 s · 24 fps · 50 steps (1 other workloads hidden)',
         'Deployment4 GPU · TP2 × Ulysses 2',
       ]);
     });
@@ -558,6 +559,34 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('mi355x').find('[data-testid="video-kpi-unavailable"]').should('exist');
     cy.get('[data-testid="video-idle-note"]').should('have.text', IDLE_NOTE);
   });
+  it('states each published source’s GPU power verdict in the history list', () => {
+    // Native srt-slurm sources record power_verified; retained supervisor sources do not.
+    cy.fixture('api/video-history.json').then((page) => {
+      page.entries[0].sources[0].powerVerified = true;
+      page.entries[2].sources[0].powerVerified = false;
+      cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('verdicts');
+    });
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+    cy.window().then((win) =>
+      win.history.replaceState(null, '', `${win.location.pathname}?history-query=`),
+    );
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@verdicts');
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+    cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
+      expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal([
+        '· GPU power: Measured',
+        '· GPU power: Not measured',
+        // The retained native H200 run records its own verdict.
+        '· GPU power: Measured',
+      ]);
+    });
+  });
   it('renders Chinese copy on /zh/video', () => {
     mount('/zh/video');
     cy.get('[data-testid="video-chart-card"]')
@@ -578,7 +607,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', 'kJ / 条视频');
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
-        '工作负载1344 × 768 · 8 s · 24 fps · 50 steps',
+        '工作负载1344 × 768 · 8 s · 24 fps · 50 steps（另有 1 个工作负载未显示）',
         '部署4 张 GPU · TP2 × Ulysses 2',
       ]);
     });

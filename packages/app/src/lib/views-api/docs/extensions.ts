@@ -1,10 +1,17 @@
-import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiResponse,
+  ApiSchema,
+} from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
-import { text } from '@/lib/api-documentation-helpers';
+import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 import {
   videoPointSchema,
+  videoProducerSchema,
+  videoReleaseCoverageSchema,
   videoQualitySelectionSchema,
   videoRowsSchema,
   videoServingEvidenceSchema,
@@ -13,6 +20,16 @@ import {
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
 const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
+const imageAgePoint: ApiSchema = {
+  type: 'object',
+  properties: {
+    date: { type: 'string', format: 'date' },
+    p90AgeDays: { type: ['integer', 'null'], minimum: 0 },
+    configurationCount: { type: 'integer', minimum: 0 },
+  },
+  required: ['date', 'p90AgeDays', 'configurationCount'],
+  additionalProperties: false,
+};
 
 /** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
@@ -29,8 +46,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '快照截止日期，格式为 YYYY-MM-DD。指定 runId 时改为读取该次运行的逻辑快照。',
   ],
   runId: [
-    'Positive safe integer workflow run ID. Omit to select the default run; required for live GPU metrics.',
-    '正安全整数格式的工作流运行 ID。不填时选择默认运行；实时 GPU 指标必须填写。',
+    'Positive safe integer workflow run ID. Omit to select the default run; required for GPU metrics.',
+    '正安全整数格式的工作流运行 ID。不填时选择默认运行；GPU 指标必须填写。',
   ],
   precisions: [
     'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays.',
@@ -65,8 +82,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -91,6 +108,14 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   config: [
     'Exact cache-reuse configuration key from configurations. Omit for the shared dashboard default.',
     'configurations 中的缓存复用配置键。省略时采用仪表板默认配置。',
+  ],
+  recipe: [
+    'Exact key from data.recipes (dashboard c_recipe). Missing or unknown keys select the recipe with the most tiered rows, then most rows, then label; overlays supply choices only without official rows. params.recipe reports the resolved key.',
+    'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
+  ],
+  cacheHitMode: [
+    'actual or theoretical (default, displayed as Theroticial Roofline). Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace, falling back to the measured rate when unavailable.',
+    'actual 或 theoretical（默认，界面显示为 Theroticial Roofline）。Actual 使用基准测试中服务端实测的 cache 命中率；theoretical 使用 trace 计算的无限缓存理论命中率，缺失时回退到实测值。',
   ],
   customCosts: [
     'JSON object from base hardware keys to finite nonnegative USD/chip-hour values, at most 100 entries.',
@@ -129,12 +154,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default), modeled or compare. Modeled power requires eligible measured source rows; estimates extrapolated from partial-GPU measurements to a full chassis are identified by powerLabel. Missing coverage is not zero.',
-    'provisioned（默认）、modeled 或 compare。建模功耗需要符合条件的实测数据行；由部分 GPU 的实测数据外推到整机的估算，会通过 powerLabel 标明。缺失数据不按零处理。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. For GW-year estimates, modeled filters source points to valid system-power inputs before building the curve at the same target, without extrapolation or historical substitution. compare uses identical valid-curve throughput for paired budgets; when no valid curve reaches the target, it retains the original provisioned estimate. provisioned-only keeps the original performance curve. All in Measured adds modeled components and PUE to measured inputs; it is not measured wall power. NVL72 rows need validated GPU telemetry; each compute tray takes an equal share of a modeled liquid-cooled rack, with measured Grace-socket power when the row has complete validated socket telemetry (CPU-rail-only and module-sensor readings are not accepted) and modeled Grace power otherwise. Both interpolation knots must share a power basis. powerSource records topology (chassis or nvl72-tray), cpu (measured or modeled), PUE and the pinned power-model revision. powerLabel marks paired estimates and full-chassis extrapolation; skipped reasons preserve missing coverage.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。按 GW 年估算时，modeled 先筛选满足系统功耗要求的数据点，再在同一目标值上构建曲线，不外推，也不借用历史数据。compare 的两种功耗方案使用同一条有效曲线的吞吐量；没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时仍沿用原性能曲线。整体实测功耗在实测输入上叠加组件估算和 PUE，并非墙上电表读数。NVL72 需要通过验证的 GPU 遥测，每个计算 tray 平均分摊建模液冷机架的功耗；带有完整且通过验证的 Grace socket 遥测时使用实测 Grace 功耗（不接受仅有 CPU rail 或模块传感器的读数），否则使用 Grace 功耗估算值。插值的两个数据点须采用相同功耗口径。powerSource 记录拓扑（chassis 或 nvl72-tray）、cpu（measured 或 modeled）、PUE 和固定的功耗模型版本；powerLabel 标明配对估算和整机外推，skipped 保留覆盖缺失原因。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',
     '以逗号分隔的 certified、legacy 功率数据等级。省略时选择全部等级。',
+  ],
+  topologies: [
+    'Comma-separated exact topology keys from the Dashboard topology selector or view point topologyKey. Filters allocation and parallelism without filtering concurrency; omitted means all. Preserve the keys verbatim. Unknown keys return no matching points.',
+    '逗号分隔的精确拓扑键，取自仪表盘拓扑选择器或数据点的 topologyKey。按 GPU 分配和并行配置筛选，保留全部已测并发；省略时不限制拓扑。原样使用这些键，未知键不会匹配数据点。',
   ],
   allPoints: [
     'Boolean, default false. Include points clipped by dashboard limits; optimal and best still apply independently.',
@@ -147,6 +176,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   asOf: [
     'Reference date YYYY-MM-DD for reproducible rolling reliability or image-age calculations.',
     '用于复现滚动可靠性或镜像日期差计算的参考日期 YYYY-MM-DD。',
+  ],
+  includeHistory: [
+    'true or false (default). Include 90 daily UTC image-age points ending on asOf, with nearest-rank p90AgeDays and configurationCount. Uses successful image-bearing submissions, an older seed per configuration, and current model/scenario retirement rules. Missing p90 is null; no future observations are backfilled. All image filters apply. This is submission age, not container build age.',
+    'true 或 false（默认）。返回截至 asOf 的 90 个 UTC 日期点，包含最近秩法计算的 p90AgeDays 和 configurationCount。使用带镜像的成功提交、每个配置在窗口前的最近记录，以及当前的模型和场景停用规则。无数据时 p90 为 null，不用未来记录向前回填。所有镜像筛选条件均适用。此指标是提交年龄，不是镜像构建年龄。',
   ],
   runs: [
     'Ordered comma-separated run IDs, at most eight. Omit for newest measured run; empty value selects none.',
@@ -235,8 +268,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '各视图对应的指标键。OperatorX 支持 tflops、latency；GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
   ],
   artifact: [
-    'GPU metric artifact name, or video numeric artifact ID paired with run.',
-    'GPU 指标产物名称，或配合 run 使用的视频数字产物 ID。',
+    'GPU metric artifact name, or <artifact>/<file> for multi-file artifacts, as returned in artifacts[]. For video, a numeric artifact ID paired with run.',
+    'GPU 指标使用 artifacts[] 返回的产物名称；一个产物含多个文件时，格式为 <artifact>/<file>。视频使用数字产物 ID，需配合 run。',
   ],
   chartView: [
     'chart (default) or correlation. Both return unsampled source rows.',
@@ -247,12 +280,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '相关性图 x 轴 GPU 指标，默认 power。',
   ],
   corrYMetric: [
-    'Correlation y-axis GPU metric, default temperature.',
-    '相关性图 y 轴 GPU 指标，默认 temperature。',
+    'Correlation y-axis GPU metric. Defaults to temperature when the artifact sampled it, otherwise to the first collected metric other than corrXMetric; without one the correlation is empty. An explicit metric is used even when unsampled, giving an empty correlation.',
+    '相关性图 y 轴 GPU 指标。默认 temperature；若该产物未采集温度，则改用 corrXMetric 以外第一个已采集的指标，没有此类指标时相关性数据为空。显式指定的指标即使未采集也照常使用，此时相关性数据为空。',
   ],
   downsample: [
-    'Boolean, default true; declares the UI 2000-interactive-point rendering cap. Returned raw rows and statistics are never sampled.',
-    '布尔值，默认 true，指定界面 2000 个交互点的渲染上限。返回的原始行和统计量不降采样。',
+    'Boolean, default true; sets the renderer hint maxInteractivePoints to 2000, or null when false. Returned raw rows and statistics are never sampled.',
+    '布尔值，默认 true；将渲染提示 maxInteractivePoints 设为 2000，false 时为 null。返回的原始行和统计量不降采样。',
   ],
   sort: [
     'Table sort column; submissions defaults to date, GPU statistics to gpuIndex.',
@@ -288,8 +321,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '镜像视图硬件键，去除首尾空白、不区分大小写，默认 all。',
   ],
   nodeType: [
-    'Image deployment: single (default), disagg or all.',
-    '镜像部署类型：single（默认）、disagg 或 all。',
+    'Image deployment: all (default), single or disagg.',
+    '镜像部署类型：all（默认）、single 或 disagg。',
   ],
   frameworks: [
     'Comma-separated framework-family keys; omitted selection includes all.',
@@ -336,6 +369,14 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON object mapping video point IDs to {hourly,source,date} strings; hourly is nonnegative USD/deployment-hour.',
     'JSON 对象，将视频数据点 ID 映射为 {hourly,source,date} 字符串；hourly 为非负 USD/deployment-hour。',
   ],
+  gpu: [
+    'GPU key, e.g. "H100 SXM"; default first available GPU. "all" returns every GPU.',
+    'GPU 键，如 "H100 SXM"；默认首个可用 GPU。设为 "all" 返回全部 GPU。',
+  ],
+  test: [
+    'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, or all (default). Determines which benchmark data is returned.',
+    'ubenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline 或 all（默认），决定返回哪种基准测试数据。',
+  ],
   view: [
     'Video dashboard (default without run/artifact), compare (dashboard plus published matched-case records), or legacy discovery/results/tradeoff. run/artifact defaults to results. Dashboard v_* and legacy selectors cannot be mixed.',
     '视频 dashboard（未指定 run/artifact 时默认）、compare（仪表板及已发布匹配用例记录），或原有 discovery/results/tradeoff。指定 run/artifact 时默认 results。v_* 仪表板选择项不能与原有参数混用。',
@@ -381,12 +422,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '以逗号分隔的隐藏硬件键，仅接受视频硬件列表中的键；默认空，排序去重，忽略未知键。只筛选图表和表格，不改变 KPI、Compare 或 Evidence。',
   ],
   v_base: [
-    'Baseline hardware key; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment).',
-    '基线硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。',
+    'Baseline hardware key (legacy) or hardware:engine:revision for a producer-sealed engine; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '基线硬件键（旧链接）或生产端已封存的 hardware:engine:revision；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。两侧始终为不同硬件或引擎配置：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_cand: [
-    'Candidate hardware key; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment).',
-    '候选硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。',
+    'Candidate hardware key (legacy) or hardware:engine:revision for a producer-sealed engine; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '候选硬件键（旧链接）或生产端已封存的 hardware:engine:revision；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。两侧始终为不同硬件或引擎配置：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_case: [
     'Zero-based matched-case index, 0–9999 (default 0). view=compare clamps it to the available pairs and returns cases.resolvedCaseIndex; dashboard leaves media not-requested.',
@@ -395,10 +436,16 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
 };
 
 export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
-  const note = PARAMETER_NOTES[name] ?? [
-    `${name} selector for ${view}; resolved value is returned in params.`,
-    `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
-  ];
+  const note: readonly [string, string] =
+    view === 'current-inferencex-image' && name === 'sequence'
+      ? ([
+          'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
+          '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
+        ] as const)
+      : (PARAMETER_NOTES[name] ?? [
+          `${name} selector for ${view}; resolved value is returned in params.`,
+          `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
+        ]);
   return {
     name,
     location: 'query',
@@ -418,7 +465,29 @@ const NEW_VIEWS = {
   'cache-reuse': [
     'Cache-reuse curves',
     '缓存复用曲线',
-    { configurations: object, data: { type: ['object', 'null'], additionalProperties: true } },
+    {
+      configurations: object,
+      data: {
+        type: ['object', 'null'],
+        additionalProperties: true,
+        properties: {
+          recipe: { type: ['string', 'null'] },
+          recipes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                key: { type: 'string' },
+                label: { type: 'string' },
+                rows: { type: 'integer' },
+                tiered: { type: 'integer' },
+              },
+              required: ['key', 'label', 'rows', 'tiered'],
+            },
+          },
+        },
+      },
+    },
   ],
   'profit-estimator': [
     'Profit per chip-hour',
@@ -433,7 +502,15 @@ const NEW_VIEWS = {
   collectivex: [
     'CollectiveX EP, KV and swap views',
     'CollectiveX EP、KV 与 swap 视图',
-    { runs: objects, ep: object, kv: object, swap: object, options: object },
+    {
+      runs: objects,
+      ep: object,
+      kv: object,
+      swap: object,
+      options: object,
+      knownSupport: object,
+      knownSupportFootnotes: object,
+    },
   ],
   submissions: [
     'Submission table and weekly volume',
@@ -443,18 +520,45 @@ const NEW_VIEWS = {
   'current-inferencex-image': [
     'Current serving images',
     '当前推理镜像',
-    { rows: objects, options: object },
+    {
+      rows: objects,
+      options: object,
+      releases: object,
+      ageSummary: imageAgePoint,
+      ageHistory: { type: 'array', items: imageAgePoint },
+      ageMethodology: object,
+    },
   ],
   'gpu-metrics': [
-    'Live GPU metrics and statistics',
-    '实时 GPU 指标与统计',
-    { runInfo: object, artifacts: strings, rows: objects, stats: objects, rendering: object },
+    'GPU telemetry and full-record statistics',
+    'GPU 遥测与全记录统计',
+    {
+      runInfo: object,
+      artifacts: strings,
+      coverage: {
+        type: ['object', 'null'],
+        properties: {
+          status: { type: 'string', enum: ['complete', 'partial', 'unknown'] },
+          missingArtifacts: strings,
+        },
+        required: ['status', 'missingArtifacts'],
+        additionalProperties: false,
+      },
+      rows: objects,
+      stats: {
+        ...objects,
+        description:
+          'Per-GPU statistics for the selected file/host series, including startup and warmup. For stored runs they are computed on each read from the stored samples: a missing reading stays missing, and a series whose stored samples do not match its recorded sample count returns no statistics. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit; rows carry no metric field, since params.metric identifies it. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
+      },
+      rendering: object,
+    },
   ],
   video: [
     'VideoGenX dashboard and published comparison evidence',
     'VideoGenX 仪表板与已发布对比证据',
     {
       cells: { type: 'array', items: videoPointSchema },
+      releaseCoverage: videoReleaseCoverageSchema,
       quality: videoQualitySelectionSchema,
       serving: videoServingEvidenceSchema,
       metricDefinitions: object,
@@ -472,6 +576,7 @@ const NEW_VIEWS = {
               items: {
                 ...object,
                 properties: {
+                  producer: videoProducerSchema,
                   model: {
                     type: ['string', 'null'],
                     description:
@@ -502,6 +607,11 @@ const NEW_VIEWS = {
       discovery: object,
     },
   ],
+  ubenchx: [
+    'ubenchX microbenchmarks (mem-bw, sm-l2-distance, and tpc-skyline)',
+    'ubenchX 微基准测试（mem-bw、sm-l2-distance 和 tpc-skyline）',
+    { gpus: objects, tests: strings, memBw: object, smL2Distance: object, tpcSkyline: object },
+  ],
 } as const;
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
@@ -516,17 +626,21 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
       description: text(
         `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${
           view === 'video'
-            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor for charts. serving retains every loaded planned cell, including zero-attempt failures, before chart/workload/hardware/quality filters; its counts preserve nulls and qualitySloGoodput stays unavailable without joint request evidence. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
-            : view === 'gpu-metrics'
-              ? ' Live artifact reads are no-store; statistics use all chips and unsampled values, while chart rows respect selected GPU indices.'
-              : ''
+            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reports the H3/Wan × SGLang/vLLM-Omni coverage of loaded sources and sealed producer identity. Technical deltas require matching model revision, selected plan and generation settings; missing quality blocks quality-normalized claims only. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
+            : view === 'current-inferencex-image'
+              ? ' ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from successful image-bearing submissions with the current active catalog. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age.'
+              : view === 'gpu-metrics'
+                ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Stored coverage describes the entire run: complete means the recorded artifact/file inventory is present, partial means recorded telemetry is missing, and unknown means no complete inventory was retained; missingArtifacts names entirely missing artifacts and may be empty when only a file is incomplete. GitHub coverage is null (unassessed). Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Statistics cover every chip of the selected file/host series, including startup and warmup, and are computed from its samples on each read; a stored series whose samples do not match its recorded sample count returns none. Mean is sample-weighted, P50/P95/P99 interpolate linearly at p*(N-1), and standard deviation divides by N. These statistics are not serving-window power or J/token. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings. This endpoint projects the raw GPU-metrics explorer, not the inference Power Timeline. Timeline role/window evidence comes from its existing series=power read plus benchmark power_audit. Timeline i_ptaxis, i_ptlines, i_ptwindow, i_ptfocus, i_ptutility and i_ptconc share fields control client rendering only and are not accepted here; they do not change raw telemetry or full-record statistics.'
+                : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
           view === 'video'
-            ? ' 默认 dashboard 模式复用已发布历史 → videoPoints → dashboardCells → metrics/plot/compare/evidence。与界面一样最多读取前五页历史，返回覆盖范围和截断状态，选择一个 canonical workload 并应用相同样本门槛。serving 在图表、工作负载、硬件和质量筛选之前保留每个已加载的计划 cell，包括零尝试失败；计数保留未知值，没有逐请求联合证据时 qualitySloGoodput 保持不可用。v_hidden 只影响图表和表格。view=compare 额外读取最多两份已发布媒体产物，复用界面配对函数，仅返回相对媒体路径，不返回 asset URL；媒体缺失或读取失败会明确标记。run/artifact 或显式 discovery/results/tradeoff 保留原有契约。不代表日期区间、完整历史、功率/质量验收或瓶颈因果判断。不读取本地数据包或任意 URL。响应不缓存。'
-            : view === 'gpu-metrics'
-              ? ' 实时产物读取不缓存；统计量使用所有芯片的未降采样值，图表行则按芯片索引筛选。'
-              : ''
+            ? ' 默认 dashboard 模式复用已发布历史 → videoPoints → dashboardCells → metrics/plot/compare/evidence。与界面一样最多读取前五页历史，返回覆盖范围和截断状态，选择一个 canonical workload 并应用相同样本门槛。v_hidden 只影响图表和表格。view=compare 额外读取最多两份已发布媒体产物，复用界面配对函数，仅返回相对媒体路径，不返回 asset URL；媒体缺失或读取失败会明确标记。run/artifact 或显式 discovery/results/tradeoff 保留原有契约。发现列表包括标准 run-sweep 运行，其中可能没有视频产物。单次运行的产物列表读取 GitHub 全部分页，兼容旧名称和原生矩阵的唯一名称。不代表日期区间、完整历史、功率/质量验收或瓶颈因果判断。不读取本地数据包或任意 URL。响应不缓存。'
+            : view === 'current-inferencex-image'
+              ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于带镜像的成功提交和当前有效模型目录重建 90 个每日 ageHistory 点。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。'
+              : view === 'gpu-metrics'
+                ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。数据库 coverage 描述整个 run：complete 表示记录的产物与文件清单均已入库，partial 表示部分已记录的遥测缺失，unknown 表示未保留完整清单；missingArtifacts 仅列出整体缺失的产物；若只是文件不完整，此列表可能为空。GitHub 数据的 coverage 为 null，表示尚未评估。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选芯片索引筛选。统计则覆盖所选文件或主机序列的全部芯片，包含启动阶段和 warmup，每次读取时由该序列的样本计算；若已存序列读取到的样本数与记录不符，则不返回统计。均值按样本加权，P50/P95/P99 在 p*(N-1) 处线性插值，标准差以 N 为分母。这些统计不是 serving-window 功率或 J/token。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。本接口投影原始 GPU-metrics 浏览器，不是推理页的 Power Timeline。时间线通过现有 series=power 读取和基准测试 power_audit 获取角色与窗口证据；i_ptaxis、i_ptlines、i_ptwindow、i_ptfocus、i_ptutility 和 i_ptconc 分享字段仅控制客户端显示，本接口不接受这些参数。它们不改变原始遥测或全记录统计。'
+                : ''
         }`,
       ),
       audience: 'public',

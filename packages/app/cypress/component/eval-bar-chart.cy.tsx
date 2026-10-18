@@ -2,9 +2,9 @@ import EvalBarChartD3 from '@/components/evaluation/ui/BarChartD3';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { mountWithProviders } from '../support/test-utils';
 import { createMockEvaluationChartData } from '../support/mock-data';
-import { Model, Precision } from '@/lib/data-mappings';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { overlayRunColor } from '@/lib/overlay-run-style';
+import { Model, Precision } from '@/lib/catalog/data-mappings';
+import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 
 describe('EvalBarChartD3', () => {
   it('omits default DP in table cells while preserving DP8 and physical chip counts', () => {
@@ -180,27 +180,6 @@ describe('EvalBarChartD3', () => {
 
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend li').should('have.length', 2);
-  });
-
-  it('Show Labels switch is present in the legend', () => {
-    const mockData = [createMockEvaluationChartData()];
-    mountWithProviders(
-      <div style={{ width: 900, height: 700 }}>
-        <EvalBarChartD3 />
-      </div>,
-      {
-        evaluation: {
-          chartData: mockData,
-          unfilteredChartData: mockData,
-          loading: false,
-          error: null,
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('Show Labels').should('exist');
-    cy.contains('High Contrast').should('exist');
   });
 
   for (const includeOfficial of [false, true]) {

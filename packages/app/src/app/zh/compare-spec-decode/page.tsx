@@ -9,20 +9,20 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
-} from '@/lib/compare-variant-availability';
-import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { formatModelListZh } from '@/lib/compare-ssr-zh';
+} from '@/lib/compare/compare-variant-availability';
+import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
+import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import {
   canonicalSpecDecodeCompareSlug,
   precisionDisplayLabel,
   specMethodDisplayLabel,
-} from '@/lib/compare-variant-slug';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-variant-slug';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 export const dynamic = 'force-dynamic';
 

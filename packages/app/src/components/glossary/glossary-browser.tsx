@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Search, X } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 
-import type { GlossaryCategory, GlossaryPreview } from '@/lib/glossary';
-import { cn } from '@/lib/utils';
+import type { GlossaryCategory, GlossaryPreview } from '@/lib/content/glossary';
+import { cn } from '@/lib/shared/utils';
 
 export type GlossaryBrowserEntry = Pick<
   GlossaryPreview,

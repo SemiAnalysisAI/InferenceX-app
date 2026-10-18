@@ -1,7 +1,9 @@
-import { at, bundleModel, number, text } from './bundle';
+import { producerIdentity, type VideoProducerFields } from './producer-identity';
+import { at, bundleModel, type Json, number, text } from './bundle';
 import type { CIArtifact } from './archive';
+import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
-import { plannedServingCells, servingCells } from './serving';
+import { isNativeH3, plannedServingCells, servingCells } from './serving';
 import { efficiencyValue, latencyValue, tradeoffPoints, workloadDurationSeconds } from './tradeoff';
 import type { VideoDeploymentFields } from './deployment-contract';
 import type { VideoQualityAssessment } from './quality';
@@ -11,7 +13,7 @@ import { servingCellEvidence, type ServingCellEvidence } from './serving-evidenc
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
 
-export interface VideoHistoryObservation extends VideoDeploymentFields {
+export interface VideoHistoryObservation extends VideoDeploymentFields, VideoProducerFields {
   id: string;
   cell: string | null;
   hardware: string;
@@ -47,7 +49,7 @@ export interface VideoHistoryObservation extends VideoDeploymentFields {
   server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
   quality?: VideoQualityAssessment | null;
 }
-export interface VideoHistorySource {
+export interface VideoHistorySource extends VideoProducerFields {
   id: string;
   /** Model identity survives zero-observation and failed generation. Absent on legacy H3 projections. */
   model?: string | null;
@@ -63,6 +65,8 @@ export interface VideoHistorySource {
   fidelity: string | null;
   calibration: string | null;
   releaseQualified: boolean | null;
+  /** Whether every cell's GPU power was measured and valid; null when the matrix records no verdict. */
+  powerVerified?: boolean | null;
   error: string | null;
 }
 export interface VideoHistoryEntry {
@@ -80,6 +84,13 @@ export interface VideoHistoryPage {
 }
 
 /** A read-only projection of published H3 artifacts, not a new benchmark result contract. */
+/** Cluster the first sealed per-cell aggregate of a native bundle names; '' when none is sealed. */
+function sealedCluster(documents: ReadonlyMap<string, Json>): string {
+  for (const [path, document] of documents)
+    if (/^gpu\/c\d+\/aggregate\.json$/u.test(path)) return text(at(document, 'cluster'));
+  return '';
+}
+
 export function videoHistoryEntry(
   saved: StoredArtifact,
   publishedAt: string | null,
@@ -97,6 +108,7 @@ export function videoHistoryEntry(
       fidelity: null,
       calibration: null,
       releaseQualified: null,
+      powerVerified: null,
       error: null,
     };
     try {
@@ -117,8 +129,12 @@ export function videoHistoryEntry(
         result.sha256 = bundle.manifestSha256;
         result.sourceSha = text(at(bundle.manifest, 'git_commit'));
         result.observedAt = text(at(bundle.ci, 'started_at')) || null;
-        result.hardware = text(at(bundle.ci, 'site', 'gpu_model'));
-        result.execution = text(at(bundle.ci, 'phase'));
+        result.hardware = isNativeH3(bundle.manifest)
+          ? nativeHardware(bundle.ci, sealedCluster(bundle.documents))
+          : text(at(bundle.ci, 'site', 'gpu_model'));
+        result.execution =
+          (isNativeH3(bundle.manifest) ? text(at(bundle.ci, 'status')) : '') ||
+          text(at(bundle.ci, 'phase'));
         result.fidelity = text(at(bundle.result, 'paired_fidelity', 'overall_status')) || null;
         result.calibration =
           text(at(bundle.result, 'policy', 'calibration_status')) ||
@@ -126,13 +142,17 @@ export function videoHistoryEntry(
           null;
         const qualified = at(bundle.ci, 'release_qualified');
         result.releaseQualified = typeof qualified === 'boolean' ? qualified : null;
+        const verified = at(bundle.documents.get('serving-smoke.json') ?? null, 'power_verified');
+        result.powerVerified = typeof verified === 'boolean' ? verified : null;
         const qualityAbsent =
           !bundle.documents.has('dashboard-observations.json') &&
           at(bundle.manifest, 'evidence', 'dashboard-observations.json') === null;
         result.serving = plannedServingCells(bundle).map((cell) =>
           servingCellEvidence({ ...cell, run: null, spec: null }, qualityAbsent),
         );
+        result.producer = producerIdentity(bundle, []);
         const cells = servingCells(bundle);
+        result.producer = producerIdentity(bundle, cells);
         // Preserve execution accounting even when an optional observation sidecar is rejected.
         result.serving = cells.map((cell) => servingCellEvidence(cell));
         const observationFields = sourceObservationFields(bundle, cells);
@@ -147,13 +167,14 @@ export function videoHistoryEntry(
           const cell = cells.find((item) => item.id === point.cellId);
           return {
             id: point.id,
+            producer: result.producer,
             ...(observationFields.get(point.cellId ?? '') ?? {
               deployment: null,
               hardwareHealth: null,
               quality: null,
             }),
             cell: point.cellId ?? null,
-            hardware: point.hardware || text(at(bundle.ci, 'site', 'gpu_model')),
+            hardware: point.hardware || result.hardware,
             concurrency: point.concurrency,
             runtime: point.revision,
             workload: point.workloadLabel,
@@ -164,7 +185,7 @@ export function videoHistoryEntry(
             completed: point.completed,
             scheduled: point.scheduled ?? number(at(cell?.cell, 'completion', 'scheduled')),
             failed: point.failed ?? number(at(cell?.cell, 'completion', 'failed')),
-            samples: point.latencies.length,
+            samples: point.samples,
             p50: latencyValue(point, 'median'),
             p90: latencyValue(point, 'p90'),
             clipsGpuHour: efficiencyValue(point, 'clipsGpu'),

@@ -6,6 +6,8 @@
  *
  * Usage:
  *   bun scripts/build-video-history-fixture.ts <dir-with-<runId>.json>
+ *
+ * Exports for runs the fixture does not list yet are added as new entries.
  */
 
 import { readdir, readFile, writeFile } from 'node:fs/promises';
@@ -23,7 +25,7 @@ import {
   assertFixtureContent,
   fixtureSha256,
   fixtureTopLevel,
-} from '../src/lib/test-fixture-manifest';
+} from '../src/lib/testing/test-fixture-manifest';
 
 const FIXTURE_NAME = 'video-history';
 const fixturesDir = resolve(import.meta.dirname, '..', 'cypress', 'fixtures', 'api');
@@ -42,6 +44,7 @@ for (const file of files.filter((name) => /^\d+\.json$/u.test(name))) {
 }
 
 let rebuilt = 0;
+const known = new Set(current.entries.map((entry) => entry.id));
 const entries: VideoHistoryEntry[] = current.entries.map((entry) => {
   const saved = exports.get(entry.id);
   if (!saved) return entry;
@@ -50,6 +53,12 @@ const entries: VideoHistoryEntry[] = current.entries.map((entry) => {
   // The existing fixture already carries the artifact identity (size, digest); keep it.
   return { ...next, artifact: { ...next.artifact, ...entry.artifact } };
 });
+// An export the fixture has not seen becomes a new entry after the existing ones: an export
+// is not a publication, so its publication time stays unknown and it sorts after dated entries.
+const added = [...exports.values()].filter(
+  (saved) => !known.has(`${saved.runId}.${saved.artifact.id}`),
+);
+entries.push(...added.map((saved) => videoHistoryEntry(saved, null)));
 const page: VideoHistoryPage = { schemaVersion: 1, entries, nextPage: current.nextPage };
 assertFixtureContent(FIXTURE_NAME, page);
 const body = `${JSON.stringify(page, null, 2)}\n`;
@@ -68,4 +77,6 @@ manifest.fixtures[FIXTURE_NAME] = {
 };
 manifest.generatedAt = capturedAt;
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-console.log(`Wrote ${entries.length} entries; ${rebuilt} rebuilt from ${exports.size} exports`);
+console.log(
+  `Wrote ${entries.length} entries; ${rebuilt} rebuilt and ${added.length} added from ${exports.size} exports`,
+);

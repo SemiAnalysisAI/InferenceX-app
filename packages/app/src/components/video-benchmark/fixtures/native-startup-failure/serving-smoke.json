@@ -1,0 +1,79 @@
+{
+  "bundle_type": "h3_serving_smoke_matrix",
+  "cells": [
+    {
+      "completion": {
+        "attempted": 0,
+        "completed": 0,
+        "failed": 0,
+        "not_started": 0,
+        "scheduled": 0,
+        "unfinished": 0,
+        "valid": 0
+      },
+      "concurrency": 1,
+      "status": "failed",
+      "verified": false
+    }
+  ],
+  "ci_accepted": false,
+  "completion": {
+    "attempted": 0,
+    "completed": 0,
+    "failed": 0,
+    "not_started": 0,
+    "scheduled": 0,
+    "unfinished": 0,
+    "valid": 0
+  },
+  "engine": {
+    "name": "vllm-omni",
+    "revision": "a8576ccb725c4e21cd13c3eb5f9a546b21149d2b"
+  },
+  "evidence_kind": "srt_slurm_h3_service",
+  "failures": [
+    "c1: run.json missing"
+  ],
+  "finished_at": "2026-10-18T08:33:15.784552Z",
+  "gpu_uuids": [],
+  "plan": {
+    "cases": [
+      {
+        "case_id": "drum-taps",
+        "prompt": "A single continuous medium shot of a drummer tapping a snare drum three times in a quiet rehearsal room. The drumsticks visibly contact the drumhead on each tap. The three crisp snare hits and the natural room ambience are audible. The camera remains still. No music, speech, subtitles, or scene cuts.",
+        "requires_motion": true,
+        "requires_sound": true,
+        "seed": 11
+      }
+    ],
+    "generation": {
+      "aspect_ratio": "16:9",
+      "audio_channels": 2,
+      "audio_flow_shift": 3.0,
+      "audio_sample_rate_hz": 32000,
+      "duration_seconds": 4,
+      "flow_shift": 12.0,
+      "fps": 24,
+      "frame_count": 107,
+      "height": 768,
+      "num_inference_steps": 50,
+      "width": 1344
+    },
+    "model_id": "MiniMaxAI/MiniMax-H3",
+    "model_revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+    "plan_id": "h3-serving-2gpu-c124-v1",
+    "repetitions": 4,
+    "warmup_runs": 1
+  },
+  "plan_sha256": "8d51a472caa7db0f5d4c33adec1e9c9f852e7144cf25356085802edaf7d80d68",
+  "power_verified": false,
+  "release_qualified": false,
+  "requests_per_configuration": 0,
+  "runtime": null,
+  "scheduled": 0,
+  "schema_version": "1.0.0",
+  "server": null,
+  "started_at": "2026-10-18T08:33:15.763942Z",
+  "status": "failed",
+  "warmup_per_configuration": 1
+}

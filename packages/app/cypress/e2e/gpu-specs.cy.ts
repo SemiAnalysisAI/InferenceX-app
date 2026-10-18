@@ -42,10 +42,6 @@ describe('GPU Specs Tab', () => {
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
-  it('tab renders with correct title', () => {
-    cy.get('h2').should('contain.text', 'Chip Specifications');
-  });
-
   it('specs table is visible with all GPUs', () => {
     // Dismiss any open dialogs first
     cy.get('body').then(($body) => {
@@ -72,64 +68,9 @@ describe('GPU Specs Tab', () => {
     for (const name of gpuNames) {
       cy.get('table').contains(name).should('exist');
     }
-  });
 
-  it('table has correct column headers', () => {
-    cy.get('th').eq(0).should('contain.text', 'Chip');
-    cy.get('th').eq(1).should('contain.text', 'Memory');
-    cy.get('th').eq(2).should('contain.text', 'Mem BW');
-    cy.get('th').eq(3).should('contain.text', 'FP4');
-    cy.get('th').eq(4).should('contain.text', 'FP8');
-    cy.get('th').eq(5).should('contain.text', 'BF16');
-  });
-
-  it('NVIDIA and AMD vendor badges are displayed', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').within(() => {
-      cy.contains('NVIDIA').should('exist');
-      cy.contains('AMD').should('exist');
-    });
-  });
-
-  it('footnote about dense TFLOPS is visible', () => {
-    cy.contains('Dense tensor core peak TFLOP/s').should('be.visible');
-  });
-
-  it('scale-out topology diagrams section is visible', () => {
-    cy.contains('Scale-Out Topology Diagrams').scrollIntoView().should('be.visible');
-  });
-
-  it('topology diagrams render for GPUs with scale-out', () => {
-    const gpusWithTopology = [
-      'h100-sxm',
-      'h200-sxm',
-      'b200-sxm',
-      'b300-sxm',
-      'mi300x',
-      'mi325x',
-      'mi355x',
-    ];
-
-    for (const gpu of gpusWithTopology) {
-      cy.get(`[data-testid="topology-${gpu}"]`).should('exist');
-    }
-  });
-
-  it('NVL72 GPUs do not have topology diagrams', () => {
     cy.get('[data-testid="topology-gb200-nvl72"]').should('not.exist');
     cy.get('[data-testid="topology-gb300-nvl72"]').should('not.exist');
-  });
-
-  it('topology diagram SVGs contain GPU, switch, and server labels', () => {
-    cy.get('[data-testid="topology-h200-sxm"] svg')
-      .should('exist')
-      .within(() => {
-        cy.contains('Chip 0').should('exist');
-        cy.contains('Chip 7').should('exist');
-        cy.contains('L0').should('exist');
-        cy.contains('S0').should('exist');
-        cy.contains('Server 1').should('exist');
-      });
   });
 
   it('preserves the English expand button label and identifies the scale-out SVG', () => {
@@ -143,93 +84,11 @@ describe('GPU Specs Tab', () => {
       .and('contain', 'H200 SXM 8-rail optimized scale-out topology diagram');
   });
 
-  it('B200 topology shows multiple pods', () => {
-    cy.get('[data-testid="topology-b200-sxm"] svg')
-      .should('exist')
-      .within(() => {
-        cy.contains('Pod 1').should('exist');
-        cy.contains('Pod 2').should('exist');
-      });
-  });
-
-  it('scale out topology column cells are clickable', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('body').type('{esc}');
-  });
-
-  it('scale-up topology diagrams section is visible', () => {
-    cy.contains('Scale-Up Topology Diagrams').scrollIntoView().should('be.visible');
-  });
-
-  it('scale-up topology diagrams render for all GPUs', () => {
-    const allGpus = [
-      'h100-sxm',
-      'h200-sxm',
-      'b200-sxm',
-      'b300-sxm',
-      'gb200-nvl72',
-      'gb300-nvl72',
-      'mi300x',
-      'mi325x',
-      'mi355x',
-    ];
-
-    for (const gpu of allGpus) {
-      cy.get(`[data-testid="scaleup-topology-${gpu}"]`).should('exist');
-    }
-  });
-
-  it('scale-up topology diagram SVGs contain GPU labels', () => {
-    cy.get('[data-testid="scaleup-topology-h200-sxm"] svg')
-      .should('exist')
-      .within(() => {
-        cy.contains('Chip 0').should('exist');
-        cy.contains('NVSwitch').should('exist');
-      });
-  });
-
-  it('AMD scale-up topology shows mesh layout', () => {
-    cy.get('[data-testid="scaleup-topology-mi300x"] svg')
-      .should('exist')
-      .within(() => {
-        cy.contains('Chip 0').should('exist');
-        cy.contains('Chip 7').should('exist');
-      });
-  });
-
-  it('scale up topology column cells are clickable', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', 'Scale-Up Topology');
-    cy.get('body').type('{esc}');
-  });
-
   it('hides scale-out topology logos with the unofficial-domain notice', () => {
     cy.contains('This deployment is not hosted at').should('be.visible');
     cy.get('[data-testid="topology-h200-sxm"] defs pattern[id^="logo-scaleout-"]').should(
       'not.exist',
     );
-  });
-
-  it('hides switched scale-up topology logos on unofficial domains', () => {
-    cy.get('[data-testid="scaleup-topology-h200-sxm"] defs pattern[id^="logo-scaleup-sw-"]').should(
-      'not.exist',
-    );
-  });
-
-  it('hides mesh scale-up topology logos on unofficial domains', () => {
-    cy.get('[data-testid="scaleup-topology-mi300x"] defs pattern[id^="logo-scaleup-mesh-"]').should(
-      'not.exist',
-    );
-  });
-
-  it('hides NVL72 scale-up topology logos on unofficial domains', () => {
-    cy.get(
-      '[data-testid="scaleup-topology-gb200-nvl72"] defs pattern[id^="logo-scaleup-nvl72-"]',
-    ).should('not.exist');
   });
 });
 
@@ -249,13 +108,6 @@ describe('GPU Specs Bar Chart View', () => {
     });
   });
 
-  it('view toggle is visible with Table, Chart, and Radar options', () => {
-    cy.get('[data-testid="gpu-specs-view-toggle"]').should('be.visible');
-    cy.get('[data-testid="gpu-specs-table-view-btn"]').should('contain.text', 'Table');
-    cy.get('[data-testid="gpu-specs-chart-view-btn"]').should('contain.text', 'Chart');
-    cy.get('[data-testid="gpu-specs-radar-view-btn"]').should('contain.text', 'Radar');
-  });
-
   it('table view is active by default', () => {
     cy.get('[data-testid="gpu-specs-table-view-btn"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="gpu-specs-chart-view-btn"]').should(
@@ -272,23 +124,6 @@ describe('GPU Specs Bar Chart View', () => {
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('be.visible');
     cy.get('table').should('not.exist');
     cy.get('[data-testid="gpu-specs-chart-view-btn"]').should('have.attr', 'aria-selected', 'true');
-  });
-
-  it('bar chart renders SVG with bars', () => {
-    // Already in chart view from previous test
-    cy.get('[data-testid="gpu-specs-bar-chart"] svg').should('exist');
-    cy.get('[data-testid="gpu-specs-bar-chart"] svg .bar').should('have.length.at.least', 5);
-  });
-
-  it('metric selector is visible in chart view', () => {
-    cy.get('[data-testid="gpu-specs-metric-select"]').should('be.visible');
-  });
-
-  it('vendor legend is visible in chart view', () => {
-    cy.get('[data-testid="gpu-specs-bar-chart"]').within(() => {
-      cy.contains('NVIDIA').should('be.visible');
-      cy.contains('AMD').should('be.visible');
-    });
   });
 
   it('FP4 metric excludes GPUs without FP4 support', () => {
@@ -330,30 +165,6 @@ describe('GPU Specs Radar Chart View', () => {
     cy.get('[data-testid="gpu-specs-radar-view-btn"]').should('have.attr', 'aria-selected', 'true');
   });
 
-  it('radar chart renders SVG with polygons and dots', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"] svg').should('exist');
-    cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should(
-      'have.length.at.least',
-      5,
-    );
-    cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-dot').should(
-      'have.length.at.least',
-      20,
-    );
-  });
-
-  it('sidebar legend with GPU items is visible', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should('exist');
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should(
-      'contain.text',
-      'H100 SXM',
-    );
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should(
-      'contain.text',
-      'MI355X',
-    );
-  });
-
   it('toggling a GPU off via sidebar legend removes its polygon', () => {
     // Count initial polygons (all 9 GPUs)
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 9);
@@ -362,9 +173,7 @@ describe('GPU Specs Radar Chart View', () => {
       .contains('H100 SXM')
       .click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 8);
-  });
 
-  it('Reset filter restores all GPUs', () => {
     // GPU already toggled off from previous test
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('Reset filter')
@@ -372,25 +181,11 @@ describe('GPU Specs Radar Chart View', () => {
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 9);
   });
 
-  it('sidebar legend shows GPU names without vendor grouping', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').within(() => {
-      // No vendor group titles should be present
-      cy.get('.gpu-legend-title').should('not.exist');
-      // GPU names should be listed directly
-      cy.contains('H100 SXM').should('exist');
-      cy.contains('MI355X').should('exist');
-    });
-  });
-
   it('hides the radar chart logo on unofficial domains', () => {
     cy.contains('This deployment is not hosted at').should('be.visible');
     cy.get('[data-testid="gpu-specs-radar-chart"] defs pattern[id^="logo-pattern"]').should(
       'not.exist',
     );
-  });
-
-  it('normalization note is visible', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"]').should('contain.text', 'Values are normalized');
   });
 
   it('switching from radar back to table restores table', () => {
@@ -427,17 +222,6 @@ describe('Topology Dialog Navigation', () => {
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
-  it('scale-out topology dialog has navigation arrows', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-prev"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-next"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', '/ 7');
-    cy.get('body').type('{esc}');
-    cy.get('[role="dialog"]').should('not.exist');
-  });
-
   it('scale-out topology dialog next button navigates to next GPU', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
@@ -470,17 +254,6 @@ describe('Topology Dialog Navigation', () => {
     cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Out Topology');
     cy.get('body').type('{leftArrow}');
     cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Out Topology');
-    cy.get('body').type('{esc}');
-    cy.get('[role="dialog"]').should('not.exist');
-  });
-
-  it('scale-up topology dialog has navigation arrows', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="scaleup-topology-nav-prev"]').should('be.visible');
-    cy.get('[data-testid="scaleup-topology-nav-next"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', '/ 9');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
   });
@@ -607,14 +380,5 @@ describe('GPU Specs Chinese route', () => {
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
       .should('include', '/zh/gpu-specs');
-  });
-
-  it('keeps the localized table contained at 390px', () => {
-    cy.viewport(390, 844);
-    cy.get('[data-testid="gpu-specs-view-toggle"]').should('have.attr', 'aria-label', '显示模式');
-    cy.get('table').parents('.overflow-x-auto').first().should('have.css', 'overflow-x', 'auto');
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
   });
 });

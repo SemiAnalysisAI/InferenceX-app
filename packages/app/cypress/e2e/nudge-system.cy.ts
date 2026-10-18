@@ -6,6 +6,8 @@
  * permanent-suppress ("starred") cross-nudge mechanism.
  */
 
+import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -14,7 +16,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-rubin-banner-dismissed',
+    'inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -48,14 +50,14 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin Agentic Inference Performance')
-      .and('contain.text', '67x Faster than Blackwell Ultra')
+      .and('contain.text', 'Google TPUv7 joins AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the three still-new landing ledger
-    // rows — the shared pill must render at the same
-    // fixed size everywhere it appears.
+    cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
+    // Banner + header-nav badges and the flashing TPU card badge — the shared
+    // pill must render at the same fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 5)
+      .should('have.length', 3)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -94,32 +96,116 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
           expect(inkOffset, 'label ink is centred').to.be.closeTo(0, 0.5);
         }
       });
+
+    // The persistent star CTA lives in the footer grid (footer-star-cta) and
+    // the header; the old immediate star modal duplicated it and covered the
+    // footer, so it must stay gone.
+    cy.get('[data-testid="github-star-modal"]').should('not.exist');
+    cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
 
-  it('localizes the Rubin banner title in Chinese', () => {
+  it('localizes the launch banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin 智能体推理性能')
-      .and('contain.text', '速度达 Blackwell Ultra 的 67 倍')
+      .and('contain.text', 'Google TPUv7 加入 AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
       .and('contain.text', '查看结果');
   });
+});
 
-  it('does not float a duplicate GitHub star card over the footer', () => {
-    // The persistent star CTA lives in the footer grid (footer-star-cta) and
-    // the header; the old immediate star modal duplicated it and covered the
-    // footer, so it must stay gone.
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]')
+// ---------------------------------------------------------------------------
+// Landing — centered TPUv7 launch modal
+// ---------------------------------------------------------------------------
+
+const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+const TPU_RESULTS_HREF =
+  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+
+function assertTpuResultsFilters() {
+  assertTpuGb300Selected();
+  cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+  cy.get('[data-testid="scenario-selector"]')
+    .invoke('text')
+    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="precision-multiselect"]')
+    .should('contain.text', 'FP8')
+    .and('not.contain.text', 'FP4');
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
+}
+
+// cypress/support/e2e.ts seeds the modal key on every load; clearing it here
+// runs after that hook, so only these visits see the modal.
+function showLaunchModal(win: Cypress.AUTWindow) {
+  clearAllNudgeStorage(win);
+  win.localStorage.removeItem(LAUNCH_MODAL_KEY);
+}
+
+describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
+  it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
+    interceptTpuLaunchData();
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
-      .and('contain.text', 'Rubin Agentic Inference Performance')
-      .and('contain.text', '67x Faster than Blackwell Ultra');
-    cy.get('[data-testid="github-star-modal"]').should('not.exist');
-    cy.get('[data-testid="footer-star-cta"]').should('exist');
+      .and('have.attr', 'aria-modal', 'true')
+      .and('contain.text', 'Google TPUv7 joins AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
+      .then(($modal) => {
+        const rect = $modal[0].getBoundingClientRect();
+        // clientWidth/Height exclude the scrollbar, which the fixed overlay also excludes.
+        const root = $modal[0].ownerDocument.documentElement;
+        expect(Math.abs(rect.left + rect.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
+        expect(Math.abs(rect.top + rect.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
+      });
+    cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
+    // Focus moves into the dialog so keyboard users land on the action.
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.get('[data-testid="launch-modal-action"]').click();
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuResultsFilters();
+  });
+
+  it('keeps Shift+Tab inside the dialog after clicking the panel', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal');
+    cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+  });
+
+  it('dismisses on Escape', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.focused().type('{esc}');
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+    });
+  });
+
+  it('persists "Maybe Later" dismissal', () => {
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+    });
+  });
+
+  it('localizes the modal and keeps the Chinese route tree', () => {
+    interceptTpuLaunchData();
+    cy.visit('/zh', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .and('contain.text', 'Google TPUv7 加入 AgentX')
+      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
+      .and('contain.text', '稍后再看');
+    cy.get('[data-testid="launch-modal-action"]').should('contain.text', '查看结果').click();
+    cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
+    assertTpuResultsFilters();
   });
 });
 
@@ -128,33 +214,17 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Landing nudges — banner', { testIsolation: true }, () => {
-  it('wraps the full Rubin title on mobile without clipping', () => {
+  it('wraps the full launch banner title on mobile without clipping', () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
       .first()
-      .should('contain.text', 'Rubin Agentic Inference Performance')
+      .should('contain.text', 'Google TPUv7 joins AgentX')
       .and('have.css', 'white-space', 'normal')
       .should(($title) => {
         expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
         expect($title[0].scrollHeight).to.be.at.most($title[0].clientHeight);
       });
-  });
-
-  it('shows launch banner on landing page', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-  });
-
-  it('banner renders within container constraints (not full-width)', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
-    // The banner's parent section has the container class for width constraints
-    cy.get('[data-testid="launch-banner"]').parent('section.container').should('exist');
   });
 
   it('dismissing the banner persists across reloads', () => {
@@ -169,27 +239,26 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]').should('not.exist');
   });
 
-  it('rendering the banner does not write its dismissal storage key', () => {
+  it('clicking the banner body navigates without persisting dismissal', () => {
+    interceptTpuLaunchData();
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
+        null,
+      );
     });
-  });
 
-  it('clicking the banner body navigates without persisting dismissal', () => {
-    cy.visit('/', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/inference/deepseek-v4');
+      .and('have.attr', 'href', TPU_RESULTS_HREF);
     cy.get('[data-testid="launch-banner"]').click();
 
-    cy.location('pathname').should('eq', '/inference/deepseek-v4');
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuResultsFilters();
 
     // Body click must not write the dismissal key — the banner should still
     // render after returning home and reloading the landing page.
@@ -197,7 +266,9 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
+        null,
+      );
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -208,7 +279,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 // ---------------------------------------------------------------------------
 
 describe('Dashboard nudges — reproducibility toast', () => {
-  it('shows reproducibility nudge after 1.5s delay on dashboard', () => {
+  it('reproducibility nudge is session-only — gone after reload', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
@@ -218,15 +289,6 @@ describe('Dashboard nudges — reproducibility toast', () => {
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     // After the timer fires (~1.5s + buffer)
     cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
-  });
-
-  it('reproducibility nudge is session-only — gone after reload', () => {
-    cy.visit('/inference', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
 
     // Session storage should be set
     cy.window().then((win) => {
@@ -234,6 +296,9 @@ describe('Dashboard nudges — reproducibility toast', () => {
         null,
       );
     });
+    cy.reload();
+    cy.wait(2000);
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
 });
 
@@ -251,12 +316,6 @@ function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
 }
 
 describe('Dashboard nudges — filter-hint toast', () => {
-  it('shows the filter-hint nudge on the inference tab after a short delay', () => {
-    cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
-  });
-
   it('does not show the filter-hint nudge outside the inference tab', () => {
     cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.wait(3500);
@@ -283,6 +342,7 @@ describe('Dashboard nudges — filter-hint toast', () => {
 
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
     cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
+    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
     cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
@@ -304,16 +364,7 @@ describe('Dashboard nudges — filter-hint toast', () => {
 // ---------------------------------------------------------------------------
 
 describe('Evaluation nudges — eval-samples toast', () => {
-  it('shows eval-samples nudge after delay on evaluation page', () => {
-    cy.visit('/evaluation', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
-  });
-
-  it('eval-samples nudge writes timestamp on show (cooldownStartsOnShow)', () => {
+  it('eval-samples open event refreshes the cooldown timestamp', () => {
     cy.visit('/evaluation', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
@@ -328,15 +379,6 @@ describe('Evaluation nudges — eval-samples toast', () => {
       expect(value).to.not.equal(null);
       expect(Number(value)).to.be.greaterThan(0);
     });
-  });
-
-  it('eval-samples open event refreshes the cooldown timestamp', () => {
-    cy.visit('/evaluation', {
-      onBeforeLoad(win) {
-        clearAllNudgeStorage(win);
-      },
-    });
-    cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
 
     cy.window().then((win) => {
       const before = Number(
@@ -373,7 +415,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

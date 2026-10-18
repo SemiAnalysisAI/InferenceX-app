@@ -6,11 +6,11 @@ import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/constants';
-import { type Sequence, Percentile, type Model } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
-import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 
 import {
   getCostField,
@@ -24,6 +24,7 @@ import {
   sign,
 } from './interpolation';
 import type { CostProvider, CostType, GPUDataPoint, InterpolatedResult } from './types';
+import { interpolateProfitForGPU, type ProfitPowerBasis } from './profit-power';
 
 // Re-export pure functions so existing imports from this module keep working.
 export {
@@ -261,6 +262,7 @@ export function useThroughputData(
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -270,7 +272,7 @@ export function useThroughputData(
         // Skip GPUs that are not visible (legend filters by hwKey)
         if (visibleHwKeys && !visibleHwKeys.has(hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
@@ -305,6 +307,7 @@ export function useThroughputData(
       visibleHwKeys?: Set<string>,
       runInfoByIndex?: Record<number, { branch: string; url: string }>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -313,7 +316,7 @@ export function useThroughputData(
         if (!meta) continue;
         if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,

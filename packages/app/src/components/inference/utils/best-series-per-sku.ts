@@ -1,6 +1,6 @@
 import { hermiteInterpolate, monotoneSlopes } from '@/components/calculator/interpolation';
 import type { InferenceData } from '@/components/inference/types';
-import { isFrontierEligible, paretoFrontForDirection } from '@/lib/chart-utils';
+import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
@@ -36,11 +36,19 @@ interface ScoredSeries {
  * operating points can be exceptional even when a broader serving curve wins
  * the AUC comparison, so every eligible TileRT series remains visible.
  */
-export function bestSeriesPerSku(points: InferenceData[], direction: Direction): Set<string> {
+export function bestSeriesPerSku(
+  points: InferenceData[],
+  direction: Direction,
+  precisions?: readonly string[],
+): Set<string> {
   const bySku = new Map<string, Map<string, InferenceData[]>>();
   const featured = new Set<string>();
   for (const point of points) {
-    if (!isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
+    // Rank within the visible precision scope, before picking a winner.
+    if (precisions && !precisions.includes(point.precision)) continue;
+    // Comparison clones re-plot the same configs at another boundary or role;
+    // the best series per SKU is judged on the selected metric alone.
+    if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
     const key = String(point.hwKey);
     if (point.framework === 'tilert') featured.add(key);
@@ -120,5 +128,28 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
     selected.add(winner.candidate.key);
   }
 
+  return selected;
+}
+
+/**
+ * Keep SKUs that the ranking could not score.
+ *
+ * All in Measured can have GPU-valid table rows for a SKU (for example NVL72
+ * without complete Grace telemetry) but no numeric estimate to rank. Those SKUs
+ * have no winner in `best`, so every candidate series for them is kept instead
+ * of letting a ranked SKU elsewhere in the selection hide them.
+ */
+export function withUnrankedSkus(
+  best: ReadonlySet<string>,
+  rankedPoints: readonly InferenceData[],
+  candidates: readonly InferenceData[],
+): Set<string> {
+  const selected = new Set(best);
+  const rankedSkus = new Set(
+    [...rankedPoints, ...candidates].filter((point) => best.has(String(point.hwKey))).map(baseSku),
+  );
+  for (const point of candidates) {
+    if (!rankedSkus.has(baseSku(point))) selected.add(String(point.hwKey));
+  }
   return selected;
 }

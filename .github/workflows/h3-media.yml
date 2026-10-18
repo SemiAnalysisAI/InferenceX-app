@@ -1,6 +1,8 @@
 name: 'Publish H3 media'
 
 on:
+  repository_dispatch:
+    types: [publish-video-results]
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
@@ -31,5 +33,5 @@ jobs:
           bun-version-file: package.json
       - name: Persist completed H3 artifacts
         env:
-          H3_RUN_ID: ${{ inputs.run_id }}
+          H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
         run: bun packages/app/scripts/warm-video-results.ts

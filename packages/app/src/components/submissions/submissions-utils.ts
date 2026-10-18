@@ -1,7 +1,10 @@
 import { DB_MODEL_TO_DISPLAY, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import type { SubmissionSummaryRow, SubmissionVolumeRow } from '@/lib/submissions-types';
+import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import type {
+  SubmissionSummaryRow,
+  SubmissionVolumeRow,
+} from '@/lib/submissions/submissions-types';
 
 /** Get vendor name for a hardware key. */
 export function getVendor(hardware: string): string {
@@ -81,8 +84,6 @@ export function buildInferenceCompareUrl(
 ): string | null {
   // DB_MODEL_TO_DISPLAY covers every DB prefix incl. point-release aliases
   // (gptoss120b, glm5.1, kimik2.6, kimik2.7-code, minimaxm2.7, llama70b).
-  // MODEL_PREFIX_MAPPING only has the single canonical prefix per Model enum
-  // and misses those rows.
   const displayModel = DB_MODEL_TO_DISPLAY[currentRow.model];
   if (!displayModel) return null;
   const hwKey = buildAvailabilityHwKey(

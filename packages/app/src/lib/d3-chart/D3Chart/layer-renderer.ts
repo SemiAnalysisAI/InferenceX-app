@@ -1,7 +1,6 @@
-import * as d3 from 'd3';
+import type * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
-import { CHART_TYPE, px } from '../typography';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
 import {
   renderHorizontalBars,
@@ -19,6 +18,7 @@ import {
 import { renderBarLabels, updateBarLabelsOnZoom } from '../layers/bar-labels';
 import {
   renderScatterPoints,
+  syncPointLabel,
   updateScatterPointsForDisplay,
   updateScatterPointsOnZoom,
 } from '../layers/scatter-points';
@@ -265,26 +265,7 @@ export function updateLayerForMetric<T>(
   const foreground = layer.config.foreground;
   if (getLabelText && foreground) {
     selection.each(function (datum) {
-      const lines = getLabelText(datum).split('\n');
-      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
-      d3.select(this)
-        .selectAll<SVGTextElement, boolean>('.point-label')
-        .data([true])
-        .join('text')
-        .attr('class', 'point-label')
-        .attr('text-anchor', 'middle')
-        .attr('fill', foreground)
-        .attr('font-size', px(CHART_TYPE.dataLabel))
-        .attr('font-weight', '700')
-        .attr('pointer-events', 'none')
-        .style('display', layer.config.hideLabels ? 'none' : '')
-        .style('opacity', layer.config.hideLabels ? 0 : 1)
-        .selectAll<SVGTSpanElement, string>('tspan')
-        .data(lines)
-        .join('tspan')
-        .attr('x', 0)
-        .attr('dy', (_line, index) => (index === 0 ? `${firstDy}em` : '1.1em'))
-        .text((line) => line);
+      syncPointLabel(this, getLabelText(datum), foreground, layer.config.hideLabels);
     });
   } else {
     selection.selectAll('.point-label').remove();

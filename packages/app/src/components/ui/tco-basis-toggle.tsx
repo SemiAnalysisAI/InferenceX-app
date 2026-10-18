@@ -2,13 +2,13 @@
 
 import { useMemo } from 'react';
 
-import { useGlobalFilterSelection, useGlobalFilterActions } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection, useGlobalFilterActions } from '@/providers/GlobalFilterContext';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import type { TcoBasis } from '@/lib/constants';
-import { showsTcoBasisSelector } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { TcoBasis } from '@/lib/catalog/constants';
+import { showsTcoBasisSelector } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 const LABELS = {
   en: { external: 'External', internal: 'Internal', aria: 'TCO basis' },

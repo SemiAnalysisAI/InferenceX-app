@@ -3,7 +3,14 @@ import * as d3 from 'd3';
 import { describe, it, expect } from 'vitest';
 
 import { setupChartStructure } from './chart-setup';
-import { renderAxes, renderGrid } from './chart-update';
+import {
+  raiseInOrder,
+  renderAxes,
+  renderGrid,
+  setAttrIfChanged,
+  setStyleIfChanged,
+  setTextIfChanged,
+} from './chart-update';
 import type { ChartLayout, ChartSetupConfig } from './types';
 
 function makeSvgEl(): SVGSVGElement {
@@ -726,5 +733,94 @@ describe('renderGrid', () => {
       expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBe(2);
       expect(layout.gridGroup.select('.grid-h').selectAll('line').size()).toBe(3);
     });
+  });
+});
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function makeGroup(classes: string[]) {
+  const group = document.createElementNS(SVG_NS, 'g');
+  for (const cls of classes) {
+    const child = document.createElementNS(SVG_NS, 'g') as SVGGElement;
+    child.setAttribute('class', cls);
+    child.dataset.id = `${cls}-${group.childNodes.length}`;
+    group.append(child);
+  }
+  return group;
+}
+
+const order = (group: Element) =>
+  [...group.children].map((child) => (child as SVGElement).dataset.id);
+
+function recordMutations(root: Node, run: () => void): MutationRecord[] {
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(root, { attributes: true, childList: true, characterData: true, subtree: true });
+  run();
+  const records = observer.takeRecords();
+  observer.disconnect();
+  return records;
+}
+
+describe('write-if-changed helpers', () => {
+  it('emit no records for unchanged values and one per real change', () => {
+    const element = document.createElementNS(SVG_NS, 'text');
+    setAttrIfChanged(element, 'fill', 'red');
+    setStyleIfChanged(element, 'opacity', '1');
+    setTextIfChanged(element, 'TP8');
+
+    expect(
+      recordMutations(element, () => {
+        setAttrIfChanged(element, 'fill', 'red');
+        setStyleIfChanged(element, 'opacity', '1');
+        setTextIfChanged(element, 'TP8');
+      }),
+    ).toHaveLength(0);
+
+    expect(
+      recordMutations(element, () => {
+        setAttrIfChanged(element, 'fill', 'blue');
+        setStyleIfChanged(element, 'opacity', '0');
+        setTextIfChanged(element, 'TP4');
+      }).map((record) => record.attributeName ?? record.type),
+    ).toEqual(['fill', 'style', 'childList']);
+  });
+
+  it("clears a style property for '' like selection.style(name, '')", () => {
+    const element = document.createElementNS(SVG_NS, 'text');
+    element.style.display = 'none';
+    setStyleIfChanged(element, 'display', '');
+    expect(element.style.display).toBe('');
+  });
+});
+
+describe('raiseInOrder', () => {
+  const SELECTORS = ['.dot-group', '.point', '.line-label'];
+
+  it('matches sequential selection.raise() calls', () => {
+    const classes = ['line-label', 'roofline', 'dot-group', 'point', 'roofline', 'dot-group'];
+    const expected = makeGroup(classes);
+    for (const selector of SELECTORS) d3.select(expected).selectAll(selector).raise();
+    const actual = makeGroup(classes);
+
+    raiseInOrder(d3.select(actual), SELECTORS);
+
+    expect(order(actual)).toEqual(order(expected));
+  });
+
+  it('moves nothing when the DOM is already in raised order', () => {
+    const group = makeGroup(['roofline', 'dot-group', 'dot-group', 'point', 'line-label']);
+
+    expect(recordMutations(group, () => raiseInOrder(d3.select(group), SELECTORS))).toHaveLength(0);
+  });
+
+  it('reorders when a new element lands after the raised tail', () => {
+    const group = makeGroup(['roofline', 'dot-group', 'line-label']);
+    const late = document.createElementNS(SVG_NS, 'path') as SVGPathElement;
+    late.dataset.id = 'late-roofline';
+    group.append(late);
+
+    raiseInOrder(d3.select(group), SELECTORS);
+
+    expect(order(group)).toEqual(['roofline-0', 'late-roofline', 'dot-group-1', 'line-label-2']);
   });
 });

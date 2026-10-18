@@ -1,3 +1,4 @@
+import type { VideoProducerFields } from './producer-identity';
 import { costPerGpuHour, type CostTier } from './hardware';
 import type { VideoDeploymentFields } from './deployment-contract';
 import {
@@ -8,7 +9,7 @@ import {
 } from './quality';
 
 /** One published serving cell (hardware × client concurrency) flattened for the dashboard. */
-export interface VideoPoint extends VideoDeploymentFields {
+export interface VideoPoint extends VideoDeploymentFields, VideoProducerFields {
   id: string;
   runId: string;
   artifactId: number;

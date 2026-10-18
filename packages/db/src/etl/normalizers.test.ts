@@ -14,6 +14,21 @@ import {
 } from './normalizers';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
+describe('Muse Spark Open ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'musespark' },
+    { model_prefix: 'musespark' },
+    { model: 'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4' },
+    { model: 'meta-models/Muse-Spark-Open-816B-A42B-NVFP4' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('musespark');
+  });
+
+  it('does not mistake the DFlash2 draft for the target model', () => {
+    expect(resolveModelKey({ model: 'RadixArk/Muse-Spark-Open-DFlash2' })).toBeNull();
+  });
+});
+
 describe('hwToGpuKey', () => {
   it('strips -nv suffix', () => {
     expect(hwToGpuKey('h200-nv')).toBe('h200');
@@ -304,8 +319,16 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('forces disagg=true for mori-* canonicals regardless of disaggField', () => {
+  it('preserves explicit MoRI topology and infers disaggregation only for legacy rows', () => {
     expect(normalizeFramework('mori-sglang', false)).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', 'False')).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', true)).toEqual({
       framework: 'mori-sglang',
       disagg: true,
     });

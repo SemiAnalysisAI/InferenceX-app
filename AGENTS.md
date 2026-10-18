@@ -3,6 +3,8 @@
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
+- Changes under `packages/app/src/lib/power/power_model/` need a companion InferenceX `power_model/` PR, cross-linked both ways. See [Power Model — TS Port and Upstream Python MUST Stay in Sync](#power-model--ts-port-and-upstream-python-must-stay-in-sync).
+- **Easter egg themes and games are just for fun.** Optional themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future ones) and the games launched from them do not need stable infrastructure, carry no compatibility or uptime guarantees, and may be deleted at any time without notice or migration. Do not add unit, component, E2E, or CI checks for them; delete existing feature tests rather than fixing or extending them. The only exceptions are `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: retain and maintain these checks to protect normal light/dark pages, embeds, resource loading, and SEO. Do not expand them into gameplay or visual-fidelity coverage. See [Easter egg policy](./docs/testing.md#easter-egg-themes-and-games).
 - Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. Missing updates are BLOCKING on PR review. See [Read-only coverage for public views](#read-only-coverage-for-public-views) for coverage requirements and documented exclusions.
 
 ## AI model disclosure
@@ -31,7 +33,7 @@ InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-back
 - **Charts**: D3.js — shared library at `src/lib/d3-chart/`, scatter/GPU/bar charts
 - **Data**: Neon DB → API routes (`/api/v1/*`) → React Query hooks → Context providers
 - **Deployment**: Vercel with daily cron-triggered rebuilds
-- **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
+- **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
 
 ## Quick Start
 
@@ -85,13 +87,18 @@ API routes (`packages/app/src/app/api/v1/`):
 - `reliability` — raw `ReliabilityRow[]`
 - `evaluations` — raw `EvalRow[]`
 - `server-log` — retrieve benchmark runtime logs
+- `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU statistics cached per revision) linked to one benchmark point
 - `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
 - `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
   from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
   assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
+- `agentic-workload-explorer/*` — page-owned (`page-bff`) reads of a frozen, anonymized ProxyTrace
+  snapshot from a **separate** read replica (`DATABASE_PROXYTRACE_READONLY_URL`) backing the
+  feature-gated `/agentic-workload-explorer` pages. See [Agentic Workload Explorer](./docs/agentic-workload-explorer.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 - `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
+- `pareto` — beta derived frontier/hinterland observations with explicit raw model, workload, metrics and axis preferences; see [Pareto API](./docs/pareto-api.md). This is a documented exception to the raw-row rule, reusing the benchmark source and chart dominance algorithm without UI filtering.
 
 **Raw-data API routes return raw DB data**. Dashboard projections under
 `/api/v1/views/*` use shared pure UI transformations server-side and publish their
@@ -104,7 +111,11 @@ enter only as explicit query params with documented defaults, so a published she
 records its methodology; and `overview`, which assembles the same `OverviewPageData` used for the
 initial server render so selector changes can update the matrix without transferring every model's
 raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
-backend-for-frontend (BFF), not a reusable public data API.
+backend-for-frontend (BFF), not a reusable public data API; and `pareto`, which returns
+frontier/hinterland coordinates over stored benchmark rows with explicit axis preferences (see
+[Pareto API](./docs/pareto-api.md)), reusing the chart dominance algorithm without UI filters;
+and `gpu-metrics-point`, a point-detail BFF that computes per-GPU statistics from stored samples
+on a cache miss and caches the payload by telemetry revision.
 
 ### Read-only coverage for public views
 
@@ -133,11 +144,11 @@ sensitive.
 ### API reference and contract synchronization
 
 The public API reference at `/api` and `/zh/api`, plus the OpenAPI 3.1 document at
-`/api/openapi.json`, are generated from `packages/app/src/lib/api-documentation.ts`.
+`/api/openapi.json`, are generated from `packages/app/src/lib/api/api-documentation.ts`.
 
 **Any change to an API route, request parameter, response shape, status code, authentication,
 caching behavior, or shared API type MUST update the documentation registry in the same change.**
-Keep `packages/app/src/lib/api-route-catalog.ts` synchronized with every handler under
+Keep `packages/app/src/lib/api/api-route-catalog.ts` synchronized with every handler under
 `packages/app/src/app/api/`; the catalog classifies unpublished routes and records review digests
 for handlers and shared contract sources. Do not update a digest without first confirming whether
 the human reference, Chinese copy, examples, or OpenAPI schema also need changes.
@@ -145,14 +156,14 @@ the human reference, Chinese copy, examples, or OpenAPI schema also need changes
 Run the synchronization guard from `packages/app`:
 
 ```bash
-bun --env-file=../../.env vitest run src/lib/api-route-catalog.test.ts
+bun --env-file=../../.env vitest run src/lib/api/api-route-catalog.test.ts
 ```
 
 Static content routes (no DB):
 
 - `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
 - `/blog/[slug]` — blog post page with MDX rendering and OG image generation
-- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
+- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/content/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
 - `/feed.xml` — RSS 2.0 feed
 - `/llms.txt` — LLM-readable site index
 - `/llms-full.txt` — full article content for LLM ingestion
@@ -172,7 +183,7 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 
 ## Testing
 
-See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review.
+See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review. **Exception:** easter egg themes and games have no feature tests; retain only the two main-site isolation checks named in the policy at the top of this file.
 
 ### E2E Runtime and PR Workflow
 
@@ -183,19 +194,19 @@ See [Testing](./docs/testing.md) for full requirements, quality standards, and p
 
 ## Analytics Requirement
 
-All interactive elements should have `track()` from `@/lib/analytics` (autocapture provides baseline coverage).
+All interactive elements should have `track()` from `@/lib/analytics/analytics` (autocapture provides baseline coverage).
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
-**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
+**Prefixes**: `agentic_workload_`, `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
 
 ## Tab Structure
 
-Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
+Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/routing/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
 
 ## Unofficial Run Support — Mandatory for Inference / Evaluation Features
 
-Any new feature that operates on inference or evaluation chart data **must** also work for unofficial run overlays — not just the official run rendering path. The overlay path is a separate code branch (`overlayData`, `processedOverlayData`, `overlayRooflines`, `activeOverlayHwTypes`, `overlayRunColor`/`overlayRunIndex` from `@/lib/overlay-run-style`, `useUnofficialRun()` from `@/components/unofficial-run-provider`) that is easy to forget — features that only handle the official path silently degrade for users who load an unofficial run via `?unofficialrun=…`.
+Any new feature that operates on inference or evaluation chart data **must** also work for unofficial run overlays — not just the official run rendering path. The overlay path is a separate code branch (`overlayData`, `processedOverlayData`, `overlayRooflines`, `activeOverlayHwTypes`, `overlayRunColor`/`overlayRunIndex` from `@/lib/charts/overlay-run-style`, `useUnofficialRun()` from `@/providers/unofficial-run-provider`) that is easy to forget — features that only handle the official path silently degrade for users who load an unofficial run via `?unofficialrun=…`.
 
 When adding a chart feature (toggle, label, overlay, filter, export, share-link param, tooltip enrichment, …):
 
@@ -209,22 +220,22 @@ If the feature genuinely cannot apply to overlays (e.g., it depends on data only
 
 ## Chinese Website Pages (/zh) — Mandatory for All Indexable Surfaces
 
-The site ships a hand-authored Simplified Chinese sibling for every indexable page under the `/zh` route prefix (`/` ↔ `/zh`, `/about` ↔ `/zh/about`, `/blog/<slug>` ↔ `/zh/blog/<slug>`, …) so the site is crawled and indexed in Chinese as well as English. There is no i18n framework — each `/zh` page is a real page that reuses the shared helpers in `packages/app/src/lib/i18n.ts` (`zhAlternates`, `enAlternates`, `ZH_OG_LOCALE`, `ZH_MIRRORED_ROUTES`) and `src/lib/tab-meta-zh.ts`. The translation quality bar above applies to all site content.
+The site ships a hand-authored Simplified Chinese sibling for every indexable page under the `/zh` route prefix (`/` ↔ `/zh`, `/about` ↔ `/zh/about`, `/blog/<slug>` ↔ `/zh/blog/<slug>`, …) so the site is crawled and indexed in Chinese as well as English. There is no i18n framework — each `/zh` page is a real page that reuses the shared helpers in `packages/app/src/lib/i18n/i18n.ts` (`zhAlternates`, `enAlternates`, `ZH_OG_LOCALE`, `ZH_MIRRORED_ROUTES`) and `src/lib/routing/tab-meta-zh.ts`. The translation quality bar above applies to all site content.
 
 **Every new indexable page, dashboard tab, or blog post MUST ship its Chinese version in the same PR:**
 
-1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
-2. **New dashboard tab** → add one entry to `src/lib/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
+1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
+2. **New dashboard tab** → add one entry to `src/lib/routing/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/routing/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
 3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
 4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Omitting the required Chinese sibling update is a 🔴 BLOCKING review issue. Fidelity or wording issues inside an updated Chinese sibling follow the advisory workflow below; serious findings require Chinese maintainer confirmation.
-5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
+5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/i18n/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
 6. **What stays English**: brand/product names, hardware SKUs, model/framework/precision names, units (tok/s/user, GB/s, $/M tok), code identifiers and flags — per the translation quality bar — plus established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English, as documented contextually in `docs/chinese-copy.md` (`warmup`, `seed`, and `offload` are non-exhaustive examples), and DB-stored _content_ (benchmark rows, dataset conversation text, run logs), which is data, not UI.
-7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
+7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
 8. **Every route gets a /zh sibling, including hidden or feature-gated ones** (`/agentx`, `/ai-chart`, `/current-inferencex-image`, `/feedback`, agentic detail pages). Noindex routes keep their noindex on both sides. The only exceptions are `feed.xml` and `llms.txt` (single-language machine feeds) plus per-post OG images. Chinese posts reuse the English post's OG image because the renderer font has no CJK glyphs.
 
 > **Claude reviews every changed user-visible Chinese string, but the Chinese maintainer makes the final decision.** Load `review-zh-copy` before opening or reviewing any PR that touches user-visible Chinese text, including refactors whose filenames do not contain `zh`. The skill evaluates semantic fidelity and natural Chinese as separate gates and follows [docs/chinese-copy.md](./docs/chinese-copy.md). Its findings never block another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or unresolved high-impact ambiguity, and ask for confirmation. The Chinese maintainer makes the final editorial decision.
 
-> **Chinese copy has a narrow objective CI guard.** `packages/app/src/lib/zh-objective-guard.test.ts` checks direction-aware App Router page parity (the documented Chinese-only `/zh/[...notFound]` catch-all is the sole current exception), explicit `en`/`zh` object-literal key shape, Blog filename and non-translatable MDX structure, and English-byte preservation for PRs labeled `chinese-copy-only`. `packages/app/src/lib/zh-copy.test.ts` retains its separately hand-checked mechanical cases. New objective rules must use the same parsing logic in the real source scan and their mutation tests. These guards do **not** judge fluency, clause order, sentence structure, register, contextual pronouns, marketing tone, quotation voice, English-token ratios, or contextual terminology; those require page context and human review. See `docs/chinese-copy.md` for the complete boundary.
+> **Chinese copy has a narrow objective CI guard.** `packages/app/src/lib/i18n/zh-objective-guard.test.ts` checks direction-aware App Router page parity (the documented Chinese-only `/zh/[...notFound]` catch-all is the sole current exception), explicit `en`/`zh` object-literal key shape, Blog filename and non-translatable MDX structure, and English-byte preservation for PRs labeled `chinese-copy-only`. `packages/app/src/lib/i18n/zh-copy.test.ts` retains its separately hand-checked mechanical cases. New objective rules must use the same parsing logic in the real source scan and their mutation tests. These guards do **not** judge fluency, clause order, sentence structure, register, contextual pronouns, marketing tone, quotation voice, English-token ratios, or contextual terminology; those require page context and human review. See `docs/chinese-copy.md` for the complete boundary.
 
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
@@ -250,9 +261,20 @@ Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a
 
 The Python file has a header comment explaining the pipeline and a `_cli()` entrypoint for stdin/stdout JSON usage. When you update it, keep the structure 1:1 with the TS so future readers can diff the two files line by line. Run the helper against a known dataset and confirm the outputs match what the chart renders before merging.
 
+## Power Model — TS Port and Upstream Python MUST Stay in Sync
+
+`packages/app/src/lib/power/power_model/` is a file-for-file TypeScript port of the InferenceX [`power_model`](https://github.com/SemiAnalysisAI/InferenceX/tree/main/power_model) package (`power_model/src/power_model`): one `.ts` per `.py`, the same directory tree, and the same class, field and method names. `power-model.manifest.json` records the pinned upstream merge commit and every upstream module; `power-model.parity.json` holds that revision's own outputs for the catalog grid plus seeded random inputs. `power-model-parity.test.ts` fails on a missing or extra module and on any number outside a relative 1e-12 of the fixture, so the port cannot drift from its pin unnoticed. The dashboard never runs the Python package, so a merged upstream change is invisible to users until the companion app PR lands.
+
+**Rule: every change to either side needs a companion PR on the other side, and each PR body links the other.** A missing companion PR is 🔴 BLOCKING on review in both repositories.
+
+- **Upstream change** (new system or component, profile value, validator, message text, workload state): land the InferenceX `power_model/` PR first. The companion app PR ports the same change with identical identifiers, bumps `REVISION` in `packages/app/scripts/generate-power-model-parity.py` to that merge commit, and regenerates the manifest and fixture with that script (Python 3.12 with pydantic, pointed at an InferenceX clone that contains the commit).
+- **Port change that upstream needs too** (a bug found in the port, a missing rejection, a new field): open the InferenceX PR first, then follow the upstream-change route.
+- **Port-only change** is allowed only when it brings the port closer to the pinned upstream behaviour and needs no upstream edit, for example matching a pydantic rejection or Python's `%g` rounding. Cite the upstream lines it mirrors, cover the case in `power-model-validation.test.ts` or the parity generator, and keep the regenerated fixture byte-stable apart from the cases you added.
+- Never hand-edit `power-model.parity.json` or `power-model.manifest.json`; regenerate them.
+
 ## Model Parameter Counts (verified)
 
-Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
+Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/catalog/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
 
 | Model                  | Total | Active      | HF ID                               | Source                             |
 | ---------------------- | ----- | ----------- | ----------------------------------- | ---------------------------------- |
@@ -307,7 +329,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 ### Add/modify a metric
 
 1. Register the field, bilingual labels/titles, polarity, and custom-source metadata in `src/components/inference/metric-registry.ts` (`METRIC_REGISTRY`).
-2. Add or reuse the derived field in `buildDerivedChartFields` (`src/lib/chart-utils.ts`) and the corresponding optional `InferenceData` field. Historical trends request the same selective builder; do not duplicate formulas.
+2. Add or reuse the derived field in `buildDerivedChartFields` (`src/lib/charts/chart-utils.ts`) and the corresponding optional `InferenceData` field. Historical trends request the same selective builder; do not duplicate formulas.
 3. Add the metric to `METRIC_CONTROL_GROUPS` when it belongs in a selector group. Chart definitions and metric key types derive from the registry.
 4. Add subtitle/disclaimer copy in `ChartDisplay.tsx` if the metric depends on assumed constants.
 5. Add the disaggregated-config caveat banner for per-GPU or per-MW metrics.
@@ -324,7 +346,7 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Modify blog components
 
-- Blog library (posts, headings, reading time): `src/lib/blog.ts`
+- Blog library (posts, headings, reading time): `src/lib/blog/blog.ts`
 - Blog list page: `src/app/blog/page.tsx`
 - Blog post page: `src/app/blog/[slug]/page.tsx`
 - MDX components: `src/components/blog/mdx-components.tsx`
@@ -339,8 +361,8 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Adding a new tab
 
-1. Add the canonical route entry to `packages/app/src/lib/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/tab-meta-zh.ts`.
+1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
+2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
 3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.

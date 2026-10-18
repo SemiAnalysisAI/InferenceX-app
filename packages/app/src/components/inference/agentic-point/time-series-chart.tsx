@@ -16,7 +16,7 @@ import {
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
 import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // Historical entry point: the pure data-shaping helpers lived in this module
 // before being extracted; re-export them so both import paths stay valid.

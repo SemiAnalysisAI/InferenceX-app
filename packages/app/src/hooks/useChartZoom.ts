@@ -68,6 +68,30 @@ export interface UseChartZoomResult {
 }
 
 /**
+ * Decides which input events may start or feed a chart zoom gesture.
+ *
+ * - Touch: a single finger must reach the page so phones can scroll past the
+ *   chart (d3-zoom would otherwise preventDefault every touchmove); two fingers
+ *   zoom/pan. One-finger pan was a dead zone anyway: ScatterGraph's constrain
+ *   pins the translate at k=1.
+ * - Wheel: require Shift so bare scroll doesn't hijack the page, and reject
+ *   ctrlKey because browsers synthesize trackpad pinch as ctrl+wheel, which
+ *   should fall through to native browser zoom.
+ * - Mouse: left button only, no Ctrl (context menu on macOS).
+ */
+export function zoomEventFilter(event: {
+  type: string;
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  button?: number;
+  touches?: ArrayLike<unknown>;
+}): boolean {
+  if (event.type.startsWith('touch')) return (event.touches?.length ?? 0) >= 2;
+  if (event.type === 'wheel') return Boolean(event.shiftKey) && !event.ctrlKey;
+  return !event.ctrlKey && !event.button;
+}
+
+/**
  * Custom hook for managing D3 zoom behavior across charts
  *
  * This hook extracts the common zoom pattern used across all D3 charts:
@@ -141,13 +165,7 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
       // create zoom behavior
       const zoom = d3
         .zoom<SVGSVGElement, unknown>()
-        .filter((event) => {
-          // Require Shift for wheel zoom so bare scroll doesn't hijack the page.
-          // Reject ctrlKey+wheel — browsers synthesize trackpad pinch as ctrl+wheel,
-          // and those should fall through to native browser zoom, not chart zoom.
-          if (event.type === 'wheel') return event.shiftKey && !event.ctrlKey;
-          return !event.ctrlKey && !event.button;
-        })
+        .filter(zoomEventFilter)
         // macOS swaps deltaY→deltaX when Shift is held (Chrome/Safari OS-level behavior).
         // Fall back to deltaX so D3 doesn't get delta=0 and compute pow(2,0)=1 (no zoom).
         .wheelDelta((event: WheelEvent) => {

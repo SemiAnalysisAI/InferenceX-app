@@ -13,8 +13,14 @@ import {
 } from 'react';
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
-import type { BenchmarkRow } from '@/lib/api';
-import { track } from '@/lib/analytics';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { track } from '@/lib/analytics/analytics';
+import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
+import {
+  needsEngineComparisonConsent,
+  supportsEngineComparisonConsent,
+  useEngineComparisonConsent,
+} from './hooks/use-engine-comparison-consent';
 import {
   FAVORITE_PRESETS,
   type FavoritePreset,
@@ -28,18 +34,20 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
-} from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { useFeatureGate } from '@/lib/use-feature-gate';
+} from '@/providers/GlobalFilterContext';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import type {
   InferenceActionsContextType,
   InferenceData,
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -56,34 +64,44 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
+import type { FixedSequenceStatistic } from '@/components/inference/utils/resolveXAxisField';
+import { parsePowerCompare } from '@/components/inference/utils/power-compare';
+import {
+  PERSISTED_PERF_RULER_CHART_ID,
+  PerfRulerStoreContext,
+  persistedPerfRulerAxisKey,
+  usePerfRulerStoreValue,
+} from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
+import { defaultYAxisMetric } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { buildAvailabilityHwKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
-import { frameworkFamily } from '@/lib/framework-family';
+import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
+  Model,
   MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 import { NORMALIZED_TOKEN_REVENUE_PRICING, usesTokenSalePricing } from './token-revenue';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import {
   EngineComparisonConflictToast,
   type EngineComparisonConflictDetail,
-} from '@/components/engine-comparison-conflict-toast';
+} from '@/components/inference/ui/engine-comparison-conflict-toast';
 import {
   effectiveLegendItems,
   exclusionResolutionFamilies,
   resolveExclusionGroups,
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
-} from '@/lib/exclusion';
-import { filterRunsByModel, getDisplayLabel } from '@/lib/utils';
+} from '@/lib/benchmarks/exclusion';
+import { filterRunsByModel, getDisplayLabel } from '@/lib/shared/utils';
 import {
   isAgenticOnlyXAxisMode,
   useChartData,
@@ -98,7 +116,8 @@ import {
   isEngineGuardLifted,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
-import { bestSeriesPerSku } from './utils/best-series-per-sku';
+import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
+import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -108,6 +127,9 @@ import {
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
+
+const splitUrlList = (value: string | undefined): string[] =>
+  value ? value.split(',').filter(Boolean) : [];
 
 const InferenceDataContext = createContext<InferenceDataContextType | undefined>(undefined);
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
@@ -194,9 +216,12 @@ export function resolveE2eXAxisMetric(
   mode: XAxisMode,
   sequence: Parameters<typeof sequenceKind>[0],
   percentile: string,
+  fixedSequenceStatistic: FixedSequenceStatistic = 'median',
 ): string | null {
   if (mode === 'ttft') {
-    return sequenceKind(sequence) === 'agentic' ? `${percentile}_ttft` : 'median_ttft';
+    return sequenceKind(sequence) === 'agentic'
+      ? `${percentile}_ttft`
+      : `${fixedSequenceStatistic}_ttft`;
   }
   if (mode === 'e2e') return null;
   return requestedMetric;
@@ -298,6 +323,11 @@ export function InferenceProvider({
   // lifted so vLLM and SGLang configs can share one graph while tuning configs.
   const featureGateUnlocked = useFeatureGate();
   const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
+  const engineConsent = useEngineComparisonConsent(
+    `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
+  );
+  const consentSupported = supportsEngineComparisonConsent(effectiveSequence);
+  const comparisonGuardLifted = engineGuardLifted || (consentSupported && engineConsent.accepted);
 
   const { getUrlParam, setUrlParams } = useUrlState();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
@@ -328,10 +358,19 @@ export function InferenceProvider({
       resolveComparisonExclusion(
         selectedModel,
         effectiveSequence,
-        engineGuardLifted,
+        comparisonGuardLifted,
         overviewHistoryPair !== undefined,
       ),
-    [selectedModel, effectiveSequence, engineGuardLifted, overviewHistoryPair],
+    [selectedModel, effectiveSequence, comparisonGuardLifted, overviewHistoryPair],
+  );
+  const requestEngineComparison = useCallback(
+    (keys: Iterable<string>, apply: () => void): boolean => {
+      if (!consentSupported || !needsEngineComparisonConsent(keys, exclusion)) return false;
+      engineConsent.request(apply);
+      track('inference_engine_comparison_confirmation_opened');
+      return true;
+    },
+    [consentSupported, exclusion, engineConsent.request],
   );
   const defaultExclusionGroup = useMemo(
     () => comparisonDefaultGroup(effectiveSequence, engineGuardLifted),
@@ -359,8 +398,8 @@ export function InferenceProvider({
   const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
   const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
   useEffect(() => {
-    if (engineGuardLifted) setEngineConflict(null);
-  }, [engineGuardLifted]);
+    if (comparisonGuardLifted) setEngineConflict(null);
+  }, [comparisonGuardLifted]);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
   // Defer URL restoration until after mount so the first client render matches SSR.
@@ -412,7 +451,11 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
+    resolveMetricConfigKey(
+      getUrlParam('i_metric'),
+      initialYAxisMetric ??
+        defaultYAxisMetric(parsePowerTiers(splitUrlList(getUrlParam('i_power')))),
+    ),
   );
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
@@ -449,7 +492,7 @@ export function InferenceProvider({
   // value (if any) in a post-mount effect — keeps server + client first render
   // identical and avoids "didn't match" hydration warnings when the URL holds
   // a non-default mode.
-  const [requestedXAxisMode, setRequestedXAxisMode] = useState<XAxisMode>('interactivity');
+  const [requestedXAxisMode, setRequestedXAxisMode] = useState<XAxisMode | null>(null);
   const xAxisModeFromUrlRef = useRef(false);
   useEffect(() => {
     if (xAxisModeFromUrlRef.current) return;
@@ -460,8 +503,10 @@ export function InferenceProvider({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const defaultXAxisMode =
+    activeTab === 'inference' ? defaultInferenceXAxisMode(selectedModel) : 'interactivity';
   const selectedXAxisMode = resolveEffectiveXAxisMode(
-    requestedXAxisMode,
+    requestedXAxisMode ?? defaultXAxisMode,
     effectiveSequence,
     sequenceResolved,
   );
@@ -469,19 +514,30 @@ export function InferenceProvider({
     xAxisModeFromUrlRef.current = true;
     setRequestedXAxisMode(mode);
   }, []);
-  // Latency percentile applied to the chart x-axis for agentic scenarios.
-  // Values: 'p90' | 'p99'. Non-agentic charts ignore.
-  const [selectedPercentile, setSelectedPercentile] = useState<string>(
-    () => getUrlParam('i_pctl') || 'p90',
-  );
+  const [fixedSequenceStatistic, setFixedSequenceStatistic] =
+    useState<FixedSequenceStatistic>('median');
+  useEffect(() => {
+    setFixedSequenceStatistic(getUrlParam('i_mstat') === 'mean' ? 'mean' : 'median');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Agentic x-axis latency basis is fixed at p90 (no Latency Percentile control).
+  const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
     requestedE2eXAxisMetric,
     selectedXAxisMode,
     effectiveSequence,
     selectedPercentile,
+    fixedSequenceStatistic,
   );
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
+  );
+  // Comparison series on a gated power metric (`i_pcompare`). Kept while the
+  // metric changes: a key without a common axis simply yields no siblings, and
+  // the Measured controls say so, so a link's intent survives a detour.
+  const [powerCompare, setPowerCompare] = useState<PowerCompare>(() =>
+    parsePowerCompare(getUrlParam('i_pcompare')),
   );
 
   // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
@@ -511,11 +567,10 @@ export function InferenceProvider({
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
   const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
+  const [quickFilterTopologies, setQuickFilterTopologies] = useState<string[]>([]);
   useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power') => {
-      const v = getUrlParam(key);
-      return v ? v.split(',').filter(Boolean) : [];
-    };
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power' | 'i_topology') =>
+      splitUrlList(getUrlParam(key));
     const vendors = parse('i_vendor');
     const frameworks = parse('i_fw');
     // Preserve old shared links: `agg` used to mean every non-disaggregated
@@ -523,11 +578,13 @@ export function InferenceProvider({
     const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
     const power = parsePowerTiers(parse('i_power'));
+    const topologies = parse('i_topology');
     if (vendors.length > 0) setQuickFilterVendors(vendors);
     if (frameworks.length > 0) setQuickFilterFrameworks(frameworks);
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
     if (power.length > 0) setQuickFilterPower(power);
+    if (topologies.length > 0) setQuickFilterTopologies(topologies);
   }, [getUrlParam, setQuickFilterFrameworks]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
@@ -536,6 +593,7 @@ export function InferenceProvider({
       deployment: quickFilterDeployment,
       spec: quickFilterSpec,
       power: quickFilterPower,
+      topologies: quickFilterTopologies,
     }),
     [
       quickFilterVendors,
@@ -543,6 +601,7 @@ export function InferenceProvider({
       quickFilterDeployment,
       quickFilterSpec,
       quickFilterPower,
+      quickFilterTopologies,
     ],
   );
   // Historical Trends hides Quick Filters, so never apply invisible selections there.
@@ -563,9 +622,6 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [showAllMeasurements, setShowAllMeasurements] = useState(
-    () => getUrlParam('i_allpoints') === '1',
-  );
   // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
   // mode follows the model + scenario default, so charts that open with every
   // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
@@ -626,6 +682,9 @@ export function InferenceProvider({
     }
     return null;
   });
+  const [hardwareDefaultsOverridden, setHardwareDefaultsOverridden] = useState(() =>
+    Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
+  );
 
   // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
@@ -757,7 +816,6 @@ export function InferenceProvider({
     selectedPercentile,
     compareGpuPair ?? null,
     benchmarkRunId,
-    effectiveSelectedRunId ? String(effectiveSelectedRunId) : undefined,
     selectedXAxisMode,
     asOfRunId,
     dataQuickFilters,
@@ -770,6 +828,8 @@ export function InferenceProvider({
       !isUnofficialRun &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
+    powerCompare,
+    fixedSequenceStatistic,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -916,10 +976,27 @@ export function InferenceProvider({
   }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
+      // Reset deliberate model changes, not initial URL hydration or presets.
+      // Entering Qwen resets the axis; direct links still keep their explicit mode.
+      if (v !== selectedModel) {
+        if (activeTab === 'inference' && v === Model.Qwen3_5) {
+          setRequestedXAxisMode(null);
+        }
+        setBestPerSku(activeTab === 'inference' ? null : false);
+        setPendingActiveHwTypes(null);
+        setHardwareDefaultsOverridden(Boolean(initialActiveHwTypes?.length || autoSelectAllGpus));
+      }
       setSelectedModel(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedModel, clearScopedSelectionOnChange],
+    [
+      selectedModel,
+      activeTab,
+      setSelectedModel,
+      clearScopedSelectionOnChange,
+      initialActiveHwTypes,
+      autoSelectAllGpus,
+    ],
   );
   const setSelectedSequenceAndClear = useCallback(
     (v: typeof effectiveSequence) => {
@@ -930,10 +1007,13 @@ export function InferenceProvider({
   );
   const setSelectedPrecisionsAndClear = useCallback(
     (v: typeof effectivePrecisions) => {
+      if (activeTab === 'inference' && selectedModel === Model.Qwen3_5) {
+        setRequestedXAxisMode(null);
+      }
       setSelectedPrecisions(v);
       clearScopedSelectionOnChange();
     },
-    [setSelectedPrecisions, clearScopedSelectionOnChange],
+    [activeTab, selectedModel, setSelectedPrecisions, clearScopedSelectionOnChange],
   );
   const setSelectedYAxisMetricAndClear = useCallback(
     (v: string) => {
@@ -942,8 +1022,31 @@ export function InferenceProvider({
     },
     [setSelectedYAxisMetric, clearPresetOnChange],
   );
+  // A tier filter is only meaningful on a power chart. The move happens once, on
+  // entry, so a metric picked while the filter is on survives later tier edits.
+  // The URL restore keeps the raw setter so a link's explicit `i_metric` wins.
+  const setQuickFilterPowerAndMetric = useCallback(
+    (tiers: PowerTier[]) => {
+      setQuickFilterPower(tiers);
+      if (
+        quickFilterPower.length === 0 &&
+        tiers.length > 0 &&
+        !getMeasuredMetricConfig(selectedYAxisMetric)
+      ) {
+        setSelectedYAxisMetricAndClear(defaultYAxisMetric(tiers));
+      }
+    },
+    [quickFilterPower, selectedYAxisMetric, setSelectedYAxisMetricAndClear],
+  );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
+      if (
+        requestEngineComparison(next, () => {
+          setSelectedGpuState(next);
+          clearScopedSelectionOnChange();
+        })
+      )
+        return;
       if (!exclusion) {
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
@@ -1003,6 +1106,7 @@ export function InferenceProvider({
       exclusionPolicy,
       clearPresetOnChange,
       clearScopedSelectionOnChange,
+      requestEngineComparison,
     ],
   );
   const setSelectedDatesAndClear = useCallback(
@@ -1034,6 +1138,21 @@ export function InferenceProvider({
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
   const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
+
+  // ── Perf rulers (persisted chart) ────────────────────────────────────────
+  // The axis identity follows the graph ChartDisplay renders as `chart-0`
+  // (picked by x mode, like `bestHwTypes` below), so an x-mode switch that
+  // swaps the rendered chart or its x units clears the rulers the same way
+  // the chart's own `usePerfRulerAxisReset` does for local state.
+  const perfRulerStore = usePerfRulerStoreValue(
+    PERSISTED_PERF_RULER_CHART_ID,
+    getUrlParam('i_rulers'),
+    persistedPerfRulerAxisKey(graphs, selectedXAxisMode, selectedYAxisMetric),
+  );
+  const iRulersStr = useMemo(
+    () => serializePerfRulers(perfRulerStore.state),
+    [perfRulerStore.state],
+  );
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
 
@@ -1199,6 +1318,13 @@ export function InferenceProvider({
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
     if (!graph) return hwTypesWithData;
+    // All in Measured can have GPU-valid table rows without a numeric estimate to rank.
+    const tableCandidates = graph.tableData?.filter((point) =>
+      effectivePrecisions.includes(point.precision),
+    );
+    const unrankedHwTypes = tableCandidates
+      ? new Set(tableCandidates.map(extractHwKey))
+      : hwTypesWithData;
     const direction =
       graph.chartDefinition[
         `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition
@@ -1209,14 +1335,36 @@ export function InferenceProvider({
       direction !== 'lower_left' &&
       direction !== 'lower_right'
     ) {
-      return hwTypesWithData;
+      return unrankedHwTypes;
     }
-    const best = bestSeriesPerSku(graph.data, direction);
-    return best.size > 0 ? best : hwTypesWithData;
-  }, [graphs, hwTypesWithData, selectedXAxisMode, selectedYAxisMetric]);
+    const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
+    if (best.size === 0) return unrankedHwTypes;
+    // Rankable SKUs keep their winner; table-only SKUs stay visible.
+    return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
+  }, [
+    graphs,
+    hwTypesWithData,
+    selectedXAxisMode,
+    selectedYAxisMetric,
+    effectivePrecisions,
+    extractHwKey,
+  ]);
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {
+      if (
+        !enabled &&
+        options?.applySelection !== false &&
+        requestEngineComparison(selectableHwTypes, () => {
+          setHardwareDefaultsOverridden(true);
+          setBestPerSku(false);
+          setActiveHwTypes(selectableHwTypes);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+        })
+      )
+        return;
+      setHardwareDefaultsOverridden(true);
       setBestPerSku(enabled);
       // Overlay-mode legend edits own a temporary unified selection. They can
       // disable the automatic mode without replacing the context selection
@@ -1227,7 +1375,7 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes],
+    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes, requestEngineComparison],
   );
 
   // Direct fallback: apply pendingHwFilter when selectableHwTypes is already populated
@@ -1247,21 +1395,42 @@ export function InferenceProvider({
 
   const toggleHwType = useCallback(
     (hw: string) => {
+      const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
+      if (
+        // Solo/restore clicks retain the exclusion-aware selection below.
+        !activeHwTypes.has(hw) &&
+        requestEngineComparison(proposed, () => {
+          setHardwareDefaultsOverridden(true);
+          setActiveHwTypes(proposed);
+          setBestPerSku(false);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+        })
+      )
+        return;
       // Toggle against the selection universe, not the metric-filtered legend:
       // computeToggle's "everything is on, so solo this one" branch compares
       // set sizes, and activeHwTypes is sized against selectableHwTypes.
       const next = toggleComparisonSelection(activeHwTypes, hw, selectableHwTypes);
       if (!next) return;
+      setHardwareDefaultsOverridden(true);
       setActiveHwTypes(next);
       setBestPerSku(false);
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [activeHwTypes, selectableHwTypes, setActiveHwTypes, toggleComparisonSelection],
+    [
+      activeHwTypes,
+      selectableHwTypes,
+      setActiveHwTypes,
+      toggleComparisonSelection,
+      requestEngineComparison,
+    ],
   );
 
   const removeHwType = useCallback(
     (hw: string) => {
+      setHardwareDefaultsOverridden(true);
       removeHwRaw(hw);
       setBestPerSku(false);
       setActivePresetId(null);
@@ -1285,6 +1454,15 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
+    if (
+      requestEngineComparison(selectableHwTypes, () => {
+        setHardwareDefaultsOverridden(true);
+        setBestPerSku(false);
+        setActiveHwTypes(selectableHwTypes);
+      })
+    )
+      return;
+    setHardwareDefaultsOverridden(true);
     setBestPerSku(false);
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(selectableHwTypes, activeHwTypes);
@@ -1305,6 +1483,7 @@ export function InferenceProvider({
     exclusion,
     resolveHwSelection,
     setActiveHwTypes,
+    requestEngineComparison,
   ]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
@@ -1329,6 +1508,7 @@ export function InferenceProvider({
     engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
+  const lastHwResetModelRef = useRef(selectedModel);
 
   // Restore legend-active selection from URL on first availability of
   // selectableHwTypes. Sets lastHwResetKeyRef so the reset effect below treats
@@ -1364,6 +1544,7 @@ export function InferenceProvider({
     }
     setActiveHwTypes(restored);
     lastHwResetKeyRef.current = hwResetKey;
+    lastHwResetModelRef.current = selectedModel;
     setPendingActiveHwTypes(null);
   }, [
     pendingActiveHwTypes,
@@ -1382,6 +1563,7 @@ export function InferenceProvider({
     if (pendingActiveHwTypes) return;
     if (selectableHwTypes.size === 0) return;
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
+    const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
     // Metric changes must preserve manual legend subsets, but automatic
     // selections still need to follow the newly selected axes. In particular,
@@ -1389,6 +1571,10 @@ export function InferenceProvider({
     // metric's winners while its toggle remained enabled.
     if (!scopeChanged && !bestPerSku && !presetFilter) return;
     lastHwResetKeyRef.current = hwResetKey;
+    lastHwResetModelRef.current = selectedModel;
+    // Keep engine stickiness within a model, never across model navigation.
+    const previousSelection = modelChanged ? new Set<string>() : undefined;
+    if (modelChanged) preferredHwTypesRef.current = new Set();
     if (presetFilter) {
       const filtered = new Set(
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
@@ -1396,17 +1582,21 @@ export function InferenceProvider({
       if (filtered.size > 0) {
         // Presets explicitly choose configs. Resolve any engine conflict
         // silently so loading a preset never flashes an invalid comparison.
-        setActiveHwTypes(resolveHwSelection(filtered).result);
+        setActiveHwTypes(resolveHwSelection(filtered, previousSelection).result);
         return;
       }
     }
+    const candidates = bestPerSku ? bestHwTypes : selectableHwTypes;
+    const automaticSelection =
+      activeTab === 'inference' && !hardwareDefaultsOverridden
+        ? defaultInferenceHardware(selectedModel, candidates)
+        : candidates;
     if (exclusion) {
       // Automatic resets must never surface multiple incomparable engine groups.
       // Scenarios that restrict standard-token engines (8K/1K, AgentX) keep one
       // sticky group so their charts remain useful; variant-only rules retain
       // the existing clear-all behavior.
-      const automaticSelection = bestPerSku ? bestHwTypes : selectableHwTypes;
-      const { result, droppedGroups } = resolveHwSelection(automaticSelection);
+      const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
         setEngineConflict({
@@ -1416,7 +1606,7 @@ export function InferenceProvider({
       }
       return;
     }
-    setActiveHwTypes(bestPerSku ? bestHwTypes : selectableHwTypes);
+    setActiveHwTypes(automaticSelection);
   }, [
     selectedModel,
     effectiveSequence,
@@ -1428,6 +1618,8 @@ export function InferenceProvider({
     exclusion,
     pendingActiveHwTypes,
     resolveHwSelection,
+    activeTab,
+    hardwareDefaultsOverridden,
   ]);
 
   // Remove selected GPUs only after successful availability has settled. An
@@ -1538,20 +1730,26 @@ export function InferenceProvider({
   // baking that axis's coverage into the share URL. Keeps share URLs short.
   const iActiveStr = useMemo(() => {
     if (activeHwTypes.size === 0) return '';
-    if (bestPerSku && activeHwTypes.size === bestHwTypes.size) {
+    const defaultSelection = (items: Set<string>) =>
+      activeTab === 'inference' && !initialActiveHwTypes?.length && !autoSelectAllGpus
+        ? defaultInferenceHardware(selectedModel, items)
+        : items;
+    const defaultBest = defaultSelection(bestHwTypes);
+    const defaultAll = defaultSelection(selectableHwTypes);
+    if (bestPerSku && activeHwTypes.size === defaultBest.size) {
       let same = true;
       for (const k of activeHwTypes) {
-        if (!bestHwTypes.has(k)) {
+        if (!defaultBest.has(k)) {
           same = false;
           break;
         }
       }
       if (same) return '';
     }
-    if (activeHwTypes.size === selectableHwTypes.size) {
+    if (activeHwTypes.size === defaultAll.size) {
       let same = true;
       for (const k of activeHwTypes) {
-        if (!selectableHwTypes.has(k)) {
+        if (!defaultAll.has(k)) {
           same = false;
           break;
         }
@@ -1559,7 +1757,16 @@ export function InferenceProvider({
       if (same) return '';
     }
     return [...activeHwTypes].toSorted().join(',');
-  }, [activeHwTypes, selectableHwTypes, bestHwTypes, bestPerSku]);
+  }, [
+    activeHwTypes,
+    selectableHwTypes,
+    bestHwTypes,
+    bestPerSku,
+    activeTab,
+    selectedModel,
+    initialActiveHwTypes,
+    autoSelectAllGpus,
+  ]);
 
   const serializedLabelState = serializeLabelState(labelScenarioKind, {
     showPointLabels,
@@ -1569,15 +1776,17 @@ export function InferenceProvider({
 
   useUrlStateSync(
     {
-      i_metric: selectedYAxisMetric,
+      i_metric:
+        selectedYAxisMetric === (initialYAxisMetric ?? defaultYAxisMetric(quickFilterPower))
+          ? ''
+          : selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
-      i_pctl: selectedPercentile,
+      i_mstat: fixedSequenceStatistic,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_allpoints: showAllMeasurements ? '1' : '',
       i_best:
         bestPerSkuChoice === null || bestPerSkuChoice === bestPerSkuDefault
           ? ''
@@ -1589,7 +1798,7 @@ export function InferenceProvider({
       i_log: logScale ? '1' : '',
       i_xmetric: selectedXAxisMetric || '',
       i_e2e_xmetric: selectedE2eXAxisMetric || '',
-      i_xmode: selectedXAxisMode,
+      i_xmode: requestedXAxisMode === null ? '' : selectedXAxisMode,
       i_scale: scaleType,
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: serializedLabelState.i_advlabel,
@@ -1603,19 +1812,24 @@ export function InferenceProvider({
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
       i_power: quickFilterPower.join(','),
+      i_topology: quickFilterTopologies.join(','),
+      i_rulers: iRulersStr,
+      i_pcompare: powerCompare === 'none' ? '' : powerCompare,
     },
     [
       selectedYAxisMetric,
+      initialYAxisMetric,
       tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
+      requestedXAxisMode,
+      fixedSequenceStatistic,
       scaleType,
       selectedGPUs,
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
-      showAllMeasurements,
       bestPerSkuChoice,
       bestPerSkuDefault,
       showPointLabels,
@@ -1634,6 +1848,9 @@ export function InferenceProvider({
       quickFilterDeployment,
       quickFilterSpec,
       quickFilterPower,
+      quickFilterTopologies,
+      iRulersStr,
+      powerCompare,
     ],
   );
 
@@ -1848,10 +2065,12 @@ export function InferenceProvider({
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
+      fixedSequenceStatistic,
+      defaultXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
-      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1873,10 +2092,12 @@ export function InferenceProvider({
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedXAxisMode,
+      fixedSequenceStatistic,
+      defaultXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
-      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -1904,18 +2125,19 @@ export function InferenceProvider({
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
     setTokenRevenuePriceSource,
-    setSelectedPercentile,
+    setFixedSequenceStatistic,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,
+    setPowerCompare,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-    setQuickFilterPower,
+    setQuickFilterPower: setQuickFilterPowerAndMetric,
+    setQuickFilterTopologies,
     setIsLegendExpanded,
     setHideNonOptimal,
-    setShowAllMeasurements,
     setShowPointLabels,
     setHighContrast,
     setLogScale,
@@ -1944,11 +2166,36 @@ export function InferenceProvider({
         display={displayValue}
         actions={actionsValue}
       >
-        {children}
+        <PerfRulerStoreContext.Provider value={perfRulerStore}>
+          {children}
+        </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
-        detail={engineGuardLifted ? null : engineConflict}
+        detail={comparisonGuardLifted ? null : engineConflict}
         onDismiss={dismissEngineConflict}
+        onCompare={
+          consentSupported
+            ? () => {
+                const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
+                requestEngineComparison(keys, () => {
+                  setBestPerSku(false);
+                  setActiveHwTypes(new Set(keys));
+                  setEngineConflict(null);
+                });
+              }
+            : undefined
+        }
+      />
+      <EngineComparisonConfirmation
+        open={engineConsent.open}
+        onCancel={() => {
+          engineConsent.cancel();
+          track('inference_engine_comparison_confirmation_cancelled');
+        }}
+        onConfirm={() => {
+          engineConsent.confirm();
+          track('inference_engine_comparison_confirmation_accepted');
+        }}
       />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>

@@ -1,4 +1,5 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { at, text, type Json } from './bundle';
 
 /** `h` = Owning at Large Hyperscaler Volume, `r` = Rent - 3 Year Commit (HW_REGISTRY costh/costr). */
 export type CostTier = 'h' | 'r';
@@ -18,6 +19,20 @@ export function hardwareKey(name: string): string | null {
 }
 
 export const hardwareLabel = (key: string): string => HW_REGISTRY[key]?.label ?? key;
+
+/**
+ * Hardware a native srt-slurm bundle names. Its producer records no GPU model
+ * and no device inventory, so the site record is honoured when present, then
+ * the cluster the sealed per-cell aggregate identifies (`h200-dgxc` → H200),
+ * then the SKU the CI runner's name carries. Nothing recognisable reads as
+ * empty, never as a guess.
+ */
+export function nativeHardware(ci: Json, cluster = ''): string {
+  const site = text(at(ci, 'site', 'gpu_model'));
+  if (site) return site;
+  const key = hardwareKey(cluster) ?? hardwareKey(text(at(ci, 'ci', 'runner_name')));
+  return key === null ? '' : hardwareLabel(key);
+}
 
 export const hardwareSort = (key: string): number =>
   HW_REGISTRY[key]?.sort ?? Number.MAX_SAFE_INTEGER;

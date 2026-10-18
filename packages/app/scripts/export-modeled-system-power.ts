@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import type { BenchmarkRow } from '../src/lib/api';
-import { AIR_COOLED_SYSTEM_PUE, modelSystemPower } from '../src/lib/modeled-system-power';
-import profileData from '../src/lib/system-power-model.profiles.json';
+import type { BenchmarkRow } from '../src/lib/api/api';
+import { isNvl72Hardware, modelSystemPower } from '../src/lib/power/modeled-system-power';
+import modelManifest from '../src/lib/power/power-model.manifest.json';
 
 interface PowerAudit {
   power_valid: boolean;
@@ -97,9 +97,9 @@ function estimatedEnergy(
     return { status: 'unavailable', reason: 'audit-does-not-match-measured-input' };
   // Energy belongs to the measured GPUs: an extrapolated chassis contributes
   // only their share at the modeled per-GPU rate.
-  const chassis = modeled.deploymentAcWatts * w.integration_duration_s;
+  const it = modeled.deploymentItWatts * w.integration_duration_s;
   const facility = modeled.deploymentFacilityWatts * w.integration_duration_s;
-  if (!finite(chassis) || !finite(facility))
+  if (!finite(it) || !finite(facility))
     return { status: 'unavailable', reason: 'non-finite-modeled-energy' };
   return {
     status: 'estimated',
@@ -109,23 +109,22 @@ function estimatedEnergy(
     completed_queries: w.completed,
     input_tokens: w.total_input_tokens,
     output_tokens: w.total_output_tokens,
-    chassis_ac_j: chassis,
+    it_j: it,
     facility_j: facility,
-    chassis_ac_j_per_output_token: chassis / w.total_output_tokens,
+    it_j_per_output_token: it / w.total_output_tokens,
     facility_j_per_output_token: facility / w.total_output_tokens,
-    chassis_ac_j_per_input_token: chassis / w.total_input_tokens,
-    chassis_ac_j_per_total_token: chassis / (w.total_input_tokens + w.total_output_tokens),
-    chassis_ac_j_per_successful_query: chassis / w.completed,
+    it_j_per_input_token: it / w.total_input_tokens,
+    it_j_per_total_token: it / (w.total_input_tokens + w.total_output_tokens),
+    it_j_per_successful_query: it / w.completed,
   };
 }
 
-export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_PUE) {
+export function buildComparison(input: ComparisonInput) {
   if (!input || typeof input.cohort !== 'string' || !Array.isArray(input.rows)) {
     throw new Error(
       'Expected a cohort envelope with a rows array. See docs/powerx-system-power.md.',
     );
   }
-  if (!finite(pue) || pue < 1) throw new Error('PUE must be a finite number >= 1.');
   const ids = new Set<string>();
   const rows = input.rows.map((entry) => {
     const row = entry.benchmark;
@@ -141,16 +140,15 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
       throw new Error(`Invalid benchmark input or duplicate id: ${entry.id}`);
     }
     ids.add(entry.id);
-    const modeled = modelSystemPower(row, pue);
-    const profile = Object.entries(profileData.profiles).find(
-      ([key]) => key === row.hardware.toLowerCase(),
-    )?.[1];
+    const modeled = modelSystemPower(row);
     const measurementStatus =
       row.metrics.power_valid === 1
         ? 'producer-valid'
         : row.metrics.power_valid === 0
           ? 'invalid'
           : 'unverified';
+    // NVL72 Grace-side keys carry their own verdict.
+    const cpuValid = row.metrics.cpu_power_valid === 1;
     return {
       id: entry.id,
       cell: entry.cell ?? null,
@@ -165,10 +163,15 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
               total_gpu_w: measurement(row.metrics.avg_total_gpu_power_w),
               total_gpu_j: measurement(row.metrics.total_gpu_energy_j),
               gpu_j_per_output_token: measurement(row.metrics.joules_per_output_token),
+              ...(isNvl72Hardware(row.hardware)
+                ? {
+                    cpu_power_valid: row.metrics.cpu_power_valid ?? null,
+                    total_grace_w: cpuValid ? measurement(row.metrics.avg_total_cpu_power_w) : null,
+                    total_grace_j: cpuValid ? measurement(row.metrics.total_cpu_energy_j) : null,
+                  }
+                : {}),
             }
           : null,
-      assumptions: profile ? { ...profile.assumptions, pue } : null,
-      model_path: profile?.modelPath ?? null,
       modeled,
       estimated_energy: estimatedEnergy(row, modeled, entry.audit),
       audit: entry.audit ?? null,
@@ -211,10 +214,7 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
       replicate_ids: replicates.map((row) => row.id),
       replicate_count: replicates.length,
       supported_replicates: replicates.filter((row) => row.modeled.status === 'supported').length,
-      model_revision: profileData.modelRevision,
-      model_path: replicates[0].model_path,
-      assumptions: replicates[0].assumptions,
-      pue,
+      model_revision: modelManifest.modelRevision,
       status: complete ? 'supported' : 'unsupported',
       unsupported_reasons: [
         ...new Set(
@@ -239,19 +239,17 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
       measured_gpu_j_per_output_token_mean: mean(
         replicates.map((row) => row.measured_inputs?.gpu_j_per_output_token ?? null),
       ),
-      modeled_chassis_ac_w_mean: mean(
+      modeled_it_w_mean: mean(
+        replicates.map((row) => (row.modeled.status === 'supported' ? row.modeled.itWatts : null)),
+      ),
+      modeled_it_w_per_gpu_mean: mean(
         replicates.map((row) =>
-          row.modeled.status === 'supported' ? row.modeled.chassisAcWatts : null,
+          row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,
         ),
       ),
-      modeled_chassis_ac_w_per_gpu_mean: mean(
+      modeled_deployment_it_w_mean: mean(
         replicates.map((row) =>
-          row.modeled.status === 'supported' ? row.modeled.chassisAcWattsPerGpu : null,
-        ),
-      ),
-      modeled_deployment_ac_w_mean: mean(
-        replicates.map((row) =>
-          row.modeled.status === 'supported' ? row.modeled.deploymentAcWatts : null,
+          row.modeled.status === 'supported' ? row.modeled.deploymentItWatts : null,
         ),
       ),
       modeled_deployment_facility_w_mean: mean(
@@ -264,8 +262,8 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
           row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,
         ),
       ),
-      estimated_chassis_ac_j_per_output_token_mean: mean(
-        replicates.map((row) => row.estimated_energy.chassis_ac_j_per_output_token ?? null),
+      estimated_it_j_per_output_token_mean: mean(
+        replicates.map((row) => row.estimated_energy.it_j_per_output_token ?? null),
       ),
       estimated_facility_j_per_output_token_mean: mean(
         replicates.map((row) => row.estimated_energy.facility_j_per_output_token ?? null),
@@ -276,19 +274,22 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
     metadata: {
       cohort: input.cohort,
       source: input.metadata,
-      pue,
       scope: { benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
       selection:
         'Every supplied row is retained, including unsupported, invalid, and missing-input cases.',
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
-        'Measured GPU-board inputs; modeled GPU-chassis AC includes their CPU/DRAM, other model components, and PSU loss. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after GPU-chassis AC.',
+        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. GB200/GB300 NVL72 rows add measured Grace-socket inputs when their socket telemetry is complete and validated (cpu_basis measured; otherwise the upstream Grace profile, cpu_basis modeled): the measured trays fold into an 18-tray rack at their mean GPU and socket power (tray NICs, optics, drives, fans and 48 V conversion; NVSwitch trays, power shelves and the rack share of scale-out networking), and each tray takes 1/18 of it. Separate CPU-only frontend/router hosts are excluded. Facility power applies the system cooling PUE after IT power.',
       extrapolation:
-        'A partially allocated chassis is modeled at measured per-GPU power × 8 (the source sweep input), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
+        'A partially allocated chassis is modeled at measured per-GPU power × 8 (the upstream model input for a full chassis), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
       energy_caveat:
         'Energy from modeled average power is an estimate. Nonlinear fan/PSU behavior is not integrated over time. Energy requires an exact matching audit window and successful token counts.',
-      model: profileData,
+      model: {
+        revision: modelManifest.modelRevision,
+        source_tree: modelManifest.sourceTree,
+        source_url: modelManifest.sourceUrl,
+      },
       row_count: rows.length,
       supported_rows: rows.filter((row) => row.modeled.status === 'supported').length,
       estimated_energy_rows: rows.filter((row) => row.estimated_energy.status === 'estimated')
@@ -311,49 +312,22 @@ export function csv(records: Record<string, unknown>[]): string {
   return `${[columns.map(csvValue).join(','), ...records.map((row) => columns.map((key) => csvValue(row[key])).join(','))].join('\r\n')}\r\n`;
 }
 
-async function main() {
-  const { values } = parseArgs({
-    options: {
-      input: { type: 'string' },
-      output: { type: 'string' },
-      pue: { type: 'string' },
-    },
-  });
-  if (!values.input || !values.output)
-    throw new Error(
-      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY [--pue 1.3]',
-    );
-  const inputBytes = await readFile(values.input);
-  const result = buildComparison(
-    JSON.parse(inputBytes.toString('utf8')),
-    values.pue === undefined ? undefined : Number(values.pue),
-  );
-  const root = resolve(import.meta.dirname, '../../..');
-  const codePaths = [
-    'packages/app/scripts/export-modeled-system-power.ts',
-    'packages/app/src/lib/modeled-system-power.ts',
-    'packages/app/src/lib/system-power-model.ts',
-    'packages/app/src/lib/system-power-model.profiles.json',
-  ];
-  const hashes: Record<string, string> = {};
-  for (const path of codePaths)
-    hashes[path] = createHash('sha256')
-      .update(await readFile(resolve(root, path)))
-      .digest('hex');
-  const metadata = {
-    ...result.metadata,
-    generated_at: new Date().toISOString(),
-    input_file: resolve(values.input),
-    input_sha256: createHash('sha256').update(inputBytes).digest('hex'),
-    app_revision: execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf8',
-    }).trim(),
-    app_worktree_dirty:
-      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() !== '',
-    implementation_sha256: hashes,
-  };
-  const flat = result.rows.map((row) => ({
+type Comparison = ReturnType<typeof buildComparison>;
+
+/** One CSV record per row: the comparison row flattened with the export's provenance. */
+/** The TypeScript port; hashed as one digest over its sorted files. */
+const POWER_MODEL_DIR = 'packages/app/src/lib/power/power_model/';
+
+export function flatRows(
+  result: Comparison,
+  metadata: Comparison['metadata'] & {
+    app_revision: string;
+    input_sha256: string;
+    generated_at: string;
+  },
+  hashes: Record<string, string>,
+) {
+  return result.rows.map((row) => ({
     cohort: metadata.cohort,
     id: row.id,
     cell: row.cell,
@@ -377,14 +351,21 @@ async function main() {
     measured_total_gpu_w: row.measured_inputs?.total_gpu_w,
     measured_total_gpu_j: row.measured_inputs?.total_gpu_j,
     measured_gpu_j_per_output_token: row.measured_inputs?.gpu_j_per_output_token,
+    cpu_power_valid: row.measured_inputs?.cpu_power_valid,
+    measured_total_grace_w: row.measured_inputs?.total_grace_w,
+    measured_total_grace_j: row.measured_inputs?.total_grace_j,
     modeled_status: row.modeled.status,
+    modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
+    cpu_basis:
+      row.modeled.status === 'supported' && row.modeled.unit === 'nvl72-tray'
+        ? row.modeled.cpuBasis
+        : null,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
-    modeled_chassis_ac_w: row.modeled.status === 'supported' ? row.modeled.chassisAcWatts : null,
-    modeled_chassis_ac_w_per_gpu:
-      row.modeled.status === 'supported' ? row.modeled.chassisAcWattsPerGpu : null,
+    modeled_it_w: row.modeled.status === 'supported' ? row.modeled.itWatts : null,
+    modeled_it_w_per_gpu: row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,
     modeled_facility_w: row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,
-    modeled_deployment_ac_w:
-      row.modeled.status === 'supported' ? row.modeled.deploymentAcWatts : null,
+    modeled_deployment_it_w:
+      row.modeled.status === 'supported' ? row.modeled.deploymentItWatts : null,
     modeled_deployment_facility_w:
       row.modeled.status === 'supported' ? row.modeled.deploymentFacilityWatts : null,
     physical_gpu_count: row.modeled.status === 'supported' ? row.modeled.gpuCount : null,
@@ -394,21 +375,18 @@ async function main() {
     telemetry_basis: row.modeled.status === 'supported' ? row.modeled.telemetryBasis : null,
     topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
     model_revision: row.modeled.modelRevision,
-    model_status: profileData.status,
     calculation_boundary: metadata.boundary,
     extrapolation_note: metadata.extrapolation,
     energy_caveat: metadata.energy_caveat,
-    model_path: row.model_path,
-    pue: metadata.pue,
-    assumptions: row.assumptions,
+    pue: row.modeled.status === 'supported' ? row.modeled.pue : null,
     estimated_energy: row.estimated_energy,
     estimated_energy_status: row.estimated_energy.status,
     estimated_energy_reason: row.estimated_energy.reason,
     integration_seconds: row.estimated_energy.integration_seconds,
     output_tokens: row.estimated_energy.output_tokens,
-    estimated_chassis_ac_j: row.estimated_energy.chassis_ac_j,
+    estimated_it_j: row.estimated_energy.it_j,
     estimated_facility_j: row.estimated_energy.facility_j,
-    estimated_chassis_ac_j_per_output_token: row.estimated_energy.chassis_ac_j_per_output_token,
+    estimated_it_j_per_output_token: row.estimated_energy.it_j_per_output_token,
     estimated_facility_j_per_output_token: row.estimated_energy.facility_j_per_output_token,
     run_url: row.benchmark.run_url,
     measurement_date: row.benchmark.date,
@@ -416,9 +394,58 @@ async function main() {
     raw_topology_and_metrics: row.benchmark,
     app_revision: metadata.app_revision,
     input_sha256: metadata.input_sha256,
-    profile_sha256: hashes['packages/app/src/lib/system-power-model.profiles.json'],
+    model_source_tree: modelManifest.sourceTree,
+    power_model_sha256: hashes[POWER_MODEL_DIR],
     generated_at: metadata.generated_at,
   }));
+}
+
+async function main() {
+  const { values } = parseArgs({
+    options: {
+      input: { type: 'string' },
+      output: { type: 'string' },
+    },
+  });
+  if (!values.input || !values.output)
+    throw new Error(
+      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY',
+    );
+  const inputBytes = await readFile(values.input);
+  const result = buildComparison(JSON.parse(inputBytes.toString('utf8')));
+  const root = resolve(import.meta.dirname, '../../..');
+  const codePaths = [
+    'packages/app/scripts/export-modeled-system-power.ts',
+    'packages/app/src/lib/power/modeled-system-power.ts',
+    'packages/app/src/lib/power/system-power-model.ts',
+    'packages/app/src/lib/power/power-model.manifest.json',
+  ];
+  const hashes: Record<string, string> = {};
+  for (const path of codePaths)
+    hashes[path] = createHash('sha256')
+      .update(await readFile(resolve(root, path)))
+      .digest('hex');
+  const portListing = await readdir(resolve(root, POWER_MODEL_DIR), { recursive: true });
+  const portFiles = portListing.filter((file) => file.endsWith('.ts')).toSorted();
+  const port = createHash('sha256');
+  for (const file of portFiles) {
+    port.update(`${file}\0`).update(await readFile(resolve(root, POWER_MODEL_DIR, file)));
+  }
+  hashes[POWER_MODEL_DIR] = port.digest('hex');
+  const metadata = {
+    ...result.metadata,
+    generated_at: new Date().toISOString(),
+    input_file: resolve(values.input),
+    input_sha256: createHash('sha256').update(inputBytes).digest('hex'),
+    app_revision: execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim(),
+    app_worktree_dirty:
+      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() !== '',
+    implementation_sha256: hashes,
+  };
+  const flat = flatRows(result, metadata, hashes);
   await mkdir(values.output);
   await writeFile(
     resolve(values.output, 'comparison.json'),

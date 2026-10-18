@@ -35,11 +35,13 @@ export const configSegmentLabel = (
   dcp?: number,
   pcp?: number,
   dp?: number,
+  dwdp?: number,
 ): string => {
   const ppSuffix = pp !== null && pp !== undefined && pp > 1 ? `PP${pp}` : '';
   const dcpSuffix = dcp !== null && dcp !== undefined && dcp > 1 ? `/DCP${dcp}` : '';
   const pcpSuffix = pcp !== null && pcp !== undefined && pcp > 1 ? `/PCP${pcp}` : '';
   const suffix = `${ppSuffix}${dcpSuffix}${pcpSuffix}${dp && dp > 1 ? `/DP${dp}` : ''}`;
+  if (dwdp !== undefined && Number.isInteger(dwdp) && dwdp > 1) return `DWDP${dwdp}${suffix}`;
   if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
     return `${dpAttention ? 'DEP' : 'TEP'}${tp}${suffix}`;
   }
@@ -67,6 +69,7 @@ export interface ParallelismFields {
   prefillPp?: number;
   prefillDcp?: number;
   prefillPcp?: number;
+  prefillDwdp?: number;
   prefillDpAttention?: boolean;
   prefillNumWorkers?: number;
   decodeTp?: number;
@@ -91,7 +94,8 @@ export interface ParallelismFields {
 export const parallelismLabel = (f: ParallelismFields): string => {
   if (
     (f.ep === null || f.ep === undefined) &&
-    (f.prefillEp === null || f.prefillEp === undefined)
+    (f.prefillEp === null || f.prefillEp === undefined) &&
+    !(f.prefillDwdp && f.prefillDwdp > 1)
   ) {
     return f.dp && f.dp > 1 ? `TP${f.tp}/DP${f.dp}` : String(f.tp);
   }
@@ -104,6 +108,8 @@ export const parallelismLabel = (f: ParallelismFields): string => {
       f.prefillPp ?? f.pp,
       f.prefillDcp ?? f.dcp,
       f.prefillPcp ?? f.pcp,
+      undefined,
+      f.prefillDwdp,
     );
     const decodeLabel = configSegmentLabel(
       f.decodeTp ?? f.tp,
@@ -122,5 +128,17 @@ export const parallelismLabel = (f: ParallelismFields): string => {
     return `${pw}x${prefillLabel}+${dw}x${decodeLabel}`;
   }
 
-  return configSegmentLabel(f.tp, f.ep, f.dpAttention, f.pp, f.dcp, f.pcp, f.dp);
+  const segment = configSegmentLabel(
+    f.tp,
+    f.ep,
+    f.dpAttention,
+    f.pp,
+    f.dcp,
+    f.pcp,
+    f.dp,
+    f.prefillDwdp,
+  );
+  return f.prefillDwdp && f.prefillDwdp > 1 && f.prefillNumWorkers && f.prefillNumWorkers > 1
+    ? `${f.prefillNumWorkers}x${segment}`
+    : segment;
 };

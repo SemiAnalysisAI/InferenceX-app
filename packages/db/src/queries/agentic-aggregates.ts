@@ -14,7 +14,7 @@
  */
 
 import { Readable } from 'node:stream';
-import { createGunzip, gunzipSync } from 'node:zlib';
+import { createGunzip } from 'node:zlib';
 
 import { chain } from 'stream-chain';
 
@@ -24,9 +24,8 @@ import { streamObject } from 'stream-json/streamers/stream-object.js';
 
 import { gunzipJsonWithinLimit } from '../etl/gzip-json-stream';
 import type { DbClient } from '../connection.js';
-import { computeDerivedFromBlob } from './derived-agentic-metrics';
+import { computeStoredProfileDistributions } from './derived-agentic-metrics';
 import {
-  extractIslOsl,
   fetchAggregateStatsRows,
   percentilesOf,
   sequenceLengthSketches,
@@ -321,29 +320,31 @@ export async function getAgenticAggregates(
   // good stored data.
   const pendingById = new Map<number, { traceReplayId: number; stats: FullAggregateStats }>();
 
-  // ── Fallback Pass 1: profile_export blobs (cheap; large batches). ──────
+  // ── Fallback Pass 1: profile metadata batches, then bounded profile reads. ──
   for (let i = 0; i < idsNeedingProfile.length; i += PROFILE_CHUNK_SIZE) {
     const chunk = idsNeedingProfile.slice(i, i + PROFILE_CHUNK_SIZE);
     const rows = (await sql`
       select
         br.id as benchmark_result_id,
         atr.id as trace_replay_id,
-        atr.profile_export_jsonl_gz as profile_blob
+        (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_profile
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = any(${chunk}::bigint[])
     `) as {
       benchmark_result_id: number;
       trace_replay_id: number;
-      profile_blob: Buffer | null;
+      has_profile: boolean;
     }[];
     for (const row of rows) {
       const id = Number(row.benchmark_result_id);
       result[id] ??= blankAggregate(id);
-      if (row.profile_blob) {
+      if (row.has_profile) {
         try {
-          const jsonl = gunzipSync(row.profile_blob).toString('utf8');
-          const { isl, osl } = extractIslOsl(jsonl);
+          const { isl, osl, e2el_per_osl } = await computeStoredProfileDistributions(
+            sql,
+            Number(row.trace_replay_id),
+          );
           const islPct = percentilesOf(isl);
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
@@ -351,7 +352,6 @@ export async function getAgenticAggregates(
           // Recompute every profile-derived field from this same JSONL so the
           // self-healed bundle is complete at the new version. Server-derived
           // fields are filled in Pass 2 (or stay null without a server blob).
-          const derived = computeDerivedFromBlob(jsonl);
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),
             stats: {
@@ -360,7 +360,7 @@ export async function getAgenticAggregates(
               osl: oslPct,
               kvCacheUtil: null,
               prefixCacheHitRate: null,
-              e2elPerOsl: derived.e2el_per_osl,
+              e2elPerOsl: e2el_per_osl,
               sequenceLengths: sequenceLengthSketches(isl, osl),
             },
           });

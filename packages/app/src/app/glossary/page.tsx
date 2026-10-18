@@ -2,11 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { GlossaryBrowser, type GlossaryBrowserEntry } from '@/components/glossary/glossary-browser';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { getAllPosts } from '@/lib/blog';
-import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/glossary';
-import { enAlternates } from '@/lib/i18n';
+import { getAllPosts } from '@/lib/blog/blog';
+import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/content/glossary';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const title = 'AI Inference Glossary';

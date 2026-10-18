@@ -216,3 +216,80 @@ function visibleTickValues(
     return Number.isFinite(numeric) && numeric >= min && numeric <= max;
   });
 }
+
+/**
+ * Write-if-changed DOM helpers for hot chart paths.
+ *
+ * A MutationObserver receives a record for every `setAttribute` / style write,
+ * even when the value is unchanged. Session replay (rrweb) serializes each
+ * record and the coach mark rescans on them, so blind rewrites of hundreds of
+ * point labels on every legend toggle or rescale cost far more than the DOM
+ * write itself. Reading an attribute or inline style never forces layout.
+ */
+
+export function setAttrIfChanged(element: Element, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
+/** `''` clears the property, matching `selection.style(name, '')`. */
+export function setStyleIfChanged(
+  element: HTMLElement | SVGElement,
+  name: string,
+  value: string,
+): void {
+  if (element.style.getPropertyValue(name) === value) return;
+  if (value === '') element.style.removeProperty(name);
+  else element.style.setProperty(name, value);
+}
+
+export function setTextIfChanged(element: Element, value: string): void {
+  if (element.textContent !== value) element.textContent = value;
+}
+
+/**
+ * `selection.raise()` for each selector in turn, skipped when the DOM is
+ * already in the resulting order.
+ *
+ * `raise()` re-appends every node even when it is already last, and each move
+ * is a remove + add record that session replay re-serializes with the node's
+ * whole subtree. Renders and zoom frames raise hundreds of point groups to keep
+ * z-order stable, which is almost always already correct.
+ */
+export function raiseInOrder(
+  root: { selectAll: (selector: string) => { nodes: () => Element[] } },
+  selectors: readonly string[],
+): void {
+  const groups = selectors.map((selector) => root.selectAll(selector).nodes());
+  // Each parent's children must already end with its raised nodes, in the
+  // order the sequential raises would leave them.
+  const tails = new Map<Node, Element[]>();
+  for (const nodes of groups) {
+    for (const node of nodes) {
+      const parent = node.parentNode;
+      if (!parent) continue;
+      let tail = tails.get(parent);
+      if (!tail) tails.set(parent, (tail = []));
+      tail.push(node);
+    }
+  }
+  let ordered = true;
+  for (const [parent, tail] of tails) {
+    let child = parent.lastChild;
+    for (let index = tail.length - 1; index >= 0; index--) {
+      if (child !== tail[index]) {
+        ordered = false;
+        break;
+      }
+      child = child.previousSibling;
+    }
+    if (!ordered) break;
+  }
+  if (ordered) return;
+  // Exactly the sequential raises: re-query each selector after the previous
+  // moves, and move only nodes that are not already last (d3's own rule).
+  for (const selector of selectors) {
+    for (const node of root.selectAll(selector).nodes()) {
+      if (node.nextSibling) node.parentNode?.append(node);
+    }
+  }
+}

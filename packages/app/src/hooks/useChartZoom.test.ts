@@ -1,52 +1,76 @@
 import { describe, expect, it } from 'vitest';
 
-/**
- * Extracted logic from useChartZoom's .filter() and .wheelDelta() for unit testing.
- * Mirrors the inline functions in useChartZoom.ts.
- */
-function wheelFilter(event: { type: string; shiftKey: boolean; ctrlKey: boolean; button: number }) {
-  if (event.type === 'wheel') return event.shiftKey && !event.ctrlKey;
-  return !event.ctrlKey && !event.button;
-}
+import { zoomEventFilter } from './useChartZoom';
 
+/**
+ * Extracted logic from useChartZoom's .wheelDelta() for unit testing.
+ * Mirrors the inline function in useChartZoom.ts.
+ */
 function wheelDelta(event: { deltaY: number; deltaX: number; deltaMode: number }) {
   const delta = event.deltaY || event.deltaX;
   return -delta * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
 }
 
-describe('useChartZoom wheel filter', () => {
+describe('useChartZoom wheel and mouse filter', () => {
   it('rejects bare wheel (no modifier)', () => {
-    expect(wheelFilter({ type: 'wheel', shiftKey: false, ctrlKey: false, button: 0 })).toBe(false);
+    expect(zoomEventFilter({ type: 'wheel', shiftKey: false, ctrlKey: false, button: 0 })).toBe(
+      false,
+    );
   });
 
   it('accepts Shift+wheel', () => {
-    expect(wheelFilter({ type: 'wheel', shiftKey: true, ctrlKey: false, button: 0 })).toBe(true);
+    expect(zoomEventFilter({ type: 'wheel', shiftKey: true, ctrlKey: false, button: 0 })).toBe(
+      true,
+    );
   });
 
   it('rejects Ctrl+wheel (trackpad pinch — should fall through to browser zoom)', () => {
-    expect(wheelFilter({ type: 'wheel', shiftKey: false, ctrlKey: true, button: 0 })).toBe(false);
+    expect(zoomEventFilter({ type: 'wheel', shiftKey: false, ctrlKey: true, button: 0 })).toBe(
+      false,
+    );
   });
 
   it('rejects Shift+Ctrl+wheel (ambiguous — let browser handle)', () => {
-    expect(wheelFilter({ type: 'wheel', shiftKey: true, ctrlKey: true, button: 0 })).toBe(false);
+    expect(zoomEventFilter({ type: 'wheel', shiftKey: true, ctrlKey: true, button: 0 })).toBe(
+      false,
+    );
   });
 
   it('allows left-button mousedown', () => {
-    expect(wheelFilter({ type: 'mousedown', shiftKey: false, ctrlKey: false, button: 0 })).toBe(
+    expect(zoomEventFilter({ type: 'mousedown', shiftKey: false, ctrlKey: false, button: 0 })).toBe(
       true,
     );
   });
 
   it('rejects right-click', () => {
-    expect(wheelFilter({ type: 'mousedown', shiftKey: false, ctrlKey: false, button: 2 })).toBe(
+    expect(zoomEventFilter({ type: 'mousedown', shiftKey: false, ctrlKey: false, button: 2 })).toBe(
       false,
     );
   });
 
   it('rejects Ctrl+click (context menu on macOS)', () => {
-    expect(wheelFilter({ type: 'mousedown', shiftKey: false, ctrlKey: true, button: 0 })).toBe(
+    expect(zoomEventFilter({ type: 'mousedown', shiftKey: false, ctrlKey: true, button: 0 })).toBe(
       false,
     );
+  });
+});
+
+describe('useChartZoom touch filter', () => {
+  it('rejects a single-finger touchstart so the page can scroll', () => {
+    expect(zoomEventFilter({ type: 'touchstart', touches: [{}] })).toBe(false);
+  });
+
+  it('rejects a touchstart with no touches', () => {
+    expect(zoomEventFilter({ type: 'touchstart', touches: [] })).toBe(false);
+    expect(zoomEventFilter({ type: 'touchstart' })).toBe(false);
+  });
+
+  it('accepts a two-finger touchstart (pinch / two-finger pan)', () => {
+    expect(zoomEventFilter({ type: 'touchstart', touches: [{}, {}] })).toBe(true);
+  });
+
+  it('ignores ctrlKey/button on touch events (TouchEvent has no button)', () => {
+    expect(zoomEventFilter({ type: 'touchstart', ctrlKey: true, touches: [{}, {}] })).toBe(true);
   });
 });
 

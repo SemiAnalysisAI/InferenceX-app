@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { generateHighContrastColors } from '@/lib/chart-utils';
-import { getChartThemeColors } from '@/lib/chart-rendering';
-import { generateVendorColors } from '@/lib/dynamic-colors';
+import { isDarkTheme } from '@/lib/themes/themes';
+import { generateHighContrastColors } from '@/lib/charts/chart-utils';
+import { getChartThemeColors } from '@/lib/charts/chart-rendering';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 export interface UseThemeColorsOptions {
   /**
@@ -135,7 +136,7 @@ export function useThemeColors(options: UseThemeColorsOptions): UseThemeColorsRe
   // generate dynamic vendor-aware colors for active keys
   const vendorColorMap = useMemo(() => {
     if (!activeKeys || activeKeys.length === 0) return null;
-    const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+    const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
     return generateVendorColors(activeKeys, theme);
   }, [activeKeys, resolvedTheme]);
 

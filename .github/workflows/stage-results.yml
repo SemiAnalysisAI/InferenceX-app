@@ -254,7 +254,7 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: $/.github/workflows/ingest-agentic-results.yml
+    uses: $/.github/workflows/ingest-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}
@@ -267,6 +267,8 @@ jobs:
 
   refresh-chart-series:
     name: Refresh staged chart series
+    outputs:
+      chart-links: ${{ steps.chart-links.outputs.chart-links }}
     needs: [validate, ingest]
     runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
@@ -288,6 +290,12 @@ jobs:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           RUN_ID: ${{ needs.validate.outputs.run-id }}
         run: bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --yes
+      - name: Build links to the staged Pareto lines
+        id: chart-links
+        env:
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+          RUN_ID: ${{ needs.validate.outputs.run-id }}
+        run: bun run --cwd packages/app scripts/staged-chart-links.ts
 
   report:
     name: Report staging result
@@ -304,6 +312,7 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
           REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
+          CHART_LINKS: ${{ needs['refresh-chart-series'].outputs.chart-links }}
           STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' && needs['refresh-chart-series'].result == 'success' }}
         with:
           github-token: ${{ secrets.PAT }}
@@ -320,6 +329,7 @@ jobs:
                 'requested-by': process.env.REQUESTED_BY,
                 'comment-id': process.env.COMMENT_ID,
                 'stage-succeeded': process.env.STAGE_SUCCEEDED,
+                'chart-links': JSON.parse(process.env.CHART_LINKS || '[]'),
                 'app-run-id': String(context.runId),
               },
             });

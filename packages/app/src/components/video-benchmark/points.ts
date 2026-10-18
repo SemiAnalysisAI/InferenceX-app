@@ -102,6 +102,7 @@ function toPoint(
     cell: o.cell ?? null,
     hardwareKey: hardwareKey(o.hardware),
     hardwareName: o.hardware,
+    producer: o.producer ?? null,
     runtime: o.runtime ?? '',
     model: o.model ?? '',
     workload: o.workload ?? '',

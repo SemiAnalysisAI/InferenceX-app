@@ -38,7 +38,7 @@ Point details and API records retain deployment/generation settings, sample/fail
 ## Sections below the chart
 
 - **API price reference** (`api-reference.ts`, `VideoApiReference.tsx`): a dated, editable USD per video-second list price (`v_api`, default `H3_API_REFERENCE`) feeds exactly one derived number, the API list price per video (`apiPricePerVideo` = price × clip seconds). It is shown beside the TCO cost per video on the KPI cards and as a table and CSV column; the chart never plots it, and no revenue, profit or price multiple is derived from it. The default records the MiniMax platform pay-as-you-go page captured on 2026-09-24 (the source has no effective date); it is a dated list-price input, not a current price guarantee; a null or non-positive price nulls the list price, and `parseApiPrice` falls back to the reference rather than pricing at 0.
-- **Compare** (`compare.ts`, `compare-url-state.ts`, `VideoCompare.tsx`): arena-style baseline vs. candidate, video first — the same prompt + seed clips from both CI runs play side by side with shared play/pause/restart and previous/next case arrows (no blind mode, no case dropdown); the deltas below are fixed to time to video (P50), TCO cost per video and energy per video (`COMPARE_METRICS`, registry polarity), with the cost tier stated in a footnote. One selectable cell per hardware (its lead deployment), defaulting to the slowest hardware as baseline and the fastest as candidate; `v_base`, `v_cand`, `v_case` in the URL. The two stored artifacts (several MB each) load once the panel scrolls into view; an HTTP 204 side reads as "clips not published", never as an error.
+- **Compare** (`compare.ts`, `compare-url-state.ts`, `VideoCompare.tsx`): arena-style baseline vs. candidate, video first — the same prompt + seed clips from both CI runs play side by side with shared play/pause/restart and previous/next case arrows (no blind mode, no case dropdown); the deltas below are fixed to time to video (P50), TCO cost per video and energy per video (`COMPARE_METRICS`, registry polarity), with the cost tier stated in a footnote. One selectable lead deployment per hardware and sealed engine revision, defaulting to the slowest hardware as baseline and the fastest as candidate; `v_base`, `v_cand`, `v_case` in the URL. The two stored artifacts (several MB each) load once the panel scrolls into view; an HTTP 204 side reads as "clips not published", never as an error.
 - **Performance evidence** (`evidence.ts`, `VideoEvidence.tsx`): recorded board-power ratios, concurrency throughput/latency ratios and observed speed-ups beside memory-bandwidth/FLOPS specifications. Cross-hardware rows require a known canonical workload, a complete matching deployment layout and C1 (`sharedLayoutCells`); unmatched hardware is omitted, never replaced with its lead cell. Concurrency ratios require a matching workload, layout and replica count. The copy reports numbers without inferring power saturation, a throughput plateau or a compute/memory bottleneck. These mechanisms need separate experiments and telemetry.
 
 ## Rules
@@ -48,7 +48,8 @@ Point details and API records retain deployment/generation settings, sample/fail
 - **Newest observation wins**: `latestVideoCells` keeps the first (newest publication) observation per hardware × deployment × concurrency, so a re-run replaces, never duplicates, a point, while a new server layout adds one.
 - **One workload, real samples**: the additive `workloadKey` preserves the full canonical workload identity from the source, including prompts and seeds; the shortened workload label is display text only. Missing identity stays null and is isolated by original source manifest. Runtime revision remains a disclosed comparison variable. `dashboardCells` keeps only the workload measured on the most hardware and drops cells with fewer than ten valid clips (the P90 floor), so a smoke run of a shorter plan never becomes a point, a KPI lead or a Compare side; the Performance history list still shows it, and the Workload fact counts the hidden workloads.
 - **Strings**: component-local `STRINGS = { en, zh }` via `useLocale()`; SKUs, units and identifiers stay English.
-- **Fixture**: `cypress/fixtures/api/video-history.json` is rebuilt from retained `StoredArtifact` exports with `bun run fixtures:video-history <dir>` (`scripts/build-video-history-fixture.ts`); it is metadata only and registered in `_manifest.json`.
+- **Native srt-slurm bundles**: the `h3-results-<run>-<attempt>` artifacts of InferenceX #2916 (`evidence_kind: srt_slurm_h3_service`) feed the same projection; see [Video performance history](./video-history.md) for the contract. They record no GPU model, so a point joins the per-SKU chart, cards and Compare only when `ci.site.gpu_model` or the CI runner's name identifies the hardware; otherwise it stays in the Performance history list with an empty hardware. Invalid or missing power renders as not measured.
+- **Fixture**: `cypress/fixtures/api/video-history.json` is rebuilt from retained `StoredArtifact` exports with `bun run fixtures:video-history <dir>` (`scripts/build-video-history-fixture.ts`); it is metadata only and registered in `_manifest.json`. Exports for runs the fixture does not list yet are appended as new entries with an unknown publication time. A downloaded `h3-results-<run>-<attempt>` bundle becomes such an export with `bun scripts/export-stored-artifact.ts <dir> <runId> <artifactId> <name> <bytes> <out.json>`; the retained native H200 run 39002901777 entered the fixture this way.
 
 ## Serving outcome accounting
 
@@ -70,7 +71,11 @@ A complete request ledger and absent quality sidecar establish valid outputs as 
 
 图表下方还有三个区块。带日期、可编辑的 API 参考价（`v_api`，记录 MiniMax 开放平台按量付费页在 2026-09-24 的价格，页面未标注生效日期；不保证当前仍适用）只推导一个数字——每条视频 API 标价（单价 × 视频秒数），显示在 KPI 卡每条视频 TCO 成本旁边，并作为表格和 CSV 的一列；它不进入图表，也不再推导收入、利润或价格倍数。价格缺失或不为正时该值为 null，`parseApiPrice` 会回退到参考价，而不是按 0 计价。Arena 式 Compare 以视频为主：同一 prompt 与 seed 在两种硬件上的视频并排播放，支持同步播放/暂停/重播和上一个/下一个用例箭头，没有盲测模式，也没有用例下拉框；下方的差值行固定为出片时间（P50）、每条视频 TCO 成本和每条视频能耗，并以脚注注明成本档位。每种硬件只有一个可选 cell（其代表部署），默认以最慢的硬件为基线、最快的为候选，选择记录在 `v_base`、`v_cand`、`v_case` 中；面板滚入视口时才加载两个已发布产物，HTTP 204 读作“未发布视频”而不是错误。性能测量证据面板展示板卡功率相对生效上限的比值、并发下的吞吐量和延迟比值，以及带宽/FLOPS 规格比与实测加速比。跨硬件比较要求完整且相同的工作负载身份、完整部署布局和 C1；缺少匹配布局的硬件直接省略，不回退到其代表部署。并发比较还要求相同副本数。文案只描述数值，不据此断言功率饱和、吞吐量平台或计算/内存瓶颈。
 
+InferenceX #2916 的原生 srt-slurm 产物包（`h3-results-<run>-<attempt>`，`evidence_kind: srt_slurm_h3_service`）走同一条投影路径，契约见[视频性能历史](./video-history.md)。它们不记录 GPU 型号：只有在 `ci.site.gpu_model` 或 CI runner 名称能识别出硬件时，对应点才会进入按 SKU 划分的图表、KPI 卡和 Compare；否则只保留在性能历史列表中，硬件留空。功率无效或缺失时显示为未测得。
+
 完整工作负载身份由附加字段 `workloadKey` 保存，包含 prompts 与 seeds；缩写标签只用于显示。身份缺失时保持 null，按原始 source manifest 隔离，不跨来源合并。runtime revision 作为比较变量单独披露。仪表板最多读取五页历史；公开 `/api/v1/views/video` 默认复用相同选择与计算逻辑，旧 API 视图仍可显式指定。
+
+`cypress/fixtures/api/video-history.json` 由保留的 `StoredArtifact` 导出通过 `bun run fixtures:video-history <dir>` 重建，只含元数据，并登记在 `_manifest.json` 中。fixture 尚未收录的 run 会作为新条目追加在末尾，发布时间记为未知。下载的 `h3-results-<run>-<attempt>` 产物包可用 `bun scripts/export-stored-artifact.ts <dir> <runId> <artifactId> <name> <bytes> <out.json>` 转成这种导出；保留的原生 H200 run 39002901777 就是这样进入 fixture 的。
 
 请求结果表与公开 API 的 `serving` 行在图表、工作负载、硬件和质量筛选之前，保留已加载历史页中的每个计划 cell，包括零样本 cell 和来源错误。计划、尝试、完成、尝试后失败、超时（尝试后失败的子集）、未启动、有效和未评判分别计数；旧失败 slot 总数单独保存为 `legacyFailedSlots`，不能当作尝试后失败。未知证据保持 null。只有完整请求记录且没有质量 sidecar 时，才能把有效输出记为未评判；聚合标签不能推导逐视频分区。质量与截止时间证据尚未逐请求关联时，`qualitySloGoodput` 保持 null。
 
@@ -83,7 +88,7 @@ pricing, hidden hardware and comparison/history selections. H3 retains its dated
 reference; Wan's API price is null unless the reader supplies `v_api`. Missing results remain
 empty. The serving reader accepts `video-serving-<run>-<attempt>` artifacts with
 `video_serving_smoke_matrix`, `controlled_video_gpu` and `live_video` evidence while preserving
-legacy H3 contracts. Evidence tags must agree with the selected model; `operator_endpoint` request records remain valid under either model's verified supervisor. Wan request duration is `frame_count / fps`; H3 keeps its explicitly requested duration. Wan's canonical model ID is `Wan-AI/Wan2.2-T2V-A14B-Diffusers`;
+legacy H3 contracts. Native selected-plan bundles use the legacy H3 kind constants for either model; generic supervised Wan bundles use the generic tags. `operator_endpoint` request records remain valid under either model's verified supervisor. Wan request duration is `frame_count / fps`; H3 keeps its explicitly requested duration. Wan's canonical model ID is `Wan-AI/Wan2.2-T2V-A14B-Diffusers`;
 the previous `Wan-AI/Wan2.2-T2V-A14B` remains a selection alias, not permission to pool unequal workload keys.
 `manifest.workload_plan.model_id` supplies source-level identity even before generation;
 a contradictory optional result is rejected. API provenance returns nullable source `model`.
@@ -94,10 +99,16 @@ Ambiguous mixed-model sources are excluded. H3's seven-dimension quality policy 
 Wan quality and quality/SLO goodput stay null until a separate video-only quality contract is supported.
 
 Wan serving 接入沿用既有目录和校验流程，接受 `video-serving-<run>-<attempt>`、
-`video_serving_smoke_matrix`、`controlled_video_gpu` 和 `live_video`，同时兼容 H3。执行证据类型须与模型一致；经对应模型 supervisor 验证的请求记录仍可使用 `operator_endpoint`。Wan 的请求时长按 `frame_count / fps` 计算，H3 保留显式请求时长。
+`video_serving_smoke_matrix`、`controlled_video_gpu` 和 `live_video`，同时兼容 H3。原生 selected-plan 数据包在两种模型上保留 H3 类型常量；通用 Wan supervisor 数据包使用通用类型。经对应模型 supervisor 验证的请求记录仍可使用 `operator_endpoint`。Wan 的请求时长按 `frame_count / fps` 计算，H3 保留显式请求时长。
 规范模型 ID 为 `Wan-AI/Wan2.2-T2V-A14B-Diffusers`，旧的 `Wan-AI/Wan2.2-T2V-A14B`
 仅作为模型选择的别名，不会合并不同的工作负载。来源身份取自已封存的
 `manifest.workload_plan.model_id`；可选结果中的模型与之冲突时会拒绝该结果。
 公开 API 的 provenance 保留可为空的来源 `model`。只有旧 `h3-*` 产物可在模型身份缺失时归入 H3；未知模型的通用产物不会进入任一模型投影。预检失败的计划数与未启动数
 必须由初始 serving summary 明确记录，不能只凭 manifest 推导。接入成功不代表
 已有 GPU 测量、通过质量验收或支持 Trainium；Wan 的质量与质量/SLO goodput 仍为 null。
+
+### Video engine identity
+
+Published history exposes `producer` when the manifest, matrix and execution records agree on the selected `plan_sha256`, model revision and `engine: {name, revision}`. Legacy sources retain null identity. The dashboard and API expose `releaseCoverage` for H3/Wan × SGLang/vLLM-Omni across the loaded published pages, including missing, failed, history-only and sample-floor-met states. This bounded coverage is not a full-catalog or quality qualification claim. Native four-clip runs remain History-only; the chart, KPI and Compare sample floor stays ten.
+
+Compare keeps distinct engine revisions on the same GPU. `v_base` and `v_cand` accept `hardware:engine:revision`; hardware-only links remain valid. Technical deltas require the same sealed model revision, selected plan and generation settings. Unknown quality does not suppress technical observations, but does not authorize quality-normalized claims. CSV rows include `model`, `model_revision`, `engine_revision` and `plan_sha256`. Compare reads `format=published` only.

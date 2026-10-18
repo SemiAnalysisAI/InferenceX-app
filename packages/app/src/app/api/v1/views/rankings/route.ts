@@ -7,10 +7,10 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { cachedDerivedData, cachedJson } from '@/lib/api-cache';
-import { getCachedBenchmarks } from '@/lib/benchmark-data.server';
-import { OVERVIEW_PRIMARY_TIER, type OverviewScenario } from '@/lib/overview-data';
-import { getAllRankingPageEntries, RANKING_KINDS, type RankingKind } from '@/lib/rankings';
+import { cachedDerivedData, cachedJson } from '@/lib/cache/api-cache';
+import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-data.server';
+import { OVERVIEW_PRIMARY_TIER, type OverviewScenario } from '@/lib/overview/overview-data';
+import { getAllRankingPageEntries, RANKING_KINDS, type RankingKind } from '@/lib/live-seo/rankings';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
  * GET /api/v1/views/rankings — JSON form of the /rankings/<slug> pages.
  *
  * Same derivation the pages use (overview model summary → ranking rows via
- * `lib/rankings.ts`), parameterized by kind, model, and scenario. Default
+ * `lib/live-seo/rankings.ts`), parameterized by kind, model, and scenario. Default
  * scenario is "all curated scenarios per model", mirroring the /overview
  * matrix rows the ranking pages are read from.
  */

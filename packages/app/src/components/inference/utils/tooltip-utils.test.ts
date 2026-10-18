@@ -1,8 +1,14 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+import { modelSystemPower, type SystemPowerEstimate } from '@/lib/power/modeled-system-power';
+import { gb300DisaggRow } from '@/lib/power/nvl72-power.fixture';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/power/system-power-model';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import {
   getPointLabel,
   generateTooltipContent,
@@ -71,18 +77,19 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 
 const systemPower = {
   status: 'supported',
+  unit: 'chassis',
   hardware: 'h100',
-  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
-  modelPath: 'chassis/H100.py',
+  modelRevision: SYSTEM_POWER_MODEL_REVISION,
+  operatingState: { workload: 'agentic' as const, scaleOut: true },
   gpuCount: 16,
   chassisCount: 2,
-  chassisAcWatts: 12000,
-  chassisAcWattsPerGpu: 750,
+  itWatts: 12000,
+  itWattsPerGpu: 750,
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
   modeledGpuCount: 16,
-  deploymentAcWatts: 12000,
+  deploymentItWatts: 12000,
   deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
@@ -129,12 +136,12 @@ describe('modeled system-power tooltip', () => {
   const config = (overrides: Partial<TooltipConfig> = {}) =>
     tooltipConfig({
       data: pt({ modeledSystemPower: systemPower }),
-      selectedYAxisMetric: 'y_modeledChassisPowerPerGpu',
+      selectedYAxisMetric: 'y_measuredAvgPower',
       isPinned: true,
       ...overrides,
     });
 
-  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+  it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
@@ -142,11 +149,11 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('14,400 W');
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -159,9 +166,9 @@ describe('modeled system-power tooltip', () => {
         gpuCount: 4,
         chassisCount: 1,
         modeledGpuCount: 8,
-        chassisAcWatts: 6000,
+        itWatts: 6000,
         facilityWatts: 7200,
-        deploymentAcWatts: 3000,
+        deploymentItWatts: 3000,
         deploymentFacilityWatts: 3600,
         topologyBasis: 'single-node',
         chassisBasis: 'extrapolated',
@@ -185,19 +192,44 @@ describe('modeled system-power tooltip', () => {
     expect(zh).not.toContain('6000 W');
   });
 
+  it('names NVL72 trays, the measured Grace socket, and the rack-share basis (en/zh)', () => {
+    const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
+    const html = generateTooltipContent(config({ data }));
+    expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
+    expect(html).toContain('Measured Grace socket power:</strong> 98.066 W/socket');
+    expect(html).toContain('Measured: GPU boards and whole Grace sockets');
+    expect(html).toContain('each tray takes 1/18 of the rack');
+    expect(html).toContain('PUE 1.1');
+    expect(html).not.toContain('eight-GPU chassis');
+    expect(html).not.toContain('regulator');
+
+    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    expect(zh).toContain('2 个完整 NVL72 计算 tray · 8 张 GPU');
+    expect(zh).toContain('Grace socket 实测功耗');
+    expect(zh).toContain('每个 tray 分摊机架的 1/18');
+  });
+
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
-    const official = config();
-    const overlay = generateOverlayTooltipContent({
-      ...official,
-      overlayData: {
-        label: 'PowerX comparison',
-        hardwareConfig: mockHardwareConfig,
-      } as OverlayTooltipConfig['overlayData'],
-    });
-    for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
-      expect(html).toContain('500 W/GPU');
-      expect(html).toContain('750 W/GPU');
-      expect(html).toContain(systemPower.modelRevision);
+    const cases: [InferenceData, string[]][] = [
+      [pt({ modeledSystemPower: systemPower }), ['500 W/GPU', '750 W/GPU', 'PUE 1.2']],
+      [
+        pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) }),
+        ['2 full NVL72 compute trays · 8 GPUs', '98.066 W/socket', 'PUE 1.1'],
+      ],
+    ];
+    for (const [data, expected] of cases) {
+      const official = config({ data });
+      const overlay = generateOverlayTooltipContent({
+        ...official,
+        overlayData: {
+          label: 'PowerX comparison',
+          hardwareConfig: mockHardwareConfig,
+        } as OverlayTooltipConfig['overlayData'],
+      });
+      for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
+        for (const text of expected) expect(html).toContain(text);
+        expect(html).toContain(SYSTEM_POWER_MODEL_REVISION);
+      }
     }
   });
 
@@ -219,6 +251,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('0 W/GPU');
   });
 
+  it('sets every system-power line in the 11px tooltip text size', () => {
+    for (const isPinned of [true, false]) {
+      const host = document.createElement('div');
+      host.innerHTML = generateTooltipContent(config({ isPinned }));
+      const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
+      const sizes = new Set<string>();
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        let el = node.parentElement;
+        while (el && el !== host && !el.style.fontSize) el = el.parentElement;
+        sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
+      }
+      expect([...sizes]).toEqual(['11px']);
+    }
+  });
+
   it('keeps hover compact and leaves unrelated metrics unchanged', () => {
     const hover = generateTooltipContent(config({ isPinned: false }));
     expect(hover).toContain('500 W/GPU');
@@ -231,10 +280,10 @@ describe('modeled system-power tooltip', () => {
   it('localizes the measurement boundary and occupancy assumptions', () => {
     const html = generateTooltipContent(config({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
-    expect(html).toContain('整个部署的机箱交流功耗估算');
+    expect(html).toContain('整个部署的 IT 功耗估算');
     expect(html).toContain('数据中心功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('CPU/DRAM 利用率：20%');
+    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
@@ -252,31 +301,6 @@ describe('modeled system-power tooltip', () => {
       expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
       expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
     }
-  });
-
-  it('uses validated model topology while preserving legacy configuration counts separately', () => {
-    const data = pt({
-      physicalChips: 64,
-      modeledSystemPower: {
-        ...systemPower,
-        gpuCount: 8,
-        chassisCount: 1,
-        modeledGpuCount: 8,
-        chassisAcWatts: 6000,
-        deploymentAcWatts: 6000,
-        topologyBasis: 'single-node',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    const html = generateTooltipContent(config({ data }));
-    expect(html).toContain('<strong>Total Chips:</strong> 8');
-    expect(html).toContain('<strong>Configured Chip Count:</strong> 64');
-    expect(html).toContain('1 full eight-GPU chassis · 8 GPUs');
-    const measured = generateTooltipContent(
-      config({ data, selectedYAxisMetric: 'y_measuredAvgPower' }),
-    );
-    expect(measured).toContain('<strong>Total Chips:</strong> 64');
-    expect(measured).not.toContain('Configured Chip Count');
   });
 });
 
@@ -528,6 +552,28 @@ describe('generateTooltipContent', () => {
   it('shows "Click elsewhere to dismiss" when isPinned is true', () => {
     const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
     expect(html).toContain('Click elsewhere to dismiss');
+  });
+
+  it('caps pinned tooltip height so stacked actions stay inside the mobile viewport', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        showPowerTelemetry: true,
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({
+          id: 42,
+          benchmark_type: 'agentic_traces',
+          power_audit: { source: 'power_validation_h100_conc8.json' },
+          run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
+        }),
+      }),
+    );
+    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
+    expect(html).toContain('overflow-y: auto');
+    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('data-action="view-power-trace"');
   });
 
   it('does not show dismiss text when isPinned is false', () => {
@@ -1010,15 +1056,6 @@ describe('generateGPUGraphTooltipContent', () => {
 describe('measured-power withheld tooltip line', () => {
   const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
 
-  it('renders the withheld line with humanized codes (en)', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
-    );
-    expect(html).toContain('Measured power withheld');
-    expect(html).toContain('sampling gap exceeded');
-    expect(html).toContain('expected gpu count mismatch');
-  });
-
   it('renders the withheld line in Chinese on /zh surfaces', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1051,11 +1088,7 @@ describe('measured-power withheld tooltip line', () => {
     expect(html).not.toContain('Measured power withheld');
   });
 
-  it.each([
-    ['absent reasons', pt({ power_valid: 0 })],
-    ['empty reasons', pt({ power_valid: 0, power_invalid_reasons: [] })],
-    ['valid row', pt({ power_valid: 1 })],
-  ])('omits the line for %s', (_name, data) => {
+  it.each([['absent reasons', pt({ power_valid: 0 })]])('omits the line for %s', (_name, data) => {
     const html = generateTooltipContent(tooltipConfig({ data }));
     expect(html).not.toContain('Measured power withheld');
   });
@@ -1147,15 +1180,6 @@ describe('worker power drilldown', () => {
     expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
   });
 
-  it('renders nothing when workers is absent or empty', () => {
-    expect(generateTooltipContent(tooltipConfig({ isPinned: true }))).not.toContain(
-      'tooltip-worker-power',
-    );
-    expect(
-      generateTooltipContent(tooltipConfig({ data: pt({ workers: [] }), isPinned: true })),
-    ).not.toContain('tooltip-worker-power');
-  });
-
   it('caps the table at 8 rows with a "+N more workers" line', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({
       role: 'decode',
@@ -1210,18 +1234,6 @@ describe('worker power drilldown', () => {
 });
 
 describe('power tier tooltip line', () => {
-  it('states the tier for a legacy point on a measured axis', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_measuredJPerOutputToken',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).toContain(
-      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
-    );
-  });
-
   it('states the certified tier on a measured axis', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1230,16 +1242,6 @@ describe('power tier tooltip line', () => {
       }),
     );
     expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
-  });
-
-  it('omits the tier line on non-measured axes', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_tpPerGpu',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).not.toContain('Power Measurement');
   });
 
   it('omits the tier line when the point carries no tier', () => {

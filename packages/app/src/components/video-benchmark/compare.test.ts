@@ -11,14 +11,16 @@ import {
   type CaseRecord,
 } from './compare';
 import type { VideoHistoryPage } from './history';
-import { videoPoints } from './points';
+import { dashboardCells, videoPoints } from './points';
 import { servingCells } from './serving';
 import { servingFixture } from './serving.fixture';
 import type { StoredArtifact, StoredSource } from './stored';
 
 // Retained H100/H200/B200 C1/C2/C4 observations of the 2026-09-09 campaign.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
-const c1 = (key: string) => comparablePoints(points).find((p) => p.hardwareKey === key)!;
+// Compare reads the dashboard's cells, so a retained smoke run under the sample floor never becomes a side.
+const c1 = (key: string) =>
+  comparablePoints(dashboardCells(points).cells).find((p) => p.hardwareKey === key)!;
 const opts = { tier: 'h' } as const;
 const row = (rows: ReturnType<typeof compareMetrics>, id: string) =>
   rows.find((item) => item.id === id)!;
@@ -106,6 +108,31 @@ describe('compareMetrics', () => {
     expect(energy.ratio).toBeCloseTo(0.6983, 3);
     expect(energy.deltaPercent).toBeCloseTo(-30.17, 1);
     expect(energy.candidateBetter).toBe(true);
+  });
+  it('compares technical measurements across engines only for the same sealed model and plan', () => {
+    const identity = {
+      modelRevision: 'a'.repeat(40),
+      planSha256: 'b'.repeat(64),
+      engine: { name: 'sglang' as const, revision: 'c'.repeat(40) },
+    };
+    const baseline = { ...c1('h200'), producer: identity, quality: null };
+    const candidate = {
+      ...baseline,
+      id: 'other-engine',
+      p50: baseline.p50! / 2,
+      producer: { ...identity, engine: { name: 'vllm-omni' as const, revision: 'd'.repeat(40) } },
+    };
+    expect(comparablePoints([baseline, candidate])).toHaveLength(2);
+    expect(compareMetrics(baseline, candidate, opts)[0].ratio).toBe(0.5);
+    for (const producer of [
+      { ...candidate.producer, modelRevision: 'e'.repeat(40) },
+      { ...candidate.producer, planSha256: 'e'.repeat(64) },
+      null,
+    ]) {
+      const metrics = compareMetrics(baseline, { ...candidate, producer }, opts);
+      expect(metrics.every((metric) => metric.ratio === null)).toBe(true);
+      expect(metrics[0].candidate).toBe(candidate.p50);
+    }
   });
   it('flips the verdict when the slower hardware is the candidate', () => {
     const rows = compareMetrics(c1('b200'), c1('h200'), opts);

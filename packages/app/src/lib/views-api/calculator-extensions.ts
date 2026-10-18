@@ -4,18 +4,24 @@ import {
   parseFirstTokenCaps,
   selectFirstTokenWinners,
 } from '@/components/calculator/first-token-limits';
-import { interpolateForGPU } from '@/components/calculator/interpolation';
 import {
+  applyCacheHitMode,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   profitModelDefaults,
+  type CacheHitMode,
 } from '@/components/calculator/profit-estimator';
-import { estimateProfitByPower } from '@/components/calculator/profit-power';
+import {
+  estimateProfitByPower,
+  interpolateProfitForGPU,
+} from '@/components/calculator/profit-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { cachedJson } from '@/lib/api-cache';
-import { getGpuSpecs } from '@/lib/constants';
-import { getOpenRouterModelId, Sequence, type Model } from '@/lib/data-mappings';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { getGpuSpecs } from '@/lib/catalog/constants';
+import { getOpenRouterModelId, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { POWER_BASIS_LABELS } from '@/lib/power/power-basis';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
 import {
@@ -97,17 +103,19 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
           'Unknown configuration',
           Object.keys(configurations),
         );
+      const data = config
+        ? buildCacheReuse({
+            ...options,
+            official: groups.official.grouped[config] ?? [],
+            config: configurations[config],
+            recipe: search.get('recipe') ?? undefined,
+          })
+        : null;
       return cachedJson({
         ...envelope,
-        params: { ...envelope.params, config },
+        params: { ...envelope.params, config, recipe: data?.recipe ?? null },
         configurations,
-        data: config
-          ? buildCacheReuse({
-              ...options,
-              official: groups.official.grouped[config] ?? [],
-              config: configurations[config],
-            })
-          : null,
+        data,
       });
     }
     const defaults = profitModelDefaults(params.model as Model);
@@ -137,6 +145,12 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       'powerBasis',
       ['provisioned', 'modeled', 'compare'],
       'provisioned',
+    );
+    const cacheHitMode = parseEnumParam<CacheHitMode>(
+      search.get('cacheHitMode'),
+      'cacheHitMode',
+      ['actual', 'theoretical'],
+      DEFAULT_CACHE_HIT_MODE,
     );
     const priceSource = parseEnumParam(
       search.get('priceSource'),
@@ -181,17 +195,19 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       powerBasis,
     } as const;
     function estimate(group: typeof groups.official) {
-      const results = Object.entries(group.grouped).flatMap(([key, points]) => {
-        const result = interpolateForGPU(
+      const raw = Object.entries(group.grouped).flatMap(([key, points]) => {
+        const result = interpolateProfitForGPU(
           points,
           target,
           'interactivity_to_throughput',
           costProvider === 'custom' ? 'costh' : costProvider,
+          basis === 'gw-year' ? powerBasis : 'provisioned',
         );
         return result && result.value > 0
           ? [{ ...result, ...group.groupMeta[key], resultKey: key }]
           : [];
       });
+      const results = applyCacheHitMode(raw, cacheHitMode);
       return estimateProfitByPower(
         results,
         (hwKey) => ({
@@ -206,8 +222,8 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         powerBasis,
         target,
         {
-          provisioned: 'Provisioned',
-          modeled: 'Measured + modeled',
+          provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+          modeled: POWER_BASIS_LABELS['utility-modeled'].en,
           extrapolated: 'Full-chassis extrapolation',
         },
       );
@@ -233,6 +249,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         priceSource,
         utilization,
         labCut,
+        cacheHitMode,
         powerBasis,
         basis,
         dates: selections.map((s) => s.entry),

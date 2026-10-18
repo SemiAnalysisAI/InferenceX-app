@@ -1,10 +1,10 @@
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import { Precision } from '@/lib/data-mappings';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+import { Precision } from '@/lib/catalog/data-mappings';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { createMockChartDefinition, createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
-const runId = 35879254139;
+const runId = 37181045340;
 const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
 const hwKey = 'mi355x_mori-sglang';
 

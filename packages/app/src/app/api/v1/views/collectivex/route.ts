@@ -1,3 +1,7 @@
+import {
+  COLLECTIVEX_KNOWN_SUPPORT,
+  COLLECTIVEX_KNOWN_FOOTNOTES,
+} from '@/components/collectivex/known-support';
 import { GET as run } from '@/app/api/v1/collectivex/runs/[runId]/route';
 import { GET as runs } from '@/app/api/v1/collectivex/runs/route';
 import {
@@ -14,7 +18,7 @@ import {
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
 import { swapChartPoints, swapRooflines } from '@/components/collectivex/swap-data';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
   assertRunIdList,
@@ -192,6 +196,8 @@ export function GET(request: NextRequest) {
     return cachedJson({
       apiVersion: 'v1',
       view: 'collectivex',
+      knownSupport: COLLECTIVEX_KNOWN_SUPPORT,
+      knownSupportFootnotes: COLLECTIVEX_KNOWN_FOOTNOTES,
       params: {
         version,
         runs: runIds,

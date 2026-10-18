@@ -1,5 +1,5 @@
-import { getHardwareConfig } from '@/lib/constants';
-import { getDisplayLabel } from '@/lib/utils';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 /**
  * Full dashboard legend text for a hardware key: the base GPU label plus the

@@ -1,5 +1,9 @@
 # Testing
 
+The [October 2026 E2E audit](testing/e2e-usefulness-audit-2026-10.md) records
+per-test usefulness rankings, the 25% runtime-case reduction, and the
+validated browser-specific timing refresh procedure.
+
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
@@ -16,6 +20,22 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 4. Bug fixes → regression test at the narrowest layer that reproduces the bug
 5. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
 
+## Easter egg themes and games
+
+Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
+
+- Do not add unit, Cypress component, Cypress E2E, or CI checks for easter egg features. The only exceptions are the two main-site isolation checks listed below.
+- The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.
+- When an existing easter egg feature test fails or slows CI, delete it. Do not fix or extend it. This does not apply to the two retained isolation checks.
+- Do not add CI jobs, shards, fixtures, or infrastructure for them.
+
+Retain and maintain exactly these two checks:
+
+- `packages/app/src/lib/optional-theme-imports.test.ts`: prevents eager optional code, engine, asset, and font imports into normal pages.
+- `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: checks normal light/dark pages, embeds, resource loading, and SEO, including theme activation/cleanup needed to verify isolation.
+
+Keep their existing support helper and E2E browser setup. Do not expand these checks into gameplay, decorative styling, or visual-fidelity tests. Ordinary light/dark UI, dashboard, export, and announcement tests remain required; those are not easter egg tests.
+
 ## Pre-commit Checklist
 
 ```bash
@@ -29,29 +49,32 @@ bun run test:e2e
 
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
-The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as one component job plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
+The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus eight integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
-`packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. Regenerate the baseline from an observed full integration run when specs are added, removed, or materially rebalanced.
+`packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
+and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome
+component baseline. Their unit guard requires one positive duration for every
+current spec and rejects removed entries.
 
-With an `E2E_FIXTURES=1` app server running on port 3000, run this from the repository root:
-
-```bash
-E2E_FIXTURES=1 \
-  SPLIT=1 \
-  SPLIT_INDEX1=1 \
-  SPLIT_FILE=timings.json \
-  SPLIT_OUTPUT_FILE=timings.json \
-  SPLIT_SUMMARY=false \
-  bun run --cwd packages/app test:e2e:integration
-```
-
-`SPLIT=1` intentionally runs every spec in one chunk so one process records the complete baseline. CI uses `SPLIT=4` only for parallel execution and writes each shard's timing output to a throwaway file.
+CI uploads raw per-shard, per-test observations and validates the complete
+20-shard matrix before publishing `cypress-timing-baselines`. Refresh all
+three baselines with the [documented artifact procedure](testing/e2e-usefulness-audit-2026-10.md#timing-evidence-and-sharding).
+Do not invent timings or treat the plugin's merged output as a fresh full
+measurement. Spec durations are Cypress's reported execution durations, not
+whole-job wall time; checkout, dependency installation, and application build
+time are not included.
 
 `E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
 
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 
 ## Quality Standards
+
+See the [October 2026 test suite audit](./test-suite-audit.md) for concrete examples
+of redundant coverage, disconnected test-only implementations, and the meaningful
+regression checks retained when pruning the suite.
+The [exact-text follow-up](./test-copy-audit.md) distinguishes incidental copy
+snapshots from assertions that protect units, data identity, and real behavior.
 
 1. **No tautological tests** — every test must verify a real transformation
 2. **Cover edge cases** — empty input, null, boundary values, error paths

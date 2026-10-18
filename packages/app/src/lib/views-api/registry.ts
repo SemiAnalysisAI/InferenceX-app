@@ -10,6 +10,7 @@ export const VIEW_QUERY_PARAMS = {
     'model',
     'percentile',
     'precisions',
+    'recipe',
     'runId',
     'sequence',
     'tcoBasis',
@@ -63,6 +64,7 @@ export const VIEW_QUERY_PARAMS = {
   compare: ['format', 'gpus', 'model', 'scenario', 'slug', 'tiers', 'variant'],
   'current-inferencex-image': [
     'asOf',
+    'includeHistory',
     'frameworks',
     'hardware',
     'model',
@@ -139,6 +141,7 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'topologies',
     'allPoints',
     'best',
     'date',
@@ -166,10 +169,18 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
     'xmetric',
     'xmode',
+    'xstat',
+    'serviceCompare',
+    'serviceBaseline',
+    'serviceComparator',
+    'serviceTarget',
+    'roleShare',
+    'powerFit',
   ],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',
@@ -194,6 +205,7 @@ export const VIEW_QUERY_PARAMS = {
     'utilization',
   ],
   'profit-estimator-per-gigawatt': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',
@@ -250,12 +262,17 @@ export const VIEW_QUERY_PARAMS = {
     'xAxis',
     'yAxis',
   ],
+  ubenchx: ['gpu', 'test'],
 } as const;
 export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
 /** Every dashboard route, including hidden/public routes, has an explicit disposition. */
 export const DASHBOARD_API_COVERAGE = {
-  inference: { view: 'inference' },
+  inference: {
+    view: 'inference',
+    exclusion:
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state.',
+  },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },
   evaluation: { view: 'evaluation' },
@@ -267,12 +284,15 @@ export const DASHBOARD_API_COVERAGE = {
   reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
+  'agentic-workload-explorer': {
+    exclusion:
+      'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
+  },
   operatorx: {
     exclusion:
       'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
   },
   collectivex: { view: 'collectivex' },
-  'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },
   video: { view: 'video' },
   'ai-chart': {

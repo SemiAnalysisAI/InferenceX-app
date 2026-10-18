@@ -53,7 +53,6 @@ describe('ThemedFigureImage', () => {
   it.each([
     ['light', '/chart-light.png'],
     ['dark', '/chart-dark.png'],
-    ['minecraft', '/chart-dark.png'],
   ])('gives an eager cold %s render exactly one active source', (theme, expectedSrc) => {
     document.documentElement.className = theme;
     renderUi(

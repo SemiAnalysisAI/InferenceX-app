@@ -8,9 +8,16 @@ import {
   writeVideoCompareSelection,
 } from './compare-url-state';
 import type { VideoHistoryPage } from './history';
+import { comparePointKey } from './compare';
+import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
 
 const points = videoPoints([history as unknown as VideoHistoryPage]);
+
+const keys = (resolved: ReturnType<typeof resolveCompareSelection>) => [
+  resolved.baseline?.hardwareKey,
+  resolved.candidate?.hardwareKey,
+];
 
 describe('video compare URL selection', () => {
   it('defaults to the slowest measured C1 hardware as baseline and the fastest as candidate', () => {
@@ -52,6 +59,55 @@ describe('video compare URL selection', () => {
       candidate: null,
       caseIndex: 0,
     });
+  });
+  it('keeps the two sides distinct when the URL lands both on one hardware', () => {
+    // v_cand on the default baseline swaps the sides, as choosing it in the panel does.
+    expect(
+      keys(resolveCompareSelection({ baseline: null, candidate: 'h100', caseIndex: 0 }, points)),
+    ).toEqual(['b200', 'h100']);
+    // v_base on the default candidate moves the candidate to the default baseline.
+    expect(
+      keys(resolveCompareSelection({ baseline: 'b200', candidate: null, caseIndex: 0 }, points)),
+    ).toEqual(['b200', 'h100']);
+    // Two explicit equal sides keep the baseline and take the default candidate.
+    expect(
+      keys(resolveCompareSelection({ baseline: 'h200', candidate: 'h200', caseIndex: 0 }, points)),
+    ).toEqual(['h200', 'b200']);
+    // Only the shared hardware left: the candidate becomes the first other measured hardware.
+    const twoFast = points.filter((p) => p.hardwareKey !== 'h100');
+    expect(
+      keys(resolveCompareSelection({ baseline: 'b200', candidate: 'b200', caseIndex: 0 }, twoFast)),
+    ).toEqual(['b200', 'h200']);
+  });
+  it('selects and restores distinct engines on the same GPU without changing legacy links', () => {
+    const base = points.find((point) => point.hardwareKey === 'h200' && point.concurrency === 1)!;
+    const enginePoints: VideoPoint[] = ['sglang', 'vllm-omni'].map((name, index) => ({
+      ...base,
+      id: `engine-${index}`,
+      p50: 100 - index * 20,
+      producer: {
+        modelRevision: 'a'.repeat(40),
+        planSha256: 'b'.repeat(64),
+        engine: {
+          name: name === 'sglang' ? 'sglang' : 'vllm-omni',
+          revision: String(index + 1).repeat(40),
+        },
+      },
+    }));
+    const defaults = defaultComparePair(enginePoints);
+    expect(defaults).toEqual({
+      baseline: comparePointKey(enginePoints[0]),
+      candidate: comparePointKey(enginePoints[1]),
+    });
+    const swapped = { baseline: defaults.candidate, candidate: defaults.baseline, caseIndex: 0 };
+    const url = writeVideoCompareSelection(new URL('https://x.test/video'), swapped, defaults);
+    const resolved = resolveCompareSelection(readVideoCompareSelection(url.search), enginePoints);
+    expect(resolved.baseline?.producer?.engine.name).toBe('vllm-omni');
+    expect(resolved.candidate?.producer?.engine.name).toBe('sglang');
+    expect(
+      resolveCompareSelection({ baseline: 'h200', candidate: null, caseIndex: 0 }, enginePoints)
+        .baseline,
+    ).toBe(enginePoints[0]);
   });
   it('writes only non-default params, keeps unrelated params and leaves the input alone', () => {
     const defaults = defaultComparePair(points);

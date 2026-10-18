@@ -23,8 +23,8 @@ import {
   useDeleteCollectiveXRun,
 } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';
@@ -575,11 +575,13 @@ export default function CollectiveXDisplay() {
     const runId = deleteRun.isPending ? deleteRun.variables?.runId : undefined;
     return new Set(runId ? [runId] : []);
   }, [bulkDeletingRunIds, deleteRun.isPending, deleteRun.variables?.runId]);
-  const handleVisibleRunChange = useCallback((runId: string, visible: boolean) => {
+  const handleVisibleRunChange = useCallback((runIds: string[], visible: boolean) => {
     setVisibleRunIds((previous) => {
       const next = new Set(previous);
-      if (visible) next.add(runId);
-      else next.delete(runId);
+      for (const runId of runIds) {
+        if (visible) next.add(runId);
+        else next.delete(runId);
+      }
       return next;
     });
   }, []);

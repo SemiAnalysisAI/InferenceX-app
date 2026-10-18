@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { DatasetDetail } from '@/components/datasets/dataset-detail';
-import { languageAlternates } from '@/lib/i18n';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 interface Props {

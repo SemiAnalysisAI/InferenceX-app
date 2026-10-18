@@ -81,6 +81,28 @@ describe('tooltip parallelism — old data (no ep field)', () => {
 // parallelism HTML in tooltips, standard parallelism (ep exists)
 // ===========================================================================
 describe('tooltip parallelism — standard (ep field present)', () => {
+  it('shows the prefill DWDP group width without calling it TP8', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          ep: 1,
+          disagg: true,
+          is_multinode: true,
+          prefill_tp: 1,
+          prefill_ep: 1,
+          prefill_dwdp_size: 8,
+          prefill_num_workers: 2,
+          decode_tp: 8,
+          decode_ep: 8,
+          decode_dp_attention: true,
+          decode_num_workers: 1,
+        }),
+      }),
+    );
+    expect(html).toContain('DWDP: 8');
+    expect(html).toContain('TP: 1, DWDP: 8');
+    expect(html).toContain('Workers: 2');
+  });
   it('shows multinode aggregate as one topology without prefill/decode roles', () => {
     const html = generateTooltipContent(
       tooltipConfig({

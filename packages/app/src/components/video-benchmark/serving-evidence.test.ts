@@ -233,10 +233,14 @@ describe('serving outcome accounting', () => {
     expect(videoServingEvidence([current, legacy])[0].attempted).toBe(0);
     oldSource.observations = [
       { ...observation, id: 'legacy:baseline', cell: null },
-      { ...observation, id: 'legacy:candidate', cell: null },
+      { ...observation, id: 'legacy:candidate', cell: null, valid: 17 },
     ];
-    expect(videoServingEvidence([legacy])).toHaveLength(2);
-    expect(new Set(videoServingEvidence([legacy]).map((row) => row.id)).size).toBe(2);
+    expect(videoServingEvidence([legacy]).map((row) => ({ id: row.id, valid: row.valid }))).toEqual(
+      [
+        { id: `35986548616:${'a'.repeat(64)}:legacy:baseline`, valid: 20 },
+        { id: `35986548616:${'a'.repeat(64)}:legacy:candidate`, valid: 17 },
+      ],
+    );
   });
 
   it('retains a failed published index even when no source could be loaded', () => {
@@ -249,10 +253,22 @@ describe('serving outcome accounting', () => {
         artifactId: 2,
         sourceId: '',
         cell: null,
+        concurrency: null,
+        status: '',
+        workloadKey: null,
+        mode: null,
         scheduled: null,
         attempted: null,
+        completed: null,
         failed: null,
+        timedOut: null,
+        notStarted: null,
+        valid: null,
         unjudged: null,
+        legacyFailedSlots: null,
+        unfinished: null,
+        deliveryDeadlineSeconds: null,
+        qualitySloGoodput: null,
         provenance: 'unavailable',
         error: 'Published source index unavailable',
       },

@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 
-import { isMonochromeLogo } from '@/lib/model-logos';
-import { getHwVendorLogo } from '@/lib/vendor-logos';
-import { cn } from '@/lib/utils';
+import { isMonochromeLogo } from '@/lib/catalog/model-logos';
+import { getHwVendorLogo } from '@/lib/catalog/vendor-logos';
+import { cn } from '@/lib/shared/utils';
 
 /**
  * Small inline hardware-vendor mark, rendered beside a GPU label (e.g. in the

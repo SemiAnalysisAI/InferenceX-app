@@ -1,13 +1,13 @@
 import Link from 'next/link';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { toModel } from '@/lib/compare-enum-coerce';
-import type { Locale } from '@/lib/i18n';
-import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
-import { getModelPageSlugs } from '@/lib/model-pages';
-import { getLocalizedModelPage } from '@/lib/model-pages-zh';
+import { toModel } from '@/lib/compare/compare-enum-coerce';
+import type { Locale } from '@/lib/i18n/i18n';
+import { formatParamCount, getModelArchitecture } from '@/lib/catalog/model-architectures';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
+import { getLocalizedModelPage } from '@/lib/catalog/model-pages-zh';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import ModelDeveloperLogo from './ModelDeveloperLogo';

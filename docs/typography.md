@@ -19,7 +19,7 @@ Rules of thumb:
 - Body and heading sizes use the standard Tailwind scale (`text-xs` … `text-6xl`). Do **not** add wrapper components for body text.
 - Never write `text-[11px]`, `text-[0.65rem]`, `tracking-[0.16em]`, etc. — the gate (below) blocks new arbitrary font sizes and letter-spacing values. `tracking-[0.1em]` is exactly `tracking-widest`; use the built-in.
 - The micro size tokens deliberately define **no paired line-height**: the arbitrary values they replaced set only `font-size` and inherited line-height, and dense tables depend on that. Don't add `--text-2xs--line-height` without re-checking those surfaces.
-- The custom tracking tokens are registered with tailwind-merge in `src/lib/utils.ts` (`extendTailwindMerge`); if you add a token, add it there too or `cn()` will keep conflicting classes.
+- The custom tracking tokens are registered with tailwind-merge in `src/lib/shared/utils.ts` (`extendTailwindMerge`); if you add a token, add it there too or `cn()` will keep conflicting classes.
 
 ## Components
 
@@ -66,4 +66,4 @@ Per-file counts are compared against `packages/app/scripts/typography-allowlist.
 
 - **A count above the allowlist (or a hit in an unlisted file) fails immediately** — fix it with a token, `CHART_TYPE`, or the standard scale.
 - **A count below the allowlist also fails**, telling you to run `bun run check:typography --update` — so the allowlist only ever shrinks. It doubles as the migration burndown; there is no deadline, offenders migrate when their file is next touched.
-- Matching logic lives in `src/lib/typography-gate.ts` (unit-tested); exemptions (OG renderers, tests, the gate itself) are defined there.
+- Matching logic lives in `src/lib/testing/typography-gate.ts` (unit-tested); exemptions (OG renderers, tests, the gate itself) are defined there.

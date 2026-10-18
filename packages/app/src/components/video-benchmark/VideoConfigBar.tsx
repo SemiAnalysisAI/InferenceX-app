@@ -1,8 +1,8 @@
 'use client';
 
 import { ControlPanel } from '@/components/ui/control-panel';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { metricLabel, X_METRICS, Y_METRICS, type XMetricId, type YMetricId } from './metrics';
 import VideoApiReference from './VideoApiReference';
 import VideoSelect from './VideoSelect';

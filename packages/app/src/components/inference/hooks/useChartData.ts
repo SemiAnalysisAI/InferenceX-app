@@ -16,8 +16,10 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
+  isAllInMeasuredConfigKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
 import {
   applyTokenRevenuePricing,
   usesTokenSalePricing,
@@ -27,27 +29,35 @@ import type {
   ChartDefinition,
   HardwareConfig,
   InferenceData,
+  PowerCompare,
   RenderableGraph,
   TokenRevenuePriceSource,
   TokenRevenuePricing,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import {
   computeAvailableQuickFilters,
   EMPTY_QUICK_FILTERS,
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import { benchmarkQueryOptions, useBenchmarks } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { remapInferencePoint } from '@/lib/chart-utils';
-import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/constants';
-import { Sequence, type Model } from '@/lib/data-mappings';
-import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+} from '@/lib/benchmarks/benchmark-run-selection';
+import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 
 export {
@@ -91,9 +101,6 @@ export function useChartData(
    * configs that the selected run did not produce.
    */
   selectedRunId?: string,
-  /** Selected main run id, including non-contested runs, used only to avoid
-   * fetching the primary run again as a same-day comparison overlay. */
-  comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
   selectedXAxisMode?: XAxisMode,
@@ -116,6 +123,9 @@ export function useChartData(
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   /** Opt-in from the inference page only; explicit date/run/history views opt out. */
   allowDefaultRunPreference = false,
+  /** Sibling boundary / role series appended to a gated power metric (`i_pcompare`). */
+  powerCompare: PowerCompare = 'none',
+  fixedSequenceStatistic: FixedSequenceStatistic = 'median',
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -200,15 +210,8 @@ export function useChartData(
 
   // GPU comparison: fetch data for each additional comparison date
   const comparisonDates = useMemo(
-    () =>
-      buildComparisonDates(
-        selectedGPUs,
-        selectedDates,
-        selectedDateRange,
-        selectedRunDate,
-        comparisonMainRunId,
-      ),
-    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate, comparisonMainRunId],
+    () => buildComparisonDates(selectedGPUs, selectedDates, selectedDateRange, selectedRunDate),
+    [selectedGPUs, selectedDates, selectedDateRange, selectedRunDate],
   );
 
   // Each comparison entry is either a plain date (latest run that day, exact-date
@@ -354,13 +357,15 @@ export function useChartData(
           isAgentic,
           percentile: selectedPercentile,
           xAxisMode: selectedXAxisMode,
+          fixedSequenceStatistic,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
         const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
-        const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
+        const ttftPctlWord =
+          ttftPctl === 'median' ? 'Median' : ttftPctl === 'mean' ? 'Mean' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
         const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
@@ -405,6 +410,22 @@ export function useChartData(
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
+          );
+        } else {
+          const word = xAxisField.startsWith('mean_')
+            ? 'Mean'
+            : xAxisField.startsWith('median_')
+              ? 'Median'
+              : xAxisField.split('_')[0].toUpperCase();
+          const wordZh = word === 'Mean' ? '平均' : '中位';
+          xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, word);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, word).replace(
+            /^(?:Mean|Median)\s+/u,
+            wordZh,
+          );
+          chartHeading = chartHeading.replace(
+            /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
+            `$1${word} `,
           );
         }
 
@@ -485,6 +506,7 @@ export function useChartData(
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
+      fixedSequenceStatistic,
       selectedSequence,
       tokenRevenuePriceSource,
     ],
@@ -538,8 +560,14 @@ export function useChartData(
         );
         const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
+        // Comparison clones are appended after the remap so they share the
+        // base point's x and differ only in y and `powerVariant`.
         const mappedData = hasMetric
-          ? metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField))
+          ? expandPowerCompareSeries(
+              metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField)),
+              selectedYAxisMetric,
+              powerCompare,
+            )
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
@@ -557,6 +585,15 @@ export function useChartData(
           chartDefinition,
           data: processedData,
           clippedData,
+          ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+            ? {
+                tableData: expandPowerCompareSeries(
+                  allInMeasuredTableData(filteredData, metricKey, xAxisField),
+                  selectedYAxisMetric,
+                  powerCompare,
+                ),
+              }
+            : {}),
         };
       },
     );
@@ -576,6 +613,7 @@ export function useChartData(
     compareGpuPair,
     selectedPercentile,
     quickFilters,
+    powerCompare,
   ]);
 
   // Points that pass every scope filter but NOT the y-metric coverage filter.

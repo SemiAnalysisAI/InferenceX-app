@@ -1,5 +1,8 @@
 import type { InferenceData, TokenRevenuePricing } from './types';
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO, pricingCacheHitRate } from '@/lib/cache-pricing';
+import {
+  DEFAULT_CACHED_INPUT_PRICE_RATIO,
+  pricingCacheHitRate,
+} from '@/lib/calculator/cache-pricing';
 
 const SECONDS_PER_HOUR = 3_600;
 const TOKENS_PER_MILLION = 1_000_000;

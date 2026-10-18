@@ -15,7 +15,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import {
   includesJalapenoResult,
   includesTpuv7Result,
@@ -23,7 +23,7 @@ import {
   JalapenoOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
-} from '@/components/official-preview-notice';
+} from '@/components/ui/official-preview-notice';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
@@ -46,25 +46,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getModelSortIndex } from '@/lib/constants';
-import { exportToCsv } from '@/lib/csv-export';
+import { track } from '@/lib/analytics/analytics';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
   getSequenceLabel,
   Percentile,
   Sequence,
   type Model,
-} from '@/lib/data-mappings';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   DEFAULT_FIRST_TOKEN_CAPS,

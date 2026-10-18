@@ -1,5 +1,5 @@
 import { at, number, rows, text, type Json } from './bundle';
-import type { VideoHistoryPage } from './history';
+import type { VideoHistoryPage, VideoHistorySource } from './history';
 import type { ServingCell } from './serving';
 
 export interface ServingCellEvidence {
@@ -118,6 +118,61 @@ export function servingCellEvidence(
   };
 }
 
+function unavailableServingEvidence(): ServingCellEvidence {
+  return {
+    cell: null,
+    concurrency: null,
+    status: '',
+    workloadKey: null,
+    mode: null,
+    scheduled: null,
+    attempted: null,
+    completed: null,
+    failed: null,
+    timedOut: null,
+    notStarted: null,
+    valid: null,
+    unjudged: null,
+    legacyFailedSlots: null,
+    unfinished: null,
+    deliveryDeadlineSeconds: null,
+    qualitySloGoodput: null,
+    provenance: 'unavailable',
+  };
+}
+
+function sourceServingRows(
+  source: VideoHistorySource,
+): { identity: string; evidence: ServingCellEvidence }[] {
+  if (source.serving?.length)
+    return source.serving.map((evidence) => ({
+      identity: evidence.cell ?? 'unknown',
+      evidence,
+    }));
+  if (source.observations.length > 0)
+    return source.observations.map((o) => ({
+      identity: o.cell ?? o.id,
+      evidence: {
+        ...unavailableServingEvidence(),
+        cell: o.cell,
+        concurrency: o.concurrency,
+        status: o.status,
+        workloadKey: o.workloadKey ?? null,
+        scheduled: o.scheduled,
+        completed: o.completed,
+        valid: o.valid,
+        legacyFailedSlots: o.failed,
+        provenance: 'legacy-projection',
+      },
+    }));
+  return [
+    {
+      identity: 'unknown',
+      evidence: { ...unavailableServingEvidence(), status: source.execution },
+    },
+  ];
+}
+
 /** Newest publication per sealed source/cell; never discard zero-sample or unknown-workload rows. */
 export function videoServingEvidence(pages: VideoHistoryPage[]): VideoServingEvidenceRow[] {
   const result: VideoServingEvidenceRow[] = [];
@@ -127,66 +182,24 @@ export function videoServingEvidence(pages: VideoHistoryPage[]): VideoServingEvi
       if (entry.sources.length === 0 && entry.error && !seen.has(entry.id)) {
         seen.add(entry.id);
         result.push({
-          ...servingCellEvidence({ id: '', concurrency: 0, cell: null, run: null, spec: null }),
+          ...unavailableServingEvidence(),
           id: entry.id,
           runId: entry.runId,
           artifactId: entry.artifact.id,
-          cell: null,
-          concurrency: null,
           sourceId: '',
           hardware: '',
           sourceSha: '',
-          provenance: 'unavailable',
           error: entry.error,
         });
       }
       for (const source of entry.sources) {
         if (source.kind !== 'observation') continue;
-        const cells: ServingCellEvidence[] = source.serving?.length
-          ? source.serving
-          : source.observations.length > 0
-            ? source.observations.map((o) => ({
-                ...servingCellEvidence({
-                  id: o.cell ?? '',
-                  concurrency: o.concurrency ?? 0,
-                  cell: null,
-                  run: null,
-                  spec: null,
-                }),
-                cell: o.cell,
-                concurrency: o.concurrency,
-                status: o.status,
-                workloadKey: o.workloadKey ?? null,
-                scheduled: o.scheduled,
-                completed: o.completed,
-                valid: o.valid,
-                legacyFailedSlots: o.failed,
-                provenance: 'legacy-projection',
-              }))
-            : [
-                {
-                  ...servingCellEvidence({
-                    id: '',
-                    concurrency: 0,
-                    cell: null,
-                    run: null,
-                    spec: null,
-                  }),
-                  cell: null,
-                  concurrency: null,
-                  status: source.execution,
-                  provenance: 'unavailable',
-                },
-              ];
-        const identities = source.serving?.length
-          ? source.serving.map((cell) => cell.cell ?? 'unknown')
-          : source.observations.map((o) => o.cell ?? o.id);
-        for (const [index, cell] of cells.entries()) {
-          const id = `${source.id}:${source.sha256 ?? entry.id}:${identities[index] ?? 'unknown'}`;
+        for (const { identity, evidence } of sourceServingRows(source)) {
+          const id = `${source.id}:${source.sha256 ?? entry.id}:${identity}`;
           if (seen.has(id)) continue;
           seen.add(id);
           result.push({
-            ...cell,
+            ...evidence,
             id,
             runId: entry.runId,
             artifactId: entry.artifact.id,

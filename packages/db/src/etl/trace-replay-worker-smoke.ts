@@ -29,7 +29,10 @@ function fingerprint(prepared: PreparedTraceReplay) {
     serverMetricsJsonSize: prepared.serverMetricsJsonSize,
     aggregateStatsJson: sha256(prepared.aggregateStatsJson),
     chartSeriesJson: sha256(prepared.chartSeriesJson),
-    requestTimelineJson: sha256(prepared.requestTimelineJson),
+    requestTimelineGz: sha256(prepared.requestTimelineGz),
+    requestTimelineRaw: prepared.requestTimelineGz
+      ? sha256(gunzipSync(prepared.requestTimelineGz))
+      : null,
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
     cacheHitRates: prepared.cacheHitRates,

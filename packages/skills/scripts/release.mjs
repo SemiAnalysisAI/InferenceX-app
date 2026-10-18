@@ -35,12 +35,14 @@ const releaseFiles = [
   'skills/inferencex-api/references/collectivex.md',
   'skills/inferencex-api/references/dashboard-views.md',
   'skills/inferencex-api/references/offline-exports.md',
+  'skills/inferencex-api/references/pareto.md',
   'skills/inferencex-api/references/powerx.md',
   'skills/inferencex-api/references/provenance.md',
   'skills/inferencex-api/references/public-api-examples.md',
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/schemas.json',
+  'skills/inferencex-api/scripts/capture-response.mjs',
   'skills/inferencex-api/scripts/chart-layout.mjs',
   'skills/inferencex-api/scripts/charts.mjs',
   'skills/inferencex-api/scripts/cli-contract.mjs',
@@ -62,6 +64,8 @@ const releaseFiles = [
   'skills/inferencex-api/scripts/local-files.mjs',
   'skills/inferencex-api/scripts/request-headers.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
+  'skills/inferencex-api/scripts/tco-summary.mjs',
+  'skills/inferencex-api/scripts/trace-summary.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
 ];
 const stableVersion = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;

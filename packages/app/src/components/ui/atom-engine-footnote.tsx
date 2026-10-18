@@ -1,7 +1,7 @@
 'use client';
 
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 /**
  * Superscript marker appended to ATOM-family framework labels (e.g. "ATOM¹",

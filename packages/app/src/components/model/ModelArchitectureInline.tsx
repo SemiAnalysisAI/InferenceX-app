@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 
 import { Skeleton } from '@/components/ui/skeleton';
-import { toModel } from '@/lib/compare-enum-coerce';
+import { toModel } from '@/lib/compare/compare-enum-coerce';
 
 // Client-only like the old dashboard drawer: the SVG diagram sizes itself
 // against the rendered container, so it has no meaningful SSR output.

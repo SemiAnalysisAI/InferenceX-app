@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { baseSku, bestSeriesPerSku } from './best-series-per-sku';
+import { baseSku, bestSeriesPerSku, withUnrankedSkus } from './best-series-per-sku';
 
 function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
@@ -19,6 +19,21 @@ function frameworkPoint(
 }
 
 describe('bestSeriesPerSku', () => {
+  it('ranks only selected precisions so an FP4 winner cannot hide the FP8 SKU', () => {
+    const rows = [
+      { ...point('gb300-nvl72', 'gb300_dynamo-trt', 10, 1000), precision: 'fp4' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-trt', 20, 800), precision: 'fp4' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-sglang', 10, 100), precision: 'fp8' },
+      { ...point('gb300-nvl72', 'gb300_dynamo-sglang', 20, 80), precision: 'fp8' },
+    ] as InferenceData[];
+
+    expect(bestSeriesPerSku(rows, 'upper_left', ['fp8'])).toEqual(new Set(['gb300_dynamo-sglang']));
+    expect(bestSeriesPerSku(rows, 'upper_left', ['fp4', 'fp8'])).toEqual(
+      new Set(['gb300_dynamo-trt']),
+    );
+    expect(bestSeriesPerSku(rows, 'upper_left', ['bf16'])).toEqual(new Set());
+  });
+
   it('selects the highest normalized frontier AUC within each SKU', () => {
     const selected = bestSeriesPerSku(
       [
@@ -145,5 +160,44 @@ describe('bestSeriesPerSku', () => {
     );
 
     expect(selected).toEqual(new Set(['b200_overlay_sglang', 'b200_overlay_tilert_mtp']));
+  });
+});
+
+describe('withUnrankedSkus', () => {
+  it('keeps table-only SKUs when another SKU in the selection can be ranked', () => {
+    const ranked = [
+      point('B200-8', 'b200_trt', 10, 100),
+      point('B200-8', 'b200_trt', 20, 80),
+      point('B200-8', 'b200_sglang', 10, 90),
+      point('B200-8', 'b200_sglang', 20, 60),
+    ];
+    const tableOnly = [
+      point('GB200-NVL72', 'gb200_dynamo', 10, Number.NaN),
+      point('GB200-NVL72', 'gb200_sglang', 10, Number.NaN),
+    ];
+    const best = bestSeriesPerSku([...ranked, ...tableOnly], 'upper_left');
+    expect([...best]).toEqual(['b200_trt']);
+
+    const selected = withUnrankedSkus(best, ranked, tableOnly);
+
+    expect([...selected].toSorted()).toEqual(['b200_trt', 'gb200_dynamo', 'gb200_sglang']);
+  });
+
+  it('does not re-add losing series for a SKU that already has a ranked winner', () => {
+    const rows = [
+      point('B200-8', 'b200_trt', 10, 100),
+      point('B200-8', 'b200_sglang', 10, 90),
+      point('B200-8', 'b200_vllm', 10, Number.NaN),
+    ];
+
+    expect(withUnrankedSkus(new Set(['b200_trt']), rows.slice(0, 2), rows)).toEqual(
+      new Set(['b200_trt']),
+    );
+  });
+
+  it('only adds table rows, not unranked chart-only series', () => {
+    const chartOnly = [point('H200-8', 'h200_vllm', 10, Number.NaN)];
+
+    expect(withUnrankedSkus(new Set(['b200_trt']), chartOnly, [])).toEqual(new Set(['b200_trt']));
   });
 });

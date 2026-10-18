@@ -4,6 +4,7 @@ import { Info } from 'lucide-react';
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEventHandler,
@@ -12,9 +13,9 @@ import {
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HELP_CONTENT_CLASS_NAME } from './tooltip';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 /** Closed-field help sits beside the value, independently of the select button. */
 export function SelectedOptionInfo({
@@ -77,10 +78,20 @@ export function InfoHelp({
   const locale = useLocale();
   const titleId = useId();
   const [open, setOpen] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState<number>();
   const hoverOpenedRef = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    // Exclude the scrollbar without measuring the popover whose size we change.
+    const updateWidth = () => setViewportWidth(document.documentElement.clientWidth);
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, [open]);
 
   const cancelClose = () => clearTimeout(closeTimerRef.current);
   useEffect(() => () => clearTimeout(closeTimerRef.current), []);
@@ -154,6 +165,11 @@ export function InfoHelp({
       </PopoverTrigger>
       <PopoverContent
         ref={contentRef}
+        style={
+          viewportWidth === undefined
+            ? undefined
+            : { maxWidth: `calc(${viewportWidth}px - 1.5rem)` }
+        }
         side="bottom"
         align={align}
         collisionPadding={12}
@@ -179,7 +195,9 @@ export function InfoHelp({
         data-testid={contentTestId ?? `option-help-content-${value}`}
         className={cn(
           HELP_CONTENT_CLASS_NAME,
-          'z-[130] w-96 max-w-[min(calc(100vw-1.5rem),var(--radix-popover-content-available-width))] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
+          // Avoid feeding the observed width back into its own size limit when
+          // the viewport changes (Firefox ResizeObserver loop).
+          'z-[130] w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto space-y-3',
         )}
       >
         <p id={titleId} className="font-medium text-foreground">

@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { slugify } from '@/lib/blog';
-import type { Locale } from '@/lib/i18n';
+import { slugify } from '@/lib/blog/blog';
+import type { Locale } from '@/lib/i18n/i18n';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 
 function childrenToText(children: ReactNode): string {
   if (typeof children === 'string') return children;

@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import VideoSelect from './VideoSelect';
-import { videoModelHistory, type VideoModel } from './models';
+import { projectVideoHistoryForModel, type VideoModel } from './models';
 import type { VideoHistoryEntry, VideoHistoryPage } from './history';
 
 const STRINGS = {
@@ -40,6 +40,9 @@ const STRINGS = {
     qualification: 'Release qualification',
     no: 'Not qualified',
     yes: 'Qualified by recorded policy',
+    power: 'GPU power',
+    measured: 'Measured',
+    notMeasured: 'Not measured',
     unavailable: 'Unavailable',
     details: 'Evidence and limitations',
     counts: 'Valid / completed / scheduled',
@@ -84,6 +87,9 @@ const STRINGS = {
     qualification: '发布验收',
     no: '未经验证',
     yes: '已按记录策略通过',
+    power: 'GPU 功率',
+    measured: '已测得',
+    notMeasured: '未测得',
     unavailable: '无数据',
     details: '证据与局限',
     counts: '有效 / 已完成 / 计划',
@@ -176,8 +182,10 @@ export default function VideoHistory({ model = 'h3' }: { model?: VideoModel }) {
     void load(1, controller.signal);
     return () => controller.abort();
   }, []);
-  const entries = videoModelHistory([{ schemaVersion: 1, entries: allEntries, nextPage }], model)[0]
-    .entries;
+  const entries = projectVideoHistoryForModel(
+    [{ schemaVersion: 1, entries: allEntries, nextPage }],
+    model,
+  )[0].entries;
   const observations = entries.flatMap((entry) =>
     entry.sources.flatMap((source) => source.observations),
   );
@@ -289,6 +297,12 @@ export default function VideoHistory({ model = 'h3' }: { model?: VideoModel }) {
                   : source.releaseQualified
                     ? s.yes
                     : s.no}
+                {typeof source.powerVerified === 'boolean' && (
+                  <span data-testid="video-history-power">
+                    {' '}
+                    · {s.power}: {source.powerVerified ? s.measured : s.notMeasured}
+                  </span>
+                )}
               </p>
               {source.error && (
                 <p role="alert" className="break-words text-sm">

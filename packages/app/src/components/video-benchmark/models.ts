@@ -1,6 +1,6 @@
 import { H3_API_REFERENCE } from './api-reference';
 import { VIDEO_HARDWARE_ROSTER, type VideoHardwareRosterEntry } from './hardware';
-import type { VideoHistoryPage } from './history';
+import type { VideoHistoryPage, VideoHistorySource } from './history';
 import type { VideoPoint } from './metrics';
 
 export const VIDEO_MODELS = {
@@ -18,54 +18,55 @@ export function canonicalVideoModelId(model: string): string {
   return model === 'Wan-AI/Wan2.2-T2V-A14B' ? VIDEO_MODELS.wan22.modelId : model;
 }
 
-/** Filter before workload selection so one model cannot suppress or inherit another's results.
+function sourceMatchesModel(
+  source: VideoHistorySource,
+  model: VideoModel,
+  artifactName: string,
+): boolean {
+  const identities = new Set(
+    source.observations
+      .map((observation) => canonicalVideoModelId(observation.model))
+      .filter(Boolean),
+  );
+  // Ambiguous mixed-model sources cannot assign serving/fidelity evidence safely.
+  if (identities.size > 1) return false;
+  const declaredModel = canonicalVideoModelId(source.model || '');
+  if (declaredModel && identities.size > 0 && !identities.has(declaredModel)) return false;
+  const identity = declaredModel || [...identities][0] || '';
+  return identity
+    ? identity === VIDEO_MODELS[model].modelId
+    : model === 'h3' && artifactName.startsWith('h3-');
+}
+
+function withoutUnsupportedQuality(
+  source: VideoHistorySource,
+  model: VideoModel,
+): VideoHistorySource {
+  if (model === 'h3') return source;
+  // Wan's video-only quality contract is not defined in this MVP. Never apply H3's audio rubric.
+  return {
+    ...source,
+    observations: source.observations.map((observation) => ({ ...observation, quality: null })),
+    ...(source.serving
+      ? { serving: source.serving.map((cell) => ({ ...cell, qualitySloGoodput: null })) }
+      : {}),
+  };
+}
+
+/** Select model sources and remove unsupported quality before workload selection.
  * Legacy sources without model metadata belong to the existing H3-only artifact catalog.
  * New model producers must identify their model even when generation has no observations.
  */
-export function videoModelHistory(
+export function projectVideoHistoryForModel(
   pages: VideoHistoryPage[],
   model: VideoModel,
 ): VideoHistoryPage[] {
-  const modelId = VIDEO_MODELS[model].modelId;
   return pages.map((page) => ({
     ...page,
     entries: page.entries.flatMap((entry) => {
-      const sources = entry.sources.flatMap((source) => {
-        const identities = new Set(
-          source.observations
-            .map((observation) => canonicalVideoModelId(observation.model))
-            .filter(Boolean),
-        );
-        // Ambiguous mixed-model sources cannot assign serving/fidelity evidence safely.
-        if (identities.size > 1) return [];
-        const identity = canonicalVideoModelId(source.model || [...identities][0] || '');
-        if (
-          source.model &&
-          identities.size > 0 &&
-          !identities.has(canonicalVideoModelId(source.model))
-        )
-          return [];
-        if (
-          !(identity
-            ? identity === modelId
-            : model === 'h3' && entry.artifact.name.startsWith('h3-'))
-        )
-          return [];
-        if (model === 'h3') return [source];
-        // Wan's video-only quality contract is not defined in this MVP. Never apply H3's audio rubric.
-        return [
-          {
-            ...source,
-            observations: source.observations.map((observation) => ({
-              ...observation,
-              quality: null,
-            })),
-            ...(source.serving
-              ? { serving: source.serving.map((cell) => ({ ...cell, qualitySloGoodput: null })) }
-              : {}),
-          },
-        ];
-      });
+      const sources = entry.sources
+        .filter((source) => sourceMatchesModel(source, model, entry.artifact.name))
+        .map((source) => withoutUnsupportedQuality(source, model));
       return sources.length > 0 ||
         (model === 'h3' &&
           entry.artifact.name.startsWith('h3-') &&

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { OptionInfo } from '@/components/ui/option-info';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
-import type { PowerTier } from '@/lib/power-tier';
+import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
+import { topologyLabel } from '@/components/inference/utils/topology-filter';
 
 import {
   useInferenceActions,
@@ -22,10 +23,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { track } from '@/lib/analytics';
-import { Sequence } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { Label } from '@/components/ui/label';
 
 const STRINGS = {
@@ -37,9 +38,9 @@ const STRINGS = {
       'Narrow the chart by chip vendor, serving framework, deployment mode, and power-measurement status. Selecting none in a group shows all.',
     selected: 'selected',
     bestPerSku: 'Best per SKU',
-    bestPerSkuHint: 'Show only the best configuration for each chip',
+    bestPerSkuHint: 'Show the best configuration per chip; turn off to select more',
     bestPerSkuHelp:
-      'Selects the best configuration line for each chip SKU using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
+      'Selects the best configuration line for each chip SKU across candidate frameworks using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Turning this off asks for confirmation before showing vLLM and SGLang on the same SKU in guarded official views. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
     vendor: 'Vendor',
     vendorHelp:
       'Filter by the company that makes the chip, such as NVIDIA, AMD, or Google (TPU). Select one or more vendors; leave the group empty to include all.',
@@ -56,6 +57,9 @@ const STRINGS = {
     specHelp:
       'MTP groups runs with speculative decoding enabled, including methods such as EAGLE. STP groups standard decoding without speculative decoding. Available only for fixed-sequence benchmarks.',
     power: 'Measured Power',
+    topology: 'Topology',
+    topologyHelp:
+      'Keep one GPU allocation and parallelism configuration across its observed concurrency sweep. This does not match software versions or fill missing measurements.',
     certified: 'Validated',
     legacyTier: 'Historical',
     validatedTitle: 'Validated measurement',
@@ -78,9 +82,9 @@ const STRINGS = {
       '按芯片厂商、推理框架、部署模式和功耗测量状态筛选图表。某组不选则显示全部。',
     selected: '项已选',
     bestPerSku: '每个 SKU 仅显示最佳配置',
-    bestPerSkuHint: '每款芯片只显示表现最佳的配置',
+    bestPerSkuHint: '每款芯片显示最佳配置；关闭后可选择更多配置',
     bestPerSkuHelp:
-      '按当前图表指标，为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
+      '按当前图表指标，从所有候选框架中为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。关闭后，受比较规则限制的官方视图会先要求确认，再同时显示同一 SKU 上的 vLLM 和 SGLang。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
     vendor: '厂商',
     vendorHelp:
       '按芯片制造商筛选，例如 NVIDIA、AMD 或 Google（TPU）。可选择一个或多个厂商；不选则显示全部。',
@@ -97,6 +101,9 @@ const STRINGS = {
     specHelp:
       'MTP 组包含启用投机解码的运行，也包括 EAGLE 等方法；STP 组为未启用投机解码的标准解码运行。该筛选仅适用于固定序列长度基准测试。',
     power: '实测功耗',
+    topology: '拓扑',
+    topologyHelp:
+      '按 GPU 分配和并行配置保留整条已测并发曲线。此筛选不会匹配软件版本，也不会补造缺失数据。',
     certified: '已验证',
     legacyTier: '历史测量',
     validatedTitle: '已验证测量',
@@ -151,6 +158,7 @@ export function QuickFiltersDialog({
     setQuickFilterDeployment,
     setQuickFilterSpec,
     setQuickFilterPower,
+    setQuickFilterTopologies,
   } = useInferenceActions();
   const { selectedSequence, quickFilters, lockedFrameworks } = useInferenceFilters();
   const { availableQuickFilters } = useInferenceData();
@@ -160,6 +168,7 @@ export function QuickFiltersDialog({
     framework: <p>{t.frameworkHelp}</p>,
     deployment: <p>{t.deploymentHelp}</p>,
     spec: <p>{t.specHelp}</p>,
+    topology: <p>{t.topologyHelp}</p>,
     power: (
       <>
         <div>
@@ -186,9 +195,12 @@ export function QuickFiltersDialog({
     label: framework.label,
     available: availableQuickFilters.frameworks.includes(framework.key),
   }));
+  const topologyKeys = [
+    ...new Set([...(availableQuickFilters.topologies ?? []), ...(quickFilters.topologies ?? [])]),
+  ];
 
   const groups: {
-    key: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power';
+    key: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology';
     label: string;
     options: readonly { value: string; label: string; available: boolean }[];
     selected: readonly string[];
@@ -254,6 +266,16 @@ export function QuickFiltersDialog({
       })),
       selected: quickFilters.power,
     },
+    {
+      key: 'topology',
+      label: t.topology,
+      options: topologyKeys.map((value) => ({
+        value,
+        label: topologyLabel(value, locale, topologyKeys),
+        available: (availableQuickFilters.topologies ?? []).includes(value),
+      })),
+      selected: quickFilters.topologies ?? [],
+    },
   ];
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
@@ -261,26 +283,29 @@ export function QuickFiltersDialog({
   // Every option is a visible toggle: one tap adds or removes it, no dropdown
   // to open first. Empty selection in a group means "all".
   const handleToggle = (
-    category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power',
+    category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology',
     value: string,
   ) => {
     const previous: readonly string[] =
-      category === 'vendor'
-        ? quickFilters.vendors
-        : category === 'framework'
-          ? quickFilters.frameworks
-          : category === 'deployment'
-            ? quickFilters.deployment
-            : category === 'power'
-              ? quickFilters.power
-              : quickFilters.spec;
+      category === 'topology'
+        ? (quickFilters.topologies ?? [])
+        : category === 'vendor'
+          ? quickFilters.vendors
+          : category === 'framework'
+            ? quickFilters.frameworks
+            : category === 'deployment'
+              ? quickFilters.deployment
+              : category === 'power'
+                ? quickFilters.power
+                : quickFilters.spec;
     const values = toggleValue(previous, value);
     track('inference_quick_filter_toggled', {
       category,
       value,
       active: values.includes(value),
     });
-    if (category === 'vendor') setQuickFilterVendors(values);
+    if (category === 'topology') setQuickFilterTopologies(values);
+    else if (category === 'vendor') setQuickFilterVendors(values);
     else if (category === 'framework') setQuickFilterFrameworks(values);
     else if (category === 'deployment') setQuickFilterDeployment(values as DeploymentMode[]);
     else if (category === 'power') setQuickFilterPower(values as PowerTier[]);
@@ -293,6 +318,7 @@ export function QuickFiltersDialog({
     setQuickFilterDeployment([]);
     setQuickFilterSpec([]);
     setQuickFilterPower([]);
+    setQuickFilterTopologies([]);
     track('inference_quick_filters_cleared', { source: 'dialog' });
   };
 
@@ -366,7 +392,10 @@ export function QuickFiltersDialog({
                 role="group"
                 aria-labelledby={`quick-filter-${group.key}-label`}
                 data-testid={`quick-filter-${group.key}-options`}
-                className="flex flex-wrap gap-2"
+                className={cn(
+                  'flex min-w-0 flex-wrap gap-2',
+                  group.key === 'topology' && 'max-h-56 overflow-y-auto overscroll-contain pr-1',
+                )}
               >
                 {group.options.map((option) => {
                   const active = group.selected.includes(option.value);
@@ -382,6 +411,8 @@ export function QuickFiltersDialog({
                       title={disabled ? t.noData : undefined}
                       className={cn(
                         'rounded-full font-normal',
+                        group.key === 'topology' &&
+                          'h-auto min-h-9 max-w-full whitespace-normal break-words rounded-lg py-2 text-left md:h-auto',
                         active && 'bg-brand hover:bg-brand/90',
                       )}
                       data-testid={`quick-filter-${group.key}-${option.value}`}

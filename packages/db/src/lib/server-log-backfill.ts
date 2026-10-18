@@ -1,4 +1,4 @@
-import { RUNNER_SUFFIX_RE, type ArtifactMeta } from './github-artifacts.js';
+import { pairWithBenchmarkSibling, type ArtifactMeta } from './github-artifacts.js';
 import { serverLogArtifactSuffix } from '../etl/server-log-artifacts.js';
 
 export interface ServerLogArtifactPair {
@@ -14,13 +14,6 @@ export interface ServerLogResultCandidate {
 export interface ServerLogResultResolution {
   ids: number[];
   usedUniqueFallback: boolean;
-}
-
-function isNewerArtifact(candidate: ArtifactMeta, existing: ArtifactMeta): boolean {
-  return (
-    candidate.created_at > existing.created_at ||
-    (candidate.created_at === existing.created_at && (candidate.id ?? 0) > (existing.id ?? 0))
-  );
 }
 
 /**
@@ -47,29 +40,7 @@ export function resolveServerLogResultCandidates(
 export function pairServerLogArtifacts(
   artifacts: readonly ArtifactMeta[],
 ): ServerLogArtifactPair[] {
-  const byName = new Map<string, ArtifactMeta>();
-  for (const artifact of artifacts) {
-    const existing = byName.get(artifact.name);
-    if (!existing || isNewerArtifact(artifact, existing)) byName.set(artifact.name, artifact);
-  }
-  const pairsByLogicalBenchmark = new Map<string, ServerLogArtifactPair>();
-
-  for (const serverLogs of byName.values()) {
-    const suffix = serverLogArtifactSuffix(serverLogs.name);
-    if (!suffix) continue;
-    // Require the exact runner suffix. Eval and benchmark jobs can share the
-    // same logical config while uploading distinct server-log artifacts.
-    const benchmarks = byName.get(`bmk_agentic_${suffix}`) ?? byName.get(`bmk_${suffix}`);
-    if (!benchmarks) continue;
-
-    const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
-    const existing = pairsByLogicalBenchmark.get(logicalName);
-    if (!existing || isNewerArtifact(benchmarks, existing.benchmarks)) {
-      pairsByLogicalBenchmark.set(logicalName, { serverLogs, benchmarks });
-    }
-  }
-
-  return [...pairsByLogicalBenchmark.values()].toSorted((a, b) =>
-    a.serverLogs.name.localeCompare(b.serverLogs.name),
+  return pairWithBenchmarkSibling(artifacts, serverLogArtifactSuffix).map(
+    ({ artifact, benchmarks }) => ({ serverLogs: artifact, benchmarks }),
   );
 }

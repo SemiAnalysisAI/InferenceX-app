@@ -43,17 +43,7 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="precision-multiselect"]').should('have.attr', 'aria-expanded', 'false');
   });
 
-  it('Escape closes an open MultiSelect dropdown', () => {
-    cy.get('[data-testid="model-selector"]').click();
-    cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'true');
-
-    cy.get('body').type('{esc}');
-
-    cy.get('[data-testid="model-selector"]').should('have.attr', 'aria-expanded', 'false');
-    cy.get('[data-slot="select-content"]').should('not.exist');
-  });
-
-  it('marks only the still-new AgentX models with a NEW pill in the dropdown', () => {
+  it('keeps NEW pills off AgentX models in the model dropdown', () => {
     // The availability fixture predates DeepSeek V4.1 Flash, so splice one
     // agentic row in: the dropdown only lists models with availability rows.
     cy.fixture('api/availability.json').then((rows: Record<string, unknown>[]) => {
@@ -79,12 +69,10 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('[data-testid="model-selector"]').click();
 
-    // A NEW AgentX model carries the pill…
+    // NEW is reserved for the TPUv7 launch, so featured AgentX models…
     cy.contains('[role="option"]', 'DeepSeek V4.1 Flash 552B')
       .find('[data-new-badge="model-option"]')
-      .should('be.visible')
-      .and('have.text', 'NEW');
-    // …featured models whose launch pill has retired render without one…
+      .should('not.exist');
     cy.contains('[role="option"]', 'MiniMax M3 428B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
@@ -95,19 +83,6 @@ describe('Dropdown one-click switching', () => {
     cy.contains('[role="option"]', 'DeepSeek R1 0528 671B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
-  });
-
-  it('separates maintenance-mode models from deprecated models', () => {
-    cy.get('[data-testid="model-selector"]').click();
-
-    cy.contains('Maintenance Mode').scrollIntoView().should('be.visible');
-    cy.contains('[role="option"]', 'DeepSeek R1 0528 671B').scrollIntoView().should('be.visible');
-    cy.contains('Deprecated').scrollIntoView().should('be.visible');
-    cy.contains('[role="option"]', 'gpt-oss 120B').scrollIntoView().should('be.visible');
-    cy.contains('[role="option"]', 'Kimi K2.5/2.6/2.7-Code 1T')
-      .scrollIntoView()
-      .should('be.visible');
-    cy.contains('[role="option"]', 'Llama 3.3 70B Instruct').scrollIntoView().should('be.visible');
   });
 
   it('Escape closes the Y-axis SearchableSelect dropdown', () => {

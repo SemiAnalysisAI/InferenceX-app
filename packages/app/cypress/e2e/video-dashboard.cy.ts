@@ -333,6 +333,10 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       cy.visit(path);
       cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
       cy.get('[data-testid="video-kpi-card"]').should('have.length', 4);
+      cy.get('[data-testid="video-engine-coverage"] [data-model][data-engine]').should(
+        'have.length',
+        4,
+      );
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth, `${path} page width`).to.be.at.most(
           doc.documentElement.clientWidth,

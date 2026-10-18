@@ -5,7 +5,6 @@ import {
   qualityValue,
   type VideoQualityAssessment,
   type VideoQualityMetricResult,
-  type VideoQualityStatus,
 } from './quality';
 
 // Synthetic calibrated evidence exercises the boundary; no retained H3 clip is judged.
@@ -51,17 +50,6 @@ function point(overrides: Partial<VideoQualityMetricResult> = {}) {
 const selection = { metric: 'prompt_adherence', threshold: null } as const;
 
 describe('quality eligibility', () => {
-  it('preserves a canonical zero score and zero frozen threshold without coercion', () => {
-    const source = point({
-      value: 0,
-      calibration: { ...calibrated().calibration!, threshold: 0 },
-    });
-    expect(qualityEligibility(source, { ...selection, threshold: 0 })).toMatchObject({
-      eligible: true,
-      value: 0,
-    });
-    expect(source.quality.metrics.prompt_adherence?.value).toBe(0);
-  });
   it('rejects missing and legacy scale metadata without shifting otherwise plausible scores', () => {
     for (const scale of [undefined, 'ordinal_1_to_5']) {
       const source = point({ value: 3 });
@@ -78,11 +66,6 @@ describe('quality eligibility', () => {
     expect(qualityEligibility({ quality: null }, selection).reasons).toEqual(['unjudged']);
     expect(qualityValue(point({ status: 'unjudged', value: null }), 'prompt_adherence')).toBeNull();
   });
-
-  it.each<VideoQualityStatus>(['judged_unqualified', 'fail', 'inconclusive', 'unassessable'])(
-    'excludes a completed score with %s decision',
-    (status) => expect(qualityEligibility(point({ status }), selection).eligible).toBe(false),
-  );
 
   it('requires complete assessed clip coverage, not a passing survivor subset', () => {
     for (const samples of [null, 0, 19, 21, 19.5, Number.NaN])

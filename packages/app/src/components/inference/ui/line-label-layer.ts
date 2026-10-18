@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -15,7 +16,6 @@ export interface LineLabelSeries<TPoint extends CartesianPoint> {
   label: string;
   color: string;
   points: readonly TPoint[];
-  keepVisibleOnCollision?: boolean;
 }
 
 export interface LineLabelPlacement {
@@ -25,6 +25,12 @@ export interface LineLabelPlacement {
   color: string;
   x: number;
   y: number;
+  /**
+   * `placeLineLabels` always emits `true`: every series it is given keeps its
+   * pill, overlapping if it must. The only producer of `false` is the caller's
+   * de-duplication pass, which keeps a hidden data-join entry for a curve that
+   * lost the one-label-per-hardware contest (GH #470).
+   */
   visible: boolean;
 }
 
@@ -145,16 +151,16 @@ interface PillLayoutItem {
  * its anchor, and both mirrors together. Every candidate is clamped into
  * `bounds` before the overlap test, so nothing leaves the plot. When every
  * mirrored candidate collides, nearby rows are tried before the default spot
- * is kept: an overlapped label is still
- * better than a missing one, and the fallback matches what the anchor pass
- * already tolerates for pinned anchors.
+ * is kept: an overlapped label is still better than a missing one, and the
+ * fallback matches what the anchor pass already tolerates.
  *
  * With no bounds — a chart that clips nothing — the anchor offset is applied
  * unchanged and the collision pass is skipped, preserving that chart's
  * existing layout.
  *
  * Hidden pills get their default transform and occupy no space, so a label
- * that later becomes visible reappears where the anchor pass put it.
+ * that later becomes visible reappears where the anchor pass put it. Only the
+ * caller's de-duplication pass hides pills; the anchor pass never does.
  */
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -318,6 +324,21 @@ function lineCandidates<TPoint extends CartesianPoint>(
   return candidates;
 }
 
+/**
+ * Anchor one pill per series along its line.
+ *
+ * Each series tries `ANCHOR_SLOTS` fractions along its own points, rotated by
+ * its index so converging curves spread out instead of stacking at the
+ * endpoint. A series that finds a clear slot takes it. A series that finds none
+ * is deferred and placed afterwards on its least crowded slot, so it never
+ * steals a clear slot from a series that could have used it.
+ *
+ * Every series gets a visible pill. The overlap that survives here is resolved
+ * by `layoutPills`, which runs later with the pills' real measured boxes; the
+ * crude nominal box used here is far too small to decide that a label is
+ * unplaceable — a rendered pill is routinely two to three times
+ * `collisionWidth`.
+ */
 export function placeLineLabels<TPoint extends CartesianPoint>(
   series: readonly LineLabelSeries<TPoint>[],
   xScale: (value: number) => number,
@@ -345,6 +366,35 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
         Math.abs(other.y - y) < collisionHeight &&
         Math.abs(other.x - x) < other.halfW + labelHalfWidth,
     );
+  /**
+   * Nominal overlap area against the labels already placed. The same crude box
+   * model as `collides`, scored instead of thresholded, so a slot that clips one
+   * neighbour is preferred over one that sits on three.
+   */
+  const collisionCost = (x: number, y: number) =>
+    placed.reduce((cost, other) => {
+      const dx = other.halfW + labelHalfWidth - Math.abs(other.x - x);
+      const dy = collisionHeight - Math.abs(other.y - y);
+      return dx > 0 && dy > 0 ? cost + dx * dy : cost;
+    }, 0);
+
+  const emit = (entry: LineLabelSeries<TPoint>, point: TPoint) => {
+    const x = xScale(point.x);
+    const y = yScale(point.y);
+    placed.push({ x, y, halfW: labelHalfWidth });
+    result.push({
+      key: entry.key,
+      seriesId: entry.seriesId,
+      label: entry.label,
+      color: entry.color,
+      x,
+      y,
+      visible: true,
+    });
+  };
+
+  /** Series with no clear slot, deferred to a second pass — see below. */
+  const crowded: { entry: LineLabelSeries<TPoint>; candidates: TPoint[] }[] = [];
 
   for (const [seriesIndex, entry] of sorted.entries()) {
     if (entry.points.length === 0) continue;
@@ -375,35 +425,37 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
 
     const candidate = candidates.find((point) => !collides(xScale(point.x), yScale(point.y)));
     if (candidate) {
-      const x = xScale(candidate.x);
-      const y = yScale(candidate.y);
-      placed.push({ x, y, halfW: labelHalfWidth });
-      result.push({
-        key: entry.key,
-        seriesId: entry.seriesId,
-        label: entry.label,
-        color: entry.color,
-        x,
-        y,
-        visible: true,
-      });
+      emit(entry, candidate);
       continue;
     }
 
-    const fallback = entry.points[0];
-    const x = xScale(fallback.x);
-    const y = yScale(fallback.y);
-    const visible = entry.keepVisibleOnCollision === true;
-    if (visible) placed.push({ x, y, halfW: labelHalfWidth });
-    result.push({
-      key: entry.key,
-      seriesId: entry.seriesId,
-      label: entry.label,
-      color: entry.color,
-      x,
-      y,
-      visible,
-    });
+    // No clear slot. Defer rather than claim one now: a series that is going to
+    // overlap something must not take a slot a later series could have had to
+    // itself.
+    crowded.push({ entry, candidates });
+  }
+
+  // Every series keeps a pill. `layoutPills` runs after this with the real
+  // measured boxes and can still mirror it, shift it a row and clamp it into the
+  // plot — "an overlapped label is still better than a missing one". Emitting the
+  // crowded ones last also hands that pass the clean labels first, so the crowded
+  // ones do the moving.
+  //
+  // This is where the chart stopped promising that line labels never overlap
+  // (#132 introduced the drop as the only way to honour that, #434 restated it).
+  // The promise was worth less than it cost: a dropped pill is silent, and with
+  // line labels on, PNG export omits the legend, so the series loses its only
+  // identifier. An overlapping pill at least announces itself.
+  for (const { entry, candidates } of crowded) {
+    emit(
+      entry,
+      candidates.reduce((best, point) =>
+        collisionCost(xScale(point.x), yScale(point.y)) <
+        collisionCost(xScale(best.x), yScale(best.y))
+          ? point
+          : best,
+      ),
+    );
   }
 
   return result;
@@ -631,6 +683,7 @@ export function placePointLabels(
     width: number;
     lineCount: number;
     defaultFirstY: number;
+    placementHidden: boolean;
   }
   const pending: Omit<LabelInfo, 'width'>[] = [];
   const ascent = 9;
@@ -642,40 +695,46 @@ export function placePointLabels(
     const label = this.querySelector<SVGTextElement>('.point-label');
     if (!label) return;
     // A label this pass hid on an earlier frame (no slot fit, or its point had
-    // left the plot) is only provisionally hidden: give it back its opacity so
-    // it is reconsidered now that the layout may have changed. Labels hidden
-    // for any other reason (toggle off, legend hover, faded series) stay put.
-    if (label.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
+    // left the plot) is only provisionally hidden: it is reconsidered now that
+    // the layout may have changed. Labels hidden for any other reason (toggle
+    // off, legend hover, faded series) stay put. Its hidden state is released
+    // only if it is skipped below; placed labels settle it once at the end, so
+    // a label that stays hidden (or visible) writes nothing.
+    const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
+    const release = () => {
+      if (!placementHidden) return;
       label.removeAttribute(PLACEMENT_HIDDEN_ATTR);
       label.style.opacity = '1';
-    }
+    };
     if (
       label.style.display === 'none' ||
       label.style.visibility === 'hidden' ||
-      label.style.opacity === '0' ||
+      (!placementHidden && label.style.opacity === '0') ||
       this.style.opacity === '0'
     ) {
+      release();
       return;
     }
     const tspans = [...label.querySelectorAll<SVGTSpanElement>('tspan')];
-    if (tspans.length === 0) return;
     const transform = this.getAttribute('transform') ?? '';
     const match = transform.match(/translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u);
-    if (!match) return;
+    if (tspans.length === 0 || !match) {
+      release();
+      return;
+    }
     const lineCount = tspans.length;
-    const defaultFirstY = -(8 + (lineCount - 1) * lineHeight);
-    // Reset to the centred default before measuring so a shift applied on a
-    // previous pass does not leak into this one.
-    tspans[0].setAttribute('dy', `${defaultFirstY}px`);
-    for (const tspan of tspans) tspan.setAttribute('x', '0');
-    label.style.opacity = '1';
+    // No reset to the centred default before measuring: `getBBox().width`
+    // depends on neither the first tspan's `dy` nor the `x` shift, which every
+    // tspan shares. Resetting would emit two mutation records per label per
+    // pass even when nothing moves (see `@/lib/d3-chart/chart-update`).
     pending.push({
       element: label,
       tspans,
       centerX: Number.parseFloat(match[1]),
       centerY: Number.parseFloat(match[2]),
       lineCount,
-      defaultFirstY,
+      defaultFirstY: -(8 + (lineCount - 1) * lineHeight),
+      placementHidden,
     });
   });
 
@@ -730,16 +789,18 @@ export function placePointLabels(
         ? 0
         : null;
     if (index === null) {
-      label.element.style.opacity = '0';
-      label.element.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
+      // Park the tspans at the centred default, as the pre-measure reset did.
+      setAttrIfChanged(label.tspans[0], 'dy', `${label.defaultFirstY}px`);
+      for (const tspan of label.tspans) setAttrIfChanged(tspan, 'x', '0');
+      setStyleIfChanged(label.element, 'opacity', '0');
+      if (!label.placementHidden) label.element.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
       continue;
     }
     const chosen = candidates[index];
-    label.tspans[0].setAttribute('dy', `${chosen.firstY}px`);
-    if (chosen.dx !== 0) {
-      for (const tspan of label.tspans) tspan.setAttribute('x', String(chosen.dx));
-    }
-    label.element.style.opacity = '1';
+    setAttrIfChanged(label.tspans[0], 'dy', `${chosen.firstY}px`);
+    for (const tspan of label.tspans) setAttrIfChanged(tspan, 'x', String(chosen.dx));
+    if (label.placementHidden) label.element.removeAttribute(PLACEMENT_HIDDEN_ATTR);
+    setStyleIfChanged(label.element, 'opacity', '1');
     if (avoidCollisions) placed.push(chosen.box);
   }
 }

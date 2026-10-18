@@ -2,15 +2,24 @@
  * Global e2e setup. Loaded before every `cy.visit` via `supportFile` in
  * `cypress.config.ts`.
  *
- * Suppresses overlay nudges (telemetry tutorial, agentic coach mark) so
+ * Suppresses overlay nudges (landing launch modal and telemetry tutorial) so
  * their backdrops don't sit on top of the UI under test. Specs that want to
  * exercise a nudge flow can clear its storage key in their own
  * `onBeforeLoad`, which runs after this hook.
  */
 import 'cypress-axe';
 
+let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
-let suppressAgenticCoachMark = true;
+
+/**
+ * Opt the whole spec out of the centered landing launch-modal suppression,
+ * for the same reason as `keepTelemetryTutorial` — the key is re-seeded on
+ * `cy.reload()`, so a per-visit `onBeforeLoad` clear cannot own its state.
+ */
+export function keepLaunchModal(): void {
+  suppressLaunchModal = false;
+}
 
 /**
  * Opt the whole spec out of the telemetry-tutorial suppression.
@@ -27,18 +36,6 @@ let suppressAgenticCoachMark = true;
  */
 export function keepTelemetryTutorial(): void {
   suppressTelemetryTutorial = false;
-}
-
-/**
- * Opt the whole spec out of the agentic point coach-mark suppression, for the
- * same reason as `keepTelemetryTutorial` — the key is re-seeded on
- * `cy.reload()`, so a per-visit `onBeforeLoad` clear cannot own its state.
- *
- * The callout is anchored to a point inside `[data-testid="scatter-graph"]`,
- * so on the agentic view it sits over the plot area that other specs click.
- */
-export function keepAgenticCoachMark(): void {
-  suppressAgenticCoachMark = false;
 }
 
 // Skip cross-document view transitions (`@view-transition` in motion.css).
@@ -77,11 +74,11 @@ Cypress.on('window:before:load', (win) => {
   win.addEventListener('pageswap', skipCrossDocumentTransition);
   win.addEventListener('pagereveal', skipCrossDocumentTransition);
   try {
+    if (suppressLaunchModal) {
+      win.localStorage.setItem('inferencex-tpuv7-agentx-modal-dismissed', '1');
+    }
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');
-    }
-    if (suppressAgenticCoachMark) {
-      win.localStorage.setItem('inferencex-agentic-point-coach-mark-dismissed', '1');
     }
   } catch {
     // localStorage unavailable — fine, the test will just see the modal.

@@ -1,5 +1,6 @@
 'use client';
 
+import VideoReleaseCoverage from './VideoReleaseCoverage';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   HW_REGISTRY,
@@ -17,8 +18,8 @@ import { captionControlTriggerClassName } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ShareButton } from '@/components/ui/share-button';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { isQueueing, layoutLabel, leadCell } from './deployment';
 import { costPerGpuHour, hardwareLabel, type CostTier } from './hardware';
 import { COST_TIERS, metricLabel, TIER_LABELS, type VideoPoint } from './metrics';
@@ -139,7 +140,8 @@ export default function VideoDashboard() {
   const locale = useLocale();
   const s = STRINGS[locale];
   const { state, update } = useVideoDashboardState();
-  const { points, servingEvidence, loading, error, replay, retry } = useVideoPoints(state.model);
+  const { points, releaseCoverage, servingEvidence, loading, error, replay, retry } =
+    useVideoPoints(state.model);
   const model = VIDEO_MODELS[state.model];
   const {
     cells,
@@ -261,6 +263,7 @@ export default function VideoDashboard() {
           </div>
         </Card>
       </section>
+      {!loading && <VideoReleaseCoverage rows={releaseCoverage} />}
       <ChartSection
         chartId={VIDEO_CHART_ID}
         analyticsPrefix="video"

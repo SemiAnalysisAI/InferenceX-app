@@ -1,15 +1,13 @@
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
 
 import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import {
-  modelRouteAvailableForTab,
-  modelRoutePath,
-  pathWithSearchParams,
-  resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
+  profitRouteInput,
+  type ProfitRouteProps,
+} from '@/components/calculator/profit-route-input';
+import { modelRouteAvailableForTab, resolveModelRouteSlug } from '@/lib/routing/model-routes';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 /**
  * `/profit-estimator/<model>` — the GW-year profit estimator seeded to a
@@ -20,10 +18,7 @@ import { modelTabMetadata } from '@/lib/tab-meta';
  * dynamically anyway.
  */
 
-interface Props {
-  params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
+type Props = ProfitRouteProps;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { model } = await params;
@@ -37,31 +32,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ProfitEstimatorModelPage({ params, searchParams }: Props) {
-  const [{ model }, sp] = await Promise.all([params, searchParams]);
-  const resolved = resolveModelRouteSlug(model);
-  // Only the models this tab serves (see MODEL_ROUTE_TAB_MODELS) get a page.
-  if (
-    !resolved ||
-    !modelRouteAvailableForTab('profit-estimator-per-gigawatt', resolved.route.model)
-  ) {
-    notFound();
-  }
-  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
-  // share-link params.
-  if (resolved.isAlias) {
-    permanentRedirect(
-      pathWithSearchParams(
-        modelRoutePath('profit-estimator-per-gigawatt', resolved.route.slug),
-        sp,
-      ),
-    );
-  }
+  const { resolved, searchParams: sp } = await profitRouteInput(
+    'profit-estimator-per-gigawatt',
+    false,
+    { params, searchParams },
+  );
   const seed = resolveCalculatorUrlSeed(sp);
   // A legacy explicit ?g_model= wins over the path, as on /calculator/<model>.
   return (
     <ProfitEstimatorDisplay
       basis="gw-year"
-      urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
+      urlSeed={{
+        ...seed,
+        model: seed.model ?? resolved.route.model,
+        profitRouteKey: JSON.stringify(sp),
+      }}
     />
   );
 }

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api';
-import { withSupplementalBenchmarks } from '@/lib/supplemental-benchmarks';
+import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api/api';
+import { withSupplementalBenchmarks } from '@/lib/benchmarks/supplemental-benchmarks';
 
 /** Shared query options — reused by useQueries for comparison dates. */
 export function benchmarkQueryOptions(

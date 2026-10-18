@@ -1,5 +1,6 @@
+import { videoReleaseCoverage } from '@/components/video-benchmark/release-coverage';
 import { videoServingEvidence } from '@/components/video-benchmark/serving-evidence';
-import { compareMetrics } from '@/components/video-benchmark/compare';
+import { compareMetrics, comparePointKey } from '@/components/video-benchmark/compare';
 import {
   readVideoCompareSelection,
   resolveCompareSelection,
@@ -13,7 +14,10 @@ import {
   powerUtilization,
   scalingVsSpec,
 } from '@/components/video-benchmark/evidence';
-import { videoModelHistory, videoModelHardware } from '@/components/video-benchmark/models';
+import {
+  projectVideoHistoryForModel,
+  videoModelHardware,
+} from '@/components/video-benchmark/models';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
   metricValue,
@@ -32,7 +36,8 @@ import {
 /** Public metadata and the dashboard's existing pure calculations; no bundle or asset URLs. */
 export function videoDashboardProjection(pages: VideoHistoryPage[], search: string) {
   const state = readVideoDashboardState(search);
-  pages = videoModelHistory(pages, state.model);
+  const releaseCoverage = videoReleaseCoverage(pages);
+  pages = projectVideoHistoryForModel(pages, state.model);
   const { cells, workload, otherWorkloads } = dashboardCells(videoPoints(pages));
   const options = metricOptions(state);
   const hidden = new Set(state.hidden);
@@ -50,8 +55,8 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
   return {
     params: {
       ...state,
-      baseline: pair.baseline?.hardwareKey ?? null,
-      candidate: pair.candidate?.hardwareKey ?? null,
+      baseline: comparePointKey(pair.baseline),
+      candidate: comparePointKey(pair.candidate),
       caseIndex: pair.caseIndex,
     },
     workload,
@@ -73,6 +78,7 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
       metricDefinition: QUALITY_METRICS[state.qualityMetric],
     },
     cells,
+    releaseCoverage,
     metricDefinitions: VIDEO_METRICS,
     // Color is renderer state; use the exact plot model with an empty color.
     plot: plotVideoPoints(cells, state, () => '', hidden),
@@ -109,6 +115,7 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
         sources: entry.sources.map((source) => ({
           id: source.id,
           model: source.model ?? null,
+          producer: source.producer ?? null,
           sha256: source.sha256,
           sourceSha: source.sourceSha,
           observedAt: source.observedAt,

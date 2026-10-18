@@ -1,0 +1,121 @@
+name: Backfill Server Log Files
+run-name: Backfill server logs ${{ inputs.run-id || format('from {0}', inputs.from-run || 'retention window') }} (${{ inputs.neon-branch || 'production' }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: One GitHub benchmark run ID; leave empty to scan a range
+        required: false
+        type: string
+      from-run:
+        description: Scan every DB run with a GitHub run ID at or above this one; leave empty for the 90-day window
+        required: false
+        type: string
+      force:
+        description: Revisit bundles already marked complete (inserts only missing filenames)
+        required: false
+        type: boolean
+        default: false
+      neon-branch:
+        description: Optional existing Neon child branch; omit for production on master
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.neon-branch || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    name: Backfill server-log bundles
+    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Select database
+        timeout-minutes: 8
+        env:
+          PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
+        run: |
+          database_url="$PRODUCTION_DATABASE_URL"
+          if [ -n "$NEON_BRANCH_NAME" ]; then
+            if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+              echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
+              exit 1
+            fi
+            api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID"
+            curl_args=(--fail --silent --show-error --connect-timeout 10 --max-time 30 --retry 3 --retry-all-errors -H "Authorization: Bearer $NEON_API_KEY")
+            branch=$(curl "${curl_args[@]}" "$api/branches?limit=100" |
+              jq -c --arg name "$NEON_BRANCH_NAME" '.branches[] | select(.name == $name)')
+            if [ -z "$branch" ]; then
+              echo "::error::Neon child branch not found: $NEON_BRANCH_NAME"
+              exit 1
+            fi
+            jq -e '.parent_id != null and .default != true and .protected != true' <<<"$branch" >/dev/null
+            branch_id=$(jq -r '.id' <<<"$branch")
+            database_url=$(curl "${curl_args[@]}" \
+              "$api/connection_uri?branch_id=$branch_id&database_name=neondb&role_name=neondb_owner&pooled=false" | jq -er '.uri')
+            echo "Child database: $NEON_BRANCH_NAME ($branch_id)" | tee -a "$GITHUB_STEP_SUMMARY"
+          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
+            echo '::error::Production backfill requires master'
+            exit 1
+          fi
+          echo "::add-mask::$database_url"
+          echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
+      - name: Backfill server-log files
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          RUN_ID: ${{ inputs.run-id }}
+          FROM_RUN: ${{ inputs.from-run }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(--yes)
+          if [ -n "$RUN_ID" ] && [ -n "$FROM_RUN" ]; then
+            echo '::error::Set run-id or from-run, not both'
+            exit 1
+          fi
+          if [ -n "$RUN_ID" ]; then args+=(--run "$RUN_ID"); fi
+          if [ -n "$FROM_RUN" ]; then args+=(--all --from-run "$FROM_RUN"); fi
+          if [ "$FORCE" = true ]; then args+=(--force); fi
+          bun packages/db/src/backfill-server-log-files.ts "${args[@]}"
+  invalidate:
+    name: Invalidate production cache
+    needs: backfill
+    if: inputs.neon-branch == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Invalidate production cache
+        env:
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com

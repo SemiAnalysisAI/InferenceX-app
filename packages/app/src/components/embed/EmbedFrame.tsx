@@ -9,7 +9,7 @@ import {
   type EmbedResizeMessage,
   type EmbedSkin,
   type EmbedTheme,
-} from '@/lib/embed';
+} from '@/lib/embed/embed';
 
 /**
  * Client shell for `/embed/model/[slug]`.

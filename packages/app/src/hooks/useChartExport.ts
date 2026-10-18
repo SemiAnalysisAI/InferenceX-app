@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
-import { getExportFooterText } from '@/lib/export-footer';
-import { useLocale } from '@/lib/use-locale';
+import { getExportFooterText } from '@/lib/export/export-footer';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { hasDarkTheme } from '@/lib/themes/themes';
 
 const STRINGS = {
   en: { exportFailed: 'Failed to export image. Please try again.' },
@@ -225,10 +226,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   const img = await loadImage(chartDataUrl);
   if (!img) return chartDataUrl;
 
-  const isDark =
-    document.documentElement.classList.contains('dark') ||
-    document.documentElement.classList.contains('minecraft') ||
-    bgColor.includes('0 0%');
+  const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
   const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
@@ -356,7 +354,13 @@ export function useChartExport({
       // Layout: force side-by-side flex row for export
       applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
 
-      const flexContainer = clone.querySelector(':scope > .flex') as HTMLElement | null;
+      for (const scroller of clone.querySelectorAll<HTMLElement>('[data-chart-scroll]')) {
+        applyStyles(scroller, { width: 'fit-content', overflow: 'visible' });
+        scroller.scrollLeft = 0;
+      }
+      const flexContainer = clone.querySelector(
+        ':scope > .flex, [data-chart-scroll] > .flex',
+      ) as HTMLElement | null;
       applyStyles(flexContainer, {
         flexDirection: 'row',
         width: 'fit-content',

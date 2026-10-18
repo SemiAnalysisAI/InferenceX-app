@@ -1,7 +1,7 @@
 import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 
 type Layout = Pick<VideoPoint, 'participating' | 'server' | 'replicas' | 'deployment'> &
-  Partial<Pick<VideoPoint, 'runtime'>>;
+  Partial<Pick<VideoPoint, 'runtime' | 'producer'>>;
 type QueueingInput = Pick<VideoPoint, 'concurrency' | 'replicas' | 'deployment'>;
 
 const positiveInteger = (n: number | null | undefined): n is number =>
@@ -11,6 +11,8 @@ const positiveInteger = (n: number | null | undefined): n is number =>
 export function deploymentKey(p: Layout): string {
   const d = p.deployment;
   return JSON.stringify([
+    p.producer?.engine.name ?? null,
+    p.producer?.engine.revision ?? null,
     p.runtime ?? null,
     p.participating,
     p.server?.tp ?? null,
@@ -48,6 +50,9 @@ export function comparisonCohortKey(p: VideoPoint): string | null {
   return JSON.stringify([
     p.workloadKey,
     p.model,
+    p.producer?.modelRevision ?? null,
+    p.producer?.planSha256 ?? null,
+    p.producer ? null : (p.deployment?.engine ?? null),
     p.deployment?.generationKey ?? null,
     p.deployment?.precision ?? null,
     p.deployment?.acceleration ?? null,

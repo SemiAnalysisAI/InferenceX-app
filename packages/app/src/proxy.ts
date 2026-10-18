@@ -1,7 +1,7 @@
 import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 
-import { EMBED_SKIN_HEADER, EMBED_THEME_HEADER, isEmbedPathname } from '@/lib/embed-route';
-import { captureClientRequest } from '@/lib/cli-request-analytics';
+import { EMBED_SKIN_HEADER, EMBED_THEME_HEADER, isEmbedPathname } from '@/lib/embed/embed-route';
+import { captureClientRequest } from '@/lib/analytics/cli-request-analytics';
 
 // `/embed/*` and `/zh/embed/*` render single charts meant to be framed by
 // third-party pages (the vLLM recipes site), so they opt out of the default

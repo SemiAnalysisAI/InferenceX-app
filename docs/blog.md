@@ -65,7 +65,7 @@ fonts are emitted to `/_next/static/media/` — no external CDN.
 
 Heading ID deduplication: if two headings share a slug, the second gets prefixed with its parent heading's slug (e.g., `overview-details`). If no parent exists, a level suffix is appended (`intro-2`).
 
-## Blog Library (`src/lib/blog.ts`)
+## Blog Library (`src/lib/blog/blog.ts`)
 
 | Function                  | Purpose                                                   |
 | ------------------------- | --------------------------------------------------------- |

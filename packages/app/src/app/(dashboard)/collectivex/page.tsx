@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import CollectiveXDisplay from '@/components/collectivex/CollectiveXDisplay';
-import { tabMetadata } from '@/lib/tab-meta';
+import { tabMetadata } from '@/lib/routing/tab-meta';
 
 export const metadata: Metadata = tabMetadata('collectivex');
 

@@ -13,7 +13,7 @@
  * must list it under "Not priced" rather than extrapolate a bar for it. The
  * wide curve reaches 130 tok/s/user so GLM's 100 and MiniMax M3's 83 tok/s/user
  * defaults are reads, not clamps, on every other SKU. Both curves start below
- * DeepSeek V4 Pro's 24 tok/s/user default, so every SKU, H200 included, is
+ * DeepSeek V4 Pro's 35 tok/s/user default, so every SKU, H200 included, is
  * priced there. DeepSeek V4.1 Flash's 125 tok/s/user default sits just inside
  * the wide curve's 130 tok/s/user top, so the four wide-curve SKUs are priced
  * and H200 is not, as on the Kimi, GLM, and MiniMax defaults.
@@ -91,6 +91,10 @@ interface ProfitSku {
   precision: string;
   curve: Curve;
   tputScale: number;
+  /** Physical GPUs per row (TP); eight when unset. */
+  gpus?: number;
+  /** Extra metric keys every row of this SKU carries, e.g. validated power telemetry. */
+  metrics?: Record<string, number>;
 }
 
 export const PROFIT_SKUS: ProfitSku[] = [
@@ -101,14 +105,39 @@ export const PROFIT_SKUS: ProfitSku[] = [
   { hardware: 'mi355x', framework: 'vllm', precision: 'fp4', curve: WIDE_CURVE, tputScale: 0.9 },
 ];
 
+/**
+ * A GB200 NVL72 aggregate deployment as the srt-slurm CPU power leg publishes it:
+ * two four-GPU compute trays on separate hosts, no per-worker telemetry, four
+ * Grace sockets. Kept out of `PROFIT_SKUS` so the default bar counts the other
+ * specs lock down do not move. Watts reuse a GB300 NVL72 replay's means.
+ */
+const NVL72_SKU: ProfitSku = {
+  hardware: 'gb200',
+  framework: 'sglang',
+  precision: 'fp4',
+  curve: WIDE_CURVE,
+  tputScale: 1.3,
+  gpus: 8,
+  metrics: {
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    cpu_power_valid: 1,
+    avg_power_w: 594.191,
+    avg_total_gpu_power_w: 4753.528,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 392.264,
+  },
+};
+
 let idCursor = 800_000;
 
 export const profitBenchmarkRows = (
   dbKey: string = PROFIT_MODEL_DB_KEY,
   date = PROFIT_DATE,
   runId?: number,
+  skus: readonly ProfitSku[] = PROFIT_SKUS,
 ) =>
-  PROFIT_SKUS.flatMap((sku) =>
+  skus.flatMap((sku) =>
     sku.curve.map(([conc, intvty, tput, e2el]) => ({
       id: idCursor++,
       hardware: sku.hardware,
@@ -118,21 +147,20 @@ export const profitBenchmarkRows = (
       spec_method: 'none',
       disagg: false,
       is_multinode: false,
-      prefill_tp: 8,
-      decode_tp: 8,
-      num_prefill_gpu: 8,
-      num_decode_gpu: 8,
+      prefill_tp: sku.gpus ?? 8,
+      decode_tp: sku.gpus ?? 8,
+      num_prefill_gpu: sku.gpus ?? 8,
+      num_decode_gpu: sku.gpus ?? 8,
       isl: null,
       osl: null,
       conc,
       offload_mode: 'on',
       benchmark_type: 'agentic_traces',
       image: `${sku.framework}:test`,
-      metrics: metricsFor(
-        intvty,
-        Math.round(tput * sku.tputScale * tputScaleFor(date, runId)),
-        e2el,
-      ),
+      metrics: {
+        ...metricsFor(intvty, Math.round(tput * sku.tputScale * tputScaleFor(date, runId)), e2el),
+        ...sku.metrics,
+      },
       workers: null,
       date,
       workflow_run_id: runId ?? PROFIT_SINGLE_RUN_ID[date],
@@ -140,6 +168,22 @@ export const profitBenchmarkRows = (
       run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId ?? PROFIT_SINGLE_RUN_ID[date] ?? idCursor}`,
     })),
   );
+
+/** GB200 NVL72 rows with measured Grace-socket power, for the smart-provisioning basis. */
+export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
+  profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]).map((row) => ({
+    ...row,
+    is_multinode: true,
+    decode_num_workers: 1,
+    power_audit: {
+      cpu: {
+        sensor_kind: 'grace_socket',
+        source: 'acpi',
+        expected_sockets: 4,
+        observed_sockets: 4,
+      },
+    },
+  }));
 
 export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEYS) =>
   dbKeys.flatMap((dbKey) =>

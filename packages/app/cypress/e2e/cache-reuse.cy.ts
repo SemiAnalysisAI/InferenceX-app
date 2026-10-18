@@ -10,6 +10,7 @@
  */
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
+  b300Rows,
   interceptCalculatorOverlayRun,
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
@@ -20,6 +21,8 @@ import {
 const BARS = '[data-testid="cache-reuse-chart"] svg .cr-bar';
 const SEGMENTS = '[data-testid="cache-reuse-chart"] svg .cr-segment';
 const X_TICKS = '[data-testid="cache-reuse-chart"] svg .x-axis .tick text';
+
+const boxOf = (el: Element) => el.getBoundingClientRect();
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -54,21 +57,22 @@ describe('Prefix Cache Reuse', () => {
         .should('contain.text', 'HBM cache')
         .and('contain.text', 'Host cache')
         .and('contain.text', 'Not reused');
+
+      cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
+      cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
+      cy.get('[data-testid="cache-reuse-config-selector"]')
+        .invoke('text')
+        .then((config) => {
+          cy.get('[data-testid="cache-reuse-figure"] figcaption')
+            .should('contain.text', config.trim())
+            .and('contain.text', 'Source: SemiAnalysis InferenceX');
+        });
     });
 
     it('takes the host tier from the CPU-offload rate and leaves the external rate out', () => {
       firstRowCell('HBM').should('have.text', '80.0%');
       firstRowCell('Host').should('have.text', '5.0%');
       firstRowCell('Not reused').should('have.text', '15.0%');
-    });
-
-    it('labels the configuration control and shows the plotted config', () => {
-      cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
-      cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
-      cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
-        'contain.text',
-        `${REAL_CONFIGS.length} of ${REAL_CONFIGS.length} measured rows report cache tiers`,
-      );
     });
   });
 
@@ -80,6 +84,54 @@ describe('Prefix Cache Reuse', () => {
       cy.get(BARS).should('have.length', REAL_CONFIGS.length);
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
     });
+  });
+
+  describe('serving recipes', () => {
+    for (const width of [393, 1280]) {
+      it(`switches recipes without mixing bars at ${width}px`, () => {
+        cy.viewport(width, 900);
+        interceptOverlayRun();
+        const rows = b300Rows(null).map((row) => ({
+          ...row,
+          prefill_ep: 1,
+          decode_ep: 1,
+          prefill_dp_attention: false,
+          decode_dp_attention: false,
+          prefill_num_workers: 1,
+          decode_num_workers: 1,
+        }));
+        const other = rows.slice(0, 2).map((row) => ({
+          ...row,
+          id: row.id + 100,
+          decode_tp: 16,
+          num_decode_gpu: 16,
+          metrics: { ...row.metrics, server_gpu_cache_hit_rate: 0.6 },
+        }));
+        cy.intercept('GET', '/api/v1/benchmarks*', { body: [...rows, ...other] }).as('recipes');
+        const recipe = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
+        cy.visit(`/cache-reuse?c_recipe=${encodeURIComponent(recipe)}`, {
+          onBeforeLoad: dismissNudges,
+        });
+        cy.wait('@recipes');
+        cy.get(BARS).should('have.length', 2);
+        firstRowCell('HBM').should('have.text', '60.0%');
+        firstRowCell('Recipe').should('contain.text', 'TP16');
+        cy.get('[data-testid="cache-reuse-recipe-selector"]').should('contain.text', 'TP16');
+        cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
+          'not.contain.text',
+          'measured rows',
+        );
+        cy.get('#cache-reuse-recipe').click();
+        cy.contains('[role="option"]', 'TP8').click();
+        cy.get(BARS).should('have.length', REAL_CONFIGS.length);
+        firstRowCell('HBM').should('have.text', '80.0%');
+        firstRowCell('Recipe').should('contain.text', 'TP8');
+        cy.get('[data-testid="cache-reuse-controls"]').screenshot(
+          `cache-recipes-controls-${width}`,
+        );
+        cy.get('[data-testid="cache-reuse-figure"]').screenshot(`cache-recipes-chart-${width}`);
+      });
+    }
   });
 
   describe('unofficial-run overlay', () => {
@@ -98,9 +150,7 @@ describe('Prefix Cache Reuse', () => {
         .and('include', 'overlay-run-0');
       cy.get(`${BARS}[data-series="official"]`).first().should('have.attr', 'stroke', 'none');
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
-    });
 
-    it('lists the run under its branch in the table', () => {
       cy.get('[data-testid="cache-reuse-table"] tbody tr').should(
         'have.length',
         REAL_CONFIGS.length * 2,
@@ -116,6 +166,56 @@ describe('Prefix Cache Reuse', () => {
       cy.wait('@benchmarks');
       cy.get('[data-testid="cache-reuse-no-tiers"]').should('contain.text', 'Fixed-sequence');
       cy.get(BARS).should('not.exist');
+    });
+  });
+
+  describe('layout', () => {
+    const labelsInsideSegments = () =>
+      cy.get(SEGMENTS).then(($segments) => {
+        const segments = [...$segments].map(boxOf);
+        cy.get('[data-testid="cache-reuse-chart"] svg .cr-value').each(($label) => {
+          const label = boxOf($label[0]);
+          const inside = segments.some(
+            (s) =>
+              label.left >= s.left - 0.5 &&
+              label.right <= s.right + 0.5 &&
+              label.top >= s.top - 0.5 &&
+              label.bottom <= s.bottom + 0.5,
+          );
+          expect(inside, `"${$label.text()}" sits inside a segment`).to.equal(true);
+        });
+      });
+
+    it('draws phone-width bars as rows, lowest concurrency first, labels inside', () => {
+      cy.viewport(393, 852);
+      interceptOverlayRun();
+      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.wait('@benchmarks');
+      cy.get(BARS).should('have.length', REAL_CONFIGS.length);
+      cy.get(BARS).each(($bar) => {
+        const box = boxOf($bar[0]);
+        expect(box.width, 'row bar is wider than tall').to.be.greaterThan(box.height);
+      });
+      cy.get(`${BARS}[data-conc="1"]`).then(($first) => {
+        cy.get(`${BARS}[data-conc="48"]`).then(($last) => {
+          expect(boxOf($first[0]).top).to.be.lessThan(boxOf($last[0]).top);
+        });
+      });
+      labelsInsideSegments();
+    });
+
+    it('keeps desktop columns and their labels inside each segment', () => {
+      cy.viewport(1280, 900);
+      interceptOverlayRun();
+      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.wait('@benchmarks');
+      cy.get(BARS)
+        .first()
+        .then(($bar) => {
+          const box = boxOf($bar[0]);
+          expect(box.height, 'column bar is taller than wide').to.be.greaterThan(box.width);
+        });
+      labelsInsideSegments();
     });
   });
 

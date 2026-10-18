@@ -1,0 +1,43 @@
+{
+  "artifact_name": "h3-results-123456790-1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "ci": {
+    "actor": null,
+    "head_sha": "1bd5e98320000000000000000000000000000000",
+    "repository": "SemiAnalysisAI/InferenceX",
+    "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123456790",
+    "runner_name": null,
+    "triggering_actor": null,
+    "workflow_ref": null,
+    "workflow_sha": "1bd5e98320000000000000000000000000000000"
+  },
+  "ci_accepted": false,
+  "concurrencies": [
+    1
+  ],
+  "evidence_kind": "srt_slurm_h3_service",
+  "failures": [
+    "c1: run.json missing"
+  ],
+  "finished_at": "2026-10-18T08:33:15.784552Z",
+  "launcher": "srt-slurm",
+  "mode": "serving-smoke",
+  "phase": "complete",
+  "power": {
+    "exporter_image_sha256": null,
+    "producer_git_commit": null
+  },
+  "power_verified": false,
+  "release_qualified": false,
+  "result_filename": "replay",
+  "run_attempt": "1",
+  "run_id": "123456790",
+  "schema_version": 1,
+  "slurm_job": {
+    "job_id": null,
+    "state": null
+  },
+  "source_sha": "1bd5e98320000000000000000000000000000000",
+  "started_at": "2026-10-18T08:33:15.763942Z",
+  "status": "failed",
+  "task_id": "h3-video"
+}

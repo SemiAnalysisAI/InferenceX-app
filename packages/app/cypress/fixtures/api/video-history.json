@@ -481,6 +481,136 @@
         }
       ],
       "error": null
+    },
+    {
+      "id": "39002901777.12090362113",
+      "runId": "39002901777",
+      "artifact": {
+        "id": 12090362113,
+        "name": "h3-results-39002901777-1",
+        "expired": false,
+        "size_in_bytes": 9285861,
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "39002901777",
+          "sha256": "a17baa4e13b3f1de1f70796e892d411a6efd2bcb5314b55d3e2c01d868a4c6d1",
+          "sourceSha": "f7c7f581088468e0c4074836603d2f90fcd5986b",
+          "hardware": "H200",
+          "execution": "complete",
+          "observedAt": "2026-10-17T05:07:27.401208Z",
+          "kind": "observation",
+          "observations": [
+            {
+              "id": "a17baa4e13b3f1de1f70796e892d411a6efd2bcb5314b55d3e2c01d868a4c6d1:c1",
+              "cell": "c1",
+              "hardware": "H200",
+              "concurrency": 1,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 4 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11 · A single continuous medium shot of a drummer tapping a snare drum three times in",
+              "workloadKey": "{\"plan\":{\"cases\":[{\"case_id\":\"drum-taps\",\"prompt\":\"A single continuous medium shot of a drummer tapping a snare drum three times in a quiet rehearsal room. The drumsticks visibly contact the drumhead on each tap. The three crisp snare hits and the natural room ambience are audible. The camera remains still. No music, speech, subtitles, or scene cuts.\",\"requires_motion\":true,\"requires_sound\":true,\"seed\":11}],\"generation\":{\"aspect_ratio\":\"16:9\",\"audio_channels\":2,\"audio_flow_shift\":3,\"audio_sample_rate_hz\":32000,\"duration_seconds\":4,\"flow_shift\":12,\"fps\":24,\"frame_count\":107,\"height\":768,\"num_inference_steps\":50,\"width\":1344},\"model_id\":\"MiniMaxAI/MiniMax-H3\",\"model_revision\":\"42ed227ee7df40d41602854ae760620d6eb651fe\"},\"semantics\":{\"boundary\":\"submit_to_downloaded_media\",\"mode\":\"closed_loop\",\"server\":{\"performance_mode\":\"speed\"}}}",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 4,
+              "completed": 4,
+              "scheduled": 4,
+              "failed": 0,
+              "samples": 4,
+              "p50": 117.06558148947079,
+              "p90": null,
+              "clipsGpuHour": 15.375335780450111,
+              "energyKj": 160.697757273,
+              "participating": 2,
+              "allocated": 2,
+              "replicas": null,
+              "wallSeconds": 468.2824559288565,
+              "durationSeconds": 4,
+              "frameCount": 107,
+              "avgPowerW": 1372.656654,
+              "enforcedLimitW": null,
+              "server": {
+                "tp": 1,
+                "ulysses": 2,
+                "attention": null
+              }
+            },
+            {
+              "id": "a17baa4e13b3f1de1f70796e892d411a6efd2bcb5314b55d3e2c01d868a4c6d1:c2",
+              "cell": "c2",
+              "hardware": "H200",
+              "concurrency": 2,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 4 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11 · A single continuous medium shot of a drummer tapping a snare drum three times in",
+              "workloadKey": "{\"plan\":{\"cases\":[{\"case_id\":\"drum-taps\",\"prompt\":\"A single continuous medium shot of a drummer tapping a snare drum three times in a quiet rehearsal room. The drumsticks visibly contact the drumhead on each tap. The three crisp snare hits and the natural room ambience are audible. The camera remains still. No music, speech, subtitles, or scene cuts.\",\"requires_motion\":true,\"requires_sound\":true,\"seed\":11}],\"generation\":{\"aspect_ratio\":\"16:9\",\"audio_channels\":2,\"audio_flow_shift\":3,\"audio_sample_rate_hz\":32000,\"duration_seconds\":4,\"flow_shift\":12,\"fps\":24,\"frame_count\":107,\"height\":768,\"num_inference_steps\":50,\"width\":1344},\"model_id\":\"MiniMaxAI/MiniMax-H3\",\"model_revision\":\"42ed227ee7df40d41602854ae760620d6eb651fe\"},\"semantics\":{\"boundary\":\"submit_to_downloaded_media\",\"mode\":\"closed_loop\",\"server\":{\"performance_mode\":\"speed\"}}}",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 4,
+              "completed": 4,
+              "scheduled": 4,
+              "failed": 0,
+              "samples": 4,
+              "p50": 233.34144142945297,
+              "p90": null,
+              "clipsGpuHour": 15.409529105389542,
+              "energyKj": 160.78275492999998,
+              "participating": 2,
+              "allocated": 2,
+              "replicas": null,
+              "wallSeconds": 467.2433499270119,
+              "durationSeconds": 4,
+              "frameCount": 107,
+              "avgPowerW": 1376.436968,
+              "enforcedLimitW": null,
+              "server": {
+                "tp": 1,
+                "ulysses": 2,
+                "attention": null
+              }
+            },
+            {
+              "id": "a17baa4e13b3f1de1f70796e892d411a6efd2bcb5314b55d3e2c01d868a4c6d1:c4",
+              "cell": "c4",
+              "hardware": "H200",
+              "concurrency": 4,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 4 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11 · A single continuous medium shot of a drummer tapping a snare drum three times in",
+              "workloadKey": "{\"plan\":{\"cases\":[{\"case_id\":\"drum-taps\",\"prompt\":\"A single continuous medium shot of a drummer tapping a snare drum three times in a quiet rehearsal room. The drumsticks visibly contact the drumhead on each tap. The three crisp snare hits and the natural room ambience are audible. The camera remains still. No music, speech, subtitles, or scene cuts.\",\"requires_motion\":true,\"requires_sound\":true,\"seed\":11}],\"generation\":{\"aspect_ratio\":\"16:9\",\"audio_channels\":2,\"audio_flow_shift\":3,\"audio_sample_rate_hz\":32000,\"duration_seconds\":4,\"flow_shift\":12,\"fps\":24,\"frame_count\":107,\"height\":768,\"num_inference_steps\":50,\"width\":1344},\"model_id\":\"MiniMaxAI/MiniMax-H3\",\"model_revision\":\"42ed227ee7df40d41602854ae760620d6eb651fe\"},\"semantics\":{\"boundary\":\"submit_to_downloaded_media\",\"mode\":\"closed_loop\",\"server\":{\"performance_mode\":\"speed\"}}}",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 4,
+              "completed": 4,
+              "scheduled": 4,
+              "failed": 0,
+              "samples": 4,
+              "p50": 292.02532795863226,
+              "p90": null,
+              "clipsGpuHour": 15.409334407778596,
+              "energyKj": 160.502909006,
+              "participating": 2,
+              "allocated": 2,
+              "replicas": null,
+              "wallSeconds": 467.24925356707536,
+              "durationSeconds": 4,
+              "frameCount": 107,
+              "avgPowerW": 1374.023888,
+              "enforcedLimitW": null,
+              "server": {
+                "tp": 1,
+                "ulysses": 2,
+                "attention": null
+              }
+            }
+          ],
+          "fidelity": null,
+          "calibration": null,
+          "releaseQualified": false,
+          "powerVerified": true,
+          "error": null
+        }
+      ],
+      "error": null
     }
   ],
   "nextPage": null

@@ -1,7 +1,7 @@
 'use client';
 
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import type { VideoPoint } from './metrics';
 import { QUALITY_METRICS, qualityEligibility, qualityMeasurement } from './quality';
 import type { VideoDashboardState } from './video-url-state';

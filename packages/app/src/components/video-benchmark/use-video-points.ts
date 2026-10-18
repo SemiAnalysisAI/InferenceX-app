@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
-import { videoModelHistory, type VideoModel } from './models';
+import { projectVideoHistoryForModel, type VideoModel } from './models';
+import { videoReleaseCoverage } from './release-coverage';
 import { videoPoints } from './points';
 import { videoServingEvidence } from './serving-evidence';
 
 /** Load every published history page (bounded) and flatten it into chart points. */
 export function useVideoPoints(model: VideoModel = 'h3') {
   const [history, setHistory] = useState<VideoHistoryPage[]>([]);
-  const selected = useMemo(() => videoModelHistory(history, model), [history, model]);
+  const selected = useMemo(() => projectVideoHistoryForModel(history, model), [history, model]);
+  const releaseCoverage = useMemo(() => videoReleaseCoverage(history), [history]);
   const points = useMemo(() => videoPoints(selected), [selected]);
   const servingEvidence = useMemo(() => videoServingEvidence(selected), [selected]);
   const [loading, setLoading] = useState(true);
@@ -50,5 +52,5 @@ export function useVideoPoints(model: VideoModel = 'h3') {
     return () => controller.abort();
   }, [attempt]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, servingEvidence, loading, error: loadError, replay, retry };
+  return { points, releaseCoverage, servingEvidence, loading, error: loadError, replay, retry };
 }

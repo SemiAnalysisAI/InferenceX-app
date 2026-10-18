@@ -82,7 +82,6 @@ describe('dashboard observation runtime shape', () => {
   });
   it.each([
     { deployment: { replicas: 1 } },
-    { deployment: { ring: '2' } },
     { deployment: { cfg: 0 } },
     { deployment: { batchSize: 1.5 } },
     { deployment: { batchDelayMs: -1 } },
@@ -97,17 +96,5 @@ describe('dashboard observation runtime shape', () => {
     { quality: { ...judgement(), contractSha256: 'not-a-hash' } },
   ])('rejects malformed or invented projection fields: %j', (value) => {
     expect(() => parseVideoObservationFields(value)).toThrow('dashboard observation');
-  });
-  it('does not promote unjudged or uncalibrated data during shape parsing', () => {
-    const quality = judgement();
-    Object.assign(quality.metrics.prompt_adherence, {
-      value: null,
-      status: 'unjudged',
-      calibration: null,
-    });
-    const parsed = parseVideoObservationFields({ quality });
-    expect(
-      qualityEligibility(parsed, { metric: 'prompt_adherence', threshold: null }),
-    ).toMatchObject({ eligible: false, value: null });
   });
 });

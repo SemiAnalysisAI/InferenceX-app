@@ -1,5 +1,5 @@
-import { metricLabel } from '@/lib/chart-utils';
-import type { Locale } from '@/lib/i18n';
+import { metricLabel } from '@/lib/charts/chart-utils';
+import type { Locale } from '@/lib/i18n/i18n';
 import type { ChartDefinition } from '@/components/inference/types';
 
 export type AiMetricDirection = 'higher' | 'lower';

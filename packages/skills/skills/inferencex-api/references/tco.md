@@ -1,5 +1,13 @@
 # Compare modeled GPU-rate costs
 
+For the profit-estimator views (`profit-estimator` and
+`profit-estimator-per-gigawatt`), `cacheHitMode` defaults to `theoretical`, labeled
+“Theroticial Roofline” in the dashboards. It uses trace-derived infinite-cache
+reuse, falling back to the measured cache hit rate when no theoretical rate is
+available. Pass `cacheHitMode=actual` to price measured cache behavior explicitly.
+Report the selected mode with the economics assumptions; a roofline estimate is
+not measured cache performance.
+
 Use explicit user-supplied USD/GPU-hour rates to estimate cost per million output
 tokens **on the API's reported throughput basis**. A supplied `/GPU-hour` rate
 establishes its billing unit; keep its source with the assumptions. Normalize a
@@ -147,13 +155,46 @@ or quality, stop this comparison and gather the necessary benchmark evidence.
 
 Use this branch only for missing rates or unspecified billing units. Keep those
 inputs symbolic and request what is missing. For a median-target task, use the
-[bounded raw-API capture recipe](public-api-examples.md) to retain the complete
+[installed response capture helper](public-api-examples.md) to retain the complete
 `tco-feed?view=points&format=json` response for the requested model, workloads,
 median target (`tiers`), and optional date. For a P99 task, use the eligible,
 comparable raw observations from the [P99 recipe](#check-a-p99-itl-constraint).
 Keep each hardware/workload's positive throughput and evidence dates separate;
 median-feed points must also be in range. Missing, clamped, and unreachable points
 have no cost boundary.
+
+Capture the current OpenAPI operation and then the exact requested points feed.
+The example paths below use the Codex installation; Claude Code uses `.claude`.
+Set the model, workloads, target and optional date from the user's request.
+
+```bash
+node --input-type=module <<'JS'
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+const { read, requests } = createResponseCapture();
+const spec = await read('/api/openapi.json');
+if (!spec.paths?.['/api/v1/tco-feed']?.get) throw new Error('TCO feed GET is not documented');
+const query = new URLSearchParams({ model: 'DeepSeek-V4-Pro', workloads: '8192x1024',
+  tiers: '50', view: 'points', format: 'json' });
+await read(`/api/v1/tco-feed?${query}`);
+console.log(JSON.stringify({ requests, points_body: requests.at(-1).body_path }, null, 2));
+JS
+```
+
+Run the installed offline summary helper on `points_body`, retaining the same
+selectors (including `--date` if the captured query used one). Use a new report path:
+
+```bash
+node .agents/skills/inferencex-api/scripts/tco-summary.mjs \
+  --input api-evidence-EXAMPLE/2.body --model DeepSeek-V4-Pro \
+  --workloads 8192x1024 --target 50 --hardware-a b200 --hardware-b mi355x \
+  --report tco-conditional.md
+```
+
+Its JSON contains `comparisons`, `source`, `price_status`, `cost_winner`,
+`conclusion` and `report_markdown`. It uses the formal TCO feed validator and
+computes each workload separately. Keep its generated conditional conclusion in
+the final reply. This is an offline analysis of a raw capture, not a formal bundle
+accepted by `inferencex verify`; retain the capture sidecars beside its source body.
 
 For two such points with throughputs `t_A` and `t_B`, equal modeled cost occurs at
 `price_A / price_B = t_A / t_B` on the API-reported throughput basis. A's estimate

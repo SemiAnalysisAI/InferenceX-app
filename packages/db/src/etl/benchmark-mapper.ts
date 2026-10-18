@@ -5,8 +5,10 @@
  */
 
 import type { ConfigParams } from './config-cache';
+import { resolveConfigTopology } from './topology';
 import type { SkipTracker } from './skip-tracker';
 import {
+  CPU_SIDE_POWER_METRIC_KEYS,
   MEASURED_POWER_METRIC_KEYS,
   METRIC_KEYS,
   PRECISION_KEYS,
@@ -19,12 +21,10 @@ import {
   normalizeFramework,
   normalizePrecision,
   normalizeSpecMethod,
-  parseBool,
-  parseOptionalBool,
   parseNum,
   parseInt2,
 } from './normalizers';
-import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
+import { normalizeLegacyTpuRow } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -46,6 +46,8 @@ const NON_METRIC_KEYS = new Set([
   'conc',
   'image',
   'recipe_fingerprint',
+  // producer provenance; used to pick one retry copy, never a metric
+  'run_attempt',
   'recipe-fingerprint',
   'disagg',
   'is_multinode',
@@ -148,10 +150,28 @@ export interface PowerAudit {
   max_sample_gap_s?: number;
   producer_sha?: string | null;
   exporter_image_sha256?: string | null;
-  /** Relative path within the source run artifact bundle. */
+  /** Validation filename; nested AgentX documents use a canonical filename alias. */
   source?: string;
   /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
   observed_gpu_ids?: string[];
+  /** NVL72 CPU-side leg provenance; present only when the producer ran that leg. */
+  cpu?: PowerAuditCpu;
+}
+
+/** Sensor kinds the consumer's CPU-side leg can select as the headline series. */
+export const POWER_AUDIT_CPU_SENSOR_KINDS = ['module', 'grace_socket', 'dcgm_cpu_rail'] as const;
+
+/**
+ * Bounded CPU-side provenance emitted next to `cpu_power_valid`: which sensor fed
+ * the Grace-side keys, its source, socket coverage, and the leg's reason codes.
+ */
+export interface PowerAuditCpu {
+  sensor_kind?: (typeof POWER_AUDIT_CPU_SENSOR_KINDS)[number];
+  source?: string;
+  expected_sockets?: number;
+  observed_sockets?: number;
+  sample_row_count?: number;
+  reason_codes?: string[];
 }
 
 export interface BenchmarkParams {
@@ -178,6 +198,11 @@ export interface BenchmarkParams {
   workers?: WorkerPower[];
   powerInvalidReasons?: string[];
   powerAudit?: PowerAudit;
+}
+
+/** Agentic-trace rows emit `scenario_type: 'agentic-coding'` (and variants). */
+export function isAgenticRow(row: Record<string, unknown>): boolean {
+  return String(row.scenario_type ?? '').startsWith('agentic');
 }
 
 /**
@@ -230,9 +255,9 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  // Agentic-trace runs emit `scenario_type: 'agentic-coding'` (and variants),
-  // no isl/osl, and `users` instead of `conc`. Everything else stays as-is.
-  const isAgentic = String(row.scenario_type ?? '').startsWith('agentic');
+  // Agentic-trace runs carry no isl/osl and `users` instead of `conc`.
+  // Everything else stays as-is.
+  const isAgentic = isAgenticRow(row);
   const benchmarkType: BenchmarkType = isAgentic ? 'agentic_traces' : 'single_turn';
 
   const isl = isAgentic ? null : (parseInt2(row.isl) ?? islOslFallback?.isl ?? null);
@@ -273,71 +298,20 @@ export function mapBenchmarkRow(
     String(row.framework ?? ''),
     row.disagg,
   );
-  const isMultinode = parseBool(row.is_multinode);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  let parallelism = resolveParallelism(row, frameworkDisagg);
-  // An explicit non-disagg Dynamo artifact is authoritative for direct
-  // deployments such as one distributed vLLM server. A non-zero decode worker
-  // pool, however, is structural proof of disaggregation and preserves older
-  // Dynamo artifacts that incorrectly emitted disagg=false.
-  const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
+  const topology = resolveConfigTopology(row, framework, frameworkDisagg);
   let metrics = captureNumericMetrics(row);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
-  if (!disagg) {
-    const usePrefill =
-      parallelism.decodeTp <= 0 ||
-      parallelism.decodeEp <= 0 ||
-      (parallelism.decodeNumWorkers <= 0 &&
-        parallelism.numDecodeGpu <= 0 &&
-        (parallelism.prefillNumWorkers > 0 || parallelism.numPrefillGpu > 0));
-    const aggregate = usePrefill
-      ? {
-          tp: parallelism.prefillTp,
-          ep: parallelism.prefillEp,
-          dpAttn: parallelism.prefillDpAttn,
-          numWorkers: parallelism.prefillNumWorkers,
-          numGpu: parallelism.numPrefillGpu,
-          pp:
-            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
-              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
-              : undefined,
-        }
-      : {
-          tp: parallelism.decodeTp,
-          ep: parallelism.decodeEp,
-          dpAttn: parallelism.decodeDpAttn,
-          numWorkers: parallelism.decodeNumWorkers,
-          numGpu: parallelism.numDecodeGpu,
-          pp:
-            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
-              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
-              : undefined,
-        };
-    // The configs schema retains prefill/decode-shaped columns for backwards
-    // compatibility, but an aggregate deployment has only one engine. Mirror
-    // that engine into both halves so every reader sees the same topology.
-    parallelism = {
-      prefillTp: aggregate.tp,
-      prefillEp: aggregate.ep,
-      prefillDpAttn: aggregate.dpAttn,
-      prefillNumWorkers: aggregate.numWorkers,
-      decodeTp: aggregate.tp,
-      decodeEp: aggregate.ep,
-      decodeDpAttn: aggregate.dpAttn,
-      decodeNumWorkers: aggregate.numWorkers,
-      numPrefillGpu: aggregate.numGpu,
-      numDecodeGpu: aggregate.numGpu,
-    };
-    if (aggregate.pp !== undefined) {
-      metrics.prefill_pp = aggregate.pp;
-      metrics.decode_pp = aggregate.pp;
-    }
+  if (!topology.disagg && (metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined)) {
+    const pp = Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1);
+    metrics.prefill_pp = pp;
+    metrics.decode_pp = pp;
   }
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
@@ -404,9 +378,7 @@ export function mapBenchmarkRow(
       model: modelKey,
       precision,
       specMethod,
-      disagg,
-      isMultinode,
-      ...parallelism,
+      ...topology,
     },
     benchmarkType,
     isl,
@@ -419,93 +391,6 @@ export function mapBenchmarkRow(
     workers,
     powerInvalidReasons,
     powerAudit,
-  };
-}
-
-/** The parallelism slice of `ConfigParams`, resolved from either artifact schema. */
-type ParallelismParams = Pick<
-  ConfigParams,
-  | 'prefillTp'
-  | 'prefillEp'
-  | 'prefillDpAttn'
-  | 'prefillNumWorkers'
-  | 'decodeTp'
-  | 'decodeEp'
-  | 'decodeDpAttn'
-  | 'decodeNumWorkers'
-  | 'numPrefillGpu'
-  | 'numDecodeGpu'
->;
-
-/**
- * Resolve prefill/decode parallelism from a raw row. v2 rows (2025-12-19+)
- * carry full disagg fields keyed by the presence of `prefill_tp`; v1 rows have
- * a single `tp`/`ep` that applies to both phases.
- */
-function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean): ParallelismParams {
-  if ('prefill_tp' in row) {
-    // v2 schema: full disagg parallelism fields
-    const prefillTp = parseInt2(row.prefill_tp) ?? 1;
-    const prefillEp = parseInt2(row.prefill_ep) ?? 1;
-    const decodeTp = parseInt2(row.decode_tp) ?? 1;
-    const decodeEp = parseInt2(row.decode_ep) ?? 1;
-    return {
-      prefillTp,
-      prefillEp,
-      prefillDpAttn: parseBool(row.prefill_dp_attention),
-      prefillNumWorkers: parseInt2(row.prefill_num_workers) ?? 0,
-      decodeTp,
-      decodeEp,
-      decodeDpAttn: parseBool(row.decode_dp_attention),
-      decodeNumWorkers: parseInt2(row.decode_num_workers) ?? 0,
-      numPrefillGpu:
-        roleChipCount(row.num_prefill_gpu) ??
-        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
-          ? undefined
-          : physicalChipCount(row.num_gpus)) ??
-        prefillTp * prefillEp,
-      numDecodeGpu:
-        roleChipCount(row.num_decode_gpu) ??
-        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
-          ? undefined
-          : physicalChipCount(row.num_gpus)) ??
-        decodeTp * decodeEp,
-    };
-  }
-  // v1 schema: single tp/ep, prefill = decode
-  const tp = parseInt2(row.tp) ?? 1;
-  const ep = parseInt2(row.ep) ?? 1;
-  const dpAttn = parseBool(row.dp_attention);
-  let numGpus = physicalChipCount(row.num_gpus);
-  if (
-    row.num_gpus === undefined &&
-    !frameworkDisagg &&
-    String(row.scenario_type ?? '').startsWith('agentic') &&
-    row.request_metrics &&
-    typeof row.request_metrics === 'object' &&
-    !Array.isArray(row.request_metrics) &&
-    parseOptionalBool(row.is_multinode) === false &&
-    parseOptionalBool(row.disagg) === false
-  ) {
-    // Match the v3 AgentX producer's physical-device count. EP and DCP share
-    // TP devices; PP and PCP add devices. Legacy flat rows keep their fallback.
-    const physicalTp = physicalChipCount(row.tp);
-    const pp = physicalChipCount(row.pp === undefined ? 1 : row.pp);
-    const pcp = physicalChipCount(row.pcp_size === undefined ? 1 : row.pcp_size);
-    if (physicalTp && pp && pcp) numGpus = physicalChipCount(physicalTp * pp * pcp);
-  }
-  numGpus ??= tp * ep;
-  return {
-    prefillTp: tp,
-    prefillEp: ep,
-    prefillDpAttn: dpAttn,
-    prefillNumWorkers: 0,
-    decodeTp: tp,
-    decodeEp: ep,
-    decodeDpAttn: dpAttn,
-    decodeNumWorkers: 0,
-    numPrefillGpu: numGpus,
-    numDecodeGpu: numGpus,
   };
 }
 
@@ -540,11 +425,13 @@ export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
-  if (Object.hasOwn(row, 'power_valid')) {
-    const verdict = row.power_valid;
-    metrics.power_valid = verdict === 1 || verdict === '1' ? 1 : 0;
-  } else {
-    delete metrics.power_valid;
+  for (const field of ['power_valid', 'cpu_power_valid'] as const) {
+    if (Object.hasOwn(row, field)) {
+      const verdict = row[field];
+      metrics[field] = verdict === 1 || verdict === '1' ? 1 : 0;
+    } else {
+      delete metrics[field];
+    }
   }
 
   if (!Object.hasOwn(row, 'power_metric_schema_version')) {
@@ -569,15 +456,24 @@ export function normalizePowerContractMetrics(
 
 /**
  * Enforces fail-closed power publication at ingest. An explicit normalized
- * invalid verdict removes every measured field while preserving the contract
- * and diagnostic fields; legacy rows without a verdict remain unchanged.
- * Returns true so callers also drop worker telemetry. Paths that bypass
- * `mapBenchmarkRow` must normalize the verdict before calling this function.
- * Queries intentionally remain raw; the frontend withholds independently.
+ * invalid GPU verdict removes every GPU-side measured field while preserving
+ * the contract and diagnostic fields; legacy rows without a verdict remain
+ * unchanged. The NVL72 CPU-side keys follow their own `cpu_power_valid`
+ * verdict instead: anything but a normalized 1 withholds them, because no
+ * legacy rows predate that verdict and the estimator admits rows the same way.
+ * Returns true when GPU power was withheld so callers also drop worker
+ * telemetry. Paths that bypass `mapBenchmarkRow` must normalize the verdicts
+ * before calling this function. Queries intentionally remain raw; the
+ * frontend withholds independently.
  */
 export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.cpu_power_valid !== 1) {
+    for (const key of CPU_SIDE_POWER_METRIC_KEYS) delete metrics[key];
+  }
   if (metrics.power_valid !== 0) return false;
-  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  for (const key of MEASURED_POWER_METRIC_KEYS) {
+    if (!CPU_SIDE_POWER_METRIC_KEYS.has(key)) delete metrics[key];
+  }
   return true;
 }
 
@@ -667,6 +563,32 @@ function auditSha(v: unknown): string | null {
 }
 
 /**
+ * Narrow the CPU-side leg's provenance. Reason codes reuse the producer reason
+ * grammar; an unrecognised sensor kind is dropped rather than stored as a label
+ * the dashboard would misread. Undefined when nothing well-formed remains.
+ */
+function extractPowerAuditCpu(raw: unknown): PowerAuditCpu | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const cpu: PowerAuditCpu = {};
+  if ((POWER_AUDIT_CPU_SENSOR_KINDS as readonly unknown[]).includes(e.sensor_kind)) {
+    cpu.sensor_kind = e.sensor_kind as PowerAuditCpu['sensor_kind'];
+  }
+  if (typeof e.source === 'string' && e.source.length > 0 && e.source.length <= 32) {
+    cpu.source = e.source;
+  }
+  for (const field of ['expected_sockets', 'observed_sockets', 'sample_row_count'] as const) {
+    const n = auditCount(e[field]);
+    if (n !== undefined) cpu[field] = n;
+  }
+  // An empty list is the producer's "leg valid, nothing to report"; keep it.
+  if (Array.isArray(e.reason_codes)) {
+    cpu.reason_codes = extractPowerInvalidReasons(e.reason_codes) ?? [];
+  }
+  return Object.keys(cpu).length > 0 ? cpu : undefined;
+}
+
+/**
  * Missing or malformed audit values must not become a fabricated measurement;
  * SQL NULL distinguishes absent evidence from an empty recorded object.
  */
@@ -701,6 +623,8 @@ export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
     );
     if (ids.length > 0) audit.observed_gpu_ids = [...new Set(ids)].slice(0, 1024);
   }
+  const cpu = extractPowerAuditCpu(e.cpu);
+  if (cpu !== undefined) audit.cpu = cpu;
   const hasNumericField = Object.keys(audit).length > 0;
 
   audit.producer_sha = auditSha(e.producer_sha);

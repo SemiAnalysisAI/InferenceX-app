@@ -1,5 +1,5 @@
 import { QUALITY_METRIC_IDS, QUALITY_SCALE } from '@/components/video-benchmark/quality';
-import type { ApiSchema } from '@/lib/api-documentation';
+import type { ApiSchema } from '@/lib/api/api-documentation';
 
 const nullableText: ApiSchema = { type: ['string', 'null'] };
 const nullableHash: ApiSchema = { type: ['string', 'null'], pattern: '^[a-f0-9]{64}$' };
@@ -71,10 +71,67 @@ export const videoQualitySchema: ApiSchema = {
   additionalProperties: false,
 };
 
+export const videoProducerSchema: ApiSchema = {
+  type: ['object', 'null'],
+  description:
+    'Producer-sealed model revision, selected plan SHA-256 and engine revision; null for legacy sources without that identity. This is independent of quality qualification.',
+  properties: {
+    modelRevision: { type: 'string', pattern: '^[a-f0-9]{40}$' },
+    planSha256: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+    engine: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', enum: ['sglang', 'vllm-omni'] },
+        revision: { type: 'string', pattern: '^[a-f0-9]{40}$' },
+      },
+      required: ['name', 'revision'],
+      additionalProperties: false,
+    },
+  },
+  required: ['modelRevision', 'planSha256', 'engine'],
+  additionalProperties: false,
+};
+
+export const videoReleaseCoverageSchema: ApiSchema = {
+  type: 'array',
+  description:
+    'H3/Wan × SGLang/vLLM-Omni coverage within the loaded published pages, before the model filter. Missing sources do not prove no run exists. Sample floor met does not imply quality qualification.',
+  items: {
+    type: 'object',
+    properties: {
+      model: { type: 'string', enum: ['h3', 'wan22'] },
+      engine: { type: 'string', enum: ['sglang', 'vllm-omni'] },
+      status: {
+        type: 'string',
+        enum: ['not_published', 'failed', 'history_only', 'sample_floor_met'],
+      },
+      sources: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            runId: { type: 'string' },
+            artifactId: { type: 'integer' },
+            sourceId: { type: 'string' },
+            producer: videoProducerSchema,
+            status: { type: 'string', enum: ['failed', 'history_only', 'sample_floor_met'] },
+            error: nullableText,
+          },
+          required: ['runId', 'artifactId', 'sourceId', 'producer', 'status', 'error'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['model', 'engine', 'status', 'sources'],
+    additionalProperties: false,
+  },
+};
+
 export const videoPointSchema: ApiSchema = {
   type: 'object',
   properties: {
     quality: videoQualitySchema,
+    producer: videoProducerSchema,
     deployment: {
       type: ['object', 'null'],
       properties: {

@@ -2,7 +2,6 @@ import {
   ArrowRight,
   BookOpen,
   Download,
-  MousePointerClick,
   MessageSquareText,
   Palette,
   ShieldCheck,
@@ -12,19 +11,11 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { isZhPathname, localePath } from '@/lib/i18n';
-import {
-  AGENTIC_COACH_MARK_STORAGE_KEY,
-  AGENTIC_POINT_ACTION_SELECTOR,
-  SCATTER_RENDERED_EVENT,
-  getAgenticPointAnchorMutationRoot,
-  getAgenticPointAnchorRect,
-  resolveAgenticPointAnchor,
-} from '@/lib/nudges/agentic-point-coach-mark';
-import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
+import { isZhPathname, localePath } from '@/lib/i18n/i18n';
+import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
-import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
+import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;
@@ -52,7 +43,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const RUBIN_RESULTS_URL = '/inference/deepseek-v4';
+export const TPUV7_LAUNCH_MODAL_STORAGE_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -264,55 +255,6 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Agentic chart coach mark
-  // -------------------------------------------------------------------------
-  {
-    id: 'agentic-point-detail',
-    type: 'coach-mark',
-    // Three ways in, all retried until an anchor exists (see `isEligible`'s
-    // `requireAnchor`): a short timer for a chart that is already painted,
-    // every subsequent chart render for the usual async-data case, and scroll
-    // — on a laptop viewport the chart starts below the fold, so the first two
-    // fire while there is still nothing on screen to point at. The resolver
-    // rejects an off-screen chart with a single rect read, keeping the scroll
-    // path cheap, and the engine drops these listeners once the tip is up.
-    trigger: [
-      { type: 'timer', delayMs: 1200 },
-      { type: 'event', event: SCATTER_RENDERED_EVENT, delayMs: 700 },
-      { type: 'dom-event', event: 'scroll' },
-    ],
-    dismissal: { type: 'permanent' },
-    storageKey: AGENTIC_COACH_MARK_STORAGE_KEY,
-    // Highest dashboard priority: it is the only nudge tied to a specific
-    // element, so it should claim its slot the moment that element exists.
-    // (It has its own slot, so this only orders it against future coach marks.)
-    priority: 45,
-    scope: 'dashboard',
-    content: {
-      icon: MousePointerClick,
-      iconClassName: 'text-brand',
-      title: 'Every point has a story',
-      titleZh: '每个数据点背后都有细节',
-      description:
-        'Click any point to view server metrics and logs — cache hit rates, queue depth, and the full request timeline for that run.',
-      descriptionZh:
-        '点击任意数据点即可查看服务端指标与日志——cache 命中率、队列深度，以及该次运行的完整请求时间线。',
-      testId: 'agentic-point-coach-mark',
-      anchor: {
-        resolve: resolveAgenticPointAnchor,
-        getRect: getAgenticPointAnchorRect,
-        getMutationRoot: getAgenticPointAnchorMutationRoot,
-        actionSelector: AGENTIC_POINT_ACTION_SELECTOR,
-      },
-    },
-    analytics: {
-      shown: 'inference_agentic_point_coach_mark_shown',
-      dismissed: 'inference_agentic_point_coach_mark_dismissed',
-      action: 'inference_agentic_point_coach_mark_point_clicked',
-    },
-  },
-
-  // -------------------------------------------------------------------------
   // Landing banner
   //
   // Note: the landing scope deliberately has no GitHub star nudge. The footer
@@ -322,7 +264,48 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
-    id: 'rubin-agentic-inference-banner',
+    id: 'tpuv7-agentx-launch-modal',
+    type: 'modal',
+    trigger: { type: 'immediate' },
+    dismissal: { type: 'permanent' },
+    // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
+    // landing UI under test; a rename here has to be mirrored there.
+    storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
+    priority: 50,
+    scope: 'landing',
+    content: {
+      icon: Sparkles,
+      iconClassName: 'text-brand',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
+      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
+      testId: 'launch-modal',
+      containerClassName: 'border-brand/40',
+      // Launch announcement — centered with a backdrop so it reads as the
+      // page's headline moment instead of a bottom-right corner card.
+      centered: true,
+      badge: 'New',
+      badgeZh: '最新',
+      dismissLabel: 'Maybe Later',
+      dismissLabelZh: '稍后再看',
+      primaryAction: {
+        label: 'View results',
+        labelZh: '查看结果',
+        icon: <ArrowRight className="size-4" />,
+        onClick: () => {
+          window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        },
+      },
+    },
+    analytics: {
+      shown: 'inference_tpuv7_agentx_modal_shown',
+      dismissed: 'inference_tpuv7_agentx_modal_dismissed',
+      action: 'inference_tpuv7_agentx_modal_clicked',
+    },
+  },
+  {
+    id: 'tpuv7-qwen-3-5-agentx-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -333,26 +316,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Rubin Agentic Inference Performance',
-      titleZh: 'Rubin 智能体推理性能',
-      description: '67x Faster than Blackwell Ultra',
-      descriptionZh: '速度达 Blackwell Ultra 的 67 倍',
+      title: 'Google TPUv7 joins AgentX',
+      titleZh: 'Google TPUv7 加入 AgentX',
+      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: RUBIN_RESULTS_URL,
+      href: TPUV7_QWEN_3_5_AGENTX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(RUBIN_RESULTS_URL);
+        window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
       },
     },
     analytics: {
-      shown: 'inference_rubin_banner_shown',
-      dismissed: 'inference_rubin_banner_dismissed',
-      action: 'inference_rubin_banner_clicked',
+      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
+      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
+      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
       properties: {
-        banner_id: 'rubin-agentic-inference',
+        banner_id: 'tpuv7-qwen-3-5-agentx',
         destination: 'inference',
       },
     },

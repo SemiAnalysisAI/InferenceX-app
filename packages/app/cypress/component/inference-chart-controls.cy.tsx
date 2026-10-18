@@ -1,82 +1,21 @@
 import 'cypress-axe';
 import { useState } from 'react';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
-import InferenceTable from '@/components/inference/ui/InferenceTable';
-import { chartDefinitions } from '@/components/inference/metric-registry';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
 import {
   createMockInferenceContextValues,
-  createMockInferenceData,
   type MockInferenceContextValues,
 } from '../support/mock-data';
 
-describe('Modeled system-power table', () => {
-  it('shows validated eight-GPU topology separately from the configured 64-chip alias in both locales', () => {
-    const data = createMockInferenceData({
-      physicalChips: 64,
-      modeledChassisPowerPerGpu: { y: 750, roof: false },
-      modeledSystemPower: {
-        status: 'supported',
-        hardware: 'h100',
-        modelRevision: 'reference-revision',
-        modelPath: 'chassis/H100.py',
-        gpuCount: 8,
-        chassisCount: 1,
-        chassisAcWatts: 6000,
-        chassisAcWattsPerGpu: 750,
-        facilityWatts: 7200,
-        pue: 1.2,
-        measuredGpuWattsPerGpu: 500,
-        modeledGpuCount: 8,
-        deploymentAcWatts: 6000,
-        deploymentFacilityWatts: 7200,
-        topologyBasis: 'single-node',
-        chassisBasis: 'full',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    for (const locale of ['en', 'zh'] as const) {
-      mountWithProviders(
-        <PathnameContext.Provider value={locale === 'en' ? '/inference' : '/zh/inference'}>
-          <InferenceTable
-            data={[data]}
-            chartDefinition={chartDefinitions[0]}
-            selectedYAxisMetric="y_modeledChassisPowerPerGpu"
-          />
-        </PathnameContext.Provider>,
-      );
-      cy.get('[data-testid="inference-results-table"]').within(() => {
-        cy.get('[data-testid="data-table-preset-all"]').click();
-        for (const [header, value] of [
-          [locale === 'en' ? 'Physical Chips' : '物理芯片数', '8'],
-          [locale === 'en' ? 'Configured Chip Count' : '配置中的芯片数', '64'],
-          [
-            locale === 'en'
-              ? 'Modeled Chassis AC Power per GPU (W/GPU)'
-              : '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
-            '750',
-          ],
-        ]) {
-          cy.contains('th', header)
-            .invoke('index')
-            .then((index) => {
-              cy.get('tbody tr').first().children().eq(index).should('have.text', value);
-            });
-        }
-      });
-    }
-  });
-});
-
 /**
- * Measured Energy and Modeled System Power sit behind the ↑↑↓↓ feature gate
- * while power telemetry is WIP. Unlock it and remount so the gated groups are
- * listed; the gate hook reads localStorage on mount.
+ * Measured Energy sits behind the ↑↑↓↓ feature gate while power telemetry is
+ * WIP. Unlock it and remount so the gated group is listed; the gate hook reads
+ * localStorage on mount.
  */
 function mountWithPowerGroupsUnlocked() {
   cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
@@ -126,35 +65,13 @@ describe('Inference ChartControls', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
 
-  it('hides the Measured Energy and Modeled System Power groups while the gate is locked', () => {
+  it('hides the Measured Energy group while the gate is locked', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-content"]').should('exist');
     cy.contains('Throughput').should('exist');
     cy.contains('Measured Power').should('not.exist');
     cy.contains('Measured Energy').should('not.exist');
-    cy.contains('Modeled System Power').should('not.exist');
     cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').should('not.exist');
-    cy.contains('[data-slot="select-item"]', 'Modeled Chassis AC Power per GPU (8k1k)').should(
-      'not.exist',
-    );
-  });
-
-  it('renders the model selector with the current model', () => {
-    // Default mock: selectedModel = Model.DeepSeek_R1 -> "DeepSeek R1 0528"
-    cy.get('#model-select').should('be.visible');
-    cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
-  });
-
-  it('renders the sequence selector with the current sequence', () => {
-    // Default mock: selectedSequence = Sequence.EightK_OneK -> label "8K / 1K"
-    cy.get('#scenario-select').should('be.visible');
-    cy.get('#scenario-select').should('contain.text', '8K / 1K');
-  });
-
-  it('renders the precision multi-select with the current precision', () => {
-    // Default mock: selectedPrecisions = [Precision.FP4] -> label "FP4"
-    cy.get('[data-testid="precision-multiselect"]').should('be.visible');
-    cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
   });
 
   it('renders the Y-axis metric selector', () => {
@@ -200,29 +117,6 @@ describe('Inference ChartControls', () => {
     }
   });
 
-  it('offers modeled chassis power separately and explains its measurement boundary', () => {
-    mountWithPowerGroupsUnlocked();
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('input[aria-label="Search options"]').type('Modeled Chassis');
-    cy.contains('Modeled System Power')
-      .closest('[role="rowgroup"]')
-      .within(() => {
-        cy.get('[data-testid="option-help-y_modeledChassisPowerPerGpu"]').scrollIntoView().click();
-      });
-    cy.get('[data-testid="option-help-content-y_modeledChassisPowerPerGpu"]')
-      .should('contain.text', 'validated measured GPU power')
-      .and('contain.text', 'extrapolated to a full chassis')
-      .and('contain.text', 'PUE after chassis AC');
-    cy.get('body').type('{esc}');
-    cy.contains('[data-slot="select-item"]', 'Modeled Chassis AC Power per GPU (8k1k)')
-      .scrollIntoView()
-      .click();
-    cy.get('@setSelectedYAxisMetric').should(
-      'have.been.calledOnceWith',
-      'y_modeledChassisPowerPerGpu',
-    );
-  });
-
   it('does not render the Cost Tier selector; it lives in the chart caption', () => {
     // Default mock: selectedYAxisMetric = y_tpPerGpu
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
@@ -263,12 +157,6 @@ describe('Inference ChartControls', () => {
     // Default mock: selectedGPUs = [] — GPU date range pickers should not render
     cy.contains('Comparison Date Range').should('not.exist');
     cy.contains('Intermediary Dates').should('not.exist');
-  });
-
-  it('renders the GPU config multi-select', () => {
-    // The GPU Config label should be present (hideGpuComparison defaults to false)
-    cy.contains('Chip Config').should('be.visible');
-    cy.get('[data-testid="gpu-multiselect"]').should('be.visible');
   });
 
   it('uses a full-width benchmark row above chart and history controls on desktop', () => {
@@ -469,15 +357,20 @@ describe('Inference ChartControls grouped measured metrics', () => {
       cy.get(`input[aria-label="${searchLabel}"]`).type(group);
       cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
         const values = [...$options].map((option) => option.dataset.value);
-        expect(values).to.have.length(13);
-        expect(new Set(values).size).to.equal(13);
+        // Thirteen measured axes plus the Timeline display of measured power.
+        expect(values).to.have.length(14);
+        expect(new Set(values).size).to.equal(14);
+        expect(values).to.include('y_measuredPowerTimeline');
       });
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
-      cy.get('[data-select-option]')
-        .should('have.length', 1)
-        .and('have.text', power)
-        .and('have.attr', 'data-value', 'y_measuredP75Power')
-        .and('have.attr', 'aria-pressed', 'true');
+      // 'All in Measured Power per Chip' also contains the family name; only
+      // the family option may display exactly that name.
+      cy.get('[data-select-option]').should(($options) => {
+        const exact = [...$options].filter((option) => option.textContent?.trim() === power);
+        expect(exact).to.have.length(1);
+        expect(exact[0].dataset.value).to.equal('y_measuredP75Power');
+        expect(exact[0].getAttribute('aria-pressed')).to.equal('true');
+      });
       cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
       cy.get('[data-select-option]')
@@ -516,6 +409,16 @@ describe('Inference ChartControls grouped measured metrics', () => {
       'have.attr',
       'aria-pressed',
       'true',
+    );
+  });
+
+  it('explains in the Boundary menu that All in Measured models unmeasured components', () => {
+    mountMeasuredControls();
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-testid="option-help-utility-modeled"]').click();
+    cy.get('[data-testid="option-help-content-utility-modeled"]').should(
+      'contain.text',
+      'unmeasured components are modeled',
     );
   });
 
@@ -670,7 +573,7 @@ describe('Inference ChartControls cost metrics', () => {
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K.
+      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
@@ -695,9 +598,9 @@ describe('Inference ChartControls cost metrics', () => {
       inference: {
         selectedYAxisMetric: 'y_costh',
         selectedModel: Model.Qwen3_5,
-        selectedSequence: Sequence.AgenticTraces,
+        selectedSequence: Sequence.OneK_OneK,
       },
-      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.AgenticTraces },
+      globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.OneK_OneK },
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });

@@ -1,0 +1,78 @@
+import { describe, expect, it } from 'vitest';
+
+import type { ArtifactMeta } from './github-artifacts.js';
+import {
+  collectMissingTelemetryExpectations,
+  pairGpuMetricsArtifacts,
+} from './gpu-metrics-backfill.js';
+
+const meta = (
+  name: string,
+  id: number,
+  created_at = '2026-09-11T00:00:00Z',
+  expired = false,
+): ArtifactMeta => ({
+  id,
+  name,
+  created_at,
+  expired,
+  archive_download_url: `https://example.test/${id}`,
+});
+
+const unreadable = (artifact: ArtifactMeta): Promise<never> =>
+  Promise.reject(new Error(`unreadable ${artifact.name}`));
+
+describe('pairGpuMetricsArtifacts', () => {
+  it('lets a power_audit bundle stand in only when its suffix has no unexpired gpu_metrics upload', () => {
+    // The bundle is listed before its gpu_metrics sibling on purpose: input
+    // order alone must not decide the winner.
+    const pairs = pairGpuMetricsArtifacts([
+      meta('power_audit_cfg-mn_b200-slurm_0', 1),
+      meta('bmk_cfg-mn_b200-slurm_0', 2),
+      meta('power_audit_cfg-sn_h200-cw_0', 4),
+      meta('gpu_metrics_cfg-sn_h200-cw_0', 3),
+      meta('bmk_cfg-sn_h200-cw_0', 5),
+      meta('power_audit_orphan_b200-slurm_0', 6),
+      meta('gpu_metrics_cfg-mn_b200-slurm_0', 7, '2026-09-11T00:00:00Z', true),
+    ]);
+    expect(pairs.map((pair) => [pair.gpuMetrics.name, pair.benchmarks.name])).toEqual([
+      ['gpu_metrics_cfg-sn_h200-cw_0', 'bmk_cfg-sn_h200-cw_0'],
+      ['power_audit_cfg-mn_b200-slurm_0', 'bmk_cfg-mn_b200-slurm_0'],
+    ]);
+  });
+});
+
+describe('collectMissingTelemetryExpectations', () => {
+  it('names both sibling uploads for an unpaired benchmark and reports expired or unreadable ones', async () => {
+    const artifacts = [
+      meta('bmk_agentic_cfg-a_h200-cw_0', 1),
+      meta('bmk_cfg-b_h200-cw_0', 2, '2026-09-11T00:00:00Z', true),
+      meta('bmk_cfg-c_h200-cw_0', 3),
+      meta('gpu_metrics_cfg-c_h200-cw_0', 4),
+    ];
+    const pairs = pairGpuMetricsArtifacts(artifacts);
+    const all = await collectMissingTelemetryExpectations(artifacts, pairs, null, unreadable);
+    expect(all.observations).toEqual([]);
+    expect(all.errors).toEqual([
+      {
+        benchmarkArtifact: 'bmk_agentic_cfg-a_h200-cw_0',
+        artifactNames: ['gpu_metrics_cfg-a_h200-cw_0', 'power_audit_cfg-a_h200-cw_0'],
+        error: 'unreadable bmk_agentic_cfg-a_h200-cw_0',
+      },
+      {
+        benchmarkArtifact: 'bmk_cfg-b_h200-cw_0',
+        artifactNames: ['gpu_metrics_cfg-b_h200-cw_0', 'power_audit_cfg-b_h200-cw_0'],
+        error: 'Benchmark artifact expired; point identities unavailable',
+      },
+    ]);
+    const targeted = await collectMissingTelemetryExpectations(
+      artifacts,
+      pairs,
+      'power_audit_cfg-b_h200-cw_0',
+      unreadable,
+    );
+    expect(targeted.errors.map((error) => error.benchmarkArtifact)).toEqual([
+      'bmk_cfg-b_h200-cw_0',
+    ]);
+  });
+});

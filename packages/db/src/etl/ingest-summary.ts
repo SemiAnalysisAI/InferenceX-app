@@ -38,6 +38,7 @@ export function printIngestSummaryFooter(
     ['unmapped hw', skips.unmappedHw],
     ['bad/empty zip', skips.badZip],
     ['DB errors', skips.dbError],
+    ['telemetry errors (non-fatal)', skips.telemetryError],
   );
 
   const nonzeroSkipLines = skipLines.filter(([, count]) => count > 0);

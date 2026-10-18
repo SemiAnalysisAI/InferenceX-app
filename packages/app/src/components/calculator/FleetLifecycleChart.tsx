@@ -3,8 +3,8 @@
 import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
-import { formatLargeNumber } from '@/lib/chart-rendering';
-import { getChartWatermark } from '@/lib/data-mappings';
+import { formatLargeNumber } from '@/lib/charts/chart-rendering';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { AnyScale } from '@/lib/d3-chart/chart-update';
 import {
   D3Chart,
@@ -14,8 +14,8 @@ import {
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   isBreakEvenAnchored,

@@ -1,7 +1,7 @@
 import createBundler from '@bahmutov/cypress-esbuild-preprocessor';
 import { defineConfig } from 'cypress';
-import cypressSplit from 'cypress-split';
 import path from 'path';
+import { setupTimingSplit } from './cypress/plugins/timings';
 
 export default defineConfig({
   allowCypressEnv: false,
@@ -25,7 +25,13 @@ export default defineConfig({
       // Force reduced motion so e2e clicks always land on settled elements.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium' && browser.name !== 'electron') {
-          launchOptions.args.push('--force-prefers-reduced-motion');
+          // The retained isolation checks activate optional WebGL backgrounds.
+          // Use software rendering on GPU-less CI runners.
+          launchOptions.args.push(
+            '--force-prefers-reduced-motion',
+            '--use-angle=swiftshader',
+            '--enable-unsafe-swiftshader',
+          );
         }
         return launchOptions;
       });
@@ -36,11 +42,15 @@ export default defineConfig({
           alias: { '@': path.resolve(__dirname, 'src') },
         }),
       );
-      cypressSplit(on, config);
+      setupTimingSplit(on, config);
       return config;
     },
   },
   component: {
+    setupNodeEvents(on, config) {
+      setupTimingSplit(on, config);
+      return config;
+    },
     devServer: {
       framework: 'next',
       bundler: 'webpack',

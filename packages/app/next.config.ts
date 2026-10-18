@@ -1,8 +1,8 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
-import { allowedDevOriginsFromEnv } from './src/lib/allowed-dev-origins';
-import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/inference-model-redirects';
-import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video-alias-redirects';
+import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
+import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
+import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
 const nextConfig: NextConfig = {
   // Allow a second, isolated dev server (e.g. a dump-mode instance on another
@@ -28,6 +28,9 @@ const nextConfig: NextConfig = {
         destination: '/zh/agentx/:path*',
         permanent: true,
       },
+      // PowerX moved into the inference dashboard.
+      { source: '/gpu-metrics', destination: '/inference', permanent: true },
+      { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
     ]);
   },
   experimental: {

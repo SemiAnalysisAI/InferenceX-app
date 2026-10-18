@@ -21,14 +21,14 @@ import {
   type OverviewReferenceHardware,
   type OverviewRowScope,
   type OverviewTier,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import {
   buildOverviewDashboardHref,
   buildOverviewHistoryDashboardHref,
   detailHref,
   overviewEngineScopeHref,
   overviewHref,
-} from '@/lib/overview-links';
+} from '@/lib/overview/overview-links';
 
 import { OverviewDetailLink } from './overview-detail-link';
 import { OverviewHistoryDetailLink } from './overview-history-detail-link';

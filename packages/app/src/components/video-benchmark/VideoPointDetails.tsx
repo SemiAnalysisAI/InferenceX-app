@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { layoutLabel } from './deployment';
 import type { VideoPoint } from './metrics';
 import { QUALITY_METRICS, qualityMeasurement } from './quality';
@@ -16,6 +16,7 @@ const STRINGS = {
     counts: 'Valid / completed / scheduled / failed',
     samples: 'Latency samples',
     runtime: 'Engine / runtime / precision / attention',
+    plan: 'Selected plan SHA256',
     settings: 'Generation settings',
     workload: 'Canonical workload identity',
     scheduling: 'Scheduling / acceleration / configuration evidence',
@@ -40,6 +41,7 @@ const STRINGS = {
     counts: '有效 / 完成 / 计划 / 失败',
     samples: '延迟样本数',
     runtime: '引擎 / runtime / precision / attention',
+    plan: '所选 plan SHA256',
     settings: '生成参数',
     workload: '完整工作负载身份',
     scheduling: '调度方式 / 加速方法 / 配置证据',
@@ -86,8 +88,16 @@ export default function VideoPointDetails({
     [s.samples, p.samples],
     [
       s.runtime,
-      [d?.engine, p.runtime, d?.precision, p.server?.attention].map((v) => v ?? '—').join(' / '),
+      [
+        p.producer?.engine.name ?? d?.engine,
+        p.producer?.engine.revision ?? p.runtime,
+        d?.precision,
+        p.server?.attention,
+      ]
+        .map((v) => v ?? '—')
+        .join(' / '),
     ],
+    [s.plan, p.producer?.planSha256 ?? '—'],
     [s.settings, d?.generationKey ?? p.workload],
     [
       s.scheduling,

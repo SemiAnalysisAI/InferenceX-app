@@ -1,3 +1,4 @@
+import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import {
   Model,
   MODEL_OPTIONS,
@@ -7,7 +8,7 @@ import {
   PRECISION_OPTIONS,
   Sequence,
   SEQUENCE_OPTIONS,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 
 export interface CalculatorUrlSeed {
   model?: Model;
@@ -16,6 +17,32 @@ export interface CalculatorUrlSeed {
   percentile?: Percentile;
   runDate?: string;
   runId?: string;
+  /** Profit estimator interactivity target (tok/s/user) from `c_ivtarget`. */
+  profitTarget?: number;
+  /** Server navigation identity, distinct from shallow client-owned route edits. */
+  profitRouteKey?: string;
+}
+
+/**
+ * Parse a `c_ivtarget` value: a finite, positive number written in plain
+ * decimal form. Anything else (empty, zero, negative, `NaN`, trailing junk)
+ * returns `undefined`, so the page falls back to the model's default target.
+ */
+export function parseProfitTargetParam(value: string | undefined): number | undefined {
+  if (value === undefined || !/^\d+(?:\.\d+)?$/u.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * The `c_ivtarget` share-link value for `target` on `model`: empty when the
+ * target is the model's default operating point (so default views keep
+ * unchanged links and follow future default changes), otherwise the exact
+ * number, which `parseProfitTargetParam` reads back.
+ */
+export function profitTargetUrlValue(model: Model, target: number): string {
+  if (!Number.isFinite(target) || target <= 0) return '';
+  return target === profitModelDefaults(model).interactivity ? '' : String(target);
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -63,6 +90,9 @@ export function resolveCalculatorUrlSeed(
   if (runDateParam && /^\d{4}-\d{2}-\d{2}$/u.test(runDateParam)) {
     seed.runDate = runDateParam;
   }
+
+  const profitTarget = parseProfitTargetParam(pickString(sp.c_ivtarget));
+  if (profitTarget !== undefined) seed.profitTarget = profitTarget;
 
   const runIdParam = pickString(sp.g_runid);
   if (runIdParam && /^[A-Za-z0-9_-]{1,64}$/u.test(runIdParam)) {

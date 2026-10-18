@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { modelDetailMetadata, modelIndexMetadata } from '@/lib/model-page-metadata';
+import { modelDetailMetadata, modelIndexMetadata } from '@/lib/catalog/model-page-metadata';
 
 describe('model page metadata locale pairing', () => {
   it('pairs the English and Chinese index canonicals and hreflang values', () => {

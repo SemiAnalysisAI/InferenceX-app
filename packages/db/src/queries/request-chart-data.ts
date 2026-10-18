@@ -2,10 +2,11 @@
  * Compact per-request data used by the default agentic point charts.
  *
  * The full request timeline contains source-trace metadata and Gantt-only
- * timing fields. Large runs can make that document tens of megabytes, even
- * though the summary charts need only nine values per request. This query
- * projects those values once in Postgres and dictionary-encodes repeated
- * strings before the response crosses the network.
+ * timing fields. Large runs can make that document hundreds of megabytes,
+ * even though the summary charts need only nine values per request. Legacy
+ * JSONB timelines of up to 250,000 requests are projected once in Postgres so
+ * only those values cross the network. Gzip timelines and larger legacy
+ * timelines are scanned in Node, keeping only those values of each request.
  */
 
 import {
@@ -13,9 +14,20 @@ import {
   type RequestRecord,
   type RequestTimeline,
 } from '../etl/compute-request-timeline';
+import {
+  scanRequestTimelineGz,
+  scanRequestTimelineText,
+  type RequestTimelineHeader,
+  type ScannedRequest,
+} from '../etl/request-timeline-codec';
 
 import type { DbClient } from '../connection.js';
-import { getRequestTimeline } from './request-timeline';
+import {
+  getRequestTimeline,
+  legacyRequestTimelineText,
+  logRequestTimelineReadFailure,
+  readRequestTimelineGz,
+} from './request-timeline';
 
 const REQUEST_CHART_SHAPE_VERSION = 2;
 export const REQUEST_CHART_DATA_VERSION =
@@ -44,10 +56,17 @@ export interface RequestChartDataWire {
   requests: RequestChartTuple[];
 }
 
-interface RawChartRow {
+interface RawChartMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
+  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
+  gz_bytes: number | null;
   timeline_version: number | null;
+  /** Length of a legacy timeline's `requests` array, for rows without a gzip timeline. */
+  legacy_request_count: number | null;
+}
+
+interface RawProjectedChartRow {
   start_ns: number | null;
   end_ns: number | null;
   duration_s: number | null;
@@ -64,10 +83,31 @@ interface RawChartRow {
   ][];
 }
 
+/**
+ * Most requests a legacy JSONB timeline may hold and still be projected in
+ * SQL. The projection costs about 155 bytes per request: trace row 3811's
+ * 459,630 requests projected to 71.5 MB, past Neon's 64 MiB response cap.
+ * Larger legacy timelines are scanned in Node from bounded text chunks.
+ */
+export const LEGACY_PROJECTION_MAX_REQUESTS = 250_000;
+
 type ChartRecord = Pick<
   RequestRecord,
   'cid' | 'phase' | 'start' | 'end' | 'ttftMs' | 'tpotMs' | 'isl' | 'osl' | 'cancelled'
 >;
+
+/** The request fields a chart tuple is built from. */
+const CHART_REQUEST_FIELDS: ReadonlySet<string> = new Set<keyof ChartRecord>([
+  'cid',
+  'phase',
+  'start',
+  'end',
+  'ttftMs',
+  'tpotMs',
+  'isl',
+  'osl',
+  'cancelled',
+]);
 
 function dictionaryIndex(value: string, values: string[], indices: Map<string, number>): number {
   const existing = indices.get(value);
@@ -81,52 +121,70 @@ function dictionaryIndex(value: string, values: string[], indices: Map<string, n
 const nanosecondsToMicroseconds = (value: number): number => Math.round(value / 1_000);
 const roundMilliseconds = (value: number | null): number | null =>
   value === null ? null : Math.round(value * 1_000) / 1_000;
+const nullableNumber = (value: unknown): number | null =>
+  typeof value === 'number' ? value : null;
 
-export function encodeRequestChartData(
-  timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
-  records: readonly ChartRecord[],
-): RequestChartDataWire {
+/**
+ * Dictionary-encode chart records one at a time, so a scanned timeline never
+ * needs an array of its records.
+ */
+function createRequestChartEncoder(): {
+  add: (record: ChartRecord) => void;
+  finish: (
+    timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
+  ) => RequestChartDataWire;
+} {
   const cids: string[] = [];
   const phases: string[] = [];
   const cidIndices = new Map<string, number>();
   const phaseIndices = new Map<string, number>();
   const requests: RequestChartTuple[] = [];
-
-  for (const record of records) {
-    requests.push([
-      dictionaryIndex(record.cid, cids, cidIndices),
-      dictionaryIndex(record.phase, phases, phaseIndices),
-      nanosecondsToMicroseconds(record.start),
-      nanosecondsToMicroseconds(record.end),
-      roundMilliseconds(record.ttftMs),
-      roundMilliseconds(record.tpotMs),
-      record.isl,
-      record.osl,
-      record.cancelled ? 1 : 0,
-    ]);
-  }
-
   return {
-    version: REQUEST_CHART_DATA_VERSION,
-    timelineVersion: timeline.version,
-    startNs: timeline.startNs,
-    endNs: timeline.endNs,
-    durationS: timeline.durationS,
-    cids,
-    phases,
-    requests,
+    add(record) {
+      requests.push([
+        dictionaryIndex(record.cid, cids, cidIndices),
+        dictionaryIndex(record.phase, phases, phaseIndices),
+        nanosecondsToMicroseconds(record.start),
+        nanosecondsToMicroseconds(record.end),
+        roundMilliseconds(record.ttftMs),
+        roundMilliseconds(record.tpotMs),
+        record.isl,
+        record.osl,
+        record.cancelled ? 1 : 0,
+      ]);
+    },
+    finish(timeline) {
+      return {
+        version: REQUEST_CHART_DATA_VERSION,
+        timelineVersion: timeline.version,
+        startNs: timeline.startNs,
+        endNs: timeline.endNs,
+        durationS: timeline.durationS,
+        cids,
+        phases,
+        requests,
+      };
+    },
   };
 }
 
-export async function getRequestChartData(
+export function encodeRequestChartData(
+  timeline: Pick<RequestTimeline, 'version' | 'startNs' | 'endNs' | 'durationS'>,
+  records: Iterable<ChartRecord>,
+): RequestChartDataWire {
+  const encoder = createRequestChartEncoder();
+  for (const record of records) encoder.add(record);
+  return encoder.finish(timeline);
+}
+
+async function projectLegacyRequestChartData(
   sql: DbClient,
-  benchmarkResultId: number,
+  traceReplayId: number,
 ): Promise<RequestChartDataWire | null> {
+  // The version predicate keeps a timeline that was converted and cleared
+  // since the metadata read from being returned as an empty chart.
   const rows = (await sql`
     select
-      atr.id as trace_replay_id,
-      (atr.profile_export_jsonl_gz is not null) as has_blob,
-      (atr.request_timeline->>'version')::int as timeline_version,
       (atr.request_timeline->>'startNs')::double precision as start_ns,
       (atr.request_timeline->>'endNs')::double precision as end_ns,
       (atr.request_timeline->>'durationS')::double precision as duration_s,
@@ -145,34 +203,124 @@ export async function getRequestChartData(
         from jsonb_array_elements(atr.request_timeline->'requests')
           with ordinality as expanded(request, ordinal)
       ), '[]'::jsonb) as requests
-    from benchmark_results br
-    join agentic_trace_replay atr on atr.id = br.trace_replay_id
-    where br.id = ${benchmarkResultId}
-  `) as unknown as RawChartRow[];
+    from agentic_trace_replay atr
+    where atr.id = ${traceReplayId}
+      and (atr.request_timeline->>'version')::int = ${REQUEST_TIMELINE_VERSION}
+  `) as unknown as RawProjectedChartRow[];
   const row = rows[0];
   if (!row) return null;
 
-  if (row.timeline_version !== null && Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
-    const records: ChartRecord[] = row.requests.map((request) => ({
-      cid: request[0],
-      phase: request[1],
-      start: Number(request[2]),
-      end: Number(request[3]),
-      ttftMs: request[4] === null ? null : Number(request[4]),
-      tpotMs: request[5] === null ? null : Number(request[5]),
-      isl: request[6] === null ? null : Number(request[6]),
-      osl: request[7] === null ? null : Number(request[7]),
-      cancelled: Boolean(request[8]),
-    }));
-    return encodeRequestChartData(
-      {
-        version: Number(row.timeline_version),
-        startNs: Number(row.start_ns ?? 0),
-        endNs: Number(row.end_ns ?? 0),
-        durationS: Number(row.duration_s ?? 0),
-      },
-      records,
-    );
+  const records: ChartRecord[] = row.requests.map((request) => ({
+    cid: request[0],
+    phase: request[1],
+    start: Number(request[2]),
+    end: Number(request[3]),
+    ttftMs: request[4] === null ? null : Number(request[4]),
+    tpotMs: request[5] === null ? null : Number(request[5]),
+    isl: request[6] === null ? null : Number(request[6]),
+    osl: request[7] === null ? null : Number(request[7]),
+    cancelled: Boolean(request[8]),
+  }));
+  return encodeRequestChartData(
+    {
+      version: REQUEST_TIMELINE_VERSION,
+      startNs: Number(row.start_ns ?? 0),
+      endNs: Number(row.end_ns ?? 0),
+      durationS: Number(row.duration_s ?? 0),
+    },
+    records,
+  );
+}
+
+/**
+ * Encode a current stored timeline by scanning it in Node: the gzip copy when
+ * `gzBytes` is non-null, else the legacy JSONB text. Only the chart fields of
+ * one request are held at a time. Logs and returns null when the stored
+ * timeline cannot be read.
+ */
+async function scanStoredRequestChartData(
+  sql: DbClient,
+  traceReplayId: number,
+  gzBytes: number | null,
+): Promise<RequestChartDataWire | null> {
+  const encoder = createRequestChartEncoder();
+  const addRequest = (request: ScannedRequest): void => {
+    encoder.add({
+      cid: String(request.cid),
+      phase: String(request.phase),
+      start: Number(request.start),
+      end: Number(request.end),
+      ttftMs: nullableNumber(request.ttftMs),
+      tpotMs: nullableNumber(request.tpotMs),
+      isl: nullableNumber(request.isl),
+      osl: nullableNumber(request.osl),
+      cancelled: request.cancelled === true,
+    });
+  };
+  let header: RequestTimelineHeader;
+  try {
+    header =
+      gzBytes === null
+        ? await scanRequestTimelineText(
+            legacyRequestTimelineText(sql, traceReplayId),
+            CHART_REQUEST_FIELDS,
+            addRequest,
+          )
+        : await scanRequestTimelineGz(
+            await readRequestTimelineGz(sql, traceReplayId, gzBytes),
+            CHART_REQUEST_FIELDS,
+            addRequest,
+          );
+  } catch (error) {
+    logRequestTimelineReadFailure(traceReplayId, error);
+    return null;
+  }
+  return encoder.finish({
+    version: Number(header.version),
+    startNs: Number(header.startNs ?? 0),
+    endNs: Number(header.endNs ?? 0),
+    durationS: Number(header.durationS ?? 0),
+  });
+}
+
+export async function getRequestChartData(
+  sql: DbClient,
+  benchmarkResultId: number,
+  legacyProjectionMaxRequests = LEGACY_PROJECTION_MAX_REQUESTS,
+): Promise<RequestChartDataWire | null> {
+  // The gzip copy wins whenever it exists and is never detoasted here. A
+  // legacy row's request count detoasts its JSONB, as reading its version does.
+  const rows = (await sql`
+    select
+      atr.id as trace_replay_id,
+      (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0) as has_blob,
+      octet_length(atr.request_timeline_gz) as gz_bytes,
+      case
+        when atr.request_timeline_gz is not null then atr.request_timeline_version::int
+        else (atr.request_timeline->>'version')::int
+      end as timeline_version,
+      case
+        when atr.request_timeline_gz is null
+          and jsonb_typeof(atr.request_timeline->'requests') = 'array'
+          then jsonb_array_length(atr.request_timeline->'requests')
+      end as legacy_request_count
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = ${benchmarkResultId}
+  `) as unknown as RawChartMetaRow[];
+  const row = rows[0];
+  if (!row) return null;
+
+  if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
+    const gzBytes = row.gz_bytes === null ? null : Number(row.gz_bytes);
+    if (
+      gzBytes === null &&
+      row.legacy_request_count !== null &&
+      Number(row.legacy_request_count) <= legacyProjectionMaxRequests
+    ) {
+      return projectLegacyRequestChartData(sql, row.trace_replay_id);
+    }
+    return scanStoredRequestChartData(sql, row.trace_replay_id, gzBytes);
   }
 
   if (!row.has_blob) return null;

@@ -25,7 +25,7 @@ export async function getTraceAvailability(
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = any(${benchmarkResultIds}::bigint[])
-      and atr.profile_export_jsonl_gz is not null
+      and (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
   `) as { id: number }[];
 
   const result: TraceAvailabilityMap = {};

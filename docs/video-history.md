@@ -8,7 +8,15 @@
 
 The projection groups all cells under the original source inside one artifact entry. It reuses `storedBundle`, `servingCells`, `storedFidelityBundle`, and the existing tradeoff calculations. Invalid or unavailable indexes remain explicit error entries. Original execution time comes from `ci.started_at`; index publication time is separate and must never be substituted for execution time. Original run IDs and export run IDs remain distinct.
 
+Two launchers produce the serving matrix, and `serving.ts` keys the contract on the manifest's `evidence_kind`. The legacy controlled GPU supervisor (`controlled_h3_gpu`) wrote `controlled_serving_smoke` receipts, device inventories, power-limit snapshots and fully timed request records. The native srt-slurm launcher (`srt_slurm_h3_service`, InferenceX #2916) writes `srt_slurm_h3_service_receipt` receipts that seal a `h3_native_power` document (`power.valid`, the receipt's `power.sha256` and the measurement phase must agree), per-cell InferenceX sidecars (`aggregate.json`, `benchmark_concurrency_<N>.json`; a `power_valid` of 0 or an `energy_normalization` other than `clips` withholds the number), and a matrix-level `power_verified` verdict shown on the source line. Native bundles name no GPU model: the projection reads `ci.site.gpu_model` when present, else the registry SKU in `ci.ci.runner_name`, else leaves the hardware empty. When an srt-client run record carries no per-request latency, the harness summary (`latency_median_seconds`, `valid_clips_per_second`, cross-checked against the matrix cell) stands in for P50 and throughput; P90 still needs the per-request population. Power that is not `valid` renders as not measured, never as a number.
+
 Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+
+## Publication and discovery
+
+The `publish-video-results` repository dispatch starts publication for its `source_run_id`; scheduled and manual catch-up use the same job. The publication job follows every catalog `nextPage`, including empty filtered pages, and deduplicates run/artifact IDs. Each per-run lookup reads all GitHub artifact pages. Standard `run-sweep.yml` runs join legacy H3 workflows in discovery; a sweep with no video artifact remains empty. An explicit `H3_RUN_ID` limits catch-up to one run. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails; timeout or failure is not proof that the catalog was fully processed.
+
+Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. Publishing still writes immutable objects before the index; history and Compare only read published indexes. Low-sample and failed sources remain history entries, without changing chart admission.
 
 The additive point contract also retains deployment/generation settings, hardware-health status, nullable per-dimension `quality`, original source ID/manifest SHA/source revision/artifact digest and independent fidelity/calibration/release labels. Old records with absent fields remain null. Quality scores require point-linked evaluator, rubric and calibration provenance; a history-level calibration label does not qualify its performance observations.
 
@@ -17,7 +25,7 @@ The additive point contract also retains deployment/generation settings, hardwar
 Serving imports accept `video-serving-<run>-<attempt>` alongside legacy H3 artifact names,
 using the same immutable `h3-video-media/v1` namespace and checksum checks. The generic
 serving matrix/evidence names are `video_serving_smoke_matrix`, `controlled_video_gpu` and
-`live_video`; these evidence tags must match the Wan model. H3 retains its legacy tags; both accept `operator_endpoint` request records under a verified model-specific supervisor. Paired H3 result/fidelity contracts are unchanged. Wan request duration derives from `frame_count / fps`; H3 retains its explicit requested duration.
+`live_video`; these generic supervised evidence tags must match the Wan model. Native selected-plan bundles keep H3 kind constants for both models. H3 retains its legacy tags; both accept `operator_endpoint` request records under a verified model-specific supervisor. Paired H3 result/fidelity contracts are unchanged. Wan request duration derives from `frame_count / fps`; H3 retains its explicit requested duration.
 `manifest.workload_plan.model_id` preserves a failed producer's identity without `result.json`.
 Wan's canonical ID is `Wan-AI/Wan2.2-T2V-A14B-Diffusers`; the old short ID is a selection alias.
 A contradictory result identity is rejected; trusted history retains the manifest identity and
@@ -63,9 +71,15 @@ For a developer's retained-data preview, `VIDEOGENX_REPLAY_DIR` supplies a local
 
 ## 中文说明
 
+`publish-video-results` repository dispatch 为指定 `source_run_id` 启动发布；定时任务和手动补发布复用同一任务。发布任务跟随所有 `nextPage`，包括筛选后为空的页面，并对运行和产物 ID 去重。单次运行会读取 GitHub 产物列表的全部分页；标准 `run-sweep.yml` 也进入发现列表，没有视频产物的 sweep 保持为空。`H3_RUN_ID` 可将补发布限定到一个运行。某个产物失败后仍尝试后续产物，但任务最终报告失败；超时或失败不代表完整处理了目录。
+
+原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。发布继续先写不可变对象、最后写索引；历史和 Compare 只读已发布索引。失败或低样本来源保留在历史中，不降低图表门槛。
+
 `/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 
 历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）、配置的 `tp_size` / `ulysses_degree` / `attention_backend`，以及端点的副本数（`execution.deployment.replica_count`，早于该记录的产物包为 null）；`workloadKey` 在信息完整时保留完整工作负载身份，prompts 与 seeds 不能由缩写显示标签替代。这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板最多读取五页，并据此推导全部指标，浏览器不再解析产物包。
+
+serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` 区分契约：旧的受控 GPU supervisor（`controlled_h3_gpu`）写入 `controlled_serving_smoke` 回执、设备清单、功率上限快照和带完整计时的请求记录；原生 srt-slurm launcher（`srt_slurm_h3_service`，InferenceX #2916）写入 `srt_slurm_h3_service_receipt` 回执，并对 `h3_native_power` 功率文档做封印（`power.valid`、回执中的 `power.sha256` 与测量阶段必须一致），同时附带每个 cell 的 InferenceX sidecar（`aggregate.json`、`benchmark_concurrency_<N>.json`；`power_valid` 为 0 或 `energy_normalization` 不是 `clips` 时不显示对应数值），矩阵级的 `power_verified` 结论显示在来源行。原生产物包不记录 GPU 型号：投影优先读取 `ci.site.gpu_model`，其次从 `ci.ci.runner_name` 中识别注册表 SKU，都没有时硬件留空。srt-client 的运行记录没有逐请求延迟时，以 harness 汇总（`latency_median_seconds`、`valid_clips_per_second`，并与矩阵 cell 交叉核对）代替 P50 与吞吐量；P90 仍需要逐请求样本。功率未通过 `valid` 校验时一律显示为未测得，不显示数字。
 
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
@@ -90,3 +104,7 @@ For a developer's retained-data preview, `VIDEOGENX_REPLAY_DIR` supplies a local
 manifest 冲突时会报错，不会归入 H3。计划计数须来自已封存的初始 `serving-smoke.json`，
 未知值保持 null。纯视频产物可不含音频；进入图表仍须满足原有 GPU 执行、工作负载、
 媒体哈希和样本数要求。
+
+### Native model and engine provenance
+
+Native selected-plan bundles keep the legacy H3 bundle, receipt, matrix and power kind constants for both H3 and Wan. The sealed workload model identifies the model; a filename prefix does not. New `producer` projections validate the manifest and matrix engine name/revision and selected plan SHA against each retained run and job. The selected YAML plan hash is separate from the execution spec hash. Failed sources can retain their sealed requested model/engine identity without a successful measurement.

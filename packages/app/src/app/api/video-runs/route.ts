@@ -1,3 +1,5 @@
+import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
+import type { CIArtifact } from '@/components/video-benchmark/archive';
 import { type NextRequest, NextResponse } from 'next/server';
 import {
   GITHUB_API_BASE,
@@ -5,8 +7,8 @@ import {
   GITHUB_REPO,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { getGithubToken } from '@/lib/github-artifacts';
-import { loadFixture } from '@/lib/test-fixtures';
+import { getGithubToken } from '@/lib/github/github-artifacts';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { readVideoReplay } from '@/lib/video-replay';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
@@ -15,7 +17,7 @@ import {
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
-} from '@/lib/video-storage';
+} from '@/lib/video/video-storage';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -23,8 +25,6 @@ const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
-const artifactName =
-  /^(?:h3-(?:results|video|fidelity)|video-serving)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
 function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
@@ -50,7 +50,8 @@ export async function GET(request: NextRequest) {
     (runId && !id(runId)) ||
     (artifactId && (!runId || !id(artifactId))) ||
     !id(page) ||
-    (history && (runId || artifactId || !Number.isSafeInteger(Number(page))))
+    !Number.isSafeInteger(Number(page)) ||
+    (history && (runId || artifactId))
   )
     return NextResponse.json(
       { error: 'Invalid CI run, artifact or page' },
@@ -141,8 +142,8 @@ export async function GET(request: NextRequest) {
           { status: metaResponse.status, headers },
         );
       const artifact = await metaResponse.json();
-      const name = artifactName.exec(artifact.name ?? '');
-      if (!name || name.groups?.runId !== runId || String(artifact.workflow_run?.id) !== runId)
+      const name = videoArtifactIdentity(artifact.name ?? '');
+      if (!name || name.run !== runId || String(artifact.workflow_run?.id) !== runId)
         return NextResponse.json(
           { error: 'Artifact does not belong to this H3 run' },
           { status: 404, headers },
@@ -185,7 +186,7 @@ export async function GET(request: NextRequest) {
       return new Response(stream, { headers: { ...headers, 'Content-Type': 'application/zip' } });
     }
     if (runId) {
-      const [runResponse, artifactsResponse, saved] = await Promise.all([
+      const [runResponse, firstArtifactsResponse, saved] = await Promise.all([
         github(`/actions/runs/${runId}`),
         github(`/actions/runs/${runId}/artifacts?per_page=100`),
         storedArtifacts(runId).catch(() => []),
@@ -195,13 +196,24 @@ export async function GET(request: NextRequest) {
           { error: 'CI run unavailable' },
           { status: runResponse.status, headers },
         );
-      if (!artifactsResponse.ok)
-        return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
-      const data = await artifactsResponse.json();
-      const artifacts = (data.artifacts ?? []).filter((a: { name: string }) => {
-        const match = artifactName.exec(a.name);
-        return match?.groups?.runId === runId;
-      });
+      const artifacts: CIArtifact[] = [];
+      const seen = new Set<number>();
+      let artifactsResponse = firstArtifactsResponse;
+      for (let artifactPage = 1; ; artifactPage++) {
+        if (!artifactsResponse.ok)
+          return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
+        const data: { artifacts: CIArtifact[] } = await artifactsResponse.json();
+        for (const artifact of data.artifacts ?? []) {
+          if (videoArtifactIdentity(artifact.name)?.run !== runId || seen.has(artifact.id))
+            continue;
+          seen.add(artifact.id);
+          artifacts.push(artifact);
+        }
+        if ((data.artifacts?.length ?? 0) < 100) break;
+        artifactsResponse = await github(
+          `/actions/runs/${runId}/artifacts?per_page=100&page=${artifactPage + 1}`,
+        );
+      }
       for (const stored of saved) {
         const index = artifacts.findIndex((a: { id: number }) => a.id === stored.id);
         if (index === -1) artifacts.push(stored);
@@ -222,6 +234,7 @@ export async function GET(request: NextRequest) {
         runs: runs.filter(
           (run: { name: string; display_title: string; path: string }) =>
             (run.path === '.github/workflows/e2e-tests.yml' && /\bh3\b/iu.test(run.name)) ||
+            run.path === '.github/workflows/run-sweep.yml' ||
             run.path === '.github/workflows/h3-video.yml' ||
             run.path === '.github/workflows/h3-fidelity.yml',
         ),

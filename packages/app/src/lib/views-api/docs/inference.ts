@@ -1,5 +1,5 @@
-import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -9,7 +9,7 @@ import {
   objectSchema,
   arraySchema,
   listParam,
-} from '@/lib/api-documentation-helpers';
+} from '@/lib/api/api-documentation-helpers';
 
 /**
  * Docs fragment for GET /api/v1/views/inference.
@@ -82,11 +82,23 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
+      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
     ),
-    schema: { type: 'string', enum: X_MODE_ENUM, default: 'interactivity' },
+    schema: { type: 'string', enum: X_MODE_ENUM },
     example: 'e2e',
+  },
+  {
+    name: 'xstat',
+    location: 'query',
+    required: false,
+    type: 'enum',
+    description: text(
+      'Fixed-sequence service-axis statistic: median (default) or mean. Mean streaming speed is 1 / mean TPOT, not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their recorded mean fields. Missing values are omitted, never replaced with median. Ignored for AgentX; params.xstat then resolves to null and xAxis.statistic records the effective percentile.',
+      '固定长度工作负载服务轴的统计量：median（默认）或 mean。Mean streaming speed 为 1 / mean TPOT，不是各请求速度的算术平均；mean TTFT 和 E2E 使用各自记录的均值。缺失时不回退到 median。AgentX 不使用此参数，params.xstat 为 null，xAxis.statistic 返回实际分位数。',
+    ),
+    schema: { type: 'string', enum: ['mean', 'median'], default: 'median' },
+    example: 'mean',
   },
   {
     name: 'xmetric',
@@ -143,8 +155,8 @@ const parameters: readonly ApiParameter[] = [
   listParam(
     'gpus',
     text(
-      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey).',
-      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。',
+      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey). When omitted, Qwen3.5 excludes MI300X, MI325X, H100, and H200. An explicit list overrides this default; gpus= includes all hardware.',
+      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。省略时，Qwen3.5 排除 MI300X、MI325X、H100 和 H200。显式列表覆盖此默认值；gpus= 包含所有硬件。',
     ),
     'h200,mi355x',
   ),
@@ -191,10 +203,82 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Return only the best series per GPU SKU. Default depends on model and sequence, matching the dashboard.',
-      '仅返回每个 GPU SKU 的最优曲线（对应仪表盘 “Best per SKU” 开关）。',
+      'Defaults to true: rank candidate frameworks per SKU within the selected precisions, using the current axes and shared measured range. An unselected precision cannot displace a visible configuration. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：仅在选定精度内，按当前坐标轴和共同实测区间对每个 SKU 的候选框架进行排名。未选中的精度不会挤掉当前可见的配置。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
-    schema: { type: 'boolean' },
+    schema: { type: 'boolean', default: true },
+    example: 'true',
+  },
+  {
+    name: 'serviceCompare',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. No corresponding dashboard control or panel. JSON only.',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
+    name: 'serviceBaseline',
+    location: 'query',
+    required: false,
+    type: 'string',
+    description: text(
+      'Exact baseline key from serviceSources. Omitted selects the first deterministic source; an unknown explicit key remains unavailable. Percent change is 100 × (comparator / baseline − 1).',
+      'serviceSources 中的完整基准来源键。省略时按确定性顺序选择首项；显式未知键保持不可用。变化百分比为 100 ×（对比值 / 基准值 − 1）。',
+    ),
+    schema: stringSchema,
+    example: 'Exact key returned in serviceSources',
+  },
+  {
+    name: 'serviceComparator',
+    location: 'query',
+    required: false,
+    type: 'string',
+    description: text(
+      'Exact comparator key from serviceSources. Omitted selects the second deterministic source. Keys retain hardware, curve snapshot, recipe, image, topology and workload identity. Stitched telemetry producer/exporter hashes do not split a snapshot; rows without one retain their own run, date and hashes. Never substitute a hardware name.',
+      'serviceSources 中的完整对比来源键。省略时按确定性顺序选择第二项。来源键保留硬件、曲线快照、测试配置指纹、镜像、拓扑和工作负载标识。同一快照内不同 telemetry producer/exporter 的 hash 不拆分来源；没有快照的行仍按原运行、日期和 hash 区分。不能用硬件名称代替。',
+    ),
+    schema: stringSchema,
+    example: 'Exact key returned in serviceSources',
+  },
+  {
+    name: 'serviceTarget',
+    location: 'query',
+    required: false,
+    type: 'number',
+    description: text(
+      'Positive finite service-axis target: tok/s/user for streaming speed, seconds for TTFT/E2E. Omitted returns the curve and null target comparison. Numerical linear interpolation is bounded by each exact source; no extrapolation or interpolation across missing metric endpoints. Concurrency is unsupported.',
+      '有限正数服务轴目标：streaming speed 单位为 tok/s/user，TTFT/E2E 单位为秒。省略时返回曲线，目标值对比为 null。仅在各完整来源的实测范围内做数值线性插值，不外推、不跨越缺失指标端点。并发轴不适用。',
+    ),
+    schema: { type: 'number', minimum: Number.MIN_VALUE },
+    example: 40,
+  },
+  {
+    name: 'roleShare',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include validated disaggregated prefill/decode energy shares on one output-token denominator, plus rolePoints with each pool’s W/GPU and role-local energy. Uses same-window aggregate J/output ÷ J/input to convert prefill J/input; share denominator is reconstructed prefill + decode energy, not pool-local token counts. Missing/invalid data is omitted or null. JSON only.',
+      '返回通过验证的分离式 prefill/decode 能耗占比，统一使用 output token 分母；rolePoints 另含各池的 W/GPU 和按本池 token 计的能耗。用同窗口总 J/output ÷ J/input 将 prefill J/input 转换为 J/output；占比分母为重建的 prefill + decode 能耗，不使用各池独立的 token 数。缺失或无效的数据会被省略或返回 null，仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
+    name: 'powerFit',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include one ordinary least-squares line per source: measured mean W/GPU = P0 + m × output tok/s per allocated GPU (disaggregated output spread over prefill and decode GPUs). P0 is the zero-output intercept, not measured idle power; m is marginal J/output token. Sources with fewer than 3 distinct output rates return observations with fit null. JSON only.',
+      '按数据源分别返回普通最小二乘拟合：实测平均 W/GPU = P0 + m × 每个已分配 GPU 的输出 tok/s（分离式部署的输出量均摊到 prefill 和 decode GPU）。P0 是零输出截距，不是实测空载功耗；m 是每个输出 token 的边际能耗（J）。不同输出速率少于 3 个的数据源返回观测点，fit 为 null。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
     example: 'true',
   },
   {
@@ -203,8 +287,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one flat row per point.',
-      '响应编码。csv 为每个数据点返回一行平面数据。',
+      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare and powerFit analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare 和 powerFit 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -218,6 +302,7 @@ const pointSchema = objectSchema(
     x: numberSchema,
     y: numberSchema,
     concurrency: numberSchema,
+    topologyKey: stringSchema,
     tp: numberSchema,
     date: { type: 'string', format: 'date' },
     runId: integerSchema,
@@ -225,7 +310,7 @@ const pointSchema = objectSchema(
     bestPerSku: booleanSchema,
     metrics: { type: 'object', additionalProperties: numberSchema },
   },
-  ['x', 'y', 'concurrency', 'tp', 'date', 'frontier', 'bestPerSku', 'metrics'],
+  ['x', 'y', 'concurrency', 'topologyKey', 'tp', 'date', 'frontier', 'bestPerSku', 'metrics'],
 );
 
 const seriesSchema = objectSchema(
@@ -254,6 +339,140 @@ const seriesSchema = objectSchema(
   ],
 );
 
+const tableRowSchema = objectSchema(
+  {
+    ...pointSchema.properties,
+    id: { type: ['integer', 'null'] },
+    hwKey: stringSchema,
+    gpu: stringSchema,
+    framework: stringSchema,
+    specMethod: stringSchema,
+    label: stringSchema,
+    vendor: stringSchema,
+    deployment: stringSchema,
+    kvOffload: booleanSchema,
+    x: { type: ['number', 'null'], description: 'Selected service axis; null when unavailable.' },
+    y: { type: ['number', 'null'], description: 'Selected all-in metric; null when unavailable.' },
+    measuredGpuWatts: { ...numberSchema, description: 'Validated measured mean W/GPU.' },
+    status: { type: 'string', enum: ['available', 'unavailable'] },
+    unavailableReason: {
+      oneOf: [
+        {
+          type: 'string',
+          enum: [
+            'workload',
+            'hardware',
+            'telemetry',
+            'gpu-count',
+            'topology',
+            'role-power',
+            'model-domain',
+            'energy',
+            'model-unavailable',
+          ],
+        },
+        { type: 'null' },
+      ],
+    },
+  },
+  [
+    'id',
+    'precision',
+    'hwKey',
+    'gpu',
+    'framework',
+    'specMethod',
+    'label',
+    'deployment',
+    'kvOffload',
+    'x',
+    'y',
+    'concurrency',
+    'topologyKey',
+    'tp',
+    'date',
+    'frontier',
+    'bestPerSku',
+    'metrics',
+    'measuredGpuWatts',
+    'status',
+    'unavailableReason',
+  ],
+);
+
+const sourceSchema = objectSchema({ key: stringSchema, label: stringSchema }, ['key', 'label']);
+const identitySchema = objectSchema({
+  id: { type: ['integer', 'null'] },
+  sourceKey: stringSchema,
+  hwKey: stringSchema,
+  precision: stringSchema,
+  concurrency: numberSchema,
+  topologyKey: stringSchema,
+  date: stringSchema,
+  runUrl: { type: ['string', 'null'] },
+  recipeFingerprint: { type: ['string', 'null'] },
+  image: { type: ['string', 'null'] },
+});
+const estimateSchema = {
+  ...objectSchema({
+    value: numberSchema,
+    interpolated: booleanSchema,
+    endpoints: arraySchema(
+      objectSchema({ x: numberSchema, value: numberSchema, point: identitySchema }),
+    ),
+  }),
+  type: ['object', 'null'] as const,
+};
+const serviceMetricSchema = objectSchema({
+  baseline: estimateSchema,
+  comparator: estimateSchema,
+  changePercent: { type: ['number', 'null'] },
+  reason: stringSchema,
+});
+const comparisonSchema = objectSchema({
+  target: numberSchema,
+  xField: stringSchema,
+  baseline: { ...sourceSchema, type: ['object', 'null'] },
+  comparator: { ...sourceSchema, type: ['object', 'null'] },
+  reason: stringSchema,
+  metrics: objectSchema({
+    meanWattsPerGpu: { ...serviceMetricSchema, description: 'Mean measured GPU board W/GPU.' },
+    outputTokensPerSecond: {
+      ...serviceMetricSchema,
+      description:
+        'Whole-deployment output tokens/s; disaggregated GPU-count normalization preserves the workload denominator.',
+    },
+    joulesPerOutputToken: {
+      ...serviceMetricSchema,
+      description: 'Validated measured GPU joules per output token.',
+    },
+  }),
+});
+
+const nullableNumber = (description: string) => ({
+  type: ['number', 'null'] as const,
+  description,
+});
+const matchedValuesSchema = objectSchema({
+  joulesPerOutputToken: { type: ['number', 'null'] },
+  meanWattsPerGpu: { type: ['number', 'null'] },
+  interactivity: { type: ['number', 'null'] },
+});
+const matchedSideSchema = objectSchema(
+  {
+    status: {
+      type: 'string',
+      enum: ['observed', 'missing', 'ambiguous'],
+      description:
+        'observed: one agreeing observation; missing: none at this concurrency; ambiguous: conflicting observations, none chosen.',
+    },
+    values: matchedValuesSchema,
+    point: identitySchema,
+    points: arraySchema(identitySchema),
+  },
+  ['status'],
+);
+
 const responseSchema = objectSchema(
   {
     view: { type: 'string', enum: ['inference'] },
@@ -274,7 +493,12 @@ const responseSchema = objectSchema(
       },
       ['key', 'configKey', 'label', 'labelZh'],
     ),
-    xAxis: objectSchema({ mode: stringSchema, field: stringSchema, label: stringSchema }),
+    xAxis: objectSchema({
+      mode: stringSchema,
+      field: stringSchema,
+      label: stringSchema,
+      statistic: stringSchema,
+    }),
     frontier: objectSchema({
       direction: {
         type: ['string', 'null'],
@@ -290,10 +514,108 @@ const responseSchema = objectSchema(
       ]),
     ),
     series: arraySchema(seriesSchema),
+    tableRows: {
+      ...arraySchema(tableRowSchema),
+      description:
+        'All in Measured only: GPU-valid observations in the selected scope, including unavailable estimates. Honors hardware/best selection; under best=true, SKUs with no rankable estimate keep their rows. Not clipped by optimal or chart axes. Also returned per comparison and overlay. count remains the numeric series point count.',
+    },
     count: integerSchema,
+    serviceSources: arraySchema(sourceSchema),
+    equalServiceComparison: { ...comparisonSchema, type: ['object', 'null'] },
+    equalServiceCurve: arraySchema(comparisonSchema),
+    roleEnergyShares: arraySchema(
+      objectSchema({
+        x: numberSchema,
+        sourceKey: stringSchema,
+        point: identitySchema,
+        prefill: { ...numberSchema, description: 'Prefill energy in J/output token.' },
+        decode: { ...numberSchema, description: 'Decode energy in J/output token.' },
+        total: {
+          ...numberSchema,
+          description: 'Reconstructed prefill + decode energy in J/output token.',
+        },
+        prefillShare: {
+          ...numberSchema,
+          description: 'Prefill percentage of reconstructed total.',
+        },
+        decodeShare: { ...numberSchema, description: 'Decode percentage of reconstructed total.' },
+      }),
+    ),
+    matchedConcurrency: objectSchema({
+      baseline: { ...sourceSchema, type: ['object', 'null'] },
+      comparator: { ...sourceSchema, type: ['object', 'null'] },
+      interactivityField: stringSchema,
+      reason: { type: 'string', enum: ['same-source', 'unknown-source'] },
+      rows: arraySchema(
+        objectSchema({
+          concurrency: integerSchema,
+          baseline: matchedSideSchema,
+          comparator: matchedSideSchema,
+          changePercent: {
+            ...matchedValuesSchema,
+            description:
+              '100 × (comparator / baseline − 1); null unless both values were observed.',
+          },
+        }),
+      ),
+    }),
+    rolePoints: arraySchema(
+      objectSchema({
+        x: numberSchema,
+        sourceKey: stringSchema,
+        point: identitySchema,
+        prefillWattsPerGpu: nullableNumber('Mean W/GPU inside the prefill pool.'),
+        decodeWattsPerGpu: nullableNumber('Mean W/GPU inside the decode pool.'),
+        prefillJoulesPerInputToken: nullableNumber('Prefill-pool joules per input token.'),
+        decodeJoulesPerOutputToken: nullableNumber('Decode-pool joules per output token.'),
+        energy: {
+          ...objectSchema({
+            prefill: numberSchema,
+            decode: numberSchema,
+            total: numberSchema,
+            prefillShare: numberSchema,
+          }),
+          type: ['object', 'null'],
+          description: 'Both pools on the output-token denominator (J/output token, share %).',
+        },
+      }),
+    ),
+    powerFits: arraySchema(
+      objectSchema({
+        source: sourceSchema,
+        tdpWatts: nullableNumber('Rated board TDP per GPU; P0 ÷ TDP = fit.intercept / tdpWatts.'),
+        fit: {
+          ...objectSchema({
+            intercept: { ...numberSchema, description: 'P0, W/GPU at zero output (extrapolated).' },
+            slope: { ...numberSchema, description: 'm, J per output token.' },
+            rSquared: { type: ['number', 'null'] },
+            n: integerSchema,
+            xMin: numberSchema,
+            xMax: numberSchema,
+          }),
+          type: ['object', 'null'],
+        },
+        reason: { type: 'string', enum: ['too-few-points'] },
+        observations: arraySchema(
+          objectSchema({
+            x: { ...numberSchema, description: 'Output tok/s per allocated GPU.' },
+            y: { ...numberSchema, description: 'Measured mean W/GPU.' },
+            point: identitySchema,
+          }),
+        ),
+      }),
+    ),
     pricing: { type: ['object', 'null'], additionalProperties: true },
-    comparisons: arraySchema({ type: 'object', additionalProperties: true }),
-    overlays: arraySchema({ type: 'object', additionalProperties: true }),
+    comparisons: arraySchema({
+      type: 'object',
+      properties: { tableRows: arraySchema(tableRowSchema) },
+      additionalProperties: true,
+    }),
+    overlays: arraySchema({
+      type: 'object',
+      properties: { tableRows: arraySchema(tableRowSchema) },
+      additionalProperties: true,
+    }),
   },
   ['view', 'apiVersion', 'params', 'metric', 'xAxis', 'frontier', 'series', 'count'],
 );
@@ -307,6 +629,7 @@ const responseExample = {
     precisions: ['fp8'],
     metric: 'y_tpPerGpu',
     xmode: 'interactivity',
+    xstat: 'median',
     xmetric: 'p90_ttft',
     percentile: 'p90',
     date: null,
@@ -316,9 +639,16 @@ const responseExample = {
     frameworks: [],
     deployment: [],
     spec: [],
+    topologies: [],
     optimal: true,
     best: true,
     format: 'json',
+    serviceCompare: false,
+    serviceBaseline: null,
+    serviceComparator: null,
+    serviceTarget: null,
+    roleShare: false,
+    powerFit: false,
   },
   metric: {
     key: 'tpPerGpu',
@@ -332,6 +662,7 @@ const responseExample = {
   xAxis: {
     mode: 'interactivity',
     field: 'median_intvty',
+    statistic: 'median',
     label: 'Median Interactivity (tok/s/user)',
   },
   frontier: { direction: 'upper_left', points: 14 },
@@ -352,6 +683,7 @@ const responseExample = {
           x: 12.5,
           y: 450.5,
           concurrency: 64,
+          topologyKey: 'Single|GPU=8|DP=?|TP=8|EP=1|PP=?|DCP=?|PCP=?|DPA=0|offload=off',
           tp: 8,
           date: '2026-08-20',
           runId: 12345678,
@@ -380,7 +712,7 @@ const responses: readonly ApiResponse[] = [
         mediaType: 'text/csv',
         schema: stringSchema,
         example:
-          'hwKey,gpu,framework,specMethod,label,vendor,deployment,kvOffload,x,y,concurrency,tp,date,runId,frontier,bestPerSku,metric_tpPerGpu\r\nh200_trt,h200,trt,none,H200 (TRTLLM),NVIDIA,single-node,false,12.5,450.5,64,8,2026-08-20,12345678,true,true,450.5',
+          'hwKey,gpu,framework,specMethod,label,vendor,deployment,kvOffload,x,y,concurrency,topologyKey,tp,date,runId,frontier,bestPerSku,metric_tpPerGpu\r\nh200_trt,h200,trt,none,H200 (TRTLLM),NVIDIA,single-node,false,12.5,450.5,64,Single|GPU=8|DP=?|TP=8|EP=1|PP=?|DCP=?|PCP=?|DPA=0|offload=off,8,2026-08-20,12345678,true,true,450.5',
       },
     ],
   },
@@ -421,8 +753,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/inference',
     summary: text('Get the main inference chart view', '获取主推理图表视图'),
     description: text(
-      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection.',
-      '返回 /inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。',
+      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection. All in Measured watts and energy support single_turn and AgentX rows with validated telemetry and supported topology; AgentX uses the power model’s agentic workload state without independent workload calibration. All in Measured adds tableRows with every GPU-valid observation in the selected scope and best-series selection (SKUs with no rankable estimate keep their rows), before optimal or axis clipping; unavailable estimates have y=null and a reason. series and count remain numeric chart points.',
+      '返回 /inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。整体实测功耗及能耗支持遥测已验证、拓扑受支持的 single_turn 和 AgentX 数据；AgentX 采用功耗模型的智能体工作负载状态，尚未针对该工作负载单独校准。整体实测指标另返回 tableRows，保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点（没有可排名估算的 SKU 保留其全部观测点），不按 optimal 或坐标轴显示范围裁剪；估算不可用时 y 为 null，并给出原因。series 和 count 仍仅包含可绘制的数值点。',
     ),
     audience: 'public',
     stability: 'beta',

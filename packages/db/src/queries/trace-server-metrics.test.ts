@@ -44,6 +44,18 @@ function metaRow(overrides: Record<string, unknown> = {}) {
     precision: 'fp8',
     spec_method: 'none',
     disagg: true,
+    is_multinode: true,
+    prefill_tp: 4,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 2,
+    decode_tp: 16,
+    decode_ep: 16,
+    decode_dp_attention: true,
+    decode_num_workers: 4,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 64,
+    recipe_fingerprint: 'exact-fingerprint',
     conc: 128,
     offload_mode: 'off',
     kv_offloading: null,
@@ -99,6 +111,19 @@ describe('getTraceServerMetrics', () => {
       kv_p2p_transfer: 'mooncake',
       router_name: 'vllm-router',
       router_version: '0.1.14',
+    });
+    expect(result?.meta).toMatchObject({
+      prefill_tp: 4,
+      prefill_ep: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 2,
+      decode_tp: 16,
+      decode_ep: 16,
+      decode_dp_attention: true,
+      decode_num_workers: 4,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 64,
+      recipe_fingerprint: 'exact-fingerprint',
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');

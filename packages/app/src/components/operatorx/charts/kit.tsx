@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart, type D3ChartHandle, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
+import { escapeHtml } from '@/lib/shared/utils';
 
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';

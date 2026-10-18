@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchBenchmarkHistory } from '@/lib/api';
-import { withSupplementalBenchmarkHistory } from '@/lib/supplemental-benchmarks';
+import { fetchBenchmarkHistory } from '@/lib/api/api';
+import { withSupplementalBenchmarkHistory } from '@/lib/benchmarks/supplemental-benchmarks';
 
 /**
  * Full benchmark history for one model + sequence — every run date, not just

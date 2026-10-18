@@ -7,28 +7,13 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese landing content', () => {
-      cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
+      cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
       // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
       // landing-page.tsx; the card and its Chinese strings still exist in the
       // source, so assert it is not rendered rather than dropping the check.
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
-    });
-
-    it('sets hreflang alternates to the English homepage', () => {
-      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
-      cy.get('link[rel="alternate"][hreflang="zh-CN"]').should('exist');
-    });
-
-    it('header language toggle points back to English', () => {
-      cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/');
-    });
-
-    it('header links to the Chinese AgentX page', () => {
-      cy.get('[data-testid="nav-link-agentx"]')
-        .should('contain.text', 'AgentX')
-        .and('have.attr', 'href', '/zh/agentx');
     });
 
     it('renders the AgentX hero on the Chinese landing page', () => {
@@ -41,18 +26,18 @@ describe('Chinese (/zh) pages', () => {
           .should('have.text', '仪表板')
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-        // Ledger NEW pills localize to 新 on the Chinese landing page.
+        // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
-        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-          .should('have.length', 3)
-          .each(($badge) => expect($badge.text()).to.equal('新'));
+        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
+          'not.exist',
+        );
       });
     });
 
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
-        'InferenceX 持续开展开源的 agentic 推理基准测试',
+        'InferenceX 持续开展开源的 AI 加速器系统基准测试',
       );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '业界评价')
@@ -85,9 +70,7 @@ describe('Chinese (/zh) pages', () => {
         cy.contains('h1', '智能体推理基准测试').should('exist');
         cy.contains('长上下文、多轮').should('exist');
       });
-    });
 
-    it('tab nav shows Chinese labels linking within /zh', () => {
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
@@ -127,17 +110,6 @@ describe('Chinese (/zh) pages', () => {
         expect(answer.right).to.be.at.most(390);
       });
       cy.viewport(1280, 720);
-    });
-  });
-
-  describe('zh blog', () => {
-    before(() => {
-      cy.visit('/zh/blog');
-    });
-
-    it('renders the Chinese blog listing', () => {
-      cy.contains('h2', '文章').should('exist');
-      cy.get('a[href^="/zh/blog/"]').should('have.length.gte', 1);
     });
   });
 
@@ -267,16 +239,6 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
     });
 
-    it('renders translated content with Chinese chrome', () => {
-      cy.get('article.prose').should('exist');
-      cy.contains('预计阅读').should('exist');
-      cy.get('a[href="/zh/blog"]').should('exist');
-    });
-
-    it('links to the English original', () => {
-      cy.get('a[href="/blog/inferencemax-open-source-inference-benchmarking"]').should('exist');
-    });
-
     it('localizes the table of contents and heading-link controls at mobile widths', () => {
       cy.viewport(390, 844);
       cy.get('details[aria-label="本页目录"]')
@@ -335,9 +297,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders KaTeX in the translation too', () => {
       cy.get('article.prose .katex').should('have.length.gte', 1);
-    });
 
-    it('keeps figures and their Chinese captions', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
       cy.get('article.prose figcaption').first().should('contain.text', '来源');
     });

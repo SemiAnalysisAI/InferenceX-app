@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import * as d3 from 'd3';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 
 import {
   POINTS,
@@ -125,41 +127,6 @@ describe('ScatterGraph toggle decoration', () => {
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
     unmount();
-  });
-
-  it('rings legacy-power points only on Measured Energy axes', () => {
-    const legacy = {
-      ...point('h100', 'fp8', 10, 100, 1),
-      power_tier: 'legacy',
-    } as InferenceData;
-    const certified = {
-      ...point('h100', 'fp8', 20, 200, 2),
-      power_tier: 'certified',
-    } as InferenceData;
-    const tierless = point('h100', 'fp8', 40, 400, 4);
-
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y_measuredAvgPower',
-    };
-    const measured = mountChart({ data: [legacy, certified, tierless] });
-    const groups = dotGroups(measured.container);
-
-    expect(groups[0].querySelector('.legacy-power-ring')).not.toBeNull();
-    expect(groups[1].querySelector('.legacy-power-ring')).toBeNull();
-    expect(groups[2].querySelector('.legacy-power-ring')).toBeNull();
-    // The legend key lives in ChartDisplay's axis-metric footer, not the chart.
-    expect(measured.container.querySelector('[data-testid="legacy-power-key"]')).toBeNull();
-    measured.unmount();
-
-    // Non-measured axis: the same legacy point renders without a ring.
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y',
-    };
-    const throughput = mountChart({ data: [legacy, certified, tierless] });
-    expect(throughput.container.querySelectorAll('.legacy-power-ring')).toHaveLength(0);
-    throughput.unmount();
   });
 
   it('reads current trace availability without changing metric identity', () => {
@@ -446,5 +413,49 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline.getAttribute('d')).not.toBe(pathBefore);
     expect(b200Dot.getAttribute('transform')).not.toBe(transformBefore);
     unmount();
+  });
+});
+
+function pointGroup() {
+  const svg = d3.create('svg:svg');
+  return svg.append('g') as unknown as d3.Selection<SVGGElement, InferenceData, null, undefined>;
+}
+
+function recordCount(root: Node, run: () => void): number {
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(root, { attributes: true, childList: true, subtree: true });
+  run();
+  const count = observer.takeRecords().length;
+  observer.disconnect();
+  return count;
+}
+
+const offloaded = { offload_mode: 'on' } as InferenceData;
+
+describe('offload halo decoration', () => {
+  it('draws the offload halo', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    expect(group.select('.offload-halo').attr('stroke')).toBe('red');
+    expect(group.select('.offload-halo').attr('stroke-dasharray')).toBe('3 2');
+  });
+
+  it('writes nothing when re-rendered with the same state', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    expect(recordCount(group.node()!, () => renderOffloadHalo(group, offloaded, 'red'))).toBe(0);
+  });
+
+  it('restyles and removes on real changes', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    renderOffloadHalo(group, offloaded, 'blue');
+    expect(group.select('.offload-halo').attr('stroke')).toBe('blue');
+
+    renderOffloadHalo(group, { offload_mode: 'off' } as InferenceData, 'blue');
+    expect(group.select('.offload-halo').empty()).toBe(true);
   });
 });

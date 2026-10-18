@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { servingFixture, wanServingFixture } from './serving.fixture';
 import { at, entries, type Json } from './bundle';
 import { videoHistoryEntry } from './history';
-import { videoModelHistory } from './models';
+import { projectVideoHistoryForModel } from './models';
 import type { StoredArtifact } from './stored';
 
 function saved(
@@ -86,6 +86,17 @@ describe('video history projection', () => {
     const source = entry.sources[0];
     expect(source.observedAt).toBe('2026-09-09T01:00:00Z');
     expect(source.releaseQualified).toBe(false);
+    expect(source.serving?.[0]).toMatchObject({
+      cell: 'c1',
+      scheduled: 4,
+      attempted: 4,
+      completed: 4,
+      valid: 4,
+      unjudged: 4,
+      failed: 0,
+      notStarted: 0,
+      qualitySloGoodput: null,
+    });
     expect(
       source.observations.map((point) => [
         point.concurrency,
@@ -229,26 +240,6 @@ describe('source-bound dashboard evidence', () => {
 });
 
 describe('planned serving population', () => {
-  it('projects successful measured requests without treating valid media as judged quality', () => {
-    const source = videoHistoryEntry(saved(20), null).sources[0];
-    expect(source).toHaveProperty(
-      'serving',
-      expect.arrayContaining([
-        expect.objectContaining({
-          cell: 'c1',
-          scheduled: 20,
-          attempted: 20,
-          completed: 20,
-          valid: 20,
-          unjudged: 20,
-          failed: 0,
-          notStarted: 0,
-          qualitySloGoodput: null,
-        }),
-      ]),
-    );
-  });
-
   it('keeps zero-attempt planned cells separate from submitted failures and chart eligibility', () => {
     const artifact = saved(20);
     const matrix = new Map(artifact.sources[0].documents).get('serving-smoke.json');
@@ -391,7 +382,7 @@ describe('Wan producer model identity', () => {
       const entry = videoHistoryEntry(artifact, null);
       expect(entry.sources[0].model).toBe('Wan-AI/Wan2.2-T2V-A14B-Diffusers');
       const pages = [{ schemaVersion: 1 as const, entries: [entry], nextPage: null }];
-      const wan = videoModelHistory(pages, 'wan22');
+      const wan = projectVideoHistoryForModel(pages, 'wan22');
       expect(wan[0].entries).toHaveLength(1);
       expect(wan[0].entries[0].sources[0].serving?.[0]).toMatchObject({
         scheduled: 20,
@@ -400,7 +391,7 @@ describe('Wan producer model identity', () => {
         failed: 0,
         qualitySloGoodput: null,
       });
-      expect(videoModelHistory(pages, 'h3')[0].entries).toEqual([]);
+      expect(projectVideoHistoryForModel(pages, 'h3')[0].entries).toEqual([]);
     },
   );
 });
@@ -427,12 +418,22 @@ it('projects synthetic video-only success through Wan while preserving missing q
     qualitySloGoodput: null,
   });
   const pages = [{ schemaVersion: 1 as const, entries: [entry], nextPage: null }];
+  const unsupportedQuality = {
+    scale: 'ordinal_0_to_4' as const,
+    contractId: null,
+    contractSha256: null,
+    rubricVersion: null,
+    rubricSha256: null,
+    metrics: {},
+  };
+  source.observations[0].quality = unsupportedQuality;
   expect(
-    videoModelHistory(pages, 'wan22')[0].entries[0].sources[0].observations.every(
+    projectVideoHistoryForModel(pages, 'wan22')[0].entries[0].sources[0].observations.every(
       (o) => o.quality === null,
     ),
   ).toBe(true);
-  expect(videoModelHistory(pages, 'h3')[0].entries).toEqual([]);
+  expect(source.observations[0].quality).toBe(unsupportedQuality);
+  expect(projectVideoHistoryForModel(pages, 'h3')[0].entries).toEqual([]);
 });
 
 it('retains the manifest model and error when a stored result contradicts it', () => {
@@ -448,7 +449,8 @@ it('retains the manifest model and error when a stored result contradicts it', (
     error: 'Manifest and result identify different video models',
   });
   expect(
-    videoModelHistory([{ schemaVersion: 1, entries: [entry], nextPage: null }], 'h3')[0].entries,
+    projectVideoHistoryForModel([{ schemaVersion: 1, entries: [entry], nextPage: null }], 'h3')[0]
+      .entries,
   ).toEqual([]);
 });
 
@@ -462,7 +464,7 @@ it('does not classify an unidentified generic producer as a legacy H3 source', (
     nextPage: null,
   };
   for (const model of ['h3', 'wan22'] as const)
-    expect(videoModelHistory([page], model)[0].entries).toEqual([]);
+    expect(projectVideoHistoryForModel([page], model)[0].entries).toEqual([]);
 });
 
 it('resolves a legacy mixed missing/known projection from its unique nonempty model identity', () => {
@@ -475,6 +477,6 @@ it('resolves a legacy mixed missing/known projection from its unique nonempty mo
   const entry = videoHistoryEntry(saved(), null);
   entry.sources = [source];
   const pages = [{ schemaVersion: 1 as const, entries: [entry], nextPage: null }];
-  expect(videoModelHistory(pages, 'h3')[0].entries).toEqual([]);
-  expect(videoModelHistory(pages, 'wan22')[0].entries).toHaveLength(1);
+  expect(projectVideoHistoryForModel(pages, 'h3')[0].entries).toEqual([]);
+  expect(projectVideoHistoryForModel(pages, 'wan22')[0].entries).toHaveLength(1);
 });

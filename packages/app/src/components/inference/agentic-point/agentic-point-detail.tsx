@@ -14,13 +14,13 @@ import {
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { withChartState } from '@/lib/url-state';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { withChartState } from '@/lib/routing/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -33,6 +33,7 @@ import {
   type StagePhase,
 } from './phase-slice';
 import { PointSummary } from './point-summary';
+import { PowerTelemetryView } from './power-telemetry-view';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
 import { ServerLogViewer } from './server-log-viewer';
 import {
@@ -61,6 +62,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     ttftOverTime: 'TTFT over time',
     perPoint: 'Per-point',
     requestTimeline: 'Request timeline',
+    powerX: 'PowerX',
     aggregatesAcrossConfigs: 'Aggregates across configs',
     logs: 'Logs',
     detailView: 'Detail view',
@@ -94,6 +96,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     ttftOverTime: 'TTFT 随时间变化',
     perPoint: '单点',
     requestTimeline: '请求时间线',
+    powerX: 'PowerX',
     aggregatesAcrossConfigs: '跨配置聚合',
     logs: '日志',
     detailView: '详情视图',
@@ -149,6 +152,7 @@ export function AgenticPointDetail({ id }: Props) {
     () => [
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
+      { value: 'power', label: t.powerX, testId: 'detail-view-power' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
       { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
     ],
@@ -347,6 +351,8 @@ export function AgenticPointDetail({ id }: Props) {
 
       {view === 'logs' ? (
         <ServerLogViewer id={id} enabled />
+      ) : view === 'power' ? (
+        <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
       ) : view === 'aggregates' ? (
         aggregatesQuery.isError ? (
           <RetryableQueryError

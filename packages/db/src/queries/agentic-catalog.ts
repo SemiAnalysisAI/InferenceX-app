@@ -44,7 +44,7 @@ export async function getAgenticCatalog(sql: DbClient): Promise<AgenticCatalogEn
       from benchmark_results br
       join configs c on c.id = br.config_id
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
-      where atr.profile_export_jsonl_gz is not null
+      where (atr.profile_export_jsonl_gz is not null or atr.profile_export_chunk_count > 0)
     ),
     ranked as (
       select

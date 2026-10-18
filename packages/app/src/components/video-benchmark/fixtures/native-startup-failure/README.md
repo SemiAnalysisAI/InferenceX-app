@@ -1,0 +1,1 @@
+Local producer replay fixture, not a GPU measurement or published run. Generated with InferenceX mvp_srt_bundle.py at 1bd5e9832 using a declared H3 plan and an absent request directory to exercise startup failure. No original clip or measured power was supplied. Preserve the generated JSON and SHA256SUMS bytes.

@@ -4,11 +4,11 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 //  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
 //    ($3.00 / $0.30 cached / $15.00), 60% utilization, 30% model license fee;
 //  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
-//    ($1.40 / $0.26 cached / $4.40), and a 10% license fee; a model switch
+//    ($1.40 / $0.26 cached / $4.40), and a 20% license fee; a model switch
 //    re-seeds all three;
 //  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
 //    ($0.30 / $0.06 cached / $1.20);
-//  - DeepSeek V4 Pro opens on 24 tok/s/user, the DeepSeek peak list price
+//  - DeepSeek V4 Pro opens on 35 tok/s/user, the DeepSeek peak list price
 //    ($1.32 / $0.044 cached / $3.96), and a 0% license fee (MIT weights);
 //  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
 //    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
@@ -38,6 +38,7 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 import {
   interceptProfitData,
   profitBenchmarkRows,
+  profitNvl72Rows,
   PROFIT_CHANGELOG_NOTES,
   PROFIT_DATE,
   PROFIT_HISTORY_DATE,
@@ -97,7 +98,40 @@ const bars = () => chart().find('rect.bar');
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+    it(`keeps available estimates without a per-configuration warning list (${locale})`, () => {
+      stubOpenRouter();
+      const width = locale === 'en' ? 1280 : 390;
+      cy.viewport(width, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: profitBenchmarkRows().map((row) => ({
+          ...row,
+          metrics: {
+            ...row.metrics,
+            power_valid: row.hardware === 'b300' ? 0 : 1,
+            power_metric_schema_version: 2,
+            avg_power_w: 500,
+            avg_total_gpu_power_w: 4000,
+          },
+        })),
+      });
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
+        onBeforeLoad: unlockPowerGate,
+      });
+      chart().find('text.revenue-label').should('have.length', 6);
+      chart()
+        .find('.x-axis')
+        .should('not.contain', 'H200')
+        .and('contain', 'B300')
+        .and('contain', 'GB300');
+      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
+      chart().scrollIntoView();
+      cy.screenshot(`profit-no-unavailable-list-${locale}`, {
+        capture: 'viewport',
+        overwrite: true,
+      });
+    });
+
+    it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(locale === 'en' ? 1280 : 393, 900);
       cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -134,24 +168,20 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         },
       );
       const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
-      const hardwareReason =
-        locale === 'en'
-          ? 'no system power model for this hardware'
-          : '该硬件暂无适用的系统功耗模型';
       cy.get('#profit-target').should('have.value', '125');
-      chart().find('text.revenue-label').should('have.length', 3);
+      // GB300 fills one NVL72 tray and prices with modeled Grace sockets.
+      chart().find('text.revenue-label').should('have.length', 4);
       chart()
-        .should('contain', 'B200')
+        .should('contain', 'GB300')
+        .and('contain', 'B200')
         .and('contain', 'B300')
         .and('contain', 'MI355X')
         .and('contain', label);
-      cy.get('[data-testid="profit-power-unavailable"]')
-        .should('contain', 'GB300')
-        .and('contain', hardwareReason);
-      cy.get('[data-testid="profit-power-note"]').should(
-        'contain',
-        locale === 'en' ? 'partly idle server' : '部分 GPU 闲置',
-      );
+      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
+      cy.get('[data-testid="profit-power-note"]')
+        .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
+        .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
+      cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
       cy.get('[data-testid="profit-power-note"]').then(($note) => {
         const box = $note[0].getBoundingClientRect();
         expect(box.left).to.be.at.least(0);
@@ -171,9 +201,12 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
             .split('\n')
             .filter(
               (line) =>
-                line.startsWith('B200') || line.startsWith('B300') || line.startsWith('MI355X'),
+                line.startsWith('GB300') ||
+                line.startsWith('B200') ||
+                line.startsWith('B300') ||
+                line.startsWith('MI355X'),
             ),
-        ).to.have.length(3);
+        ).to.have.length(4);
       });
     });
   }
@@ -208,7 +241,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.then(() => expect(rawRequests).to.equal(0));
     cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     cy.window().then((win) => {
       win.localStorage.removeItem('inferencex-feature-gate');
       win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
@@ -219,7 +252,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
   });
 
   for (const currentValid of [true, false]) {
-    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'empty chart'})`, () => {
+    it(`keeps historical provisioned bars when measured power is unavailable (${currentValid ? 'with current bars' : 'provisioned bars only'})`, () => {
       stubOpenRouter();
       cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
         const historical = req.query['date'] === PROFIT_HISTORY_DATE;
@@ -244,16 +277,9 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
         { onBeforeLoad: unlockPowerGate },
       );
-      cy.get('[data-testid="profit-power-unavailable"]').should(
-        'contain',
-        `B300 (vLLM) (FP4) • ${PROFIT_HISTORY_DATE}`,
-      );
-      cy.get('[data-testid="profit-power-unavailable"]').should(
-        'contain',
-        `B200 (SGLang) (FP4) • ${PROFIT_HISTORY_DATE}`,
-      );
-      if (currentValid) chart().find('text.revenue-label').should('have.length', 2);
-      else cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
+      chart()
+        .find('text.revenue-label')
+        .should('have.length', currentValid ? 4 : 3);
     });
   }
 
@@ -283,11 +309,194 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
     cy.get('#profit-power').should('contain', 'Compare both');
     cy.get('#profit-target').should('have.value', '45');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
-    chart().should('contain', 'Measured + modeled').and('contain', 'Provisioned');
-    cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
+    chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
+    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
   });
+
+  it('prices GB200 NVL72 trays on measured GPU and Grace-socket power and names the basis', () => {
+    stubOpenRouter();
+    cy.viewport(1280, 900);
+    cy.intercept('GET', '/api/v1/benchmarks*', {
+      body: [
+        ...profitBenchmarkRows().map((row) => ({
+          ...row,
+          metrics: {
+            ...row.metrics,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+            avg_power_w: 500,
+            avg_total_gpu_power_w: 4000,
+          },
+        })),
+        ...profitNvl72Rows(),
+      ],
+    });
+    let csv: Blob | undefined;
+    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: (win) => {
+        unlockPowerGate(win);
+        win.URL.createObjectURL = (blob) => {
+          if (blob instanceof win.Blob) csv = blob;
+          return 'blob:profit-nvl72-csv-test';
+        };
+        win.HTMLAnchorElement.prototype.click = () => {};
+      },
+    });
+    // Four SKUs get pairs, GB200 included; GB300 has no Grace power and keeps one bar.
+    chart().find('text.revenue-label').should('have.length', 9);
+    chart().should('contain', 'GB200').and('contain', 'All in Measured');
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+    cy.then(() => csv!.text()).then((text) => {
+      expect(text).to.contain('PUE 1.3 (air-cooled chassis) or 1.1 (liquid-cooled NVL72)');
+      const rows = text.split('\n').filter((line) => line.startsWith('GB200'));
+      expect(rows).to.have.length(2);
+      expect(rows.some((row) => row.includes('All in Provisioned'))).to.equal(true);
+      expect(rows.some((row) => row.includes('measured GPU board and Grace socket'))).to.equal(
+        true,
+      );
+      expect(text).not.to.contain('regulator');
+    });
+  });
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`keeps all nine power comparison bars readable and reachable on mobile (${locale})`, () => {
+      stubOpenRouter();
+      cy.viewport(390, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: [
+          ...profitBenchmarkRows().map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+          ...profitNvl72Rows(),
+        ],
+      });
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
+        onBeforeLoad: unlockPowerGate,
+      });
+      chart()
+        .find('text.revenue-label')
+        .should('have.length', 9)
+        .should(($labels) => {
+          const boxes = [...$labels].map((label) => label.getBoundingClientRect());
+          for (let i = 1; i < boxes.length; i++) {
+            expect(
+              boxes[i].left - boxes[i - 1].right,
+              'space between revenue and margin labels',
+            ).to.be.at.least(4);
+          }
+        });
+      chart()
+        .find('image.bar-vendor-mark')
+        .should(($marks) => {
+          const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
+          for (let i = 1; i < boxes.length; i++) {
+            expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
+              4,
+            );
+          }
+        });
+      const scroller = () => chart().find('[data-chart-scroll]');
+      scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
+      scroller()
+        .scrollIntoView({ offset: { top: -70, left: 0 } })
+        .focus()
+        .should('have.focus');
+      scroller().then(($scroll) => {
+        const el = $scroll[0];
+        const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+        });
+        el.dispatchEvent(event);
+        expect(
+          event.defaultPrevented,
+          `handled key on ${el.clientWidth}/${el.scrollWidth}`,
+        ).to.equal(true);
+        expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
+      });
+      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+      scroller().scrollTo('right');
+      chart().find('rect.bar-profit').last().should('be.visible');
+      chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
+      cy.get('[data-chart-tooltip="profit-estimator-chart"]')
+        .should('be.visible')
+        .and('contain', 'MI355X');
+      // Clear the pinned tooltip for screenshots; the SVG center is outside the scroll viewport.
+      chartSvg().trigger('click', { force: true, scrollBehavior: false });
+      cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+      cy.document().should((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(390);
+      });
+      cy.get('[data-testid="profit-caption"]').should(($caption) => {
+        const bounds = $caption[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
+      scroller()
+        .scrollIntoView({ offset: { top: -70, left: 0 } })
+        .scrollTo('left');
+      chart().find('rect.bar-tco').first().should('be.visible');
+      cy.screenshot(`profit-dense-${locale}-mobile-left`, { capture: 'viewport', overwrite: true });
+      scroller().scrollTo('right');
+      cy.screenshot(`profit-dense-${locale}-mobile-right`, {
+        capture: 'viewport',
+        overwrite: true,
+      });
+      let exportedPng = '';
+      let exportedLabels: string[] = [];
+      cy.window().then((win) => {
+        win.HTMLAnchorElement.prototype.click = function () {
+          if (this.download.endsWith('.png')) {
+            exportedPng = this.href;
+            exportedLabels = [
+              ...win.document.querySelectorAll('#profit-estimator-chart-export text.revenue-label'),
+            ].map((label) => label.textContent ?? '');
+          }
+        };
+      });
+      cy.get('[data-testid="export-button"]').first().click();
+      cy.get('[data-testid="export-png-button"]').click();
+      cy.window()
+        .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
+        .then((win) => {
+          expect(exportedLabels).to.have.length(9);
+          cy.writeFile(
+            `cypress/downloads/profit-dense-${locale}.png`,
+            exportedPng.split(',')[1],
+            'base64',
+          );
+          return new Cypress.Promise<void>((resolve, reject) => {
+            const png = new win.Image();
+            png.addEventListener('load', () => {
+              expect(png.naturalWidth).to.be.greaterThan(1500);
+              resolve();
+            });
+            png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
+            png.src = exportedPng;
+          });
+        });
+      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+      cy.viewport(1280, 900);
+      scroller().should('not.have.attr', 'tabindex');
+      scroller().should(($scroll) => {
+        expect($scroll[0].scrollWidth).to.equal($scroll[0].clientWidth);
+      });
+      chart().find('text.revenue-label').should('have.length', 9);
+      chartSvg().scrollIntoView({ offset: { top: -70, left: 0 } });
+      cy.screenshot(`profit-dense-${locale}-desktop`, { capture: 'viewport', overwrite: true });
+    });
+  }
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
     stubOpenRouter();
@@ -297,18 +506,16 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .invoke('text')
       .then((original) => {
         cy.get('#profit-power').click();
-        cy.get('[role="option"]').contains('Measured + modeled power').click();
+        cy.get('[role="option"]').contains('All in Measured').click();
         // These existing fixtures intentionally have throughput but no validated power.
-        cy.get('[data-testid="profit-power-unavailable"]').should(
-          'contain',
-          'no usable measured power',
-        );
+        cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
+        cy.contains('No SKU can be priced for the current selection.').should('be.visible');
         cy.get('#profit-target').should('have.value', '45');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
         cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
         cy.get('#profit-power').click();
-        cy.get('[role="option"]').contains('Provisioned power').click();
+        cy.get('[role="option"]').contains('All in Provisioned').click();
         bars().its('length').should('be.greaterThan', 0);
         chart().should('have.text', original);
       });
@@ -387,8 +594,9 @@ describe('Profit Estimator per GW', () => {
     chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
+      'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity (Beta)',
     );
+    cy.contains('Revenue & Profit Estimator per GigaWatt (Beta)').should('be.visible');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
@@ -473,9 +681,7 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="footer-link-fleet"]')
       .should('have.attr', 'href', '/fleet')
       .and('contain.text', 'Fleet Lifecycle');
-  });
 
-  it('stacks TCO first and labels every bar with its revenue', () => {
     chart()
       .find('rect.bar-tco')
       .its('length')
@@ -528,6 +734,11 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('[data-testid="profit-utilization-input"]').clear().type('60').blur();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
+
+    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('clamps utilization and the license fee to 0–100 on blur', () => {
@@ -541,13 +752,6 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('30').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
-  });
-
-  it('retypes the target interactivity and rewrites the heading', () => {
-    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('uses the SKU legend as the bar filter', () => {
@@ -642,6 +846,9 @@ describe('Profit Estimator per GW', () => {
   });
 
   it('switches to custom $/GPU/hr when a caption badge is edited', () => {
+    // This case verifies the published default; the preceding case edits the
+    // same badge on the shared page, so start with a fresh estimator instance.
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
@@ -959,8 +1166,8 @@ describe('Profit Estimator per GW — per-model route', () => {
           .invoke('val')
           .should((value) => {
             const shared = new URL(String(value));
-            expect(shared.searchParams.get('i_seq')).to.equal('agentic-traces');
-            expect(shared.searchParams.has('c_profit_target')).to.equal(false);
+            expect(shared.pathname).to.equal(route);
+            expect(shared.search).to.equal('');
           });
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
@@ -987,8 +1194,8 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
-    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '10%');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
+    cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
       'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 100 tok/s/user Interactivity',
@@ -1041,6 +1248,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
@@ -1051,6 +1259,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
       .should('contain.text', 'Kimi K3')
       .and('contain.text', '45 tok/s/user');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $3')
       .and('contain.text', '(Moonshot list price)');
@@ -1059,6 +1268,7 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.contains('[role="option"]', 'GLM5.2/GLM5.3').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/glm-5-3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.4')
       .and('contain.text', '(Z.ai list price)');
@@ -1133,7 +1343,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.visit('/profit-estimator-per-gigawatt/glm-5-3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '100');
-    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '10');
+    cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'MiniMax M3').click();
@@ -1176,16 +1386,45 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.viewport(1280, 1000);
   });
 
-  it('opens /profit-estimator/deepseek-v4 on 24 tok/s/user and the DeepSeek list price', () => {
+  it('shares an explicit P90 interactivity target and reopens on it', () => {
+    cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+    chart().should('exist');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
+    cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .then((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4/target/24');
+        expect(shared.search).to.equal('');
+        cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: suppressNudges });
+      });
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 24 tok/s/user');
+
+    // Back on the model's default operating point, the link carries no target.
+    cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should((value) => {
+        const shared = new URL(String(value));
+        expect(shared.pathname).to.equal('/profit-estimator/deepseek-v4');
+        expect(shared.search).to.equal('');
+      });
+  });
+
+  it('opens /profit-estimator/deepseek-v4 on 35 tok/s/user and the DeepSeek list price', () => {
     cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.location('pathname').should('eq', '/profit-estimator/deepseek-v4');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 24 tok/s/user Interactivity',
+      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 35 tok/s/user Interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1195,7 +1434,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
       .and('contain.text', 'DeepSeek');
-    // 24 tok/s/user sits inside every fixture curve, the short H200 one included,
+    // 35 tok/s/user sits inside every fixture curve, the short H200 one included,
     // so all five SKUs are priced.
     chart().find('image.bar-vendor-mark').should('have.length', 5);
     chart().should('contain.text', 'H200');
@@ -1236,8 +1475,8 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v4');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'DeepSeek V4 Pro')
-      .and('contain.text', '24 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+      .and('contain.text', '35 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
@@ -1258,7 +1497,7 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
   it('serves the Chinese mirror with the list price named in Chinese', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', '输入：$1.32')
       .and('contain.text', 'DeepSeek 官方定价');
@@ -1324,7 +1563,7 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
   it('re-seeds the operating point and price source when switching from DeepSeek V4 Pro', () => {
     cy.visit('/profit-estimator-per-gigawatt/deepseek-v4', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
 
     // Both DeepSeek models share a vendor label, so the switch must land on the
@@ -1376,7 +1615,10 @@ describe('Profit Estimator per GW — Chinese mirror', () => {
     chart().should('contain.text', '模型许可费').and('contain.text', '利润');
     cy.get('[data-testid="profit-benchmark-panel"] legend').should('have.text', '基准测试配置');
     cy.get('[data-testid="profit-pricing-panel"] legend').should('have.text', '定价配置');
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦每年收入与利润估算');
+    cy.get('[data-testid="profit-caption"] h2')
+      .should('contain.text', '每吉瓦每年收入与利润估算')
+      .and('contain.text', '（Beta）');
+    cy.contains('每吉瓦收入与利润估算器（Beta）').should('be.visible');
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
   });
@@ -1404,7 +1646,7 @@ describe('Profit Estimator (per chip-hour)', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity',
+      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity (Beta)',
     );
     // The chip-hour basis reads like a renter's P&L, so it opens on the
     // 3-year-commit rental tier rather than the owning tier the GW-year page uses.
@@ -1467,7 +1709,7 @@ describe('Profit Estimator — responsive control panels', () => {
   beforeEach(stubOpenRouter);
 
   for (const route of ['/profit-estimator', '/profit-estimator-per-gigawatt']) {
-    for (const width of [375, 1440]) {
+    for (const width of [375, 768, 1280, 1440]) {
       it(`keeps benchmark and pricing controls grouped on ${route} at ${width}px`, () => {
         cy.viewport(width, 1000);
         cy.visit(route, { onBeforeLoad: suppressNudges });
@@ -1476,6 +1718,33 @@ describe('Profit Estimator — responsive control panels', () => {
           cy.get('legend').should('have.text', 'Benchmark Config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '45');
+        });
+        cy.get('[data-testid="profit-controls"]').should(($controls) => {
+          const bounds = (selector: string) => $controls.find(selector)[0]!.getBoundingClientRect();
+          const model = bounds('#profit-model');
+          const target = bounds('#profit-target');
+          const cache = bounds('#profit-cache-hit');
+          const pricing = bounds('#profit-price-source');
+          if (width >= 768) {
+            expect(Math.abs(model.bottom - target.bottom), 'model/target aligned').to.be.lessThan(
+              2,
+            );
+            expect(Math.abs(target.bottom - cache.bottom), 'target/cache aligned').to.be.lessThan(
+              2,
+            );
+            expect(target.left, 'target beside model').to.be.greaterThan(model.right);
+            expect(cache.left, 'cache beside target').to.be.greaterThan(target.right);
+          } else {
+            expect(target.top, 'target below model').to.be.greaterThan(model.bottom);
+            expect(cache.top, 'cache below target').to.be.greaterThan(target.bottom);
+          }
+          if (width >= 1280) {
+            expect(Math.abs(cache.bottom - pricing.bottom), 'pricing aligned').to.be.lessThan(2);
+            expect(pricing.left, 'pricing beside benchmark').to.be.greaterThan(cache.right);
+          }
+          const history = bounds('[data-testid="profit-history-panel"]');
+          const chip = bounds('#profit-history-gpu');
+          expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
           cy.get('legend').should('have.text', 'Pricing Config');
@@ -1508,8 +1777,12 @@ describe('Profit Estimator — responsive control panels', () => {
             .find('[data-testid="profit-pricing-panel"]')[0]!
             .getBoundingClientRect();
           if (width >= 1280) {
-            expect(Math.abs(benchmark.top - pricing.top), 'aligned panel tops').to.be.lessThan(2);
-            expect(pricing.left - benchmark.right, 'space between panels').to.be.at.least(15);
+            expect(pricing.top - benchmark.bottom, 'custom prices on a full row').to.be.at.least(
+              15,
+            );
+            expect(Math.abs(benchmark.width - pricing.width), 'full-width pricing').to.be.lessThan(
+              2,
+            );
           } else {
             expect(pricing.top - benchmark.bottom, 'stacked panels').to.be.at.least(15);
           }
@@ -1527,6 +1800,22 @@ describe('Profit Estimator — responsive control panels', () => {
         });
         cy.get('#profit-utilization').clear().type('50').blur();
         cy.get('[data-testid="result-context-utilization"]').should('have.text', '50%');
+        cy.get('#profit-price-source').click();
+        cy.contains('[role="option"]', 'Moonshot list price').click();
+        cy.get('[data-testid="profit-custom-prices"]').should('not.exist');
+        pickChip('GB300');
+        cy.get('[data-testid="profit-history-date-range"]').should('be.visible');
+        cy.get('[data-testid="profit-history-panel"]').should(($panel) => {
+          const chip = $panel.find('#profit-history-gpu')[0]!.getBoundingClientRect();
+          const dates = $panel
+            .find('[data-testid="profit-history-date-range"]')[0]!
+            .getBoundingClientRect();
+          if (width >= 768) {
+            expect(dates.left, 'date range beside chip').to.be.greaterThan(chip.right);
+          } else {
+            expect(dates.top, 'date range below chip').to.be.greaterThan(chip.bottom);
+          }
+        });
       });
     }
   }
@@ -1543,35 +1832,47 @@ describe('VR publication economics', () => {
           onBeforeLoad: suppressNudges,
         });
         cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
-        cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
-          const rows = [...$bars].map(
-            (node) =>
-              (
-                node as unknown as {
-                  __data__: {
-                    row: {
-                      hwKey: string;
-                      tco: number;
-                      revenue: number;
+        const assertCachePricing = (cacheHitRate: number) =>
+          cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
+            const rows = [...$bars].map(
+              (node) =>
+                (
+                  node as unknown as {
+                    __data__: {
+                      row: {
+                        hwKey: string;
+                        tco: number;
+                        revenue: number;
+                      };
                     };
-                  };
-                }
-              ).__data__.row,
-          );
-          const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
-          const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
-          expect(vr, 'VR is priced').not.to.equal(undefined);
-          expect(gb, 'GB300 remains priced').not.to.equal(undefined);
-          const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
-          const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-          expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
-          expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
-          // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
-          // 95% cache hit, DeepSeek list prices, 60% revenue utilization.
-          const revenuePerHour =
-            (((12_600 * (0.05 * 1.32 + 0.95 * 0.044) + 5_400 * 3.96) * 3600) / 1_000_000) * 0.6;
-          expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
-        });
+                  }
+                ).__data__.row,
+            );
+            const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
+            const gb = rows.find((row) => row.hwKey.startsWith('gb300'));
+            expect(vr, 'VR is priced').not.to.equal(undefined);
+            expect(gb, 'GB300 remains priced').not.to.equal(undefined);
+            const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
+            const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
+            expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
+            expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+            // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
+            // the selected cache rate, DeepSeek list prices, 60% revenue utilization.
+            const revenuePerHour =
+              (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
+                3600) /
+                1_000_000) *
+              0.6;
+            expect(vr!.revenue).to.be.closeTo(revenuePerHour * vrHours, 0.01);
+          });
+        cy.get('[data-testid="profit-cache-hit-selector"]').should(
+          'contain.text',
+          'Theroticial Roofline',
+        );
+        assertCachePricing(0.97);
+        cy.get('[data-testid="profit-cache-hit-selector"]').click();
+        cy.contains('[role="option"]', /^Actual$/).click();
+        assertCachePricing(0.95);
       });
     }
   }
@@ -1580,7 +1881,7 @@ describe('VR publication economics', () => {
 it('keeps the latest VR snapshot in the profit estimator, matching the private preference scope', () => {
   interceptVrPublicationData(true);
   cy.intercept('GET', 'https://openrouter.ai/api/v1/models', OPENROUTER_MODELS);
-  cy.visit('/profit-estimator/deepseek-v4', { onBeforeLoad: suppressNudges });
+  cy.visit('/profit-estimator/deepseek-v4/cache-hit-mode/actual', { onBeforeLoad: suppressNudges });
   cy.get('[data-testid="profit-target-input"]').clear().type('40').blur();
   cy.get('[data-testid="profit-estimator-chart"] rect.bar').should(($bars) => {
     const rows = [...$bars].map(

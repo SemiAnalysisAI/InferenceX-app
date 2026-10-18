@@ -1,19 +1,19 @@
-import '@/lib/polyfills';
+import '@/lib/runtime/polyfills';
 import './globals.css';
 
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
-import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
-import { JsonLd } from '@/components/json-ld';
-import { CircuitBackground } from '@/components/circuit-background';
-import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
-import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
+import { JsonLd } from '@/components/seo/json-ld';
+import { AutumnLeaves } from '@/components/effects/autumn-leaves';
+import { CircuitBackground } from '@/components/effects/circuit-background';
+import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -25,7 +25,7 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { fetchStarCount } from '@/lib/github-stars.server';
+import { fetchStarCount } from '@/lib/github/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 import { VisitTracker } from '@/providers/visit-tracker';
@@ -38,13 +38,6 @@ const dm_sans = DM_Sans({
   subsets: ['latin'],
   display: 'optional',
   variable: '--font-dm-sans',
-});
-
-const monocraft = localFont({
-  src: './fonts/Monocraft.woff2',
-  variable: '--font-minecraft',
-  display: 'swap',
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -190,7 +183,7 @@ export default async function RootLayout({
 }>) {
   const starCount = await fetchStarCount();
   return (
-    <html lang="en" className={monocraft.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="preload"
@@ -211,21 +204,21 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
         <CircuitBackground />
-        <MinecraftBackgroundLazy />
-        <MinecraftDecorations />
+        <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
           <QueryProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="dark"
-              themes={['light', 'dark', 'minecraft']}
+              themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
             >
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
+              <EasterEggThemeLazy />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

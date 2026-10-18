@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-26T08:01:00.397Z",
+  "generatedAt": "2026-10-17T05:15:55.279Z",
   "fixtures": {
     "agentic-catalog": {
       "bytes": 10027,
@@ -16,17 +16,17 @@
       "source": null,
       "topLevel": "array"
     },
-    "benchmarks-history": {
-      "bytes": 1859995,
-      "capturedAt": null,
-      "sha256": "9e7efc17d018d25acd13095ac0c33ed3c20aaf0d86c225792c0a73bde8e12d15",
-      "source": null,
-      "topLevel": "array"
-    },
     "benchmarks": {
       "bytes": 775884,
       "capturedAt": null,
       "sha256": "f46823a76cb63248705329f327e1494df02b4dfa4df0898b7ee084c75c20bd52",
+      "source": null,
+      "topLevel": "array"
+    },
+    "benchmarks-history": {
+      "bytes": 1859995,
+      "capturedAt": null,
+      "sha256": "9e7efc17d018d25acd13095ac0c33ed3c20aaf0d86c225792c0a73bde8e12d15",
       "source": null,
       "topLevel": "array"
     },
@@ -57,6 +57,13 @@
       "sha256": "edd2740ddbf1104c763114018fa081e96c39d5edfa3f2e2424a7ce4b724a06c9",
       "source": null,
       "topLevel": "array"
+    },
+    "muse-spark-unofficial-run": {
+      "bytes": 6124,
+      "capturedAt": "2026-10-16T02:59:38.939Z",
+      "sha256": "a7f566b66430c0bbb848e99df5a3f7fa76357fc6b6816fb01a96dc210175076d",
+      "source": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/38825822770",
+      "topLevel": "object"
     },
     "overview-history-rows": {
       "bytes": 5002,
@@ -94,9 +101,9 @@
       "topLevel": "object"
     },
     "video-history": {
-      "bytes": 100442,
-      "capturedAt": "2026-09-26T08:01:00.397Z",
-      "sha256": "59dd1be0246da1f4702385399995ee9b2ea61fe40130e40fc751200a82a8a50a",
+      "bytes": 108039,
+      "capturedAt": "2026-10-17T05:15:55.279Z",
+      "sha256": "f27fbbcd2c6a8154b030939714501b8480b59fd3b0d5701007cd2e29e2a1559e",
       "source": "Retained public H3 metadata replay from original runs via videoHistoryEntry (canonical workload identity, per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.",
       "topLevel": "object"
     }

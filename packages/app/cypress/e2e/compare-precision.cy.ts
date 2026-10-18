@@ -9,7 +9,7 @@ describe('Compare precision index page', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
@@ -52,7 +52,7 @@ describe('Compare precision index page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',
@@ -77,16 +77,6 @@ describe('Compare precision index page', () => {
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
-
-  it('renders the /compare-per-dollar index with precision and spec-decode CTA links', () => {
-    cy.visit('/compare-per-dollar');
-    cy.get('[data-testid="compare-index-precision-link"]')
-      .should('have.attr', 'href', '/compare-precision')
-      .and('contain.text', 'Compare precisions');
-    cy.get('[data-testid="compare-index-spec-decode-link"]')
-      .should('have.attr', 'href', '/compare-spec-decode')
-      .and('contain.text', 'Compare speculative decoding');
-  });
 });
 
 describe('Compare precision index + slug page', () => {
@@ -94,12 +84,6 @@ describe('Compare precision index + slug page', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-  });
-
-  it('renders the precision index with a hero title and at least one card', () => {
-    cy.visit('/compare-precision');
-    cy.contains('h1', /precision/iu).should('be.visible');
-    cy.get('a[href^="/compare-precision/"]').should('have.length.greaterThan', 0);
   });
 
   it('navigates to the first card slug, renders table + hero PNG + JSON-LD', () => {

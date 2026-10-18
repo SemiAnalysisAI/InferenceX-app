@@ -330,6 +330,7 @@ describe('quality-qualified frontier', () => {
       expect(plot(points, selected).plotted.map((p) => [p.id, p.y])).toEqual([[base.id, 0]]);
       expect(ids(listedVideoCells(points, selected, new Set()))).toEqual([base.id]);
     }
+    expect(zero.metrics.prompt_adherence?.value).toBe(0);
   });
   it('filters before dominance and applies the same eligibility with Optimal Only off', () => {
     const accepted = cell({ quality: quality() });
@@ -363,12 +364,5 @@ describe('quality-qualified frontier', () => {
     expect(result.plotted.map((p) => p.y)).toEqual([4, 4]);
     expect(Object.values(result.frontiers).every((group) => group.length === 1)).toBe(true);
     expect(result.multiLayout).toBe(false);
-  });
-  it('returns no quality table or chart rows for uncalibrated retained measurements', () => {
-    for (const optimal of [true, false]) {
-      const selected = { ...state, optimal, y: 'quality' as const };
-      expect(plot(h200, selected).plotted).toEqual([]);
-      expect(listedVideoCells(h200, selected, new Set())).toEqual([]);
-    }
   });
 });

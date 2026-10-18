@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import VideoDashboard from '@/components/video-benchmark/VideoDashboard';
-import { tabMetadata } from '@/lib/tab-meta';
+import { tabMetadata } from '@/lib/routing/tab-meta';
 
 export const metadata: Metadata = {
   ...tabMetadata('video'),

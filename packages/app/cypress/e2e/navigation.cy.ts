@@ -1,4 +1,4 @@
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
 import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact } from '../support/video-artifacts';
@@ -86,12 +86,6 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
-  it('shows mobile chart select dropdown on small viewport', () => {
-    cy.viewport(375, 812);
-    cy.visit('/inference');
-    cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
-  });
-
   it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
     // Start locked: testIsolation is off, so an unlock persisted by an earlier
     // test would make the konami sequence below a no-op (nothing would insert,
@@ -123,6 +117,17 @@ describe('Chart Section Tabs — E2E', () => {
     // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
+
+  it('permanently redirects the retired PowerX page to the inference dashboard', () => {
+    cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/inference?gm_runId=12345');
+    });
+    cy.request({ url: '/zh/gpu-metrics', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/zh/inference');
+    });
+  });
 });
 
 describe('First-load navigation', () => {
@@ -134,7 +139,7 @@ describe('First-load navigation', () => {
         // on first load, and its corner card would sit over the footer links
         // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
       },
     });
 
@@ -156,8 +161,8 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
-  it('navigates to comparisons from the header with one click', () => {
-    cy.get('[data-testid="nav-link-compare"]').click();
+  it('navigates to comparisons from the footer with one click', () => {
+    cy.get('[data-testid="footer-link-compare"]').click();
     cy.location('pathname').should('eq', '/compare');
   });
 
@@ -191,26 +196,16 @@ describe('First-load navigation', () => {
         );
         expect(slugs).to.deep.equal([
           'kimi-k3',
+          'muse-spark-open',
           'deepseek-v41-flash',
           'glm-5-3',
           'minimax-m3',
-          'qwen-3-5',
         ]);
       });
-      // Only the still-new rows carry the NEW pill — see AGENTX_NEW_MODEL_SLUGS.
-      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-        .should('have.length', 3)
-        .each(($badge) => expect($badge.text()).to.equal('NEW'));
-      for (const slug of ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('exist');
-      }
-      for (const slug of ['minimax-m3', 'qwen-3-5']) {
-        cy.get(
-          `[data-testid="compare-agentx-model-${slug}"] [data-new-badge="agentx-ledger"]`,
-        ).should('not.exist');
-      }
+      // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
+      cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
+        'not.exist',
+      );
       cy.get('[data-testid="compare-agentx-model-deepseek-v41-flash"]')
         .should('have.attr', 'href', '/inference/deepseek-v41-flash')
         .and('contain.text', 'DeepSeek V4.1 Flash 552B');
@@ -225,29 +220,32 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('Rubin launch banner', { testIsolation: true }, () => {
+describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens DeepSeek V4 results from ${locale || '/'} landing page`, () => {
+    it(`opens Qwen3.5 AgentX results from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
-          // Dismissing the previous launch must not hide the Rubin banner.
-          win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+          // Dismissing the previous Rubin MiniMax M3 launch must not hide this banner.
+          win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
+          win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
       cy.get('[data-testid="launch-banner"]')
-        .should('have.attr', 'href', `${locale}/inference/deepseek-v4`)
-        .and(
-          'contain.text',
-          locale ? 'Rubin 智能体推理性能' : 'Rubin Agentic Inference Performance',
+        .should(
+          'have.attr',
+          'href',
+          `${locale}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
         )
+        .and('contain.text', locale ? 'Google TPUv7 加入 AgentX' : 'Google TPUv7 joins AgentX')
         .and(
           'contain.text',
-          locale ? '速度达 Blackwell Ultra 的 67 倍' : '67x Faster than Blackwell Ultra',
+          locale
+            ? 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍'
+            : 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v4`);
+      cy.location('pathname').should('eq', `${locale}/inference/qwen-3-5`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
     });
   }

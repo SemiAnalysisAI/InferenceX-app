@@ -25,16 +25,16 @@ If the user gives you only the chart, ask for the CSV — the chart is for the f
 
 ## Step 1: Verify the numbers
 
-When chart, CSV, and the InferenceX data dump disagree, use this priority:
+When the chart, the CSV and the InferenceX public API disagree, use this priority:
 
 1. **CSV the user pasted in chat** — they exported it from the dashboard, it matches whatever they saw
 2. **Chart image the user shared** — read points off the curves visually; use it only when no CSV is available
-3. **InferenceX data dump** (via the `inferencex-data` skill) — useful for sanity-check and for fields not in the CSV (TPOT, run IDs, image tags), but the dump can lag the chart by a week or more
+3. **InferenceX public API** (via the `inferencex` skill) is useful as a sanity check and for fields not in the CSV (TPOT, run IDs, image tags).
 
 Common gotchas:
 
 - **Workload mismatch**: chart headers can mislead. Verify ISL/OSL from the data itself — 1k/1k and 8k/1k give wildly different `tok/s/GPU` and `$/M tokens` numbers. The blog title, lede, tables, and chart caption must all use the same ISL/OSL.
-- **Latest run only**: filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`. See the `inferencex-data` skill for the exact filter.
+- **Latest run only**: `/api/v1/benchmarks` already returns the latest result per point. When you work from history, filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`.
 - **Model spec verification**: never invent parameter counts. Always `WebSearch` the model's released specs (total params, active params, expert count, attention type) before writing the architecture paragraph. Cite sources. GLM-5 is _not_ GLM-4.5 — the numbers changed.
 - **TCO values**: pull from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/). Current values (verify if older than a quarter):
   - H100 $1.30, H200 $1.41, B200 $1.95, B300 $2.34, GB200 $2.21, GB300 $2.652
@@ -177,7 +177,7 @@ Structure (~3 elements, in order):
 
 1. **One short intro paragraph** — name the two SKUs and their generation, then explain that the radar normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where a different SKU (typically GB200/GB300 NVL72 for scale-up-domain axes, GB300 NVL72 for FP4) sets the ceiling.
 2. **`<Figure>` for the radar.** Save the user's radar screenshot to `packages/app/public/images/{slug}/specs-radar-light.png` (and `-dark.png` — copy the same file in if they only have one). The caption should call out (a) which SKU sets the ceiling on the most-visually-compressed axes and the absolute max value (e.g. "FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%"), (b) that the older-gen SKU reads 0% on the FP4 axis when it has no FP4 tensor cores.
-3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
+3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/catalog/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
 
 Standard row set (10 rows, in this order; drop rows that are identical and uninteresting for a same-vendor same-generation comparison):
 

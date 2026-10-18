@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceTable';
+import InferenceTable, {
+  formatInferenceTableNumber,
+} from '@/components/inference/ui/InferenceTable';
+import { expandPowerCompareSeries } from '../utils/power-compare';
 
-// Test the pure logic used by InferenceTable — sorting and value resolution
-import { getNestedYValue } from '@/lib/chart-utils';
 import * as inferenceTableModule from './InferenceTable';
 import { chartDefinitions } from '../metric-registry';
 import { sortRowsByYMetric } from './inference-table-sort';
@@ -21,12 +24,6 @@ const CHART_DEF = {
   y_tpPerGpu_labelZh: '单 GPU token 吞吐量 (tok/s/gpu)',
   y_tpPerGpu_title: 'Token Throughput per GPU',
   y_tpPerGpu_roofline: 'upper_left',
-  y_costh: 'costh.y',
-  y_costh_label: 'Cost per Million Total Tokens ($)',
-  y_costh_roofline: 'lower_right',
-  y_tokensPerDollarH: 'tokensPerDollarH.y',
-  y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
-  y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
 function makePoint(overrides: Partial<InferenceData>): InferenceData {
@@ -50,16 +47,53 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
-  it('sorts supported modeled estimates by ascending power', () => {
-    const definition = chartDefinitions[0];
-    const metric = 'y_modeledChassisPowerPerGpu';
-    const points = [
-      makePoint({ modeledChassisPowerPerGpu: { y: 1200, roof: false } }),
-      makePoint({ modeledChassisPowerPerGpu: { y: 750, roof: false } }),
-    ];
-    const sorted = sortRowsByYMetric(points, definition, metric);
-    expect(sorted.map((point) => point.modeledChassisPowerPerGpu?.y)).toEqual([750, 1200]);
-  });
+  it.each(['roles', 'boundaries'] as const)(
+    'renders and sorts each %s comparison by its plotted value',
+    (mode) => {
+      const base = makePoint({
+        hwKey: 'gb300_dynamo-trt',
+        y: 708.1,
+        measuredAvgPower: { y: 708.1, roof: false },
+        measuredPrefillAvgPower: { y: 760.442, roof: false },
+        measuredDecodeAvgPower: { y: 690.652, roof: false },
+        gpuProvisionedWatts: { y: 1400, roof: false },
+        utilityProvisionedWatts: { y: 1920, roof: false },
+      });
+      const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', mode);
+      const sorted = sortRowsByYMetric(points, chartDefinitions[0], 'y_measuredAvgPower');
+      expect(sorted.map((point) => point.y)).toEqual(
+        mode === 'roles' ? [690.652, 708.1, 760.442] : [708.1, 1400, 1920],
+      );
+
+      const html = renderToStaticMarkup(
+        createElement(InferenceTable, {
+          data: points,
+          chartDefinition: chartDefinitions[0],
+          selectedYAxisMetric: 'y_measuredAvgPower',
+        }),
+      );
+      const body = html.split('<tbody>')[1].split('</tbody>')[0];
+      const cells = [...body.matchAll(/<tr\b[^>]*>(?<row>.*?)<\/tr>/gu)].map((match) =>
+        [...match.groups!.row.matchAll(/<td\b[^>]*>(?<cell>.*?)<\/td>/gu)].map(
+          (cell) => cell.groups!.cell,
+        ),
+      );
+      expect(cells.map((row) => [row[2], row[3]])).toEqual(
+        mode === 'roles'
+          ? [
+              ['Decode GPUs', '691'],
+              ['All GPUs', '708'],
+              ['Prefill GPUs', '760'],
+            ]
+          : [
+              ['GPU Level Measured', '708'],
+              ['GPU Level Provisioned (TDP)', '1,400'],
+              ['All in Provisioned', '1,920'],
+            ],
+      );
+      expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
+    },
+  );
 
   it('provides locale-aware table headers without changing the English source', () => {
     const headerLabels = (
@@ -94,14 +128,10 @@ describe('InferenceTable sorting logic', () => {
       makePoint({ tpPerGpu: { y: 300, roof: false } }),
     ];
 
-    const yPath = CHART_DEF.y_tpPerGpu as string;
-    const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
-    );
+    const definition = chartDefinitions.find((chart) => chart.chartType === 'interactivity')!;
+    const sorted = sortRowsByYMetric(points, definition, 'y_tpPerGpu');
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(500);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(300);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(100);
+    expect(sorted.map((point) => point.tpPerGpu.y)).toEqual([500, 300, 100]);
   });
 
   it('sorts tokens-per-dollar purchasing power descending', () => {
@@ -111,36 +141,10 @@ describe('InferenceTable sorting logic', () => {
       makePoint({ tokensPerDollarH: { y: 1_500_000, roof: true } }),
     ];
 
-    const yPath = CHART_DEF.y_tokensPerDollarH as string;
-    const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
-    );
+    const definition = chartDefinitions.find((chart) => chart.chartType === 'interactivity')!;
+    const sorted = sortRowsByYMetric(points, definition, 'y_tokensPerDollarH');
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(1_500_000);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(800_000);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(200_000);
-  });
-});
-
-describe('getNestedYValue', () => {
-  it('resolves nested roofline metric path (tpPerGpu.y)', () => {
-    const point = makePoint({ tpPerGpu: { y: 42, roof: true } });
-    expect(getNestedYValue(point, 'tpPerGpu.y')).toBe(42);
-  });
-
-  it('resolves the existing cost-per-million path (costh.y)', () => {
-    const point = makePoint({ costh: { y: 1.23, roof: false } });
-    expect(getNestedYValue(point, 'costh.y')).toBe(1.23);
-  });
-
-  it('resolves the separate tokens-per-dollar path', () => {
-    const point = makePoint({ tokensPerDollarH: { y: 1_500_000, roof: false } });
-    expect(getNestedYValue(point, 'tokensPerDollarH.y')).toBe(1_500_000);
-  });
-
-  it('returns 0 for missing paths', () => {
-    const point = makePoint({});
-    expect(getNestedYValue(point, 'nonexistent.y')).toBe(0);
+    expect(sorted.map((point) => point.tokensPerDollarH?.y)).toEqual([1_500_000, 800_000, 200_000]);
   });
 });
 

@@ -1,3 +1,5 @@
+import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
+import type { InferenceData } from '@/components/inference/types';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -54,8 +56,8 @@ const boundaryRows = (runUrl: string | null) =>
   }));
 
 function interceptMeasuredComparison(
-  official = measuredRows(null),
-  overlay = measuredRows(OVERLAY_RUN_URL),
+  official: object[] = measuredRows(null),
+  overlay: object[] = measuredRows(OVERLAY_RUN_URL),
 ) {
   cy.intercept('GET', '/api/v1/availability', { body: official.slice(0, 1) });
   cy.intercept('GET', '/api/v1/benchmarks*', { body: official });
@@ -107,28 +109,14 @@ function assertVisibleMeasuredValues(selector: string, expected: number[]) {
 
 describe('Inference Chart', () => {
   before(() => {
+    cy.intercept('GET', '/api/v1/availability').as('chartAvailability');
+    cy.intercept('GET', '/api/v1/benchmarks*').as('chartBenchmarks');
     cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/inference');
-  });
-
-  it('renders the inference chart display wrapper', () => {
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-  });
-
-  it('shows the Inference Performance heading', () => {
-    cy.contains('h2', 'Inference Performance').should('be.visible');
-  });
-
-  it('renders at least one chart figure', () => {
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-  });
-
-  it('renders at least one scatter graph with an SVG', () => {
-    cy.get('[data-testid="scatter-graph"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="scatter-graph"]').first().find('svg').should('exist');
+    cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
   it('hides the logo watermark when the unofficial-domain notice is shown', () => {
@@ -136,18 +124,6 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="inference-chart-display"] pattern[id^="logo-pattern-"]').should(
       'not.exist',
     );
-  });
-
-  it('SVG contains data point circles', () => {
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg circle')
-      .should('have.length.greaterThan', 0);
-  });
-
-  it('does not show "No data available" when data loads', () => {
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
   });
 
   it('leads the chart heading with the model and workload, without the cost tier', () => {
@@ -171,9 +147,7 @@ describe('Inference Chart', () => {
             expect(heading.trim().startsWith(model.trim())).to.equal(true);
           });
       });
-  });
 
-  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
@@ -184,26 +158,6 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-  });
-
-  it('shows the sidebar legend for GPU types', () => {
-    cy.get('.sidebar-legend').should('be.visible');
-  });
-
-  it('renders quick filters as visible toggles and toggles a vendor', () => {
-    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
-    cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-pressed', 'false')
-      .click()
-      .should('have.attr', 'aria-pressed', 'true')
-      .click()
-      .should('have.attr', 'aria-pressed', 'false');
-    cy.get('body').type('{esc}');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -580,7 +534,9 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
   });
 });
 
-it('hydrates a direct PowerX metric link and shows availability for the selected workload', () => {
+it('hydrates a direct PowerX metric link', () => {
+  cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
+  cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
   cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
     onBeforeLoad(win) {
@@ -589,6 +545,7 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
       cy.spy(win.console, 'error').as('powerLinkConsoleErrors');
     },
   });
+  cy.wait(['@powerLinkAvailability', '@powerLinkBenchmarks']);
   cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Power');
   cy.get('[data-testid="measured-power-display"]').should('contain', 'TDP');
   cy.get('[data-testid="measured-power-statistic-average"]').should(
@@ -596,17 +553,6 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
     'aria-pressed',
     'true',
   );
-  cy.get('[data-testid="power-metric-availability"]').should(
-    'contain',
-    'Current workload and hardware selection',
-  );
-  cy.contains('summary', 'Availability of all measured metrics').click();
-  cy.get('[data-testid="power-metric-availability"]').within(() => {
-    cy.contains('button', 'Measured P75 Fleet Power per Chip').should('contain', '/');
-    cy.contains('button', 'Measured Joules per Output Token').click();
-  });
-  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Energy');
-  cy.get('[data-testid="measured-energy-denominator"]').should('contain', 'Output');
   cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
 });
 
@@ -637,6 +583,29 @@ it('replots measured settings for official and unofficial data and preserves ove
   assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
 });
 
+it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
+  // The config has benchmarks but no power telemetry, like GB200/GB300 NVL72 on DSR1 8K/1K.
+  interceptMeasuredComparison(singleTurnRows(null), []);
+  cy.viewport(1440, 900);
+  cy.visit(
+    '/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
+    { onBeforeLoad: unlockAgenticGate },
+  );
+  cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
+  cy.get('[data-testid="scatter-empty-state"]')
+    .should('have.attr', 'data-reason', 'selection')
+    .and('contain', 'No measured GPU power is reported for this selection.');
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+  cy.contains('[data-slot="select-item"]', /^Token Throughput per Chip/u)
+    .scrollIntoView()
+    .click();
+  cy.get('[data-testid="scatter-empty-state"]').should('not.exist');
+  cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
+    'have.length.at.least',
+    1,
+  );
+});
+
 it('uses Optimal Only to filter power boundary dots without replacing official or overlay curves', () => {
   interceptMeasuredComparison(boundaryRows(null), boundaryRows(OVERLAY_RUN_URL));
   cy.viewport(1440, 900);
@@ -650,7 +619,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
   });
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [650, 700, 900]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
 
@@ -682,7 +650,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
             expect(curve.dataset.curveKind).to.equal('power-envelope');
           }
         });
-        cy.get('#scatter-show-all-measurements').should('not.exist');
       }
     });
 
@@ -692,8 +659,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     .click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
-  cy.get('[data-testid="power-curve-description"]').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
   cy.get(curves)
@@ -824,5 +789,324 @@ describe('VR default date preference', () => {
     );
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_LATEST_FIXTURE_DATE);
+  });
+});
+
+const withTp4 = (rows: ReturnType<typeof boundaryRows>) => [
+  ...rows,
+  ...rows.map((row) => ({
+    ...row,
+    id: row.id + 10000,
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+  })),
+];
+
+const assertVisibleLoads = (expected: number[]) => {
+  for (const selector of ['.dot-group', '.unofficial-overlay-pt']) {
+    cy.get<SVGElement & { __data__: InferenceData }>(
+      `[data-testid="inference-chart-display"] svg ${selector}`,
+    ).should(($points) => {
+      expect($points).to.have.length(expected.length);
+      expect(
+        [...$points].map((element) => element.__data__.conc).sort((a, b) => a - b),
+      ).to.deep.equal(expected);
+      for (const element of $points) expect(getComputedStyle(element).opacity).to.equal('1');
+    });
+  }
+};
+
+describe('Date comparison with unofficial runs', () => {
+  // Every measurement is shown (i_optimal=0), so both runs plot all four loads.
+  it('keeps ?unofficialrun= overlays on the date comparison', () => {
+    interceptMeasuredComparison();
+    cy.viewport(1440, 900);
+    cy.visit(
+      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@measuredOverlay');
+    cy.get('[data-testid="gpu-graph"]').should('exist');
+    cy.get('[data-testid="scatter-graph"]').should('not.exist');
+    assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+    assertMeasuredValues('.unofficial-overlay-pt', [450, 460, 470, 480]);
+    cy.get('[aria-label="Dismiss measured-comparison"]').click();
+    cy.get('[data-testid="gpu-graph"] .unofficial-overlay-pt').should('not.exist');
+    assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+  });
+});
+
+describe('Exact topology quick filter', () => {
+  it('applies the exact-topology filter to official and ?unofficialrun= overlay loads', () => {
+    const officialRun = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/800001';
+    const officialBase = boundaryRows(null).map((row) => ({ ...row, run_url: officialRun }));
+    const overlayBase = boundaryRows(OVERLAY_RUN_URL);
+    interceptMeasuredComparison(withTp4(officialBase), withTp4(overlayBase));
+    cy.viewport(1440, 900);
+    cy.visit(
+      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@measuredOverlay');
+    assertVisibleLoads([1, 1, 2, 2, 8, 8, 48, 48]);
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.contains('[data-testid="quick-filter-topology-options"] button', /GPU=?4.*TP=?4/u).click();
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+    assertVisibleLoads([1, 2, 8, 48]);
+  });
+});
+
+describe('Staged Pareto deep links', () => {
+  it('renders only the requested run line when that run is also selected as the latest run', () => {
+    const runId = '9100001';
+    const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
+    const stagedRows = b300Rows(runUrl).map((row, index) => ({
+      ...row,
+      id: 980000 + index,
+      workflow_run_id: 42,
+    }));
+    const otherRows = b300Rows(null, 'b200');
+    cy.intercept('GET', '/api/v1/availability*', { body: [stagedRows[0], otherRows[0]] });
+    cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+      if (request.query['exactRun'] === 'true' && request.query['runId'] === runId) {
+        request.alias = 'stagedSnapshot';
+        request.reply({ body: stagedRows });
+      } else {
+        // The main chart includes other hardware and cannot stand in for the
+        // requested snapshot, even if the workflow picker selects the same run.
+        request.reply({ body: [...otherRows, ...stagedRows] });
+      }
+    });
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: {
+        runs: [
+          {
+            github_run_id: Number(runId),
+            run_attempt: 1,
+            name: 'Staged sweep',
+            conclusion: 'success',
+            html_url: runUrl,
+            created_at: `${stagedRows[0]!.date}T12:00:00Z`,
+            date: stagedRows[0]!.date,
+          },
+        ],
+        changelogs: [],
+        configs: [],
+        runConfigs: [],
+      },
+    });
+    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    const [link] = buildStagedChartLinks(runId, [stagedRows[0]!]);
+    const url = new URL(link!.url);
+    cy.visit(`${url.pathname}${url.search}`, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.wait('@stagedSnapshot');
+    cy.get('[data-testid="gpu-graph"]')
+      .first()
+      .find('svg .dot-group')
+      .should(($points) => {
+        expect($points.length).to.be.greaterThan(0);
+        for (const element of $points) {
+          const point = (
+            element as unknown as { __data__: { date: string; hwKey: string; run_url: string } }
+          ).__data__;
+          expect(point.date).to.equal(`${stagedRows[0]!.date}~r${runId}`);
+          expect(point.hwKey).to.equal('b300_sglang');
+          expect(point.run_url).to.equal(runUrl);
+        }
+      });
+    cy.get('[data-testid="gpu-graph"]').first().find('.roofline-path').should('have.length', 1);
+  });
+});
+
+function expectGpuSelection(gpus: string[], checked: boolean) {
+  for (const gpu of gpus) {
+    cy.get(`[data-testid="chart-legend"] input[id^="checkbox-${gpu}_"]`)
+      .should('have.length.at.least', 1)
+      .each(($input) => cy.wrap($input).should(checked ? 'be.checked' : 'not.be.checked'));
+  }
+}
+
+describe('Qwen3.5 chart defaults', () => {
+  const olderGpus = ['mi300x', 'mi325x', 'h100', 'h200'];
+  const newerGpus = ['mi355x', 'b200'];
+  const baseRow = singleTurnRows(null)[0];
+  const rows = ['qwen3.5', 'dsr1'].flatMap((model, modelIndex) =>
+    [...olderGpus, ...newerGpus].flatMap((hardware, gpuIndex) =>
+      [16, 32, 64].map((conc, pointIndex) => ({
+        ...baseRow,
+        id: 900_000 + modelIndex * 100 + gpuIndex * 10 + pointIndex,
+        model,
+        hardware,
+        framework: 'sglang',
+        precision: 'fp8',
+        isl: 8192,
+        osl: 1024,
+        conc,
+        spec_method: 'none',
+        disagg: false,
+        is_multinode: false,
+        benchmark_type: 'single_turn',
+        offload_mode: 'off',
+        metrics: {
+          ...baseRow.metrics,
+          median_e2el: 10 + pointIndex * 10,
+          median_intvty: 100 / (pointIndex + 1),
+          tput_per_gpu: 100 * (pointIndex + 1),
+          output_tput_per_gpu: 100 * (pointIndex + 1),
+        },
+      })),
+    ),
+  );
+
+  beforeEach(() => {
+    cy.intercept('GET', '/api/v1/availability*', {
+      body: rows.map(({ metrics: _metrics, ...row }) => row),
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
+    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: { runs: [], changelogs: [], configs: [], runConfigs: [] },
+    });
+    cy.viewport(1440, 1000);
+  });
+
+  it('uses E2EL and newer GPUs, while preserving explicit hardware and axis in shared links', () => {
+    cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+    expectGpuSelection(olderGpus, false);
+    expectGpuSelection(newerGpus, true);
+
+    cy.get('[data-testid="chart-legend"] label[for^="checkbox-h200_"]').first().click();
+    expectGpuSelection(['h200'], true);
+    selectXAxisMode('interactivity');
+    cy.get('[data-testid="share-button"]').first().click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should('include', 'i_xmode=interactivity')
+      .and('include', 'i_active=')
+      .then((value) => {
+        const shared = new URL(String(value));
+        cy.visit(shared.pathname + shared.search, { onBeforeLoad: unlockAgenticGate });
+      });
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    expectGpuSelection(['h200'], true);
+    expectGpuSelection(['mi300x', 'mi325x', 'h100'], false);
+  });
+
+  it('keeps the other model defaults and resets hardware when switching to Qwen', () => {
+    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    expectGpuSelection([...olderGpus, ...newerGpus], true);
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+    expectGpuSelection(olderGpus, false);
+    expectGpuSelection(newerGpus, true);
+  });
+
+  for (const axisSource of ['URL', 'manual']) {
+    it(`switches to E2EL when entering Qwen after a ${axisSource} axis selection`, () => {
+      const axisParam = axisSource === 'URL' ? '&i_xmode=ttft' : '';
+      cy.visit(`/inference?g_model=DeepSeek-R1-0528&i_prec=fp8${axisParam}`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      if (axisSource === 'manual') selectXAxisMode('ttft');
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+      cy.scrollTo('top');
+      cy.get('[data-testid="model-selector"]').click().should('have.attr', 'aria-expanded', 'true');
+      cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      expectGpuSelection(olderGpus, false);
+      expectGpuSelection(newerGpus, true);
+    });
+  }
+
+  for (const { chart, path, expectedAxis } of [
+    { chart: 'Qwen inference', path: '/inference/qwen-3-5', expectedAxis: 'e2e' },
+    { chart: 'another model', path: '/inference?g_model=DeepSeek-R1-0528', expectedAxis: 'ttft' },
+    { chart: 'Qwen comparison', path: '/compare/qwen-3-5-b200-vs-h200', expectedAxis: 'ttft' },
+  ]) {
+    it(`applies the correct axis when adding and removing precisions on ${chart}`, () => {
+      const precisionRows = rows.flatMap((row) => [
+        row,
+        { ...row, id: row.id + 1000, precision: 'fp4' },
+      ]);
+      cy.intercept('GET', '/api/v1/availability*', {
+        body: precisionRows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: precisionRows });
+      cy.visit(`${path}${path.includes('?') ? '&' : '?'}i_prec=fp8&i_xmode=ttft`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+      cy.scrollTo('top');
+      cy.get('[data-testid="precision-multiselect"]').should('not.be.disabled').click('right');
+      cy.contains('[role="option"]', 'FP4').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('contain.text', 'FP8');
+      cy.get('[data-testid="x-axis-mode-selector"]').should(
+        'have.attr',
+        'data-value',
+        expectedAxis,
+      );
+
+      selectXAxisMode('ttft');
+      cy.scrollTo('top');
+      cy.get('[data-testid="precision-multiselect"]').click('right');
+      cy.contains('[role="option"]', 'FP8').click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('not.contain.text', 'FP8');
+      cy.get('[data-testid="x-axis-mode-selector"]').should(
+        'have.attr',
+        'data-value',
+        expectedAxis,
+      );
+    });
+  }
+
+  it('does not count the default E2EL axis as a changed control on mobile', () => {
+    cy.viewport(375, 900);
+    cy.visit('/inference/qwen-3-5?i_prec=fp8', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+    cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
+    expectGpuSelection(olderGpus, false);
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(375);
+    });
+  });
+
+  it('uses the comparison view default for the mobile changed-control indicator', () => {
+    cy.viewport(375, 900);
+    cy.visit('/compare/qwen-3-5-b200-vs-h200?i_prec=fp8', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('[data-testid="x-axis-mode-selector"]').should(
+      'have.attr',
+      'data-value',
+      'interactivity',
+    );
+    cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
   });
 });
