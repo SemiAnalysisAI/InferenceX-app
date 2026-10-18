@@ -407,11 +407,23 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'tpu',
     vendor: 'Google',
-    title: 'TPU Results',
-    titleZh: 'TPU 结果',
-    subtitle: 'Qwen3.5 · AgentX',
+    title: 'TPU Qwen3.5 Submission',
+    titleZh: 'TPU Qwen3.5 提交结果',
+    subtitle: 'AgentX',
     href: TPUV7_QWEN_3_5_AGENTX_URL,
     model: 'qwen-3-5',
+    analyticsEvent: 'landing_tpu_results_clicked',
+    isNew: true,
+  },
+  {
+    id: 'tpu-kimi-k3',
+    vendor: 'Google',
+    title: 'TPU Kimi K3 Submission',
+    titleZh: 'TPU Kimi K3 提交结果',
+    subtitle: '2.8 Trillion parameters AgentX',
+    subtitleZh: '2.8 万亿参数 AgentX',
+    href: '/inference/kimi-k3',
+    model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
     isNew: true,
   },
@@ -621,7 +633,9 @@ export function AgentXCompareHero({
                             )}
                           </span>
                           <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                            {result.subtitle}
+                            {locale === 'zh' && 'subtitleZh' in result
+                              ? result.subtitleZh
+                              : result.subtitle}
                           </span>
                         </span>
                       </span>

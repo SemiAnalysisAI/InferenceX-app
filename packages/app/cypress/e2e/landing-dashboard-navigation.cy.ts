@@ -102,6 +102,7 @@ interface HistoryWrite {
 
 const TPU_RESULTS_HREF =
   '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
+const TPU_KIMI_RESULTS_HREF = '/inference/kimi-k3';
 
 function assertTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
@@ -115,6 +116,14 @@ function assertTpuView() {
   cy.location('search').should('contain', 'i_prec=fp8');
   cy.location('search').should('not.contain', 'i_spec=');
   assertTpuGb300Selected();
+}
+
+function assertKimiTpuView() {
+  cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+  cy.get('[data-testid="scenario-selector"]')
+    .invoke('text')
+    .should('match', /Agentic|智能体/u);
+  cy.location('search').should('eq', '');
 }
 
 describe('landing model curation', () => {
@@ -147,14 +156,25 @@ describe('landing model curation', () => {
           .first()
           .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k3');
         cy.get('[data-testid="landing-tpu-results-link"]')
-          .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
-          .and('contain.text', 'Qwen3.5 · AgentX')
+          .should('contain.text', prefix ? 'TPU Qwen3.5 提交结果' : 'TPU Qwen3.5 Submission')
+          .and('contain.text', 'AgentX')
+          .and('not.contain.text', 'Qwen3.5 · AgentX')
           .and('have.attr', 'href', `${prefix}${TPU_RESULTS_HREF}`);
         cy.get('[data-new-badge="landing-tpu"]')
           .should('contain.text', prefix ? '新' : 'NEW')
           .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
         cy.get('[data-testid="landing-tpu-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
+          .and('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
+          .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 Submission')
+          .and('contain.text', prefix ? '2.8 万亿参数 AgentX' : '2.8 Trillion parameters AgentX');
+        cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
+        cy.get('[data-new-badge="landing-tpu-kimi-k3"]')
+          .should('contain.text', prefix ? '新' : 'NEW')
+          .and('have.class', 'new-badge-flash');
+        cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-rubin-results-link')
           .and('have.attr', 'href', `${prefix}/inference/minimax-m3`)
@@ -184,6 +204,7 @@ describe('landing model curation', () => {
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
@@ -205,6 +226,18 @@ describe('landing model curation', () => {
       assertTpuView();
       cy.reload();
       assertTpuView();
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens Kimi K3 AgentX TPU results from ${prefix || '/'} and retains them on reload`, () => {
+      interceptTpuLaunchData('Kimi-K3');
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k3`);
+      assertKimiTpuView();
+      cy.reload();
+      assertKimiTpuView();
       cy.go('back');
       cy.location('pathname').should('eq', prefix || '/');
     });
