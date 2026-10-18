@@ -51,12 +51,13 @@ describe('H3 CI artifact access', () => {
           { id: 2, name: 'Test H3 Video', path: '.github/workflows/test-h3-video.yml' },
           { id: 3, name: 'H3 Video Smoke', path: '.github/workflows/h3-video.yml' },
           { id: 4, name: 'H3 retained-media fidelity', path: '.github/workflows/h3-fidelity.yml' },
+          { id: 5, name: 'InferenceX Sweep', path: '.github/workflows/run-sweep.yml' },
         ],
       }),
     );
     const result = await GET(request());
     const data = await result.json();
-    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4]);
+    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4, 5]);
     expect(result.headers.get('cache-control')).toContain('no-store');
   });
   it('refuses a private repository before reading any artifacts', async () => {
@@ -92,7 +93,7 @@ describe('H3 CI artifact access', () => {
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(
         response({
-          name: 'h3-results-10-1',
+          name: 'h3-results-10-1-h3-sglang-h200-bf16',
           workflow_run: { id: 10 },
           size_in_bytes: 4,
           archive_download_url: 'https://evil.example',
@@ -131,6 +132,25 @@ describe('H3 CI artifact access', () => {
       run: { id: 10, conclusion: 'failure' },
       artifacts: [],
     });
+  });
+  it('discovers native row artifacts beyond the first run page without duplicating overlapping IDs', async () => {
+    const native = { id: 120, name: `h3-results-10-2-${'a'.repeat(64)}` };
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response({ id: 10, conclusion: 'failure' }))
+      .mockResolvedValueOnce(
+        response({
+          artifacts: Array.from({ length: 100 }, (_, id) => ({ id, name: 'unrelated' })),
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({ artifacts: [native, native, { id: 121, name: 'h3-results-11-1' }] }),
+      );
+    const result = await GET(request('?run=10'));
+    const data = await result.json();
+    expect(data.artifacts).toEqual([native]);
+    expect(String(fetchMock.mock.calls[3][0])).toContain('artifacts?per_page=100&page=2');
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
   });
   it('falls back to the CI ZIP when object storage is not configured', async () => {
     fetchMock.mockResolvedValueOnce(response({ private: false }));
