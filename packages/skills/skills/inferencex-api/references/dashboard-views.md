@@ -145,7 +145,80 @@ which API selectors belong together.
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                               |
 | `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                                                                                                                                                                                                                                     |
 | `ubenchx`                       | Test selector (`test`: `mem-bw`, `sm-l2-distance`, `tpc-skyline`, or `all`) plus GPU selector (`all` or one GPU). `mem-bw` returns static device-memory copy bandwidth rows with derived MBU and latency. `sm-l2-distance` returns SM-to-SM L2 latency difference matrix with GPC/die topology and summary statistics. `tpc-skyline` returns measured TPCs per GPC (sorted descending) with GPC, TPC, and SM counts, defaulting to every GPU. `all` (default) returns every test. The Y-axis selector on `/ubenchx/mem-bw` is presentation-only. |
-| `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                                                                                                                                                                                                                           |
+| `video`                         | Default VideoGenX dashboard: shared workload, deployment, axes, cost tier, API-price reference, optimal and hidden-hardware filters. `view=compare` adds published matched-case selection. Legacy run/artifact discovery/results/tradeoff remain explicit. No-store.                                                                                                                                                                                                                                                                             |
+
+### VideoGenX selection and coverage
+
+With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
+published-history projection, not CI discovery. Copy its URL selectors directly:
+`v_x`, `v_y`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
+`v_view=chart|table` is presentation only. Read resolved `params`; malformed values
+use the same defaults as the UI. Unknown/repeated query names still return 400.
+
+- Defaults: P90 seconds vs videos/USD TCO, owning tier `h`, optimal deployments
+  only; `r` selects renting. `v_optimal=0` includes dominated deployments. Queued
+  client-concurrency cells stay in evidence, outside chart/table.
+- `v_hidden` is a comma-separated roster-key list (for example `h100,mi355x`),
+  default empty. It filters chart/table only; KPI/Compare/Evidence keep their
+  original scope. Unknown keys are ignored, remaining keys are sorted/deduplicated.
+- Allocated GPUs require retained scheduler allocation evidence; native power device counts
+  do not prove the reservation. Missing allocation and allocation-normalized metrics stay null.
+- Metrics use participating GPUs. API list price is USD/video-second multiplied
+  by clip duration, not TCO, revenue or measured power. `metricDefinitions`
+  declares units and optimization direction; missing values remain null.
+- The server reads the same first **five published history pages at most** as the
+  UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
+  the inspected window; this is not all-history or date-range coverage. It applies
+  the UI's canonical workload selection, sample floor and newest-cell rules.
+- Evidence rows share one known workload and deployment layout. Hardware without
+  C1 keeps raw concurrency measurements only within that cohort, with null ratios.
+  Without any known C1 cohort, concurrency evidence is empty.
+- Default mode leaves `comparison.cases.status=not-requested`. `view=compare`
+  reads at most two already-published media artifacts and returns the matched
+  pair selected by `v_case` (zero-based), `resolvedCaseIndex`, pair count and
+  unmatched counts. `not-published`, `no-pair` and `unavailable` are explicit
+  alternatives to `ready`; `no-pair` means a missing baseline/candidate.
+  `ready` means both artifacts were read, not that a matched case exists: always
+  inspect `count` and `selected` (they can be 0 and null).
+  Returned media paths are relative; private asset URLs and raw bundles are omitted.
+- Use `view=discovery&page=1` for the CI listing, including standard `run-sweep` runs; follow `nextPage` even when a page contains no video runs. Runs may have no video artifacts. Per-run listings include all artifact pages and legacy or uniquely named native matrix artifacts. `run=…&artifact=…` retains
+  the legacy result/serving/fidelity contract; `view=results|tradeoff` is explicit.
+  Legacy selectors and `v_*` selectors cannot be mixed. Legacy missing artifacts
+  return 204; dashboard mode returns its empty/partial projection and coverage.
+
+Example (check deployed OpenAPI availability first; no authentication or write):
+
+```js
+const url = new URL('https://inferencex.semianalysis.com/api/v1/views/video');
+url.search = new URLSearchParams({
+  view: 'compare',
+  v_x: 'p50Latency',
+  v_y: 'videosPerGpuHour',
+  v_tier: 'r',
+  v_optimal: '0',
+  v_api: '0.08',
+  v_hidden: 'mi355x',
+  v_base: 'h200',
+  v_cand: 'b200',
+  v_case: '3',
+}).toString();
+const response = await fetch(url);
+if (!response.ok) throw new Error(`Video view HTTP ${response.status}`);
+const data = await response.json();
+console.log(
+  JSON.stringify({
+    params: data.params,
+    coverage: data.coverage,
+    rows: data.rows,
+    comparison: data.comparison,
+    provenance: data.provenance,
+  }),
+);
+```
+
+Measured ratios and uncalibrated media similarity do not qualify visual quality,
+energy claims or a causal compute/memory bottleneck. Preserve source IDs, seals,
+execution/publication times and coverage alongside exported values.
 
 ## Interpretation and maintenance
 

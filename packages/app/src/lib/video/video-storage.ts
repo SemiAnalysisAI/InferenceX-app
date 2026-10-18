@@ -1,3 +1,4 @@
+import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
 import { head, list, put, BlobNotFoundError } from '@vercel/blob';
 import { archiveSources, type CIArtifact } from '@/components/video-benchmark/archive';
 import {
@@ -16,6 +17,11 @@ import {
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
+import {
+  videoHistoryEntry,
+  type VideoHistoryEntry,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
 
 // Media must survive the dashboard cache's prefix-wide purge.
 const PREFIX = 'h3-video-media/v1';
@@ -32,10 +38,8 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   do {
     const page = await list({ prefix: runPrefix(runId), cursor });
     for (const blob of page.blobs) {
-      const match = /\/(?<name>h3-(?:results|video|fidelity)-\d+-\d+)_(?<id>\d+)\.json$/u.exec(
-        blob.pathname,
-      );
-      if (match?.groups)
+      const match = /\/(?<name>[^/]+)_(?<id>[1-9]\d*)\.json$/u.exec(blob.pathname);
+      if (match?.groups && videoArtifactIdentity(match.groups.name)?.run === runId)
         result.push({
           id: Number(match.groups.id),
           name: match.groups.name,
@@ -242,4 +246,56 @@ export async function storeVideoArtifact(
     signal,
   );
   return result;
+}
+
+/** Read existing immutable indexes only. This path never uploads an artifact or media. */
+export async function publishedVideoHistory(page: number): Promise<VideoHistoryPage> {
+  if (!videoStorageEnabled()) return { schemaVersion: 1, entries: [], nextPage: null };
+  const indexes: { runId: string; artifact: CIArtifact; publishedAt: string }[] = [];
+  let cursor: string | undefined;
+  // ponytail: scan index metadata; add a materialized catalog if the published inventory grows large.
+  do {
+    const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
+    for (const blob of batch.blobs) {
+      const match =
+        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>[^/]+)_(?<artifact>[1-9]\d*)\.json$/u.exec(
+          blob.pathname,
+        )?.groups;
+      if (!match || videoArtifactIdentity(match.name)?.run !== match.run) continue;
+      indexes.push({
+        runId: match.run,
+        publishedAt: blob.uploadedAt.toISOString(),
+        artifact: {
+          id: Number(match.artifact),
+          name: match.name,
+          expired: false,
+          size_in_bytes: 0,
+          stored: true,
+          indexUrl: blob.url,
+        },
+      });
+    }
+    cursor = batch.hasMore ? batch.cursor : undefined;
+  } while (cursor);
+  indexes.sort(
+    (a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.artifact.id - a.artifact.id,
+  );
+  const size = 10;
+  const entries = await Promise.all(
+    indexes.slice((page - 1) * size, page * size).map(async (index): Promise<VideoHistoryEntry> => {
+      try {
+        const saved = await readStoredArtifact(index.runId, index.artifact);
+        if (!saved) throw new Error('Published artifact unavailable');
+        return videoHistoryEntry(saved, index.publishedAt);
+      } catch (error) {
+        return {
+          id: `${index.runId}.${index.artifact.id}`,
+          ...index,
+          sources: [],
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }),
+  );
+  return { schemaVersion: 1, entries, nextPage: page * size < indexes.length ? page + 1 : null };
 }

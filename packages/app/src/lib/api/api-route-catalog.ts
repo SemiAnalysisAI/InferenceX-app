@@ -203,7 +203,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
+    sourceSha256: '63a4ab1aebb979a3c4e449fa20bb24b052c3431f492ea140944a517293464248',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -615,10 +615,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for live public CI runs and checksum-verified artifact ZIPs; uses the backend result contract rather than a published data API.',
-      zh: '供隐藏的 H3 查看器实时读取公开 CI 运行及校验和已验证的产物 ZIP；依赖后端结果契约，不作为公开数据 API 发布。',
+      en: 'Hidden H3 viewer transport for live public CI runs, checksum-verified artifact ZIPs, and read-only published history (format=history). Discovery includes standard sweeps and paginates their artifacts; publication admits checksum-verified legacy and uniquely named native artifacts. History and format=published read existing immutable indexes without publishing media; these UI contracts are not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP，以及只读的已发布历史（format=history）。发现列表包含标准 sweep，并读取运行的全部产物分页；发布流程接收校验通过的旧产物和唯一命名的原生产物。历史视图和 format=published 从既有不可变索引读取，不发布媒体；这些界面契约不作为公开数据 API。',
     },
-    sourceSha256: '74f786c85bf1289a2b4ca50e7ea240a71d775ee6dd62558461bbb0dec8ec2ca3',
+    sourceSha256: '27f071ac4da20035dddbe1751fa2461ead409548e6cb0ff9653febe6586c5f58',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -1287,6 +1287,95 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/views-api/video-dashboard.ts',
+    sourceSha256: '62bbf123e8fd9fb8ceff3724558fc99b52e842433f96266b1be4d3ed5f438036',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/tradeoff.ts',
+    sourceSha256: '7d41923b24813a8c5d511c964bf86d9360ee9bc3fa6047bac575c21208f01af9',
+    reviewArea: {
+      en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
+      zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/history.ts',
+    sourceSha256: 'c57714065521100046c4d9e452f1890b41ba73d1f857aa12e7f8903dba46d778',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/metrics.ts',
+    sourceSha256: '9d5a4cd412ded8ebc3fb4a4c3b60b8fa9081e6393c901a8431a923b651f6590b',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/points.ts',
+    sourceSha256: 'a7c5313843b44a3fed1dea989024b1be689fd4952d8c0f8119f19c41e1afaab7',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/plot.ts',
+    sourceSha256: '50e15dd8ee90b9e96b8b1083294070270044abaf26f540be9cf17f594a3883e3',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/deployment.ts',
+    sourceSha256: 'f7416efa7fc30edabdefa3802775ba2bbbdcbe106b1651a200922d30cc41430d',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/evidence.ts',
+    sourceSha256: '9b634b47e4a9dc98c5fec645592f5b7ee5a984f144f2566177c0702ebf878f46',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/compare.ts',
+    sourceSha256: '3ae75e6a93dd6db966a4a3b0d36caadc36178db28b766921759d0f26a3c2b073',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/compare-url-state.ts',
+    sourceSha256: 'ba33d95eab86de143ab08ea661908168c00ef0b6f9470bc49dab1c9d9d04f732',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/video-url-state.ts',
+    sourceSha256: 'deb6b936fdf5caf2562896ca8a96cb8a08fc5a61b3cde6dd38b866a9a3c27018',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+
+  {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
     reviewArea: {
@@ -1414,7 +1503,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '48cc9e1aef031ca1d00aaf0bf15b98a9c3421507d62fc89daa4eb2c1e42f9449',
+    sourceSha256: '11cdeb0878b02c81a2eb2d0219b2eb9aa577c2da45c14df7723b3813ae1719fe',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

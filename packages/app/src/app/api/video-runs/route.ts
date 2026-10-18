@@ -1,3 +1,5 @@
+import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
+import type { CIArtifact } from '@/components/video-benchmark/archive';
 import { type NextRequest, NextResponse } from 'next/server';
 import {
   GITHUB_API_BASE,
@@ -6,7 +8,10 @@ import {
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
+import { loadFixture } from '@/lib/testing/test-fixtures';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
+  publishedVideoHistory,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
@@ -19,7 +24,6 @@ const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
-const artifactName = /^h3-(?:results|video|fidelity)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
 function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
@@ -38,13 +42,27 @@ export async function GET(request: NextRequest) {
   const runId = query.get('run');
   const artifactId = query.get('artifact');
   const page = query.get('page') ?? '1';
+  const history = query.get('format') === 'history';
   const publishedOnly = query.get('format') === 'published';
   const media = query.get('format') === 'media' || publishedOnly;
-  if ((runId && !id(runId)) || (artifactId && (!runId || !id(artifactId))) || !id(page))
+  if (
+    (runId && !id(runId)) ||
+    (artifactId && (!runId || !id(artifactId))) ||
+    !id(page) ||
+    !Number.isSafeInteger(Number(page)) ||
+    (history && (runId || artifactId))
+  )
     return NextResponse.json(
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
+  if (history && process.env.E2E_FIXTURES === '1') {
+    const fixture = loadFixture<VideoHistoryPage>('video-history');
+    return NextResponse.json(
+      Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
+      { headers: { ...headers, 'X-VideoGenX-Replay': '1' } },
+    );
+  }
   const deadline = AbortSignal.timeout(270000);
   try {
     if (
@@ -54,6 +72,7 @@ export async function GET(request: NextRequest) {
     ) {
       // Production checks repository visibility; local reads must never publish on a cache miss.
       const url = new URL('/api/video-runs', SITE_URL);
+      if (history) url.searchParams.set('format', 'history');
       if (runId) url.searchParams.set('run', runId);
       if (artifactId) {
         url.searchParams.set('artifact', artifactId);
@@ -82,9 +101,11 @@ export async function GET(request: NextRequest) {
           )
             throw new Error('Published artifact identity mismatch');
         } else if (
-          runId
-            ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
-            : !Array.isArray(data.runs)
+          history
+            ? data.schemaVersion !== 1 || !Array.isArray(data.entries)
+            : runId
+              ? String(data.run?.id) !== runId || !Array.isArray(data.artifacts)
+              : !Array.isArray(data.runs)
         ) {
           throw new Error('Published run identity mismatch');
         }
@@ -99,6 +120,7 @@ export async function GET(request: NextRequest) {
         { error: 'Public H3 repository unavailable' },
         { status: 503, headers },
       );
+    if (history) return NextResponse.json(await publishedVideoHistory(Number(page)), { headers });
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
@@ -117,8 +139,8 @@ export async function GET(request: NextRequest) {
           { status: metaResponse.status, headers },
         );
       const artifact = await metaResponse.json();
-      const name = artifactName.exec(artifact.name ?? '');
-      if (!name || name.groups?.runId !== runId || String(artifact.workflow_run?.id) !== runId)
+      const name = videoArtifactIdentity(artifact.name ?? '');
+      if (!name || name.run !== runId || String(artifact.workflow_run?.id) !== runId)
         return NextResponse.json(
           { error: 'Artifact does not belong to this H3 run' },
           { status: 404, headers },
@@ -161,7 +183,7 @@ export async function GET(request: NextRequest) {
       return new Response(stream, { headers: { ...headers, 'Content-Type': 'application/zip' } });
     }
     if (runId) {
-      const [runResponse, artifactsResponse, saved] = await Promise.all([
+      const [runResponse, firstArtifactsResponse, saved] = await Promise.all([
         github(`/actions/runs/${runId}`),
         github(`/actions/runs/${runId}/artifacts?per_page=100`),
         storedArtifacts(runId).catch(() => []),
@@ -171,13 +193,24 @@ export async function GET(request: NextRequest) {
           { error: 'CI run unavailable' },
           { status: runResponse.status, headers },
         );
-      if (!artifactsResponse.ok)
-        return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
-      const data = await artifactsResponse.json();
-      const artifacts = (data.artifacts ?? []).filter((a: { name: string }) => {
-        const match = artifactName.exec(a.name);
-        return match?.groups?.runId === runId;
-      });
+      const artifacts: CIArtifact[] = [];
+      const seen = new Set<number>();
+      let artifactsResponse = firstArtifactsResponse;
+      for (let artifactPage = 1; ; artifactPage++) {
+        if (!artifactsResponse.ok)
+          return NextResponse.json({ error: 'Cannot list CI artifacts' }, { status: 502, headers });
+        const data: { artifacts: CIArtifact[] } = await artifactsResponse.json();
+        for (const artifact of data.artifacts ?? []) {
+          if (videoArtifactIdentity(artifact.name)?.run !== runId || seen.has(artifact.id))
+            continue;
+          seen.add(artifact.id);
+          artifacts.push(artifact);
+        }
+        if ((data.artifacts?.length ?? 0) < 100) break;
+        artifactsResponse = await github(
+          `/actions/runs/${runId}/artifacts?per_page=100&page=${artifactPage + 1}`,
+        );
+      }
       for (const stored of saved) {
         const index = artifacts.findIndex((a: { id: number }) => a.id === stored.id);
         if (index === -1) artifacts.push(stored);
@@ -198,6 +231,7 @@ export async function GET(request: NextRequest) {
         runs: runs.filter(
           (run: { name: string; display_title: string; path: string }) =>
             (run.path === '.github/workflows/e2e-tests.yml' && /\bh3\b/iu.test(run.name)) ||
+            run.path === '.github/workflows/run-sweep.yml' ||
             run.path === '.github/workflows/h3-video.yml' ||
             run.path === '.github/workflows/h3-fidelity.yml',
         ),
@@ -207,7 +241,11 @@ export async function GET(request: NextRequest) {
     );
   } catch {
     return NextResponse.json(
-      { error: 'GitHub is unavailable; retry shortly' },
+      {
+        error: history
+          ? 'Published video history is unavailable; retry shortly'
+          : 'GitHub is unavailable; retry shortly',
+      },
       { status: 502, headers },
     );
   }
