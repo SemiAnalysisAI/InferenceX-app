@@ -5,6 +5,15 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+## TCO basis
+
+Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
+read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
+on 8K/1K and Agentic Traces; inference charts show it for cost metrics when
+TPUv7 data is visible. The API accepts the pricing basis independently of
+control visibility. It changes configured ownership costs, not measured
+throughput; explicit custom costs remain user-controlled.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at

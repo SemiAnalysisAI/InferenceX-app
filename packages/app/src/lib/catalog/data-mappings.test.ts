@@ -312,10 +312,19 @@ describe('isBestPerSkuDefaultOff', () => {
 // per-model TCO Basis selector
 // ===========================================================================
 describe('showsTcoBasisSelector', () => {
-  it('shows the selector only for Qwen3.5 on 8K/1K and AgentX', () => {
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(true);
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+  it.each([Model.Qwen3_5, Model.Kimi_K3])(
+    'shows the selector for %s only on 8K/1K and AgentX',
+    (model) => {
+      for (const sequence of Object.values(Sequence)) {
+        expect(showsTcoBasisSelector(model, sequence)).toBe(
+          sequence === Sequence.EightK_OneK || sequence === Sequence.AgenticTraces,
+        );
+      }
+    },
+  );
+
+  it('keeps unrelated models hidden', () => {
+    expect(showsTcoBasisSelector(Model.Kimi_K2_5, Sequence.AgenticTraces)).toBe(false);
     expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
   });
 

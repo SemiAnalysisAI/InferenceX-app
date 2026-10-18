@@ -631,6 +631,7 @@ export function isBestPerSkuDefaultOff(
  */
 const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+  [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
 };
 
 /** Whether the TCO Basis selector is shown for this model and scenario. */

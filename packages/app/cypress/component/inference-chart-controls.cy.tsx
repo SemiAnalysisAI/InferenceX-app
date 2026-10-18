@@ -573,10 +573,26 @@ describe('Inference ChartControls cost metrics', () => {
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
+
+  for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
+    it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
+      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: Model.Kimi_K3,
+          selectedSequence: sequence,
+        },
+        globalFilters: { selectedModel: Model.Kimi_K3, effectiveSequence: sequence },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
