@@ -563,7 +563,7 @@ function ModalRenderer({
       aria-describedby={descriptionId}
       className={
         centered
-          ? `relative z-50 w-[calc(100vw-2rem)] max-w-[30rem] rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
+          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
           : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
       }
     >
@@ -578,11 +578,11 @@ function ModalRenderer({
       {content.renderContent ? (
         content.renderContent({ dismiss: onDismiss, titleId, descriptionId })
       ) : (
-        <div className={`flex flex-col ${centered ? 'gap-6' : 'gap-4'}`}>
-          <div className={centered ? 'space-y-2' : 'space-y-1.5 pr-6'}>
+        <div className={`flex flex-col ${centered ? 'gap-7' : 'gap-4'}`}>
+          <div className={centered ? 'text-center' : 'space-y-1.5 pr-6'}>
             {centered && (
-              <div className="mb-4 flex min-h-5 items-center gap-2 pr-6">
-                <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />
+              <div className="mb-5 flex min-h-5 items-center justify-center gap-2">
+                <Icon className={`size-6 shrink-0 ${content.iconClassName ?? ''}`} />
                 {content.badge && (
                   <NewBadge data-new-badge="launch-modal" flashing>
                     {localized(locale, content.badge, content.badgeZh)}
@@ -594,7 +594,7 @@ function ModalRenderer({
               id={titleId}
               className={
                 centered
-                  ? 'text-balance text-xl font-semibold leading-7'
+                  ? 'text-balance text-dialog-title font-semibold'
                   : 'flex items-center gap-2 text-lg font-semibold'
               }
             >
@@ -606,7 +606,10 @@ function ModalRenderer({
                 </NewBadge>
               )}
             </h2>
-            <p id={descriptionId} className="text-sm text-muted-foreground">
+            <p
+              id={descriptionId}
+              className={`text-sm text-muted-foreground ${centered ? 'mt-3' : ''}`}
+            >
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
