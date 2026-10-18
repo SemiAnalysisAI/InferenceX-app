@@ -178,6 +178,8 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
 - `v_hidden` is a comma-separated roster-key list (for example `h100,mi355x`),
   default empty. It filters chart/table only; KPI/Compare/Evidence keep their
   original scope. Unknown keys are ignored, remaining keys are sorted/deduplicated.
+- Allocated GPUs require retained scheduler allocation evidence; native power device counts
+  do not prove the reservation. Missing allocation and allocation-normalized metrics stay null.
 - Metrics use participating GPUs. API list price is USD/video-second multiplied
   by clip duration, not TCO, revenue or measured power. `metricDefinitions`
   declares units and optimization direction; missing values remain null.

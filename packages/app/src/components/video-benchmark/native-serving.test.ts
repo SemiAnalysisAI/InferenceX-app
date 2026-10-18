@@ -93,7 +93,7 @@ describe('native srt-slurm H3 bundle', () => {
       expect(p.rate).toBeCloseTo(240);
       expect(efficiencyValue(p, 'clipsGpu')).toBeCloseTo(120);
       expect(p.participating).toBe(2);
-      expect(p.allocated).toBe(2);
+      expect(p.allocated).toBeNull();
       expect(p.power).toBe(1201);
       expect(p.energy).toBe(18000.25);
       expect(p.powerWindow).toBe(60);
@@ -132,7 +132,7 @@ describe('native srt-slurm H3 bundle', () => {
       avgPowerW: 1201,
       enforcedLimitW: null,
       participating: 2,
-      allocated: 2,
+      allocated: null,
       replicas: null,
       wallSeconds: 60,
       durationSeconds: 4,
@@ -161,6 +161,30 @@ describe('native srt-slurm H3 bundle', () => {
       videoReleaseCoverage([{ schemaVersion: 1, nextPage: null, entries: [entry] }])[1].status,
     ).toBe('failed');
   });
+
+  it.each([null, 8])(
+    'keeps native allocation separate from two participating GPUs (%s)',
+    async (allocated) => {
+      const b = await bundle();
+      expect(at(b.ci, 'slurm_job')).toEqual({ job_id: '77', state: 'COMPLETED' });
+      if (allocated !== null)
+        set(at(b.ci, 'slurm_job'), 'AllocTRES', `cpu=128,mem=512G,node=1,gres/gpu=${allocated}`);
+      for (const p of points(b)) {
+        expect(p.allocated).toBe(allocated);
+        expect(p.participating).toBe(2);
+        expect(p.power).toBe(1201);
+        expect(efficiencyValue(p, 'clipsGpu')).toBeCloseTo(120);
+        expect(efficiencyValue(p, 'clipsAllocatedGpu')).toBe(allocated === null ? null : 30);
+      }
+      const source = videoHistoryEntry(stored(b), null).sources[0];
+      expect(source.powerVerified).toBe(true);
+      expect(source.observations.map((p) => [p.allocated, p.participating])).toEqual([
+        [allocated, 2],
+        [allocated, 2],
+        [allocated, 2],
+      ]);
+    },
+  );
 
   it('names the hardware only from the site record or the CI runner', async () => {
     expect(

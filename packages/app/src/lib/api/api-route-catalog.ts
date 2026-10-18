@@ -1224,10 +1224,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/tradeoff.ts',
-    sourceSha256: '7f954dbaa3bbc8b04f5a0b4b1e30786c6bdcfeaa642c45e841b31d04b9e99fe2',
+    sourceSha256: '62cab3b1380360a97eb04a64298abac87fc9eb2de866389730c1ae60c4459ea8',
     reviewArea: {
-      en: 'Video producer model identity, workload completeness and requested video duration.',
-      zh: '视频来源的模型身份、工作负载完整性与请求视频时长。',
+      en: 'Video producer model identity, workload completeness, requested video duration and GPU allocation evidence.',
+      zh: '视频来源的模型身份、工作负载完整性、请求视频时长与 GPU 分配证据。',
     },
   },
   {
