@@ -112,6 +112,8 @@ export interface NudgeContent {
   dismissLabelZh?: string;
   /** Label + handler for the primary CTA (modals only). */
   primaryAction?: NudgeAction;
+  /** Optional second CTA, rendered after the primary action (modals only). */
+  secondaryAction?: NudgeAction;
   /** Extra CSS class on the modal container (e.g. branded border). */
   containerClassName?: string;
   /** Render as a true center-of-page modal with a backdrop instead of a bottom-right card. */

@@ -15,7 +15,7 @@ import {
 } from '@/lib/nudges/persistence';
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
-import type { NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
+import type { NudgeAction, NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
@@ -187,23 +187,26 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     bannerShownRef.current = false;
   }, [activeBanner]);
 
-  const handleOverlayAction = useCallback(() => {
-    if (!activeOverlay) return;
-    trackNudgeEvent(activeOverlay, 'action');
-    const detail = eventDetailRef.current ?? undefined;
+  const handleOverlayAction = useCallback(
+    (action?: NudgeAction) => {
+      if (!activeOverlay) return;
+      trackNudgeEvent(activeOverlay, 'action');
+      const detail = eventDetailRef.current ?? undefined;
 
-    if (activeOverlay.type === 'toast') {
-      activeOverlay.content.action?.onClick(detail);
-    } else if (activeOverlay.type === 'modal') {
-      activeOverlay.content.primaryAction?.onClick(detail);
-    }
+      if (activeOverlay.type === 'toast') {
+        activeOverlay.content.action?.onClick(detail);
+      } else if (activeOverlay.type === 'modal') {
+        (action ?? activeOverlay.content.primaryAction)?.onClick(detail);
+      }
 
-    if (!dismissesOnAction(activeOverlay)) return;
-    markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
-    sessionDismissedRef.current.add(activeOverlay.id);
-    setActiveOverlayId(null);
-    overlayShownRef.current = false;
-  }, [activeOverlay]);
+      if (!dismissesOnAction(activeOverlay)) return;
+      markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
+      sessionDismissedRef.current.add(activeOverlay.id);
+      setActiveOverlayId(null);
+      overlayShownRef.current = false;
+    },
+    [activeOverlay],
+  );
 
   // -------------------------------------------------------------------------
   // Trigger setup
@@ -325,7 +328,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         <ToastRenderer
           def={activeOverlay}
           onDismiss={dismissOverlay}
-          onAction={handleOverlayAction}
+          onAction={() => handleOverlayAction()}
         />
       )}
       {activeOverlay?.type === 'modal' && (
@@ -484,7 +487,7 @@ function ModalRenderer({
 }: {
   def: NudgeDefinition;
   onDismiss: () => void;
-  onAction: () => void;
+  onAction: (action?: NudgeAction) => void;
 }) {
   const locale = useLocale();
   const rs = RENDERER_STRINGS[locale];
@@ -578,7 +581,7 @@ function ModalRenderer({
         <div className="flex flex-col gap-4">
           <div className="space-y-1.5 pr-6">
             <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold">
-              <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
+              <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />
               {localized(locale, content.title, content.titleZh)}
               {content.badge && (
                 <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
@@ -590,7 +593,7 @@ function ModalRenderer({
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
-          <div className="flex flex-row justify-end gap-2">
+          <div className="flex flex-row flex-wrap justify-end gap-2">
             <Button
               variant="outline"
               onClick={onDismiss}
@@ -604,13 +607,23 @@ function ModalRenderer({
             </Button>
             {content.primaryAction && (
               <Button
-                onClick={onAction}
+                onClick={() => onAction(content.primaryAction)}
                 data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
                 className={content.actionClassName}
               >
                 {content.primaryAction.icon}
                 {localized(locale, content.primaryAction.label, content.primaryAction.labelZh)}
+              </Button>
+            )}
+            {content.secondaryAction && (
+              <Button
+                onClick={() => onAction(content.secondaryAction)}
+                data-testid={content.testId ? `${content.testId}-secondary-action` : undefined}
+                className={content.actionClassName}
+              >
+                {content.secondaryAction.icon}
+                {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}
               </Button>
             )}
           </div>

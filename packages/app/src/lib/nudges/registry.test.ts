@@ -133,7 +133,7 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
   });
 
-  it.each(['tpuv7-agentx-launch-modal', 'tpuv7-qwen-3-5-agentx-banner'])(
+  it.each(['tpuv7-qwen-3-5-agentx-banner'])(
     '%s uses the announcement title without a breaking-news prefix in either locale',
     (id) => {
       const nudge = NUDGE_REGISTRY.find((entry) => entry.id === id);
@@ -148,6 +148,24 @@ describe('NUDGE_REGISTRY integrity', () => {
       'TPUv7 Kimi K2.8T prelimary Submisison: Competitive Results',
     );
     expect(banner?.content.descriptionZh).toBe('TPUv7 Kimi K2.8T 初步提交：成绩具有竞争力');
+  });
+
+  it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {
+    const location = { pathname: prefix || '/', href: '' };
+    vi.stubGlobal('window', { location });
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    expect(modal?.content.title).toBe('TPUv7 prelimary results across multiple models');
+    expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
+    expect(modal?.content.description).toBe('AgentX Preview Submissions');
+    expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');
+    expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
+    modal?.content.primaryAction?.onClick();
+    expect(location.href).toBe(
+      `${prefix}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+    );
+    expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
+    modal?.content.secondaryAction?.onClick();
+    expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
   });
 
   it('centers the TPUv7 launch modal on the landing page', () => {

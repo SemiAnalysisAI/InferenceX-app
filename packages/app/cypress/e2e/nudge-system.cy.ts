@@ -150,8 +150,8 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
       .and('have.attr', 'aria-modal', 'true')
-      .and('contain.text', 'Google TPUv7 joins AgentX')
-      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
+      .and('contain.text', 'TPUv7 prelimary results across multiple models')
+      .and('contain.text', 'AgentX Preview Submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
         // clientWidth/Height exclude the scrollbar, which the fixed overlay also excludes.
@@ -162,7 +162,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
     // Focus moves into the dialog so keyboard users land on the action.
     cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
-    cy.get('[data-testid="launch-modal-action"]').click();
+    cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
     assertTpuResultsFilters();
   });
@@ -172,7 +172,9 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]').should('be.visible').click(12, 12);
     cy.focused().should('have.attr', 'data-testid', 'launch-modal');
     cy.focused().trigger('keydown', { key: 'Tab', shiftKey: true });
-    cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
+    cy.focused().should('have.attr', 'data-testid', 'launch-modal-secondary-action');
+    cy.focused().trigger('keydown', { key: 'Tab' });
+    cy.focused().should('have.attr', 'aria-label', 'Close');
     cy.get('[data-testid="launch-modal"]').should('be.visible');
   });
 
@@ -200,13 +202,39 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.visit('/zh', { onBeforeLoad: showLaunchModal });
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
-      .and('contain.text', 'Google TPUv7 加入 AgentX')
-      .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍')
+      .and('contain.text', 'TPUv7 多模型初步结果')
+      .and('contain.text', 'AgentX 预览版提交结果')
       .and('contain.text', '稍后再看');
-    cy.get('[data-testid="launch-modal-action"]').should('contain.text', '查看结果').click();
+    cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
     cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
     assertTpuResultsFilters();
   });
+
+  for (const prefix of ['', '/zh']) {
+    it(`opens Kimi K3 and persists dismissal from ${prefix || '/'} on mobile`, () => {
+      cy.viewport(375, 812);
+      cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
+      cy.get('[data-testid="launch-modal"]')
+        .should('be.visible')
+        .within(() => {
+          cy.get('button[data-testid]')
+            .should('have.length', 3)
+            .each(($button) => {
+              const rect = $button[0].getBoundingClientRect();
+              expect(rect.left).to.be.at.least(0);
+              expect(rect.right).to.be.at.most(375);
+            });
+          cy.get('[data-testid="launch-modal-secondary-action"]')
+            .should('have.text', 'Kimi K3')
+            .click();
+        });
+      cy.location('pathname').should('eq', `${prefix}/inference/kimi-k3`);
+      cy.window().then((win) => {
+        expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
+      });
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------

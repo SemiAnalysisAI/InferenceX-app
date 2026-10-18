@@ -276,10 +276,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Google TPUv7 joins AgentX',
-      titleZh: 'Google TPUv7 加入 AgentX',
-      description: 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
-      descriptionZh: 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍',
+      title: 'TPUv7 prelimary results across multiple models',
+      titleZh: 'TPUv7 多模型初步结果',
+      description: 'AgentX Preview Submissions',
+      descriptionZh: 'AgentX 预览版提交结果',
       testId: 'launch-modal',
       containerClassName: 'border-brand/40',
       // Launch announcement — centered with a backdrop so it reads as the
@@ -290,11 +290,19 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       dismissLabel: 'Maybe Later',
       dismissLabelZh: '稍后再看',
       primaryAction: {
-        label: 'View results',
-        labelZh: '查看结果',
+        label: 'Qwen3.5',
+        labelZh: 'Qwen3.5',
         icon: <ArrowRight className="size-4" />,
         onClick: () => {
           window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        },
+      },
+      secondaryAction: {
+        label: 'Kimi K3',
+        labelZh: 'Kimi K3',
+        icon: <ArrowRight className="size-4" />,
+        onClick: () => {
+          window.location.href = localizedNudgeHref('/inference/kimi-k3');
         },
       },
     },
