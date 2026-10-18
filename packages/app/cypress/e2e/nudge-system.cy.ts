@@ -120,7 +120,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 // Landing — centered TPUv7 launch modal
 // ---------------------------------------------------------------------------
 
-const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
 const TPU_RESULTS_HREF =
   '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
 
@@ -144,6 +144,46 @@ function showLaunchModal(win: Cypress.AUTWindow) {
 }
 
 describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
+  it('shows the new announcement despite a permanent dismissal of the old one', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        showLaunchModal(win);
+        win.localStorage.setItem('inferencex-tpuv7-agentx-modal-dismissed', '1');
+      },
+    });
+    cy.get('[data-testid="launch-modal"]').should('be.visible');
+    cy.window().then((win) => {
+      expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.eq(null);
+    });
+    cy.get('[data-testid="launch-modal"] button[aria-label="Close"]').click();
+    cy.window().then((win) => {
+      expect(Number(win.localStorage.getItem(LAUNCH_MODAL_KEY))).to.be.greaterThan(1);
+      expect(win.localStorage.getItem('inferencex-tpuv7-agentx-modal-dismissed')).to.eq('1');
+    });
+  });
+
+  for (const offset of [-1, 0, 1]) {
+    it(`checks the three-day cooldown at ${offset}ms from expiry`, () => {
+      const now = Date.parse('2026-10-22T12:00:00Z');
+      cy.clock(now, ['Date']);
+      cy.visit('/', {
+        onBeforeLoad(win) {
+          showLaunchModal(win);
+          win.localStorage.setItem(
+            LAUNCH_MODAL_KEY,
+            String(now - (3 * 24 * 60 * 60 * 1000 + offset)),
+          );
+        },
+      });
+      if (offset < 0) {
+        cy.get('[data-testid="launch-banner"]').should('be.visible');
+        cy.get('[data-testid="launch-modal"]').should('not.exist');
+      } else {
+        cy.get('[data-testid="launch-modal"]').should('be.visible');
+      }
+    });
+  }
+
   for (const prefix of ['', '/zh']) {
     for (const width of [1280, 375]) {
       it(`centers each button row and loads model logos at ${width}px on ${prefix || '/'}`, () => {

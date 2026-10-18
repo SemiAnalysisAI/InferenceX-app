@@ -46,7 +46,8 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-export const TPUV7_LAUNCH_MODAL_STORAGE_KEY = 'inferencex-tpuv7-agentx-modal-dismissed';
+export const TPUV7_LAUNCH_MODAL_STORAGE_KEY =
+  'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -270,7 +271,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     id: 'tpuv7-agentx-launch-modal',
     type: 'modal',
     trigger: { type: 'immediate' },
-    dismissal: { type: 'permanent' },
+    dismissal: { type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 },
     // cypress/support/e2e.ts seeds this key so the backdrop can't cover the
     // landing UI under test; a rename here has to be mirrored there.
     storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
