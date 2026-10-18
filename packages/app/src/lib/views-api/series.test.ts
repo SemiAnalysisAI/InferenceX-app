@@ -116,6 +116,20 @@ function powerSweepRows(): BenchmarkRow[] {
 }
 
 describe('buildInferenceSeries', () => {
+  it('uses the MoRI vLLM display label while preserving API framework and hardware keys', () => {
+    const result = buildInferenceSeries(
+      [makeRow({ hardware: 'mi355x', framework: 'vllm-disagg', disagg: true })],
+      BASE_OPTIONS,
+    );
+
+    expect(result.series).toHaveLength(1);
+    expect(result.series[0]).toMatchObject({
+      hwKey: 'mi355x_vllm-disagg',
+      framework: 'vllm-disagg',
+      label: 'MI355X (MoRI vLLM)',
+    });
+  });
+
   it('keeps the FP8 SKU winner when a faster FP4 configuration exists', () => {
     const rows = [
       makeRow({ hardware: 'gb300', framework: 'dynamo-sglang' }),

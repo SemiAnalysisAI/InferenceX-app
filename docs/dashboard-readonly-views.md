@@ -198,6 +198,11 @@ and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/
 neither API selectors nor response data, framework/hardware keys, or raw CSV
 exports, so no API or OpenAPI contract change is required.
 
+The shared framework label for `vllm-disagg` is `MoRI vLLM`, including chart
+legends, tooltips, and read-only view labels. The raw framework key remains
+`vllm-disagg`; hardware keys such as `mi355x_vllm-disagg` and API selectors are
+unchanged. This display correction requires no data migration or OpenAPI change.
+
 The `/inference` Power Timeline is a different surface from the raw `gpu-metrics`
 explorer. Its existing read-only `/api/gpu-metrics?series=power` source returns
 one-second per-device buckets, role assignments and validation-source identities;

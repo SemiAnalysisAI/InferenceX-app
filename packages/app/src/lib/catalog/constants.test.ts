@@ -123,6 +123,15 @@ describe('getHardwareConfig', () => {
     expect(config.suffix).toBe('(NONEXISTENT)');
   });
 
+  it('labels disaggregated vLLM in chart legends and tooltips', () => {
+    const config = getHardwareConfig('mi355x_vllm-disagg');
+    expect(config.name).toBe('mi355x-vllm-disagg');
+    expect(config.label).toBe('MI355X');
+    expect(config.suffix).toBe('(MoRI vLLM)');
+    expect(config.gpu).toContain('MoRI vLLM');
+    expect(getHardwareConfig('mi355x_vllm-disagg_mtp').suffix).toBe('(MoRI vLLM, MTP)');
+  });
+
   it('handles GB200 NVL72 label vs gpu name divergence', () => {
     const config = getHardwareConfig('gb200_dynamo-trt');
     expect(config.label).toBe('GB200 NVL72');
