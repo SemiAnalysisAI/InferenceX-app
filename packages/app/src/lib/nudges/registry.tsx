@@ -15,6 +15,8 @@ import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
+import { ModelLogo } from '@/components/ui/model-logo';
+import { Model } from '@/lib/catalog/data-mappings';
 import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
 
@@ -287,12 +289,11 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       centered: true,
       badge: 'New',
       badgeZh: '最新',
-      dismissLabel: 'Maybe Later',
-      dismissLabelZh: '稍后再看',
+      hideDismissButton: true,
       primaryAction: {
         label: 'Qwen3.5',
         labelZh: 'Qwen3.5',
-        icon: <ArrowRight className="size-4" />,
+        icon: <ModelLogo model={Model.Qwen3_5} />,
         onClick: () => {
           window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
         },
@@ -300,7 +301,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       secondaryAction: {
         label: 'Kimi K3',
         labelZh: 'Kimi K3',
-        icon: <ArrowRight className="size-4" />,
+        icon: <ModelLogo model={Model.Kimi_K3} />,
         onClick: () => {
           window.location.href = localizedNudgeHref('/inference/kimi-k3');
         },

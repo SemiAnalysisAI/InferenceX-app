@@ -570,10 +570,10 @@ function ModalRenderer({
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
+        className={`absolute rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none ${centered ? 'right-2 top-2 flex size-9 items-center justify-center focus-visible:ring-2 focus-visible:ring-ring' : 'right-4 top-4'}`}
         aria-label={rs.close}
       >
-        <X className="size-4" />
+        <X className={centered ? 'size-5' : 'size-4'} />
       </button>
       {content.renderContent ? (
         content.renderContent({ dismiss: onDismiss, titleId, descriptionId })
@@ -593,18 +593,22 @@ function ModalRenderer({
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
-          <div className="flex flex-row flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={onDismiss}
-              data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
-            >
-              {localized(
-                locale,
-                content.dismissLabel ?? 'Maybe Later',
-                content.dismissLabelZh ?? rs.maybeLater,
-              )}
-            </Button>
+          <div
+            className={`flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`}
+          >
+            {!content.hideDismissButton && (
+              <Button
+                variant="outline"
+                onClick={onDismiss}
+                data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
+              >
+                {localized(
+                  locale,
+                  content.dismissLabel ?? 'Maybe Later',
+                  content.dismissLabelZh ?? rs.maybeLater,
+                )}
+              </Button>
+            )}
             {content.primaryAction && (
               <Button
                 onClick={() => onAction(content.primaryAction)}

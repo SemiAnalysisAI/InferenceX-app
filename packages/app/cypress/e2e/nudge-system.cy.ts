@@ -144,6 +144,56 @@ function showLaunchModal(win: Cypress.AUTWindow) {
 }
 
 describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () => {
+  for (const prefix of ['', '/zh']) {
+    for (const width of [1280, 375]) {
+      it(`centers each button row and loads model logos at ${width}px on ${prefix || '/'}`, () => {
+        cy.viewport(width, 812);
+        cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
+        cy.get('[data-testid="launch-modal"]')
+          .should('be.visible')
+          .then(($modal) => {
+            const modal = $modal[0];
+            const panel = modal.getBoundingClientRect();
+            const rows = new Map<number, DOMRect[]>();
+            modal.querySelectorAll('button[data-testid]').forEach((button) => {
+              const rect = button.getBoundingClientRect();
+              const top = Math.round(rect.top);
+              rows.set(top, [...(rows.get(top) ?? []), rect]);
+            });
+            expect(modal.querySelectorAll('button[data-testid]')).to.have.length(2);
+            expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
+            const close = modal.querySelector('button[aria-label]')!;
+            expect(close.getBoundingClientRect().width).to.eq(36);
+            expect(close.getBoundingClientRect().height).to.eq(36);
+            expect(close.querySelector('svg')!.getBoundingClientRect().width).to.eq(20);
+            for (const row of rows.values()) {
+              const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
+              const right = panel.right - Math.max(...row.map((rect) => rect.right));
+              expect(left).to.be.greaterThan(0);
+              expect(
+                Math.abs(left - right),
+                'equal space on both sides of each row',
+              ).to.be.lessThan(2);
+            }
+          });
+        for (const [action, logo] of [
+          ['action', 'qwen-color.svg'],
+          ['secondary-action', 'kimi-color.svg'],
+        ]) {
+          cy.get(`[data-testid="launch-modal-${action}"] img`)
+            .should('have.attr', 'src', `/logos/${logo}`)
+            .and('have.attr', 'alt', '')
+            .and('have.attr', 'aria-hidden', 'true')
+            .and('be.visible')
+            .should(($img) => {
+              expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+            });
+          cy.get(`[data-testid="launch-modal-${action}"] svg`).should('not.exist');
+        }
+      });
+    }
+  }
+
   it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
     interceptTpuLaunchData();
     cy.visit('/', { onBeforeLoad: showLaunchModal });
@@ -188,13 +238,15 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     });
   });
 
-  it('persists "Maybe Later" dismissal', () => {
+  it('persists close-button dismissal', () => {
     cy.visit('/', { onBeforeLoad: showLaunchModal });
-    cy.get('[data-testid="launch-modal-dismiss"]').click();
+    cy.get('[data-testid="launch-modal"] button[aria-label="Close"]').click();
     cy.get('[data-testid="launch-modal"]').should('not.exist');
     cy.window().then((win) => {
       expect(win.localStorage.getItem(LAUNCH_MODAL_KEY)).to.not.eq(null);
     });
+    cy.reload();
+    cy.get('[data-testid="launch-modal"]').should('not.exist');
   });
 
   it('localizes the modal and keeps the Chinese route tree', () => {
@@ -204,7 +256,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .should('be.visible')
       .and('contain.text', 'TPUv7 多模型初步结果')
       .and('contain.text', 'AgentX 预览版提交结果')
-      .and('contain.text', '稍后再看');
+      .and('not.contain.text', '稍后再看');
     cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
     cy.location('pathname').should('eq', '/zh/inference/qwen-3-5');
     assertTpuResultsFilters();
@@ -218,7 +270,7 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
         .should('be.visible')
         .within(() => {
           cy.get('button[data-testid]')
-            .should('have.length', 3)
+            .should('have.length', 2)
             .each(($button) => {
               const rect = $button[0].getBoundingClientRect();
               expect(rect.left).to.be.at.least(0);
