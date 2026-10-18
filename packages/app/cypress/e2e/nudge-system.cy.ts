@@ -54,10 +54,10 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
-    // Banner + header-nav badges and the flashing TPU card badge — the shared
+    // Banner + header-nav badges and both flashing TPU card badges — the shared
     // pill must render at the same fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 3)
+      .should('have.length', 4)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
