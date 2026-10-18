@@ -6,7 +6,7 @@ import {
   type MetricOptions,
   type VideoPoint,
 } from './metrics';
-import { leadCell } from './deployment';
+import { comparisonCohortKey, leadCell } from './deployment';
 import { latestVideoCells } from './points';
 import { servingCells, type ServingCell } from './serving';
 import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
@@ -31,15 +31,21 @@ export interface CompareRow {
   candidateBetter: boolean | null;
 }
 
-/**
- * One cell a reader can pick per registry hardware: its most efficient
- * non-queued deployment (per participating GPU) with a P50. Queued cells never qualify.
- */
+export function comparePointKey(point: VideoPoint | null): string | null {
+  if (!point?.hardwareKey) return null;
+  return point.producer
+    ? `${point.hardwareKey}:${point.producer.engine.name}:${point.producer.engine.revision}`
+    : point.hardwareKey;
+}
+
 export function comparablePoints(points: VideoPoint[]): VideoPoint[] {
-  const cells = latestVideoCells(points);
-  const keys = [...new Set(cells.flatMap((p) => (p.hardwareKey === null ? [] : [p.hardwareKey])))];
-  return keys.flatMap((key) => {
-    const lead = leadCell(cells, key, { tier: 'h' });
+  const groups = new Map<string, VideoPoint[]>();
+  for (const point of latestVideoCells(points)) {
+    const key = comparePointKey(point);
+    if (key !== null) groups.set(key, [...(groups.get(key) ?? []), point]);
+  }
+  return [...groups.values()].flatMap((cells) => {
+    const lead = leadCell(cells, cells[0].hardwareKey!, { tier: 'h' });
     return lead && lead.p50 !== null ? [lead] : [];
   });
 }
@@ -50,10 +56,12 @@ export function compareMetrics(
   candidate: VideoPoint,
   options: MetricOptions,
 ): CompareRow[] {
+  const cohort = comparisonCohortKey(baseline);
+  const comparable = cohort !== null && cohort === comparisonCohortKey(candidate);
   return COMPARE_METRICS.map((id) => {
     const b = metricValue(baseline, id, options);
     const c = metricValue(candidate, id, options);
-    if (b === null || c === null || !(b > 0))
+    if (!comparable || b === null || c === null || !(b > 0))
       return {
         id,
         baseline: b,

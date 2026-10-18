@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
+import {
+  deploymentKey,
+  isQueueing,
+  layoutLabel,
+  leadCell,
+  queueingStatus,
+  sharedLayoutCells,
+} from './deployment';
 import type { VideoPoint } from './metrics';
 
 const base: VideoPoint = {
@@ -39,15 +46,16 @@ const options = { tier: 'h' } as const;
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
     const c4: VideoPoint = { ...base, concurrency: 4 };
-    expect(deploymentKey(base)).toBe('4g:tp2:u2');
-    expect(deploymentKey(c4)).toBe('4g:tp2:u2');
+    expect(deploymentKey(c4)).toBe(deploymentKey(base));
     expect(
       deploymentKey({
         ...base,
         server: { tp: 1, ulysses: 4, attention: null },
       }),
-    ).toBe('4g:tp1:u4');
-    expect(deploymentKey({ ...base, participating: null, server: null })).toBe('nag:tpna:una');
+    ).not.toBe(deploymentKey(base));
+    expect(deploymentKey({ ...base, participating: null, server: null })).not.toBe(
+      deploymentKey(base),
+    );
   });
   it('treats concurrency above the replica count as queueing, with one replica when unknown', () => {
     expect(isQueueing(base)).toBe(false);
@@ -118,7 +126,7 @@ describe('deployment', () => {
     expect(leadCell([noRate], 'h200', options)?.id).toBe('e');
   });
   it('requires a known shared workload and layout at C1 for evidence comparisons', () => {
-    const matching = { ...base, id: 'b', hardwareKey: 'b200' };
+    const matching = { ...base, id: 'b', hardwareKey: 'b200', runtime: 'different-runtime' };
     const variants: VideoPoint[] = [
       {
         ...base,
@@ -141,5 +149,58 @@ describe('deployment', () => {
     expect(sharedLayoutCells([{ ...base, workloadKey: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, server: null }])).toEqual([]);
     expect(sharedLayoutCells([{ ...base, concurrency: 2, replicas: 2 }])).toEqual([]);
+  });
+  it('keeps recorded replica, Ring, CFG, offload, batch and generation configurations distinct', () => {
+    const variants: VideoPoint[] = [
+      base,
+      { ...base, replicas: 2 },
+      { ...base, runtime: 'different-runtime' },
+      { ...base, deployment: { ring: 2 } },
+      { ...base, deployment: { cfg: 2 } },
+      { ...base, deployment: { offload: { ditCpu: true } } },
+      { ...base, deployment: { batchSize: 2, scheduling: 'fixed_batch' } },
+      { ...base, deployment: { precision: 'fp8' } },
+      { ...base, deployment: { generationKey: 'steps:25' } },
+      { ...base, deployment: { acceleration: 'cache' } },
+      { ...base, server: { ...base.server!, attention: 'flash' } },
+    ];
+    expect(new Set(variants.map(deploymentKey)).size).toBe(variants.length);
+  });
+  it('uses recorded fixed-batch capacity instead of applying the legacy batch-one rule', () => {
+    const batched = {
+      ...base,
+      replicas: 2,
+      deployment: { batchSize: 2, scheduling: 'fixed_batch' },
+    };
+    expect(isQueueing({ ...batched, concurrency: 4 })).toBe(false);
+    expect(isQueueing({ ...batched, concurrency: 5 })).toBe(true);
+  });
+  it('never selects a failed-hardware observation as a representative or evidence comparison', () => {
+    const failed: VideoPoint = {
+      ...base,
+      id: 'failed',
+      wallSeconds: 100,
+      hardwareHealth: { status: 'fail', reason: 'thermal throttle', evidence: 'health.json' },
+    };
+    expect(leadCell([failed, base], 'h200', options)?.id).toBe('a');
+    expect(sharedLayoutCells([failed, base]).map((p) => p.id)).toEqual(['a']);
+  });
+
+  it('does not equate unknown batch capacity with an observed batch or configured dynamic maximum', () => {
+    const modern = { ...base, replicas: 1, concurrency: 2, deployment: { scheduling: 'dynamic' } };
+    expect(queueingStatus(modern)).toBe('unknown');
+    expect(
+      queueingStatus({ ...modern, deployment: { scheduling: 'dynamic', maxBatchSize: 1 } }),
+    ).toBe('queueing');
+    expect(
+      queueingStatus({ ...modern, deployment: { scheduling: 'dynamic', maxBatchSize: 4 } }),
+    ).toBe('unknown');
+    expect(queueingStatus({ ...modern, concurrency: null })).toBe('unknown');
+    expect(queueingStatus({ ...modern, replicas: null })).toBe('unknown');
+    expect(queueingStatus({ ...modern, replicas: null, concurrency: 1 })).toBe('unqueued');
+    expect(deploymentKey({ ...base, deployment: { batchSize: null } })).toBe(deploymentKey(base));
+    expect(deploymentKey({ ...base, deployment: { offload: { ditCpu: false } } })).not.toBe(
+      deploymentKey(base),
+    );
   });
 });

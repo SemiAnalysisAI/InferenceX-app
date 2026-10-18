@@ -1,3 +1,4 @@
+import { VIDEO_MODELS } from './models';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_VIDEO_DASHBOARD_STATE,
@@ -18,9 +19,27 @@ export function useVideoDashboardState() {
     setState(initial);
   }, []);
   const update = useCallback((patch: Partial<VideoDashboardState>) => {
+    const modelChanged = patch.model !== undefined && patch.model !== latest.current.model;
     const next = { ...latest.current, ...patch };
+    const url = new URL(location.href);
+    if (modelChanged) {
+      next.apiPrice = VIDEO_MODELS[next.model].apiReference?.pricePerVideoSecondUsd ?? null;
+      next.hidden = [];
+      next.qualityThreshold = null;
+      next.qualityMetric = 'prompt_adherence';
+      if (next.model === 'wan22' && next.y === 'quality') next.y = 'videosPerDollar';
+      for (const key of [
+        'v_base',
+        'v_cand',
+        'v_case',
+        'history-hardware',
+        'history-concurrency',
+        'history-query',
+      ])
+        url.searchParams.delete(key);
+    }
     latest.current = next;
-    history.replaceState(null, '', writeVideoDashboardState(new URL(location.href), next));
+    history.replaceState(null, '', writeVideoDashboardState(url, next));
     setState(next);
   }, []);
   return { state, update };

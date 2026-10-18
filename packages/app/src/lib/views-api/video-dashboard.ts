@@ -1,4 +1,6 @@
-import { compareMetrics } from '@/components/video-benchmark/compare';
+import { videoReleaseCoverage } from '@/components/video-benchmark/release-coverage';
+import { videoServingEvidence } from '@/components/video-benchmark/serving-evidence';
+import { compareMetrics, comparePointKey } from '@/components/video-benchmark/compare';
 import {
   readVideoCompareSelection,
   resolveCompareSelection,
@@ -12,7 +14,10 @@ import {
   powerUtilization,
   scalingVsSpec,
 } from '@/components/video-benchmark/evidence';
-import { VIDEO_HARDWARE_ROSTER } from '@/components/video-benchmark/hardware';
+import {
+  projectVideoHistoryForModel,
+  videoModelHardware,
+} from '@/components/video-benchmark/models';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
   metricValue,
@@ -22,6 +27,7 @@ import {
 } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { QUALITY_METRICS, qualityEligibility } from '@/components/video-benchmark/quality';
 import {
   metricOptions,
   readVideoDashboardState,
@@ -30,6 +36,8 @@ import {
 /** Public metadata and the dashboard's existing pure calculations; no bundle or asset URLs. */
 export function videoDashboardProjection(pages: VideoHistoryPage[], search: string) {
   const state = readVideoDashboardState(search);
+  const releaseCoverage = videoReleaseCoverage(pages);
+  pages = projectVideoHistoryForModel(pages, state.model);
   const { cells, workload, otherWorkloads } = dashboardCells(videoPoints(pages));
   const options = metricOptions(state);
   const hidden = new Set(state.hidden);
@@ -40,16 +48,37 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
   const pair = resolveCompareSelection(readVideoCompareSelection(search), cells);
   const power = powerUtilization(cells);
   const plateau = concurrencyPlateau(cells);
+  const qualityResults = cells.map((p) => ({
+    id: p.id,
+    ...qualityEligibility(p, { metric: state.qualityMetric, threshold: state.qualityThreshold }),
+  }));
   return {
     params: {
       ...state,
-      baseline: pair.baseline?.hardwareKey ?? null,
-      candidate: pair.candidate?.hardwareKey ?? null,
+      baseline: comparePointKey(pair.baseline),
+      candidate: comparePointKey(pair.candidate),
       caseIndex: pair.caseIndex,
     },
     workload,
     otherWorkloads,
+    serving: videoServingEvidence(pages),
+    quality: {
+      metric: state.qualityMetric,
+      direction: QUALITY_METRICS[state.qualityMetric].polarity,
+      readerThreshold: state.qualityThreshold,
+      thresholdProvenance:
+        state.qualityThreshold === null
+          ? null
+          : 'reader-selected URL; frozen evaluator rule still required',
+      active: state.y === 'quality' || state.qualityThreshold !== null,
+      eligible: qualityResults.filter((r) => r.eligible).length,
+      exclusions: qualityResults
+        .filter((r) => !r.eligible)
+        .map(({ id, reasons }) => ({ id, reasons })),
+      metricDefinition: QUALITY_METRICS[state.qualityMetric],
+    },
     cells,
+    releaseCoverage,
     metricDefinitions: VIDEO_METRICS,
     // Color is renderer state; use the exact plot model with an empty color.
     plot: plotVideoPoints(cells, state, () => '', hidden),
@@ -57,7 +86,7 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
       point,
       metrics: metrics(point),
     })),
-    kpis: VIDEO_HARDWARE_ROSTER.map(({ key }) => {
+    kpis: videoModelHardware(state.model, cells).map(({ key }) => {
       const point = leadCell(cells, key, options);
       return { hardwareKey: key, point: point ?? null, metrics: point ? metrics(point) : null };
     }),
@@ -85,6 +114,8 @@ export function videoDashboardProjection(pages: VideoHistoryPage[], search: stri
         unavailable: entry.error !== null,
         sources: entry.sources.map((source) => ({
           id: source.id,
+          model: source.model ?? null,
+          producer: source.producer ?? null,
           sha256: source.sha256,
           sourceSha: source.sourceSha,
           observedAt: source.observedAt,

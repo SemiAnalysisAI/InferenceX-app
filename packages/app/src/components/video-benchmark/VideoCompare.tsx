@@ -9,6 +9,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import {
   comparablePoints,
   compareMetrics,
+  comparePointKey,
   compareSide,
   pairCases,
   type CompareRow,
@@ -38,11 +39,11 @@ const STRINGS = {
   en: {
     title: 'Compare',
     subtitle:
-      'Arena-style: the same prompt and seed generated on two hardware, side by side. Pick a baseline and a candidate (each on its most efficient measured deployment); the metric deltas follow below the clips.',
+      'Compare retained clips and technical measurements across hardware or engines. Each side uses its most efficient measured deployment; deltas require the same model and workload identity.',
     baseline: 'Baseline',
     candidate: 'Candidate',
     swap: 'Swap sides',
-    needTwo: 'Comparison needs at least two measured hardware.',
+    needTwo: 'Comparison needs at least two measured hardware or engine configurations.',
     metrics: 'Metric deltas',
     metric: 'Metric',
     change: 'Change',
@@ -76,11 +77,11 @@ const STRINGS = {
   zh: {
     title: '对比',
     subtitle:
-      'Arena 式对比：同一 prompt 与 seed 在两种硬件上生成的视频并排播放。选择基线与候选硬件（各自取实测中最高效的部署），指标差异列在视频下方。',
+      '跨硬件或引擎对比保留的视频与技术测量。每侧使用最高效的实测部署；只有模型与工作负载身份一致时才显示差值。',
     baseline: '基线',
     candidate: '候选',
     swap: '交换两侧',
-    needTwo: '至少需要两种已实测的硬件才能对比。',
+    needTwo: '至少需要两种已实测的硬件或引擎配置才能对比。',
     metrics: '指标差异',
     metric: '指标',
     change: '变化',
@@ -242,11 +243,12 @@ export default function VideoCompare({
       .map((pair) => pair.key),
   );
   const hardwareOptions = measured.map((point) => ({
-    value: point.hardwareKey ?? '',
-    label: hardwareLabel(point.hardwareKey ?? ''),
+    value: comparePointKey(point) ?? '',
+    label: `${hardwareLabel(point.hardwareKey ?? '')}${point.producer ? ` · ${point.producer.engine.name} @ ${point.producer.engine.revision.slice(0, 8)}` : ''}`,
   }));
   const sideOf = { baseline, candidate } as Record<Role, VideoPoint | null>;
-  const paneLabel = (role: Role) => hardwareLabel(sideOf[role]?.hardwareKey ?? '');
+  const paneLabel = (role: Role) =>
+    hardwareOptions.find((option) => option.value === comparePointKey(sideOf[role]))?.label ?? '—';
   const paneColor = (role: Role) => colorFor(sideOf[role]?.hardwareKey ?? '');
 
   const update = (patch: Partial<VideoCompareSelection>) => {
@@ -254,16 +256,16 @@ export default function VideoCompare({
     // a collision is explicit from then on, as the URL already records it.
     const resolved = resolveCompareSelection(
       {
-        baseline: baseline?.hardwareKey ?? null,
-        candidate: candidate?.hardwareKey ?? null,
+        baseline: comparePointKey(baseline),
+        candidate: comparePointKey(candidate),
         caseIndex,
         ...patch,
       },
       points,
     );
     const next = {
-      baseline: resolved.baseline?.hardwareKey ?? null,
-      candidate: resolved.candidate?.hardwareKey ?? null,
+      baseline: comparePointKey(resolved.baseline),
+      candidate: comparePointKey(resolved.candidate),
       caseIndex: resolved.caseIndex,
     };
     setSelection(next);
@@ -278,14 +280,14 @@ export default function VideoCompare({
     const other = sideOf[side === 'baseline' ? 'candidate' : 'baseline'];
     const patch: Partial<VideoCompareSelection> = { [side]: hardware };
     // Picking the other side's hardware swaps the two instead of comparing a hardware with itself.
-    if (other?.hardwareKey === hardware && own)
-      patch[side === 'baseline' ? 'candidate' : 'baseline'] = own.hardwareKey;
+    if (comparePointKey(other) === hardware && own)
+      patch[side === 'baseline' ? 'candidate' : 'baseline'] = comparePointKey(own);
     update(patch);
     track(`video_compare_${side}_changed`, { hardware });
   };
   const swap = () => {
     if (!baseline || !candidate) return;
-    update({ baseline: candidate.hardwareKey, candidate: baseline.hardwareKey });
+    update({ baseline: comparePointKey(candidate), candidate: comparePointKey(baseline) });
     track('video_compare_swapped', {
       baseline: candidate.hardwareKey,
       candidate: baseline.hardwareKey,
@@ -364,7 +366,7 @@ export default function VideoCompare({
       >
         <VideoSelect
           label={s.baseline}
-          value={baseline?.hardwareKey ?? ''}
+          value={comparePointKey(baseline) ?? ''}
           onValueChange={(value) => choose('baseline', value)}
           options={hardwareOptions}
         />
@@ -381,7 +383,7 @@ export default function VideoCompare({
         </Button>
         <VideoSelect
           label={s.candidate}
-          value={candidate?.hardwareKey ?? ''}
+          value={comparePointKey(candidate) ?? ''}
           onValueChange={(value) => choose('candidate', value)}
           options={hardwareOptions}
         />

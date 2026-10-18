@@ -61,6 +61,34 @@ const pick = (label: string, option: string) => {
 };
 
 describe('Video compare panel (retained fixture)', () => {
+  for (const width of [1440, 390]) {
+    it(`selects two engines on H200 and restores the swap at ${width}px`, () => {
+      cy.viewport(width, 900);
+      const base = c1('h200');
+      const data: VideoPoint[] = ['sglang', 'vllm-omni'].map((engine, index) => ({
+        ...base,
+        id: `${base.id}-${engine}`,
+        p50: 100 - index * 20,
+        producer: {
+          modelRevision: 'a'.repeat(40),
+          planSha256: 'b'.repeat(64),
+          engine: {
+            name: engine === 'sglang' ? 'sglang' : 'vllm-omni',
+            revision: String(index + 1).repeat(40),
+          },
+        },
+      }));
+      mount('/video', '', data);
+      cy.get('[data-testid="video-compare-baseline"]').should('contain', 'sglang');
+      cy.get('[data-testid="video-compare-candidate"]').should('contain', 'vllm-omni');
+      pick('Baseline', 'vllm-omni');
+      cy.get('[data-testid="video-compare-baseline"]').should('contain', 'vllm-omni');
+      cy.get('[data-testid="video-compare-candidate"]').should('contain', 'sglang');
+      cy.location('search').should('contain', 'vllm-omni');
+      cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(width));
+      cy.screenshot(`video-engine-compare-${width}`);
+    });
+  }
   it('plays the same case from the slowest and fastest hardware side by side by default', () => {
     mount();
     cy.wait(['@h100', '@b200']);
@@ -224,7 +252,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-controls"]').should('have.attr', 'disabled');
     cy.get('[data-testid="video-compare"]').should(
       'contain',
-      'Comparison needs at least two measured hardware.',
+      'Comparison needs at least two measured hardware or engine configurations.',
     );
     cy.get('[data-testid="video-compare-table"]').should('not.exist');
   });

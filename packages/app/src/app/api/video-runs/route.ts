@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
+import { readVideoReplay } from '@/lib/video-replay';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
   publishedVideoHistory,
@@ -65,6 +66,8 @@ export async function GET(request: NextRequest) {
   }
   const deadline = AbortSignal.timeout(270000);
   try {
+    const replay = await readVideoReplay(query);
+    if (replay) return replay;
     if (
       process.env.NODE_ENV === 'development' &&
       !videoStorageEnabled() &&

@@ -8,6 +8,14 @@ import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
 import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
+import {
+  videoPointSchema,
+  videoProducerSchema,
+  videoReleaseCoverageSchema,
+  videoQualitySelectionSchema,
+  videoRowsSchema,
+  videoServingEvidenceSchema,
+} from './video';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
@@ -373,13 +381,25 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Video dashboard (default without run/artifact), compare (dashboard plus published matched-case records), or legacy discovery/results/tradeoff. run/artifact defaults to results. Dashboard v_* and legacy selectors cannot be mixed.',
     '视频 dashboard（未指定 run/artifact 时默认）、compare（仪表板及已发布匹配用例记录），或原有 discovery/results/tradeoff。指定 run/artifact 时默认 results。v_* 仪表板选择项不能与原有参数混用。',
   ],
+  v_model: [
+    'Video model: h3 (default) or wan22 (Wan2.2-T2V-A14B). Scopes results, serving evidence, history provenance and pricing. Wan sources use the canonical Wan-AI/Wan2.2-T2V-A14B-Diffusers identity (the earlier short ID remains accepted). No GPU measurements or quality qualification are implied by ingestion; quality axes and thresholds use the descriptive-performance defaults.',
+    '视频模型：h3（默认）或 wan22（Wan2.2-T2V-A14B）。分别筛选结果、服务记录、历史来源与价格。Wan 使用规范模型 ID Wan-AI/Wan2.2-T2V-A14B-Diffusers（兼容旧短 ID）。接入产物不代表已有 GPU 测量或通过质量验收；质量坐标轴与阈值回退至描述性能的默认值。',
+  ],
   v_x: [
     'Dashboard X metric: p90Latency (default) or p50Latency, in seconds. Invalid values use the UI default.',
     '仪表板 X 轴指标：p90Latency（默认）或 p50Latency，单位秒。无效值按界面默认值处理。',
   ],
   v_y: [
-    'Dashboard Y metric: videosPerDollar (default), dollarsPerVideo, videosPerGpuHour or kjPerVideo. Invalid values use the UI default.',
-    '仪表板 Y 轴指标：videosPerDollar（默认）、dollarsPerVideo、videosPerGpuHour 或 kjPerVideo。无效值按界面默认值处理。',
+    'Dashboard Y metric: videosPerDollar (default), dollarsPerVideo, videosPerGpuHour, kjPerVideo or quality. quality uses the selected v_quality dimension and calibrated eligible records only. Invalid values use the UI default.',
+    '仪表板 Y 轴指标：videosPerDollar（默认）、dollarsPerVideo、videosPerGpuHour、kjPerVideo 或 quality。quality 使用 v_quality 指定的维度，只显示已校准且符合条件的记录。无效值按界面默认值处理。',
+  ],
+  v_quality: [
+    'Separate human rubric dimension: prompt_adherence (default), visual_fidelity, temporal_consistency, motion_plausibility, audio_quality, audio_content or av_sync. All preserve the original higher-is-better ordinal 0–4 ratings; no composite quality score. All seven critical dimensions must satisfy their frozen calibrated rules before quality-qualified admission.',
+    '独立人工评价维度：prompt_adherence（默认）、visual_fidelity、temporal_consistency、motion_plausibility、audio_quality、audio_content 或 av_sync。保留原始 0–4 级评分，越高越好，不合成为总分。七项关键维度均须满足已冻结并校准的规则，才能进入质量前沿。',
+  ],
+  v_qmin: [
+    'Optional finite 0–4 reader threshold for v_quality. Filters calibrated pass records before Pareto selection in chart/table/CSV/API; it cannot relax the frozen protocol threshold. Missing/invalid values disable this extra filter; unjudged and uncalibrated records remain ineligible whenever quality is selected.',
+    'v_quality 的可选筛选阈值，取 0–4 的有限数值。在图表、表格、CSV 和 API 计算 Pareto 前筛选已校准且通过质量判定的记录，不能放宽已冻结的协议阈值。缺失或无效值关闭该额外筛选；选择质量指标时，未评价和未校准记录仍不具备入选资格。',
   ],
   v_tier: [
     'TCO cost tier: h (owning, default) or r (renting), from the same hardware registry as the dashboard; invalid values use h.',
@@ -394,20 +414,20 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '除值恰为 0 外，仅保留每种硬件的 Pareto 部署。作用于图表和表格；排队 cell 始终不进入这两者。',
   ],
   v_api: [
-    'Positive USD/video-second API list-price reference, rounded to four decimals; invalid values use the dated UI reference. Multiplies clip duration only, not TCO or chart efficiency.',
-    '正数 API 视频秒参考价，单位 USD/video-second，四舍五入至四位小数；无效值回退至界面带日期的参考价。仅用于乘以视频时长，不影响 TCO 或图表效率。',
+    'Positive USD/video-second API list-price reference, rounded to four decimals; invalid values use the selected model reference (H3: 0.08; Wan: null until supplied). Multiplies clip duration only, not TCO or chart efficiency.',
+    '正数 API 视频秒参考价，单位 USD/video-second，四舍五入至四位小数；无效值回退至所选模型参考价（H3：0.08；Wan：未提供时为 null）。仅用于乘以视频时长，不影响 TCO 或图表效率。',
   ],
   v_hidden: [
     'Comma-separated hidden hardware keys from the video roster; default empty, deduplicated and sorted, unknown keys ignored. Filters chart/table only, not KPI/Compare/Evidence.',
     '以逗号分隔的隐藏硬件键，仅接受视频硬件列表中的键；默认空，排序去重，忽略未知键。只筛选图表和表格，不改变 KPI、Compare 或 Evidence。',
   ],
   v_base: [
-    'Baseline hardware key; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
-    '基线硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
+    'Baseline hardware key (legacy) or hardware:engine:revision for a producer-sealed engine; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '基线硬件键（旧链接）或生产端已封存的 hardware:engine:revision；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。两侧始终为不同硬件或引擎配置：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_cand: [
-    'Candidate hardware key; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
-    '候选硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
+    'Candidate hardware key (legacy) or hardware:engine:revision for a producer-sealed engine; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '候选硬件键（旧链接）或生产端已封存的 hardware:engine:revision；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。两侧始终为不同硬件或引擎配置：若一侧与另一侧相同，则改用另一侧的默认值。',
   ],
   v_case: [
     'Zero-based matched-case index, 0–9999 (default 0). view=compare clamps it to the available pairs and returns cases.resolvedCaseIndex; dashboard leaves media not-requested.',
@@ -537,13 +557,37 @@ const NEW_VIEWS = {
     'VideoGenX dashboard and published comparison evidence',
     'VideoGenX 仪表板与已发布对比证据',
     {
-      cells: objects,
+      cells: { type: 'array', items: videoPointSchema },
+      releaseCoverage: videoReleaseCoverageSchema,
+      quality: videoQualitySelectionSchema,
+      serving: videoServingEvidenceSchema,
       metricDefinitions: object,
       plot: object,
-      rows: objects,
+      rows: videoRowsSchema,
       kpis: objects,
       comparison: object,
-      provenance: objects,
+      provenance: {
+        type: 'array',
+        items: {
+          ...object,
+          properties: {
+            sources: {
+              type: 'array',
+              items: {
+                ...object,
+                properties: {
+                  producer: videoProducerSchema,
+                  model: {
+                    type: ['string', 'null'],
+                    description:
+                      'Sealed source model identity, including preflight failures; null on legacy projections.',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       workload: { type: ['string', 'null'] },
       otherWorkloads: { type: 'integer', minimum: 0 },
       coverage: {
@@ -582,7 +626,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
       description: text(
         `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${
           view === 'video'
-            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. Allocated GPU counts require retained scheduler allocation evidence; native power device counts cannot substitute for it. Missing allocation and allocation-normalized metrics remain null. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
+            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reports the H3/Wan × SGLang/vLLM-Omni coverage of loaded sources and sealed producer identity. Technical deltas require matching model revision, selected plan and generation settings; missing quality blocks quality-normalized claims only. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. Allocated GPU counts require retained scheduler allocation evidence; native power device counts cannot substitute for it. Missing allocation and allocation-normalized metrics remain null. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'current-inferencex-image'
               ? ' ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from successful image-bearing submissions with the current active catalog. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age.'
               : view === 'gpu-metrics'

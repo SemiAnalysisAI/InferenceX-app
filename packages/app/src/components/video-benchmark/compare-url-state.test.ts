@@ -8,6 +8,8 @@ import {
   writeVideoCompareSelection,
 } from './compare-url-state';
 import type { VideoHistoryPage } from './history';
+import { comparePointKey } from './compare';
+import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
 
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -76,6 +78,36 @@ describe('video compare URL selection', () => {
     expect(
       keys(resolveCompareSelection({ baseline: 'b200', candidate: 'b200', caseIndex: 0 }, twoFast)),
     ).toEqual(['b200', 'h200']);
+  });
+  it('selects and restores distinct engines on the same GPU without changing legacy links', () => {
+    const base = points.find((point) => point.hardwareKey === 'h200' && point.concurrency === 1)!;
+    const enginePoints: VideoPoint[] = ['sglang', 'vllm-omni'].map((name, index) => ({
+      ...base,
+      id: `engine-${index}`,
+      p50: 100 - index * 20,
+      producer: {
+        modelRevision: 'a'.repeat(40),
+        planSha256: 'b'.repeat(64),
+        engine: {
+          name: name === 'sglang' ? 'sglang' : 'vllm-omni',
+          revision: String(index + 1).repeat(40),
+        },
+      },
+    }));
+    const defaults = defaultComparePair(enginePoints);
+    expect(defaults).toEqual({
+      baseline: comparePointKey(enginePoints[0]),
+      candidate: comparePointKey(enginePoints[1]),
+    });
+    const swapped = { baseline: defaults.candidate, candidate: defaults.baseline, caseIndex: 0 };
+    const url = writeVideoCompareSelection(new URL('https://x.test/video'), swapped, defaults);
+    const resolved = resolveCompareSelection(readVideoCompareSelection(url.search), enginePoints);
+    expect(resolved.baseline?.producer?.engine.name).toBe('vllm-omni');
+    expect(resolved.candidate?.producer?.engine.name).toBe('sglang');
+    expect(
+      resolveCompareSelection({ baseline: 'h200', candidate: null, caseIndex: 0 }, enginePoints)
+        .baseline,
+    ).toBe(enginePoints[0]);
   });
   it('writes only non-default params, keeps unrelated params and leaves the input alone', () => {
     const defaults = defaultComparePair(points);

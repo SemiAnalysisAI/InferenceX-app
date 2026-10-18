@@ -325,3 +325,25 @@ describe('published video history catalog', () => {
     expect(put).not.toHaveBeenCalled();
   });
 });
+
+it('discovers generic serving artifacts through the same immutable catalog without writes', async () => {
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+  const published = {
+    ...blob(10),
+    pathname: 'h3-video-media/v1/runs/10/video-serving-10-1_20.json',
+  };
+  vi.mocked(list).mockResolvedValue({ blobs: [published], hasMore: false, cursor: undefined });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    Response.json({
+      storageVersion: 1,
+      runId: '10',
+      artifact: { ...artifact, name: 'video-serving-10-1' },
+      sources: [],
+    }),
+  );
+  const artifacts = await storedArtifacts('10');
+  const page = await publishedVideoHistory(1);
+  expect(artifacts.map((a) => a.name)).toEqual(['video-serving-10-1']);
+  expect(page.entries.map((e) => e.artifact.name)).toEqual(['video-serving-10-1']);
+  expect(put).not.toHaveBeenCalled();
+});

@@ -109,6 +109,31 @@ describe('compareMetrics', () => {
     expect(energy.deltaPercent).toBeCloseTo(-30.17, 1);
     expect(energy.candidateBetter).toBe(true);
   });
+  it('compares technical measurements across engines only for the same sealed model and plan', () => {
+    const identity = {
+      modelRevision: 'a'.repeat(40),
+      planSha256: 'b'.repeat(64),
+      engine: { name: 'sglang' as const, revision: 'c'.repeat(40) },
+    };
+    const baseline = { ...c1('h200'), producer: identity, quality: null };
+    const candidate = {
+      ...baseline,
+      id: 'other-engine',
+      p50: baseline.p50! / 2,
+      producer: { ...identity, engine: { name: 'vllm-omni' as const, revision: 'd'.repeat(40) } },
+    };
+    expect(comparablePoints([baseline, candidate])).toHaveLength(2);
+    expect(compareMetrics(baseline, candidate, opts)[0].ratio).toBe(0.5);
+    for (const producer of [
+      { ...candidate.producer, modelRevision: 'e'.repeat(40) },
+      { ...candidate.producer, planSha256: 'e'.repeat(64) },
+      null,
+    ]) {
+      const metrics = compareMetrics(baseline, { ...candidate, producer }, opts);
+      expect(metrics.every((metric) => metric.ratio === null)).toBe(true);
+      expect(metrics[0].candidate).toBe(candidate.p50);
+    }
+  });
   it('flips the verdict when the slower hardware is the candidate', () => {
     const rows = compareMetrics(c1('b200'), c1('h200'), opts);
     expect(row(rows, 'p50Latency').ratio).toBeCloseTo(1.9323, 3);
@@ -317,14 +342,14 @@ describe('compareSide', () => {
     set(document(inconsistent.sources[0], 'manifest.json'), 'mode', 'fidelity');
     expect(() => compareSide(misbundled, h100)).toThrow('Stored result identity mismatch');
     expect(() => compareSide(inconsistent, h100)).toThrow(
-      'Invalid H3 serving matrix: CI identity does not match the manifest',
+      'Invalid video serving matrix: CI identity does not match the manifest',
     );
     expect(() =>
       compareSide(
         { ...inconsistent, sources: [...inconsistent.sources, ...misbundled.sources] },
         h100,
       ),
-    ).toThrow('Invalid H3 serving matrix: CI identity does not match the manifest');
+    ).toThrow('Invalid video serving matrix: CI identity does not match the manifest');
     // A readable source without the cell does not prove the unreadable one lacked it.
     const readable = stored(h100.runId, h100.artifactId, hardware);
     expect(() =>

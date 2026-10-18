@@ -1,3 +1,5 @@
+import { canonicalVideoModelId } from './models';
+
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export const ROLES = ['baseline', 'candidate'] as const;
 export function at(value: Json | undefined, ...keys: (string | number)[]): Json {
@@ -86,6 +88,15 @@ export async function readVerifiedFiles(
   return { files, documents, checksums };
 }
 
+/** Resolve sealed producer identity; an optional result must agree with its manifest. */
+export function bundleModel(manifest: Json, result: Json): string | null {
+  const declared = canonicalVideoModelId(text(at(manifest, 'workload_plan', 'model_id')));
+  const observed = canonicalVideoModelId(text(at(result, 'workload', 'plan', 'model_id')));
+  if (declared && observed && declared !== observed)
+    throw new Error('Manifest and result identify different video models');
+  return declared || observed || null;
+}
+
 export async function loadBundle(read: (path: string) => Promise<Blob>): Promise<Bundle> {
   const { files, documents, checksums } = await readVerifiedFiles(read, 'manifest.json');
   const manifest = documents.get('manifest.json') ?? null;
@@ -129,6 +140,7 @@ export async function loadBundle(read: (path: string) => Promise<Blob>): Promise
       at(result, 'execution', 'ci', 'run_id') !== at(manifest, 'run_id'))
   )
     throw new Error('Unsupported or mismatched H3 result contract');
+  bundleModel(manifest, result);
   return {
     manifest,
     result,

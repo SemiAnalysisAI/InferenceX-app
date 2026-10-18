@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { at, loadBundle, type Bundle, type Json } from './bundle';
+import { videoReleaseCoverage } from './release-coverage';
 import { nativeHardware } from './hardware';
 import { videoHistoryEntry } from './history';
 import { servingFixture } from './serving.fixture';
@@ -141,6 +142,26 @@ describe('native srt-slurm H3 bundle', () => {
     expect(source.observations[0].workloadKey).toEqual(expect.any(String));
   });
 
+  it('retains the sealed engine identity and failed status from a producer startup-failure replay', async () => {
+    const directory = join(import.meta.dirname, 'fixtures', 'native-startup-failure');
+    const failed = await loadBundle(
+      async (path) => new Blob([await readFile(join(directory, path))]),
+    );
+    const saved = stored(failed);
+    saved.runId = '123456790';
+    saved.sources[0].id = saved.runId;
+    const entry = videoHistoryEntry(saved, '2026-10-18T00:00:00Z');
+    const source = entry.sources[0];
+    expect(source.execution).toBe('failed');
+    expect(source.producer?.engine.name).toBe('vllm-omni');
+    expect(source.producer?.planSha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(source.observations).toEqual([]);
+    expect(source.serving?.[0].scheduled).toBe(0);
+    expect(
+      videoReleaseCoverage([{ schemaVersion: 1, nextPage: null, entries: [entry] }])[1].status,
+    ).toBe('failed');
+  });
+
   it.each([null, 8])(
     'keeps native allocation separate from two participating GPUs (%s)',
     async (allocated) => {
@@ -252,7 +273,7 @@ describe('native srt-slurm H3 bundle', () => {
     for (const [name, defect] of defects) {
       const b = await bundle();
       defect(b);
-      expect(() => servingCells(b), name).toThrow('Invalid H3 serving matrix:');
+      expect(() => servingCells(b), name).toThrow('Invalid video serving matrix:');
     }
   });
 

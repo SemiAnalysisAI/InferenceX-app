@@ -1,0 +1,327 @@
+{
+  "provenance": {
+    "description": "Read-only projection of retained artifacts; no new execution. All measured records retained; decoder details and infrastructure fields omitted.",
+    "h200": {
+      "runId": "35533977848",
+      "runUrl": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35533977848",
+      "artifactMember": "gpu/c1/baseline/run.json",
+      "sha256": "31d57c9ade99bb6fc553a317a764c58c73331b48d9cf3da5314bd370976c7b30"
+    },
+    "amd": {
+      "runId": "35986548616",
+      "runUrl": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35986548616",
+      "artifactMember": "serving-smoke.json",
+      "sha256": "17ae678ba828de00ea4046f39d4d22375a608d4ea4a7af1756c23ca8ccf719a6"
+    }
+  },
+  "h200": {
+    "id": "c1",
+    "concurrency": 1,
+    "cell": {
+      "status": "complete",
+      "completion": {
+        "scheduled": 20,
+        "completed": 20,
+        "valid": 20,
+        "failed": 0,
+        "not_started": 0
+      }
+    },
+    "run": {
+      "summary": {
+        "completed": 20,
+        "failed": 0,
+        "failed_attempts": 0,
+        "invalid_completed": 0,
+        "latency_max_seconds": 290.75736394990236,
+        "latency_mean_seconds": 290.3732462304877,
+        "latency_median_seconds": 290.3730132339988,
+        "latency_min_seconds": 289.86329363589175,
+        "latency_sample_stddev_seconds": 0.21760976791751133,
+        "latency_samples": 20,
+        "media_validation_median_seconds": 1.0842243559891358,
+        "not_started": 0,
+        "scheduled": 20,
+        "submit_to_media_median_seconds": 289.2909479374066,
+        "submit_to_terminal_median_seconds": 289.28318243008107,
+        "technical_success_rate": 1.0,
+        "valid": 20,
+        "valid_clips_per_second": 0.003457026195178493
+      },
+      "serving": {
+        "mode": "closed_loop",
+        "submitted": 20,
+        "outcomes": {
+          "completed": 20,
+          "interrupted": 0,
+          "invalid_media": 0,
+          "not_started": 0,
+          "provider_cancelled": 0,
+          "provider_failed": 0,
+          "timed_out": 0,
+          "transport_error": 0,
+          "validation_error": 0
+        },
+        "delivery_deadline_seconds": null
+      },
+      "records": [
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "warmup",
+          "sha256": "460c0260cb3f2835ca0272bf12c1396eda1d5953f2e4478bbb865912371752f5",
+          "slot_id": "warmup-001",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "460c0260cb3f2835ca0272bf12c1396eda1d5953f2e4478bbb865912371752f5",
+          "slot_id": "measurement-r001-c001",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "1d4ad8784f5227abc93641623454c803490ae6e947b4f537681cea35df5a8f4e",
+          "slot_id": "measurement-r001-c002",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "c8eff0108706cf47df6e141e3ebe38e21b6b153741c00a0b150ac24c0ee7a158",
+          "slot_id": "measurement-r001-c003",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "7047c402370b6e7477a438a0364b6da30865b088adb46d9ba58a07f59e565893",
+          "slot_id": "measurement-r001-c004",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "ebff8e5a0b4cc44468c99e266dd11aa1c29a80ab724912084867ea2ce3721551",
+          "slot_id": "measurement-r001-c005",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "93601caa44a5077e3f02c3b7278ed61fda0a4685a50c0ab99e79b5a04d238e10",
+          "slot_id": "measurement-r001-c006",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "717272b921de5e9fbb24693d8ddec6ec788a2fb61d6758976d62c3ab5766f85e",
+          "slot_id": "measurement-r001-c007",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "d95f685c61406b25ba91728c557a94ce58401579f989c1b9b5dddf73296134f3",
+          "slot_id": "measurement-r001-c008",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "483c4f39aec29867cd85ad56c8a6aa08ee3d02ef13dff1dc218c250ad63d4932",
+          "slot_id": "measurement-r001-c009",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "85f00771502271861517783d87f384973efd945a70c6d3db1a808a9d2a841aca",
+          "slot_id": "measurement-r001-c010",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "21fafc4d1f2157c634ac77b77f256dc264ac2186c9d37c59d92bf098b7e81a36",
+          "slot_id": "measurement-r001-c011",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "119254f969ed96a03ace89c41cec348d8393942b06b09dd69d679d73e8ab4efc",
+          "slot_id": "measurement-r001-c012",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "5d2d414d0966fb4f90b1bab94c70e2e84c85d7ea262f5b2abbfb4d2ef3a5c964",
+          "slot_id": "measurement-r001-c013",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "1738206d6e6732d8969758c8a2b97b6770d650b85cb80fbd3a85b73be2a43753",
+          "slot_id": "measurement-r001-c014",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "52777e2e86db835ed5992bd32fc0c7aa686eb916c9d13e6bf50fc2eb87fcef5c",
+          "slot_id": "measurement-r001-c015",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "c435474e06123894229e5d440b90b10cd408b019eb1060444f2daa17cceb9105",
+          "slot_id": "measurement-r001-c016",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "bcc783d3b2abc437d342fc08a0447715a5e54b47bbc3b59e8c28d057c0ca8c93",
+          "slot_id": "measurement-r001-c017",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "eedc35099b9c9daf4da92153eb9b5336b33faa71baaad278c12a10f9e7542290",
+          "slot_id": "measurement-r001-c018",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "261c31990cfa70a5bf7bd2bcf87ba489facbcbbb001e4eceeb920141384aa1b2",
+          "slot_id": "measurement-r001-c019",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        },
+        {
+          "attempted": true,
+          "outcome": "completed",
+          "phase": "measurement",
+          "sha256": "e4a06d32812cd2fb17072e0f9bebfe08170b47b4397b9016f9a30a381d2b396b",
+          "slot_id": "measurement-r001-c020",
+          "status": "succeeded",
+          "media": {
+            "valid": true
+          }
+        }
+      ]
+    },
+    "spec": null
+  },
+  "amd": {
+    "id": "c1",
+    "concurrency": 1,
+    "cell": {
+      "completion": {
+        "attempted": 0,
+        "completed": 0,
+        "failed": 20,
+        "not_started": 20,
+        "scheduled": 20,
+        "unfinished": 0,
+        "valid": 0
+      },
+      "concurrency": 1,
+      "receipt": {
+        "path": "gpu/c1/gpu-job.json",
+        "sha256": "ec68a39add00fe1cad74760ad7348c05251bda315a649af1eb625be9f05d0b53"
+      },
+      "status": "failed",
+      "verified": false
+    },
+    "run": null,
+    "spec": null
+  }
+}

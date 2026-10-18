@@ -11,6 +11,7 @@ import { layoutLabel } from './deployment';
 import { formatMetric, metricLabel, type VideoPoint } from './metrics';
 import { plotVideoPoints, type PlottedVideoPoint } from './plot';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
+import { qualityMeasurement } from './quality';
 
 export const VIDEO_CHART_ID = 'video-hardware';
 /** Matches ChartSection's default `${analyticsPrefix}_zoom_reset_${chartId}`. */
@@ -19,30 +20,39 @@ export const VIDEO_ZOOM_RESET_EVENT = `video_zoom_reset_${VIDEO_CHART_ID}`;
 const STRINGS = {
   en: {
     single: (layouts: string) =>
-      `One deployment measured per hardware so far (${layouts}), so each hardware is a single point. A per-hardware Pareto curve needs the GPUs-per-video sweep.`,
+      `Measured observations are shown as separate points (${layouts}). A frontier line requires distinct measured deployments for the same hardware within a comparable cohort.`,
     multi:
-      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); faded points are dominated deployments.",
+      'Solid lines join eligible measured frontier deployments within each hardware and comparable cohort; faded points are dominated. Segments guide the eye, without estimating unmeasured configurations.',
     multiOptimal:
-      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); dominated deployments are hidden. Turn off Optimal Only to show them.",
+      'Solid lines join eligible measured frontier deployments within each hardware and comparable cohort. Segments guide the eye, without estimating unmeasured configurations. Turn off Optimal Only to show dominated deployments.',
     controls:
       'Shift+scroll to zoom; drag to pan; double-click to reset. Click a point to pin its details.',
     deployment: 'Deployment',
     n: 'valid samples',
     run: 'run',
     noData: 'No hardware has both selected metrics for this configuration.',
+    emptyCaption: 'No eligible measured points for the current filters.',
+    noQuality:
+      'No deployment has complete, calibrated evidence for this quality dimension. Unjudged or uncalibrated results cannot enter a quality-qualified frontier.',
+    noQualityMatch:
+      'No deployment meets the selected quality conditions. Review the threshold, decision status and sample coverage.',
   },
   zh: {
     single: (layouts: string) =>
-      `目前每种硬件只测得一种部署（${layouts}），因此每种硬件只有一个点；要得到各硬件自己的 Pareto 曲线，还需扫描每条视频占用的 GPU 数。`,
+      `实测观测以独立散点展示（${layouts}）。前沿连线需要同一硬件、同一可比组内不同部署的实测结果。`,
     multi:
-      '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；淡色点为被支配的部署。',
+      '实线连接同一硬件、同一可比组内符合条件的实测前沿部署；淡色点为被支配的部署。线段仅帮助读图，不估计未测量的配置。',
     multiOptimal:
-      '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；被支配的部署已隐藏，关闭“仅最优”可显示。',
+      '实线连接同一硬件、同一可比组内符合条件的实测前沿部署。线段仅帮助读图，不估计未测量的配置。关闭“仅最优”可显示被支配的部署。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。点击数据点可固定详情。',
     deployment: '部署',
     n: '有效样本',
     run: '运行',
     noData: '当前配置下没有硬件同时具备所选的两个指标。',
+    emptyCaption: '当前筛选条件下没有符合条件的实测点。',
+    noQuality:
+      '暂无部署具备该质量维度完整且经过校准的证据。尚未评判或未经校准的结果不能进入质量合格前沿。',
+    noQualityMatch: '暂无部署满足当前质量条件。请检查阈值、判定状态和样本覆盖。',
   },
 };
 
@@ -84,19 +94,63 @@ export default function VideoHardwareChart({
     group: Selection<SVGGElement, unknown, null, undefined>,
     x: ContinuousScale,
     y: ContinuousScale,
+    width: number,
+    height: number,
   ) => {
-    group
+    const labels = group
       .selectAll<SVGTextElement, PlottedVideoPoint>('text.video-point-label')
       .data(plotted, (p) => p.id)
       .join('text')
       .attr('class', 'video-point-label')
       .attr('x', (p) => x(p.x) + 10)
       .attr('y', (p) => y(p.y) - 10)
+      .attr('text-anchor', 'start')
+      .attr('display', (p) =>
+        x(p.x) < 0 || x(p.x) > width || y(p.y) < 0 || y(p.y) > height ? 'none' : null,
+      )
       .attr('font-size', px(CHART_TYPE.axisLabel))
       .attr('font-weight', (p) => (p.optimal ? 600 : 400))
       .attr('fill', (p) => (p.optimal ? 'var(--foreground)' : 'var(--muted-foreground)'))
       .attr('pointer-events', 'none')
       .text(pointLabel);
+    const placed: { x: number; y: number; width: number; height: number }[] = [];
+    labels.each(function (p) {
+      if (this.getAttribute('display') === 'none') return;
+      let box = this.getBBox();
+      if (box.width > width) {
+        this.textContent = pointLabel(p)
+          .replace(' 张 GPU', ' GPU')
+          .replace(' GPU', 'G')
+          .replace('Ulysses ', 'U')
+          .replace(' × ', '/');
+        box = this.getBBox();
+      }
+      if (box.x + box.width > width) {
+        this.setAttribute('text-anchor', 'end');
+        this.setAttribute('x', String(x(p.x) - 10));
+        box = this.getBBox();
+      }
+      // Keep the measured label inside the clip and choose the nearest free row.
+      const left = Math.max(0, Math.min(width - box.width, box.x));
+      const top = Math.max(0, Math.min(height - box.height, box.y));
+      const neighbors = placed.filter((b) => left < b.x + b.width && left + box.width > b.x);
+      const candidates = [
+        top,
+        ...neighbors.flatMap((b) => [b.y - box.height - 4, b.y + b.height + 4]),
+      ];
+      const nextTop =
+        candidates
+          .filter((candidate) => candidate >= 0 && candidate + box.height <= height)
+          .sort((a, b) => Math.abs(a - top) - Math.abs(b - top))
+          .find((candidate) =>
+            neighbors.every(
+              (b) => candidate + box.height + 4 <= b.y || candidate >= b.y + b.height + 4,
+            ),
+          ) ?? top;
+      this.setAttribute('x', String(Number(this.getAttribute('x')) + left - box.x));
+      this.setAttribute('y', String(Number(this.getAttribute('y')) + nextTop - box.y));
+      placed.push({ x: left, y: nextTop, width: box.width, height: box.height });
+    });
   };
   // Both axes start at zero so per-dollar and per-video readings compare by length, not offset.
   const xDomain = zeroAnchoredDomain(
@@ -154,10 +208,18 @@ export default function VideoHardwareChart({
               group,
               (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
               (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+              ctx.width,
+              ctx.height,
             );
           },
           onZoom: (group, ctx) =>
-            drawLabels(group, ctx.newXScale as ContinuousScale, ctx.newYScale as ContinuousScale),
+            drawLabels(
+              group,
+              ctx.newXScale as ContinuousScale,
+              ctx.newYScale as ContinuousScale,
+              ctx.width,
+              ctx.height,
+            ),
         },
       ]}
       tooltip={{
@@ -176,13 +238,27 @@ export default function VideoHardwareChart({
       noDataOverlay={
         plotted.length === 0 ? (
           <p className="text-sm text-muted-foreground" role="status">
-            {s.noData}
+            {state.y === 'quality' || state.qualityThreshold !== null
+              ? points.some(
+                  (p) =>
+                    qualityMeasurement(p, state.qualityMetric)?.calibration?.status ===
+                    'calibrated',
+                )
+                ? s.noQualityMatch
+                : s.noQuality
+              : s.noData}
           </p>
         ) : undefined
       }
       caption={
         <p className="text-xs text-muted-foreground" data-testid="video-chart-caption">
-          {multiLayout ? (state.optimal ? s.multiOptimal : s.multi) : s.single(layouts || '—')}
+          {plotted.length === 0
+            ? s.emptyCaption
+            : multiLayout
+              ? state.optimal
+                ? s.multiOptimal
+                : s.multi
+              : s.single(layouts || '—')}
         </p>
       }
     />

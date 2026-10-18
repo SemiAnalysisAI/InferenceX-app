@@ -1,4 +1,4 @@
-import type { Bundle, Json } from './bundle';
+import { at, rows, type Bundle, type Json } from './bundle';
 
 const hash = (name: string) => name.padEnd(64, '0');
 
@@ -226,4 +226,43 @@ export function servingFixture(
       slurm_job: { AllocTRES: 'cpu=32,mem=512G,node=1,gres/gpu=2' },
     },
   });
+}
+
+/** Synthetic video-only producer contract, never measured Wan performance. */
+export function wanServingFixture(requests = 20) {
+  const fixture = servingFixture('123', 'NVIDIA H200', requests);
+  for (const document of [fixture.manifest, ...fixture.documents.values()]) {
+    if (document === null || typeof document !== 'object' || Array.isArray(document)) continue;
+    const value = document;
+    const plan = value.workload_plan ?? value.plan;
+    if (plan !== null && typeof plan === 'object' && !Array.isArray(plan)) {
+      plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B-Diffusers';
+      plan.generation = {
+        width: 832,
+        height: 480,
+        frame_count: 81,
+        fps: 16,
+        num_inference_steps: 40,
+        guidance_scale: 4,
+        guidance_scale_2: 3,
+        flow_shift: 12,
+        negative_prompt: '',
+      };
+    }
+    if (value.bundle_type === 'h3_serving_smoke_matrix')
+      value.bundle_type = 'video_serving_smoke_matrix';
+    if (value.evidence_kind === 'controlled_h3_gpu') value.evidence_kind = 'controlled_video_gpu';
+    if (value.bundle_type === 'mvp_run') {
+      value.evidence_kind = 'live_video';
+      Object.assign(at(value, 'serving')!, { valid_video_seconds_per_second: 81 / 16 / 120 });
+      for (const record of rows(at(value, 'records')))
+        Object.assign(at(record, 'media', 'video')!, { duration_seconds: 81 / 16 });
+    }
+    if (value.bundle_type === 'video_serving_smoke_matrix')
+      for (const cell of rows(at(value, 'cells')))
+        Object.assign(at(cell, 'metrics', 'serving')!, {
+          valid_video_seconds_per_second: 81 / 16 / 120,
+        });
+  }
+  return fixture;
 }
