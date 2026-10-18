@@ -1,3 +1,4 @@
+import { videoArtifactIdentity } from '@/components/video-benchmark/artifact-identity';
 import { head, list, put, BlobNotFoundError } from '@vercel/blob';
 import { archiveSources, type CIArtifact } from '@/components/video-benchmark/archive';
 import {
@@ -37,10 +38,8 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   do {
     const page = await list({ prefix: runPrefix(runId), cursor });
     for (const blob of page.blobs) {
-      const match = /\/(?<name>h3-(?:results|video|fidelity)-\d+-\d+)_(?<id>\d+)\.json$/u.exec(
-        blob.pathname,
-      );
-      if (match?.groups)
+      const match = /\/(?<name>[^/]+)_(?<id>[1-9]\d*)\.json$/u.exec(blob.pathname);
+      if (match?.groups && videoArtifactIdentity(match.groups.name)?.run === runId)
         result.push({
           id: Number(match.groups.id),
           name: match.groups.name,
@@ -259,10 +258,10 @@ export async function publishedVideoHistory(page: number): Promise<VideoHistoryP
     const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
     for (const blob of batch.blobs) {
       const match =
-        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>h3-(?:results|video|fidelity)-(?<producer>[1-9]\d*)-[1-9]\d*)_(?<artifact>[1-9]\d*)\.json$/u.exec(
+        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>[^/]+)_(?<artifact>[1-9]\d*)\.json$/u.exec(
           blob.pathname,
         )?.groups;
-      if (!match || match.run !== match.producer) continue;
+      if (!match || videoArtifactIdentity(match.name)?.run !== match.run) continue;
       indexes.push({
         runId: match.run,
         publishedAt: blob.uploadedAt.toISOString(),

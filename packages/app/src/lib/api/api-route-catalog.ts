@@ -615,10 +615,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for live public CI runs, checksum-verified artifact ZIPs, and read-only published history (format=history). History projects existing immutable indexes without publishing media; these UI contracts are not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP，以及只读的已发布历史（format=history）。历史视图从既有不可变索引生成，不发布媒体；这些界面契约不作为公开数据 API。',
+      en: 'Hidden H3 viewer transport for live public CI runs, checksum-verified artifact ZIPs, and read-only published history (format=history). Discovery includes standard sweeps and paginates their artifacts; publication admits checksum-verified legacy and uniquely named native artifacts. History and format=published read existing immutable indexes without publishing media; these UI contracts are not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP，以及只读的已发布历史（format=history）。发现列表包含标准 sweep，并读取运行的全部产物分页；发布流程接收校验通过的旧产物和唯一命名的原生产物。历史视图和 format=published 从既有不可变索引读取，不发布媒体；这些界面契约不作为公开数据 API。',
     },
-    sourceSha256: '0ae586743620bbd78125d9a5326d132b51258d73cab6bbb91f59df13440ac52b',
+    sourceSha256: '27f071ac4da20035dddbe1751fa2461ead409548e6cb0ff9653febe6586c5f58',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',

@@ -12,6 +12,12 @@ Two launchers produce the serving matrix, and `serving.ts` keys the contract on 
 
 Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
 
+## Publication and discovery
+
+The `publish-video-results` repository dispatch starts publication for its `source_run_id`; scheduled and manual catch-up use the same job. The publication job follows every catalog `nextPage`, including empty filtered pages, and deduplicates run/artifact IDs. Each per-run lookup reads all GitHub artifact pages. Standard `run-sweep.yml` runs join legacy H3 workflows in discovery; a sweep with no video artifact remains empty. An explicit `H3_RUN_ID` limits catch-up to one run. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails; timeout or failure is not proof that the catalog was fully processed.
+
+Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. Publishing still writes immutable objects before the index; history and Compare only read published indexes. Low-sample and failed sources remain history entries, without changing chart admission.
+
 ## Evidence boundaries
 
 - Only descriptive observations are shown: this version has no selected matched baseline and computes no before/after delta.
@@ -25,6 +31,10 @@ Each observation also carries the cell's participating and allocated GPU counts,
 `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
 ## 中文说明
+
+`publish-video-results` repository dispatch 为指定 `source_run_id` 启动发布；定时任务和手动补发布复用同一任务。发布任务跟随所有 `nextPage`，包括筛选后为空的页面，并对运行和产物 ID 去重。单次运行会读取 GitHub 产物列表的全部分页；标准 `run-sweep.yml` 也进入发现列表，没有视频产物的 sweep 保持为空。`H3_RUN_ID` 可将补发布限定到一个运行。某个产物失败后仍尝试后续产物，但任务最终报告失败；超时或失败不代表完整处理了目录。
+
+原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。发布继续先写不可变对象、最后写索引；历史和 Compare 只读已发布索引。失败或低样本来源保留在历史中，不降低图表门槛。
 
 `/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 

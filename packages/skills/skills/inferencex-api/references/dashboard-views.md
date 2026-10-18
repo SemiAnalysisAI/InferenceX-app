@@ -179,7 +179,7 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
   `ready` means both artifacts were read, not that a matched case exists: always
   inspect `count` and `selected` (they can be 0 and null).
   Returned media paths are relative; private asset URLs and raw bundles are omitted.
-- Use `view=discovery&page=1` for the prior CI listing. `run=…&artifact=…` retains
+- Use `view=discovery&page=1` for the CI listing, including standard `run-sweep` runs; follow `nextPage` even when a page contains no video runs. Runs may have no video artifacts. Per-run listings include all artifact pages and legacy or uniquely named native matrix artifacts. `run=…&artifact=…` retains
   the legacy result/serving/fidelity contract; `view=results|tradeoff` is explicit.
   Legacy selectors and `v_*` selectors cannot be mixed. Legacy missing artifacts
   return 204; dashboard mode returns its empty/partial projection and coverage.
