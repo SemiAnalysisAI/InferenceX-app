@@ -425,4 +425,14 @@ describe('tooltip — Total GPUs line', () => {
     expect(html).toContain('Total Chips');
     expect(html).toContain('32');
   });
+
+  it('shows data parallelism for aggregate rows only when DP exceeds 1', () => {
+    const withDp = generateTooltipContent(
+      tooltipConfig({ data: pt({ tp: 1, physicalChips: 8, dp: 8 }) }),
+    );
+    expect(withDp).toMatch(/Data Parallelism:<\/strong> 8</u);
+
+    const withoutDp = generateTooltipContent(tooltipConfig({ data: pt({ tp: 8, dp: 1 }) }));
+    expect(withoutDp).not.toContain('Data Parallelism');
+  });
 });

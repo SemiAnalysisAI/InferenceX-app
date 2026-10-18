@@ -810,7 +810,8 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
       tooltipLine(t.deployment, deployment) +
       tooltipLine(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)) +
       (aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : '') +
-      (aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : '')
+      (aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : '') +
+      (d.dp && d.dp > 1 ? tooltipLine(t.dataParallelism, d.dp) : '')
     );
   }
 
