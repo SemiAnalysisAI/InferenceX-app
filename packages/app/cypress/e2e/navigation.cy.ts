@@ -240,8 +240,8 @@ describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
         .and(
           'contain.text',
           locale
-            ? 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍'
-            : 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+            ? 'TPUv7 Kimi K2.8T 初步提交：成绩具有竞争力'
+            : 'TPUv7 Kimi K2.8T prelimary Submisison: Competitive Results',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/inference/qwen-3-5`);
