@@ -32,19 +32,22 @@ export function assertTpuGb300Selected() {
   cy.get('body').type('{esc}');
 }
 
-export function interceptTpuLaunchData() {
+export function interceptTpuLaunchData(
+  model: 'Qwen-3.5-397B-A17B' | 'Kimi-K3' = 'Qwen-3.5-397B-A17B',
+) {
+  const rows =
+    model === 'Kimi-K3'
+      ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
+      : qwenAgenticRows;
   // Preserve other models and any test-specific availability overrides.
   cy.intercept('GET', '/api/v1/availability*', (request) => {
     request.on('response', (response) => {
-      response.body = [
-        ...response.body,
-        ...qwenAgenticRows.map(({ metrics: _metrics, ...row }) => row),
-      ];
+      response.body = [...response.body, ...rows.map(({ metrics: _metrics, ...row }) => row)];
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
-    if (request.query.model === 'Qwen-3.5-397B-A17B') {
-      request.reply({ body: qwenAgenticRows });
+    if (request.query.model === model) {
+      request.reply({ body: rows });
     }
   });
 }
