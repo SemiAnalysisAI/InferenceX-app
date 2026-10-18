@@ -208,7 +208,7 @@ describe('createUnofficialWatermark', () => {
     expect(Number(rect.attr('height'))).toBe(innerHeight);
   });
 
-  it('inserts one large background image behind the warning pattern', () => {
+  it('inserts one pointing Muse mascot behind the warning pattern without intercepting input', () => {
     const { svg, defs } = makeSvg();
     createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 
@@ -216,10 +216,11 @@ describe('createUnofficialWatermark', () => {
     expect(images.size()).toBe(1);
 
     const image = d3.select(images.node()!);
-    expect(image.attr('href')).toBe('/decorative/kanye-west.png');
+    expect(image.attr('href')).toBe('/decorative/pointing-muse.webp');
     expect(image.attr('preserveAspectRatio')).toBe('xMidYMid meet');
     expect(image.attr('opacity')).toBe('0.22');
     expect(image.attr('pointer-events')).toBe('none');
+    expect(image.attr('aria-hidden')).toBe('true');
     expect(Number(image.attr('x'))).toBe(margin.left);
     expect(Number(image.attr('y'))).toBe(margin.top);
     expect(Number(image.attr('width'))).toBe(innerWidth);

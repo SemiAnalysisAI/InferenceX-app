@@ -3,7 +3,7 @@ import type * as d3 from 'd3';
 import type { ChartMargin } from './types';
 import { CHART_TYPE, px } from './typography';
 
-const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/kanye-west.png';
+const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/pointing-muse.webp';
 
 /** Insert the watermark backing rect, masked to the inner chart area. */
 function insertWatermarkRect(
@@ -124,7 +124,7 @@ export function createUnofficialWatermark(
   insertWatermarkRect(svg, innerWidth, innerHeight, margin, patternId);
 
   // Insert after the warning rect so :first-child places the image behind it.
-  // Source: https://freepngimg.com/png/16388-kanye-west-png-image (CC BY-NC 4.0).
+  // Asset provenance: public/decorative/pointing-muse.md.
   svg
     .insert('image', ':first-child')
     .attr('class', 'unofficial-watermark-image')
