@@ -67,7 +67,9 @@ export function packedSkillSuite() {
     return join(cwd, target === 'codex' ? '.agents' : '.claude', 'skills/inferencex-api');
   }
   const suite = { temporaryRoot, environment, project, node, run, query, install };
+  // Downstream setup hooks consume the archive synchronously.
   before(() => {
+    succeeded(node([join(packageRoot, 'scripts/update-integrity.mjs'), '--check']));
     const suppliedArchive = process.env.INFERENCEX_SKILLS_ARCHIVE;
     const suppliedHash = process.env.INFERENCEX_SKILLS_ARCHIVE_SHA256;
     assert.equal(
