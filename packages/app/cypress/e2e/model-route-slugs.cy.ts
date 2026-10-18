@@ -113,44 +113,6 @@ function expectBestPerSku(enabled: boolean) {
   cy.contains('button', 'Done').click();
 }
 
-Cypress.on('fail', (err) => {
-  const doc = (cy as any).state('document') as Document | undefined;
-  if (!doc) throw err;
-  const win = doc.defaultView!;
-  const desc = (e: Element | null) =>
-    e
-      ? `${e.tagName}${e.getAttribute("data-testid") ? `[${  e.getAttribute('data-testid')  }]` : ''}.${String(e.className).slice(0, 25)} pe=${win.getComputedStyle(e).pointerEvents} z=${win.getComputedStyle(e).zIndex}`
-      : 'null';
-  const done = [...doc.querySelectorAll('button')].filter((b) => b.textContent === 'Done');
-  const info = {
-    t: Math.round(win.performance.now()),
-    url: win.location.search,
-    body: `pe=${doc.body.style.pointerEvents} locked=${doc.body.dataset.scrollLocked}`,
-    bodyKids: [...doc.body.children].map(
-      (c) => `${c.tagName}#${c.id}.${String(c.className).slice(0, 20)}`,
-    ),
-    overlays: [...doc.querySelectorAll('div.fixed.inset-0')].map(
-      (o) => `${desc(o)} state=${o.getAttribute("data-state")} parent=${desc(o.parentElement)}`,
-    ),
-    dialogs: [...doc.querySelectorAll('[role=dialog],[role=alertdialog]')].map((d) => {
-      const r = d.getBoundingClientRect();
-      return `${desc(d)} state=${d.getAttribute("data-state")} rect=${r.top | 0},${r.left | 0},${r.bottom | 0},${r.right | 0} sh=${d.scrollHeight} ch=${d.clientHeight} st=${(d as HTMLElement).scrollTop} op=${win.getComputedStyle(d).opacity} anims=${d.getAnimations().length}`;
-    }),
-    done: done.map((b) => {
-      const r = b.getBoundingClientRect();
-      return `rect=${r.top | 0},${r.left | 0},${r.bottom | 0},${r.right | 0} pe=${win.getComputedStyle(b).pointerEvents} stack=${doc
-        .elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2)
-        .slice(0, 4)
-        .map(desc)
-        .join(' > ')}`;
-    }),
-    toasts: [...doc.querySelectorAll('[role=status]')].map(desc),
-    viewport: `${win.innerWidth}x${win.innerHeight} scrollY=${win.scrollY}`,
-  };
-  err.message += `\nDIAG ${JSON.stringify(info)}`;
-  throw err;
-});
-
 function visitModel(model: string, extra = '', path = '/inference') {
   cy.intercept('GET', '/api/v1/availability', { body: modelSelectionAvailability });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
