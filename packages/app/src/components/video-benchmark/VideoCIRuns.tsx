@@ -19,6 +19,7 @@ import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
 import type { Bundle } from './bundle';
 import { archiveSources, type CIArtifact, type CIRun } from './archive';
 import { comparisonRefs, rememberComparison } from './comparison';
+import { videoView } from './view';
 
 const STRINGS = {
   en: {
@@ -117,7 +118,11 @@ function share(runId: number, artifactId?: number, source?: string, cell?: strin
   history.replaceState(null, '', url);
 }
 
-export default function VideoCIRuns() {
+export default function VideoCIRuns({
+  initialView,
+}: {
+  initialView: ReturnType<typeof videoView>;
+}) {
   const s = STRINGS[useLocale()];
   const [runs, setRuns] = useState<CIRun[]>([]);
   const [run, setRun] = useState<CIRun | null>(null);
@@ -134,18 +139,18 @@ export default function VideoCIRuns() {
   const [sourceId, setSourceId] = useState('');
   const [nextPage, setNextPage] = useState<number | null>(1);
   const [loadError, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(initialView === 'results');
   const [progress, setProgress] = useState('');
   const [direct, setDirect] = useState('');
   const [manual, setManual] = useState(false);
   const [cellId, setCellId] = useState('');
-  const [view, setView] = useState('');
+  const [view, setView] = useState(initialView);
   const [browsing, setBrowsing] = useState(false);
   const [compared, setCompared] = useState<TradeoffRun[]>([]);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState(false);
   const comparisonDownload = useRef<AbortController | null>(null);
-  const changeView = (value: string) => {
+  const changeView = (value: ReturnType<typeof videoView>) => {
     if (value === 'history') {
       request.current++;
       download.current?.abort();
@@ -474,13 +479,13 @@ export default function VideoCIRuns() {
   }
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const initialView = params.get('view') ?? (params.has('run') ? 'results' : 'history');
-    setView(['history', 'tradeoff'].includes(initialView) ? initialView : 'results');
+    const requestedView = videoView(params.get('view') ?? undefined, params.has('run'));
+    setView(requestedView);
     if (params.has('compare')) void restoreComparison();
     const directRun = params.get('run');
-    if (directRun)
+    if (requestedView !== 'history' && directRun)
       void selectRun(directRun, params.get('artifact'), params.get('source'), params.get('cell'));
-    else if (initialView === 'results') void openPublished();
+    else if (requestedView === 'results') void openPublished();
 
     return () => {
       request.current++;
@@ -621,7 +626,7 @@ export default function VideoCIRuns() {
         )}
         {run && !loading && !loadError && artifacts.length === 0 && <p>{s.none}</p>}
       </Card>
-      {loading && !selectedSource && (
+      {view === 'results' && loading && !selectedSource && (
         <div className="grid gap-4 lg:grid-cols-3" aria-hidden="true">
           <Skeleton className="h-72" />
           <Skeleton className="aspect-video" />

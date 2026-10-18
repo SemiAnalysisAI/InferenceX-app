@@ -1,5 +1,5 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
+import VideoCIRuns from '../support/video-page';
 import { videoHistoryEntry } from '@/components/video-benchmark/history';
 import { servingArtifact, videoRun } from '../support/video-artifacts';
 
@@ -32,6 +32,31 @@ describe('Published video result navigation', () => {
     cy.location('search').should('contain', 'view=results').and('contain', 'run=123');
     cy.get('@recent.all').should('have.length', 0);
   });
+  for (const width of [1440, 390]) {
+    it(`keeps a retained run dormant on History at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.window().then((win) =>
+        win.history.replaceState(null, '', `${win.location.pathname}?view=history&run=123`),
+      );
+      cy.mount(
+        <PathnameContext.Provider value="/video">
+          <VideoCIRuns />
+        </PathnameContext.Provider>,
+      );
+      cy.wait('@published');
+      cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+      cy.get('@run.all').should('have.length', 0);
+      cy.get('@media.all').should('have.length', 0);
+      cy.get('[data-slot="skeleton"]').should('not.exist');
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.contains('button', 'Videos & result').click();
+      cy.wait('@run');
+      cy.get('[data-testid="serving-selected-metrics"]').should('be.visible');
+      cy.screenshot(`video-history-entry-${width}`);
+    });
+  }
   it('shows the Chinese published empty state and scans CI only after an explicit request', () => {
     cy.intercept('GET', '/api/video-runs?format=history&page=1', {
       schemaVersion: 1,

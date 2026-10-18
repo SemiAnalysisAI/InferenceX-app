@@ -2,6 +2,8 @@
 
 `/video` and `/zh/video` default to **Performance history**. Explicit run/artifact/source/cell URLs retain the existing video viewer. `?view=results` opens the first readable artifact/source from the newest published page; `?view=history` restores history. History filters use `history-hardware`, `history-concurrency`, and `history-query` in the URL. Videos & result follows the same published-first path when no run is selected; empty or failed reads show a recoverable message. Browse CI runs explicitly opens legacy Actions discovery. Returning to History cancels pending result selection; Refresh and reload preserve the selected artifact/source/cell.
 
+The requested tab is resolved in the server response. An explicit `view=history` keeps a retained `run` dormant until Results is opened; result loading placeholders do not appear in History.
+
 ## Read path
 
 `GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing published H3 indexes. It lists `h3-video-media/v1/runs/` metadata, validates pathname identities, sorts by index publication time (artifact ID breaks ties), then reads at most ten indexes for one page. It neither downloads media nor calls the publication path. The repository visibility check still applies. This UI transport is not a stable public benchmark API.

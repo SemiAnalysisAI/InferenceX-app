@@ -1,5 +1,5 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
+import VideoCIRuns from '../support/video-page';
 import ResultPower from '@/components/video-benchmark/ResultPower';
 import VideoSelect from '@/components/video-benchmark/VideoSelect';
 import { videoHistoryEntry } from '@/components/video-benchmark/history';

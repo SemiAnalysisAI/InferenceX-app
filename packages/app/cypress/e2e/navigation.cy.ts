@@ -380,6 +380,36 @@ describe('H3 video artifact viewer', () => {
       nextPage: null,
     });
   });
+  for (const [path, width] of [
+    ['/video', 1440],
+    ['/zh/video', 390],
+  ] as const) {
+    it(`hydrates and reloads ${path} History without opening its retained run`, () => {
+      cy.viewport(width, 900);
+      cy.intercept('GET', '/api/video-runs?run=123', {
+        run: videoRun(123, 'success'),
+        artifacts: [],
+      }).as('retainedRun');
+      cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+        schemaVersion: 1,
+        entries: [videoHistoryEntry(servingArtifact(), null)],
+        nextPage: null,
+      }).as('retainedHistory');
+      cy.visit(`${path}?view=history&run=123`);
+      cy.wait('@retainedHistory');
+      cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+      cy.get('@retainedRun.all').should('have.length', 0);
+      cy.get('[data-testid="video-ci-runs"] [data-slot="skeleton"]').should('not.exist');
+      cy.reload();
+      cy.wait('@retainedHistory');
+      cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+      cy.get('@retainedRun.all').should('have.length', 0);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.screenshot(`video-history-reload-${width}`);
+    });
+  }
   it('opens old published entries by default and restores history filters after reload', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
     cy.intercept('GET', '/api/video-runs?format=history&page=1', {
