@@ -166,6 +166,15 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
             expect(close.getBoundingClientRect().width).to.eq(36);
             expect(close.getBoundingClientRect().height).to.eq(36);
             expect(close.querySelector('svg')!.getBoundingClientRect().width).to.eq(20);
+            const actions = [...modal.querySelectorAll('button[data-testid]')].map((button) =>
+              button.getBoundingClientRect(),
+            );
+            expect(Math.abs(actions[0].width - actions[1].width)).to.be.lessThan(1);
+            expect(actions[0].top).to.eq(actions[1].top);
+            expect(actions[0].height).to.be.at.least(44);
+            const heading = modal.querySelector('h2')!.getBoundingClientRect();
+            const badge = modal.querySelector('[data-new-badge]')!.getBoundingClientRect();
+            expect(badge.bottom).to.be.lessThan(heading.top);
             for (const row of rows.values()) {
               const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
               const right = panel.right - Math.max(...row.map((rect) => rect.right));

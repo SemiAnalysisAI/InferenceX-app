@@ -563,7 +563,7 @@ function ModalRenderer({
       aria-describedby={descriptionId}
       className={
         centered
-          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+          ? `relative z-50 w-[calc(100vw-2rem)] max-w-[30rem] rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
           : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
       }
     >
@@ -578,12 +578,29 @@ function ModalRenderer({
       {content.renderContent ? (
         content.renderContent({ dismiss: onDismiss, titleId, descriptionId })
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="space-y-1.5 pr-6">
-            <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold">
-              <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />
+        <div className={`flex flex-col ${centered ? 'gap-6' : 'gap-4'}`}>
+          <div className={centered ? 'space-y-2' : 'space-y-1.5 pr-6'}>
+            {centered && (
+              <div className="mb-4 flex min-h-5 items-center gap-2 pr-6">
+                <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />
+                {content.badge && (
+                  <NewBadge data-new-badge="launch-modal" flashing>
+                    {localized(locale, content.badge, content.badgeZh)}
+                  </NewBadge>
+                )}
+              </div>
+            )}
+            <h2
+              id={titleId}
+              className={
+                centered
+                  ? 'text-balance text-xl font-semibold leading-7'
+                  : 'flex items-center gap-2 text-lg font-semibold'
+              }
+            >
+              {!centered && <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />}
               {localized(locale, content.title, content.titleZh)}
-              {content.badge && (
+              {!centered && content.badge && (
                 <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
                   {localized(locale, content.badge, content.badgeZh)}
                 </NewBadge>
@@ -594,7 +611,14 @@ function ModalRenderer({
             </p>
           </div>
           <div
-            className={`flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`}
+            className={
+              centered &&
+              content.hideDismissButton &&
+              content.primaryAction &&
+              content.secondaryAction
+                ? 'grid grid-cols-2 gap-3'
+                : `flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`
+            }
           >
             {!content.hideDismissButton && (
               <Button
@@ -614,7 +638,7 @@ function ModalRenderer({
                 onClick={() => onAction(content.primaryAction)}
                 data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
-                className={content.actionClassName}
+                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
               >
                 {content.primaryAction.icon}
                 {localized(locale, content.primaryAction.label, content.primaryAction.labelZh)}
@@ -624,7 +648,7 @@ function ModalRenderer({
               <Button
                 onClick={() => onAction(content.secondaryAction)}
                 data-testid={content.testId ? `${content.testId}-secondary-action` : undefined}
-                className={content.actionClassName}
+                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
               >
                 {content.secondaryAction.icon}
                 {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}

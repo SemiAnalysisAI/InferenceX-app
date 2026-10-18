@@ -4,6 +4,7 @@ The TPUv7 launch modal's copy and model buttons are presentation-only navigation
 Qwen3.5 keeps its existing filtered URL; Kimi K3 opens its existing model route.
 Centered button rows and shared model logos are also presentation-only.
 The launch modal omits its footer dismiss button and keeps a larger close control and Escape dismissal.
+Its compact announcement layout separates the badge from the title and gives both model actions equal width.
 No data selectors, defaults, calculations, API contracts, or skills change.
 
 The replacement for #901 starts from the repository default branch, master.
