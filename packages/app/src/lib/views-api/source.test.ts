@@ -6,7 +6,7 @@ import { ViewsUpstreamError } from './upstream-error';
 
 describe('Kimi K3 TCO selection', () => {
   it.each(['8k/1k', 'agentic'])('preserves both pricing bases for %s', (sequence) => {
-    const search = new URLSearchParams({ model: 'kimik3', sequence });
+    const search = new URLSearchParams({ model: Model.Kimi_K3, sequence });
     const defaults = selection(search);
     expect(defaults.model).toBe(Model.Kimi_K3);
     expect(defaults.sequence).toBe(
