@@ -11,7 +11,6 @@ import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import { SCATTER_RENDERED_EVENT } from '@/lib/nudges/agentic-point-coach-mark';
 import { GRADIENT_NUDGE_EVENT } from '@/lib/nudges/registry';
 import {
   useInferenceActions,
@@ -59,7 +58,6 @@ import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
   getOverlayLineLabel,
-  OVERLAY_LABEL_MARKER,
   overlayRunTag,
 } from '@/lib/benchmarks/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -787,8 +785,8 @@ const ScatterGraph = React.memo(
               direction === 'lower_left' ||
               direction === 'lower_right'
             ) {
-              const selection = bestSeriesPerSku(data, direction);
-              for (const key of bestSeriesPerSku(overlayData.data, direction)) {
+              const selection = bestSeriesPerSku(data, direction, selectedPrecisions);
+              for (const key of bestSeriesPerSku(overlayData.data, direction, selectedPrecisions)) {
                 selection.add(`overlay:${key}`);
               }
               commitUnifiedSelection(selection);
@@ -804,6 +802,7 @@ const ScatterGraph = React.memo(
         overlayData,
         chartDefinition,
         selectedYAxisMetric,
+        selectedPrecisions,
         data,
         commitUnifiedSelection,
         resetUnifiedSelection,
@@ -2976,9 +2975,6 @@ const ScatterGraph = React.memo(
 
           renderLineLabels(zoomGroup, lineLabels, {
             seriesAttribute: 'data-series-id',
-            // Plain coloured run names next to their lines, not boxes over the plot.
-            appearance: 'text',
-            halo: ir.getCssColor('--card'),
             iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
@@ -2999,10 +2995,6 @@ const ScatterGraph = React.memo(
               const runTag = meta?.runTag ?? '';
               let coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
               if (runTag) coreLabel = coreLabel.slice(0, -runTag.length);
-              // Overlay pills lead with the run marker; the hardware behind it is
-              // parsed like an official pill so the GPU name stays bold.
-              const marker = coreLabel.startsWith(OVERLAY_LABEL_MARKER) ? OVERLAY_LABEL_MARKER : '';
-              coreLabel = coreLabel.slice(marker.length);
               const hardwareLabel = getDisplayLabel(config);
               const isHardwareLabel =
                 coreLabel === hardwareLabel || coreLabel.startsWith(`${config.label} `);
@@ -3016,32 +3008,21 @@ const ScatterGraph = React.memo(
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
-              const markerSegments = marker
-                ? [{ className: 'll-marker', text: marker, fill: label.color, weight: '600' }]
-                : [];
               const runSegments = runTag
-                ? [
-                    {
-                      className: 'll-run',
-                      text: runTag,
-                      fill: ir.getCssColor('--muted-foreground'),
-                      weight: '400',
-                    },
-                  ]
+                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
                 : [];
               const variantSegments = suffix
-                ? [{ className: 'll-variant', text: suffix, fill: label.color, weight: '500' }]
+                ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
-                    ...markerSegments,
-                    { className: 'll-gpu', text: config.label, fill: label.color, weight: '700' },
+                    { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
                     ...(precisionLabel
                       ? [
                           {
                             className: 'll-precision',
                             text: precisionLabel,
-                            fill: label.color,
+                            fill: 'white',
                             weight: '600',
                           },
                         ]
@@ -3051,7 +3032,7 @@ const ScatterGraph = React.memo(
                           {
                             className: 'll-engine',
                             text: engineLabel,
-                            fill: ir.getCssColor('--muted-foreground'),
+                            fill: '#d1d5db',
                             weight: '400',
                           },
                         ]
@@ -3060,11 +3041,10 @@ const ScatterGraph = React.memo(
                     ...variantSegments,
                   ]
                 : [
-                    ...markerSegments,
                     {
                       className: 'll-plain',
                       text: coreLabel,
-                      fill: label.color,
+                      fill: 'white',
                       weight: '600',
                     },
                     ...runSegments,
@@ -3075,7 +3055,7 @@ const ScatterGraph = React.memo(
                 .data(segments, (segment) => segment.className)
                 .join('tspan')
                 .attr('class', (segment) => segment.className)
-                .style('fill', (segment) => segment.fill)
+                .attr('fill', (segment) => segment.fill)
                 .attr('font-weight', (segment) => segment.weight)
                 .attr('x', null)
                 .attr('dy', null)
@@ -3821,10 +3801,6 @@ const ScatterGraph = React.memo(
 
         avoidPointLabelCollisions(zoomGroup);
 
-        // Tell the nudge engine the chart has painted, so an anchored coach
-        // mark can retry resolving a point to point at. This fires once per
-        // full render, never per zoom frame.
-        window.dispatchEvent(new CustomEvent(SCATTER_RENDERED_EVENT));
         // Log tick formatting on initial render
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;

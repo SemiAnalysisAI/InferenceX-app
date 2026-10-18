@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  AGENTIC_COACH_MARK_STORAGE_KEY,
-  AGENTIC_POINT_ACTION_SELECTOR,
-} from './agentic-point-coach-mark';
-import { dismissesOnAction } from './policy';
-import {
   NUDGE_REGISTRY,
   TELEMETRY_TUTORIAL_STORAGE_KEY,
   TPUV7_LAUNCH_MODAL_STORAGE_KEY,
@@ -74,7 +69,6 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('contains the expected set of migrated nudges', () => {
     const ids = NUDGE_REGISTRY.map((n) => n.id).toSorted();
     expect(ids).toEqual([
-      'agentic-point-detail',
       'agentx-telemetry-tutorial',
       'eval-samples',
       'export',
@@ -139,6 +133,15 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
   });
 
+  it.each(['tpuv7-agentx-launch-modal', 'tpuv7-qwen-3-5-agentx-banner'])(
+    '%s uses the announcement title without a breaking-news prefix in either locale',
+    (id) => {
+      const nudge = NUDGE_REGISTRY.find((entry) => entry.id === id);
+      expect(nudge?.content.title).toBe('Google TPUv7 joins AgentX');
+      expect(nudge?.content.titleZh).toBe('Google TPUv7 加入 AgentX');
+    },
+  );
+
   it('centers the TPUv7 launch modal on the landing page', () => {
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     expect(modal?.scope).toBe('landing');
@@ -159,18 +162,15 @@ describe('NUDGE_REGISTRY integrity', () => {
     }
   });
 
-  it('anchors the agentic coach mark to the inference chart, dismissed for good on a point click', () => {
-    const coachMark = NUDGE_REGISTRY.find((n) => n.id === 'agentic-point-detail');
-
-    expect(coachMark?.type).toBe('coach-mark');
-    expect(coachMark?.scope).toBe('dashboard');
-    expect(coachMark?.dismissal.type).toBe('permanent');
-    expect(coachMark?.storageKey).toBe(AGENTIC_COACH_MARK_STORAGE_KEY);
-    expect(dismissesOnAction(coachMark!)).toBe(true);
-    expect(coachMark?.content.anchor?.actionSelector).toBe(AGENTIC_POINT_ACTION_SELECTOR);
-    expect(typeof coachMark?.content.anchor?.getRect).toBe('function');
-    expect(typeof coachMark?.content.anchor?.getMutationRoot).toBe('function');
-    expect(AGENTIC_COACH_MARK_STORAGE_KEY).toBe('inferencex-agentic-point-coach-mark-dismissed');
+  it('does not register the retired agentic point callout', () => {
+    expect(
+      NUDGE_REGISTRY.some(
+        (nudge) =>
+          nudge.id === 'agentic-point-detail' ||
+          nudge.content.testId === 'agentic-point-coach-mark' ||
+          nudge.storageKey === 'inferencex-agentic-point-coach-mark-dismissed',
+      ),
+    ).toBe(false);
   });
 
   it('ships a Chinese translation for every user-visible nudge string', () => {

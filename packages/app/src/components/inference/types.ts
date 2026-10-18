@@ -727,6 +727,7 @@ export interface InferenceDisplayContextType {
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
   selectedXAxisMode: XAxisMode;
+  defaultXAxisMode: XAxisMode;
   scaleType: 'auto' | 'linear' | 'log';
   /** Comparison series overlaid on a gated power metric (`i_pcompare`). */
   powerCompare: PowerCompare;

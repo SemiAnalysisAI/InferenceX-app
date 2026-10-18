@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '436f0f797c1d80798436eced2067ff4885b9e46c82969562d0d37192987863c3',
+    sourceSha256: '8cf74590a89a4aa56a4e9dff001bc5e58d456492cc7b09d71e7b90690f1d7f34',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1472,6 +1472,15 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/inference/utils/model-defaults.ts',
+    sourceSha256: '675182832cfef28385ee3853ce022dbe341aecadef5215f54478c0063e5aa4df',
+    reviewArea: {
+      en: 'Inference model-specific axis and hardware defaults.',
+      zh: '推理视图的模型特定坐标轴和硬件默认值。',
     },
   },
 

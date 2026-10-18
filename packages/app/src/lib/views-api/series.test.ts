@@ -116,6 +116,23 @@ function powerSweepRows(): BenchmarkRow[] {
 }
 
 describe('buildInferenceSeries', () => {
+  it('keeps the FP8 SKU winner when a faster FP4 configuration exists', () => {
+    const rows = [
+      makeRow({ hardware: 'gb300', framework: 'dynamo-sglang' }),
+      makeRow({
+        hardware: 'gb300',
+        framework: 'dynamo-trt',
+        precision: 'fp4',
+        metrics: metrics({ tput_per_gpu: 10000 }),
+      }),
+    ];
+    const result = buildInferenceSeries(rows, { ...BASE_OPTIONS, best: true });
+
+    expect(result.series.map((series) => series.hwKey)).toEqual(['gb300_dynamo-sglang']);
+    expect(result.series[0].bestPerSku).toBe(true);
+    expect(result.series[0].points.every((point) => point.precision === 'fp8')).toBe(true);
+  });
+
   it('retains GPU-valid all-in table rows without adding unavailable estimates to chart series', () => {
     const measured = metrics({
       avg_power_w: 500,
