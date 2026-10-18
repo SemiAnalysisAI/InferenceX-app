@@ -11,3 +11,8 @@ packages/app/cypress/fixtures/api/collectivex-runs.json
 # The power-model parity fixture is upstream Python output, regenerated wholesale by
 # packages/app/scripts/generate-power-model-parity.py; pretty-printed it is ~5x larger.
 packages/app/src/lib/power/power-model.parity.json
+
+# Vendored verbatim from github.com/chenglou/handwired; re-vendor instead of reformatting.
+packages/app/src/lib/handwired/vendor/
+# Machine-written benchmark snapshot (scripts/handwired/build-fixture.ts).
+packages/app/scripts/handwired/frontiers.fixture.json

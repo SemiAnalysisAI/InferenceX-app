@@ -1,4 +1,5 @@
 {
+  "ignorePatterns": ["packages/app/src/lib/handwired/vendor/**"],
   "categories": {
     "correctness": "deny",
     "suspicious": "deny",
