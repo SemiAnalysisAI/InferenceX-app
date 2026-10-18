@@ -9,8 +9,9 @@ renting from GCP is a customer price that does not change with who owns the chip
 retains its existing rates. The selection is shared across inference, historical
 trends, the TCO calculator, fleet lifecycle, and the profit estimator, and is encoded as
 `g_tco=external` in share links. The selector itself is only rendered for model/scenario pairs
-listed in `MODEL_TCO_BASIS_SELECTOR` (`data-mappings.ts`), currently Qwen3.5 on 8K/1K, since it
-only reprices hardware benchmarked there. Explicit custom hourly costs remain user-controlled.
+listed in `MODEL_TCO_BASIS_SELECTOR` (`data-mappings.ts`): Qwen3.5 and Kimi K3 on 8K/1K and
+Agentic Traces. Inference charts additionally require a cost metric and visible TPUv7 data.
+Explicit custom hourly costs remain user-controlled.
 
 The basis changes cost per token and tokens per dollar, including unofficial overlays, without
 changing measured throughput or energy assumptions. TPUv7's Qwen3.5 snapshot uses four physical

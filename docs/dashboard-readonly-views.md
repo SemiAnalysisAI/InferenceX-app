@@ -5,6 +5,15 @@ The implementation reuses the existing @semianalysisai/inferencex-skills package
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
 registry.test.ts, including hidden and feature-gated routes.
 
+## TCO basis selector coverage
+
+Qwen3.5 and Kimi K3 expose the shared External/Internal selector on 8K/1K and
+Agentic Traces. The control updates the existing global pricing basis; inference
+charts also require a cost metric and visible TPUv7 data. The read-only views
+already accept `tcoBasis=internal|external` for both models, defaulting to
+`internal`. This change only expands control visibility, with no new API
+parameter, response field, pricing calculation, or OpenAPI contract.
+
 ## Static editorial content
 
 `/agentx/quickstart` and `/zh/agentx/quickstart`, plus their `/agentx` and
