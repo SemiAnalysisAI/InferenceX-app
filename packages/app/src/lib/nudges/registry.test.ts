@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isDismissed, markDismissed, markShown } from './persistence';
 
 import {
   NUDGE_REGISTRY,
@@ -7,6 +8,7 @@ import {
 } from './registry';
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('NUDGE_REGISTRY integrity', () => {
@@ -174,12 +176,42 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(modal?.content.centered).toBe(true);
     // cypress/support/e2e.ts seeds this key; a rename has to be mirrored there.
     expect(modal?.storageKey).toBe(TPUV7_LAUNCH_MODAL_STORAGE_KEY);
-    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe('inferencex-tpuv7-agentx-modal-dismissed');
+    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe(
+      'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
+    );
+    expect(modal?.dismissal).toEqual({ type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 });
     expect(modal?.analytics).toEqual({
       shown: 'inference_tpuv7_agentx_modal_shown',
       dismissed: 'inference_tpuv7_agentx_modal_dismissed',
       action: 'inference_tpuv7_agentx_modal_clicked',
     });
+  });
+
+  it('ignores the old launch dismissal and waits exactly three days after each new dismissal', () => {
+    const oldKey = 'inferencex-tpuv7-agentx-modal-dismissed';
+    const storage = new Map<string, string>([[oldKey, '1']]);
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    let now = Date.parse('2026-10-18T12:00:00Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal')!;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markShown(modal.storageKey, modal.dismissal);
+    expect(storage.has(modal.storageKey)).toBe(false);
+    markDismissed(modal.storageKey, modal.dismissal);
+    expect(storage.get(modal.storageKey)).toBe(String(now));
+    now += 3 * 24 * 60 * 60 * 1000 - 1;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(true);
+    now += 1;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markShown(modal.storageKey, modal.dismissal);
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markDismissed(modal.storageKey, modal.dismissal);
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(true);
+    expect(storage.get(modal.storageKey)).toBe(String(now));
+    expect(storage.get(oldKey)).toBe('1');
   });
 
   it('gives every coach mark an anchor to point at', () => {

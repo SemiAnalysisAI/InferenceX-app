@@ -75,7 +75,10 @@ Cypress.on('window:before:load', (win) => {
   win.addEventListener('pagereveal', skipCrossDocumentTransition);
   try {
     if (suppressLaunchModal) {
-      win.localStorage.setItem('inferencex-tpuv7-agentx-modal-dismissed', '1');
+      win.localStorage.setItem(
+        'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
+        String(win.Date.now()),
+      );
     }
     if (suppressTelemetryTutorial) {
       win.localStorage.setItem('inferencex-agentx-telemetry-tutorial-dismissed', '1');

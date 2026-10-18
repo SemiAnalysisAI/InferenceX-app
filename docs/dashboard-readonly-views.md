@@ -6,6 +6,9 @@ Centered button rows and shared model logos are also presentation-only.
 The launch modal omits its footer dismiss button and keeps a larger close control and Escape dismissal.
 Its centered announcement layout separates the badge from the title and gives both model actions equal width.
 The inline Google mark matches the landing-page vendor strip without an additional image request.
+Dismissal uses `inferencex-tpuv7-agentx-multiple-model-modal-dismissed` and a 72-hour cooldown from closing or choosing a model.
+The old permanent-dismissal key is ignored, and viewing alone does not start or extend the cooldown.
+Once expired, the modal is eligible on the next landing-page evaluation; it does not interrupt an already open page on a timer.
 No data selectors, defaults, calculations, API contracts, or skills change.
 
 The replacement for #901 starts from the repository default branch, master.
