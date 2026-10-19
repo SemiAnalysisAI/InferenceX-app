@@ -11,6 +11,12 @@ The old permanent-dismissal key is ignored, and viewing alone does not start or 
 Once expired, the modal is eligible on the next landing-page evaluation; it does not interrupt an already open page on a timer.
 No data selectors, defaults, calculations, API contracts, or skills change.
 
+The landing hero's Vera Rubin NVL72 submission cards are presentation-only
+navigation to the existing GLM 5.3 and MiniMax M3 model routes. GLM appears
+immediately before MiniMax, whose existing link is unchanged. The standalone
+MiniMax landing ledger entry is hidden without removing it from `/compare`.
+Parameter-count subtitles do not change data, API contracts, or skills.
+
 The replacement for #901 starts from the repository default branch, master.
 The implementation reuses the existing @semianalysisai/inferencex-skills package.
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
