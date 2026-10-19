@@ -111,7 +111,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['kimi-k3', 'muse-spark-open', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
+            ['kimi-k3', 'muse-spark-open', 'deepseek-v41-flash', 'glm-5-3'].map(
               (slug) => `${prefix}/inference/${slug}`,
             ),
           );
@@ -125,6 +125,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('match', ':first-child')
           .parent()
@@ -153,9 +154,29 @@ describe('landing model curation', () => {
           .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .next()
+          .should('have.attr', 'data-testid', 'landing-rubin-glm-5-3-results-link')
+          .and('have.attr', 'href', `${prefix}/inference/glm-5-3`)
+          .and(
+            'contain.text',
+            prefix ? 'Vera Rubin NVL72 GLM 5.3 提交结果' : 'Vera Rubin NVL72 GLM 5.3 Submission',
+          )
+          .and('contain.text', prefix ? '7440 亿参数 AgentX' : '744 Billion parameters AgentX');
+        cy.get('[data-testid="landing-rubin-glm-5-3-nvidia-logo"] path').should(
+          'have.attr',
+          'fill',
+          '#76B900',
+        );
+        cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]')
+          .next()
           .should('have.attr', 'data-testid', 'landing-rubin-results-link')
           .and('have.attr', 'href', `${prefix}/inference/minimax-m3`)
-          .and('contain.text', 'MiniMax M3');
+          .and(
+            'contain.text',
+            prefix
+              ? 'Vera Rubin NVL72 MiniMax M3 提交结果'
+              : 'Vera Rubin NVL72 MiniMax M3 Submission',
+          )
+          .and('contain.text', prefix ? '4280 亿参数 AgentX' : '428 Billion parameters AgentX');
         cy.get('[data-testid="landing-rubin-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
@@ -182,10 +203,11 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
-        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5']) {
+        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5', 'minimax-m3']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
             'href',
@@ -219,7 +241,29 @@ describe('landing model curation', () => {
       cy.location('pathname').should('eq', prefix || '/');
     });
 
-    it(`opens Rubin AgentX results from ${prefix || '/'}`, () => {
+    it(`opens GLM 5.3 Rubin AgentX results from ${prefix || '/'}`, () => {
+      const rows = vrPublicationRows.map((row) => ({ ...row, model: 'glm5.2' }));
+      cy.intercept('GET', '/api/v1/availability*', {
+        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
+      cy.get('[data-testid="scenario-selector"]').should(
+        'contain.text',
+        prefix ? '智能体' : 'Agentic',
+      );
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.reload();
+      cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens MiniMax M3 Rubin AgentX results from ${prefix || '/'}`, () => {
       interceptMinimaxM3RubinData();
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-results-link"]').click();

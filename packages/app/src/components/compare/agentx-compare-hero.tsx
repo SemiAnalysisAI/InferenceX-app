@@ -364,6 +364,7 @@ const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',
+  'minimax-m3',
 ]);
 
 const LANDING_HARDWARE_RESULTS = [
@@ -391,11 +392,23 @@ const LANDING_HARDWARE_RESULTS = [
     isNew: true,
   },
   {
+    id: 'rubin-glm-5-3',
+    vendor: 'NVIDIA',
+    title: 'Vera Rubin NVL72 GLM 5.3 Submission',
+    titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
+    subtitle: '744 Billion parameters AgentX',
+    subtitleZh: '7440 亿参数 AgentX',
+    href: '/inference/glm-5-3',
+    model: 'glm-5-3',
+    analyticsEvent: 'landing_rubin_results_clicked',
+  },
+  {
     id: 'rubin',
     vendor: 'NVIDIA',
-    title: 'Rubin Results',
-    titleZh: 'Rubin 结果',
-    subtitle: 'MiniMax M3 · AgentX',
+    title: 'Vera Rubin NVL72 MiniMax M3 Submission',
+    titleZh: 'Vera Rubin NVL72 MiniMax M3 提交结果',
+    subtitle: '428 Billion parameters AgentX',
+    subtitleZh: '4280 亿参数 AgentX',
     href: '/inference/minimax-m3',
     model: 'minimax-m3',
     analyticsEvent: 'landing_rubin_results_clicked',
