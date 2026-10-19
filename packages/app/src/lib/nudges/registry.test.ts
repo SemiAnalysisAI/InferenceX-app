@@ -147,9 +147,9 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('uses the requested Kimi subtitle for the launch banner', () => {
     const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
     expect(banner?.content.description).toBe(
-      'TPUv7 Kimi K2.8T prelimary Submisison: Competitive Results',
+      'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
     );
-    expect(banner?.content.descriptionZh).toBe('TPUv7 Kimi K2.8T 初步提交：成绩具有竞争力');
+    expect(banner?.content.descriptionZh).toBe('TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力');
   });
 
   it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {

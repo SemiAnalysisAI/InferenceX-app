@@ -51,7 +51,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('contain.text', 'Google TPUv7 joins AgentX')
-      .and('contain.text', 'TPUv7 Kimi K2.8T prelimary Submisison: Competitive Results')
+      .and('contain.text', 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
     // Banner + header-nav badges and both flashing TPU card badges — the shared
@@ -111,7 +111,7 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('contain.text', 'Google TPUv7 加入 AgentX')
-      .and('contain.text', 'TPUv7 Kimi K2.8T 初步提交：成绩具有竞争力')
+      .and('contain.text', 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力')
       .and('contain.text', '查看结果');
   });
 });
