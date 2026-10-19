@@ -1,4 +1,5 @@
 export * from './benchmark-curve';
+export * from './cache-validity';
 export * from './framework-aliases';
 export * from './github';
 export * from './gpu-keys';

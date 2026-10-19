@@ -1,3 +1,5 @@
+import { CACHE_VALIDITY_METRIC_KEYS } from './cache-validity';
+
 /**
  * NVL72 Grace-side and compute-module measurements from the srt-slurm CPU power
  * leg (ACPI hwmon), integrated over the same formal window as GPU energy. They
@@ -241,6 +243,8 @@ export const METRIC_KEYS = new Set([
   'server_cpu_cache_hit_rate',
   'server_external_cache_hit_rate',
   'theoretical_cache_hit_rate',
+  // cache-validity core and overall rate (v3 server_metrics.cache_validity)
+  ...CACHE_VALIDITY_METRIC_KEYS,
   // server KV-cache occupancy — mean GPU KV-cache usage fraction (0-1) over the
   // profiling window (agentic aiperf; flat in v2 artifacts, mapped from
   // server_metrics.kv_cache.gpu_usage_pct in v3)

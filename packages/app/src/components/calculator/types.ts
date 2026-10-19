@@ -1,4 +1,5 @@
 import type { BenchmarkRow } from '@/lib/api/api';
+import type { PricingCacheSource } from '@/lib/calculator/cache-pricing';
 
 export type CalculatorMode = 'interactivity_to_throughput' | 'throughput_to_interactivity';
 
@@ -44,6 +45,15 @@ export interface GPUDataPoint {
    * absence is what makes cached-input billing a no-op outside agentic traces.
    */
   cacheHitRate?: number;
+  /**
+   * The validity policy left this point's actual cache hit rate unproven. Not
+   * the same as an absent `cacheHitRate`, which bills no cache discount.
+   */
+  cacheHitUnavailable?: boolean;
+  /** Where the rate came from; recorded only when a validity policy is enforced. */
+  cacheHitSource?: PricingCacheSource;
+  /** Why the actual rate is unavailable, when it is. */
+  cacheHitReason?: string;
   /**
    * Infinite-cache theoretical hit rate (0..1) computed from the trace itself,
    * representing the maximum reuse potential of the workload with unbounded
@@ -100,6 +110,16 @@ export interface InterpolatedResult {
    * fixed-sequence frontier). See {@link GPUDataPoint.cacheHitRate}.
    */
   cacheHitRate?: number;
+  /**
+   * Some frontier point's actual cache hit rate is unproven, or a verified
+   * point sits next to one without a rate, so actual pricing at this operating
+   * point is unavailable. See {@link GPUDataPoint.cacheHitUnavailable}.
+   */
+  cacheHitUnavailable?: boolean;
+  /** Why actual pricing is unavailable at this operating point. */
+  cacheHitUnavailableReason?: string;
+  /** Distinct sources of the frontier points' rates, when a validity policy is enforced. */
+  cacheHitSources?: PricingCacheSource[];
   /**
    * Infinite-cache theoretical hit rate at that operating point, or undefined
    * when the frontier did not carry a theoretical rate on every point.

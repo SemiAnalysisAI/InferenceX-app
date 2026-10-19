@@ -33,7 +33,10 @@
 
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
-import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
+import {
+  assertBackfillKeepsValidatedCache,
+  matchesExpectedBackfillMetrics,
+} from '../lib/benchmark-point-backfill';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
@@ -1252,6 +1255,7 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   if (!backfill || !matchesExpectedBackfillMetrics(point.metrics, backfill)) {
     return { point, backfillId: null, sourceIdentity, desiredIdentity: sourceIdentity };
   }
+  assertBackfillKeepsValidatedCache(point.metrics, backfill);
 
   const metrics = { ...point.metrics };
   for (const key of backfill.set.metricsRemove ?? []) delete metrics[key];

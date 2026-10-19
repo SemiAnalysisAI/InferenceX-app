@@ -3,7 +3,33 @@
  * Shared by both server-side (compare SSR) and client-side (calculator, trends).
  */
 
+import { frontierCacheUnavailableReason } from '@/lib/calculator/cache-pricing';
+
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
+
+/**
+ * Frontier-level cache verdict and provenance. Empty for points priced by the
+ * legacy rule, which carry no source, so legacy results are unchanged.
+ */
+function frontierCache(
+  points: readonly GPUDataPoint[],
+): Pick<
+  InterpolatedResult,
+  'cacheHitUnavailable' | 'cacheHitUnavailableReason' | 'cacheHitSources'
+> {
+  const reason = frontierCacheUnavailableReason(
+    points.map((p) => ({
+      rate: p.cacheHitRate,
+      source: p.cacheHitSource ?? (p.cacheHitUnavailable ? 'unavailable' : undefined),
+      reason: p.cacheHitReason,
+    })),
+  );
+  const sources = [...new Set(points.flatMap((p) => (p.cacheHitSource ? [p.cacheHitSource] : [])))];
+  return {
+    ...(reason ? { cacheHitUnavailable: true, cacheHitUnavailableReason: reason } : {}),
+    ...(sources.length > 0 ? { cacheHitSources: sources.toSorted() } : {}),
+  };
+}
 
 /**
  * Compute the upper-left pareto front for GPUDataPoints.
@@ -390,6 +416,7 @@ export function interpolateForGPU(
       inputTpPerMw: sorted[0].inputTpPerMw,
       outputTpPerMw: sorted[0].outputTpPerMw,
       cacheHitRate: sorted[0].cacheHitRate,
+      ...frontierCache(sorted),
       theoreticalCacheHitRate: sorted[0].theoreticalCacheHitRate,
       inputTokenShare: sorted[0].inputTokenShare,
       concurrency: sorted[0].concurrency,
@@ -456,6 +483,9 @@ export function interpolateForGPU(
   const cacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
     ? buildMetric((p) => p.cacheHitRate!)
     : undefined;
+  // One unproven knot, or a verified knot beside one without a rate, leaves the
+  // operating point without an actual rate rather than a full-price one.
+  const cache = frontierCache(sorted);
 
   // Same all-or-nothing logic for the theoretical (infinite-cache) hit rate.
   const theoreticalCacheHitRate = sorted.every((p) => typeof p.theoreticalCacheHitRate === 'number')
@@ -495,6 +525,7 @@ export function interpolateForGPU(
     inputTpPerMw,
     outputTpPerMw,
     cacheHitRate,
+    ...cache,
     theoreticalCacheHitRate,
     inputTokenShare,
     concurrency,

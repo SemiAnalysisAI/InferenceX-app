@@ -20,7 +20,10 @@
  * eats the revenue; the operator's profit can therefore go negative.
  */
 
-import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
+import {
+  cacheAffectsPrice,
+  tokenRevenueFromRatesPerGpuHour,
+} from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { Model } from '@/lib/catalog/data-mappings';
 
@@ -252,7 +255,8 @@ export type ProfitEstimatorSkipReason =
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'
-  | 'no-token-mix';
+  | 'no-token-mix'
+  | 'cache-hit-unavailable';
 
 export interface ProfitEstimatorSkipped {
   hwKey: string;
@@ -298,7 +302,14 @@ export interface ProfitEstimatorSpecs {
 export function estimateSkuProfit(
   result: Pick<
     InterpolatedResult,
-    'hwKey' | 'resultKey' | 'precision' | 'value' | 'inputTokenShare' | 'cacheHitRate' | 'clamped'
+    | 'hwKey'
+    | 'resultKey'
+    | 'precision'
+    | 'value'
+    | 'inputTokenShare'
+    | 'cacheHitRate'
+    | 'cacheHitUnavailable'
+    | 'clamped'
   > & { date?: string },
   specs: ProfitEstimatorSpecs,
   pricing: TokenRevenuePricing,
@@ -315,6 +326,9 @@ export function estimateSkuProfit(
   const gpuHours = assumptions.basis === 'chip-hour' ? 1 : gpuHoursPerGwYear(specs.powerKwPerGpu);
   if (gpuHours === null) return { ...base, reason: 'no-power' };
   if (!(specs.costPerGpuHour > 0)) return { ...base, reason: 'no-cost' };
+  if (result.cacheHitUnavailable && cacheAffectsPrice(pricing)) {
+    return { ...base, reason: 'cache-hit-unavailable' };
+  }
 
   const revenuePerGpuHour = tokenRevenueFromRatesPerGpuHour(
     result.value,
@@ -427,17 +441,32 @@ export function modelsWithAgenticData<M extends string>(
 /**
  * Remap interpolated results to use the theoretical cache hit rate in place of
  * the measured one. When the theoretical rate is unavailable, the measured rate
- * is kept — the intent is an upper-bound estimate, not a dropout.
+ * is kept — the intent is an upper-bound estimate, not a dropout. An unproven
+ * measured rate stays unavailable rather than passing for a theoretical one.
  */
 export function applyCacheHitMode<
-  T extends { cacheHitRate?: number; theoreticalCacheHitRate?: number },
+  T extends Pick<
+    InterpolatedResult,
+    | 'cacheHitRate'
+    | 'theoreticalCacheHitRate'
+    | 'cacheHitUnavailable'
+    | 'cacheHitUnavailableReason'
+    | 'cacheHitSources'
+  >,
 >(results: readonly T[], mode: CacheHitMode): T[] {
   if (mode === 'actual') return results as T[];
-  return results.map((r) =>
-    typeof r.theoreticalCacheHitRate === 'number'
-      ? { ...r, cacheHitRate: r.theoreticalCacheHitRate }
-      : r,
-  );
+  return results.map((r) => {
+    if (typeof r.theoreticalCacheHitRate !== 'number') return r;
+    const next = {
+      ...r,
+      cacheHitRate: r.theoreticalCacheHitRate,
+      // Recorded provenance must name the theoretical rate, not the actual one it replaced.
+      ...(r.cacheHitSources ? { cacheHitSources: ['theoretical' as const] } : {}),
+    };
+    delete next.cacheHitUnavailable;
+    delete next.cacheHitUnavailableReason;
+    return next;
+  });
 }
 
 /**
