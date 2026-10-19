@@ -36,6 +36,36 @@ describe('Historical improvement waterfall', () => {
     });
     cy.get('[data-chart-scroll]').should('have.attr', 'tabindex', '0');
   });
+
+  it('preserves hardware filtering, high contrast and reset in waterfall mode', () => {
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('[data-testid="waterfall-controls"]').should('have.attr', 'open');
+    cy.get('#historical-log-scale').should('not.exist');
+    cy.get('#historical-high-contrast').should('be.visible').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
+
+    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
+      const initialCount = $options.length;
+      expect(initialCount).to.be.greaterThan(1);
+      const hardware = String($options.eq(0).val()).split('__')[0];
+      cy.get(`[data-testid="waterfall-controls"] label[for="checkbox-${hardware}"]`).click();
+      cy.get('[data-testid="waterfall-series"] option').should(
+        'have.length.lessThan',
+        initialCount,
+      );
+      cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
+      cy.get('[data-testid="waterfall-series"] option').should('have.length', initialCount);
+    });
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
+    cy.get('#historical-log-scale').should('be.visible');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'unchecked');
+  });
 });
 
 const visitHistoricalWithSetup = () => {
