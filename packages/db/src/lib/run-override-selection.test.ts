@@ -11,6 +11,21 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it.each([38878624849, 38925660934])(
+    'selects only the whole-run purge for Muse Spark H100 256k corpus run %s',
+    (runId) => {
+      expect(selectRunOverrides(['--run-id', String(runId), '--yes'])).toEqual({
+        runId,
+        conclusions: new Map(),
+        changelogs: [],
+        benchmarks: [],
+        purgedRuns: new Set([runId]),
+        purgedAttempts: new Map(),
+        purgedPoints: [],
+      });
+    },
+  );
+
   it.each([
     32403083041, 33219708211, 31927376673, 34413290524, 33716849615, 33219706372, 32346724519,
   ])('selects only the whole-run purge for GB300 FP4 TensorRT-LLM AgentX run %s', (runId) => {
