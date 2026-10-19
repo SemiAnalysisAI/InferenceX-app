@@ -46,6 +46,12 @@ describe('hwToGpuKey', () => {
     expect(hwToGpuKey('cluster:h200')).toBe('h200');
   });
 
+  it('maps the vrnvl72 runner label to vr200', () => {
+    expect(hwToGpuKey('vrnvl72-nv')).toBe('vr200');
+    expect(hwToGpuKey('vrnvl72-nv_12_1')).toBe('vr200');
+    expect(hwToGpuKey('cluster:vrnvl72-nv')).toBe('vr200');
+  });
+
   it('strips -amds suffix', () => {
     expect(hwToGpuKey('mi355x-amds')).toBe('mi355x');
   });
