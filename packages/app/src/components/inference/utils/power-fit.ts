@@ -8,23 +8,11 @@ import {
   type EqualServiceSource,
 } from './equal-service-comparison';
 
-/**
- * Serving-regime power model per source (PowerX Figure 15): an ordinary
- * least-squares line `W/GPU = P0 + m × output tok/s per GPU` through one
- * source's measured load points. `P0` is the fit's zero-throughput intercept,
- * not measured idle power; `m` is marginal GPU energy per output token in
- * joules. The fit describes only the observed throughput range.
- */
-
-/** Distinct throughputs a line needs before its intercept and R² mean anything. */
 export const MIN_FIT_POINTS = 3;
 
 export interface LinearFit {
-  /** `P0`, W/GPU at zero output rate (extrapolated). */
   intercept: number;
-  /** `m`, J per output token (W per output tok/s/GPU). */
   slope: number;
-  /** Null when every observation draws the same power (no variance to explain). */
   rSquared: number | null;
   n: number;
   xMin: number;
@@ -58,11 +46,6 @@ export function ordinaryLeastSquares(pairs: readonly { x: number; y: number }[])
   };
 }
 
-/**
- * Whole-deployment output tokens/s divided by every allocated GPU, so a
- * disaggregated deployment's prefill GPUs share the output they enable and its
- * mean W/GPU (averaged over all GPUs) sits on the same basis.
- */
 export function outputRatePerAllocatedGpu(point: InferenceData): number | undefined {
   if (!isPositive(point.output_tput_per_gpu)) return undefined;
   const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization({
@@ -78,23 +61,19 @@ export function outputRatePerAllocatedGpu(point: InferenceData): number | undefi
 }
 
 export interface PowerFitObservation {
-  /** Output tok/s per allocated GPU. */
   x: number;
-  /** Measured mean GPU-board W/GPU. */
   y: number;
   point: InferenceData;
 }
 
 export interface PowerFit {
   source: EqualServiceSource;
-  /** Rated board TDP per GPU from the hardware registry, to read `P0 ÷ TDP`; null when unknown. */
   tdpWatts: number | null;
   observations: PowerFitObservation[];
   fit: LinearFit | null;
   reason?: 'too-few-points';
 }
 
-/** One fit per equal-service source that has any measured observation. */
 export function buildPowerFits(
   points: readonly InferenceData[],
   locale: 'en' | 'zh' = 'en',

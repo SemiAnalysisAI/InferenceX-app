@@ -66,54 +66,18 @@ import {
 } from './operations';
 import { NOW, TODAY_UTC_DATE, TODAY_UTC_START } from './as-of';
 
-// ─────────────────────────────────────────────────────────────────────────
-// Stats caching + rollup layer.
-//
-// `/api/overview` and `/api/models` are served from `stats_cache` (finished
-// JSON payloads, one row per scope × trace-version) instead of running their
-// lifetime, unbounded aggregates live on every request. The snapshot's caches
-// were built once when it was frozen; the explorer never writes, so cache
-// writes here are no-ops and a miss is computed inline without being stored.
-//
-// The heavy lifting is split three ways:
-//   • ADDITIVE lifetime metrics (request/token/cost totals, per-model token
-//     breakdown, daily model time-series) come from `rollup_requests_daily`
-//     for historical UTC days + a cheap live "today" tail — no full-table scan.
-//   • EXACT stats that can't be rolled up (per-session turns/gap percentiles,
-//     >20-request session counts, TTFT/TPOT/prefill percentiles, recent rows)
-//     stay live but run only at refresh time, accelerated by
-//     idx_requests_stream_latency where relevant.
-//   • The correlated per-session `count(*) > 20` subquery in the usage
-//     histograms is rewritten as a JOIN against a single eligible-session set.
-//
-// Aggregate payloads preserve their former route semantics. Performance is
-// intentionally different only at the transport boundary: raw per-request
-// distributions are replaced by parity-tested histograms.
-// ─────────────────────────────────────────────────────────────────────────
-
-// Rollup-backed payloads use an independent generation: schema 2 rejects any
-// partial rows written before full-history rollup readiness was enforced.
 const STATS_CACHE_SCHEMA = 1;
-// Graphs schema 4 expands wall-clock history and splits daily rows by exact client family.
 const GRAPHS_STATS_CACHE_SCHEMA = 4;
 const ROLLUP_BACKED_STATS_CACHE_SCHEMA = 3;
 const COSTS_STATS_CACHE_SCHEMA = 2;
 const ERRORS_STATS_CACHE_SCHEMA = 2;
 
 const LONG_CONTEXT_MODEL_NAMES = Object.keys(LONG_CONTEXT_PRICING_MODELS);
-// Rows can arrive late (fire-and-forget uploads + retries). Re-aggregate this
-// many trailing UTC days on every rollup refresh so late writes to recent days
-// are captured; older days are treated as immutable. 3 days safely covers the
-// documented ~48 h upload lag across day boundaries.
 export const ROLLUP_REFRESH_LAG_DAYS = 3;
 
 export type StatsCacheKind =
   | 'overview'
   | 'models'
-  // Additional parameterless dashboard aggregates served from the same
-  // stats_cache machinery. All are keyed only by (scope, traceVersion).
-  // Performance distributions are pre-binned before caching, so no raw
-  // per-request arrays cross the cache or API boundary.
   | 'cache'
   | 'traffic'
   | 'errors'
@@ -124,20 +88,8 @@ export type StatsCacheKind =
   | 'session-reuse'
   | 'performance'
   | 'fast-mode'
-  // /graphs dashboard. Unlike the other Wave-2A kinds this caches a SINGLE
-  // payload object keyed by dataset key ({ requestStats, ttftValues, ... });
-  // each value is a pre-binned per-chart shape (server-side VERBATIM port of
-  // the client's buildHistogram/percentile math), so the cached JSON is ~1000x
-  // smaller than the old raw per-request arrays. The GET route serves only the
-  // requested `include=` subset out of the full cached payload. Only warmed for
-  // the model=null combos; a ?model= filter is live-computed, never cached.
   | 'graphs';
 
-/**
- * Cache key. Scope collapses the visibility filter to the two warmed buckets
- * ('all' = admin/every privacy mode, 'anon' = non-admin). Mirrors
- * `toolAnalyticsCacheKey` so the two caches key identically.
- */
 export function statsCacheKey(
   kind: StatsCacheKind,
   visibleClientIds: string[] | null,
@@ -157,11 +109,6 @@ export function statsCacheKey(
   return `sc:${schema}:${kind}:${scope}:${traceVersion ?? 'all'}`;
 }
 
-/**
- * `'missing-table'` means migration 029 hasn't reached this database yet.
- * Callers treat it as a setup problem, not a cache miss (writes would fail the
- * same way). Mirrors `readToolAnalyticsCache`.
- */
 export async function readStatsCache(
   key: string,
   dbOverride?: Kysely<Database>,
@@ -182,18 +129,10 @@ export async function readStatsCache(
   }
 }
 
-// Read-only deployment: cache writes are no-ops. Payloads are still computed
-// on a cold miss and returned; the main ProxyTrace deployment's crons keep
-// stats_cache fresh.
 function writeStatsCache(_db: Kysely<Database>, _key: string, _data: unknown): Promise<void> {
   return Promise.resolve();
 }
 
-/**
- * Atomically merge a top-level JSON object into a cache row. The merge lives
- * entirely in the upsert so concurrent writers patch the latest stored value
- * instead of racing through a read-modify-write cycle.
- */
 export function patchStatsCache(
   _db: Kysely<Database>,
   _key: string,
@@ -212,11 +151,6 @@ export interface StatsCacheMetadataEntry {
   payloadBytes: number;
 }
 
-/**
- * Read only operational metadata for an explicit, bounded cache-key whitelist.
- * The rollup readiness marker is included in the same query so callers never
- * need a second lookup. Cached JSON payloads never leave PostgreSQL.
- */
 export async function readStatsCacheMetadata(
   keys: readonly string[],
   dbOverride?: Kysely<Database>,
@@ -268,17 +202,6 @@ export function isRollupNotReadyError(error: unknown): error is RollupNotReadyEr
   );
 }
 
-/**
- * Proves that the one-time full-history backfill has completed before any
- * rollup-backed payload can be returned or cached. A trailing cron refresh can
- * make the rollup non-empty while older history is still absent, so readiness
- * is based on historical request-count parity, not table non-emptiness.
- *
- * The marker avoids repeating the full historical count after readiness has
- * been established. Existing fully-backfilled deployments establish it on
- * their first compute; incomplete deployments fail closed to the routes'
- * correct (but slower) live-query fallback.
- */
 export async function assertRollupReady(db: Kysely<Database>): Promise<void> {
   const marker = await db
     .selectFrom('stats_cache')
@@ -308,18 +231,12 @@ export async function assertRollupReady(db: Kysely<Database>): Promise<void> {
   });
 }
 
-// ── Rollup-scoped filter helpers ──────────────────────────────────────────
-
 function rollupVisFilter(visibleClientIds: string[] | null, traceVersion: number | null) {
   const vis =
     visibleClientIds === null ? sql`TRUE` : sql`rollup_requests_daily.privacy_mode = 'anon'`;
   if (traceVersion === null) return vis;
   return sql`${vis} AND rollup_requests_daily.trace_version = ${traceVersion}`;
 }
-
-// UTC-day boundary: rollup covers `day < today`; the live tail covers
-// `timestamp >= today_start`. Together they reproduce a full-table aggregate
-// while keeping "today" exact regardless of rollup refresh lag.
 
 interface Totals {
   request_count: number;
@@ -330,7 +247,6 @@ interface Totals {
   cost_usd: number;
 }
 
-/** Lifetime additive totals = rollup(day < today) + live(timestamp >= today). */
 async function overviewTotals(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -393,11 +309,6 @@ export interface TokensByModelRow {
   long_cache_write_tokens: number;
 }
 
-/**
- * Per-model token breakdown, byte-identical to `getTokensByModel`. Historical
- * days from the rollup, today from live rows, merged by model. NULL-model rows
- * (rollup sentinel '') are excluded to mirror the original `model IS NOT NULL`.
- */
 async function tokensByModelFromRollup(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -516,21 +427,6 @@ export interface ModelTimeSeriesRow {
   output_tokens: number;
 }
 
-/**
- * Daily per-model request/token counts for the trend chart.
- *
- * Historical whole UTC days (`[today-30, today-1]`) come from the rollup;
- * "today" comes from a live tail so its bar is exact regardless of rollup
- * refresh lag (matching the totals/tokensByModel approach). Both emit `day` as
- * a UTC-midnight timestamptz so the wire value (`String(Date)`) is identical to
- * the old `date_trunc('day', timestamp)`.
- *
- * SEMANTIC NOTE: the original used a rolling `timestamp >= now() - 30 days`
- * window whose OLDEST bucket was a partial UTC day. A daily rollup can only
- * bucket whole UTC days, so the single oldest boundary day (`today-30`) now
- * counts the whole day and can differ from the old query. Every other day —
- * including today — matches exactly.
- */
 async function modelTimeSeriesFromRollup(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -577,8 +473,6 @@ async function modelTimeSeriesFromRollup(
     `.execute(db),
   ]);
   const rows = [...rollupRes.rows, ...liveRes.rows].map((r) => ({
-    // `instant` orders chronologically; the wire `day` is the stringified Date
-    // (byte-identical to the old date_trunc output).
     instant: r.day instanceof Date ? r.day.getTime() : new Date(r.day).getTime(),
     day: String(r.day),
     model: String(r.model),
@@ -586,7 +480,6 @@ async function modelTimeSeriesFromRollup(
     input_tokens: Number(r.input_tokens),
     output_tokens: Number(r.output_tokens),
   }));
-  // Match the original ORDER BY day, model (day compared chronologically).
   rows.sort(
     (a, b) => a.instant - b.instant || (a.model < b.model ? -1 : a.model > b.model ? 1 : 0),
   );
@@ -598,8 +491,6 @@ async function modelTimeSeriesFromRollup(
     output_tokens: r.output_tokens,
   }));
 }
-
-// ── Usage histograms (correlated subquery rewritten as a JOIN) ────────────
 
 interface UsageBucketRow {
   hour: string;
@@ -616,16 +507,6 @@ interface DailyBucketRow {
   newSessions: number;
 }
 
-/**
- * One request-count per session (`GROUP BY session_id`), returned as ~1 row
- * per session (thousands, not millions). This single scan feeds THREE things
- * that each used to be their own full-table scan — the eligible-session set
- * (>20 requests) for the histograms, the turns-per-session percentiles, and
- * the lifetime >20-request session count — cutting concurrent heavy scans (and
- * the Neon contention that made the cold compute slow). `model=null` matches
- * the histograms' unfiltered eligibility predicate; a model-filtered call
- * matches the turns/gt20 model predicate.
- */
 async function sessionRequestCounts(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -643,13 +524,6 @@ async function sessionRequestCounts(
   };
 }
 
-/**
- * `percentile_cont(p)` — exact port of Postgres' continuous-percentile
- * ordered-set aggregate (linear interpolation between the two nearest ranks),
- * so turns percentiles computed in JS from `sessionRequestCounts` match the
- * old SQL `percentile_cont(...) WITHIN GROUP (ORDER BY cnt)` bit-for-bit.
- * Empty input → 0 (mirrors `Number(null ?? 0)`).
- */
 export function percentileCont(sortedAsc: number[], p: number): number {
   const n = sortedAsc.length;
   if (n === 0) return 0;
@@ -684,8 +558,6 @@ function newSessionsJoin(
   bucketExpr: ReturnType<typeof sql>,
   windowCond: ReturnType<typeof sql>,
 ) {
-  // `sessions.id = ANY(<eligible>)` reproduces the original
-  // `(SELECT count(*) ... ) > 20` gate without the per-session subquery.
   const eligibleCond =
     eligible.length === 0 ? sql`FALSE` : sql`sessions.id = ANY(${sql.val(eligible)}::text[])`;
   return sql`
@@ -823,8 +695,6 @@ function mapUsageRow(r: Record<string, unknown>): UsageBucketRow {
   };
 }
 
-// ── Exact non-rollup overview pieces (identical SQL to getOverviewStats) ──
-
 async function scalarStats(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -833,7 +703,6 @@ async function scalarStats(
 ) {
   const modelCond = modelFilter(model);
   const [sessionRow, gt20Row, windowCostRow, clientRow, gapRow] = await Promise.all([
-    // Session-level counts (model-agnostic, like the original).
     sql<Record<string, string>>`
       WITH bounds AS (
         SELECT
@@ -847,9 +716,6 @@ async function scalarStats(
         (SELECT count(*) FROM sessions, bounds WHERE sessions.last_active_at >= bounds.today_start AND ${sessionsVisFilter(vis, traceVersion)}) AS sessions_today_utc,
         (SELECT count(*) FROM sessions, bounds WHERE sessions.last_active_at >= bounds.yesterday_start AND sessions.last_active_at < bounds.today_start AND ${sessionsVisFilter(vis, traceVersion)}) AS sessions_yesterday_utc
     `.execute(db),
-    // Windowed >20-request session counts (model-filtered, like the original).
-    // The LIFETIME sessions_gt20 is derived from sessionRequestCounts instead,
-    // so it doesn't add another full-table group-by here.
     sql<Record<string, string>>`
       WITH bounds AS (
         SELECT
@@ -861,8 +727,6 @@ async function scalarStats(
         (SELECT count(*) FROM (SELECT session_id FROM requests, bounds WHERE ${requestsVisFilter(vis, 'requests', traceVersion)} AND ${modelCond} AND requests.timestamp >= bounds.today_start GROUP BY session_id HAVING count(*) > 20) sub) AS sessions_gt20_today_utc,
         (SELECT count(*) FROM (SELECT session_id FROM requests, bounds WHERE ${requestsVisFilter(vis, 'requests', traceVersion)} AND ${modelCond} AND requests.timestamp >= bounds.yesterday_start AND requests.timestamp < bounds.today_start GROUP BY session_id HAVING count(*) > 20) sub) AS sessions_gt20_yesterday_utc
     `.execute(db),
-    // Windowed cost sums — exact, but scanned only over the last ~48h of rows
-    // (every window's lower bound is >= yesterday_start).
     sql<Record<string, string>>`
       WITH bounds AS (
         SELECT
@@ -914,16 +778,6 @@ interface LatencyStat {
   count: number;
 }
 
-/**
- * TTFT + TPOT + prefill-speed percentile stats in a SINGLE index-only scan of
- * the streaming rows (idx_requests_stream_latency), instead of three separate
- * full scans. Each stat's row subset is expressed with a per-aggregate FILTER,
- * so the numbers are identical to the original getTTFTStats / getTPOTStats /
- * getPrefillSpeedStats (verified by parity tests). Kept exact/lifetime —
- * percentiles can't be rolled up. On this Neon compute heavy scans effectively
- * serialize, so collapsing 3 → 1 is a real win for both cron load and the
- * cold-miss compute.
- */
 async function streamingStats(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -969,14 +823,6 @@ async function streamingStats(
   return { ttftStats: stat('ttft'), tpotStats: stat('tpot'), prefillSpeedStats: stat('pf') };
 }
 
-// ── Public compute entry points ───────────────────────────────────────────
-
-/**
- * Build the exact `/api/overview` response object (pre-camelCase — the route
- * wraps it in jsonCamel, matching the old inline handler byte-for-byte).
- * Requires a db that can run heavy scans without the Neon HTTP 64 MB cap /
- * per-statement round-trips: pass a pooled `createDirectDb()` for cron/miss.
- */
 export async function computeOverviewPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -985,9 +831,6 @@ export async function computeOverviewPayload(
 ) {
   await assertRollupReady(db);
 
-  // One session scan (no model filter) drives histogram eligibility. When
-  // model is null it also drives turns + lifetime gt20; a model filter needs a
-  // second, model-scoped scan for those (uncommon, uncached path).
   const perSessionNoModel = await sessionRequestCounts(db, vis, null, traceVersion);
   const eligible = perSessionNoModel.ids.filter((_, i) => perSessionNoModel.counts[i] > 20);
   const turnsSource =
@@ -1062,7 +905,6 @@ export async function computeOverviewPayload(
   };
 }
 
-/** Build the exact `/api/models` response object (pre-camelCase). */
 export async function computeModelsPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1079,10 +921,6 @@ export async function computeModelsPayload(
   };
 }
 
-/**
- * Compute + upsert one overview cache combo (cron / self-heal / cache-miss).
- * Returns the payload so the miss path can serve it without a second read.
- */
 export async function computeAndCacheOverview(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1093,7 +931,6 @@ export async function computeAndCacheOverview(
   return payload;
 }
 
-/** Compute + upsert one models cache combo (cron / self-heal / cache-miss). */
 export async function computeAndCacheModels(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1104,21 +941,6 @@ export async function computeAndCacheModels(
   return payload;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Parameterless aggregate endpoints served from stats_cache.
-//
-// Most `computeXPayload` helpers return the same object their GET route used
-// to return inline. Performance is the exception: it keeps the chart math and
-// exact label stats but replaces unbounded rows with server-binned histograms.
-// Each helper takes a pooled `db` (createDirectDb) for cron / cold-miss so the
-// heavy scans don't run over the Neon HTTP driver.
-//
-// The operation-backed helpers pass that db through explicitly. Unlike
-// overview/models, these payloads don't read the rollup; they run the same
-// aggregates off the request path and share the result through the cache.
-// ─────────────────────────────────────────────────────────────────────────
-
-// ── /api/cache ────────────────────────────────────────────────────────────
 export async function computeCachePayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1133,7 +955,6 @@ export async function computeCachePayload(
   return { stats, daily, byModel: sanitizeModels(byModel), byClient };
 }
 
-// ── /api/traffic ──────────────────────────────────────────────────────────
 export async function computeTrafficPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1148,7 +969,6 @@ export async function computeTrafficPayload(
   return { stats, daily, heatmap, streamingBreakdown };
 }
 
-// ── /api/errors ───────────────────────────────────────────────────────────
 export async function computeErrorsPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1166,7 +986,6 @@ export async function computeErrorsPayload(
   };
 }
 
-// ── /api/web-search ───────────────────────────────────────────────────────
 export async function computeWebSearchPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1176,7 +995,6 @@ export async function computeWebSearchPayload(
   return { ...data, byModel: sanitizeModels(data.byModel) };
 }
 
-// ── /api/platform ─────────────────────────────────────────────────────────
 export async function computePlatformPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1189,7 +1007,6 @@ export async function computePlatformPayload(
   return { stats, timeSeries };
 }
 
-// ── /api/costs ────────────────────────────────────────────────────────────
 export async function computeCostsPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -1217,11 +1034,6 @@ export async function computeCostsPayload(
   };
 }
 
-// ── /api/session-insights ─────────────────────────────────────────────────
-// Histogram + percentile helpers ported verbatim from the route
-// (packages/app/src/app/api/session-insights/route.ts) so the cached payload
-// is byte-identical to the old inline response. The route now reads the cache;
-// this is the single source of truth for its binning math.
 interface SessionInsightsBin {
   min: number;
   max: number;
@@ -1236,8 +1048,6 @@ interface SessionInsightsPercentiles {
   p99: number;
 }
 
-// Exported for unit tests (see packages/app/src/__tests__/stats-cache.test.ts).
-// Nearest-rank percentiles — matches the pre-Wave-2A session-insights route.
 export function sessionInsightsPercentiles(sorted: number[]): SessionInsightsPercentiles {
   if (sorted.length === 0) return { p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 };
   const pct = (p: number) =>
@@ -1245,8 +1055,6 @@ export function sessionInsightsPercentiles(sorted: number[]): SessionInsightsPer
   return { p25: pct(25), p50: pct(50), p75: pct(75), p90: pct(90), p95: pct(95), p99: pct(99) };
 }
 
-// Exported for unit tests. Equal-width bins clipped at p95+10%; single-value
-// input collapses to one [v, v+1) bin. Byte-identical to the old route logic.
 export function sessionInsightsHistogram(
   values: number[],
   bucketCount: number,
@@ -1262,7 +1070,6 @@ export function sessionInsightsHistogram(
     return { bins: [{ min, max: min + 1, count: values.length }], percentiles };
   }
 
-  // Clip at p95 + 10% margin so outliers don't stretch the x-axis
   const p95Idx = Math.min(Math.floor(0.95 * sorted.length), sorted.length - 1);
   const p95Val = sorted[p95Idx];
   const max = p95Val + (p95Val - min) * 0.1 || sorted.at(-1)!;
@@ -1274,7 +1081,7 @@ export function sessionInsightsHistogram(
     count: 0,
   }));
   for (const v of sorted) {
-    if (v > max) continue; // outliers beyond p95+10% clipped
+    if (v > max) continue;
     let idx = Math.floor((v - min) / step);
     if (idx >= bucketCount) idx = bucketCount - 1;
     bins[idx].count++;
@@ -1311,22 +1118,6 @@ export async function computeSessionInsightsPayload(
     hourlyConcurrent: data.hourlyConcurrent,
   };
 }
-
-// ─────────────────────────────────────────────────────────────────────────
-// /graphs — server-side binning (exact port of the client math).
-//
-// The /graphs page used to pull RAW per-request value arrays (up to ~1.4M rows
-// per dataset) and bin them in the browser. Binning now happens here: at
-// compute time we pull the same raw rows over the provided (pooled, off-request)
-// db handle and run a VERBATIM TypeScript port of the client's
-// buildHistogram(_, 50) + nearest-rank percentile math, so the buckets and
-// percentile cards are byte-identical to what the browser produced. The result
-// is a small pre-binned payload cached wholesale (see StatsCacheKind 'graphs').
-//
-// Every pure function below is a straight port of code that lived in
-// packages/app/src/app/dashboard/graphs/page.tsx; the shapes it emits are the
-// integration contract the page now consumes via useGraphDataset.
-// ─────────────────────────────────────────────────────────────────────────
 
 export interface GraphBucket {
   min: number;
@@ -1502,7 +1293,6 @@ export interface FastModePayload {
   byModel: FastModeModelRow[];
 }
 export interface GraphPie {
-  // p50 of series A / series B, in the seconds unit the pie renders.
   p50a: number;
   p50b: number;
   n: number;
@@ -1512,22 +1302,12 @@ export interface GraphConcurrencyBucket {
   value: number;
 }
 
-/**
- * VERBATIM port of the client `buildHistogram(values, bucketCount)`:
- *   • empty → []
- *   • single distinct value → one [v, v] bucket holding every value
- *   • otherwise `bucketCount` equal-width bins from min to (p95 + 10% margin),
- *     with the `|| sorted.at(-1)!` fallback, outliers past the ceiling dropped,
- *     and the top-bin index clamp.
- * Exported for the parity unit test.
- */
 function graphBuildHistogramFromSorted(sorted: number[], bucketCount: number): GraphBucket[] {
   if (sorted.length === 0) return [];
   if (sorted[0] === sorted.at(-1)) {
     return [{ min: sorted[0], max: sorted[0], count: sorted.length }];
   }
   const min = sorted[0];
-  // Clip at p95 + 10% margin so outliers don't stretch the x-axis.
   const p95Idx = Math.min(Math.floor(0.95 * sorted.length), sorted.length - 1);
   const p95Val = sorted[p95Idx];
   const max = p95Val + (p95Val - min) * 0.1 || sorted.at(-1)!;
@@ -1553,14 +1333,6 @@ export function graphBuildHistogram(values: number[], bucketCount: number): Grap
   );
 }
 
-/**
- * VERBATIM port of the client Histogram's percentile block. Nearest-rank
- * `pct(p) = src[min(floor(p/100 * len), len-1)]`. When `sourceValues` is given
- * the percentiles are computed from those (sorted) and each is passed through
- * `sourceTransform` (interactivity: TPOT percentiles → 1000/v). `tailDirection`
- * selects the set: 'high' → p50/p75/p90/p95/p99 (latency), 'low' →
- * p1/p5/p10/p25/p50 (throughput). Exported for the parity unit test.
- */
 function graphPercentilesFromSorted(
   sorted: number[],
   tailDirection: 'high' | 'low',
@@ -1585,7 +1357,6 @@ export function graphPercentiles(
   return graphPercentilesFromSorted(sorted, tailDirection, sourceTransform ?? ((value) => value));
 }
 
-/** Assemble a graph histogram payload from raw values with one sort per source. */
 export function graphHistogram(
   values: number[],
   tailDirection: 'high' | 'low' = 'high',
@@ -1807,20 +1578,12 @@ function assemblePerformanceStreamingPayload(
   };
 }
 
-/**
- * Compute the shared, bounded payload behind /api/latency and /api/streaming.
- * Raw per-request rows exist only while this function assembles histograms;
- * neither branch returned to the cache or wire retains them.
- */
 export async function computePerformancePayload(
   db: Kysely<Database>,
   vis: string[] | null,
   model: string | null,
   traceVersion: number | null,
 ): Promise<PerformancePayload> {
-  // Keep concurrent scans within a small Neon compute's connection/CPU
-  // envelope. Several combined helpers launch two queries internally, so one
-  // giant Promise.all can fan out beyond the pool and fail before caching.
   const [latencyStats, latencyRows, hourly] = await Promise.all([
     getLatencyStats(vis, model, traceVersion, db),
     getLatencyDistribution(vis, model, traceVersion, db),
@@ -1833,7 +1596,6 @@ export async function computePerformancePayload(
       getCacheHeatmap(vis, model, traceVersion, db),
       getCacheHeatmapByOutput(vis, model, traceVersion, db),
     ]);
-  // Each distribution+stats helper uses two concurrent queries by itself.
   const ttftCombined = await getTTFTDistributionAndStats(vis, model, traceVersion, db);
   const tpotCombined = await getTPOTDistributionAndStats(vis, model, traceVersion, db);
   const [cacheHeatmapTTFT, cacheHeatmapPrefillSpeed, cacheTotalVsOutputInteractivity] =
@@ -1848,8 +1610,6 @@ export async function computePerformancePayload(
     traceVersion,
     db,
   );
-  // getStreamingStats uses two queries; with the two neighboring aggregates
-  // this final wave has at most four database requests in flight.
   const [streamingStatsWithRows, dailyRatio, streamingByModel] = await Promise.all([
     getStreamingStats(vis, model, traceVersion, db),
     getDailyStreamingRatio(vis, model, traceVersion, db),
@@ -1888,16 +1648,12 @@ export async function computePerformancePayload(
   };
 }
 
-/** Compute only the bounded live payload returned by model-filtered /api/latency. */
 export async function computePerformanceLatencyPayload(
   db: Kysely<Database>,
   vis: string[] | null,
   model: string | null,
   traceVersion: number | null,
 ): Promise<PerformanceLatencyPayload> {
-  // Keep live model filters within the same four-request ceiling as the
-  // cached union. Several helpers launch two queries internally, so the
-  // explicit waves account for nested fanout rather than only top-level calls.
   const [stats, distribution, hourly, byModel] = await Promise.all([
     getLatencyStats(vis, model, traceVersion, db),
     getLatencyDistribution(vis, model, traceVersion, db),
@@ -1938,20 +1694,17 @@ export async function computePerformanceLatencyPayload(
   );
 }
 
-/** Compute only the bounded live payload returned by model-filtered /api/streaming. */
 export async function computePerformanceStreamingPayload(
   db: Kysely<Database>,
   vis: string[] | null,
   model: string | null,
   traceVersion: number | null,
 ): Promise<PerformanceStreamingPayload> {
-  // The stats helper runs two queries; this first wave peaks at four.
   const [statsWithRows, dailyRatio, byModel] = await Promise.all([
     getStreamingStats(vis, model, traceVersion, db),
     getDailyStreamingRatio(vis, model, traceVersion, db),
     getStreamingByModel(vis, model, traceVersion, db),
   ]);
-  // Split the two-query helpers into waves so nested fanout never exceeds four.
   const ttftCombined = await getTTFTDistributionAndStats(vis, model, traceVersion, db);
   const [tpotCombined, prefillSpeedCombined] = await Promise.all([
     getTPOTDistributionAndStats(vis, model, traceVersion, db),
@@ -1964,7 +1717,6 @@ export async function computePerformanceStreamingPayload(
   );
 }
 
-/** Compute the bounded payload currently returned by /api/fast-mode. */
 export async function computeFastModePayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -2020,18 +1772,12 @@ export async function computeFastModePayload(
   };
 }
 
-/**
- * VERBATIM port of the pie's `percentile(sorted, 50)` — nearest-rank p50, and
- * 0 for an empty series (matches the client's `if (sorted.length === 0) return 0`).
- */
 function graphP50(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].toSorted((a, b) => a - b);
   return sorted[Math.min(Math.floor(0.5 * sorted.length), sorted.length - 1)];
 }
 
-// Concurrency bucket defs — VERBATIM port of the page's CONCURRENCY_BUCKET_DEFS
-// (labels included, en-dashes and all). Colors stay client-side.
 const GRAPH_CONCURRENCY_BUCKETS: { label: string; accepts: (v: number) => boolean }[] = [
   { label: '0', accepts: (v) => v === 0 },
   { label: '1', accepts: (v) => v === 1 },
@@ -2042,7 +1788,6 @@ const GRAPH_CONCURRENCY_BUCKETS: { label: string; accepts: (v: number) => boolea
   { label: '11+', accepts: (v) => v >= 11 },
 ];
 
-/** VERBATIM port of the page's bucketConcurrencyCounts (minus the color). */
 export function graphConcurrencyBuckets(values: number[]): GraphConcurrencyBucket[] {
   const counts = GRAPH_CONCURRENCY_BUCKETS.map(() => 0);
   for (const v of values) {
@@ -2056,20 +1801,11 @@ export function graphConcurrencyBuckets(values: number[]): GraphConcurrencyBucke
   return GRAPH_CONCURRENCY_BUCKETS.map((def, i) => ({ label: def.label, value: counts[i] }));
 }
 
-// Models whose fast / non-fast CPU-GPU + prefill-decode splits get their own
-// cards. Hardcoded server-side (mirrors the old route) so the dataset keys and
-// cache key stay stable and free of a per-key model param.
 const GRAPH_OPUS_47_MODEL = 'claude-opus-4-7';
 const GRAPH_OPUS_48_MODEL = 'claude-opus-4-8';
 
-// The session-scoped charts pin to the CURRENT trace version + >20 requests
-// (matches the old route) regardless of the global trace-version selector.
 const GRAPH_SESSION_MIN_REQS = 20;
 
-/**
- * Dataset keys the /graphs route can request via `?include=`. One raw DB pull
- * per key at compute time; each value is a pre-binned per-chart payload.
- */
 export const GRAPH_DATASET_KEYS = [
   'requestStats',
   'sessionAggregates',
@@ -2095,7 +1831,6 @@ export const GRAPH_DATASET_KEYS = [
 
 export type GraphDatasetKey = (typeof GRAPH_DATASET_KEYS)[number];
 
-/** CPU-vs-GPU pie payload from paired {gapSeconds, durationMs} rows. */
 function cpuGpuPie(rows: { gapSeconds: number; durationMs: number }[]): GraphPie {
   return {
     p50a: graphP50(rows.map((r) => r.gapSeconds)),
@@ -2104,7 +1839,6 @@ function cpuGpuPie(rows: { gapSeconds: number; durationMs: number }[]): GraphPie
   };
 }
 
-/** Prefill-vs-decode pie payload from paired {ttftMs, durationMs} rows. */
 function prefillDecodePie(rows: { ttftMs: number; durationMs: number }[]): GraphPie {
   return {
     p50a: graphP50(rows.map((r) => r.ttftMs / 1000)),
@@ -2113,12 +1847,6 @@ function prefillDecodePie(rows: { ttftMs: number; durationMs: number }[]): Graph
   };
 }
 
-/**
- * Compute the pre-binned payload for ONE dataset key over the provided db.
- * `model` applies only to the global per-request/per-session keys; the Opus
- * cards are model-pinned and the session-scoped keys are model-agnostic +
- * version-pinned (all matching the old route's per-key wiring exactly).
- */
 export async function computeGraphsDataset(
   db: Kysely<Database>,
   key: GraphDatasetKey,
@@ -2185,7 +1913,6 @@ export async function computeGraphsDataset(
       };
     }
     case 'hourlyTokens': {
-      // As-is: 48 bounded rows. Stored raw; the route's jsonCamel camelCases it.
       return getHourlyTokenCounts(vis, model, traceVersion, db);
     }
     case 'ttftValues': {
@@ -2228,7 +1955,6 @@ export async function computeGraphsDataset(
       return graphHistogram(rows.map((r) => r.tokens_per_chunk));
     }
     case 'weeklySessionsByHarness': {
-      // As-is + version-pinned + model-agnostic (matches the old route).
       return getWeeklySessionsByHarness(vis, CURRENT_TRACE_VERSION, GRAPH_SESSION_MIN_REQS, db);
     }
     case 'sessionDurationValues': {
@@ -2318,13 +2044,11 @@ export async function computeGraphsDataset(
       );
     }
     default: {
-      // Exhaustive over GraphDatasetKey — `key` is `never` here.
       throw new Error(`unknown graphs dataset key: ${key as string}`);
     }
   }
 }
 
-/** Compute a `{ [key]: payload }` map for the requested subset of keys. */
 export async function computeGraphsSubset(
   db: Kysely<Database>,
   keys: readonly GraphDatasetKey[],
@@ -2340,11 +2064,6 @@ export async function computeGraphsSubset(
   return out;
 }
 
-/**
- * Full /graphs payload (model=null). `opts.skipDatasets` is retained for
- * focused diagnostics; production cron and cold-miss writers compute every
- * bounded dataset, including the seven-day subagent window.
- */
 export function computeGraphsPayload(
   db: Kysely<Database>,
   vis: string[] | null,
@@ -2356,8 +2075,6 @@ export function computeGraphsPayload(
     skip.size === 0 ? GRAPH_DATASET_KEYS : GRAPH_DATASET_KEYS.filter((k) => !skip.has(k));
   return computeGraphsSubset(db, keys, vis, null, traceVersion);
 }
-
-// ── compute-and-cache wrappers + dispatcher ────────────────────────────────
 
 const WAVE2A_COMPUTERS: Record<
   Exclude<StatsCacheKind, 'overview' | 'models'>,
@@ -2376,11 +2093,6 @@ const WAVE2A_COMPUTERS: Record<
   graphs: computeGraphsPayload,
 };
 
-/**
- * Compute + upsert one Wave-2A combo. Returns the payload so a miss path can
- * serve it without a second read. Graph cron/stale refreshes use the atomic
- * patch writer below so a concurrent one-key repair cannot be lost.
- */
 export async function computeAndCacheStatsKind(
   db: Kysely<Database>,
   kind: Exclude<StatsCacheKind, 'overview' | 'models'>,
@@ -2392,12 +2104,6 @@ export async function computeAndCacheStatsKind(
   return payload;
 }
 
-/**
- * Complete graph refresh used by the dedicated cron and stale revalidation.
- * Scheduled writers run one current-version visibility combo per function so
- * this full payload stays inside its 300-second budget. The atomic patch also
- * composes with concurrent one-key repairs.
- */
 export async function computeAndPatchGraphsRefresh(
   db: Kysely<Database>,
   vis: string[] | null,

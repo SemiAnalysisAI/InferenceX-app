@@ -1,41 +1,16 @@
-/**
- * TCO feed — per-hardware Pareto-frontier throughput reads at fixed
- * interactivity tiers, consumed by external spreadsheet TCO models
- * (Excel / Power Query) via /api/v1/tco-feed. The scores view
- * (computeTcoScores) folds those per-tier reads into a single tier-weighted,
- * workload-blended, output-equivalent number per chip.
- *
- * Reuses the calculator's frontier + monotone-spline code (interpolation.ts)
- * so every number matches what the dashboard chart renders at the same
- * interactivity. Boundary semantics deliberately differ from the chart,
- * which refuses to read outside the frontier on both sides:
- *
- * - tier BELOW the frontier's min interactivity → the min-knot's throughput
- *   (`clamped_low`). The low end of a sweep is a coverage artifact — the
- *   chip can serve at least that much when batched deeper — so a null here
- *   would understate chips whose concurrency sweep stopped early.
- * - tier ABOVE the frontier's max interactivity → 0 (`unreachable`). The
- *   high end is a genuine capability limit: the chip cannot serve that SLA,
- *   and 0 is the honest "can't serve this segment" for a weighted-average
- *   consumer (a blank cell would silently become a stale pasted number).
- */
-
 import {
   hermiteInterpolate,
   monotoneSlopes,
   paretoFrontUpperLeft,
 } from '@/components/calculator/interpolation';
 
-/** Minimal structural slice of a BenchmarkRow the feed computation reads. */
 export interface TcoFeedSourceRow {
   hardware: string;
-  /** Absent on rows predating the column — treated as single_turn. */
   benchmark_type?: string | null;
   isl: number | null;
   osl: number | null;
   metrics: Record<string, number>;
   date: string;
-  /** Optional caller-owned label carried through to the tier's bracketing evidence. */
   evidence_label?: string;
 }
 
@@ -48,51 +23,28 @@ export type TcoTierBoundary = 'interpolated' | 'clamped_low' | 'unreachable';
 
 export interface TcoFeedRow {
   hardware: string;
-  /** `<isl>x<osl>`, e.g. `8192x1024`. */
   workload: string;
-  /** Interactivity read point (tok/s/user). */
   tier: number;
-  /** Output tokens/s per GPU on the frontier at `tier`; 0 when unreachable. */
   output_tput_per_gpu: number;
   boundary: TcoTierBoundary;
-  /**
-   * True only when `tier` falls strictly between two observed frontier knots.
-   * `boundary: interpolated` also covers an exact in-range knot, so consumers
-   * that distinguish measured points from estimates must use this flag.
-   */
   is_interpolated: boolean;
-  /** Number of Pareto-frontier knots backing this hardware × workload. */
   frontier_points: number;
   frontier_min_interactivity: number;
   frontier_max_interactivity: number;
-  /** Newest benchmark date among the frontier knots (freshness). */
   latest_date: string;
-  /** Oldest benchmark date among the frontier knots (staleness flag). */
   oldest_frontier_date: string;
-  /**
-   * Run dates of the frontier knot(s) actually backing THIS tier read: the
-   * bracketing pair when interpolated, the single min-interactivity knot when
-   * clamped_low, null when unreachable. Unlike latest/oldest_frontier_date
-   * (whole-frontier freshness), it never blends knots outside the tier, so a
-   * downstream result can carry its own evidence date. Ordered ascending.
-   */
   evidence_date: { from: string; to: string } | null;
-  /** Distinct caller-owned labels from the bracketing frontier knot(s). */
   evidence_labels?: string[];
 }
 
 export interface TcoTierPoint {
   interactivity: number;
-  /** Serving throughput (tok/s per GPU) in the CALLER-CHOSEN metric: the
-   *  external feed reads output tokens, the Overview total (input + output)
-   *  tokens per deployed GPU. The frontier math is metric-agnostic. */
   throughput: number;
   date: string;
   evidenceLabel?: string;
 }
 
 export type TcoTierRead = Omit<TcoFeedRow, 'hardware' | 'workload' | 'output_tput_per_gpu'> & {
-  /** Frontier read at `tier` in the caller's throughput metric; 0 when unreachable. */
   throughput_per_gpu: number;
 };
 
@@ -101,17 +53,7 @@ export const DEFAULT_WORKLOADS: readonly TcoFeedWorkload[] = [
   { isl: 1024, osl: 1024 },
   { isl: 8192, osl: 1024 },
 ];
-/**
- * Traffic-mix weights for DEFAULT_TIERS: most tokens are served in the
- * 30–75 tok/s/user band; 100+ is a premium sliver. Only used when the
- * request keeps the default tiers — custom tiers default to equal weights.
- */
 export const DEFAULT_TIER_WEIGHTS: readonly number[] = [0.35, 0.4, 0.2, 0.05];
-/**
- * Default input-token value ratio for the output-equivalent conversion
- * `out × (1 + α × ISL/OSL)` — prefill work is worth ~25% of decode work
- * per token, consistent with prevailing API input:output pricing.
- */
 export const DEFAULT_ALPHA = 0.25;
 
 const MAX_TIERS = 20;
@@ -119,11 +61,6 @@ const MAX_TIER_VALUE = 10_000;
 const MAX_WORKLOADS = 8;
 const MAX_ALPHA = 10;
 
-/**
- * Parse `tiers=30,50,75,100`. Absent/blank → defaults; any invalid or
- * duplicate entry → null (caller responds 400 — duplicates would
- * double-count in the scores view).
- */
 export function parseTiers(raw: string | null): number[] | null {
   if (raw === null || raw.trim() === '') return [...DEFAULT_TIERS];
   const parts = raw.split(',').map((s) => s.trim());
@@ -140,11 +77,6 @@ export function parseTiers(raw: string | null): number[] | null {
   return tiers;
 }
 
-/**
- * Parse `workloads=1024x1024,8192x1024` (lowercase `x` separator).
- * Absent/blank → defaults; any invalid or duplicate entry → null (caller
- * responds 400 — duplicates would double-count in the scores view).
- */
 export function parseWorkloads(raw: string | null): TcoFeedWorkload[] | null {
   if (raw === null || raw.trim() === '') return [...DEFAULT_WORKLOADS];
   const parts = raw.split(',').map((s) => s.trim());
@@ -165,10 +97,6 @@ export function parseWorkloads(raw: string | null): TcoFeedWorkload[] | null {
   return workloads;
 }
 
-/**
- * Parse a comma-separated non-negative weight list of exactly `expected`
- * entries, normalized to sum to 1. Any invalid entry or a zero sum → null.
- */
 function parseWeightList(raw: string, expected: number): number[] | null {
   const parts = raw.split(',').map((s) => s.trim());
   if (parts.length !== expected) return null;
@@ -183,11 +111,6 @@ function parseWeightList(raw: string, expected: number): number[] | null {
   return weights.map((w) => w / sum);
 }
 
-/**
- * Parse `weights=0.35,0.4,0.2,0.05` (one per tier, normalized to sum 1).
- * Absent/blank → DEFAULT_TIER_WEIGHTS when the tiers are exactly
- * DEFAULT_TIERS, equal weights otherwise; invalid → null (caller 400s).
- */
 export function parseTierWeights(raw: string | null, tiers: readonly number[]): number[] | null {
   if (raw === null || raw.trim() === '') {
     const isDefaultTiers =
@@ -198,10 +121,6 @@ export function parseTierWeights(raw: string | null, tiers: readonly number[]): 
   return parseWeightList(raw, tiers.length);
 }
 
-/**
- * Parse `workload_weights=0.5,0.5` (one per workload, normalized to sum 1).
- * Absent/blank → equal split; invalid → null (caller 400s).
- */
 export function parseWorkloadWeights(
   raw: string | null,
   workloads: readonly TcoFeedWorkload[],
@@ -210,11 +129,6 @@ export function parseWorkloadWeights(
   return parseWeightList(raw, workloads.length);
 }
 
-/**
- * Parse `alpha=0.25` — the input-token value ratio in the score view's
- * output-equivalent conversion. Absent/blank → DEFAULT_ALPHA; invalid
- * (non-finite, negative, > 10) → null (caller 400s).
- */
 export function parseAlpha(raw: string | null): number | null {
   if (raw === null || raw.trim() === '') return DEFAULT_ALPHA;
   const value = Number(raw.trim());
@@ -224,7 +138,6 @@ export function parseAlpha(raw: string | null): number | null {
 
 const round3 = (v: number): number => Math.round(v * 1000) / 1000;
 
-/** Two knots' dates as an ascending {from,to} evidence range. */
 function evidenceRange(a: TcoTierPoint, b: TcoTierPoint): { from: string; to: string } {
   return a.date <= b.date ? { from: a.date, to: b.date } : { from: b.date, to: a.date };
 }
@@ -234,11 +147,6 @@ function evidenceLabels(a: TcoTierPoint, b: TcoTierPoint): string[] | undefined 
   return labels.length === 0 ? undefined : labels;
 }
 
-/**
- * The frontier knots backing an interpolated read at `tier`: the bracketing
- * pair xs[lo] ≤ tier ≤ xs[lo+1], collapsing to a single knot when `tier` lands
- * on an endpoint. `frontier` is sorted ascending by interactivity.
- */
 function bracketKnots(frontier: TcoTierPoint[], tier: number): [TcoTierPoint, TcoTierPoint] {
   const last = frontier.length - 1;
   if (tier <= frontier[0].interactivity) return [frontier[0], frontier[0]];
@@ -251,8 +159,6 @@ function bracketKnots(frontier: TcoTierPoint[], tier: number): [TcoTierPoint, Tc
   return [frontier[lo], frontier[lo + 1]];
 }
 
-/** Read fixed service tiers from a serving-throughput frontier (the
- *  throughput metric is whatever the caller put in `TcoTierPoint.throughput`). */
 export function computeTierReads(
   points: readonly TcoTierPoint[],
   tiers: readonly number[],
@@ -318,13 +224,6 @@ export function computeTierReads(
   });
 }
 
-/**
- * Chart parity: for single_turn rows the inference chart plots the STORED
- * median_intvty on the x-axis (the ingest mapper's 1/itl invariant only
- * rewrites agentic rows), so prefer the stored value and fall back to
- * 1/median_itl only for legacy rows/fixtures that predate the intvty key.
- * Shared by the feed and the Overview so both read the same x-axis.
- */
 export function singleTurnInteractivity(metrics: Record<string, number>): number | undefined {
   const storedIv = metrics.median_intvty;
   if (Number.isFinite(storedIv) && storedIv > 0) return storedIv;
@@ -332,11 +231,6 @@ export function singleTurnInteractivity(metrics: Record<string, number>): number
   return Number.isFinite(itl) && itl > 0 ? 1 / itl : undefined;
 }
 
-/**
- * Compute the feed: for each (workload, hardware), build the
- * (interactivity, output tok/s/GPU) Pareto frontier across every config —
- * frameworks, precisions, spec-decode, disagg — and read it at each tier.
- */
 export function computeTcoFeed(
   rows: readonly TcoFeedSourceRow[],
   workloads: readonly TcoFeedWorkload[] = DEFAULT_WORKLOADS,
@@ -347,9 +241,6 @@ export function computeTcoFeed(
   for (const workload of workloads) {
     const byHardware = new Map<string, TcoTierPoint[]>();
     for (const row of rows) {
-      // Rows predating the benchmark_type column are fixed-seq by definition
-      // (agentic rows are newer and carry isl/osl = null, which the workload
-      // match below excludes anyway).
       if ((row.benchmark_type ?? 'single_turn') !== 'single_turn') continue;
       if (row.isl !== workload.isl || row.osl !== workload.osl) continue;
       const interactivity = singleTurnInteractivity(row.metrics);
@@ -371,7 +262,6 @@ export function computeTcoFeed(
     const hardwareKeys = [...byHardware.keys()].toSorted((a, b) => a.localeCompare(b));
     for (const hardware of hardwareKeys) {
       for (const read of computeTierReads(byHardware.get(hardware)!, tiers)) {
-        // The feed's contract names the metric it serves: output tokens.
         const { throughput_per_gpu: outputTputPerGpu, ...rest } = read;
         out.push({
           hardware,
@@ -399,15 +289,6 @@ const CSV_COLUMNS = [
   'oldest_frontier_date',
 ] as const;
 
-// `is_interpolated` is JSON-only provenance. Keep the long-lived Power Query
-// CSV schema stable; Overview consumes the typed in-process rows.
-
-/**
- * Serialize feed rows as CSV for one-line Power Query consumption.
- * Every value is a number, ISO date, or enum-like token (hardware keys,
- * `<isl>x<osl>`, boundary) — none can contain commas/quotes/newlines, so no
- * field quoting is needed.
- */
 export function tcoFeedToCsv(rows: readonly TcoFeedRow[]): string {
   const lines = rows.map((row) => CSV_COLUMNS.map((col) => String(row[col])).join(','));
   return `${[CSV_COLUMNS.join(','), ...lines].join('\n')}\n`;
@@ -415,41 +296,15 @@ export function tcoFeedToCsv(rows: readonly TcoFeedRow[]): string {
 
 export interface TcoScoreRow {
   hardware: string;
-  /**
-   * Tier-weighted, workload-blended, output-equivalent throughput
-   * (tok/s/GPU) — the single per-chip number a TCO sheet consumes.
-   */
   score: number;
-  /**
-   * Tier-weighted output tok/s/GPU per requested workload key, BEFORE the
-   * output-equivalent factor and workload blend; null = no benchmark data
-   * for that workload (as opposed to 0 = every tier unreachable).
-   */
   workload_scores: Record<string, number | null>;
   workloads_covered: number;
-  /** Tier reads (across covered workloads) above the capability ceiling. */
   unreachable_tiers: number;
-  /** Tier reads (across covered workloads) below the sweep floor. */
   clamped_tiers: number;
-  /** Newest frontier-knot date across covered workloads. */
   latest_date: string;
-  /** Oldest frontier-knot date across covered workloads. */
   oldest_frontier_date: string;
 }
 
-/**
- * Aggregate per-tier feed rows into one score per hardware:
- *
- *   score = Σ_covered workloads [ wWeight × (Σ_tiers tierWeight × tput) × (1 + α × ISL/OSL) ]
- *
- * - Unreachable tiers contribute 0 at full weight — the chip genuinely
- *   cannot serve that traffic segment (matches the feed's boundary docs).
- * - Workloads with no data are EXCLUDED and the workload weights are
- *   renormalized over covered ones — absence of a sweep is a coverage gap,
- *   not a capability limit; `workloads_covered` flags the reduced basis.
- * - Aggregates from the already-rounded feed values, so a consumer can
- *   reproduce `score` exactly by SUMPRODUCT over the `points` view.
- */
 export function computeTcoScores(
   feedRows: readonly TcoFeedRow[],
   workloads: readonly TcoFeedWorkload[],
@@ -478,7 +333,6 @@ export function computeTcoScores(
 
     for (const [w, workload] of workloads.entries()) {
       const key = `${workload.isl}x${workload.osl}`;
-      // computeTcoFeed emits per-workload rows in `tiers` order.
       const tierRows = hwRows.filter((r) => r.workload === key);
       if (tierRows.length !== tiers.length) {
         workloadScores[key] = null;
@@ -493,15 +347,12 @@ export function computeTcoScores(
       workloadScores[key] = round3(weighted);
       coveredWeight += workloadWeights[w];
       blended += workloadWeights[w] * weighted * (1 + (alpha * workload.isl) / workload.osl);
-      // 'YYYY-MM-DD' compares chronologically as a string.
       if (latest === '' || tierRows[0].latest_date > latest) latest = tierRows[0].latest_date;
       if (oldest === '' || tierRows[0].oldest_frontier_date < oldest) {
         oldest = tierRows[0].oldest_frontier_date;
       }
     }
 
-    // Every hardware in feedRows covers ≥1 workload, so coveredWeight can
-    // only be 0 when the caller zero-weighted all its covered workloads.
     const covered = Object.values(workloadScores).filter((v) => v !== null).length;
     out.push({
       hardware,
@@ -517,12 +368,6 @@ export function computeTcoScores(
   return out;
 }
 
-/**
- * Serialize score rows as CSV. One `score_<isl>x<osl>` column per requested
- * workload, in request order; an uncovered workload is an empty field.
- * Same no-quoting invariant as tcoFeedToCsv — every value is a number, ISO
- * date, hardware key, or `<digits>x<digits>` workload key.
- */
 export function tcoScoresToCsv(
   rows: readonly TcoScoreRow[],
   workloads: readonly TcoFeedWorkload[],

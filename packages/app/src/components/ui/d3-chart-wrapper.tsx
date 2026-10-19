@@ -17,13 +17,8 @@ const SHEET_STRINGS = {
   zh: { title: '数据点详情', close: '关闭数据点详情' },
 } as const;
 
-/** Downward swipe distance (px) that dismisses the mobile detail sheet. */
 const SHEET_SWIPE_DISMISS_PX = 64;
 
-/**
- * Shown instead of the Shift+Scroll guidance on touch-primary devices, where
- * useChartZoom only accepts two-finger gestures (one finger scrolls the page).
- */
 const TOUCH_CHART_INSTRUCTIONS = {
   en: 'Pinch to zoom • Two-finger drag to pan • Double-tap to reset • Tap a point to pin tooltip',
   zh: '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框',
@@ -31,12 +26,6 @@ const TOUCH_CHART_INSTRUCTIONS = {
 
 export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
 
-/**
- * Picks the hint to render under a chart. When the chart zooms and the device
- * is touch-primary, the Shift+Scroll guidance (the default, or a chart's own
- * copy, which also describes mouse zooming) is swapped wholesale for the touch
- * version. An explicit empty string (embeds) still renders nothing.
- */
 export function resolveChartInstructions(
   instructions: string | undefined,
   locale: Locale,
@@ -46,18 +35,6 @@ export function resolveChartInstructions(
   return useTouchHint && resolved ? TOUCH_CHART_INSTRUCTIONS[locale] : resolved;
 }
 
-/**
- * Renders the d3 tooltip element via React Portal to document.body so it
- * escapes any parent stacking context (e.g. the chart Card's backdrop-filter
- * creates one, trapping z-index inside it). Position is set as viewport
- * coordinates by the d3 layer.
- *
- * On phones a pinned tooltip is presented as a bottom sheet (`data-sheet`,
- * styled in globals.css) over a dimmed backdrop: the full per-point metrics
- * and the View charts / View logs actions stay reachable without covering
- * the plot or running off-screen. Tapping the backdrop or swiping the sheet
- * down dismisses it.
- */
 function PortalTooltip({
   chartId,
   tooltipRef,
@@ -72,8 +49,6 @@ function PortalTooltip({
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  // Bottom sheet only on touch phones. A narrow desktop window driven by a
-  // mouse keeps the floating tooltip so pin-then-hover comparisons still work.
   const isMobile = useIsMobileViewport();
   const isTouch = useIsCoarsePointer();
   const sheet = pinned && isMobile && isTouch;
@@ -81,8 +56,6 @@ function PortalTooltip({
   const onSheetDismissRef = useRef(onSheetDismiss);
   onSheetDismissRef.current = onSheetDismiss;
 
-  // Swipe-down-to-dismiss, only when the sheet is scrolled to its top so the
-  // gesture never fights scrolling through a long metrics list.
   useEffect(() => {
     const el = tooltipRef.current;
     if (!sheet || !el) return;
@@ -105,7 +78,6 @@ function PortalTooltip({
     };
   }, [sheet, tooltipRef]);
 
-  // Escape closes the sheet for keyboard and switch-access users.
   useEffect(() => {
     if (!sheet) return;
     const onKey = (event: KeyboardEvent) => {
@@ -172,7 +144,6 @@ export interface D3ChartWrapperProps {
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
   instructions?: string;
-  /** Whether d3-zoom is attached; gates the touch-device hint swap. */
   zoomEnabled?: boolean;
   testId?: string;
   grabCursor?: boolean;
@@ -213,16 +184,11 @@ export function D3ChartWrapper({
     >
       <div ref={setContainerRef} className="relative flex-1 min-w-0">
         <div className="relative">
-          {/* Stable hook for tests. `[data-testid="scatter-graph"] svg` also
-                matches every Lucide icon inside the card — dozens of them —
-                so picking "the first svg" silently grabs an icon whenever the
-                selected metric renders one above the chart. */}
           <svg
             ref={svgRef}
             data-testid="d3-chart-svg"
             width="100%"
             height={dimensions.height}
-            // pan-y lets one-finger swipes scroll the page while d3-zoom handles two-finger gestures.
             style={{ cursor: grabCursor ? 'grab' : undefined, touchAction: 'pan-y' }}
             onMouseDown={
               grabCursor
@@ -245,10 +211,6 @@ export function D3ChartWrapper({
               }
             }}
           />
-          {/* Tooltip is portalled to <body> with position:fixed so it can
-                rise above sibling chart cards' stacking contexts. The d3 layer
-                writes viewport-coords into style.left/top — see
-                computeTooltipPosition. */}
           <PortalTooltip
             chartId={chartId}
             tooltipRef={tooltipRef}
@@ -270,13 +232,6 @@ export function D3ChartWrapper({
         </div>
       </div>
       {legendElement && (
-        /* Sizes to the legend content: when the sidebar legend panel is open
-             (.sidebar-legend present) the column grows to fit the widest
-             legend label (capped) so full names display without truncation,
-             while still sitting next to the plot without overlapping it; when
-             closed the legend renders only a small reopen button and the
-             chart reclaims the width. Height belongs to the legend itself:
-             short lists should not reserve an empty chart-height column. */
         <div
           data-slot="chart-legend-wrapper"
           className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"

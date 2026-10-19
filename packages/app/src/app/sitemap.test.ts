@@ -94,10 +94,6 @@ describe('sitemap locale parity', () => {
     for (const tab of MODEL_ROUTE_TABS) {
       const served = new Set(modelRoutesForTab(tab).map((route) => route.model));
       for (const route of MODEL_ROUTES) {
-        // The default model's page canonicalizes to the bare tab path, which
-        // the dashboard-route loop above already covers. Models a tab does not
-        // serve (the profit estimator is Kimi K3, GLM 5.2/5.3, MiniMax M3,
-        // DeepSeek V4 Pro and DeepSeek V4.1 Flash only) 404 and stay out.
         const expected = served.has(route.model) && route.model !== defaultRouteModel(tab);
         const enPath = modelRoutePath(tab, route.slug);
         expect(urls.has(`${SITE_URL}${enPath}`)).toBe(expected);
@@ -148,7 +144,6 @@ describe('sitemap locale parity', () => {
     const urls = new Set(entries.map((entry) => entry.url));
     expect(urls.has(`${SITE_URL}/run`)).toBe(true);
     expect(urls.has(`${SITE_URL}${zhPath('/run')}`)).toBe(true);
-    // Availability mock returns no pairs, so no /run/<pair> URLs may leak in.
     for (const url of urls) {
       expect(url.startsWith(`${SITE_URL}/run/`)).toBe(false);
       expect(url.startsWith(`${SITE_URL}/zh/run/`)).toBe(false);

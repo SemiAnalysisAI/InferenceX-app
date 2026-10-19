@@ -95,10 +95,6 @@ const STRINGS = {
 
 const VENDOR_LABEL: Record<string, string> = { nvidia: 'nvidia-smi', amd: 'amd-smi' };
 
-/**
- * Single-node CSVs come from the vendor CLI; multinode power bundles record
- * their own producer (e.g. `srt-slurm.dcgm-power`) in the context sidecar.
- */
 export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecars'>): string {
   const context = series.sidecars?.context;
   const producer =
@@ -110,9 +106,7 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
 interface Props {
   id: number;
   enabled: boolean;
-  /** The point's hardware key, for the TDP reference line. */
   hardware?: string;
-  /** Fixed-sequence points do not have AgentX server-metric overlays. */
   serverMetricsEnabled?: boolean;
 }
 
@@ -120,11 +114,6 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
   return total > 1 ? `${series.artifactName} · ${series.fileName}` : series.artifactName;
 }
 
-/**
- * PowerX tab of the per-point detail page: the full-resolution chip telemetry
- * recorded while this benchmark point ran, read from the ingest-time digest
- * (migration 016) rather than from GitHub artifacts.
- */
 export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled = true }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -150,8 +139,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
     () => [...new Set(data.map((row) => row.index))].toSorted((a, b) => a - b),
     [data],
   );
-  // Hidden chips are scoped to the series they were hidden on so switching
-  // series never carries over a stale filter.
   const [hiddenSelection, setHiddenSelection] = useState<{
     seriesId: number;
     hidden: number[];
@@ -180,8 +167,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
 
-  // Server-metric overlay. The series are fetched as soon as the tab opens so
-  // the menu can list exactly the metrics this point has; one source at a time.
   const metricsQuery = useTraceServerMetrics(id, enabled && serverMetricsEnabled);
   const serverMetrics = metricsQuery.data;
   const overlaySources = useMemo(() => availableOverlaySources(serverMetrics), [serverMetrics]);
@@ -190,8 +175,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   );
   const overlayKey = overlaySelection?.id === id ? overlaySelection.key : 'none';
   const overlaySource = overlaySources.find((source) => source.key === overlayKey) ?? null;
-  // Trace timeslices carry epoch-ns starts, so both series can share wall-clock
-  // time. A zero startNs means the trace only has relative time.
   const overlayAbsolute = Boolean(serverMetrics && serverMetrics.startNs > 0);
   const overlay = useMemo<TelemetryOverlaySeries | null>(() => {
     if (!overlaySource || !serverMetrics || !selectedSeries) return null;

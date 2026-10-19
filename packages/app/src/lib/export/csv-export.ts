@@ -1,9 +1,3 @@
-/**
- * CSV export utility for chart data.
- * Converts structured data into CSV format and triggers a browser download.
- */
-
-/** License preamble prepended to every exported CSV file */
 export function csvLicensePreamble(): string {
   return [
     '# Licensed under Apache License 2.0 — https://www.apache.org/licenses/LICENSE-2.0',
@@ -12,11 +6,6 @@ export function csvLicensePreamble(): string {
   ].join('\n');
 }
 
-/**
- * Escape a cell value for CSV (RFC 4180): wrap in quotes only if it contains a
- * comma, quote, or line break; null/undefined serialize as an empty cell.
- * Shared with the views-API CSV representations.
- */
 export function escapeCsvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   const str = typeof value === 'string' ? value : String(value);
@@ -26,7 +15,6 @@ export function escapeCsvCell(value: unknown): string {
   return str;
 }
 
-/** Build a CSV string from headers and rows */
 export function buildCsv(
   headers: string[],
   rows: (string | number | boolean | null | undefined)[][],
@@ -38,7 +26,6 @@ export function buildCsv(
   return [csvLicensePreamble(), ...noteLines, headerLine, ...dataLines].join('\n');
 }
 
-/** Trigger a CSV file download in the browser */
 export function downloadCsv(filename: string, csvContent: string): void {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -49,7 +36,6 @@ export function downloadCsv(filename: string, csvContent: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Build CSV content and trigger download in one call */
 export function exportToCsv(
   filename: string,
   headers: string[],

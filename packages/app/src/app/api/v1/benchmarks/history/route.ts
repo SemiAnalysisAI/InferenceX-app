@@ -15,20 +15,6 @@ import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-m
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Trim a history response to the calculator's metric allowlist.
- *
- * Opt-in only. `CALCULATOR_METRIC_KEYS` excludes the measured-power metrics
- * (`measured_avg_power_w`, `joules_per_output_token`, …) that Historical Trends
- * plots, so applying this to every history response would silently blank those
- * charts. The sequence is derived from the route's own isl/osl rather than
- * taken as a parameter, so the two can never disagree.
- *
- * Agentic requests carry no isl/osl and so have no sequence to key on. Those
- * responses pass through untrimmed rather than guessing a sequence — the trim is
- * a payload optimisation, and the agentic payload is a fraction of a fixed one.
- * The calculator's lifecycle section consumes them either way.
- */
 function applyCalculatorView<
   T extends {
     benchmark_type: string;
@@ -74,7 +60,6 @@ export async function GET(request: NextRequest) {
     const rows = isAgentic
       ? await getCachedAgenticBenchmarkHistory(modelKeys)
       : await getCachedBenchmarkHistory(modelKeys, isl!, osl!);
-    // Both trims run after the cache, so every view shares one cached query.
     const trimmed = agenticWorkflowMetadataOnly(rows);
     return cachedJson(calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
   } catch (error) {

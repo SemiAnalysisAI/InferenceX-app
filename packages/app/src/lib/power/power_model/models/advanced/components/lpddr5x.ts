@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Whole Grace memory-pool power from physical DRAM traffic. */
 
 import { type Details, Provenance, validate_watts, ValidationError } from '../../../base';
 import { GenericComponent, type GenericComponentFields } from './base';

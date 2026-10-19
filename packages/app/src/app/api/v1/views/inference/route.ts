@@ -98,22 +98,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/v1/views/inference
- *
- * Chart-ready series for the main /inference scatter chart: the same dedupe →
- * transform → filter → remap → Pareto pipeline `useChartData` runs client-side,
- * executed server-side via `buildInferenceSeries` (lib/views-api/series.ts).
- *
- * Query params: model (required), sequence (default 8k/1k), precisions
- * (default: densest-precision auto-resolution), metric (default
- * tokensPerDollarN), xmode (default interactivity; the trace-derived
- * e2e-normalized-interactivity mode falls back to interactivity, as the
- * dashboard does for fixed-seq), xmetric (default p90_ttft), percentile
- * (default p90), date, runId (exact workflow-run snapshot), gpus, vendors,
- * frameworks, deployment, spec, optimal, best, format (json|csv).
- */
-
 const XMETRIC_VALUES = ['median_ttft', 'p75_ttft', 'p90_ttft', 'p95_ttft', 'p99_ttft'] as const;
 
 interface InferenceViewParams {
@@ -164,8 +148,6 @@ function buildView(
   params: InferenceViewParams,
   derivedMetrics?: DerivedAgenticMetricMap,
 ): InferenceViewData {
-  // Precision auto-resolution runs against the sequence-scoped rows, exactly
-  // like the dashboard's densest-precision default.
   const seqRows = rows.filter((row) => rowToSequence(row) === params.sequence);
   const availablePrecisions = [...new Set(seqRows.map((row) => row.precision))].toSorted();
   const resolvedPrecisions = resolveEffectivePrecisions({
@@ -189,8 +171,6 @@ function buildView(
       frameworks: [...params.frameworks],
       deployment: [...params.deployment] as ('single-node' | 'multi-node' | 'disagg')[],
       spec: [...params.spec] as ('mtp' | 'stp')[],
-      // Measured-power tier pills are a dashboard-only affordance; the API
-      // returns every row regardless of power certification, like the default view.
       power: [...params.power],
       topologies: [...params.topologies],
     },
@@ -241,7 +221,6 @@ function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRo
   );
 }
 
-/** Keep public endpoint provenance without serializing internal chart objects. */
 function observedPointIdentity(point: InferenceData) {
   return {
     id: point.id ?? null,
@@ -313,8 +292,6 @@ export function GET(request: NextRequest) {
       X_AXIS_MODES,
       defaultInferenceXAxisMode(displayName),
     );
-    // The trace-derived mode has no server-side data source; resolve it to the
-    // interactivity chart (the dashboard applies the same fallback on fixed-seq).
     const xmode: SeriesXMode =
       requestedXMode === 'e2e-normalized-interactivity' && sequence !== Sequence.AgenticTraces
         ? 'interactivity'
@@ -361,7 +338,6 @@ export function GET(request: NextRequest) {
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
-    // Topology keys are opaque values returned by this view, not case-folded names.
     const topologies = [
       ...new Set(
         (search.get('topologies') ?? '')
@@ -459,7 +435,6 @@ export function GET(request: NextRequest) {
       );
     const data = await project(rows, params);
     const observedPoints = [...data.result.observedPoints];
-    // Service/role panels pool every scope's observed points; the payload omits them.
     const collectObserved = ({ observedPoints: points, ...result }: InferenceSeriesResult) => {
       observedPoints.push(...points);
       return result;
@@ -508,7 +483,6 @@ export function GET(request: NextRequest) {
             buildMatchedConcurrencyTable(observedPoints, {
               baseline: serviceBaseline,
               comparator: serviceComparator,
-              // The dashboard reads streaming speed at the selected statistic.
               interactivityField: resolveServiceField('median_intvty', {
                 isAgentic: sequence === Sequence.AgenticTraces,
                 percentile,

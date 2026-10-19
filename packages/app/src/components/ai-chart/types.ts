@@ -16,48 +16,28 @@ export interface AiChartSpec {
   chartType: AiChartType;
   dataSource: AiDataSource;
 
-  // ── Data filters ──
-  /** Model display name. Empty string = all models. */
   model: string;
-  /** Sequence length string (e.g. "8k/1k"). */
   sequence: string;
-  /** GPU base keys to include. [] = all. */
   hardwareKeys: string[];
-  /** Precision filters. [] = all. */
   precisions: string[];
-  /** Framework filters. [] = all. Allows filtering to specific serving backends. */
   frameworks: string[];
-  /** Filter to disaggregated configs only (true), non-disagg only (false), or both (null). */
   disagg: boolean | null;
 
-  // ── Metric ──
-  /** Primary y-axis metric key. */
   yAxisMetric: string;
-  /** Human-readable y-axis label. */
   yAxisLabel: string;
 
-  // ── Bar chart options ──
-  /** Interactivity level (tok/s/user) to sample at for bar charts. Default 40. */
   targetInteractivity?: number;
-  /** Sort order for bar charts. "desc" = highest first (default), "asc" = lowest first, "registry" = GPU registry order. */
   sortOrder?: AiSortOrder;
 
-  // ── Radar chart options ──
-  /** For radar charts: list of y-axis metric keys to plot as axes. */
   radarMetrics?: string[];
 
-  // ── Top-N filtering (applied after data loads) ──
-  /** Show only the top N hardware configs by metric value. Undefined = show all. */
   topN?: number;
-  /** When true, topN deduplicates by base GPU (best config per GPU family). Default true. */
   topNDistinctGpus?: boolean;
 
-  // ── Display ──
   title: string;
   description: string;
 }
 
-/** The LLM may return an array of up to 2 specs for comparison queries. */
 export type AiLlmResponse = AiChartSpec | AiChartSpec[];
 
 export interface AiChartBarPoint {
@@ -66,10 +46,6 @@ export interface AiChartBarPoint {
   value: number;
   color: string;
 }
-
-// ---------------------------------------------------------------------------
-// Validation whitelists
-// ---------------------------------------------------------------------------
 
 const VALID_CHART_TYPES = new Set<string>(['bar', 'scatter', 'line', 'radar']);
 const VALID_DATA_SOURCES = new Set<string>(['benchmarks', 'evaluations', 'reliability', 'history']);
@@ -96,7 +72,6 @@ function fallbackYAxisLabel(metric: string, locale: Locale): string {
   return isMetricKey(metricKey) ? METRIC_REGISTRY[metricKey].labelZh : metric;
 }
 
-/** Validate and clamp an LLM-generated spec to known values. Throws on unrecoverable input. */
 export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'): AiChartSpec {
   const chartType = VALID_CHART_TYPES.has(raw.chartType as string)
     ? (raw.chartType as AiChartType)

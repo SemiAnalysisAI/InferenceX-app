@@ -1,21 +1,3 @@
-/**
- * Lazy CollectiveX ingest: the CollectiveX database is a durable cache of
- * GitHub Actions, populated on read. Each `ensure*` function checks the DB
- * first and only then discovers/downloads sweep artifacts from GitHub,
- * persisting the RAW documents so a run outlives its 14-day artifact
- * retention once anyone has viewed it.
- *
- * Rules encoded here:
- *  - Sweep runs are accepted from ANY branch (they are launched via `gh api`
- *    on feature branches); only the workflow identity is checked.
- *  - Discovery never gates on conclusion — a red or partial run still
- *    surfaces what it produced.
- *  - Tombstoned runs (deleted via the dashboard) are never re-ingested.
- *  - GitHub being down must not take the page down: callers read the DB
- *    after `ensure*` and serve whatever is there, so these functions only
- *    matter when the DB has nothing to fall back to.
- */
-
 import AdmZip from 'adm-zip';
 
 import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
@@ -49,17 +31,9 @@ const MAX_RUN_BYTES = 256 * 1024 * 1024;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_REQUEST_ATTEMPTS = 3;
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
-// The workflow retains artifacts for 14 days. Older runs already persisted in
-// the DB remain visible, but unknown runs beyond this window cannot be
-// assembled and need not spend one GitHub artifact-list request apiece.
 const ARTIFACT_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
-// GitHub permits a workflow rerun for 30 days after creation. Include that
-// whole window plus artifact retention so the created-date filter still finds
-// the oldest run whose newest rerun artifacts could be downloadable.
 const WORKFLOW_RERUN_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 const DISCOVERY_LOOKBACK_MS = WORKFLOW_RERUN_WINDOW_MS + ARTIFACT_RETENTION_MS;
-// Bound one origin request's work. The runs route reports whether discovery is
-// complete, and the client refetches while more ingestible runs remain.
 const MAX_CHANGED_RUNS_PER_PASS = 8;
 
 type SweepErrorCode = 'invalid' | 'not-found' | 'unavailable';
@@ -100,7 +74,6 @@ export function collectiveXSweepErrorCode(error: unknown): SweepErrorCode | null
   return error instanceof CollectiveXSweepError ? error.code : null;
 }
 
-/** HTTP status for a sweep-ingest failure; null for unexpected errors. */
 export function collectiveXSweepErrorStatus(error: unknown): 404 | 502 | 503 | null {
   const code = collectiveXSweepErrorCode(error);
   if (code === 'not-found') return 404;
@@ -109,7 +82,6 @@ export function collectiveXSweepErrorStatus(error: unknown): 404 | 502 | 503 | n
   return null;
 }
 
-// Concurrent requests for the same target share one discovery pass.
 const inFlight = new Map<string, Promise<unknown>>();
 
 function dedupe<T>(key: string, work: () => Promise<T>): Promise<T> {
@@ -120,15 +92,6 @@ function dedupe<T>(key: string, work: () => Promise<T>): Promise<T> {
   return promise;
 }
 
-// Cooldown for the latest-run walk. The DB is the durable cache, but sharing
-// only the in-flight promise still left every latest read walking GitHub. The
-// runs-list path is intentionally not throttled while incomplete: its response
-// is uncached and the client requests the next bounded discovery batch.
-//
-// Failures are remembered too, and rethrown for the rest of their (shorter)
-// window: swallowing them would let a GitHub outage read as "discovery fine,
-// nothing found", which downgrades the routes' 502/503 to a 404 when the DB is
-// empty. The window is the upper bound on how stale "latest" can be.
 const DISCOVERY_COOLDOWN_MS = 60_000;
 const DISCOVERY_FAILURE_COOLDOWN_MS = 10_000;
 
@@ -156,11 +119,6 @@ function throttled(key: string, work: () => Promise<void>): () => Promise<void> 
   };
 }
 
-/**
- * Test-only: drop every discovery cooldown. The module keeps this state for the
- * lifetime of the process, so a suite driving successive passes must clear it
- * between cases.
- */
 export function resetCollectiveXDiscoveryCooldown(): void {
   discoveryCooldown.clear();
 }
@@ -212,7 +170,6 @@ function requireToken(): string {
   return token;
 }
 
-// Identity check only — never the branch: sweeps run on feature branches.
 function isSweepRun(run: WorkflowRun): boolean {
   return (
     run.name === WORKFLOW_NAME &&
@@ -233,9 +190,6 @@ function artifactsMayBeAvailable(run: WorkflowRun): boolean {
   return !Number.isFinite(timestamp) || Date.now() - timestamp <= ARTIFACT_RETENTION_MS;
 }
 
-// Newest-first stream of completed sweep runs across all branches. GitHub's
-// created filter bounds cold-origin discovery without excluding any run whose
-// original or rerun artifacts could still be within their retention window.
 async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
   let page = 1;
   let visited = 0;
@@ -362,9 +316,6 @@ async function collectDocs(artifact: GithubArtifact, token: string): Promise<unk
   return docs;
 }
 
-// A run's validated matrix, its version tag, and the artifacts that feed
-// persistence. Kept separate so discovery can read the version tag cheaply
-// (matrix docs are tiny) before committing to a full download.
 interface MatrixCandidate {
   matrixDoc: unknown;
   version: number;
@@ -404,11 +355,6 @@ async function loadMatrixCandidate(
   return { matrixDoc: matrixCandidates[0], version, matrixArtifacts, resultArtifacts };
 }
 
-/**
- * Download a candidate's result docs, validate assembly, persist raw.
- * `refresh` replaces an already-live row whose GitHub attempt is newer (a
- * re-run of failed shards); plain inserts are conflict-safe no-ops.
- */
 async function persistRun(
   run: WorkflowRun,
   candidate: MatrixCandidate,
@@ -441,8 +387,6 @@ async function persistRun(
     source_sha: run.head_sha,
   };
 
-  // Assemble once to validate the bundle and precompute the run-table summary;
-  // only the raw documents are stored.
   let summary;
   try {
     summary = buildRunSummary(buildDatasetFromNeutral(candidate.matrixDoc, docs, meta));
@@ -464,7 +408,6 @@ async function persistRun(
     : insertCollectiveXRun(getCollectiveXWriteDb(), row, docs);
 }
 
-/** Download and version-check a candidate's matrix; null when not ingestible. */
 async function matrixCandidateFor(
   run: WorkflowRun,
   version: CollectiveXVersion,
@@ -476,15 +419,6 @@ async function matrixCandidateFor(
   return candidate.version === version ? candidate : null;
 }
 
-/**
- * Handle one discovery candidate — the single walker step shared by the
- * latest and runs-list paths: persist absent requested-version runs, refresh
- * live ones whose GitHub attempt is newer (re-run of failed shards), skip
- * everything else. `changed-match` means this pass inserted or refreshed the
- * requested version; `changed-other` means an absent run was persisted under
- * its actual version while walking. Known live rows are `match` but do not
- * consume the runs-list batch. Tombstoned rows are `skip`.
- */
 type CandidateResult = 'changed-match' | 'changed-other' | 'match' | 'skip';
 
 async function considerCandidate(
@@ -513,11 +447,6 @@ async function considerCandidate(
   return candidate.version === version ? 'changed-match' : 'changed-other';
 }
 
-/**
- * Make sure the newest requested-version sweep run on GitHub is in the DB.
- * Completes silently when GitHub has nothing new; throws only on GitHub or
- * artifact failures (callers fall back to whatever the DB already holds).
- */
 export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise<void> {
   const key = `latest:${version}`;
   return dedupe(
@@ -532,15 +461,6 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
   );
 }
 
-/**
- * Progressively backfill every requested-version run whose artifacts may
- * still be available. Known live rows do not consume the per-request batch,
- * so successive calls advance through the workflow history instead of
- * revisiting the same newest rows forever.
- *
- * Returns true once the current GitHub history has been exhausted, or false
- * when this pass stopped at the mutation budget and the caller should refetch.
- */
 export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<boolean> {
   const key = `list:${version}`;
   return dedupe(key, async () => {
@@ -553,9 +473,6 @@ export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<
         result = await considerCandidate(run, version, token);
       } catch (error) {
         const code = collectiveXSweepErrorCode(error);
-        // One incomplete or malformed workflow run must not hide every valid
-        // run behind it. Network/service failures still abort so the route can
-        // serve its stored fallback and expose the outage when no fallback exists.
         if (code === 'invalid' || code === 'not-found') continue;
         throw error;
       }
@@ -566,10 +483,6 @@ export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<
   });
 }
 
-/**
- * Make sure one specific run is in the DB. Throws 'not-found' for absent,
- * non-sweep, cross-version, or tombstoned runs.
- */
 export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string): Promise<void> {
   return dedupe(`run:${version}:${runId}`, async () => {
     const numericId = Number(runId);
@@ -579,7 +492,6 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
     const states = await getCollectiveXRunStates(getCollectiveXWriteDb(), [runId]);
     const known = states[runId];
     if (known && (known.state !== 'live' || known.version !== version)) {
-      // Tombstoned or cross-version rows both read as absent to the caller.
       throw new CollectiveXSweepError('not-found', 'run is not available');
     }
     const token = requireToken();
@@ -600,9 +512,6 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
     if (!isSweepRun(run)) {
       throw new CollectiveXSweepError('not-found', 'run is not a CollectiveX sweep');
     }
-    // Persisting an in-progress run would freeze a partial snapshot forever
-    // (the run_id is then "known" and never re-fetched). Discovery only sees
-    // completed runs; hold fetch-by-id to the same bar.
     if (run.status !== 'completed') {
       throw new CollectiveXSweepError('not-found', 'sweep run has not completed');
     }

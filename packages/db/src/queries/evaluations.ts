@@ -28,7 +28,6 @@ export interface EvalRow {
   run_url: string | null;
 }
 
-/** Get all evaluation results (latest attempt only). */
 export async function getAllEvalResults(sql: DbClient): Promise<EvalRow[]> {
   const rows = await sql`
     SELECT

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** QM9790 NDR switch box, its optics, and the agreed two-tier allocation. */
 
 import { Provenance } from '../../../base';
 import { NetworkGroup } from './base';

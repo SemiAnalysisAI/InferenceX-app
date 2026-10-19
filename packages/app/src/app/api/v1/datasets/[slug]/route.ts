@@ -13,7 +13,6 @@ const getCachedDataset = cachedQuery(
   'dataset',
 );
 
-/** GET /api/v1/datasets/[slug] — one dataset incl. precomputed chart_data. */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string }> },

@@ -6,20 +6,17 @@
 @custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
-/* Allow hash navigation to clear the fixed navbar */
 .blog-prose h2[id],
 .blog-prose h3[id] {
   scroll-margin-top: 6rem;
 }
 
-/* Allow long inline code and links to wrap on mobile */
 .blog-prose code,
 .blog-prose a {
   overflow-wrap: break-word;
   word-break: break-all;
 }
 
-/* Allow wide tables to scroll horizontally on narrow viewports */
 .blog-prose .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -29,23 +26,18 @@
   min-width: 100%;
 }
 
-/* Inline code is already distinguished visually; omit Typography's generated backticks. */
 .blog-prose code::before,
 .blog-prose code::after {
   content: none;
 }
 
-/* Remove auto-inserted curly quotes from blockquotes in blog prose */
 .blog-prose blockquote p:first-of-type::before,
 .blog-prose blockquote p:last-of-type::after {
   content: none;
 }
 
-/* October header treatment; keep chart and export branding unchanged. */
 .halloween-wordmark {
   color: #b54708;
-  /* Hinted glyph advances at 18px left DM Sans visibly uneven ("Inf e r");
-     unhinted advances plus explicit kerning keep the letters evenly set. */
   text-rendering: geometricPrecision;
   font-kerning: normal;
 }
@@ -74,13 +66,10 @@
   }
 }
 
-/* October decoration: leaves falling down the left edge (autumn-leaves.tsx).
-   Sits under the sticky header (z-50) and never takes pointer input. */
 .autumn-leaves {
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 40;
-  /* At container breakpoints only the page padding remains available. */
   width: clamp(14px, calc((100vw - 1280px) / 2), 96px);
   --leaf-sway-scale: 1;
   overflow: hidden;
@@ -106,7 +95,6 @@
     alternate;
 }
 
-/* Tablet and laptop breakpoints need the same protection as phones. */
 @media (max-width: 1359px) {
   .autumn-leaves {
     --leaf-sway-scale: 0.1;
@@ -157,9 +145,6 @@ html[data-inferencex-embed] .autumn-leaves {
   display: none;
 }
 
-/* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
-   DOM text so they stay out of the element's text content and out of anything
-   the reader copies from the pane. */
 .log-lines {
   counter-reset: log-line;
 }
@@ -172,7 +157,6 @@ html[data-inferencex-embed] .autumn-leaves {
   content: counter(log-line);
 }
 
-/* Shiki dual-theme: light by default, dark when .dark class is active */
 .shiki,
 .shiki span {
   color: var(--shiki-light);
@@ -186,13 +170,11 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 
 @theme inline {
-  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* Base Theme Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-ring: var(--ring);
@@ -214,21 +196,16 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
-  /* Translucent panel and muted-label tokens used by the Agentic Workload
-     Explorer. Derived from the base palette so every theme adapts them. */
   --color-surface: color-mix(in oklab, var(--background) 20%, transparent);
   --color-surface-hover: color-mix(in oklab, var(--muted) 55%, transparent);
   --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
 
-  /* Fonts */
   --font-sans: var(--font-dm-sans);
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
 
-  /* Breakpoints */
   --breakpoint-2xl: 80rem;
   --breakpoint-3xl: 80rem;
 
-  /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -239,31 +216,20 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-sidebar: var(--sidebar);
 }
 
-/* Typography tokens — the governed alternative to arbitrary values like
-   text-[11px] or tracking-[0.16em]. New arbitrary font-size/tracking values
-   are blocked by scripts/check-typography.ts; use these instead.
-   See docs/typography.md. */
 @theme {
-  /* Micro label sizes (smaller than text-xs). Deliberately no paired
-     --text-*--line-height: the arbitrary values these replace set only
-     font-size and inherited line-height, and dense tables depend on that. */
-  --text-2xs: 0.6875rem; /* 11px */
-  --text-3xs: 0.625rem; /* 10px */
-  --text-dialog-title: 1.375rem; /* 22px */
-  --text-dialog-title--line-height: 1.875rem; /* 30px */
+  --text-2xs: 0.6875rem;
+  --text-3xs: 0.625rem;
+  --text-dialog-title: 1.375rem;
+  --text-dialog-title--line-height: 1.875rem;
 
-  /* Named letter-spacing for the recurring uppercase-eyebrow and
-     tightened-heading recipes. */
   --tracking-eyebrow: 0.16em;
   --tracking-eyebrow-wide: 0.2em;
   --tracking-heading: -0.04em;
 }
 
 :root {
-  /* Setup variables */
   --radius: 0.625rem;
 
-  /* Base Theme Colors */
   --background: #eaebec;
   --foreground: #131416;
   --card: #eaebec;
@@ -285,7 +251,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --input: #656b72;
   --ring: #27272a;
 
-  /* Sidebar */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -295,16 +260,14 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Overlay-run palette (light mode): darker + saturated so X-shape strokes and
-   * pastel legend swatches stay readable on the #eaebec background. */
-  --overlay-run-0: oklch(0.55 0.23 25); /* deep red */
-  --overlay-run-1: oklch(0.55 0.15 200); /* teal */
-  --overlay-run-2: oklch(0.6 0.17 65); /* burnt amber */
-  --overlay-run-3: oklch(0.5 0.25 290); /* royal violet */
-  --overlay-run-4: oklch(0.55 0.18 150); /* forest green */
-  --overlay-run-5: oklch(0.55 0.22 330); /* magenta */
-  --overlay-run-6: oklch(0.55 0.2 230); /* blue */
-  --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
+  --overlay-run-0: oklch(0.55 0.23 25);
+  --overlay-run-1: oklch(0.55 0.15 200);
+  --overlay-run-2: oklch(0.6 0.17 65);
+  --overlay-run-3: oklch(0.5 0.25 290);
+  --overlay-run-4: oklch(0.55 0.18 150);
+  --overlay-run-5: oklch(0.55 0.22 330);
+  --overlay-run-6: oklch(0.55 0.2 230);
+  --overlay-run-7: oklch(0.6 0.17 60);
 }
 
 .dark,
@@ -312,7 +275,6 @@ html[data-inferencex-embed] .autumn-leaves {
 .gta,
 .doom,
 .halo {
-  /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
   --card: #131416;
@@ -334,7 +296,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --input: oklch(1 0 0 / 15%);
   --ring: #fafafa;
 
-  /* Sidebar */
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
@@ -343,9 +304,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Overlay-run palette (dark mode): lighter + saturated so strokes pop on
-   * #131416. Hues align with the light-mode palette so each run index reads as
-   * the same conceptual color across themes. */
   --overlay-run-0: oklch(0.72 0.22 25);
   --overlay-run-1: oklch(0.75 0.2 190);
   --overlay-run-2: oklch(0.78 0.2 90);
@@ -356,7 +314,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
-/* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
 .doom {
   color-scheme: dark;
   --background: #140b09;
@@ -377,7 +334,6 @@ html[data-inferencex-embed] .autumn-leaves {
   display: none;
 }
 
-/* Scoped pre-paint palettes for persisted themes. No assets or animation. */
 .csgo {
   color-scheme: dark;
   --background: #101820;
@@ -442,7 +398,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
   --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
-/* Halo Infinite menu chrome: deep navy panels, Forerunner cyan accents. */
 .halo {
   --font-industry: 'Industry';
   color-scheme: dark;
@@ -498,7 +453,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --input: rgba(255, 255, 255, 0.15);
   --ring: #ffffff;
 
-  /* Sidebar */
   --sidebar: #1a1a1a;
   --sidebar-foreground: #ffffff;
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -508,15 +462,11 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-border: #555555;
   --sidebar-ring: #888888;
 
-  /* Override ALL fonts to pixel font */
   --font-dm-sans: var(--font-minecraft, 'Monocraft', monospace);
   --font-mono: var(--font-minecraft, 'Monocraft', monospace);
 
-  /* Kill all border radius — Minecraft has no curves */
   --radius: 0px;
 
-  /* Overlay-run palette (minecraft theme): same as dark since background is
-   * also dark (#1e1e1e). */
   --overlay-run-0: oklch(0.72 0.22 25);
   --overlay-run-1: oklch(0.75 0.2 190);
   --overlay-run-2: oklch(0.78 0.2 90);
@@ -536,7 +486,6 @@ html[data-inferencex-embed] .autumn-leaves {
   display: none;
 }
 
-/* Shiki code blocks: reuse dark theme in minecraft mode */
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,
@@ -551,23 +500,10 @@ html[data-inferencex-embed] .autumn-leaves {
   background-color: var(--shiki-dark-bg);
 }
 
-/* Embed routes (/embed/model/[slug]) render one chart inside a third-party
- * iframe. The decorative backgrounds would show through as noise behind the
- * host page's own layout, so they are dropped; the attribute is set by
- * EmbedFrame on mount. */
 html[data-inferencex-embed] .circuit-bg {
   display: none;
 }
 
-/* ── Embed skin: vLLM recipes ──
- * `/embed/model/[slug]?theme=vllm-light|vllm-dark`. Re-tokens the embed with
- * the vLLM recipes site's palette (shadcn slate scale, oklch values copied from
- * recipes/src/app/globals.css) plus its Inter / JetBrains Mono fonts, so the
- * iframe reads as part of the host page. Tokens InferenceX uses differently
- * from shadcn (`--muted` is a text color here, cards are translucent) get
- * embed-specific values instead of a straight copy. The skin attribute is set
- * by EmbedFrame; the theme class still comes from next-themes, so every
- * `.dark`-keyed rule and `resolvedTheme` check keeps working. */
 html[data-inferencex-skin='vllm'] {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -576,12 +512,12 @@ html[data-inferencex-skin='vllm'] {
   --card-foreground: oklch(0.129 0.042 264.695);
   --popover: oklch(0.97 0.005 265);
   --popover-foreground: oklch(0.25 0.04 265);
-  --primary: #fdb517; /* vLLM yellow */
+  --primary: #fdb517;
   --primary-foreground: oklch(0.129 0.042 264.695);
-  --secondary: #30a2ff; /* vLLM blue */
+  --secondary: #30a2ff;
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --brand: var(--secondary);
-  --muted: oklch(0.72 0.03 257); /* readable as text on white */
+  --muted: oklch(0.72 0.03 257);
   --muted-foreground: oklch(0.554 0.046 257.417);
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
@@ -603,7 +539,7 @@ html[data-inferencex-skin='vllm'].dark {
   --secondary: #30a2ff;
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --brand: var(--primary);
-  --muted: oklch(0.55 0.035 258); /* readable as text on slate */
+  --muted: oklch(0.55 0.035 258);
   --muted-foreground: oklch(0.704 0.04 256.788);
   --accent: oklch(0.279 0.041 260.031);
   --accent-foreground: oklch(0.984 0.003 247.858);
@@ -613,15 +549,11 @@ html[data-inferencex-skin='vllm'].dark {
   --ring: oklch(0.551 0.027 264.364);
 }
 
-/* Fonts: EmbedFrame copies --font-embed-* from the layout wrapper onto <html>. */
 html[data-inferencex-skin='vllm'] body {
   --font-dm-sans: var(--font-embed-sans, Inter, system-ui, sans-serif);
   --font-mono: var(--font-embed-mono, 'JetBrains Mono', ui-monospace, monospace);
 }
 
-/* Solid cards with a full-strength border, like the host's shadcn cards;
- * InferenceX's translucent blurred card reads as a foreign object on a flat
- * white or slate page. */
 html[data-inferencex-skin='vllm'] [data-slot='card'] {
   background-color: var(--card);
   border-color: var(--border);
@@ -640,8 +572,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 
 .splash-text {
   display: inline-block;
-  /* Light mode paints this over a white card, where flat #ffff00 all but
-     disappears — keep the Minecraft yellow but ring it with a dark outline. */
   color: #ffcc00;
   font-weight: bold;
   font-size: 0.85rem;
@@ -652,14 +582,11 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     -1px 1px 0 #4a3800,
     -1px -1px 0 #4a3800,
     2px 2px 0 #4a3800;
-  /* The keyframes re-declare this; keeping it on the element means the splash
-     still sits where it belongs when the animation is off (reduced motion). */
   transform: translate(2rem, 2.25rem) rotate(10deg);
   transform-origin: center;
   font-family: inherit;
 }
 
-/* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
 .csgo .splash-text,
@@ -694,18 +621,13 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     @apply border-border outline-ring/50;
   }
   html {
-    /* Keep iOS from inflating text after rotation, and let pages own
-       horizontal overflow (wide tables scroll inside their own containers). */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
   body {
     @apply bg-background text-foreground font-sans;
-    /* Replace the grey iOS/Android tap flash with our own :active states. */
     -webkit-tap-highlight-color: transparent;
   }
-  /* Remove the 300ms double-tap-zoom delay on controls without disabling
-     pinch zoom for the page. */
   a,
   button,
   [role='button'],
@@ -715,9 +637,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   summary {
     touch-action: manipulation;
   }
-  /* iOS Safari zooms the whole page when focusing a field whose font is
-     smaller than 16px. Hold form fields at 16px on phones; desktop keeps the
-     compact design sizes. */
   @media (max-width: 767px) and (pointer: coarse) {
     input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
     select,
@@ -732,7 +651,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     outline: none;
   }
 }
-/* Custom scrollbar styling */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
 }
@@ -754,7 +672,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   background-clip: padding-box;
 }
 
-/* Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.2) transparent;
@@ -767,7 +684,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   fill: hsl(var(--foreground));
 }
 
-/* D3 chart theming via CSS vars */
 .chart-root .x-axis .domain,
 .chart-root .y-axis .domain {
   stroke: var(--border);
@@ -788,7 +704,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   fill: var(--foreground);
 }
 
-/* Flashing NEW badge: a bright brand glow pulse that stays legible at its dimmest frame. */
 @keyframes new-badge-flash {
   0%,
   100% {
@@ -811,7 +726,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   }
 }
 
-/* Subtle star button glow animation - uses opacity for GPU compositing */
 @keyframes star-glow {
   0%,
   100% {
@@ -836,8 +750,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   pointer-events: none;
 }
 
-/* Horizontal scrollers (mobile tab strip, chip rows) hide the scrollbar but
-   remain scrollable by touch, trackpad and keyboard. */
 .no-scrollbar {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -846,10 +758,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   display: none;
 }
 
-/* ── Mobile chart detail sheet ────────────────────────────────────────────
-   On phones a pinned chart tooltip becomes a bottom sheet instead of a
-   floating card that covers the plot and runs off-screen. The d3 layer still
-   writes viewport left/top for desktop placement; the sheet overrides them. */
 @media (max-width: 767px) {
   [data-chart-tooltip][data-sheet='true'] {
     left: 0 !important;
@@ -869,7 +777,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     box-shadow: 0 -12px 32px -12px rgb(0 0 0 / 0.45);
     animation: chart-sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  /* Grab handle */
   [data-chart-tooltip][data-sheet='true']::before {
     content: '';
     position: sticky;
@@ -884,7 +791,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     opacity: 0.9;
     z-index: 1;
   }
-  /* The generated tooltip card is the sheet body: drop its own chrome. */
   [data-chart-tooltip][data-sheet='true'] > div {
     border: 0 !important;
     border-radius: 0 !important;
@@ -895,13 +801,10 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     padding: 0 16px 16px !important;
     font-size: 13px;
   }
-  /* "Click elsewhere to dismiss" is desktop copy; the sheet has its own
-     backdrop and swipe affordances. */
   [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'],
   [data-chart-tooltip][data-sheet='true'] > div > div:first-child.italic {
     display: none;
   }
-  /* Bigger targets for the in-sheet actions (View charts / View logs). */
   [data-chart-tooltip][data-sheet='true'] button,
   [data-chart-tooltip][data-sheet='true'] a[role='button'],
   [data-chart-tooltip][data-sheet='true'] a[data-action] {
@@ -930,8 +833,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   }
 }
 
-/* Expanded charts (ChartZoom): --k is screen px per SVG unit, so text, dots and
-   strokes stay at their drawn size while the chart scales up or zooms. */
 .chart-zoom svg:not(.lucide) text:not([transform]),
 .chart-zoom svg:not(.lucide) circle {
   transform-box: fill-box;

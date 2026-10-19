@@ -4,12 +4,6 @@ import {
   modelSelectionBenchmarks,
 } from '../support/model-selection-fixtures';
 
-/**
- * Per-model SEO routes: /historical/<model> and /calculator/<model> (and
- * their /zh siblings) render the tab seeded to the routed model. Switching
- * models on the page rewrites the pathname in place via history.replaceState
- * — no full page reload and no App Router remount.
- */
 const visitOptions = {
   onBeforeLoad(win: Cypress.AUTWindow) {
     win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -31,8 +25,6 @@ describe('Per-model dashboard routes', () => {
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax');
 
-    // A full page load (or App Router remount via hard navigation) would wipe
-    // this marker; the in-place history.replaceState rewrite must keep it.
     cy.window().then((win) => {
       (win as MarkerWindow).__modelRouteNoReloadMarker = true;
     });
@@ -152,7 +144,6 @@ describe('Model-local manual legend selection', () => {
     cy.get('.dot-group[data-hw-key="gb300_vllm"]').should('have.css', 'opacity', '1');
     cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '0');
 
-    // Returning to the source model must not resurrect its earlier manual mode.
     selectModel(PRO);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_dynamo-sglang']);
     expectBestPerSku(true);
@@ -168,7 +159,6 @@ describe('Model-local manual legend selection', () => {
     expectSelection(['checkbox-gb300_dynamo-sglang']);
     expectBestPerSku(false);
 
-    // Flash has not loaded yet: the reset must survive an empty-data interval.
     selectModel(FLASH);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_vllm']);
     expectBestPerSku(true);

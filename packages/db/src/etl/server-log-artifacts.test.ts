@@ -27,7 +27,6 @@ function tempRoot(): string {
   return root;
 }
 
-/** Write `files` under a scratch `logs/` tree and gzip it to `archivePath`. */
 function writeLogsArchive(archivePath: string, files: Record<string, string>): void {
   const staging = tempRoot();
   for (const [name, text] of Object.entries(files)) {
@@ -86,9 +85,7 @@ describe('server-log artifact discovery', () => {
       'srt-setup.log',
       'srt-single-node-logs/logs/host-1_agg_w0.out',
     ]);
-    // The primary stream is unchanged from the pre-archive layout.
     expect(primaryServerLogFile(files)?.fileName).toBe('results/benchmark.log');
-    // A second read reuses the extraction instead of failing on an existing directory.
     expect(readServerLogArtifact(artifact)).toEqual(files);
   });
 

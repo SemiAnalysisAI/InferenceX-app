@@ -79,7 +79,6 @@ beforeEach(() => {
   origToken = process.env.GITHUB_TOKEN;
   origReadonlyUrl = process.env.DATABASE_READONLY_URL;
   process.env.GITHUB_TOKEN = 'test-gh-token';
-  // No readonly URL: the GitHub fallback is exercised unless a test opts in.
   delete process.env.DATABASE_READONLY_URL;
   mockGetGpuMetricsForRun.mockResolvedValue(null);
 });
@@ -182,7 +181,6 @@ describe('GET /api/gpu-metrics — database first', () => {
       source: 'database',
       artifacts: names.map((name) => ({ name })),
     });
-    // An absent selection reads every artifact; `artifact: null` narrows to the first.
     expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
       prefix: null,
       sourceResults: null,
@@ -289,12 +287,10 @@ describe('GET /api/gpu-metrics', () => {
 
     globalThis.fetch = vi
       .fn()
-      // 1st call: fetch workflow run info
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockRunData),
       })
-      // 2nd call: fetch artifacts list (page 1)
       .mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -313,7 +309,6 @@ describe('GET /api/gpu-metrics', () => {
             ],
           }),
       })
-      // 3rd call: download artifact zip
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '1024' }),
@@ -439,12 +434,10 @@ describe('GET /api/gpu-metrics', () => {
             ],
           }),
       })
-      // First artifact download fails
       .mockResolvedValueOnce({
         ok: false,
         statusText: 'Forbidden',
       })
-      // Second artifact download succeeds
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),
@@ -454,7 +447,6 @@ describe('GET /api/gpu-metrics', () => {
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    // Only the second artifact should be present
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
   });
@@ -494,13 +486,11 @@ describe('GET /api/gpu-metrics', () => {
             ],
           }),
       })
-      // First artifact too large
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       })
-      // Second artifact ok
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),

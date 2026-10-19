@@ -2,9 +2,6 @@ import { ImageResponse } from 'next/og';
 
 import { getAllPosts, getPostBySlug } from '@/lib/blog/blog';
 
-// The OG renderer's default Satori font has no CJK glyphs, so Chinese posts
-// reuse the ENGLISH post metadata for the image — same visual as the original
-// article card. Swapping in a CJK-capable font is a known follow-up.
 import { renderOgImage, size } from '../../../blog/[slug]/og-image-render';
 
 export const alt = 'InferenceX 文章';

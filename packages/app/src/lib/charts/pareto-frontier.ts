@@ -3,7 +3,6 @@ export interface ParetoCoordinate {
   y: number;
 }
 
-/** Global, non-dominated observations, sorted by x. Input is never mutated. */
 export function globalParetoFrontier<T extends ParetoCoordinate>(
   points: readonly T[],
   maximizeX: boolean,

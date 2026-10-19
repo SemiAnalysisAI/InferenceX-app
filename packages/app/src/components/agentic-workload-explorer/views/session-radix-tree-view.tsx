@@ -10,8 +10,6 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── Strings ─────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     hiddenFullMode: 'Hash radix tree is hidden for full-mode sessions.',
@@ -89,16 +87,12 @@ const STRINGS = {
 
 type T = (typeof STRINGS)[keyof typeof STRINGS];
 
-// ── Types ────────────────────────────────────────────────────────
-
 interface RadixNode {
   segment: string[];
   leaves: SessionRequest[];
   children: Map<string, RadixNode>;
   totalLeaves: number;
 }
-
-// ── Radix tree builder ──────────────────────────────────────────
 
 function buildRadixTree(requests: SessionRequest[]): RadixNode {
   const root: RadixNode = { segment: [], leaves: [], children: new Map(), totalLeaves: 0 };
@@ -127,7 +121,6 @@ function insertChain(root: RadixNode, req: SessionRequest, _depth: number) {
 }
 
 function compressTree(root: RadixNode) {
-  // Post-order iterative: collect all nodes, process leaves first
   const stack: RadixNode[] = [root];
   const order: RadixNode[] = [];
   while (stack.length > 0) {
@@ -137,7 +130,6 @@ function compressTree(root: RadixNode) {
       stack.push(child);
     }
   }
-  // Process in reverse (children before parents)
   for (let i = order.length - 1; i >= 0; i--) {
     const node = order[i];
     for (const [key, child] of node.children) {
@@ -152,7 +144,6 @@ function compressTree(root: RadixNode) {
 }
 
 function computeTotals(root: RadixNode) {
-  // Post-order iterative
   const stack: RadixNode[] = [root];
   const order: RadixNode[] = [];
   while (stack.length > 0) {
@@ -172,8 +163,6 @@ function computeTotals(root: RadixNode) {
   }
 }
 
-// ── Formatting ──────────────────────────────────────────────────
-
 function truncHash(h: string) {
   return h.slice(0, 8);
 }
@@ -184,8 +173,6 @@ function formatTokens(n: number | null) {
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
 }
-
-// ── Colors ──────────────────────────────────────────────────────
 
 const DEPTH_COLORS = [
   'text-cyan-400 border-cyan-500/30 bg-cyan-500/8',
@@ -229,11 +216,7 @@ function depthSvgColor(depth: number) {
   return DEPTH_SVG_COLORS[depth % DEPTH_SVG_COLORS.length];
 }
 
-// ── Chronological ordering ──────────────────────────────────────
-
-/** Build a map of RadixNode -> chronological index, sorted by earliest request timestamp */
 function buildChronoMap(root: RadixNode): Map<RadixNode, number> {
-  // Collect all nodes with their earliest timestamp
   const entries: { node: RadixNode; ts: number }[] = [];
   const stack: RadixNode[] = [root];
   while (stack.length > 0) {
@@ -241,7 +224,6 @@ function buildChronoMap(root: RadixNode): Map<RadixNode, number> {
     entries.push({ node, ts: earliestTimestamp(node) });
     for (const child of node.children.values()) stack.push(child);
   }
-  // Sort by timestamp (chronological order)
   entries.sort((a, b) => a.ts - b.ts);
   const map = new Map<RadixNode, number>();
   for (let i = 0; i < entries.length; i++) {
@@ -250,7 +232,6 @@ function buildChronoMap(root: RadixNode): Map<RadixNode, number> {
   return map;
 }
 
-/** Build sorted timestamps array matching chronological node order */
 function buildChronoTimestamps(root: RadixNode): number[] {
   const entries: { ts: number }[] = [];
   const stack: RadixNode[] = [root];
@@ -262,8 +243,6 @@ function buildChronoTimestamps(root: RadixNode): number[] {
   entries.sort((a, b) => a.ts - b.ts);
   return entries.map((e) => e.ts);
 }
-
-// ── D3 types + iterative converter ──────────────────────────────
 
 interface D3TreeNode {
   label: string;
@@ -325,8 +304,6 @@ function radixToD3(
   return map.get(root)!;
 }
 
-// ── D3 Tree Visualization ───────────────────────────────────────
-
 function D3Tree({
   tree,
   compact,
@@ -351,7 +328,6 @@ function D3Tree({
   const isReplay = visibleCount !== undefined;
   const d3Data = useMemo(() => radixToD3(tree, compact, chronoMap), [tree, compact, chronoMap]);
 
-  // Full render — lays out the tree and draws all elements
   const render = useCallback(() => {
     const container = containerRef.current;
     const svg = svgRef.current;
@@ -381,7 +357,6 @@ function D3Tree({
       .domain([1, Math.max(maxReqs, 1)])
       .range([baseR, maxR]);
 
-    // Links
     g.selectAll('.link')
       .data(root.links())
       .join('path')
@@ -398,7 +373,6 @@ function D3Tree({
           .y((d) => d.y!) as never,
       );
 
-    // Nodes
     const nodeGroups = g
       .selectAll('.node')
       .data(root.descendants())
@@ -429,7 +403,6 @@ function D3Tree({
       .text((d) => (d.data.blocks > 0 ? String(d.data.blocks) : 'R'))
       .style('pointer-events', 'none');
 
-    // Hover tooltip via mouse events
     nodeGroups
       .on('mouseenter', (event, d) => {
         const el = containerRef.current;
@@ -451,7 +424,6 @@ function D3Tree({
       })
       .on('mouseleave', () => setTooltip(null));
 
-    // Zoom
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 8])
@@ -459,7 +431,6 @@ function D3Tree({
     d3.select(svg).call(zoom);
     zoomRef.current = zoom;
 
-    // Initial zoom to fit
     const gNode = g.node();
     if (gNode) {
       const bounds = gNode.getBBox();
@@ -476,7 +447,6 @@ function D3Tree({
     setRendered(true);
   }, [d3Data, compact]);
 
-  // Initial render
   useEffect(() => {
     setRendered(false);
     const frame = requestAnimationFrame(() => render());
@@ -488,7 +458,6 @@ function D3Tree({
     };
   }, [render]);
 
-  // Replay: update visibility and auto-zoom to latest visible node
   useEffect(() => {
     const g = gRef.current;
     const svg = svgRef.current;
@@ -497,7 +466,6 @@ function D3Tree({
     if (!g || !svg || !root) return;
 
     if (!isReplay) {
-      // Show everything
       g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr('opacity', 1);
       g.selectAll<SVGPathElement, d3.HierarchyLink<D3TreeNode>>('.tree-link').attr('opacity', 1);
       return;
@@ -505,18 +473,15 @@ function D3Tree({
 
     const vc = visibleCount!;
 
-    // Fade nodes by visibility
     g.selectAll<SVGGElement, d3.HierarchyPointNode<D3TreeNode>>('.tree-node').attr(
       'opacity',
       (d) => (d.data.chronoIndex < vc ? 1 : 0.08),
     );
 
-    // Fade links — visible only if both source and target are visible
     g.selectAll<SVGPathElement, d3.HierarchyLink<D3TreeNode>>('.tree-link').attr('opacity', (d) =>
       d.source.data.chronoIndex < vc && d.target.data.chronoIndex < vc ? 1 : 0.08,
     );
 
-    // Auto-zoom to the latest revealed node
     if (zoom && vc > 0) {
       const allNodes = root.descendants();
       let latest: d3.HierarchyPointNode<D3TreeNode> | null = null;
@@ -577,8 +542,6 @@ function D3Tree({
   );
 }
 
-// ── Iterative tree utilities ────────────────────────────────────
-
 function iterativeCountNodes(root: RadixNode): number {
   let total = 0;
   const stack: RadixNode[] = [root];
@@ -603,7 +566,6 @@ function iterativeMaxDepth(root: RadixNode): number {
   return max;
 }
 
-/** Get the earliest request timestamp in a subtree (iterative) */
 function earliestTimestamp(root: RadixNode): number {
   let min = Infinity;
   const stack: RadixNode[] = [root];
@@ -619,8 +581,6 @@ function earliestTimestamp(root: RadixNode): number {
   }
   return min;
 }
-
-// ── Tree node component ─────────────────────────────────────────
 
 function TreeNode({
   node,
@@ -747,8 +707,6 @@ function TreeNode({
   );
 }
 
-// ── Main page ───────────────────────────────────────────────────
-
 export default function RadixTreePage() {
   const { session, requests } = useSession();
   const [compact, setCompact] = useState(true);
@@ -795,8 +753,6 @@ export default function RadixTreePage() {
     };
   }, [hashRequests, tree]);
 
-  // Full-mode sessions still carry hashIds (kept for SQL-side debugging) but
-  // the radix tree UI is meant for anon traces — hide the whole view.
   if (session.privacyMode === 'full') {
     return (
       <div className="text-center py-16 space-y-1">
@@ -817,7 +773,6 @@ export default function RadixTreePage() {
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {[
           { label: t.requestsStat, value: stats.requests },
@@ -836,7 +791,6 @@ export default function RadixTreePage() {
         ))}
       </div>
 
-      {/* Tree */}
       <div>
         <div className="flex items-center gap-2 mb-2">
           <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
@@ -920,7 +874,6 @@ export default function RadixTreePage() {
           </div>
         </div>
 
-        {/* Replay controls (shared across views) */}
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => {

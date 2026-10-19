@@ -1,27 +1,16 @@
-/**
- * Pure time-series helpers for the PowerX telemetry charts. They operate on
- * absolute millisecond timestamps so irregular sampling (dropped rows, a few
- * ms of skew between chips) is handled by time, not by sample index.
- */
-
 export interface TimedSample {
-  /** Absolute timestamp in milliseconds since the Unix epoch. */
   ms: number;
-  /** NaN preserves an explicitly unavailable reading in the timeline. */
   value: number;
 }
 
-/** Rolling-average window choices offered by the chart controls, in seconds. */
 export const SMOOTHING_WINDOWS_S = [10, 30, 60, 300] as const;
 export type SmoothingWindowS = (typeof SMOOTHING_WINDOWS_S)[number];
 
 export interface AggregatedSample extends TimedSample {
-  /** Number of chips that contributed a sample within tolerance. */
   count: number;
 }
 
 export type TelemetryDisplayMode = 'points' | 'rolling';
-/** Per-chip lines, one mean line across the visible chips, or both. */
 export type TelemetrySeriesMode = 'chips' | 'mean' | 'both';
 
 export interface TelemetryDisplayState {
@@ -30,24 +19,12 @@ export interface TelemetryDisplayState {
   series: TelemetrySeriesMode;
 }
 
-/** Rolling average is the default: at 1 s cadence the raw points read as noise. */
 export const DEFAULT_TELEMETRY_DISPLAY: TelemetryDisplayState = {
   mode: 'rolling',
   windowS: 30,
   series: 'chips',
 };
 
-/**
- * Centered time-window mean. Each output sample averages every input sample
- * whose timestamp lies within `windowMs / 2` (inclusive) of its own, so the
- * smoothed line stays time-aligned with the raw one instead of lagging by half
- * a window as a trailing average would. Window edges are inclusive on both
- * sides; samples near the start or end of the series average over the shorter
- * one-sided neighbourhood that exists. Missing values do not contribute, and
- * missing centers stay missing rather than being filled from nearby readings.
- *
- * `samples` must be sorted by `ms` ascending. O(n) via prefix sums.
- */
 export function rollingTimeAverage(
   samples: readonly TimedSample[],
   windowMs: number,
@@ -81,11 +58,6 @@ export function rollingTimeAverage(
   return out;
 }
 
-/**
- * Median gap between consecutive samples, in ms. Used as the alignment
- * tolerance when averaging chips that were polled a few ms apart. Falls back
- * to `fallbackMs` when fewer than two distinct timestamps exist.
- */
 export function estimateSampleIntervalMs(
   samples: readonly TimedSample[],
   fallbackMs = 1000,
@@ -100,16 +72,6 @@ export function estimateSampleIntervalMs(
   return gaps[Math.floor(gaps.length / 2)]!;
 }
 
-/**
- * Mean across several chips at each timestamp of the reference chip (the one
- * with the most samples, first on ties). For every reference sample each other
- * chip contributes its nearest sample if that sample lies within
- * `toleranceMs`; chips with no sample that close are left out of that mean
- * rather than interpolated, and `count` records how many contributed. Missing
- * readings are excluded; a timestamp with no contributors remains a gap.
- *
- * Every inner array must be sorted by `ms` ascending.
- */
 export function meanAcrossSeries(
   series: readonly (readonly TimedSample[])[],
   toleranceMs: number,
@@ -145,10 +107,6 @@ export function meanAcrossSeries(
   });
 }
 
-/**
- * Convert a relative-seconds series (`t` from its own start) to absolute
- * milliseconds so it can share an x-axis with wall-clock telemetry.
- */
 export function toAbsoluteMs(
   points: readonly { t: number; value: number }[],
   originMs: number,
@@ -156,7 +114,6 @@ export function toAbsoluteMs(
   return points.map((p) => ({ ms: originMs + p.t * 1000, value: p.value }));
 }
 
-/** Sample nearest to `ms` (earlier one on a tie), or null when the series is empty. */
 export function nearestSample(samples: readonly TimedSample[], ms: number): TimedSample | null {
   if (samples.length === 0) return null;
   let lo = 0;

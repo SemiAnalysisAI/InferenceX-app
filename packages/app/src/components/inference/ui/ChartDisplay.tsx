@@ -147,8 +147,6 @@ const STRINGS = {
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    // Boundary disclosures for the derived power axes (lib/power/power-basis.ts).
-    // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU Level Provisioned (TDP) · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
@@ -190,10 +188,6 @@ const STRINGS = {
   },
 } as const;
 
-// Translate the "vs. …" chart-heading suffix from the metric registry
-// into Chinese. useChartData rewrites the heading with the selected percentile
-// for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
-// pattern instead of a fixed string; unknown headings pass through unchanged.
 const HEADING_SUBJECT_ZH: Record<string, string> = {
   'E2E Normalized Interactivity': '端到端归一化交互性',
   Interactivity: '交互性',
@@ -213,7 +207,6 @@ function zhHeading(configured: string): string {
   return `vs. ${statisticZh}${subjectZh}`;
 }
 
-/** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
   xField: (percentile: string) => string;
   xLabel: (percentileLabel: string) => string;
@@ -260,16 +253,6 @@ export function formatTokenLength(value: number): string {
   return `${(rounded / 1_000_000).toFixed(2).replace(/\.0+$/u, '')}m`;
 }
 
-/**
- * Renders the inference chart cards, captions, and overlay controls for the current filtered
- * benchmark data.
- *
- * `embedded` renders the chart without the header section (title, description,
- * share actions, and selector controls) — used by the `/model/[slug]` pages,
- * which seed the model/scenario/metric via providers instead of user-facing
- * selectors. The run-date changelog strip and the charts themselves remain.
- */
-// Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
 function renderInferenceTcoBadges(props: {
   label: string;
   values: Record<string, number>;
@@ -318,12 +301,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
   const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
-  // The metric key carries the power boundary; the caption discloses it for
-  // the derived boundaries (there is no separate URL param).
   const selectedPowerBasis = selectedMeasuredConfig?.basis;
-  // The Measured Power "Timeline" display swaps the scatter body for the
-  // per-second telemetry traces (PowerTimeline); table view and captions are
-  // unchanged because the metric key aliases the measured average.
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
@@ -346,11 +324,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
-  // Stable run numbering shared by the changelog and the chart legend: each of a
-  // date's runs gets a fixed 1-based number (by start time) regardless of which
-  // are on the chart, so the two surfaces always show the same #N for a run and a
-  // removed run leaves a matching gap. Built from the same data-run enumeration
-  // the changelog uses.
   const runNumbering = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of changelogs) {
@@ -366,11 +339,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     return map;
   }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedBenchmarkType]);
 
-  // Expand a plain-date selection into one entry per run once that date's runs are
-  // known. Picking a date that has multiple runs shows each run as its own series
-  // (matching the changelog, which renders a block per run) instead of a single
-  // merged "latest" line with no changelog row — keeping the legend and changelog
-  // in sync. Idempotent: after expansion no expandable plain date remains.
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
     const scope = {
@@ -437,7 +405,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useUnofficialRun();
   const { tcoBasis } = useGlobalFilterSelection();
 
-  // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
       return { e2e: null, interactivity: null };
@@ -446,8 +413,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e');
     const interactivityRaw = getOverlayData(selectedModel, selectedSequence, 'interactivity');
 
-    // Per-row run lookup used by the overlay tooltip so hovering a point shows
-    // its OWN run's branch, not the banner-level first-run fallback.
     const getRunForRow = (row: InferenceData) => {
       const url = row.run_url ?? null;
       if (!url) return undefined;
@@ -638,9 +603,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
     [activeOverlayHwTypes, overlayScope],
   );
-  // Caption spec badges (TCO $/chip/hr, Power/Chip) should only quote chips
-  // that can actually appear on the plot: the active official legend selection
-  // plus any active unofficial-overlay selection.
   const captionHwKeys = useMemo(
     () => new Set([...selectedOfficialHwTypes, ...scopedActiveOverlayHwTypes]),
     [selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
@@ -701,10 +663,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     },
     [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
-  // Date comparison (GPUGraph, Timeline): official rows follow the per-date
-  // legend toggles instead of the scatter hardware selection, and unofficial
-  // runs keep the overlay hardware selection. Boundary / role siblings are a
-  // same-run comparison, so neither side draws them here.
   const visibleDateComparisonRows = useCallback(
     (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => ({
       officialRows: officialRows.filter(
@@ -726,19 +684,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     throw new Error('Something went wrong.');
   }
 
-  // Show skeletons only on first load (no data yet). Same-model query-key
-  // changes keep the previous rows rendered (placeholderData in
-  // benchmarkQueryOptions), so switching dates/runs/scopes never flashes
-  // skeletons — those windows surface as `refreshing` instead.
   const isFirstLoad = loading && graphs.length === 0;
-  // Stale-while-refetching: previous charts stay rendered but dim slightly
-  // (motion.css `.motion-stale`) so the update reads as "updating", not
-  // "frozen". aria-busy mirrors the cue for assistive tech.
   const isRefetching = refreshing && graphs.length > 0;
 
-  // When the selected model has no DB data but an unofficial run provides overlay
-  // data for this (model, sequence), synthesize empty-data stub graphs from the
-  // chart-config so the overlay has a base chart to render on.
   const effectiveGraphs = useMemo(() => {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
@@ -786,9 +734,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     }
     return [...ids];
   }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
-  // Unofficial-run artifacts are transformed in memory and do not have
-  // persisted aggregate_stats sketches. Suppress the footer summary in overlay mode
-  // rather than presenting official-only values as if they covered the overlay.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
     isAgenticSequence && !isUnofficialRun,
@@ -827,8 +772,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const renderableGraphs = useMemo(() => {
     if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
-      // Legacy AgentX axes can still render transient/non-persisted rows, which
-      // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
       return visibleGraphs.map((graph) => ({
         ...graph,
@@ -901,9 +844,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         ]
       : renderableGraphs.length === 0
         ? [
-            // Reserved-height empty state: without it the chart region
-            // collapses to zero height, which shifts the page and breaks
-            // scroll restoration when a selection has no data.
             <Card
               key="empty-0"
               data-testid="chart-empty-state"
@@ -922,14 +862,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-            // Chart-level notices: the KV-offload halo
-            // key, the agentic optimization note, and the ATOM engine
-            // footnote. Detected from the same data the chart plots —
-            // official points plus any loaded unofficial-run overlay for
-            // this chart type — so they moved out of the legend without
-            // changing when they appear.
-            // GPU/date comparison renders GPUGraph, which plots the loaded
-            // unofficial runs next to the compared dates on every x-axis.
             const isGpuComparison =
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
@@ -950,9 +882,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            // The resident ISL/OSL percentile summary (agentic only) renders
-            // here as the footer's last block rather than in the chart subtitle,
-            // keeping the result-context header compact.
             const footerNotices =
               hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
                 <>
@@ -1071,8 +1000,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             xHeader: resolvedXLabel,
                           },
                         );
-                        // Match warnings against the same series the chart annotates,
-                        // including visible unofficial-run overlay series.
                         const issueNotes = matchKnownConfigIssues(graph.model, [
                           ...visibleData,
                           ...visibleOverlayRowsForExport,
@@ -1094,9 +1021,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
-                              {/* Model + workload lead the heading; the cost tier that used
-                                  to trail the metric title lives in the caption's Cost Tier
-                                  line instead, so the title reads as one measurement. */}
                               <ModelLogo
                                 model={graph.model as Model}
                                 className="mr-2 size-6 align-[-0.3em]"
@@ -1105,7 +1029,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
-                                // The timeline's x axis is time, not the scatter x metric.
                                 if (isPowerTimeline) return null;
                                 if (!isAgenticSequence) {
                                   const heading = String(graph.chartDefinition.heading);
@@ -1119,8 +1042,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                   );
                                 }
 
-                                // The e2e chart heading follows the branch-level x-axis
-                                // mode selector.
                                 if (graph.chartDefinition.chartType === 'e2e') {
                                   const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
                                   if (modeSpec) {
@@ -1135,7 +1056,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                     : t.vsE2eLatency();
                                 }
 
-                                // Fall back to configured heading
                                 const configured = graph.chartDefinition.heading;
                                 return locale === 'zh' ? zhHeading(String(configured)) : configured;
                               })()}
@@ -1156,9 +1076,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            // The dashboard shows the Precision selector right above the
-                            // chart, so the caption omits it there; embedded model pages
-                            // render no controls and keep it as the only precision cue.
                             precision={
                               embedded
                                 ? selectedPrecisions
@@ -1171,17 +1088,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                               );
                               if (!tier) return undefined;
-                              // With the selector in the caption, the export twin
-                              // prints the selector's own copy so a PNG export
-                              // matches the control; plain-text captions keep
-                              // the caption label.
                               return embedded || minimalChrome
                                 ? costTierLabel(tier, locale)
                                 : costTierOptionLabel(tier, locale);
                             })()}
-                            // The dashboard picks the pricing basis right here in the
-                            // caption; embedded model pages render no controls and
-                            // keep the plain-text tier.
                             costTierControl={
                               embedded || minimalChrome ? undefined : <CostTierSelector />
                             }
@@ -1276,10 +1186,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
-                        // Display limits keep outliers off the plotted domain but
-                        // must not silently remove measured rows from the table.
-                        // Restore both official and unofficial clipped points before
-                        // applying the shared precision, quick-filter, and legend gates.
                         const tableOfficialData = graph.tableData ?? [
                           ...graph.data,
                           ...(graph.clippedData ?? []).map((entry) => entry.point),
@@ -1313,8 +1219,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           <div className="relative">
                             <PowerTimeline
                               chartId={`chart-${graphIndex}`}
-                              // Display limits clip outliers from the scatter domain; the
-                              // timeline draws every measured config, so restore them.
                               data={[
                                 ...graph.data,
                                 ...(graph.clippedData ?? []).map((entry) => entry.point),
@@ -1343,8 +1247,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
-                          // Date comparison draws one hardware across runs; the
-                          // boundary / role siblings are a same-run overlay only.
                           data={graph.data.filter((point) => !point.powerVariant)}
                           xLabel={resolvedXLabel}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
@@ -1455,8 +1357,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
                   onAddDate={(date) => {
-                    // Functional updater: adding several runs in quick succession must
-                    // each build on the latest state, not the value captured at render.
                     setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
                   }}
                   onRemoveDate={(date) => {

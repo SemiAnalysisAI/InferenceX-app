@@ -6,21 +6,14 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
-/** One observed or derived value drawn as a marker. */
 export interface PanelMarker {
   x: number;
   y: number;
-  /** Series identity; the colour comes from `markerColor(key)`. */
   key: string;
   selected?: boolean;
-  /** Tooltip HTML; callers escape any source text. */
   tooltip?: string;
 }
 
-/**
- * A polyline drawn beneath the markers (series connections, fit lines). A
- * non-finite y breaks the line; it never bridges a missing value.
- */
 export interface PanelLine {
   key: string;
   points: { x: number; y: number }[];
@@ -30,7 +23,6 @@ export interface PanelLine {
 
 const MARGIN = { top: 20, right: 18, bottom: 64, left: 65 };
 
-/** d3's log labelling: the 1× and 2× steps of each decade get labels, other ticks stay bare. */
 function logTickFormat(domain: [number, number]) {
   const format = d3.scaleLog().domain(domain).tickFormat(5, '~g');
   return (value: d3.AxisDomain) => format(Number(value));
@@ -44,7 +36,6 @@ function logDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.25, max * 1.25];
 }
 
-/** Observed x range; a single value widens from zero so the marker is not on an edge. */
 function linearXDomain(values: number[]): [number, number] {
   const finite = values.filter(Number.isFinite);
   if (finite.length === 0) return [0, 1];
@@ -53,7 +44,6 @@ function linearXDomain(values: number[]): [number, number] {
   return min === max ? [0, max * 1.05 || 1] : [min, max];
 }
 
-/** Values plus zero and the reference, padded by a tenth of the span; never below zero for non-negative data. */
 function linearYDomain(values: number[], include: number[]): [number, number] {
   const finite = [...values, ...include].filter(Number.isFinite);
   const min = Math.min(...finite);
@@ -62,11 +52,6 @@ function linearYDomain(values: number[], include: number[]): [number, number] {
   return [min >= 0 ? 0 : min - pad, max + pad];
 }
 
-/**
- * Small D3 plot shared by the PowerX comparison panels: markers, optional
- * connecting or fitted lines, and one dashed reference value (0 %, 50 %…).
- * Log axes drop non-positive values instead of clamping them.
- */
 export function PowerPanelPlot({
   chartId,
   markers,

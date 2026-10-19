@@ -2,11 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTogglableSet } from './useTogglableSet';
 import { useUrlState } from './useUrlState';
 
-/**
- * Reconcile a user's active selection with the current available items.
- * Returns the previous set unchanged (same reference) when nothing was removed
- * to avoid unnecessary re-renders.
- */
 export function reconcileActiveSet<T>(
   prev: Set<T>,
   itemsWithData: Set<T>,
@@ -32,9 +27,7 @@ export interface AvailableSelectionInput<T> {
   active: Set<T>;
   available: Set<T>;
   pending?: Set<T> | null;
-  /** A user-visible scope changed (model, date range, benchmark, etc.). */
   scopeChanged: boolean;
-  /** False while an empty available set may still be a loading transition. */
   settled: boolean;
 }
 
@@ -43,14 +36,6 @@ export interface AvailableSelectionResult<T> {
   consumedPending: boolean;
 }
 
-/**
- * Shared policy for legend selections backed by asynchronously available data.
- *
- * Pending URL intent wins once data settles. A real scope transition starts
- * fully enabled, while updates inside the same scope only prune stale keys.
- * An explicitly empty selection is preserved inside a scope rather than being
- * mistaken for an uninitialized set.
- */
 export function resolveAvailableSelection<T>({
   active,
   available,
@@ -82,27 +67,11 @@ export function resolveAvailableSelection<T>({
   };
 }
 
-/**
- * Common chart context state and logic shared across all chart types.
- * Extracts duplicated patterns from InferenceChartContext, ReliabilityChartContext,
- * and EvaluationChartContext.
- */
-
 interface UseChartStateConfig {
-  /** URL parameter prefix (e.g., 'i_' for inference, 'r_' for reliability, 'e_' for evaluation) */
   urlPrefix: string;
-  /**
-   * Initial high-contrast value when the URL has no `<prefix>hc` param.
-   * Defaults to false; the inference chart opts in to true. A `<prefix>hc=0`
-   * URL param overrides it back off.
-   */
   defaultHighContrast?: boolean;
 }
 
-/**
- * Manages common chart UI state (high contrast, legend expansion) with URL sync.
- * Includes mobile-specific legend collapse behavior.
- */
 export function useChartUIState(config: UseChartStateConfig) {
   const { urlPrefix, defaultHighContrast = false } = config;
   const { getUrlParam } = useUrlState();
@@ -110,8 +79,6 @@ export function useChartUIState(config: UseChartStateConfig) {
   const hcParam = `${urlPrefix}hc` as any;
   const legendParam = `${urlPrefix}legend` as any;
 
-  // Initialize with safe defaults that match SSR output to avoid hydration mismatches.
-  // URL-param values are applied in a mount effect so the state is only set client-side.
   const [highContrast, setHighContrast] = useState(defaultHighContrast);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const didInit = useRef(false);
@@ -120,7 +87,6 @@ export function useChartUIState(config: UseChartStateConfig) {
     if (didInit.current) return;
     didInit.current = true;
     const hcVal = getUrlParam(hcParam);
-    // Respect both overrides so the toggle round-trips regardless of the default.
     if (hcVal === '1') setHighContrast(true);
     else if (hcVal === '0') setHighContrast(false);
     const legendVal = getUrlParam(legendParam);
@@ -135,10 +101,6 @@ export function useChartUIState(config: UseChartStateConfig) {
   };
 }
 
-/**
- * Manages togglable set state (e.g., enabled models, enabled hardware)
- * with automatic initialization and callbacks.
- */
 export function useChartToggleSet<T extends string = string>() {
   const {
     activeSet,
@@ -148,7 +110,6 @@ export function useChartToggleSet<T extends string = string>() {
     remove: removeRaw,
   } = useTogglableSet();
 
-  // memoize callbacks to prevent unnecessary re-renders
   const toggle = useCallback(
     (item: T, availableItems: Set<T>) => toggleRaw(item, availableItems),
     [toggleRaw],
@@ -170,10 +131,6 @@ export function useChartToggleSet<T extends string = string>() {
   };
 }
 
-/**
- * Syncs state to URL parameters, skipping the initial render to avoid
- * overwriting URL-provided values.
- */
 export function useUrlStateSync(
   params: Record<string, string | number | boolean | undefined | null>,
   deps: any[],
@@ -190,43 +147,31 @@ export function useUrlStateSync(
   }, deps);
 }
 
-/**
- * Manages data filtering with memoized available items set.
- * Automatically updates active items when available items change.
- */
 export function useChartDataFilter<TData, TKey extends string>(
   data: TData[],
-  setActiveSet: any, // accept any to allow functional updates
+  setActiveSet: any,
   extractKey: (item: TData) => TKey,
   options?: {
-    /** When available items change completely, reset to all available */
     resetOnChange?: boolean;
-    /** Skip empty data (during loading transitions) */
     skipEmpty?: boolean;
   },
 ) {
   const { resetOnChange = true, skipEmpty = true } = options || {};
 
-  // memoize the set of items that have data points
   const itemsWithData = useMemo(() => {
     const itemSet = new Set(data.map(extractKey));
     return itemSet;
   }, [data, extractKey]);
 
-  // create stable string representation for comparison
   const itemsWithDataKey = useMemo(() => [...itemsWithData].toSorted().join(','), [itemsWithData]);
 
-  // track previous key to detect actual changes
   const prevItemsKeyRef = useRef<string>('');
 
-  // update active items when available items change
   useEffect(() => {
-    // skip during loading transitions when data is temporarily empty
     if (skipEmpty && itemsWithData.size === 0) {
       return;
     }
 
-    // skip if the key hasn't actually changed
     if (prevItemsKeyRef.current === itemsWithDataKey) {
       return;
     }

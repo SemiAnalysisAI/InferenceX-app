@@ -37,8 +37,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 
-// ── i18n ────────────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     description:
@@ -154,17 +152,6 @@ const STRINGS = {
   },
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// /trends — "behavior over time". Reads ONE payload from
-// /api/trends (cache-backed, see packages/db/src/trends.ts) and derives
-// every chart below from
-// its raw daily rows client-side, mirroring how /models derives
-// cacheHitRatio/fastModePct from raw totals rather than having the server
-// pre-compute ratios.
-// ─────────────────────────────────────────────────────────────────────────
-
-// ── Wire types (camelCased mirror of TrendsPayload in packages/db/src/trends.ts) ──
-
 interface DailyModelPoint {
   day: string;
   model: string;
@@ -221,8 +208,6 @@ interface TrendsData {
   meta: TrendsMeta;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
 function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
@@ -235,11 +220,6 @@ function windowCutoffMs(choice: WindowChoice): number | null {
   return SNAPSHOT_NOW_MS - days * 24 * 60 * 60 * 1000;
 }
 
-/**
- * True for complete UTC days; the snapshot's last day is partial. Compares
- * instants because cached payloads carry Date strings ("Fri Sep 25 2026 …"),
- * not ISO days.
- */
 function isCompleteDay(day: string): boolean {
   return dayTime(day) < Date.parse(LAST_DAY_ISO);
 }
@@ -253,7 +233,6 @@ interface RatioAcc {
   b: number;
 }
 
-/** Group DailyModelPoint rows by day and (optionally) by model, accumulating an (a, b) pair per bucket. */
 function groupByDayAndKey(
   rows: DailyModelPoint[],
   cutoff: number | null,
@@ -302,8 +281,6 @@ function pivotToSeries(
     );
 }
 
-// ── Small toggle control (window selector, share/count, overall/per-model) ──
-
 function ToggleGroup<T extends string>({
   value,
   options,
@@ -330,8 +307,6 @@ function ToggleGroup<T extends string>({
   );
 }
 
-// ── Loading skeleton ─────────────────────────────────────────────────────
-
 function TrendsSkeleton({ strings }: { strings: (typeof STRINGS)['en'] }) {
   return (
     <div className="space-y-5">
@@ -348,8 +323,6 @@ function TrendsSkeleton({ strings }: { strings: (typeof STRINGS)['en'] }) {
     </div>
   );
 }
-
-// ── Main page ────────────────────────────────────────────────────────────
 
 export default function TrendsPage() {
   return (
@@ -383,8 +356,6 @@ function TrendsPageContent() {
     key: String(traceVersionParam),
   });
 
-  // Harness-aware version mix is read live; the trends cache only has
-  // Claude Code's cliVersion.
   const { data: harnessVersions } = useDashboardData<DailyHarnessVersionPoint[]>({
     fetcher: async (signal) => {
       const r = await fetch(
@@ -404,14 +375,11 @@ function TrendsPageContent() {
 
   const cutoff = windowCutoffMs(windowChoice);
 
-  // Dated and undated ids (claude-haiku-4-5, claude-haiku-4-5-20251001) are
-  // one model; key every chart by the short name so they merge.
   const dailyModel = useMemo(
     () => data?.dailyModel.map((r) => ({ ...r, model: shortenModel(r.model) })) ?? [],
     [data],
   );
 
-  // Stable color map across the full history, independent of window choice.
   const allModelsFull = useMemo(() => {
     const set = new Set<string>();
     for (const row of dailyModel) set.add(row.model);
@@ -419,7 +387,6 @@ function TrendsPageContent() {
   }, [dailyModel]);
   const modelColorMap = useMemo(() => buildColorMap(allModelsFull), [allModelsFull]);
 
-  // ── Chart 1: Model mix over time (stacked share/count, requests or tokens) ──
   const modelDays: StackedDayPoint[] = useMemo(() => {
     const byDay = new Map<string, Record<string, number>>();
     for (const row of dailyModel) {
@@ -443,7 +410,6 @@ function TrendsPageContent() {
     return [...set].toSorted();
   }, [modelDays]);
 
-  // ── Chart 2: Cache hit-rate trend ──
   const cacheHitSeries = useMemo(() => {
     const groups = groupByDayAndKey(dailyModel, cutoff, cacheHitPerModel, (acc, r) => {
       acc.a += r.cacheReadInputTokens;
@@ -457,7 +423,6 @@ function TrendsPageContent() {
     );
   }, [dailyModel, cutoff, cacheHitPerModel, modelColorMap, t]);
 
-  // ── Chart 3: Context growth (avg input+cache_read tokens per request) ──
   const contextGrowthSeries = useMemo(() => {
     const groups = groupByDayAndKey(dailyModel, cutoff, contextPerModel, (acc, r) => {
       acc.a += r.inputTokens + r.cacheReadInputTokens;
@@ -471,7 +436,6 @@ function TrendsPageContent() {
     );
   }, [dailyModel, cutoff, contextPerModel, modelColorMap, t]);
 
-  // ── Chart 4: Compaction-rate proxy (heuristic) ──
   const compactionRows = useMemo(() => {
     if (!data) return [];
     return data.dailyCompaction
@@ -503,7 +467,6 @@ function TrendsPageContent() {
 
   const compactionRecent = useMemo(() => {
     if (!data || data.dailyCompaction.length === 0) return null;
-    // Final 7 complete UTC days; the snapshot's last day is partial.
     const rows = data.dailyCompaction
       .filter((r) => isCompleteDay(r.day))
       .toSorted((a, b) => dayTime(b.day) - dayTime(a.day))
@@ -518,14 +481,12 @@ function TrendsPageContent() {
     };
   }, [data]);
 
-  // ── Chart 5: Harness-version mix over time ──
   const cliDays: StackedDayPoint[] = useMemo(() => {
     if (!harnessVersions) return [];
     const byDay = new Map<string, Record<string, number>>();
     for (const row of harnessVersions) {
       if (cutoff !== null && dayTime(row.day) < cutoff) continue;
       if (cliHarness !== 'all' && row.harness !== cliHarness) continue;
-      // Across harnesses the versions aren't comparable, so stack by harness.
       const key = cliHarness === 'all' ? HARNESS_LABELS[row.harness] : (row.version ?? 'unknown');
       const bucket = byDay.get(row.day) ?? {};
       bucket[key] = (bucket[key] ?? 0) + row.sessionCount;
@@ -551,7 +512,6 @@ function TrendsPageContent() {
     [harnessVersions],
   );
 
-  // ── Chart 6: Latency trend ──
   const latencySeries: LineSeries[] = useMemo(() => {
     if (!data) return [];
     const rows = data.dailyLatency
@@ -585,8 +545,6 @@ function TrendsPageContent() {
     ];
   }, [data, cutoff, t]);
 
-  // ── Headline stats ──
-  // "Latest" = the snapshot's last complete UTC day, not the partial final day.
   const latestCacheHit =
     cacheHitSeries
       .find((s) => s.key === 'all')
@@ -616,7 +574,6 @@ function TrendsPageContent() {
         <TrendsSkeleton strings={t} />
       ) : data ? (
         <>
-          {/* Stats */}
           <div>
             <SectionHeader label={t.stats} />
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -650,7 +607,6 @@ function TrendsPageContent() {
             </div>
           </div>
 
-          {/* 1. Model mix over time */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
@@ -690,7 +646,6 @@ function TrendsPageContent() {
             />
           </div>
 
-          {/* 2. Cache hit-rate trend */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
@@ -716,7 +671,6 @@ function TrendsPageContent() {
             />
           </div>
 
-          {/* 3. Context growth */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
@@ -742,7 +696,6 @@ function TrendsPageContent() {
             />
           </div>
 
-          {/* 4. Compaction-rate proxy */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
@@ -777,7 +730,6 @@ function TrendsPageContent() {
             />
           </div>
 
-          {/* 5. CLI-version mix over time */}
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
@@ -821,7 +773,6 @@ function TrendsPageContent() {
             />
           </div>
 
-          {/* 6. Latency trend */}
           <div>
             <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-1">
               {t.latencyTrend}

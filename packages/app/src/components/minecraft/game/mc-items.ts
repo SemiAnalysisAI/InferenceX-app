@@ -3,7 +3,6 @@ import { BLOCKS, type ToolKind } from './mc-blocks';
 
 export interface ToolStats {
   kind: ToolKind;
-  /** 1 wood, 2 stone, 3 iron, 4 diamond; gold mines like wood but fast. */
   tier: number;
   speed: number;
   durability: number;
@@ -14,20 +13,16 @@ export interface ItemDef {
   zh: string;
   icon: IconName;
   stack: number;
-  /** Block placed by this item. */
   block?: number;
   tool?: ToolStats;
-  /** Melee damage in half-hearts. */
   damage?: number;
   food?: { hunger: number; saturation: number };
-  /** Furnace burn time in seconds. */
   fuel?: number;
 }
 
 export interface Stack {
   id: string;
   count: number;
-  /** Uses consumed for tools. */
   wear?: number;
 }
 
@@ -37,7 +32,6 @@ function add(def: Omit<ItemDef, 'stack' | 'icon'> & { stack?: number; icon?: Ico
   ITEMS[def.key] = { stack: 64, icon: def.key as IconName, ...def };
 }
 
-// Every placeable block (except internal ones) is an item.
 const NOT_ITEMS = new Set([
   'air',
   'water',
@@ -174,10 +168,6 @@ export const itemName = (id: string, locale: 'en' | 'zh') => {
   return def ? def[locale] : id;
 };
 
-// ---------------------------------------------------------------------------
-// Crafting
-// ---------------------------------------------------------------------------
-/** Ingredient matchers: '#planks' and '#log' accept any wood type. */
 const TAGS: Record<string, string[]> = {
   '#planks': ['oak_planks', 'birch_planks', 'spruce_planks'],
   '#log': ['oak_log', 'birch_log', 'spruce_log'],
@@ -191,7 +181,6 @@ const matches = (ingredient: string, id: string | undefined) =>
     : ingredient === id;
 
 export interface Recipe {
-  /** Rows of single-character keys, ' ' for empty. Absent for shapeless. */
   pattern?: string[];
   keys?: Record<string, string>;
   shapeless?: string[];
@@ -236,7 +225,6 @@ export const RECIPES: Recipe[] = [
     keys: { F: 'flint', S: 'stick', P: 'feather' },
     result: { id: 'arrow', count: 4 },
   },
-  // Wool supplies string until spiders are implemented.
   { shapeless: ['white_wool'], result: { id: 'string', count: 4 } },
   { shapeless: ['oak_log'], result: { id: 'oak_planks', count: 4 } },
   { shapeless: ['birch_log'], result: { id: 'birch_planks', count: 4 } },
@@ -307,7 +295,6 @@ for (const [tier, material] of TOOL_MATERIALS) {
   }
 }
 
-/** Crop a crafting grid to its bounding box. */
 function trim(grid: (string | undefined)[], size: number) {
   let minX = size;
   let minY = size;
@@ -345,7 +332,6 @@ function shapedMatch(recipe: Recipe, rows: (string | undefined)[][], mirror: boo
   return true;
 }
 
-/** Result of a 2x2 (size 2) or 3x3 (size 3) crafting grid, or null. */
 export function craft(grid: (Stack | null)[], size: 2 | 3): Stack | null {
   const ids = grid.map((s) => (s && s.count > 0 ? s.id : undefined));
   const rows = trim(ids, size);
@@ -369,9 +355,6 @@ export function craft(grid: (Stack | null)[], size: 2 | 3): Stack | null {
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Smelting
-// ---------------------------------------------------------------------------
 export const SMELTING: Record<string, string> = {
   raw_iron: 'iron_ingot',
   raw_gold: 'gold_ingot',
@@ -394,10 +377,8 @@ export const SMELTING: Record<string, string> = {
   diamond_ore: 'diamond',
   coal_ore: 'coal',
 };
-/** Seconds to smelt one item, as in the original (200 ticks). */
 export const SMELT_TIME = 10;
 
-/** Mining time in seconds for a block with the held item, or Infinity. */
 export function breakTime(
   blockId: number,
   held: string | undefined,
@@ -421,7 +402,6 @@ export function breakTime(
   return Math.ceil(1 / damage) / 20;
 }
 
-/** Whether breaking yields the block's drop with this tool. */
 export function canHarvest(blockId: number, held: string | undefined) {
   const block = BLOCKS[blockId];
   if (!block?.tier) return true;

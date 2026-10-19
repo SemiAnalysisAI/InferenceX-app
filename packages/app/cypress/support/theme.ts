@@ -1,6 +1,5 @@
 import { APP_THEMES } from '../../src/lib/themes/themes';
 
-/** Reach a theme through ordinary clicks, waiting for each React update. */
 export function cycleToTheme(theme: string, remaining = APP_THEMES.length): void {
   expect(APP_THEMES, 'registered target theme').to.include(theme);
   cy.get('[data-testid="theme-toggle"]')

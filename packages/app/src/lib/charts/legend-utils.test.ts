@@ -88,7 +88,6 @@ describe('filterAndSortLegendItems', () => {
     it('filters first then sorts', () => {
       const result = filterAndSortLegendItems(items, 'nvidia', true);
       expect(result).toHaveLength(3);
-      // Active NVIDIA items first, then inactive
       expect(result[0].label).toBe('H100');
       expect(result[1].label).toBe('H200');
       expect(result[2].label).toBe('B200');
@@ -98,10 +97,8 @@ describe('filterAndSortLegendItems', () => {
   describe('combined search + sort (additional)', () => {
     it('sorts filtered results active-first', () => {
       const result = filterAndSortLegendItems(items, '00', true);
-      // H100 (active), MI300X (active), H200 (inactive), B200 (inactive)
       const activeLabels = result.filter((r) => r.isActive).map((r) => r.label);
       const inactiveLabels = result.filter((r) => !r.isActive).map((r) => r.label);
-      // All active items should come before inactive
       const lastActiveIdx = result.findIndex((r) => !r.isActive);
       if (lastActiveIdx > 0) {
         result.slice(0, lastActiveIdx).forEach((r) => expect(r.isActive).toBe(true));

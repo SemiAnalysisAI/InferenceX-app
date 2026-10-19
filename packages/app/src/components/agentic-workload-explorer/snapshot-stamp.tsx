@@ -22,10 +22,6 @@ const STRINGS = {
   },
 };
 
-/**
- * Stamp making the frozen-snapshot nature of the explorer explicit on every
- * page: nothing here is live, and "last N" windows end at the snapshot.
- */
 export function SnapshotStamp() {
   const strings = STRINGS[useLocale()];
   return (

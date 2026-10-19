@@ -1,10 +1,3 @@
-/**
- * Shared server-rendered body for `/rankings/<slug>` and `/zh/rankings/<slug>`.
- * One markup tree, two string bundles — the EN and ZH routes cannot drift.
- * All numbers come pre-derived from `getRankingPageData`, which reads the
- * exact cells the /overview leaderboard renders.
- */
-
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';

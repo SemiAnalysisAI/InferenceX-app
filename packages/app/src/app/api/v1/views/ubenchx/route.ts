@@ -14,7 +14,6 @@ export const dynamic = 'force-dynamic';
 
 const AVAILABLE_TESTS = ['mem-bw', 'sm-l2-distance', 'tpc-skyline'] as const;
 
-/** TPC per GPC groupings for every GPU (`gpu=all`, the default) or one GPU. */
 function tpcSkylineResults(gpu: string) {
   return gpu === 'all'
     ? Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) => transformTpcSkylineRun(key, run))
@@ -63,7 +62,6 @@ export function GET(request: NextRequest) {
         );
       }
 
-      // test === 'all': return every test
       const smL2GpuKeys = Object.keys(SM_L2_RUNS);
       const smL2Gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...smL2GpuKeys], 'all');
       const smL2Results =
@@ -82,8 +80,6 @@ export function GET(request: NextRequest) {
           tests: AVAILABLE_TESTS,
           memBw: { gpus: memBwResults },
           smL2Distance: { gpus: smL2Results },
-          // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
-          // match the GPU key case-insensitively as parseEnumParam does for the others.
           tpcSkyline: {
             gpus: tpcSkylineResults(
               Object.keys(TPC_SKYLINE_RUNS).find(
@@ -95,7 +91,6 @@ export function GET(request: NextRequest) {
       );
     }
 
-    // test === 'sm-l2-distance'
     const smL2GpuKeys = Object.keys(SM_L2_RUNS);
     const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...smL2GpuKeys], smL2GpuKeys[0]);
     const smL2Results =

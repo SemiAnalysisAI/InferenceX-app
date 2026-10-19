@@ -15,11 +15,7 @@ interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link>
     | 'landing_rubin_results_clicked'
     | 'landing_jalapeno_results_clicked';
   analyticsTarget?: string;
-  /** Which page rendered the hero, so `/compare` and `/` clicks stay separable. */
   analyticsSurface?: string;
-  /** Route the click through `navigateInApp`, the way the header nav and the
-   *  landing card already do for `/overview` and `/inference`, keeping the
-   *  transition same-document so the Minecraft music persists. */
   appNavigation?: boolean;
 }
 

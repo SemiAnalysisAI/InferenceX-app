@@ -46,13 +46,6 @@ interface UseInterpolatedTrendDataResult {
   refetch: () => Promise<unknown>;
 }
 
-/**
- * Hook that loads historical benchmark data, groups by GPU per date, and interpolates
- * the selected metric at a user-specified interactivity level for each date.
- *
- * Uses the /api/v1/benchmarks/history endpoint which returns all dates in one query.
- * The interpolation memo re-computes instantly when targetInteractivity or metric changes.
- */
 export function useInterpolatedTrendData({
   selectedModel,
   selectedSequence,
@@ -109,7 +102,6 @@ export function useInterpolatedTrendData({
     [dateGroupedData, targetInteractivity, trendMetricKey, tokenRevenuePricing],
   );
 
-  // Artificial progress that ramps up while the API call is in flight
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval>>(null);
 

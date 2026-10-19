@@ -29,9 +29,7 @@ export function HeadingLink({ id, locale = 'en' }: { id: string; locale?: Locale
             timerRef.current = setTimeout(() => setState('idle'), 300);
           }, 2000);
         },
-        () => {
-          /* clipboard denied — silent fallback */
-        },
+        () => {},
       );
     },
     [id],

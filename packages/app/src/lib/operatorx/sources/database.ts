@@ -1,7 +1,3 @@
-/**
- * OperatorX runs from the OperatorX database, where `db:ingest:operatorx` pushes them.
- * The rows are the raw bundles, so this is a thin read.
- */
 import { getOperatorXDb } from '@semianalysisai/inferencex-db/connection';
 import type {
   OperatorXRawBundle,

@@ -1,18 +1,3 @@
-/**
- * Helpers shared by the agentic per-point queries (`agentic-aggregates.ts`,
- * `derived-agentic-metrics.ts`): percentile math over aiperf samples,
- * the `{value, unit}` metric-envelope reader, the single-round-trip
- * `aggregate_stats` fetch both fast paths start from, and the best-effort
- * write-back both use to self-heal a stale precomputed payload.
- *
- * `STATS_VERSION` and the profile-blob extractor `extractIslOsl` live here (the
- * dependency-free leaf) rather than in `agentic-aggregates.ts` so both query
- * modules — and `etl/compute-aggregate-stats.ts` — can share them without an
- * import cycle: `agentic-aggregates` ⇄ `derived-agentic-metrics` would
- * otherwise close a loop once each needs the other's blob helpers for
- * write-back. (agentic-aggregates re-exports both for existing importers.)
- */
-
 import type { DbClient } from '../connection.js';
 import type { RequestTimeline } from '../etl/compute-request-timeline';
 import { gzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -22,37 +7,6 @@ import {
   type TokenLengthSketch,
 } from '@semianalysisai/inferencex-constants';
 
-/**
- * Bump when the aggregate-stats computation algorithm changes — the backfill
- * script recomputes any row whose stored `aggregate_stats.version` is older,
- * and the read-path fast/slow branches key off it.
- *
- * v2: aggregate vllm gauges/counters across all engine series (was reading
- * only series[0], which under-counted by Nx on multi-engine DP/PP deployments).
- *
- * v3: extract sglang:* metrics too — kv_cache_util + prefix_cache_hit_rate
- * populate for SGLang runs (qwen3.5/h100, mi355x sglang, etc.) the same way
- * they do for vllm runs.
- *
- * v4: add per-request normalized E2E percentiles at a fixed 400-token OSL.
- *
- * v5: reject osl <= 0 in extractTurn to exclude cancelled/empty-output turns
- * whose decode-interval math would explode normalized E2E to thousands of seconds.
- *
- * v6: drop the retired per-point derived metrics (normalizedSessionTimeS,
- * p90PrefillTpsPerUser, normalizedE2e400) along with the experimental chart
- * modes they fed.
- *
- * v7: add `e2elPerOsl` — percentiles of per-request E2E latency divided by
- * OSL (seconds per output token), the inverse of the "E2E Normalized Interactivity" x-axis
- * metric.
- *
- * v8: add p95 and bounded mergeable ISL/OSL sketches. The dashboard merges
- * the sketches for all resident chart points instead of loading request-level
- * timelines or attempting to combine per-point percentiles.
- *
- * v9: extract ATOM KV utilization and admitted prefix-cache hit rates.
- */
 export const STATS_VERSION = 9;
 
 interface ProfileRecord {
@@ -63,7 +17,6 @@ interface ProfileRecord {
   };
 }
 
-/** Parse the profile_export.jsonl → per-request ISL + OSL arrays. */
 export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
   const isl: number[] = [];
   const osl: number[] = [];
@@ -93,11 +46,9 @@ export interface MetricPercentiles {
   p90: number;
   p95: number;
   p99: number;
-  /** Sample count used to compute the percentiles. */
   n: number;
 }
 
-/** Linear-interpolated percentile (matches numpy's default linear method). */
 export function quantile(sortedAsc: number[], q: number): number {
   if (sortedAsc.length === 0) return Number.NaN;
   if (sortedAsc.length === 1) return sortedAsc[0]!;
@@ -115,7 +66,6 @@ export function meanOf(xs: number[]): number {
   return s / xs.length;
 }
 
-/** Compute the percentile bundle for an array of samples; null if empty. */
 export function percentilesOf(samples: number[]): MetricPercentiles | null {
   const clean = samples.filter((v) => Number.isFinite(v));
   if (clean.length === 0) return null;
@@ -146,7 +96,6 @@ export function sequenceLengthSketches(
   };
 }
 
-/** Pull a numeric metric out of the {value, unit} envelope (or a bare number). */
 export function readNum(v: unknown): number | undefined {
   if (typeof v === 'number') return v;
   if (v && typeof v === 'object' && 'value' in v) {
@@ -156,12 +105,6 @@ export function readNum(v: unknown): number | undefined {
   return undefined;
 }
 
-/**
- * One round-trip fetch of the pre-computed `aggregate_stats` JSONB for a set
- * of benchmark_results ids (via their trace_replay link). Both agentic fast
- * paths read from this; ids without a trace_replay row simply don't appear.
- * `Stats` is the caller's view of the JSONB shape.
- */
 export async function fetchAggregateStatsRows<Stats>(
   sql: DbClient,
   benchmarkResultIds: readonly number[],
@@ -176,18 +119,14 @@ export async function fetchAggregateStatsRows<Stats>(
   `) as unknown as { benchmark_result_id: number; stats: Stats | null }[];
 }
 
-/** Trace-replay JSONB columns the read path may self-heal after a recompute. */
 export type WriteBackColumn = 'aggregate_stats' | 'chart_series';
 
-/** Logged once per process so a read-only connection doesn't spam the console. */
 let writeBackWarned = false;
 
-/** Reset the once-per-process warning latch (test-only). */
 export function _resetWriteBackWarned(): void {
   writeBackWarned = false;
 }
 
-/** Warn once per process. A failed write-back never fails the read. */
 function warnWriteBackFailure(target: string, error: unknown): void {
   if (writeBackWarned) return;
   writeBackWarned = true;
@@ -199,17 +138,6 @@ function warnWriteBackFailure(target: string, error: unknown): void {
   );
 }
 
-/**
- * Issue the fixed-column UPDATE. Kept as one tagged-template call per column so
- * the SQL text is fully static — no column name is ever interpolated — which
- * keeps it injection-proof and driver-agnostic. The bound value is the plain
- * payload OBJECT cast to `::jsonb`: both the neon HTTP driver and postgres.js
- * JSON-serialize an object parameter exactly once, so `::jsonb` parses it to a
- * JSONB object. (Passing `JSON.stringify(payload)` instead double-encodes into
- * a JSONB *string* — `jsonb_typeof` = 'string' — which is why we don't.) The
- * abstract `DbClient` doesn't expose postgres.js's `sql.json()`, so this is the
- * portable way to write JSONB.
- */
 function updateJsonbColumn(
   sql: DbClient,
   column: WriteBackColumn,
@@ -226,19 +154,6 @@ function updateJsonbColumn(
   }
 }
 
-/**
- * Best-effort, fire-and-forget persist of a freshly recomputed versioned
- * payload back into an `agentic_trace_replay` JSONB column, so the next request
- * takes the precomputed fast path instead of re-gunzipping the raw blob.
- *
- * The read path runs on the READONLY connection. On a true read replica (prod's
- * `DATABASE_READONLY_URL`) the UPDATE fails at the wire — this catches the
- * rejection and silently no-ops (warning once) so the response is never delayed
- * or failed. On local/superuser connections (where the readonly URL is also
- * write-capable) it self-heals the stored payload. Callers must only pass a
- * COMPLETE recomputed payload — never a partial/null-blob result — so a
- * self-heal never clobbers good data with holes.
- */
 export function writeBackTraceReplayJsonb(
   sql: DbClient,
   column: WriteBackColumn,
@@ -246,23 +161,12 @@ export function writeBackTraceReplayJsonb(
   payload: unknown,
 ): void {
   if (payload === null || payload === undefined) return;
-  // structuredClone strips any class prototypes so the driver serializes plain
-  // data only — matches `jsonbParam` in the backfill runner.
   const value = structuredClone(payload);
   void updateJsonbColumn(sql, column, traceReplayId, value).catch((error: unknown) => {
     warnWriteBackFailure(column, error);
   });
 }
 
-/**
- * Best-effort persist of a freshly recomputed request timeline in its storage
- * form: `request_timeline_gz` plus the `request_timeline_version` and
- * `request_count` scalars the readers route on. Same read-only contract as
- * {@link writeBackTraceReplayJsonb}. The legacy `request_timeline` JSONB is
- * never written, and a newer stored version is never replaced. The returned
- * promise never rejects; the read path discards it with `void` so compression
- * and the UPDATE never delay a response.
- */
 export async function writeBackRequestTimeline(
   sql: DbClient,
   traceReplayId: number,

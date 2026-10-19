@@ -19,9 +19,6 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
   const { model } = filter;
   const traceVersion = parseTraceVersion(req.nextUrl.searchParams);
 
-  // Model filters are intentionally live and never cached: model is a
-  // free-form, high-cardinality dimension. The returned payload is still
-  // server-binned and bounded.
   if (model !== null) {
     return computePerformanceLatencyPayload(getDb(), vis, model, traceVersion);
   }
@@ -36,8 +33,6 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
     return (cached.data as PerformancePayload).latency;
   }
 
-  // Both performance routes coalesce on this one cache key, so simultaneous
-  // cold latency/streaming requests share one pooled compute.
   const payload = (await coalesceCompute(key, async () => {
     const db = createDirectDb();
     try {

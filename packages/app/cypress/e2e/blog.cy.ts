@@ -34,13 +34,6 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    // Card thumbnails are the only load-blocking subresources the listing adds
-    // on top of the shared chrome, and the featured card plus the first grid
-    // row are eager. Serve every optimizer request from a fixture so the visit
-    // never waits on image resizing or a remote thumbnail host; the optimizer
-    // itself is covered by the cy.request check below. Visiting per test
-    // instead of once in before-all lets Cypress retries cover a lost Firefox
-    // load event, which otherwise fails the hook and skips the whole suite.
     beforeEach(() => {
       cy.intercept(
         { method: 'GET', pathname: '/_next/image' },
@@ -50,8 +43,6 @@ describe('Blog', () => {
     });
 
     it('serves local card thumbnails through the image optimizer', () => {
-      // The browser never fetches these (stubbed above), so check the real
-      // optimizer response directly for the first local thumbnail on the page.
       cy.get('[data-testid="blog-post-grid"] img[src^="/_next/image?url=%2Fimages%2F"]')
         .first()
         .invoke('attr', 'src')
@@ -74,8 +65,6 @@ describe('Blog', () => {
     });
 
     it('renders the post title as the one and only h1', () => {
-      // The title is the page's single <h1> (primary-keyword top heading);
-      // MDX body sections map to <h2>, so there must be exactly one h1.
       cy.get('h1').should('have.length', 1).and('contain.text', 'InferenceMAX');
     });
   });
@@ -107,16 +96,12 @@ describe('Blog', () => {
     });
 
     it('leaves single-dollar prices as literal text, not math', () => {
-      // `singleDollarTextMath: false` — otherwise "$3 ... $15" would be swallowed
-      // into an inline formula and the prices would disappear from the prose.
       cy.get('article.prose').should('contain.text', '$3 per million tokens input');
       cy.get('article.prose').should('contain.text', '$15 per million tokens output');
     });
 
     it('renders every figure the post references', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
-      // Only the first figure is eager; the rest are `loading="lazy"` and stay at
-      // naturalWidth 0 until scrolled to, so decode is only asserted on that one.
       cy.get('article.prose figure img')
         .first()
         .should(($img) => {
@@ -129,8 +114,6 @@ describe('Blog', () => {
         );
       });
 
-      // Complements the eager-only decode check above: the srcs exist on the server
-      // even though lazy images have not fetched them yet.
       cy.get('article.prose figure img').then(($imgs) => {
         const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
         for (const src of srcs) {

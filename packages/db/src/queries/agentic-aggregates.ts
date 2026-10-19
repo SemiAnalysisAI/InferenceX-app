@@ -1,18 +1,3 @@
-/**
- * Per-id aggregate stats for the "Aggregates across configs" view on the
- * agentic detail page. Each id contributes one summary number per metric per
- * percentile so the frontend can plot how each metric varies across the
- * SKU's parallelism + concurrency configs.
- *
- * Sources:
- *  - `profile_export.jsonl` → ISL / OSL per request (filtered to profiling phase)
- *  - `server_metrics_json` → time-series of KV cache utilization +
- *     prefix-cache hit rate per scrape interval
- *
- * Returns mean/p50/p75/p90/p99 per metric. Nulls when the blob is missing
- * or has no usable samples — frontend treats those as "no data".
- */
-
 import { Readable } from 'node:stream';
 import { createGunzip } from 'node:zlib';
 
@@ -35,10 +20,6 @@ import {
   type SequenceLengthSketches,
 } from './agentic-shared';
 
-// STATS_VERSION, the profile extractor `extractIslOsl`, and the percentile
-// math + envelope reader all live in agentic-shared.ts (the cycle-free leaf).
-// Re-exported here because etl/compute-aggregate-stats and the API layer
-// import them from this module.
 export {
   extractIslOsl,
   percentilesOf,
@@ -58,14 +39,6 @@ export interface AgenticAggregate {
 
 export type AgenticAggregateMap = Record<number, AgenticAggregate>;
 
-/**
- * `profile_export_jsonl_gz` is small (~1-3 MB) so we can batch many per
- * round-trip. `server_metrics_json_gz` is much bigger (~17 MB compressed
- * for high-conc TP+EP runs; Neon encodes bytea over HTTP at ~1.6× wire
- * size, so two of those = ~50 MB and three already trips the 64 MB cap).
- * We fetch the two blob types in separate queries with different chunk
- * sizes.
- */
 const PROFILE_CHUNK_SIZE = 8;
 const SERVER_CHUNK_SIZE = 1;
 
@@ -88,18 +61,6 @@ interface MetricsJson {
   metrics?: Record<string, MetricMeta>;
 }
 
-/**
- * Aggregate a per-timeslice field across all series of a metric, indexed by
- * the timeslice's `start_ns`. vllm reports one series per engine on
- * multi-engine DP/PP deployments, so we sum (or average) across engines to
- * get the cluster-wide value at each timeslice.
- *
- * `field` selects which numeric field on a timeslice to read (`avg` for
- * gauges, `rate` for counter deltas). `combine` controls cross-engine math:
- * 'sum' for running/waiting/throughput counters where the cluster total is
- * the sum; 'avg' for KV cache utilization, which is bounded [0, 1] per
- * engine and should be averaged across engines for the cluster view.
- */
 function aggregateSeriesByStart(
   metricSeries: readonly Series[] | undefined,
   field: 'avg' | 'rate',
@@ -122,15 +83,6 @@ function aggregateSeriesByStart(
   return out;
 }
 
-/**
- * Parse the server_metrics_json → time-series arrays for KV cache util and
- * prefix cache hit rate (per-interval, computed from the prometheus
- * counters the same way trace-server-metrics does it).
- *
- * Aggregates across all engine series so multi-engine DP/PP deployments are
- * counted correctly (previously we only read engine 0).
- */
-/** First metric whose series array is non-empty; supports vllm/sglang fallback. */
 function pickFirstNonEmpty(
   metrics: Record<string, MetricMeta>,
   ...names: string[]
@@ -149,8 +101,6 @@ export function extractServerMetricSamples(json: string): {
   const parsed = JSON.parse(json) as MetricsJson;
   const metrics = parsed.metrics ?? {};
 
-  // KV cache util — per-engine gauge in [0, 1]. Average across engines so the
-  // value stays a percentage; summing would give meaningless 0..N.
   const kvSeriesAll = pickFirstNonEmpty(
     metrics,
     'vllm:kv_cache_usage_perc',
@@ -161,8 +111,6 @@ export function extractServerMetricSamples(json: string): {
   );
   const kvCacheUtil = [...aggregateSeriesByStart(kvSeriesAll, 'avg', 'avg').values()];
 
-  // Prefix cache hit rate per interval = Σhits.rate / Σqueries.rate across
-  // all engines. Sum first, then divide. SGLang names: cached_tokens / prompt_tokens.
   const hitsAll = pickFirstNonEmpty(
     metrics,
     'vllm:prefix_cache_hits',
@@ -201,9 +149,7 @@ export function extractServerMetricSamples(json: string): {
   return { kvCacheUtil, prefixCacheHitRate };
 }
 
-/** Metrics our aggregates pipeline cares about. Anything else in the blob is skipped. */
 const TARGET_METRIC_KEYS = new Set([
-  // vLLM
   'vllm:kv_cache_usage_perc',
   'vllm:gpu_cache_usage_perc',
   'vllm:prefix_cache_hits',
@@ -211,16 +157,13 @@ const TARGET_METRIC_KEYS = new Set([
   'vllm:gpu_prefix_cache_hits',
   'vllm:gpu_prefix_cache_queries',
   'vllm:prompt_tokens',
-  // SGLang
   'sglang:token_usage',
   'sglang:cached_tokens',
   'sglang:prompt_tokens',
-  // ATOM
   'atom:kv_cache_usage_ratio',
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
   'atom:prefix_cache_hit_ratio',
-  // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',
   'trtllm_prompt_cached_tokens',
@@ -229,27 +172,10 @@ const TARGET_METRIC_KEYS = new Set([
   'trtllm_prompt_tokens_total',
 ]);
 
-/**
- * Stream-parse the gzipped server_metrics_json and collect ONLY the metrics
- * we need. Avoids the Node 512 MB string cap that JSON.parse hits on
- * server_metrics blobs from high-conc TP+EP runs (which can decompress to
- * >500 MB because vllm dumps `cache_config_info` every scrape interval).
- *
- * Pipeline: Buffer → gunzip → JSON parser → Pick('metrics') →
- * StreamObject (one metric per chunk) → keep only the keys we care about.
- *
- * Returns the same `{ kvCacheUtil, prefixCacheHitRate }` shape as the
- * synchronous fast path so callers can use either interchangeably.
- */
 async function streamExtractServerMetricSamples(
   buffer: Buffer,
 ): Promise<{ kvCacheUtil: number[]; prefixCacheHitRate: number[] }> {
   const collected: Record<string, MetricMeta> = {};
-  // stream-json's TypeScript types don't compose cleanly with node:stream's
-  // pipeline() generic, and several `.pipe()`/event APIs are typed loosely —
-  // cast to any for this local pipe chain. It works at runtime.
-  // stream-json composes transforms via stream-chain. `pick`/`streamObject`
-  // each return a Transform when called; `chain([...])` wires them.
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const pipeline = chain([
     Readable.from(buffer),
@@ -278,11 +204,6 @@ export async function getAgenticAggregates(
 
   const result: AgenticAggregateMap = {};
 
-  // Fast path: read the pre-computed `aggregate_stats` JSONB written by the
-  // ingest pipeline (and back-filled by `backfill-aggregate-stats.ts`). One
-  // round-trip pulls everything we need for every requested id with no blob
-  // decompression, so the slow blob-parsing fallback only runs for ids
-  // whose stats are missing or were produced by an older `STATS_VERSION`.
   const statsRows = await fetchAggregateStatsRows<AggregateStatsRow>(sql, benchmarkResultIds);
 
   const idsNeedingProfile: number[] = [];
@@ -296,15 +217,11 @@ export async function getAgenticAggregates(
       agg.kvCacheUtil = row.stats.kvCacheUtil ?? null;
       agg.prefixCacheHitRate = row.stats.prefixCacheHitRate ?? null;
     } else {
-      // No stats (or stale version) — schedule the blob-parse fallback below
-      // so the response still surfaces data. Backfill should drain these.
       idsNeedingProfile.push(id);
       idsNeedingServer.push(id);
     }
     result[id] = agg;
   }
-  // Also fall back for ids that didn't return a row at all (no trace_replay
-  // link) — keep the caller contract: every id we know about lands in the map.
   for (const id of benchmarkResultIds) {
     if (!(id in result)) result[id] = blankAggregate(id);
   }
@@ -313,14 +230,8 @@ export async function getAgenticAggregates(
     return result;
   }
 
-  // Accumulate a complete, version-stamped `aggregate_stats` bundle per id as
-  // the two passes recompute it, so we can self-heal the shared JSONB column
-  // afterward (see the write-back loop below). Only ids whose profile blob
-  // parsed cleanly get an entry — a null/malformed blob must never overwrite
-  // good stored data.
   const pendingById = new Map<number, { traceReplayId: number; stats: FullAggregateStats }>();
 
-  // ── Fallback Pass 1: profile metadata batches, then bounded profile reads. ──
   for (let i = 0; i < idsNeedingProfile.length; i += PROFILE_CHUNK_SIZE) {
     const chunk = idsNeedingProfile.slice(i, i + PROFILE_CHUNK_SIZE);
     const rows = (await sql`
@@ -349,9 +260,6 @@ export async function getAgenticAggregates(
           const oslPct = percentilesOf(osl);
           result[id].isl = islPct;
           result[id].osl = oslPct;
-          // Recompute every profile-derived field from this same JSONL so the
-          // self-healed bundle is complete at the new version. Server-derived
-          // fields are filled in Pass 2 (or stay null without a server blob).
           pendingById.set(id, {
             traceReplayId: Number(row.trace_replay_id),
             stats: {
@@ -364,16 +272,10 @@ export async function getAgenticAggregates(
               sequenceLengths: sequenceLengthSketches(isl, osl),
             },
           });
-        } catch {
-          // ignore malformed blob
-        }
+        } catch {}
       }
     }
   }
-  // ── Fallback Pass 2: server_metrics blobs (huge; one at a time). ───────
-  // Serial to avoid OOM on the decompressed JSON of a high-conc TP+EP row
-  // (>500 MB raw). The aggregator is fronted by a blob cache, so the slow
-  // path runs at most once per sibling set.
   for (let i = 0; i < idsNeedingServer.length; i += SERVER_CHUNK_SIZE) {
     const chunk = idsNeedingServer.slice(i, i + SERVER_CHUNK_SIZE);
     const rows = (await sql`
@@ -395,9 +297,7 @@ export async function getAgenticAggregates(
           json === null
             ? await streamExtractServerMetricSamples(row.server_blob)
             : extractServerMetricSamples(json);
-      } catch {
-        // malformed blob or failed stream fallback — leave nulls
-      }
+      } catch {}
       if (parsed) {
         const kvPct = percentilesOf(parsed.kvCacheUtil);
         const prefixPct = percentilesOf(parsed.prefixCacheHitRate);
@@ -412,13 +312,6 @@ export async function getAgenticAggregates(
     }
   }
 
-  // Self-heal the shared `aggregate_stats` column: persist the freshly
-  // recomputed, version-stamped bundle so the next request (this route AND the
-  // derived-agentic-metrics route, which read the same column) takes the fast
-  // path instead of re-decompressing these blobs. Only ids whose profile blob
-  // parsed cleanly are in `pendingById`, so a null/malformed recompute never
-  // clobbers good data. Fire-and-forget, best-effort (no-ops on a read-only
-  // replica) — never delays or fails the response.
   for (const { traceReplayId, stats } of pendingById.values()) {
     writeBackTraceReplayJsonb(sql, 'aggregate_stats', traceReplayId, stats);
   }
@@ -426,7 +319,6 @@ export async function getAgenticAggregates(
   return result;
 }
 
-/** Shape of the JSONB column when read back via postgres-js. */
 interface AggregateStatsRow {
   version: number;
   isl: MetricPercentiles | null;
@@ -435,11 +327,6 @@ interface AggregateStatsRow {
   prefixCacheHitRate: MetricPercentiles | null;
 }
 
-/**
- * The complete `aggregate_stats` bundle we write back on the fallback path.
- * Mirrors `AggregateStats` in etl/compute-aggregate-stats.ts (kept local to
- * avoid an import cycle with that module, which depends on this one).
- */
 interface FullAggregateStats {
   version: number;
   isl: MetricPercentiles | null;

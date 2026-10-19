@@ -36,8 +36,6 @@ describe('findEvalSampleArtifact', () => {
   });
 
   it('accepts the legacy `sglang-disagg` alias when the config framework is `mori-sglang`', () => {
-    // Eval rows are normalized via FRAMEWORK_ALIASES (sglang-disagg → mori-sglang),
-    // but artifact names keep the raw alias. The matcher must accept either.
     const artifacts = [
       makeArtifact(
         'eval_dsr1_8k1k_dsr1_8k1k_fp4_sglang-disagg_prefill-tp8-ep1-dpfalse-nw1_decode-tp8-ep1-dpfalse-nw2_disagg-true_spec-mtp_conc64x128x256_mi355x-amds_08',

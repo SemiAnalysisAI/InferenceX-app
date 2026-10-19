@@ -19,7 +19,6 @@ const STORED_METRIC: Record<GpuMetricKey, string> = {
   mmActivity: 'mm_activity_pct',
 };
 
-/** Full-record statistics, including startup/warmup; never a measured-window summary. */
 export function storedGpuStatsForMetric(
   stats: readonly GpuMetricStatRow[],
   metricKey: GpuMetricKey,

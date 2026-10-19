@@ -56,11 +56,6 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Same rows and trim the dashboard's calculator fetch gets from
- * `/api/v1/benchmarks?view=calculator` (or `runId=&exactRun=true`), through the
- * cache slots that endpoint already owns.
- */
 async function calculatorRows(
   dbModelKeys: string[],
   sequence: Sequence,
@@ -75,13 +70,6 @@ async function calculatorRows(
     : getCachedCalculatorBenchmarks(dbModelKeys, sequence, date);
 }
 
-/**
- * The interactivity and total throughput actually served at this operating
- * point. On the target axis a clamped read sits at the frontier's nearest edge
- * point rather than at the requested target — `interpolateForGPU` resolves the
- * off-axis metrics against that clamped position (its `clampedTarget`), so the
- * fleet must be sized against the edge value, not the requested one.
- */
 function operatingPoint(
   result: InterpolatedResult,
   target: number,
@@ -149,10 +137,6 @@ const toNearest = (point: GPUDataPoint | undefined): NearestPoint | null =>
       }
     : null;
 
-/**
- * `nearestPoints` is ordered by the *input* axis: one edge point when clamped,
- * otherwise the bracketing pair. Split it into below/above on that axis.
- */
 function nearestOf(result: InterpolatedResult): HardwareResult['nearest'] {
   const [first, second] = result.nearestPoints;
   if (result.nearestPoints.length === 1) {
@@ -224,9 +208,6 @@ export function GET(request: NextRequest): Promise<Response> {
     const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions, overlayRows);
     const multiPrecision = precisions.length > 1;
 
-    // Same group identity as the dashboard's official path in
-    // `useThroughputData`: one bar per hwKey, split per precision only when the
-    // effective selection spans more than one.
     const { grouped, groupMeta, hwConfigMap } = buildGpuGroups<GroupMeta>(
       [...rows, ...overlayRows],
       {
@@ -261,8 +242,6 @@ export function GET(request: NextRequest): Promise<Response> {
         continue;
 
       const point = operatingPoint(result, target, mode);
-      // Same sizing call the dashboard makes (CostTargetPanel/FleetLifecycle):
-      // chips from the power budget, streams from the measured mix.
       const fleet =
         mw === undefined
           ? undefined
@@ -300,8 +279,6 @@ export function GET(request: NextRequest): Promise<Response> {
     }
     hardware.sort((a, b) => b.value - a.value);
 
-    // Cost-cap table (mirrors CostTargetPanel): the highest interactivity each
-    // config can serve without exceeding the cap, and its operating point there.
     let costCapResults: CostCapRow[] | undefined;
     if (costcap !== undefined) {
       costCapResults = [];
@@ -324,8 +301,6 @@ export function GET(request: NextRequest): Promise<Response> {
         if (!atIv) continue;
         let concurrentUsers: number | null = null;
         if (mw !== undefined) {
-          // Cost-cap rows interpolate forward at maxIv, so the total throughput
-          // is the interpolation's own value — same as CostTargetPanel.
           const stats = computeFleetStatsForResult(atIv, maxIv, atIv.value, meta.hwKey, mw, {
             costProvider,
             costType,
@@ -347,7 +322,6 @@ export function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    // Latest run date in the fetched rows — a stable, cache-friendly timestamp.
     const generatedAt = rows.reduce<string | null>(
       (latest, row) => (latest === null || row.date > latest ? row.date : latest),
       null,
@@ -434,7 +408,6 @@ function computeFleetStatsForResult(
   mw: number,
   options: { costProvider: CostProvider; costType: CostType; tcoBasis: TcoBasis },
 ): FleetStats | null {
-  // Specs come from the base chip like the dashboard's fleet sizing does.
   const stats = sizeFleetForResult(result, {
     mw,
     specs: getGpuSpecs(hwKey, options.tcoBasis),

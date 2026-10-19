@@ -25,53 +25,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/v1/tco-feed
- *
- * Per-hardware Pareto-frontier throughput reads at fixed interactivity
- * tiers, for external spreadsheet TCO models (Excel Power Query and
- * similar consumers that cannot run the frontend's TS transforms).
- *
- * This route is a DOCUMENTED EXCEPTION to the "/api/v1 returns raw DB
- * data" convention: it applies the dashboard's frontier interpolation
- * (calculator/interpolation.ts) server-side so external consumers get
- * numbers identical to what the chart renders, without reimplementing —
- * and inevitably drifting from — the spline. Assumptions (tier weights,
- * workload mix, the α token-value ratio) enter ONLY as query params on the
- * `scores` view, never as hidden constants beyond the documented defaults —
- * a published sheet's URL fully records its methodology, and `view=scores`
- * is exactly SUMPRODUCT over the `points` view, reproducible by hand.
- *
- * Query params (all optional):
- * - model     — DB key (`dsv4`) or display name (`DeepSeek-V4-Pro`).
- *               Default `dsv4`.
- * - workloads — `<isl>x<osl>` pairs, comma-separated.
- *               Default `1024x1024,8192x1024`.
- * - tiers     — interactivity read points (tok/s/user), comma-separated.
- *               Default `30,50,75,100`.
- * - date      — `YYYY-MM-DD`; reads use data as of this date
- *               (reproducibility of published sheets). Default: latest.
- * - format    — `json` (default) or `csv` (one-line Power Query import).
- * - view      — `points` (default): one row per hardware × workload × tier.
- *               `scores`: one row per hardware — tier-weighted, workload-
- *               blended, output-equivalent tok/s/GPU (the single number a
- *               TCO sheet consumes per chip).
- *               JSON point rows include `is_interpolated` to distinguish
- *               estimates between frontier knots from observed in-range
- *               knots. The CSV column contract remains unchanged.
- *
- * `scores`-only params (400 with `view=points`):
- * - weights          — per-tier traffic-mix weights, comma-separated,
- *                      normalized to sum 1. Default `0.35,0.4,0.2,0.05`
- *                      for the default tiers, equal weights otherwise.
- * - workload_weights — per-workload blend weights, normalized to sum 1.
- *                      Default: equal split. Renormalized over covered
- *                      workloads when a chip lacks data for one.
- * - alpha            — input-token value ratio in the output-equivalent
- *                      conversion `out × (1 + α × ISL/OSL)`. Default 0.25;
- *                      `alpha=0` scores plain output throughput.
- */
-
 const getCachedTcoFeed = cachedQuery(
   async (
     dbModelKeys: string[],
@@ -85,7 +38,6 @@ const getCachedTcoFeed = cachedQuery(
   'tco-feed-v2',
 );
 
-/** Resolve a `model` param that may be a DB key or a display name. */
 function resolveModelKeys(model: string): string[] | undefined {
   const fromDisplay = DISPLAY_MODEL_TO_DB[model];
   if (fromDisplay && fromDisplay.length > 0) return fromDisplay;
@@ -141,8 +93,6 @@ export async function GET(request: NextRequest) {
   const rawWorkloadWeights = params.get('workload_weights');
   const rawAlpha = params.get('alpha');
   if (view === 'points' && (rawWeights ?? rawWorkloadWeights ?? rawAlpha) !== null) {
-    // Reject rather than ignore — a consumer passing weights to the points
-    // view would silently get unweighted numbers.
     return NextResponse.json(
       { error: 'weights, workload_weights, and alpha require view=scores' },
       { status: 400 },

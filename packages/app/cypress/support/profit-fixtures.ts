@@ -1,23 +1,3 @@
-/**
- * Synthetic agentic rows for the `/profit-estimator` e2e spec, one identical
- * SKU set per model the estimator serves (Kimi K3, GLM 5.2/5.3, MiniMax M3,
- * DeepSeek V4 Pro, DeepSeek V4.1 Flash).
- *
- * The captured API fixtures carry no `agentic_traces` rows, and the estimator
- * is pinned to that workload, so the spec intercepts availability and
- * benchmarks with this set instead. Shapes follow `overlay-fixtures.ts`; the
- * metric aliases derive interactivity from `p90_itl`, so the tuples below are
- * (concurrency, p90 interactivity tok/s/user, tput_per_gpu, p90 e2e latency s).
- *
- * The H200 curve tops out below the 45 tok/s/user default on purpose: the page
- * must list it under "Not priced" rather than extrapolate a bar for it. The
- * wide curve reaches 130 tok/s/user so GLM's 100 and MiniMax M3's 83 tok/s/user
- * defaults are reads, not clamps, on every other SKU. Both curves start below
- * DeepSeek V4 Pro's 35 tok/s/user default, so every SKU, H200 included, is
- * priced there. DeepSeek V4.1 Flash's 125 tok/s/user default sits just inside
- * the wide curve's 130 tok/s/user top, so the four wide-curve SKUs are priced
- * and H200 is not, as on the Kimi, GLM, and MiniMax defaults.
- */
 import { metricsFor } from './overlay-fixtures';
 
 export const PROFIT_MODEL_DB_KEY = 'kimik3';
@@ -25,7 +5,6 @@ export const PROFIT_GLM_DB_KEY = 'glm5.2';
 export const PROFIT_MINIMAX_DB_KEY = 'minimaxm3';
 export const PROFIT_DEEPSEEK_DB_KEY = 'dsv4';
 export const PROFIT_DEEPSEEK_FLASH_DB_KEY = 'dsv41flash';
-/** `?model=` display key the benchmarks request carries → DB key of its rows. */
 const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
   'Kimi-K3': PROFIT_MODEL_DB_KEY,
   'GLM-5.2': PROFIT_GLM_DB_KEY,
@@ -35,25 +14,13 @@ const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
-/**
- * Earlier run date served for the compare-history panel. Its rows carry 80% of
- * the current throughput, so a history bar always lands below today's for the
- * same chip and the spec can tell the two apart.
- */
 export const PROFIT_HISTORY_DATE = '2026-07-15';
 const PROFIT_HISTORY_TPUT_SCALE = 0.8;
-/**
- * A date between the two above on which the sweep ran twice, so the Config
- * Changelog offers each run as its own comparison entry (`date~r<runId>`) the
- * way `/inference` does. Run #1 carries 85% and run #2 92% of today's
- * throughput; `?date=` (the day's latest) resolves to run #2.
- */
 export const PROFIT_RUN_DATE = '2026-08-10';
 export const PROFIT_RUNS = [
   { runId: 27_480_000_001, startedAt: `${PROFIT_RUN_DATE}T02:00:00Z`, tputScale: 0.85 },
   { runId: 27_480_000_002, startedAt: `${PROFIT_RUN_DATE}T09:00:00Z`, tputScale: 0.92 },
 ] as const;
-/** Single run behind each of the other two dates, for the changelog's Git/Workflow links. */
 const PROFIT_SINGLE_RUN_ID: Record<string, number> = {
   [PROFIT_HISTORY_DATE]: 27_470_000_001,
   [PROFIT_DATE]: 27_490_000_001,
@@ -91,9 +58,7 @@ interface ProfitSku {
   precision: string;
   curve: Curve;
   tputScale: number;
-  /** Physical GPUs per row (TP); eight when unset. */
   gpus?: number;
-  /** Extra metric keys every row of this SKU carries, e.g. validated power telemetry. */
   metrics?: Record<string, number>;
 }
 
@@ -105,12 +70,6 @@ export const PROFIT_SKUS: ProfitSku[] = [
   { hardware: 'mi355x', framework: 'vllm', precision: 'fp4', curve: WIDE_CURVE, tputScale: 0.9 },
 ];
 
-/**
- * A GB200 NVL72 aggregate deployment as the srt-slurm CPU power leg publishes it:
- * two four-GPU compute trays on separate hosts, no per-worker telemetry, four
- * Grace sockets. Kept out of `PROFIT_SKUS` so the default bar counts the other
- * specs lock down do not move. Watts reuse a GB300 NVL72 replay's means.
- */
 const NVL72_SKU: ProfitSku = {
   hardware: 'gb200',
   framework: 'sglang',
@@ -169,7 +128,6 @@ export const profitBenchmarkRows = (
     })),
   );
 
-/** GB200 NVL72 rows with measured Grace-socket power, for the smart-provisioning basis. */
 export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
   profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]).map((row) => ({
     ...row,
@@ -203,7 +161,6 @@ export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEY
     ),
   );
 
-/** Changelog config key for a SKU, in the `<model>-<precision>-<gpu>-<framework>-agentic` form the API emits. */
 const configKeyFor = (dbKey: string, sku: ProfitSku) =>
   `${dbKey}-${sku.precision}-${sku.hardware}-${sku.framework}-agentic`;
 
@@ -235,7 +192,6 @@ const changelogRow = (runId: number, date: string, sha: string, description: str
   pr_link: `https://github.com/SemiAnalysisAI/InferenceX/pull/${runId % 10_000}`,
 });
 
-/** Changelog text the spec asserts on for each run. */
 export const PROFIT_CHANGELOG_NOTES = {
   [PROFIT_HISTORY_DATE]: 'Initial agentic-traces submission for every SKU',
   run1: 'Run 1: bump serving image and retune concurrency sweep',
@@ -243,11 +199,6 @@ export const PROFIT_CHANGELOG_NOTES = {
   [PROFIT_DATE]: 'Upgrade to the latest serving release',
 } as const;
 
-/**
- * `/api/v1/workflow-info?date=` payload per fixture date: one run with a
- * changelog on the first and last dates, two runs (each with its own
- * changelog) on `PROFIT_RUN_DATE`, nothing anywhere else.
- */
 export const profitWorkflowInfo = (date: string) => {
   const runRow = (runId: number, createdAt: string) => ({
     github_run_id: runId,
@@ -289,13 +240,6 @@ export const profitWorkflowInfo = (date: string) => {
   };
 };
 
-/**
- * Intercept availability (every model, all three dates), benchmarks (the rows
- * of whichever model the request names, so a model switch never sees another
- * model's bars; an earlier date's rows for `?date=`, one specific run's rows
- * for `?runId=&exactRun=true`), and the workflow-info feed behind the Config
- * Changelog.
- */
 export const interceptProfitData = (): void => {
   cy.intercept('GET', '/api/v1/availability*', { body: profitAvailabilityRows() }).as(
     'profit-availability',

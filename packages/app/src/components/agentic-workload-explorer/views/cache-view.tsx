@@ -106,8 +106,6 @@ const STRINGS = {
 
 type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
-// -- Chart constants ──────────────────────────────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
@@ -116,8 +114,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// -- Helpers ──────────────────────────────────────────────────────
 
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
@@ -165,8 +161,6 @@ function truncateModel(model: string, maxLen = 32): string {
   return `${model.slice(0, maxLen - 1)}...`;
 }
 
-// -- Cache Efficiency Contribution Heatmap ────────────────────────
-
 interface HeatmapEntry {
   clientId: string;
   apiKeyHash: string;
@@ -175,13 +169,7 @@ interface HeatmapEntry {
   inputTokens: number;
 }
 
-const HEATMAP_COLORS = [
-  'var(--color-border)', // level 0: no data
-  '#065f46', // level 1: 0-25%
-  '#047857', // level 2: 25-50%
-  '#059669', // level 3: 50-75%
-  '#10b981', // level 4: 75-100%
-];
+const HEATMAP_COLORS = ['var(--color-border)', '#065f46', '#047857', '#059669', '#10b981'];
 
 function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   const { apiParam: traceVersionParam } = useTraceVersion();
@@ -218,7 +206,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     fetchData();
   }, [fetchData]);
 
-  // Get unique clients sorted by total cache read desc
   const clientList = (() => {
     const map = new Map<string, { apiKeyHash: string; totalCacheRead: number }>();
     for (const d of data) {
@@ -239,10 +226,8 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     })).toSorted((a, b) => b.totalCacheRead - a.totalCacheRead);
   })();
 
-  // Filter data for selected client (or show all merged)
   const filteredData = selectedClient ? data.filter((d) => d.clientId === selectedClient) : data;
 
-  // Build day -> efficiency map (merge across clients if no filter)
   const dayMap = new Map<string, { cacheRead: number; inputTokens: number }>();
   for (const d of filteredData) {
     const existing = dayMap.get(d.day);
@@ -254,10 +239,9 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     }
   }
 
-  // Build 13-week grid (91 days)
   const today = snapshotNow();
   today.setHours(0, 0, 0, 0);
-  const dayOfWeek = today.getDay(); // 0=Sun
+  const dayOfWeek = today.getDay();
   const endDate = new Date(today);
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - (12 * 7 + dayOfWeek));
@@ -282,7 +266,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   if (currentWeek.length > 0) weeks.push(currentWeek);
 
   const svgW = LABEL_W + weeks.length * (CELL_SIZE + CELL_GAP);
-  const svgH = 7 * (CELL_SIZE + CELL_GAP) + 20; // +20 for month labels
+  const svgH = 7 * (CELL_SIZE + CELL_GAP) + 20;
 
   const weekdayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
@@ -302,7 +286,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
       <SectionHeader label={t.cacheEfficiencyPerDev} detail={t.cacheEfficiencyPerDevDetail} />
       <Expandable title={t.cacheEfficiencyPerDev} subtitle={t.cacheEfficiencyPerDevDetail} corner>
         <div className="rounded-md border border-border bg-surface p-3">
-          {/* Client selector */}
           <div className="flex items-center gap-2 mb-3">
             <Select
               value={selectedClient === null ? 'all' : `client:${selectedClient}`}
@@ -326,10 +309,8 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
             </Select>
           </div>
 
-          {/* Heatmap */}
           <div ref={containerRef} className="overflow-x-auto relative">
             <svg viewBox={`0 0 ${svgW} ${svgH}`} className="block w-full max-w-[640px]">
-              {/* Weekday labels */}
               {weekdayLabels.map((label, i) =>
                 label ? (
                   <text
@@ -346,7 +327,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                 ) : null,
               )}
 
-              {/* Month labels */}
               {weeks.map((week, wi) => {
                 const firstDay = week[0];
                 if (firstDay.date.getDate() <= 7 && wi > 0) {
@@ -368,7 +348,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                 return null;
               })}
 
-              {/* Cells */}
               {weeks.map((week, wi) =>
                 week.map((day) => {
                   const dow = day.date.getDay();
@@ -411,7 +390,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
               )}
             </svg>
 
-            {/* Tooltip */}
             {hoveredCell && (
               <div
                 className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-2.5 py-1.5"
@@ -435,7 +413,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
             )}
           </div>
 
-          {/* Legend */}
           <div className="flex items-center gap-1.5 mt-2">
             <span className="text-3xs font-mono text-muted-foreground">{t.less}</span>
             {HEATMAP_COLORS.map((color, i) => (
@@ -453,8 +430,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   );
 }
 
-// -- Section header ───────────────────────────────────────────────
-
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -467,8 +442,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// -- Stat card ────────────────────────────────────────────────────
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -480,8 +453,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// -- Cache Hit Rate Over Time (SVG line chart) ────────────────────
 
 function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
   const locale = useLocale();
@@ -538,7 +509,6 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -565,7 +535,6 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -576,13 +545,10 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
             strokeWidth={0.5}
           />
 
-          {/* Area fill */}
           <path d={areaD} fill="#10b981" fillOpacity={0.1} />
 
-          {/* Line */}
           <path d={pathD} fill="none" stroke="#10b981" strokeWidth={1.5} strokeLinejoin="round" />
 
-          {/* Data points */}
           {rates.map((r, i) => (
             <circle key={data[i].day} cx={sx(i)} cy={sy(r)} r={2} fill="#10b981">
               <title>
@@ -591,7 +557,6 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
             </circle>
           ))}
 
-          {/* X-axis labels */}
           {data.map((d, i) => {
             if (i % labelInterval !== 0 && i !== data.length - 1) return null;
             return (
@@ -616,8 +581,6 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
     </Expandable>
   );
 }
-
-// -- Cache Read vs Write Trends (SVG grouped bar chart) ───────────
 
 function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
   const locale = useLocale();
@@ -649,7 +612,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
     <Expandable title={t.cacheReadVsWrite}>
       <div className="rounded-md border border-border bg-surface p-3">
         <div className="flex items-center justify-between mb-2">
-          {/* Legend */}
           <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground">
             <span className="flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />{' '}
@@ -681,7 +643,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -708,7 +669,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -719,10 +679,8 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
             strokeWidth={0.5}
           />
 
-          {/* Grouped bars */}
           {data.map((d, i) => (
             <g key={d.day}>
-              {/* Cache Read bar */}
               <rect
                 x={sx(i, 0)}
                 y={sy(d.cacheRead)}
@@ -735,7 +693,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                   {d.day} read: {formatNumber(d.cacheRead)}
                 </title>
               </rect>
-              {/* Cache Write bar */}
               <rect
                 x={sx(i, 1)}
                 y={sy(d.cacheWrite)}
@@ -748,7 +705,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                   {d.day} write: {formatNumber(d.cacheWrite)}
                 </title>
               </rect>
-              {/* X-axis label */}
               {(i % labelInterval === 0 || i === data.length - 1) && (
                 <text
                   x={sx(i, 0) + barWidth}
@@ -771,8 +727,6 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
     </Expandable>
   );
 }
-
-// -- Cache Efficiency by Model (horizontal bars) ──────────────────
 
 function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: Strings }) {
   const sorted = [...byModel]
@@ -818,8 +772,6 @@ function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: String
     </div>
   );
 }
-
-// -- Cache by Client Table ──────────────────────────────────────────
 
 function ClientCacheTable({ byClient, t }: { byClient: ClientCache[]; t: Strings }) {
   const sorted = [...byClient]
@@ -890,8 +842,6 @@ function ClientCacheTable({ byClient, t }: { byClient: ClientCache[]; t: Strings
   );
 }
 
-// -- Main page ────────────────────────────────────────────────────
-
 export default function CachePage() {
   return (
     <Suspense>
@@ -919,7 +869,6 @@ function CachePageContent() {
 
   return (
     <div className="space-y-6">
-      {/* -- Stats ───────────────────────────────────────────────── */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -954,7 +903,6 @@ function CachePageContent() {
 
       {data && (
         <>
-          {/* -- Cache Hit Rate Over Time ──────────────────────────── */}
           <div>
             <SectionHeader
               label={t.cacheHitRateOverTime}
@@ -963,7 +911,6 @@ function CachePageContent() {
             <HitRateChart daily={data.daily} t={t} />
           </div>
 
-          {/* -- Cache Read vs Write Trends ────────────────────────── */}
           <div>
             <SectionHeader
               label={t.cacheReadVsWriteTrends}
@@ -972,7 +919,6 @@ function CachePageContent() {
             <ReadWriteChart daily={data.daily} t={t} />
           </div>
 
-          {/* -- Cache Efficiency by Model ─────────────────────────── */}
           <div>
             <SectionHeader
               label={t.cacheEfficiencyByModel}
@@ -983,7 +929,6 @@ function CachePageContent() {
             </div>
           </div>
 
-          {/* -- Cache by Client ─────────────────────────────────────── */}
           <div>
             <SectionHeader label={t.cacheByClient} detail={t.nClients(data.byClient.length)} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -991,7 +936,6 @@ function CachePageContent() {
             </div>
           </div>
 
-          {/* -- Cache Efficiency Contribution Heatmap ────────────── */}
           <CacheEfficiencyHeatmap t={t} />
         </>
       )}

@@ -4,13 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 
 export interface ServerLogFile {
-  /** POSIX-style path relative to the extracted server-log artifact root. */
   fileName: string;
   logText: string;
 }
 
 export interface ServerLogFilePath {
-  /** POSIX-style path relative to the extracted server-log artifact root. */
   fileName: string;
   path: string;
 }
@@ -31,7 +29,6 @@ export function cleanLogText(value: string): string {
   return value.replaceAll('\u0000', '');
 }
 
-/** Return the shared suffix used to pair a server-log artifact with bmk[_agentic] artifacts. */
 export function serverLogArtifactSuffix(artifactName: string): string | null {
   for (const prefix of SERVER_LOG_PREFIXES) {
     if (artifactName.startsWith(prefix)) return artifactName.slice(prefix.length);
@@ -39,7 +36,6 @@ export function serverLogArtifactSuffix(artifactName: string): string | null {
   return null;
 }
 
-/** Recursively list every regular .log/.out file under an extracted artifact root. */
 export function listServerLogFilePaths(root: string): ServerLogFilePath[] {
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
   const files: ServerLogFilePath[] = [];
@@ -72,7 +68,6 @@ export function readServerLogFilePaths(files: readonly ServerLogFilePath[]): Ser
   }));
 }
 
-/** Prefer server.log as the legacy/primary stream, then fall back to the first file. */
 export function primaryServerLogFile(files: readonly ServerLogFile[]): ServerLogFile | null {
   return (
     files.find((file) => path.posix.basename(file.fileName).toLowerCase() === 'server.log') ??
@@ -81,7 +76,6 @@ export function primaryServerLogFile(files: readonly ServerLogFile[]): ServerLog
   );
 }
 
-/** Extract `archivePath` into `extractedDir` once; returns whether `extractedDir` exists. */
 function extractArchiveOnce(archivePath: string, extractedDir: string): boolean {
   if (!fs.existsSync(extractedDir) && fs.existsSync(archivePath)) {
     fs.mkdirSync(extractedDir, { recursive: true });
@@ -90,13 +84,6 @@ function extractArchiveOnce(archivePath: string, extractedDir: string): boolean 
   return fs.existsSync(extractedDir) && fs.statSync(extractedDir).isDirectory();
 }
 
-/**
- * Resolve the root containing logs for an extracted GitHub artifact.
- * Multinode uploads wrap their files in multinode_server_logs.tar.gz. Native
- * srt-slurm single-node uploads keep the client logs at the artifact root and
- * wrap the job's logs directory, including the server worker logs, in
- * srt-single-node-logs.tar.gz; it is extracted in place so both are listed.
- */
 export function serverLogArtifactRoot(artifactDir: string, artifactName: string): string | null {
   if (artifactName.startsWith('server_logs_')) {
     extractArchiveOnce(
@@ -118,7 +105,6 @@ export function readServerLogArtifact(artifact: ServerLogArtifact): ServerLogFil
   return root ? readServerLogFiles(root) : [];
 }
 
-/** Read one archived GCS copy without retaining its potentially GiB-scale expansion. */
 export function readServerLogArtifactZip(zipPath: string, artifactName: string): ServerLogFile[] {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-artifact-'));
   try {
@@ -129,7 +115,6 @@ export function readServerLogArtifactZip(zipPath: string, artifactName: string):
   }
 }
 
-/** Index all extracted single-node and multinode server-log artifacts by shared suffix. */
 export function discoverServerLogArtifacts(artifactsDir: string): Map<string, ServerLogArtifact> {
   const discovered = new Map<string, ServerLogArtifact>();
   if (!fs.existsSync(artifactsDir)) return discovered;

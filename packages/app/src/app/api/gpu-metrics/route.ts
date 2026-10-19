@@ -1,41 +1,3 @@
-/**
- * PowerX telemetry for one GitHub Actions run, answered from one source per run.
- *
- * A run with stored telemetry (migration 016: series, samples, per-GPU
- * statistics, point links) is read from the database only. A run without it
- * (not yet ingested, still in progress, or unofficial) is read from its live
- * GitHub artifacts only.
- *
- * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. Live
- * GitHub Actions artifacts change while a run is in progress, and stored
- * telemetry must reflect a successful re-ingest immediately.
- *
- * Two telemetry collectors publish GPU power for a run:
- * - single-node runners (nvidia-smi / amd-smi) publish one `gpu_metrics_<RESULT_FILENAME>`
- *   CSV artifact per benchmark config;
- * - Slurm / Dynamo disaggregated runners (DCGM) publish one `power_audit_<RESULT_FILENAME>`
- *   bundle per concurrency sweep, holding the sweep's samples plus one
- *   `power_validation_*.json` window per config
- *   (`components/gpu-power/power-audit-bundle.ts`).
- *
- * Two response shapes:
- * - default: parsed metric rows for the public GPU metrics view, from storage
- *   when the run is ingested, else from GitHub; native bundle samples provide
- *   per-host temperature when no CSV sibling exists;
- * - `series=power`: compact per-GPU watt series bucketed to one second
- *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
- *   CSV artifacts and from bundles cut per validation window. The timeline
- *   joins them to chart points by `source` (bundle) or artifact name (CSV).
- *   Persisted samples and validation windows use the same bucketing/cut
- *   transform as artifacts, so historical runs survive artifact expiry.
- * `prefix=<RESULT_FILENAME prefix>` narrows either shape to the artifacts of
- * one model / workload / precision so a full nightly sweep is not downloaded
- * for one chart. A bundle names a whole sweep, so it also matches when the
- * prefix extends past its name into the per-concurrency suffix.
- * Timeline POSTs sorted validation basenames in `{ sources: [...] }` to read
- * only the windows its points need. `sourceCoverage` describes those requested
- * identities, not full-run completeness.
- */
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';
@@ -54,9 +16,7 @@ import {
 import { ARTIFACT_PREFIX } from './artifact-selection';
 import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
-/** Bundle downloads are latency-bound; match the other artifact routes' budget. */
 export const maxDuration = 300;
-/** RESULT_FILENAME characters: model, workload, precision, framework, parallelism, host, hash. */
 const PREFIX_PATTERN = /^[A-Za-z0-9._-]{1,200}$/u;
 const SOURCE_PATTERN = /^power_validation_[A-Za-z0-9._-]{1,200}\.json$/u;
 const MAX_REQUEST_BYTES = 256 * 1024;
@@ -69,7 +29,6 @@ export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   coverage?: GpuMetricsRunPayload['coverage'];
 }
 
-/** Shape stored series like the GitHub payload so readers are source-agnostic. */
 export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
   const run = payload.workflowRun;
   const filesPerArtifact = new Map<string, number>();
@@ -93,7 +52,6 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
       status: run.status ?? '',
     },
     artifacts: payload.series.map(({ data, ...series }) => ({
-      // Multinode uploads carry one CSV per node; keep them distinguishable.
       name:
         (filesPerArtifact.get(series.artifactName) ?? 1) > 1 ||
         payload.artifactNames?.includes(`${series.artifactName}/${series.fileName}`)
@@ -105,7 +63,6 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   };
 }
 
-/** Validation basenames identify individual windows, including siblings in one bundle. */
 function seriesSource(series: GpuPowerSeries): string | null {
   return (
     series.source ??
@@ -149,12 +106,10 @@ export function GET(request: NextRequest) {
   return readGpuMetrics(request, null);
 }
 
-/** Selecting a host must not discard the view's sibling artifact choices. */
 export function readGpuMetricsForView(request: NextRequest, artifact: string | null) {
   return readGpuMetrics(request, null, artifact);
 }
 
-/** Read-only Timeline transport; the body avoids URL limits for a run's point identities. */
 export async function POST(request: NextRequest) {
   const reader = request.body?.getReader();
   const chunks: Uint8Array[] = [];
@@ -241,7 +196,6 @@ async function readGpuMetrics(
       ...(selectedArtifact === undefined ? {} : { artifact: selectedArtifact }),
     });
   } catch (error) {
-    // Missing data may use live artifacts; a failed read cannot establish absence.
     console.error(`gpu-metrics: database lookup failed for run ${runId}:`, error);
     return NextResponse.json(
       {
@@ -254,8 +208,6 @@ async function readGpuMetrics(
 
   try {
     if (stored) {
-      // The query already scoped series to `prefix` and the requested artifacts;
-      // only the window cut below is finer than an artifact.
       if (series !== 'power')
         return NextResponse.json(stored, { headers: { 'Cache-Control': 'no-store' } });
       const storedSeries = storedPowerSeries(

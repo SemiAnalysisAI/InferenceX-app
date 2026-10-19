@@ -30,7 +30,6 @@ function point(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('summarizeTraceWindow', () => {
-  // Two prefill and two decode GPUs; the window holds buckets 1–3 (t = 11..13 s).
   const pooled: PowerTimelineTrace = {
     key: `34716669498:${NAME_B}`,
     point: point({ disagg: true, conc: 4 }),
@@ -62,8 +61,6 @@ describe('summarizeTraceWindow', () => {
     const summary = summarizeTraceWindow(pooled, tracePools(pooled.series));
     expect(summary.windowSeconds).toBe(2.5);
     expect(summary.bucketSeconds).toBe(1);
-    // The 900 W buckets sit outside the window; bucket 2 lacks one prefill GPU,
-    // so it is a gap, not a 260 W dip.
     expect(summary.pools).toEqual([
       { role: 'prefill', gpuCount: 2, peakWatts: 540 },
       { role: 'decode', gpuCount: 2, peakWatts: 840 },
@@ -73,9 +70,6 @@ describe('summarizeTraceWindow', () => {
 
 describe('windowPhase', () => {
   it('classifies each bucket by its samples’ time, not the start of their second', () => {
-    // GB300 run 38460258140 at c4: DCGM sampled at .87 s past each second and
-    // the validated window opened at .354 s, so flooring dropped the first
-    // in-window scrape and kept the first one after the window closed.
     const windowStartMs = Date.UTC(2026, 9, 13, 18, 25, 28, 354);
     const rows = [-0.484, 0.516, 1.516, 2.516, 3.516].map((offset, i) => ({
       timestamp: new Date(windowStartMs + offset * 1000).toISOString(),

@@ -45,7 +45,6 @@ describe('GET /api/v1/views/gpu-specs', () => {
       scaleUpBandwidthGBs: 450,
       scaleUpWorldSize: 8,
     });
-    // Derived domain metrics: usable memory × world size.
     expect(h100.domainMemoryTB).toBeCloseTo(0.64, 10);
     expect(h100.domainMemoryBandwidthTBs).toBeCloseTo(26.8, 10);
   });

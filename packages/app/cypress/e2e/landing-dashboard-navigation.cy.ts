@@ -1,25 +1,6 @@
-/**
- * Regression: the landing "Dashboard" CTA must navigate in exactly one
- * transition — one router commit, one new history entry, no URL revert.
- *
- * One click used to: commit /inference/kimi-k3, get reverted to `/` by a
- * stale router restore (url-state.ts initializing mid-transition and calling
- * the Next-patched history.replaceState), then be pushed again by
- * navigateInApp's 250ms retry — replaying the landing reveal, pausing, and
- * stacking a duplicate history entry (a single Back no longer returned to
- * the landing page).
- *
- * The cold-load simulation below (failed prefetches + a slow click-time RSC
- * response) makes that race deterministic. Motion is re-enabled via CDP on
- * chromium — the launch flags force reduced motion there, which hides the
- * visible half of this regression — while Firefox runs motion-enabled
- * natively.
- */
-
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
 import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
 
-// The landing Rubin card links to MiniMax M3; reuse the synthetic Rubin curve under its DB key.
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
 
 function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
@@ -42,8 +23,6 @@ const TARGET = '/inference/kimi-k3';
 
 describe('Muse Spark Open results', () => {
   beforeEach(() => {
-    // Normalized conc=32 bmk artifact 12019076285 from run 38825822770.
-    // This is a measured B200 row, not a synthetic performance sample.
     cy.fixture('api/muse-spark-unofficial-run.json').then((body) => {
       cy.intercept('GET', '/api/unofficial-run*', { body }).as('museRun');
     });
@@ -68,7 +47,6 @@ describe('Muse Spark Open results', () => {
       );
       cy.location('search').should('eq', '');
       cy.get('[data-testid="model-selector"]').should(($selector) => {
-        // Without published availability, the selector falls back to the model ID.
         expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
       });
       cy.get('[data-testid="scenario-selector"]')
@@ -146,7 +124,6 @@ describe('landing model curation', () => {
           .should('have.attr', 'src', '/logos/muse-mascot.webp');
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
-        // Qwen 3.5 is reached through the TPU card, and the hardware cards sit above the ledger.
         cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('match', ':first-child')
@@ -280,8 +257,6 @@ describe('landing model curation', () => {
     });
 
     it(`does not carry TPU precision through Back into Rubin on ${prefix || '/'}`, () => {
-      // Include FP8 as well as Rubin's FP4: FP4-only fixtures mask stale FP8
-      // because the availability validator falls back to the only precision.
       const rubinRows = [
         ...minimaxM3RubinRows,
         ...minimaxM3RubinRows
@@ -332,7 +307,6 @@ describe('landing → full dashboard navigation', () => {
   });
 
   after(() => {
-    // Other specs in this run expect the config's forced reduced motion.
     cy.wrap(null).then(() => setReducedMotion(''));
   });
 
@@ -341,11 +315,9 @@ describe('landing → full dashboard navigation', () => {
 
     cy.intercept({ url: /\/inference\/kimi-k3/ }, (req) => {
       if (req.headers['next-router-prefetch']) {
-        // A cold visit has no warmed router cache for the target.
         req.reply({ statusCode: 404, body: '' });
         return;
       }
-      // The click-time payload takes longer than any timer-based re-push.
       req.on('response', (res) => {
         res.setDelay(800);
       });
@@ -354,8 +326,6 @@ describe('landing → full dashboard navigation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        // Wrap the native methods before Next patches them, so the router's
-        // own commits are observed too.
         const origPush = win.history.pushState.bind(win.history);
         const origReplace = win.history.replaceState.bind(win.history);
         const pathnameOf = (url: unknown) =>
@@ -371,8 +341,6 @@ describe('landing → full dashboard navigation', () => {
       },
     });
 
-    // The real motion path must be active (reduced motion hides the visible
-    // half of this regression).
     cy.window().then((win) => {
       expect(
         win.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -380,7 +348,6 @@ describe('landing → full dashboard navigation', () => {
       ).to.eq(false);
     });
 
-    // Let hydration and the landing reveal settle, as in the manual repro.
     cy.get('[data-testid="compare-agentx-dashboard-link"]').should('be.visible');
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1500);
@@ -392,7 +359,6 @@ describe('landing → full dashboard navigation', () => {
     cy.get('[data-testid="compare-agentx-dashboard-link"]').click();
     cy.location('pathname', { timeout: 15000 }).should('eq', TARGET);
 
-    // Give any stray timer-based re-push time to fire before asserting.
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
 
@@ -414,8 +380,6 @@ describe('landing → full dashboard navigation', () => {
       );
     });
 
-    // A single Back must return to the landing page, and Forward must come
-    // straight back to the dashboard.
     cy.go('back');
     cy.location('pathname').should('eq', '/');
     cy.get('[data-testid="compare-agentx-dashboard-link"]').should('be.visible');

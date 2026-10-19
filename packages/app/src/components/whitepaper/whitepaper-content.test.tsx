@@ -19,7 +19,6 @@ function paper() {
   return found;
 }
 
-/** renderToStaticMarkup escapes `&` in text nodes and attributes. */
 function escapeHtml(text: string) {
   return text.replaceAll('&', '&amp;');
 }
@@ -56,7 +55,6 @@ describe('WhitepaperDetailContent', () => {
     expect(html).toContain(chart.tcoSourceHref);
     expect(html).toContain(escapeHtml(chart.tcoSourceTitle));
     expect(html).toContain(chart.modelLogoPath);
-    // The chip is a pure visual overlay: decorative alt text, no caption.
     expect(html).toContain('mi355x-transparent.png');
     expect(html).toContain(WHITEPAPER_COPY.en.onThisPage);
     expect(html).toContain(WHITEPAPER_COPY.en.keyNumbers);

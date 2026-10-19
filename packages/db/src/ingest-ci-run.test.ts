@@ -75,8 +75,6 @@ describe('purged CI ingestion', () => {
 });
 
 describe('database write receipt on a failed ingest', () => {
-  // The finalizer writes this receipt before its telemetry read, which queries
-  // the database; nothing after a failed ingest may skip it.
   it('is written when the ingest itself fails', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'failed-ingest-'));
     const writeReceiptPath = path.join(dir, 'database-writes.json');
@@ -89,10 +87,8 @@ describe('database write receipt on a failed ingest', () => {
           env: {
             PATH: process.env.PATH,
             NODE_ENV: 'test',
-            // Unreachable, so the ingest fails before writing anything.
             DATABASE_WRITE_URL: 'postgres://unused:unused@127.0.0.1:1/unused',
             GITHUB_TOKEN: 'unused',
-            // Fail GitHub lookups fast and offline.
             HTTPS_PROXY: 'http://127.0.0.1:1',
             HTTP_PROXY: 'http://127.0.0.1:1',
             INGEST_RUN_ID: '99999999998',

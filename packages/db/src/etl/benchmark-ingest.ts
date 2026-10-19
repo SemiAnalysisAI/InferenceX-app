@@ -1,7 +1,3 @@
-/**
- * Bulk DB insert functions for `benchmark_results` and `run_stats`.
- */
-
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -33,7 +29,6 @@ type BenchmarkPointIdentity = Pick<
   'configId' | 'benchmarkType' | 'isl' | 'osl' | 'conc' | 'offloadMode' | 'recipeFingerprint'
 >;
 
-/** Stable in-batch identity matching benchmark_results_unique. */
 export function benchmarkPointIngestKey(row: BenchmarkPointIdentity): string {
   return JSON.stringify([
     row.configId,
@@ -46,19 +41,6 @@ export function benchmarkPointIngestKey(row: BenchmarkPointIdentity): string {
   ]);
 }
 
-/**
- * Bulk-insert benchmark results for a single artifact in one DB round-trip using `UNNEST`.
- * Rows are deduplicated within the batch on the persisted point identity, including
- * the producer's recipe fingerprint when present, before sending because Postgres
- * rejects an `ON CONFLICT DO UPDATE` statement that
- * would update the same row twice in a single query.
- *
- * @param sql - Active `postgres` connection.
- * @param rows - Benchmark persistence fields with their resolved `configId`.
- * @param workflowRunId - DB id of the parent `workflow_runs` row.
- * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
- * @returns Counts of newly inserted rows and rows that hit the conflict path.
- */
 export async function bulkIngestBenchmarkRows(
   sql: Sql,
   rows: BenchmarkPersistenceInput[],
@@ -67,9 +49,6 @@ export async function bulkIngestBenchmarkRows(
 ): Promise<{ newCount: number; dupCount: number; insertedIds: number[] }> {
   if (rows.length === 0) return { newCount: 0, dupCount: 0, insertedIds: [] };
 
-  // Postgres rejects ON CONFLICT DO UPDATE if the same conflict key appears
-  // more than once in a single batch. Deduplicate within the batch, keeping
-  // the last occurrence for each unique recipe/config/scenario/concurrency point.
   const seen = new Map<string, BenchmarkPersistenceInput>();
   for (const r of rows) {
     seen.set(benchmarkPointIngestKey(r), r);
@@ -85,8 +64,6 @@ export async function bulkIngestBenchmarkRows(
   const images = deduped.map((r) => r.image);
   const recipeFingerprints = deduped.map((r) => r.recipeFingerprint);
   const metricsJsons = deduped.map((r) => JSON.stringify(r.metrics));
-  // Optional JSONB lanes use JSON null so each jsonb[] input remains
-  // homogeneous and missing payloads persist as SQL NULL.
   const workersJsons = deduped.map((r) =>
     r.workers === undefined ? null : JSON.stringify(r.workers),
   );
@@ -151,11 +128,6 @@ export async function bulkIngestBenchmarkRows(
   return { newCount, dupCount: deduped.length - newCount, insertedIds: result.map((r) => r.id) };
 }
 
-/**
- * Store every .log/.out file from one server-log artifact and link the bundle
- * to the given benchmark result IDs. Existing bundles receive only missing
- * filenames, making both normal ingest and the historical backfill idempotent.
- */
 interface DeferredServerLogFile {
   fileName: string;
   readText: () => string;
@@ -189,8 +161,6 @@ async function insertDeferredServerLogFiles(
       ? primaryText
       : null;
   const kvCachePoolTokens = serverLog ? kvCachePoolTokensFromServerLog(serverLog) : null;
-  // Derive metrics from the full text above, then cap what is stored: PostgreSQL
-  // drops the connection on any value over 1 GB (see server-log-limits.ts).
   const maxBytes = maxServerLogFileBytes();
   const storedText = (fileName: string, text: string): string => {
     const capped = capServerLogText(text, maxBytes);
@@ -229,8 +199,6 @@ async function insertDeferredServerLogFiles(
     }
 
     for (const logId of bundleIds) {
-      // Legacy rows used the synthetic name server.log. Backfill upgrades that
-      // label to the artifact-relative path without rewriting the large text.
       await tx`
         update server_logs
         set file_name = case
@@ -240,8 +208,6 @@ async function insertDeferredServerLogFiles(
             files_complete = true
         where id = ${logId}
       `;
-      // Skip names the bundle already stores so forced backfills do not
-      // re-read and re-send large multinode files only to hit the conflict.
       const stored = await tx<{ file_name: string }[]>`
         select file_name from server_log_files where server_log_id = ${logId}
       `;
@@ -257,9 +223,6 @@ async function insertDeferredServerLogFiles(
       }
     }
 
-    // Derive the KV-cache pool size (tokens) from the authoritative server.log
-    // when the artifact includes one. Multinode bundles without server.log are
-    // still stored in full; they simply cannot contribute this derived metric.
     if (kvCachePoolTokens !== null) {
       await tx`
         update benchmark_results
@@ -286,7 +249,6 @@ export async function insertServerLogFiles(
   );
 }
 
-/** Read archived log files one at a time so multinode bundles stay memory-bounded. */
 export async function insertServerLogFilePaths(
   sql: Sql,
   benchmarkResultIds: number[],
@@ -302,7 +264,6 @@ export async function insertServerLogFilePaths(
   );
 }
 
-/** Compatibility wrapper for callers/tests that still provide one legacy stream. */
 export async function insertServerLog(
   sql: Sql,
   benchmarkResultIds: number[],
@@ -313,17 +274,6 @@ export async function insertServerLog(
   ]);
 }
 
-/**
- * Bulk-insert `run_stats` rows for one workflow run in a single DB round-trip.
- * Rows are deduplicated within the batch on `hardware` before sending.
- * On conflict the `n_success` and `total` counts are overwritten with the latest values.
- *
- * @param sql - Active `postgres` connection.
- * @param rows - Hardware success/total stats to insert.
- * @param workflowRunId - DB id of the parent `workflow_runs` row.
- * @param date - ISO date string (`YYYY-MM-DD`) for the `date` column.
- * @returns Counts of newly inserted rows and rows that hit the conflict path.
- */
 export async function bulkIngestRunStats(
   sql: Sql,
   rows: { hardware: string; nSuccess: number; total: number }[],
@@ -332,7 +282,6 @@ export async function bulkIngestRunStats(
 ): Promise<{ newCount: number; dupCount: number }> {
   if (rows.length === 0) return { newCount: 0, dupCount: 0 };
 
-  // Deduplicate on conflict key (workflow_run_id, hardware) — keep last occurrence.
   const seen = new Map<string, { hardware: string; nSuccess: number; total: number }>();
   for (const r of rows) seen.set(r.hardware, r);
   const deduped = [...seen.values()];
@@ -354,11 +303,6 @@ export async function bulkIngestRunStats(
   return { newCount, dupCount: deduped.length - newCount };
 }
 
-/**
- * Bulk-upsert rows into the `availability` table.
- * Rows are deduplicated within the batch before sending. ON CONFLICT DO NOTHING
- * makes re-runs idempotent.
- */
 export async function bulkUpsertAvailability(
   sql: Sql,
   rows: {

@@ -50,8 +50,6 @@ describe('buildConversationTree — extended', () => {
     expect(buildConversationTree([])).toEqual([]);
   });
 
-  // -- Anthropic response content blocks --
-
   it('creates thinking node from thinking block', () => {
     const req = makeRequest('t1', {
       responseBody: {
@@ -121,7 +119,6 @@ describe('buildConversationTree — extended', () => {
       responseBody: { body: { content: [], stop_reason: 'end_turn' } },
     });
     const nodes = buildConversationTree([req]) as MessageNode[];
-    // Only user node, no response nodes
     expect(nodes).toHaveLength(1);
     expect(nodes[0].type).toBe('user');
   });
@@ -132,8 +129,6 @@ describe('buildConversationTree — extended', () => {
     expect(nodes).toHaveLength(1);
     expect(nodes[0].type).toBe('user');
   });
-
-  // -- Anonymized / stripped content --
 
   it('shows [content stripped] for all-null text blocks', () => {
     const req = makeRequest('anon1', {
@@ -152,16 +147,12 @@ describe('buildConversationTree — extended', () => {
     expect(user!.content).toBe('[content stripped]');
   });
 
-  // -- Stop reason --
-
   it('passes through Anthropic stop_reason', () => {
     const req = makeRequest('sr1');
     const nodes = buildConversationTree([req]) as MessageNode[];
     const assistant = nodes.find((n) => n.type === 'assistant');
     expect(assistant!.stopReason).toBe('end_turn');
   });
-
-  // -- Request context --
 
   it('attaches requestContext to first node', () => {
     const req = makeRequest('ctx1', {
@@ -178,8 +169,6 @@ describe('buildConversationTree — extended', () => {
     expect(nodes[0].requestContext!.tools).toHaveLength(1);
   });
 
-  // -- Fast mode --
-
   it('detects fast mode from request headers', () => {
     const req = makeRequest('fm1', {
       requestHeaders: { 'anthropic-beta': 'fast-mode-2026-02-01' },
@@ -194,8 +183,6 @@ describe('buildConversationTree — extended', () => {
     expect(nodes[0].fastMode).toBe(false);
   });
 
-  // -- System reminder stripping --
-
   it('strips system reminders from user messages', () => {
     const req = makeRequest('sys1', {
       requestBody: {
@@ -206,8 +193,6 @@ describe('buildConversationTree — extended', () => {
     const user = nodes.find((n) => n.type === 'user');
     expect(user!.content).toBe('Question');
   });
-
-  // -- Subagent grouping --
 
   it('groups subagent requests into SubagentGroupNode', () => {
     const sub = makeRequest('sub1', {
@@ -403,16 +388,12 @@ describe('buildConversationTree — extended', () => {
     });
     const main2 = makeRequest('m2', { timestamp: '2025-01-01T00:00:03Z' });
     const nodes = buildConversationTree([main1, sub, main2]);
-    expect(nodes[0].kind).toBe('message'); // main1 user
-    // Find subagent group
+    expect(nodes[0].kind).toBe('message');
     const groupIdx = nodes.findIndex((n) => n.kind === 'subagent_group');
     expect(groupIdx).toBeGreaterThan(0);
-    // Find main2 messages after the group
     const afterGroup = nodes.slice(groupIdx + 1);
     expect(afterGroup.some((n) => n.kind === 'message')).toBe(true);
   });
-
-  // -- No messages and no input --
 
   it('returns empty nodes when request has no messages and no input', () => {
     const req = makeRequest('empty1', {
@@ -421,8 +402,6 @@ describe('buildConversationTree — extended', () => {
     const nodes = buildConversationTree([req]);
     expect(nodes).toHaveLength(0);
   });
-
-  // -- Cost and hash passthrough --
 
   it('passes costUsd and hashIds through to nodes', () => {
     const req = makeRequest('pass1', {

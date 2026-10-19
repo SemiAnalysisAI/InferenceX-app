@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Generic 51.2 Tbit/s Ethernet switch and two-tier allocations for AMD and B300. */
 
 import { Provenance } from '../../../base';
 import { NetworkGroup } from './base';

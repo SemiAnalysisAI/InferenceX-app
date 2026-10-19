@@ -10,7 +10,6 @@ interface SectionCopy {
   description: string;
 }
 
-/** Explorer sections with their own route, keyed by explorer-relative path. */
 export const EXPLORER_SECTION_META = {
   '/sessions': {
     en: {
@@ -150,7 +149,6 @@ export const EXPLORER_SECTION_META = {
 
 export type ExplorerSectionPath = keyof typeof EXPLORER_SECTION_META;
 
-/** Session-detail tabs, keyed by the tab segment after `/sessions/[id]/`. */
 export const EXPLORER_SESSION_TAB_META = {
   conversation: { en: 'Conversation', zh: '对话' },
   raw: { en: 'Raw Trace', zh: '原始 Trace' },
@@ -191,7 +189,6 @@ function localizedMetadata(
   };
 }
 
-/** Metadata for an explorer section page in either locale. */
 export function explorerSectionMetadata(section: ExplorerSectionPath, locale: Locale): Metadata {
   const copy = EXPLORER_SECTION_META[section][locale];
   return localizedMetadata(
@@ -203,7 +200,6 @@ export function explorerSectionMetadata(section: ExplorerSectionPath, locale: Lo
   );
 }
 
-/** Metadata for one session-detail tab; session pages are never indexed. */
 export function explorerSessionMetadata(
   id: string,
   tab: ExplorerSessionTab,

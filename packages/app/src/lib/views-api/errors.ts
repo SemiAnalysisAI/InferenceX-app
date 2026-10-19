@@ -5,13 +5,6 @@ import { ViewsUpstreamError } from './upstream-error';
 
 export { ViewsUpstreamError } from './upstream-error';
 
-/**
- * Typed parameter-validation failure for the views API.
- *
- * Thrown by the parsers in `params.ts`; converted into a stable 400 JSON body
- * (`{ error, param, allowed? }`) by `runViewsRoute` so every views endpoint
- * reports invalid options the same way and documents its allowed values.
- */
 export class ViewsApiParamError extends Error {
   readonly param: string;
   readonly allowed?: readonly string[];
@@ -24,7 +17,6 @@ export class ViewsApiParamError extends Error {
   }
 }
 
-/** Standard handler wrapper: param errors → 400 with allowed values, anything else → 500. */
 export async function runViewsRoute(
   logLabel: string,
   handler: () => Promise<Response>,

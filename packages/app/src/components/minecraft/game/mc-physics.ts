@@ -8,12 +8,10 @@ export interface Body {
   vx: number;
   vy: number;
   vz: number;
-  /** Full width and height of the axis-aligned box; x, z is the bottom centre. */
   w: number;
   h: number;
   onGround: boolean;
   collidedH: boolean;
-  /** Vertical step the body can climb without jumping (0.6 for mobs and players). */
   step: number;
 }
 
@@ -28,7 +26,6 @@ interface AABB {
 
 const boxesScratch: AABB[] = [];
 
-/** Collision boxes of all blocks overlapping a region. */
 function gatherBoxes(world: World, r: AABB, out: AABB[]) {
   out.length = 0;
   const x0 = Math.floor(r.x0);
@@ -40,7 +37,6 @@ function gatherBoxes(world: World, r: AABB, out: AABB[]) {
   for (let x = x0; x <= x1; x++)
     for (let z = z0; z <= z1; z++) {
       if (!world.isLoaded(x, z)) {
-        // Unloaded terrain acts as a wall so nothing falls out of the world.
         out.push({ x0: x, y0: -64, z0: z, x1: x + 1, y1: 512, z1: z + 1 });
         continue;
       }
@@ -105,7 +101,6 @@ function shift(box: AABB, axis: 0 | 1 | 2, d: number) {
   }
 }
 
-/** Swept move, Y then X then Z like the original, with step-up and sneak edge guard. */
 export function move(
   world: World,
   b: Body,
@@ -161,7 +156,6 @@ export function move(
   let r = attempt(dx, dy, dz);
   const blocked = r.mx !== dx || r.mz !== dz;
   if (blocked && b.step > 0 && (b.onGround || (dy < 0 && r.my !== dy))) {
-    // Try stepping up.
     const up = { ...start };
     const sy = clip(boxes, up, 1, b.step);
     shift(up, 1, sy);
@@ -185,7 +179,6 @@ export function move(
   if (vertical) b.vy = 0;
 }
 
-/** Whether a body intersects any solid block (used for placement checks). */
 export function intersectsBlock(
   b: { x: number; y: number; z: number; w: number; h: number },
   bx: number,
@@ -204,7 +197,6 @@ export function intersectsBlock(
   );
 }
 
-/** Fraction of the body submerged in a liquid, sampled at feet, waist and eyes. */
 export function liquidAt(world: World, x: number, y: number, z: number, id: number) {
   const block = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
   if (block !== id) return false;
@@ -224,13 +216,11 @@ export interface RayHit {
   x: number;
   y: number;
   z: number;
-  /** Face index hit (+X -X +Y -Y +Z -Z). */
   face: number;
   distance: number;
   id: number;
 }
 
-/** Outline box used for selection and ray tests, in 1/16 units. */
 export function selectionBox(id: number, meta: number): Box {
   if (id === B.netherPortal && meta & 1) return [7, 0, 0, 9, 16, 16];
   const def = BLOCKS[id];
@@ -295,7 +285,6 @@ function rayBox(ox: number, oy: number, oz: number, dx: number, dy: number, dz: 
   return { t: Math.max(0, tmin), face };
 }
 
-/** Voxel ray cast (Amanatides-Woo) honouring partial block shapes. */
 export function raycast(
   world: World,
   ox: number,
@@ -354,7 +343,6 @@ export function raycast(
   return null;
 }
 
-/** Ray against an entity box; returns the distance or null. */
 export function rayEntity(
   ox: number,
   oy: number,

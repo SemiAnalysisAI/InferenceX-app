@@ -46,16 +46,12 @@ interface MultiSelectOption {
   disabled?: boolean;
   title?: string;
   testId?: string;
-  /** Optional leading visual (e.g. a brand logo) rendered before the label. */
   icon?: React.ReactNode;
-  /** Optional trailing visual (e.g. a NEW pill) rendered after the label. */
   badge?: React.ReactNode;
 }
 
 export interface MultiSelectSection {
-  /** Stable key for React list rendering */
   id: string;
-  /** Section header (plain text or small composite UI) */
   header?: React.ReactNode;
   options: MultiSelectOption[];
 }
@@ -74,12 +70,11 @@ interface MultiSelectProps {
   size?: 'sm' | 'default';
   className?: string;
   disabled?: boolean;
-  maxSelections?: number; // Maximum number of items that can be selected
-  minSelections?: number; // Minimum number of items that must be selected
+  maxSelections?: number;
+  minSelections?: number;
   showClearAll?: boolean;
   searchable?: boolean;
   plainSelectedText?: boolean;
-  /** Keep selected chips on one scrollable row in compact filter panels. */
   wrapSelectedChips?: boolean;
   showSelectionSummary?: boolean;
   searchPlaceholder?: string;
@@ -170,10 +165,6 @@ function MultiSelect({
           event.target === document.body ||
           event.target === document.documentElement)
       ) {
-        // Radix dialogs listen at document capture. Handle this nested menu
-        // first so Escape does not also dismiss the surrounding dialog.
-        // A disabled/replaced option can leave focus on the document body;
-        // Escape must still dismiss the open menu in that state.
         event.preventDefault();
         event.stopPropagation();
         setIsOpen(false);
@@ -193,8 +184,6 @@ function MultiSelect({
 
     if (isOpen) {
       window.addEventListener('keydown', handleEscape, true);
-      // Capture-phase pointerdown closes this menu before other dropdown triggers
-      // process the same interaction, enabling smooth one-click handoff.
       document.addEventListener('pointerdown', handlePointerDownOutside, true);
       document.addEventListener('focusin', handleFocusOutside);
     }
@@ -208,7 +197,6 @@ function MultiSelect({
 
   React.useEffect(() => {
     if (!isOpen) return;
-    // Focus only on opening, not on a controlled parent's value update.
     if (searchableRef.current) searchRef.current?.focus();
     else {
       const firstOption = contentRef.current?.querySelector<HTMLButtonElement>(
@@ -267,7 +255,6 @@ function MultiSelect({
     }
 
     if (maxSelections !== undefined && value.length >= maxSelections) {
-      // Single-select mode should replace the previous value in one click.
       if (maxSelections === 1) {
         const newValue = [optionValue];
         track('multi_select_selected', { value: optionValue });
@@ -313,7 +300,6 @@ function MultiSelect({
     onChange?.([]);
   };
 
-  // Preserve the order of selected values, not the order of options
   const selectedOptions = value.map(
     (val) => flatOptions.find((opt) => opt.value === val) ?? { value: val, label: val },
   );

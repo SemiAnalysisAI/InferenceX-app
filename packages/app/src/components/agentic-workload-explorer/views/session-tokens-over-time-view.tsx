@@ -66,9 +66,6 @@ function TokensOverTimePageContent() {
   const { requests, session } = useSession();
 
   const agentOptions = useMemo(() => buildAgentOptions(requests), [requests]);
-  // Fall back to main when the URL points at an agent key that doesn't exist
-  // in this session (e.g. stale share link, or sub-agent filtered out by the
-  // agent-id grouping rules).
   const rawAgentKey = searchParams.get('agent') ?? MAIN_AGENT_KEY;
   const agentKey = agentOptions.some((a) => a.key === rawAgentKey) ? rawAgentKey : MAIN_AGENT_KEY;
   const activeAgent = agentOptions.find((a) => a.key === agentKey) ?? null;
@@ -122,9 +119,6 @@ function TokensOverTimePageContent() {
           ))}
         </div>
 
-        {/* Mode toggle + agent selector only apply to the cached/uncached
-            view — the trajectory view always uses Anthropic-reported totals
-            and plots every agent. */}
         {view === 'cached' && (
           <>
             <div className="flex items-center overflow-hidden rounded-md border border-border">

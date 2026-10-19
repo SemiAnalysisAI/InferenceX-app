@@ -40,18 +40,10 @@ import CompareSpecDecodePageClient from '../../../compare-spec-decode/[slug]/pag
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/zh/compare-spec-decode/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
 
-/** English twin of `scenarioPath` — hreflang pairs are keyed off the
- *  English route, so the segment has to survive the locale swap. */
 function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
   return scenarioSegment
     ? `/compare-spec-decode/${canonical}/${scenarioSegment}`
@@ -90,10 +82,6 @@ export function buildSpecDecodeMetadataZh(
     parsed.precision,
     parsed.method,
   );
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
   const description = `在 ${gpuLabel} ${precLabel} 上运行 ${parsed.model.label} 时，对比启用 ${aLabel} 与关闭投机解码的表现。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}了解投机解码在不同交互性水平下能否提高吞吐量并降低成本。`;
@@ -145,8 +133,6 @@ export async function renderSpecDecodePageZh(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
@@ -157,7 +143,6 @@ export async function renderSpecDecodePageZh(
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = '关闭';
 
-  // Precision is fixed by the slug — both sides share it.
   const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
   const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
   const defaults = pickVariantPairDefaults('spec-decode', rows, parsed.gpu, sideA, sideB);
@@ -190,7 +175,6 @@ export async function renderSpecDecodePageZh(
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideAFull, sideBFull);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-spec-decode/${canonical}/spec-decode-comparison.png?lang=zh`;
 
   const jsonLd = buildVariantJsonLdZh(

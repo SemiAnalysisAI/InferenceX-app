@@ -16,7 +16,6 @@ import {
 
 export const LANDING_META = {
   title: 'AI Accelerator System Benchmark',
-  /** Landing-only brand suffix; other pages keep the root layout's `| InferenceX by SemiAnalysis`. */
   brand: 'AcceleratorX by SemiAnalysis',
   description:
     "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
@@ -127,9 +126,6 @@ export function getTabTitle(tab: string): string {
   return meta ? `${meta.title} | ${TITLE_SUFFIX}` : TITLE_SUFFIX;
 }
 
-/** Model-specific copy for the per-model tab routes (/calculator/<slug>,
- *  /historical/<slug>). Same shape as TAB_META but parameterized on the
- *  model's SEO name. */
 export const MODEL_TAB_META: Record<
   ModelRouteTab,
   { title: (seoName: string) => string; description: (seoName: string) => string }
@@ -156,19 +152,12 @@ export const MODEL_TAB_META: Record<
   },
 };
 
-/**
- * English path a per-model tab page canonicalizes to. The default model's
- * page shows exactly what the bare tab route shows, so it canonicalizes to
- * the bare path instead of competing with it; every other model is
- * self-canonical.
- */
 export function modelTabCanonicalPath(tab: ModelRouteTab, route: ModelRoute): string {
   return route.model === defaultRouteModel(tab)
     ? getDashboardRoute(tab).canonicalPath
     : modelRoutePath(tab, route.slug);
 }
 
-/** Generate Next.js Metadata for a per-model tab page. */
 export function modelTabMetadata(tab: ModelRouteTab, route: ModelRoute): Metadata {
   const meta = MODEL_TAB_META[tab];
   const title = meta.title(route.seoName);
@@ -194,7 +183,6 @@ export function modelTabMetadata(tab: ModelRouteTab, route: ModelRoute): Metadat
   };
 }
 
-/** Generate Next.js Metadata for a tab page. */
 export function tabMetadata(tab: DashboardRouteKey): Metadata {
   const meta = TAB_META[tab];
   const route = getDashboardRoute(tab);
@@ -205,7 +193,6 @@ export function tabMetadata(tab: DashboardRouteKey): Metadata {
     description: meta.description,
     alternates: {
       canonical: url,
-      // hreflang to the Chinese sibling page, for tabs mirrored under /zh.
       ...(route.localeMirrored && { languages: languageAlternates(enPath) }),
     },
     openGraph: {

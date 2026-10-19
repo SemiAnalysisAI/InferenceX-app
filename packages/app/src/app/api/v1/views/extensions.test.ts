@@ -501,7 +501,6 @@ describe('new dashboard projections', () => {
         body.data,
       ]);
 
-      // An in-progress run can change between requests; the next one must fetch it again.
       overlay = { ...overlay, hardware: 'mi355x' };
       const freshResponse = await profit(req('profit-estimator', query));
       expect(freshResponse.status).toBe(200);
@@ -518,7 +517,6 @@ describe('new dashboard projections', () => {
         agenticRow({ id: 90, hardware: 'mi355x', date: '2026-09-09' }),
         agenticRow({ id: 100 }),
       ];
-      // A pinned run can legitimately contain append-only rows from an older date.
       const pinned = agenticRow({ id: 789, hardware: 'b300', date: '2026-09-08' });
       mocks.benchmarks.mockImplementation((request: NextRequest) => {
         const search = request.nextUrl.searchParams;
@@ -564,8 +562,6 @@ describe('new dashboard projections', () => {
           agenticRow({
             id: scale * 100 + index,
             conc: 3 - index,
-            // The exact logical snapshot includes a retained endpoint from an
-            // older producer run; power selection must not split that curve.
             date: scale === 2 && index === 0 ? '2026-09-08' : date,
             run_url:
               scale === 2 && index === 0
@@ -604,10 +600,6 @@ describe('new dashboard projections', () => {
       ]) {
         expect(output.skipped).toEqual([]);
         expect(output.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
-        // The existing Steffen curve over valid endpoints at 20/60 yields
-        // 4766.6015625 tok/s/GPU at 45.
-        // Both power budgets use that throughput, even though the full performance
-        // frontier includes the faster, power-invalid knot at 40.
         for (const row of output.rows)
           expect(row.revenuePerGpuHour).toBeCloseTo(17.159765625 * scale);
       }

@@ -12,7 +12,6 @@ import { parseTraceVersion } from '@/lib/agentic-workload-explorer/request';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
 
-/** Cache-only reads, including cold starts and exports. Heavy queries run after the response. */
 export const GET = withExplorerRoute(async ({ vis, req }) => {
   const params = req.nextUrl.searchParams;
   const rawDays = params.get('days');
@@ -30,7 +29,6 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
   const version = parseTraceVersion(params);
   const cached = await readStatsCache(statsCacheKey('session-reuse', vis, version));
   if (cached === 'missing-table') return Response.json({ setupRequired: true }, { headers });
-  // The frozen snapshot is never recomputed, so a miss is permanent.
   if (!cached) return Response.json({ warming: true }, { headers });
   const data = selectReuseDays(cached.data as SessionReusePayload, days);
   if (format === 'csv')

@@ -1,13 +1,3 @@
-/**
- * Read side of the stored PowerX telemetry (migration 016).
- *
- * Two entry points: everything recorded during one GitHub Actions run (the
- * PowerX explorer keyed by run ID), and the series linked to one benchmark
- * point (the per-point detail tab). Samples are returned as flat rows with
- * ISO timestamps so the existing D3 charts consume them unchanged. Per-GPU
- * statistics are computed from the stored samples on every read.
- */
-
 import {
   computeStoredGpuMetricStats,
   statMetricColumn,
@@ -25,10 +15,6 @@ export interface GpuMetricSampleRow {
   timestamp: string;
   index: number;
   power?: number;
-  /**
-   * Absent when the collector did not sample the metric, so readers can tell "not collected"
-   * from a genuine zero reading.
-   */
   temperature?: number;
   smClock?: number;
   memClock?: number;
@@ -68,7 +54,6 @@ export interface GpuMetricSeries {
   startedAt: string;
   endedAt: string;
   sidecars: Record<string, unknown>;
-  /** Measurement-window audits (`power_audit`) of the linked benchmark points. */
   powerAudits?: Record<string, unknown>[];
   stats: GpuMetricStatRow[];
   data: GpuMetricSampleRow[];
@@ -89,22 +74,16 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
-  /** Coverage across the whole run, however `prefix`, `sourceResults` or `artifact` scope the samples. */
   coverage: GpuMetricsRunCoverage;
-  /** Complete explorer labels when only one view artifact's samples were requested. */
   artifactNames?: string[];
 }
 
 export interface GpuMetricsRunSelection {
   prefix?: string | null;
   sourceResults?: readonly string[] | null;
-  /** Undefined reads all matching artifacts; null selects the first explorer artifact. */
   artifact?: string | null;
 }
 
-// One sample row serializes to roughly 0.5 KB over the Neon HTTP driver (17 numeric
-// columns plus keys and an ISO timestamp), so 50k rows stay near 25 MB, well below the
-// 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
 export const SAMPLE_PAGE_SIZE = 50_000;
 
 interface RawSeriesRow {
@@ -123,7 +102,6 @@ interface RawSeriesRow {
   ingested_at: string | Date;
 }
 
-/** The columns `upsertGpuMetricSeries` rewrites whenever it replaces a series. */
 interface RawSeriesVersionRow {
   id: number | string;
   csv_sha256: string;
@@ -140,10 +118,6 @@ const isoString = (value: string | Date): string =>
 
 const optional = (value: number | null): number | undefined => (value === null ? undefined : value);
 
-/**
- * Thrown by the point/run readers when a series was replaced while its parts
- * were being read; the caller restarts the whole read (links may have changed).
- */
 export class TelemetrySnapshotChangedError extends Error {
   constructor(seriesIds: readonly number[]) {
     super(`gpu_metric_series ${seriesIds.join(', ')} changed while being read`);
@@ -189,7 +163,6 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   };
 }
 
-/** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
 async function readSeriesRows(
   sql: DbClient,
   scope:
@@ -206,8 +179,6 @@ async function readSeriesRows(
   const pointId = 'benchmarkResultId' in scope ? scope.benchmarkResultId : null;
   const prefix = 'workflowRunId' in scope ? scope.prefix : null;
   const sources = 'workflowRunId' in scope ? scope.sources : null;
-  // Under the null guard, `in (select ...)` would scan every series; an array
-  // keeps the point lookup on the link and series primary keys.
   return (await sql`
     select s.id, s.artifact_name, s.file_name, s.vendor, s.sample_interval_s, s.sample_count,
       s.gpu_count, s.started_at, s.ended_at, s.sidecars, s.csv_sha256, s.ingested_at,
@@ -265,10 +236,8 @@ async function loadSeriesDetails(
     `) as unknown as RawSampleRow[];
     sampleRows.push(...page);
     if (page.length < SAMPLE_PAGE_SIZE) break;
-    // Keep PostgreSQL's microseconds: a JS Date cursor would repeat or omit boundary rows.
     cursor = page.at(-1)!;
   }
-  // The primary-key pages group by GPU; retain the public time-then-GPU ordering.
   sampleRows.sort(
     (a, b) =>
       Number(a.series_id) - Number(b.series_id) ||
@@ -276,10 +245,6 @@ async function loadSeriesDetails(
       Number(a.gpu_index) - Number(b.gpu_index),
   );
 
-  // The series and sample pages use separate autocommit queries (the DbClient has
-  // no transaction), so a re-ingest can commit between them. The writer replaces
-  // samples and the series row in one transaction and stamps `ingested_at`. An
-  // unchanged key after the sample read proves both belong to the same series version.
   const versionRows = (await sql`
     select id, csv_sha256, sample_count, ingested_at
     from gpu_metric_series
@@ -316,7 +281,6 @@ async function loadSeriesDetails(
       endedAt: isoString(row.ended_at),
       sidecars: row.sidecars,
       powerAudits: row.power_audits ?? [],
-      // Never present a partial population as full-record statistics.
       stats:
         samples.length === Number(row.sample_count)
           ? computeStoredGpuMetricStats(samples).map((stat) => ({
@@ -329,12 +293,6 @@ async function loadSeriesDetails(
   });
 }
 
-/**
- * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
- * before reading samples. View selection also returns the full artifact-name inventory.
- * Returns null when the run is unknown or has no stored series, so callers can
- * fall back to the live GitHub artifacts for in-flight runs.
- */
 export function getGpuMetricsForRun(
   sql: DbClient,
   githubRunId: number,
@@ -448,7 +406,6 @@ export interface GpuMetricsPointPayload {
   series: GpuMetricSeries[];
 }
 
-/** Series linked to one benchmark point, with samples. Null when none is linked. */
 export function getGpuMetricsForPoint(
   sql: DbClient,
   benchmarkResultId: number,

@@ -65,7 +65,6 @@ describe('token revenue', () => {
       output_tput_per_gpu: 200,
       server_gpu_cache_hit_rate: 0.8,
       server_external_cache_hit_rate: 0.1,
-      // External already contains this offload tier, so it must not be added.
       server_cpu_cache_hit_rate: 0.05,
     });
     const pricing: TokenRevenuePricing = {
@@ -75,7 +74,6 @@ describe('token revenue', () => {
       outputPerMillion: 10,
     };
 
-    // 80 fresh input tok/s at $2/M, 720 cached at $0.2/M, 200 output at $10/M.
     expect(tokenRevenuePerGpuHour(agentic, pricing)).toBeCloseTo(8.2944, 10);
   });
 
@@ -206,8 +204,6 @@ describe('token revenue', () => {
 });
 
 describe('GB300 cache hit-rate fallback', () => {
-  // A GB300 AgentX point shaped like production run 32146276534: ~97% of the
-  // 130k tok/s/GPU is cached input, but the server hit rate never got scraped.
   const unmeasuredGb300 = point({
     hw: 'gb300',
     hwKey: 'gb300_dynamo-vllm',

@@ -22,16 +22,6 @@ const getCachedEvalSampleOffset = cachedQuery(
   'eval-sample-offset',
 );
 
-/**
- * GET /api/v1/eval-samples?eval_result_id=N&filter=all|passed|failed&offset=0&limit=200&doc_id=N
- *
- * Returns a paginated slice of per-prompt samples for one `eval_results` row,
- * plus passed/failed totals for the filter-chip badges. Drawer use only —
- * agg metrics live on `/api/v1/evaluations`.
- *
- * For unofficial / un-ingested runs the live-fetch fallback (TODO) will be
- * added in a follow-up; this v1 covers the DB path only.
- */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const evalResultId = Number(params.get('eval_result_id'));

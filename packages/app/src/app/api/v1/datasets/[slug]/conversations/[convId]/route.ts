@@ -17,17 +17,12 @@ const getCachedConversation = cachedQuery(
   'dataset-conversation',
 );
 
-/** GET /api/v1/datasets/[slug]/conversations/[convId] — flamegraph structure. */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ slug: string; convId: string }> },
 ) {
   const { slug, convId } = await params;
   try {
-    // App Router has already decoded the `[convId]` segment exactly once, so
-    // `convId` is the raw conversation id. The client (useDatasetConversation)
-    // encodeURIComponent-encodes it before the fetch; decoding again here would
-    // over-decode and mis-key ids containing '%' / '/'. Decode exactly once.
     const data = await getCachedConversation(slug, convId);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     return cachedJson(data);

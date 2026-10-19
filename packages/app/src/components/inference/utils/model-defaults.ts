@@ -7,7 +7,6 @@ export function defaultInferenceXAxisMode(model: string): 'e2e' | 'interactivity
   return model === Model.Qwen3_5 ? 'e2e' : 'interactivity';
 }
 
-/** Filter automatic selections only; keep the full universe available to the legend. */
 export function defaultInferenceHardware(model: string, hardware: Set<string>): Set<string> {
   if (model !== Model.Qwen3_5) return hardware;
   return new Set(

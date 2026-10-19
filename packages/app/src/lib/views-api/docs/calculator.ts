@@ -6,8 +6,6 @@ import {
   parameterErrorSchema as errorSchema,
 } from '@/lib/api/api-documentation-helpers';
 
-// The 'views' group id is registered by the docs coordinator alongside the
-// route catalog entries; fragments are written against it ahead of that.
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const nearestPointSchema: ApiSchema = {

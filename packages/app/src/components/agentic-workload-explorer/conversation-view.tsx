@@ -51,7 +51,6 @@ interface RequestData {
   isFastMode: boolean | null;
   privacyMode?: 'anon' | 'full';
   hashIds: string[] | null;
-  /** Block count when hashIds weren't loaded (fetched on demand instead). */
   hashCount?: number;
   hashTokenCount: number | null;
   subagentLabel: string | null;
@@ -61,9 +60,6 @@ interface RequestData {
   metadata: Record<string, unknown> | null;
 }
 
-// -- Content helpers ---------------------------------------------------------
-
-/** @visibleForTesting */
 export function extractTextFromContent(content: string | ContentBlock[] | undefined): string {
   if (!content) return '';
   if (typeof content === 'string') return content;
@@ -76,29 +72,22 @@ export function extractTextFromContent(content: string | ContentBlock[] | undefi
       return JSON.stringify(b.text);
     });
 
-  // If all text blocks are stripped, show one marker
   if (texts.every((t) => t === null)) {
     return texts.length > 0 ? '[content stripped]' : '';
   }
   return texts.filter((t) => t !== null).join('\n');
 }
 
-/** @visibleForTesting */
 export function stripSystemReminders(text: string): string {
   return text.replaceAll(/<system-reminder>[\s\S]*?<\/system-reminder>/gu, '').trim();
 }
 
-/** Pull the core pipeline stages from metadata. */
 function extractProcessors(metadata: Record<string, unknown> | null): string[] | null {
   const raw = metadata?.pipeline;
   if (!Array.isArray(raw)) return null;
   const ids = raw.filter((v): v is string => typeof v === 'string');
   return ids.length > 0 ? ids : null;
 }
-
-// -- Tree structure ----------------------------------------------------------
-// We build a list of "ConversationNode" items. Each node is either a
-// top-level message or a subagent group that contains its own messages.
 
 export interface MessageNode {
   kind: 'message';
@@ -155,15 +144,12 @@ export type ConversationNode = MessageNode | SubagentGroupNode;
 
 export function buildConversationTree(requests: RequestData[]): ConversationNode[] {
   const nodes: ConversationNode[] = [];
-  // Normalize OpenAI Responses bodies to the Anthropic shape
-  // before tagging/parsing — everything downstream assumes messages[] + content[].
   const normalizedRequests = requests.map((req) => normalizeDashboardTrace(req));
 
   for (const run of buildRequestRuns(normalizedRequests)) {
     if (run.kind === 'subagent_group') {
       nodes.push(buildSubagentGroupNode(run));
     } else {
-      // Main agent request — extract only the latest turn's messages
       const messages = parseRequestMessages(run.req, true);
       nodes.push(...messages);
     }
@@ -217,13 +203,6 @@ function buildSubagentGroupNode(
   };
 }
 
-/**
- * Parse a single request into MessageNodes.
- * For main agent: only extract the last user message + response (to avoid
- * re-showing the entire conversation history on each turn).
- * For subagents: extract only the latest turn to avoid repeating the growing
- * conversation history (each request carries prior tool calls + the original prompt).
- */
 function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageNode[] {
   const nodes: MessageNode[] = [];
   const body = req.requestBody;
@@ -241,14 +220,12 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
 
   const messages = body.messages;
 
-  // Build request context (system prompt, message count, tools)
   const requestContext = {
     system: Array.isArray(body.system) ? body.system : undefined,
     messageCount: messages.length,
     tools: Array.isArray(body.tools) ? body.tools : undefined,
   };
 
-  // Extract user message(s)
   const userMessages = onlyLastTurn
     ? messages.filter((m) => m.role === 'user').slice(-1)
     : messages.filter((m) => m.role === 'user');
@@ -282,27 +259,12 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
     isFirstNode = false;
   }
 
-  // Note: we intentionally skip the request message history (prior assistant
-  // tool_use and user tool_result blocks) to avoid showing the subagent's
-  // growing conversation history. Each request's response content is shown
-  // separately below.
-
-  // Extract response content
   const responseContent = req.responseBody?.body?.content;
   const stopReason = req.responseBody?.body?.stop_reason as string | null;
 
   if (responseContent && Array.isArray(responseContent)) {
-    // Codex Responses commonly interleaves text runs with reasoning/function_call
-    // items. We emit one node per run/block, so the suffix has to disambiguate
-    // them within a single request — a static `-response` collides on the second
-    // text run and React warns about duplicate keys.
     let textIdx = 0;
     let thinkingIdx = 0;
-    // Track which response-derived nodes were appended so we can stamp the
-    // request's usage/cost/timing on the most informative one *after* the
-    // response is fully parsed. Without deferring we'd attribute the billed
-    // numbers to the model's preamble ("I'll pull from official sources…")
-    // instead of the substantive final answer.
     const responseNodeIndices: number[] = [];
     const trackPush = (node: Omit<MessageNode, 'requestId' | 'isRequestAnchor'>) => {
       pushNode(node);
@@ -320,7 +282,6 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
       hashIds: null,
     };
 
-    // Flush accumulated consecutive text blocks into a single assistant node
     const flushText = (textParts: string[]) => {
       if (textParts.length === 0) return;
       const merged = textParts.join('').trim();
@@ -346,12 +307,9 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
         if (typeof block.text === 'string' && block.text) {
           pendingText.push(block.text);
         } else if (block.text === null) {
-          // Anon-stripped assistant text. Emit a placeholder so the message
-          // node still renders (and carries the request's stats).
           pendingText.push('[content stripped]');
         }
       } else {
-        // Non-text block breaks the run — flush accumulated text first
         flushText(pendingText);
         pendingText = [];
 
@@ -388,12 +346,8 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
         }
       }
     }
-    // Flush any trailing text blocks
     flushText(pendingText);
 
-    // Attribute the request's billing/timing to the most informative response
-    // node — preferring the last assistant text (the answer), and otherwise
-    // the last emitted node (e.g. when the response is purely tool_use).
     if (responseNodeIndices.length > 0) {
       let target = responseNodeIndices.at(-1)!;
       for (let k = responseNodeIndices.length - 1; k >= 0; k--) {
@@ -421,8 +375,6 @@ function parseRequestMessages(req: RequestData, onlyLastTurn: boolean): MessageN
 
   return nodes;
 }
-
-// -- Styles ------------------------------------------------------------------
 
 const typeStyles: Record<string, { label: string; color: string; border: string; bg: string }> = {
   user: {
@@ -534,15 +486,12 @@ const STRINGS = {
   },
 };
 
-// -- Components --------------------------------------------------------------
-
 function nodeMatchesQuery(node: ConversationNode, q: string): boolean {
   if (node.kind === 'message') {
     return (
       node.content.toLowerCase().includes(q) || (node.toolName?.toLowerCase().includes(q) ?? false)
     );
   }
-  // subagent group: check label and children
   if (node.label.toLowerCase().includes(q)) return true;
   return node.children.some(
     (c) => c.content.toLowerCase().includes(q) || (c.toolName?.toLowerCase().includes(q) ?? false),
@@ -564,7 +513,6 @@ export function ConversationView({
   const [showSearch, setShowSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cmd/Ctrl+F to open search
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -595,7 +543,6 @@ export function ConversationView({
 
   return (
     <div className="space-y-1">
-      {/* Search bar — hidden during replay mode */}
       {visibleNodeCount === undefined && (
         <div className="flex items-center gap-2 mb-2">
           {showSearch ? (
@@ -685,7 +632,6 @@ export function ConversationView({
         </div>
       )}
 
-      {/* Results */}
       {displayNodes.map((node, idx) => {
         const isAnchor = node.kind === 'message' && node.isRequestAnchor === true;
         const showDivider = idx > 0 && isAnchor;
@@ -720,7 +666,6 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
 
   return (
     <div className="rounded-md border border-purple-500/30 bg-purple-500/5">
-      {/* Group header */}
       <button
         onClick={() => {
           track('agentic_workload_conversation_subagent_toggled', {
@@ -762,7 +707,6 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
         </div>
       </button>
 
-      {/* Expanded children */}
       {expanded && (
         <div className="border-t border-purple-500/20 ml-4 pl-4 border-l-2 border-l-purple-500/20 py-2 pr-4 space-y-1">
           {group.children.map((child, idx) => {
@@ -793,10 +737,6 @@ function RequestDivider() {
   );
 }
 
-/**
- * Collapsed hash_ids list. When the session was loaded without hash_ids (the
- * conversation tab), the list is fetched for this one request on first expand.
- */
 function HashIdsDetails({
   requestId,
   hashIds,
@@ -856,8 +796,6 @@ function MessageRow({
       data-request-id={msg.requestId}
       className={`rounded-md border ${style.border} ${style.bg} ${compact ? 'px-3 py-2' : 'px-4 py-3'} scroll-mt-20`}
     >
-      {/* Header. The badge cluster can get long (pipeline processors etc.) —
-          let it wrap and keep the metrics block from being pushed off-screen. */}
       <div className="flex items-start justify-between gap-x-3 mb-1.5">
         <div className="flex items-center gap-2 flex-wrap gap-y-1 min-w-0">
           <span className={`text-xs font-medium ${style.color}`}>
@@ -928,10 +866,8 @@ function MessageRow({
         </div>
       </div>
 
-      {/* Request context (system prompt, message history, tools) */}
       {msg.requestContext && <RequestContextBlock context={msg.requestContext} />}
 
-      {/* Content */}
       {msg.type === 'tool_use' ? (
         <ToolCallContent name={msg.toolName} input={msg.toolInput} />
       ) : msg.type === 'tool_result' ? (
@@ -940,9 +876,6 @@ function MessageRow({
         <TextContent text={msg.content} type={msg.type} highlight={highlight} />
       )}
 
-      {/* Hash IDs — only shown for anon traces. Full-mode traces also carry
-          hash blocks for debugging, but we keep them out of the UI to avoid
-          duplicating information already visible in the redacted body. */}
       {msg.privacyMode !== 'full' && (msg.hashIds?.length ?? msg.hashCount ?? 0) > 0 && (
         <HashIdsDetails
           requestId={msg.requestId}
@@ -1055,11 +988,6 @@ function TextContent({
   const truncated = text.length > maxPreview;
   const displayText = truncated && !expanded ? `${text.slice(0, maxPreview)}...` : text;
 
-  // Render markdown for user/assistant messages so code fences, lists, headers
-  // etc. display structurally instead of as raw syntax. Skip when there's an
-  // active search highlight (the highlighter doesn't compose with the markdown
-  // AST) and for `thinking` blocks (model output of structured reasoning we
-  // already truncate aggressively — markdown adds little there).
   const useMarkdown = !highlight && (type === 'user' || type === 'assistant');
 
   return (
@@ -1233,7 +1161,6 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
     );
   }
 
-  // Default: show JSON
   return (
     <details>
       <summary className="text-xs text-muted-foreground cursor-pointer">{t.parameters}</summary>

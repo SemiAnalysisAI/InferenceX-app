@@ -1,18 +1,6 @@
-/**
- * Static microbenchmark data for ubenchX device-memory copy bandwidth.
- *
- * Source: ubenchX/mem_bw/bench.py and ubenchX/mem_bw/results/*.csv in SemiAnalysisAI/InferenceX
- * (PRs #3874, #3879, #3880).
- * Methodology: times `b.copy_(a)` on float32 tensors with `triton.testing.do_bench`,
- * power-of-two sizes 8 B .. 16 GiB, bandwidth = 2 * bytes / time (read + write).
- */
-
 export interface UbenchxRow {
-  /** Message size in bytes. */
   readonly bytes: number;
-  /** Copy latency in milliseconds. */
   readonly timeMs: number;
-  /** Achieved bandwidth in GB/s. */
   readonly bandwidthGbps: number;
 }
 
@@ -31,7 +19,6 @@ export interface UbenchxRun {
   readonly rows: readonly UbenchxRow[];
 }
 
-/** GPU keys used in UBENCHX_RUNS, ordered for display (NVIDIA then AMD). */
 export const UBENCHX_GPU_KEYS = [
   'B300 SXM',
   'GB200 NVL72',
@@ -45,7 +32,6 @@ export const UBENCHX_GPU_KEYS = [
 
 export type UbenchxGpuKey = (typeof UBENCHX_GPU_KEYS)[number];
 
-/** All runs keyed by GPU identifier (matching GPU_SPECS names). */
 export const UBENCHX_RUNS: Record<string, UbenchxRun> = {
   'H100 SXM': {
     metadata: {

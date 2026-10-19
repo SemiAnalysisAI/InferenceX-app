@@ -1,4 +1,3 @@
-/** Relative luminance (WCAG 2.x simplified). */
 function relativeLuminance(r: number, g: number, b: number): number {
   const [rs, gs, bs] = [r, g, b].map((c) => {
     c /= 255;
@@ -9,7 +8,6 @@ function relativeLuminance(r: number, g: number, b: number): number {
 
 let _probeCtx: CanvasRenderingContext2D | null = null;
 
-/** Parse any CSS color to [r, g, b] using a canvas probe. */
 function parseRgb(color: string): [number, number, number] | null {
   if (!_probeCtx) {
     const canvas = document.createElement('canvas');
@@ -25,12 +23,6 @@ function parseRgb(color: string): [number, number, number] | null {
   return [r, g, b];
 }
 
-/**
- * Returns the optimal text color for overlaying on a given background color.
- * Resolves CSS variables (e.g. `var(--h100)`) via getComputedStyle.
- * Handles any CSS color format (hex, rgb, oklch, hsl, etc.) via canvas probe.
- * Light backgrounds → dark text; dark backgrounds → white text.
- */
 export function contrastColors(bgColor: string): string {
   let resolved = bgColor;
   if (bgColor.startsWith('var(')) {

@@ -11,8 +11,6 @@ import type {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── Constants ───────────────────────────────────────────────────────
-
 const NODE_HEIGHT = 36;
 const NODE_GAP = 4;
 const TRUNK_X = 24;
@@ -21,8 +19,6 @@ const _BRANCH_X = 56;
 const BRANCH_WIDTH = 480;
 const CHILD_INDENT = 32;
 const CONNECTOR_WIDTH = 32;
-
-// ── Node color map ──────────────────────────────────────────────────
 
 const STRINGS = {
   en: {
@@ -120,9 +116,6 @@ function getNodeStyle(type: string, t: Strings): NodeStyleDef & { label: string 
   return { ...def, label: labels[type] || labels.assistant };
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────
-
-/** @visibleForTesting */
 export function truncate(str: string | unknown, max: number): string {
   if (str === null) return '[stripped]';
   if (typeof str !== 'string') {
@@ -132,7 +125,6 @@ export function truncate(str: string | unknown, max: number): string {
   return clean.length > max ? `${clean.slice(0, max)}...` : clean;
 }
 
-/** @visibleForTesting */
 export function tokenSummary(
   input: number | null,
   cacheRead: number | null,
@@ -147,13 +139,11 @@ export function tokenSummary(
   return parts.join(' \u00B7 ');
 }
 
-/** @visibleForTesting */
 export function formatCost(cost: number): string {
   if (cost < 0.01) return '<$0.01';
   return `$${cost.toFixed(3)}`;
 }
 
-/** @visibleForTesting */
 export function messageNodeSummary(node: MessageNode, t?: Strings): string {
   const s = t ?? STRINGS.en;
   switch (node.type) {
@@ -178,7 +168,6 @@ export function messageNodeSummary(node: MessageNode, t?: Strings): string {
   }
 }
 
-/** @visibleForTesting */
 export function getToolArg(node: MessageNode): string {
   if (!node.toolInput) return '';
   const input = node.toolInput;
@@ -195,12 +184,9 @@ export function getToolArg(node: MessageNode): string {
   return '';
 }
 
-/** @visibleForTesting */
 export function subagentSummary(node: SubagentGroupNode): string {
   return `${node.label} \u00B7 ${node.requestCount} req${node.requestCount === 1 ? '' : 's'}${node.totalCost > 0 ? ` \u00B7 ${formatCost(node.totalCost)}` : ''}`;
 }
-
-// ── Component ───────────────────────────────────────────────────────
 
 export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
   const t = STRINGS[useLocale()];
@@ -218,7 +204,6 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Summary stats */}
       <div className="flex items-center gap-4">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.flowGraph}
@@ -252,7 +237,6 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
         </div>
       </div>
 
-      {/* DAG container */}
       <div className="relative rounded-md border border-border bg-surface p-4 overflow-x-auto">
         <div
           className="relative"
@@ -288,7 +272,6 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
         </div>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.legend}
@@ -303,8 +286,6 @@ export function SessionDAG({ nodes }: { nodes: ConversationNode[] }) {
     </div>
   );
 }
-
-// ── Trunk message node row ──────────────────────────────────────────
 
 function MessageNodeRow({
   node,
@@ -323,7 +304,6 @@ function MessageNodeRow({
 
   return (
     <div className="relative flex items-stretch" style={{ minHeight: NODE_HEIGHT + NODE_GAP }}>
-      {/* Trunk connector line */}
       <div
         className="absolute flex flex-col items-center"
         style={{ left: TRUNK_X - 8, width: 16, top: 0, bottom: 0 }}
@@ -333,7 +313,6 @@ function MessageNodeRow({
         {!isLast && <div className="w-px flex-1 bg-border" />}
       </div>
 
-      {/* Node card */}
       <div
         className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono`}
         style={{
@@ -380,8 +359,6 @@ function MessageNodeRow({
   );
 }
 
-// ── Sub-agent group row ─────────────────────────────────────────────
-
 function SubagentGroupRow({
   node,
   index: _index,
@@ -400,8 +377,6 @@ function SubagentGroupRow({
   t: Strings;
 }) {
   const [expanded, setExpanded] = useState(true);
-  // Adjust state during render on prop change instead of in an effect — avoids
-  // the extra commit with stale UI between the two renders.
   const [prevExpandAll, setPrevExpandAll] = useState(expandAllCounter);
   const [prevCollapseAll, setPrevCollapseAll] = useState(collapseAllCounter);
   if (expandAllCounter !== prevExpandAll) {
@@ -418,9 +393,7 @@ function SubagentGroupRow({
 
   return (
     <div className="relative">
-      {/* Main row with branch-off */}
       <div className="relative flex items-stretch" style={{ minHeight: NODE_HEIGHT + NODE_GAP }}>
-        {/* Trunk connector line */}
         <div
           className="absolute flex flex-col items-center"
           style={{ left: TRUNK_X - 8, width: 16, top: 0, bottom: 0 }}
@@ -430,7 +403,6 @@ function SubagentGroupRow({
           {!isLast && <div className="w-px flex-1 bg-border" />}
         </div>
 
-        {/* Branch-off connector: horizontal line from trunk to group node */}
         <svg
           className="absolute"
           style={{
@@ -451,7 +423,6 @@ function SubagentGroupRow({
           />
         </svg>
 
-        {/* Group header node (clickable) */}
         <div
           className={`flex items-center gap-2 rounded-md border ${style.bg} ${style.border} px-3 font-mono cursor-pointer hover:brightness-125 transition-all`}
           style={{
@@ -491,11 +462,8 @@ function SubagentGroupRow({
         </div>
       </div>
 
-      {/* Children (collapsible) */}
       {expanded && node.children.length > 0 && (
         <div className="relative">
-          {/* Vertical branch line for children */}
-          {/* Trunk continues */}
           <div
             className="absolute w-px bg-border"
             style={{
@@ -504,7 +472,6 @@ function SubagentGroupRow({
               height: totalChildHeight,
             }}
           />
-          {/* Branch vertical line */}
           <div
             className="absolute w-px"
             style={{
@@ -524,7 +491,6 @@ function SubagentGroupRow({
                 className="relative flex items-stretch"
                 style={{ minHeight: NODE_HEIGHT + NODE_GAP }}
               >
-                {/* Child connector dot */}
                 <div
                   className="absolute flex flex-col items-center"
                   style={{
@@ -536,7 +502,6 @@ function SubagentGroupRow({
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-400/50" />
                 </div>
 
-                {/* Child node card */}
                 <div
                   className={`flex items-center gap-2 rounded-md border ${childStyle.bg} ${childStyle.border} px-3 font-mono`}
                   style={{
@@ -579,7 +544,6 @@ function SubagentGroupRow({
             );
           })}
 
-          {/* Rejoin connector: from last child back to trunk */}
           <div className="relative" style={{ height: NODE_GAP }}>
             <svg
               className="absolute"

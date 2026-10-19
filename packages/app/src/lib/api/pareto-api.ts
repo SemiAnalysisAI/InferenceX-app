@@ -42,7 +42,6 @@ export interface ParetoSelection {
   precision: string | null;
 }
 
-/** Reject ignored/ambiguous selectors rather than silently widening an analysis. */
 export function parseParetoRequest(params: URLSearchParams): {
   selection: ParetoSelection;
   sourceParams: URLSearchParams;

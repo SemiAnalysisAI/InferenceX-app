@@ -1,4 +1,3 @@
-// Shared OG tile grid, logo, font loaders, and color tokens.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -67,9 +66,6 @@ export interface OgFontAsset {
 let cjkFontsPromise: Promise<OgFontAsset[]> | undefined;
 export function getCjkFonts(): Promise<OgFontAsset[]> {
   if (!cjkFontsPromise) {
-    // These are Noto Sans CJK SC subsets pinned to upstream tag Sans2.004.
-    // Keep compare-image-glyphs.txt synchronized when adding CJK image copy;
-    // the font license is preserved beside the subset assets in OFL.txt.
     cjkFontsPromise = Promise.all([
       readFile(new URL('../compare-og-fonts/NotoSansCJKsc-Compare-Regular.otf', import.meta.url)),
       readFile(new URL('../compare-og-fonts/NotoSansCJKsc-Compare-Bold.otf', import.meta.url)),

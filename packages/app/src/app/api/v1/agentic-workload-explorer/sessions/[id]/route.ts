@@ -11,8 +11,6 @@ export const GET = withExplorerRoute(async ({ vis, req, params }) => {
   const searchParams = req.nextUrl.searchParams;
   const { limit, offset } = parsePagination(searchParams, { limit: 20 });
   const sort = searchParams.get('sort') === 'desc' ? ('desc' as const) : ('asc' as const);
-  // hashes=0 returns hash_ids as null plus a hashCount per request; the lists
-  // are ~90% of the payload and most tabs only show the count.
   const includeHashIds = searchParams.get('hashes') !== '0';
 
   const [session, { requests, total }] = await Promise.all([

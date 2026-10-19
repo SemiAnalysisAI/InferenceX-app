@@ -1,5 +1,3 @@
-// GET /api/v1/feedback/list — public; rows are ciphertext-only, decrypted client-side.
-
 import { NextResponse } from 'next/server';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';

@@ -13,8 +13,6 @@ import { sessionReuseQuery } from '@semianalysisai/inferencex-db/proxytrace/sess
 import type { Database } from '@semianalysisai/inferencex-db/proxytrace/types';
 
 const window = sessionReuseWindow(new Date('2026-09-21T05:00:00Z'));
-// Three sessions: one instant, one exactly seven days long, one fifteen days.
-// Bucket boundaries are CEIL(age_days), so an exactly-seven-day call fits day 7.
 const buckets: ReuseBucket[] = [
   { kind: 'sessionAge', cohort: 'all', bucket: 0, count: 1 },
   { kind: 'sessionAge', cohort: 'all', bucket: 7, count: 1 },

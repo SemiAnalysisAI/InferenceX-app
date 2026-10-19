@@ -22,10 +22,6 @@ describe('countLeq / countLt', () => {
 });
 
 describe('cursorStatsAt', () => {
-  // Three requests on a shared clock:
-  //   A: credit 0,  start 2,  end 10
-  //   B: credit 1,  start 5,  end 8
-  //   C: credit 12, start 14, end 20
   const times = {
     credits: [0, 1, 12],
     starts: [2, 5, 14],
@@ -33,21 +29,18 @@ describe('cursorStatsAt', () => {
   };
 
   it('counts running, waiting, and completed at an instant', () => {
-    // t=3: A running, B credited but not started, C not yet credited.
     expect(cursorStatsAt(times, 3)).toEqual({
       running: 1,
       waiting: 1,
       completed: 0,
       inflight: 2,
     });
-    // t=6: A and B running.
     expect(cursorStatsAt(times, 6)).toEqual({
       running: 2,
       waiting: 0,
       completed: 0,
       inflight: 2,
     });
-    // t=13: A and B done, C waiting in queue.
     expect(cursorStatsAt(times, 13)).toEqual({
       running: 0,
       waiting: 1,
@@ -57,8 +50,6 @@ describe('cursorStatsAt', () => {
   });
 
   it('counts a request as still running at its exact end instant', () => {
-    // end < t (strict) excludes the request from "ended", so at t === end it
-    // still counts as running — matches the popover's documented semantics.
     expect(cursorStatsAt(times, 8).running).toBe(2);
     expect(cursorStatsAt(times, 8).completed).toBe(1);
   });

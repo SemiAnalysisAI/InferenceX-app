@@ -93,7 +93,6 @@ function TrendLineChart({
     const xMin = d3.min(data, (p) => p.x) ?? 0;
     const xMax = d3.max(data, (p) => p.x) ?? 1;
     const yMax = d3.max(data, (p) => p.y) ?? 0;
-    // Index keys keep arbitrary model IDs out of D3's CSS selectors.
     const lines = Object.fromEntries(
       colored.map((s, i) => [
         String(i),
@@ -237,7 +236,6 @@ function StackedBarChart({
         .attr('height', (s) => Math.max(0, yScale(s.low) - yScale(s.high)))
         .attr('fill', (s) => s.color);
     };
-    // The shared renderer owns axes, resize, zoom and tooltips. Only stacking is custom.
     const layers: LayerConfig<Segment>[] = [
       {
         type: 'custom',
@@ -360,7 +358,6 @@ export function TrendsLineChart({
       const values = new Map(s.points.map((p) => [p.day, p.value]));
       return {
         ...s,
-        // Explicit NaNs preserve gaps instead of connecting across missing days.
         points: sortedDays.map((day, x) => ({
           x,
           y: values.get(day) ?? NaN,
@@ -461,7 +458,6 @@ export function StatCard({
   );
 }
 
-/** Categorical series palette, led by the SemiAnalysis brand blue and amber. */
 export const CHART_COLORS = [
   '#0b86d1',
   '#f7b041',

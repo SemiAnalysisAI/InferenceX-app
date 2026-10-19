@@ -49,8 +49,6 @@ describe('sanitizeTrendsPayload', () => {
   });
 });
 
-// ── trendsCacheKey ───────────────────────────────────────────────────────
-
 describe('trendsCacheKey', () => {
   it('collapses visibility to scope: null=all, empty/array=anon', () => {
     expect(trendsCacheKey(null, null)).toBe('tr:2:trends:all:all');
@@ -76,15 +74,13 @@ describe('trendsCacheKey', () => {
   });
 });
 
-// ── isCompactionCandidate ────────────────────────────────────────────────
-
 function baseInputs(overrides: Partial<CompactionCandidateInputs> = {}): CompactionCandidateInputs {
   return {
     prevCacheRead: 10_000,
     prevTotalContext: 12_000,
-    curCacheRead: 500, // <= 20% of prevCacheRead (cliff)
-    curTotalContext: 1_000, // shrinks vs prevTotalContext
-    gapMs: 60_000, // 1 minute, well under idle threshold
+    curCacheRead: 500,
+    curTotalContext: 1_000,
+    gapMs: 60_000,
     ...overrides,
   };
 }
@@ -113,7 +109,6 @@ describe('isCompactionCandidate', () => {
   it('rejects idle-gap restarts (gap >= 30 min)', () => {
     expect(isCompactionCandidate(baseInputs({ gapMs: COMPACTION_IDLE_GAP_MS }))).toBe(false);
     expect(isCompactionCandidate(baseInputs({ gapMs: COMPACTION_IDLE_GAP_MS + 1 }))).toBe(false);
-    // just under the threshold still counts
     expect(isCompactionCandidate(baseInputs({ gapMs: COMPACTION_IDLE_GAP_MS - 1 }))).toBe(true);
   });
 
@@ -123,7 +118,6 @@ describe('isCompactionCandidate', () => {
         baseInputs({ prevCacheRead: COMPACTION_MIN_PREV_CACHE_READ - 1, curCacheRead: 1 }),
       ),
     ).toBe(false);
-    // exactly at the threshold is allowed
     expect(
       isCompactionCandidate(
         baseInputs({
@@ -137,11 +131,9 @@ describe('isCompactionCandidate', () => {
   });
 
   it('rejects a shallow drop (current cache_read above the cliff ratio)', () => {
-    // 80% cliff means current must be <= 20% of previous; 50% of previous is not a cliff.
     expect(isCompactionCandidate(baseInputs({ prevCacheRead: 10_000, curCacheRead: 5_000 }))).toBe(
       false,
     );
-    // exactly at the ratio boundary is allowed
     const boundary = 10_000 * (1 - COMPACTION_CLIFF_DROP_RATIO);
     expect(
       isCompactionCandidate(baseInputs({ prevCacheRead: 10_000, curCacheRead: boundary })),
@@ -161,8 +153,6 @@ describe('isCompactionCandidate', () => {
     ).toBe(false);
   });
 });
-
-// ── SQL shape (capturingDb pattern, mirrors stats-cache.test.ts) ────────
 
 const noop = () => Promise.resolve();
 
@@ -210,8 +200,6 @@ describe('dailyModelRollup SQL shape', () => {
 
     const liveSql = sink[1].sql.toLowerCase();
     expect(liveSql).toContain('from requests');
-    // UTC-hardened: explicit AT TIME ZONE 'UTC' rather than relying on the
-    // session TimeZone being UTC (P2-c).
     const utcLiveBucket = "date_trunc('day', requests.timestamp at time zone 'utc')";
     expect(liveSql.split(utcLiveBucket)).toHaveLength(3);
     expect(liveSql).toContain('requests.timestamp >=');

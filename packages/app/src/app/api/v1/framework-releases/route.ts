@@ -17,7 +17,7 @@ async function fetchLatestRelease(owner: string, repo: string): Promise<string |
       Accept: 'application/vnd.github.v3+json',
       ...(process.env.GITHUB_TOKEN && { Authorization: `token ${process.env.GITHUB_TOKEN}` }),
     },
-    next: { revalidate: 60 * 60 }, // 1 hour
+    next: { revalidate: 60 * 60 },
   });
 
   if (!res.ok) return null;

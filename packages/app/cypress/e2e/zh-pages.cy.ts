@@ -9,9 +9,6 @@ describe('Chinese (/zh) pages', () => {
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
-      // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
-      // landing-page.tsx; the card and its Chinese strings still exist in the
-      // source, so assert it is not rendered rather than dropping the check.
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
     });
@@ -26,7 +23,6 @@ describe('Chinese (/zh) pages', () => {
           .should('have.text', '仪表板')
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-        // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
           'not.exist',
@@ -333,8 +329,6 @@ describe('Chinese (/zh) pages', () => {
         .should('contain.text', '投机解码方法：')
         .and('contain.text', '分离式部署：')
         .and('contain.text', '聚合推理芯片数：');
-      // Disaggregated deployments split the chip pool, so their expanded
-      // details localize the prefill/decode fields instead of the aggregate ones.
       cy.get('input[placeholder="搜索配置……"]').type('atom-disagg');
       cy.contains('tr', 'Mooncake ATOMesh')
         .first()
@@ -356,9 +350,6 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('shows a safe error and retries through a real button click', () => {
-      // Fail every request until the retry button is actually clicked — counting
-      // attempts is race-prone because query retries can consume the "healthy"
-      // response before the error UI is asserted.
       let failRequests = true;
       cy.intercept('GET', '**/api/v1/submissions', (request) => {
         request.reply(
@@ -481,7 +472,6 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('has a zh-CN hreflang alternate and a language toggle', () => {
-      // hreflang URLs are absolute against the production origin.
       cy.get('link[rel="alternate"][hreflang="zh-CN"]')
         .should('have.attr', 'href')
         .and('match', /\/zh\/blog$/u);

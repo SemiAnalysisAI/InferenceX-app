@@ -48,7 +48,6 @@ export default function ConversationPage() {
   const pendingTargetRef = useRef<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Build tree and extract timestamps when in replay mode
   const tree = useMemo(
     () => (replayMode ? buildConversationTree(requests) : []),
     [replayMode, requests],
@@ -60,7 +59,6 @@ export default function ConversationPage() {
         if (node.kind === 'message') {
           return new Date(node.timestamp).getTime();
         }
-        // subagent_group
         return new Date(node.startTime).getTime();
       }),
     [tree],
@@ -70,7 +68,6 @@ export default function ConversationPage() {
 
   const replay = useSessionReplay(nodeCount, timestamps);
 
-  // Load all data when replay mode is activated
   const handleEnableReplay = useCallback(async () => {
     setReplayMode(true);
     if (requests.length < total) {
@@ -91,7 +88,6 @@ export default function ConversationPage() {
     setAllLoaded(false);
   }, [replay]);
 
-  // Check if data finished loading (e.g., loaded by layout scroll)
   useEffect(() => {
     if (!replayMode || allLoaded || requests.length < total) return;
 
@@ -102,7 +98,6 @@ export default function ConversationPage() {
     return () => cancelAnimationFrame(frame);
   }, [replayMode, allLoaded, requests.length, total]);
 
-  // Auto-scroll to keep latest revealed message visible during playback
   useEffect(() => {
     if (replayMode && replay.isPlaying && lastNodeRef.current) {
       lastNodeRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -119,7 +114,6 @@ export default function ConversationPage() {
     return () => window.removeEventListener('hashchange', syncHash);
   }, []);
 
-  // Scroll to hash target after requests load/render (e.g., from waterfall click).
   useEffect(() => {
     const targetId = getHashTargetId(targetHash);
     if (!targetId) return;
@@ -134,7 +128,6 @@ export default function ConversationPage() {
           clearTimeout(highlightTimerRef.current);
         }
         el.classList.remove('waterfall-highlight');
-        // Restart the animation when navigating to a request that was just highlighted.
         void el.offsetWidth;
         el.classList.add('waterfall-highlight');
         highlightTimerRef.current = setTimeout(() => {
@@ -171,7 +164,6 @@ export default function ConversationPage() {
   return (
     <Card>
       <CardContent className="pt-6">
-        {/* Replay toggle button */}
         <div className="flex items-center gap-2 mb-3">
           <button
             onClick={() => {
@@ -195,7 +187,6 @@ export default function ConversationPage() {
           )}
         </div>
 
-        {/* Replay controls bar */}
         {replayReady && (
           <div className="mb-3">
             <ReplayControls
@@ -211,14 +202,12 @@ export default function ConversationPage() {
           </div>
         )}
 
-        {/* Conversation view */}
         <div>
           <ConversationView
             requests={requests}
             visibleNodeCount={replayReady ? replay.currentIndex : undefined}
             reversed={replayMode ? false : Boolean(reversed)}
           />
-          {/* Scroll anchor for auto-scroll during playback */}
           <div ref={lastNodeRef} />
         </div>
       </CardContent>

@@ -60,7 +60,6 @@ describe('ATOM server metrics', () => {
     expect(result.prefixCacheHitsTps.map((p) => p.value)).toEqual([80, 60]);
     expect(result.prefixCacheHitRate.map((p) => p.value)).toEqual([0.8, 0.6]);
     expect(result.promptTokensBySource['compute (miss)']?.map((p) => p.value)).toEqual([20, 40]);
-    // The exporter provides a cluster-wide KV gauge, not per-DP-rank or CPU-pool gauges.
     expect(result.kvCacheUsageByEngine).toEqual([]);
     expect(result.hostKvCacheUsage).toEqual([]);
     expect(result.metricSources).toEqual([]);

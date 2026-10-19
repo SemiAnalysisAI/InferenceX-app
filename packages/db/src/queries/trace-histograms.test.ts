@@ -18,9 +18,6 @@ function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
 
 describe('getTraceHistograms', () => {
   it('builds distributions from the precomputed timeline without selecting the raw blob', async () => {
-    // The query unnests isl/osl server-side, so the driver hands back arrays
-    // rather than the timeline document. Requests with a null isl contribute
-    // to osl only, which is why the two arrays differ in length.
     const { sql, calls } = mockSql([
       [
         {
@@ -40,7 +37,6 @@ describe('getTraceHistograms', () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('profile_export_jsonl_gz as blob');
-    // Never ship the whole document. That is what blew the 64 MiB HTTP cap.
     expect(calls[0]).not.toMatch(/atr\.request_timeline\s*,/);
     expect(calls[0]).toContain('jsonb_array_elements');
   });
@@ -79,7 +75,6 @@ describe('getTraceHistograms', () => {
           trace_replay_id: 3811,
           gz_bytes: stored.length,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          // The SQL leaves the legacy unnest null for rows with a gzip copy.
           isl: null,
           osl: null,
           has_blob: true,
@@ -140,7 +135,6 @@ describe('getTraceHistograms', () => {
   });
 
   it('yields empty arrays when a timeline has no isl/osl at all', async () => {
-    // array_agg over zero matching rows returns NULL, not an empty array.
     const { sql } = mockSql([
       [
         {
@@ -167,7 +161,6 @@ describe('getTraceHistograms', () => {
           trace_replay_id: 6,
           gz_bytes: null,
           timeline_version: REQUEST_TIMELINE_VERSION,
-          // numeric columns arrive as strings on some drivers.
           isl: ['4096', null, 'NaN'] as unknown as number[],
           osl: ['512'] as unknown as number[],
           has_blob: false,

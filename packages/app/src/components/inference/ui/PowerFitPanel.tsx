@@ -82,7 +82,6 @@ export default function PowerFitPanel({
       ].join('<br/>'),
     })),
   );
-  // Line keys become SVG class names, so they index the source rather than embed its key.
   const lines: PanelLine[] = fits.flatMap(({ source, fit }, index) => {
     if (!fit) return [];
     const at = (x: number) => ({ x, y: fit.intercept + fit.slope * x });

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Versioned provenance for explicit inputs and the agreed model baselines. */
 
 import { formatG, Provenance } from '../../../base';
 

@@ -2,73 +2,17 @@ import { SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { computeToggle } from '@/lib/shared/toggle-set';
 
-/**
- * Data-driven config exclusion.
- *
- * Some models or scenarios can't show certain config variants on the same graph
- * because the numbers aren't directly comparable. DeepSeek V4 MTP configs use
- * engine-specific acceptance forcing; AgentX also keeps standard-token (STP)
- * results from different engines separate while the benchmark is new.
- *
- * Rules are expressed as DATA — `ExclusionSpec[]` values declared by model or
- * sequence in `data-mappings.ts` — then compiled into resolvers by
- * `buildExclusion`. Every helper here operates on a compiled `Exclusion`, so
- * adding an exclusivity rule means adding data, not branching UI code.
- *
- * Participating keys are partitioned into comparability GROUPS. Keys in the
- * same group may be active together; keys in different groups are mutually
- * exclusive — at most one group active at a time. ATOM and SGLang may share a
- * group while vLLM remains separate.
- */
-
-/** Data params defining one exclusion rule. */
 export interface ExclusionSpec {
-  /**
-   * Non-empty hwKey suffix for a variant (for example `_mtp`), or `null` for
-   * standard-token configs whose hwKeys have no speculative-method suffix.
-   */
   suffix: string | null;
-  /**
-   * Engine-family prefixes stripped from the framework segment before grouping
-   * (e.g. `dynamo-`, `mori-`), so `h100_dynamo-vllm_mtp` resolves to `vllm`.
-   */
   stripPrefixes?: string[];
-  /**
-   * Raw family → shared comparability-group id. Two families can co-exist on a
-   * graph iff they resolve to the same group; families omitted here are their
-   * own group. (e.g. `{ atom: 'sglang' }` — ATOM and SGLang are comparable.)
-   */
   groupAliases?: Record<string, string>;
-  /**
-   * Restrict the rule to these literal engine families, matched AFTER
-   * `stripPrefixes` but BEFORE `groupAliases`. A key whose family falls outside
-   * the list does not participate at all, so it may share a graph with
-   * anything. Omit to make every engine family participate.
-   *
-   * Matching before the aliases is what lets a rule cover vLLM vs SGLang
-   * (including `dynamo-`/`mori-` variants) while leaving ATOM — which is
-   * aliased into SGLang's group for the rules that do cover it — unrestricted.
-   *
-   * A scenario can narrow every one of its rules at once by composing its own
-   * allowlist onto each spec (see `comparisonExclusion`), which is how 8K/1K
-   * guards only vLLM and SGLang while the same model-level MTP rule keeps
-   * covering every family on other scenarios.
-   */
   participatingFamilies?: readonly string[];
-  /**
-   * Restrict mutual exclusion to configs on the same hardware SKU. Different
-   * hardware may use different engine groups on the same graph.
-   */
   scope?: 'hardware';
 }
 
-/** Compiled resolvers for model- or sequence-scoped exclusion specs. */
 export interface Exclusion {
-  /** Literal engine family of a participating key (for display), else null. */
   familyOf: (hwKey: string) => string | null;
-  /** Comparability-group id of a participating key (for exclusion), else null. */
   groupOf: (hwKey: string) => string | null;
-  /** Mutual-exclusion scopes of a participating key. Empty when it does not participate. */
   scopesOf: (hwKey: string) => readonly string[];
 }
 
@@ -78,18 +22,10 @@ const ACTIVE_SPEC_SUFFIXES = [...SPEC_METHOD_KEYS]
 
 const GLOBAL_SCOPE = '*';
 
-/** Comparability-group id for a raw engine family under a single spec. */
 function groupForFamily(family: string, spec: ExclusionSpec): string {
   return spec.groupAliases?.[family] ?? family;
 }
 
-/**
- * Extract the literal engine family for `hwKey` under a single spec: strip the
- * configured variant suffix (or require an unsuffixed STP key), drop the leading
- * GPU segment, then strip any configured engine-family prefix. Returns null if
- * the key doesn't participate — either because the suffix doesn't match or
- * because the family is outside the spec's `participatingFamilies`.
- */
 function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
   let head: string;
   if (spec.suffix === null) {
@@ -113,11 +49,6 @@ function familyForSpec(hwKey: string, spec: ExclusionSpec): string | null {
   return framework;
 }
 
-/**
- * Compile a list of `ExclusionSpec`s into family, group, and scope resolvers.
- * The first spec that matches a key wins; variant-specific suffixes and the
- * unsuffixed STP matcher are disjoint.
- */
 export function buildExclusion(specs: readonly ExclusionSpec[]): Exclusion {
   return {
     familyOf(hwKey: string): string | null {
@@ -170,13 +101,6 @@ function groupKeysByScope(
   return byScope;
 }
 
-/**
- * Find the literal engine family of an active participating key in `keys` that
- * belongs to comparability group `group`. Used to label conflict messaging with
- * the real active engine (e.g. "ATOM") rather than the group id (e.g. "sglang").
- * When several comparable engines are active, returns the alphabetically-first
- * for a stable message. Returns null if none match.
- */
 function activeFamilyInGroup(
   keys: Iterable<string>,
   group: string,
@@ -191,24 +115,6 @@ function activeFamilyInGroup(
   return families.length > 0 ? families.toSorted()[0] : null;
 }
 
-/**
- * Pick a single comparability group to keep when `proposed` contains keys from
- * multiple groups. Sticks to a group already present in `prev`; for a shared
- * scope with no direct prior key (for example the global MTP scope), also honors
- * a prior key from the same group on an overlapping hardware scope. Otherwise
- * uses `fallbackGroup` when that group is available, then falls back to the
- * alphabetically-first group.
- *
- * Stickiness only counts as a user's engine choice when `prev` names ONE of the
- * candidate groups. When `prev` spans several of them the prior selection is
- * ambiguous — it was carried over from a scope with laxer rules (e.g. switching
- * a fixed-seq chart, where both engines may be active per hardware, over to
- * Agentic Traces) — so `fallbackGroup` decides instead of the alphabetical
- * tie-break, which would otherwise silently pick a different engine than the
- * one a fresh load of the same chart shows.
- *
- * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
- */
 export function pickStickyGroup(
   proposed: Set<string>,
   prev: Set<string>,
@@ -221,9 +127,6 @@ export function pickStickyGroup(
   const winners = new Set<string>();
   const dropped = new Set<string>();
 
-  // A single sticky candidate is an unambiguous prior choice and wins outright;
-  // several candidates mean `prev` didn't choose between them, so defer to the
-  // configured default before the alphabetical tie-break.
   const stickyWinner = (candidates: string[]): string | undefined => {
     if (candidates.length <= 1) return candidates[0];
     if (fallbackGroup && candidates.includes(fallbackGroup)) return fallbackGroup;
@@ -281,14 +184,6 @@ export function pickStickyGroup(
   };
 }
 
-/**
- * Compute the effective legend universe for solo/restore-all toggle semantics
- * under exclusion. Participating keys whose group is not active or remembered
- * for one of their scopes are dropped. Remembered groups preserve each
- * hardware's selection while it is temporarily absent in solo mode; an idle
- * global scope without a remembered selection remains excluded so default-
- * deselected variants (e.g. DSv4 MTP) still count as deselected.
- */
 export function effectiveLegendItems(
   allItems: Set<string>,
   active: Set<string>,
@@ -333,13 +228,6 @@ export function effectiveLegendItems(
   return result;
 }
 
-/**
- * Drop participating keys for ALL groups when `proposed` contains keys from more
- * than one group. Used for auto-reset / select-all paths so the user has to opt
- * into one group explicitly (and only one at a time).
- *
- * If `proposed` has 0 or 1 groups, the input set is returned unchanged.
- */
 export function clearAllExclusionGroups(
   proposed: Set<string>,
   ex: Exclusion,
@@ -368,7 +256,6 @@ export interface ExclusionResolution {
   droppedGroups: string[];
 }
 
-/** Resolve a multi-group set according to the view's default-selection policy. */
 export function resolveExclusionGroups(
   proposed: Set<string>,
   prev: Set<string>,
@@ -381,7 +268,6 @@ export function resolveExclusionGroups(
   return { ...cleared, keptGroup: null };
 }
 
-/** Engine families wholly retained, wholly removed, or retained only on other scopes. */
 export function exclusionResolutionFamilies(
   proposed: Iterable<string>,
   result: ReadonlySet<string>,
@@ -406,18 +292,6 @@ export function exclusionResolutionFamilies(
   };
 }
 
-/**
- * Decision for a single hw-toggle action under an exclusion rule.
- *
- *  - `block`: the user explicitly tried to add a key whose group conflicts with
- *    the group already active. The provider should refuse the toggle (no state
- *    change) and surface a toast. `attempted` / `existing` name the literal
- *    engine families for display.
- *  - `silent-resolve`: the toggle would surface multiple groups (e.g. via
- *    solo→restore-all). Replace the active set with the policy-resolved `result`
- *    and don't show a toast — the user didn't explicitly try to add anything.
- *  - `fallthrough`: the toggle is fine, run the normal toggle path.
- */
 export type ExclusionToggleDecision =
   | { kind: 'block'; attempted: string; existing: string | null }
   | { kind: 'silent-resolve'; result: Set<string> }
@@ -438,9 +312,6 @@ export function resolveExclusionToggle(
   const newGroup = ex.groupOf(hw);
   const newScopes = ex.scopesOf(hw);
 
-  // Hard-block only an explicit add that introduces a second group in an
-  // overlapping exclusion scope. Global rules also participate in their
-  // hardware scope, preserving same-SKU STP/MTP conflicts.
   if (!wasActive && willBeActive && newGroup && newScopes.length > 0) {
     for (const newScope of newScopes) {
       const existingGroup = [...prev]
@@ -453,8 +324,6 @@ export function resolveExclusionToggle(
     }
   }
 
-  // Other paths (e.g. solo→restore-all surfacing a hidden second group) are
-  // normalized silently because the user didn't explicitly add a conflict.
   const resolved = resolveExclusionGroups(proposed, prev, ex, policy, fallbackGroup);
   if (resolved.droppedGroups.length > 0) {
     return { kind: 'silent-resolve', result: resolved.result };

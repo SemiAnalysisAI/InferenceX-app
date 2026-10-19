@@ -13,10 +13,6 @@ export interface TraceReplayWorkerRequest {
   job: TraceReplayWorkerJob;
 }
 
-/**
- * Prepared payload buffers that cross the worker boundary as transferred
- * ArrayBuffers. The worker and the pool both iterate this one list.
- */
 export const PREPARED_TRACE_REPLAY_BUFFER_FIELDS = [
   'profileGz',
   'serverMetricsCsv',

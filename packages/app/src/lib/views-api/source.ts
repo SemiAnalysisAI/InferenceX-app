@@ -28,7 +28,6 @@ import {
 
 export { CALCULATOR_PERCENTILE_VALUES, matchesHardware };
 
-/** Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL. */
 export function sourceRequest(
   request: NextRequest,
   path: string,
@@ -42,8 +41,6 @@ export function sourceRequest(
 
 export function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ViewsUpstreamError(response.status);
-  // Direct route calls do not get fetch's transparent content decoding.
-  // cachedJson emits compressed bytes, even when called without an HTTP hop.
   if (response.headers.get('Content-Encoding') === 'gzip' && response.body) {
     return new Response(
       response.body.pipeThrough(new DecompressionStream('gzip')),
@@ -110,9 +107,6 @@ export async function benchmarkRows(
   );
 }
 
-// Extensions retain raw telemetry for modeled-power estimates and carry overlay
-// runIndex metadata for cache-reuse series. The calculator route uses trimmed
-// rows and source-tagged keys; both paths share buildGpuGroups for the math.
 export async function calculatorGroups(
   request: NextRequest,
   params: ViewSelection,
@@ -123,7 +117,6 @@ export async function calculatorGroups(
   } = {},
 ) {
   const rows = await benchmarkRows(request, params, sourceOptions);
-  // Comparisons reuse the primary overlay rows for precision resolution only.
   const overlayRows = sourceOptions.overlayRows ?? (await unofficialRows(request));
   const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);
   const options = { ...params, precisions };
@@ -169,11 +162,6 @@ export interface UnofficialRunPayload {
 
 const EMPTY_UNOFFICIAL: UnofficialRunPayload = { benchmarks: [], evaluations: [] };
 
-/**
- * Overlay rows for `unofficialrun=` (up to eight run ids) from the first-party
- * `/api/unofficial-run` handler. Returns both payload halves so the benchmark
- * views and the evaluation view share one validation and one upstream call.
- */
 export async function unofficialRunPayload(
   request: NextRequest,
   param = 'unofficialrun',
@@ -185,7 +173,6 @@ export async function unofficialRunPayload(
   );
 }
 
-/** Unofficial-run benchmark rows narrowed to the request's `model=`. */
 export async function unofficialRows(request: NextRequest): Promise<BenchmarkRow[]> {
   const { benchmarks: overlayRows } = await unofficialRunPayload(request);
   if (overlayRows.length === 0) return [];

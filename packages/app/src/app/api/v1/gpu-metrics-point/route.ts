@@ -21,15 +21,6 @@ const getCachedGpuMetricsForPoint = cachedQuery(
   { blobOnly: true },
 );
 
-/**
- * GET /api/v1/gpu-metrics-point?id=N
- *
- * PowerX telemetry recorded while one benchmark point ran: every linked
- * gpu_metrics series with full-resolution per-GPU samples and the per-GPU
- * statistics computed from them. 404 when the point has no linked series (its
- * run predates migration 016 and the artifacts have expired, or the job
- * uploaded no gpu_metrics artifact).
- */
 const handleGet = idQueryRoute({
   logLabel: 'gpu metrics point',
   fetch: async (id) => {
@@ -40,7 +31,6 @@ const handleGet = idQueryRoute({
 
 export async function GET(request: NextRequest): Promise<Response> {
   const response = await handleGet(request);
-  // The live revision check must run even when a point used to be missing.
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }

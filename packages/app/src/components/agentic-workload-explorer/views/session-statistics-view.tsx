@@ -166,7 +166,6 @@ export default function StatisticsPage() {
       .catch(console.error);
   }, [id]);
 
-  // When requests update and we have a pending scroll target, try to scroll
   useEffect(() => {
     const target = pendingScrollRef.current;
     if (target === null) return;
@@ -176,7 +175,6 @@ export default function StatisticsPage() {
       setLoadingRequest(null);
       revealTurn(info);
     } else {
-      // loadUntil fetches one page at a time; keep going until the request arrives.
       void loadUntil(target.request);
     }
   }, [requests.length, rows]);
@@ -185,7 +183,6 @@ export default function StatisticsPage() {
     if (info.kind === 'subagent_group') {
       setExpandedGroups((prev) => new Set(prev).add(info.turn));
     }
-    // Wait for the DOM update
     requestAnimationFrame(() => scrollToRow(info.turn));
   }
 
@@ -195,7 +192,6 @@ export default function StatisticsPage() {
       revealTurn(info);
       return;
     }
-    // Need to load more
     setLoadingRequest(entry.request);
     pendingScrollRef.current = entry;
     await loadUntil(entry.request);
@@ -251,8 +247,6 @@ export default function StatisticsPage() {
     { title: t.output, key: 'output' },
   ];
 
-  // Timing distributions are per request; group rows sum tokens across many
-  // subagent requests but keep a single TTFT.
   const leaves = flattenStatRowsChronologically(rows).map((l) => l.row);
   const tpotRows = leaves.filter((r) => r.tpotMs !== null && r.tpotMs > 0);
   const timingCharts: {
@@ -295,9 +289,6 @@ export default function StatisticsPage() {
     },
   ];
 
-  // Whole-session cache hit rates — the API number alongside the trie-derived
-  // upper bound. Mirrors the tiles on the Tokens Over Time chart but covers
-  // every agent's request, not just the main agent's.
   const cacheHitRates = computeSessionCacheHitRates(requests);
 
   return (
@@ -385,7 +376,6 @@ export default function StatisticsPage() {
                                 track('agentic_workload_statistics_request_navigated', {
                                   request: e.request,
                                 });
-                                // The table is behind the dialog.
                                 close();
                                 void navigateToRequest(e);
                               }}
@@ -426,7 +416,6 @@ export default function StatisticsPage() {
         })}
       </div>
 
-      {/* TTFT / TPOT / Interactivity / Prefill Speed Distributions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {timingCharts.map(({ title, values, format, axisLabel, sourceValues, sourceTransform }) => {
           if (values.length === 0) return <EmptyDistribution key={title} title={title} t={t} />;
@@ -434,7 +423,6 @@ export default function StatisticsPage() {
             values.map((value, request) => ({ request, value })),
             30,
           );
-          // Interactivity percentiles come from TPOT so p90 is the slow tail.
           const source = (sourceValues ?? values).toSorted((a, b) => a - b);
           const transform = sourceTransform ?? ((v: number) => v);
           const percentiles = ['p50', 'p75', 'p90', 'p95', 'p99'].map((label) => ({
@@ -794,7 +782,6 @@ interface TurnInfo {
   label?: string;
 }
 
-/** The table row holding a request: its own row, or the subagent group containing it. */
 function findTurn(requestId: string | undefined, rows: StatRow[]): TurnInfo | null {
   for (const row of rows) {
     if (row.kind === 'main') {

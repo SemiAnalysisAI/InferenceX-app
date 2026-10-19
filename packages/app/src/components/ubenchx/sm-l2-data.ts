@@ -1,12 +1,3 @@
-/**
- * Static SM-to-SM L2 latency difference data for ubenchX.
- *
- * Source: SemiAnalysisAI/microbench-blackwell/sm_l2_distance
- * Data: B200 SXM results from SemiAnalysisAI/InferenceX PR #3881
- * Measures L2 cache access latency differences between SMs via pointer-chase
- * benchmarks, revealing GPC and die topology structure.
- */
-
 export interface SmL2SmInfo {
   readonly sm: number;
   readonly gpc: number;
@@ -37,7 +28,6 @@ export interface SmL2Run {
   readonly orderedSms: readonly number[];
   readonly smInfo: readonly SmL2SmInfo[];
   readonly gpcBounds: readonly SmL2GpcBound[];
-  /** Symmetric numSms x numSms matrix of mean |diff| per L2 address (cycles). */
   readonly matrix: readonly (readonly number[])[];
 }
 

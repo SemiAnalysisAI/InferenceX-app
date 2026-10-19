@@ -61,7 +61,6 @@ export function GET(request: NextRequest) {
       readResponse<FrameworkReleases>(await releases()),
     ]);
     const active = raw.filter(isActiveImageRow);
-    // The image catalog also exposes new model names before they enter the registry.
     const model =
       requestedModel === 'all'
         ? 'all'

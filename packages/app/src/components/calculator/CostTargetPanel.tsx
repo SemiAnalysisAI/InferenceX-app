@@ -25,30 +25,13 @@ import { outputTokPerChip } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
 import type { CostProvider, CostType, GPUDataPoint } from './types';
 
-/**
- * The inverse of the target-interactivity slider: the slider fixes a speed and
- * reads off the cost, this fixes a cost ceiling and reads off the highest speed
- * that stays under it. That is why it sits directly beneath the slider rather
- * than among the fleet-economics sections — it answers a question about the
- * operating point, not about a deployment's lifetime.
- *
- * Deliberately independent of the slider's own value: `gpuDataByGroupKey` is the
- * unfiltered frontier, so a chip that interpolates to nothing at the current
- * target still gets an answer here.
- */
 interface CostTargetPanelProps {
   gpuDataByGroupKey: Record<string, GPUDataPoint[]>;
   hardwareConfig: HardwareConfig;
   costProvider: CostProvider;
   costType: CostType;
-  /** Legend visibility by base hwKey. */
   visibleHwKeys: Set<string>;
-  /**
-   * Facility power budget, owned by the page. Only used to turn the answer into
-   * concurrent users; the interactivity result itself does not need it.
-   */
   mw: number | null;
-  /** Raw MW input value (page-owned so the `c_mw` URL param has one writer). */
   mwInput: string;
   onMwInputChange: (raw: string) => void;
 }
@@ -128,7 +111,6 @@ interface CostCapRow {
   resultKey: string;
   hwKey: string;
   precision?: string;
-  /** null = cost target not reachable anywhere on this chip's frontier */
   maxInteractivity: number | null;
   tputAtIv: number | null;
   users: number | null;
@@ -160,8 +142,6 @@ export default function CostTargetPanel({
     track('calculator_cost_target_set', { costCap: costCapInput });
   }, [costCapInput]);
 
-  // Gated ONLY by the legend's hw visibility — never by results interpolated at
-  // the current slider target, which would hide a chip whose frontier is fine.
   const visibleGroupKeys = useMemo(
     () =>
       new Set(
@@ -228,7 +208,6 @@ export default function CostTargetPanel({
         users: stats ? stats.concurrentUsers : null,
       });
     }
-    // Highest achievable interactivity first; unreachable rows last.
     return rows.toSorted(
       (a, b) => (b.maxInteractivity ?? -Infinity) - (a.maxInteractivity ?? -Infinity),
     );
@@ -368,8 +347,6 @@ export default function CostTargetPanel({
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                  {/* With a valid target set, empty means nothing is legend-visible
-                      (unreachable chips still produce rows). */}
                   {costCap ? t.costCapNoGpus : t.costCapEmpty}
                 </p>
               )}

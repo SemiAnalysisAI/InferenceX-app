@@ -71,7 +71,6 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
         cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
         cy.location('pathname').should('eq', `${base}/cache-hit-mode/theoretical`);
-        // A model switch must also clear a non-default target, not only a default.
         cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
         cy.get('[data-testid="profit-model-selector"]').click();
         cy.contains('[role="option"]', 'Kimi K3').click();

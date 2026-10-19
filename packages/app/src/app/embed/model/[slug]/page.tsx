@@ -8,13 +8,6 @@ interface Props {
   searchParams: Promise<EmbedSearchParams>;
 }
 
-/**
- * Embeddable single-model chart: `/embed/model/<slug>?framework=vllm`.
- *
- * Query options are documented on `parseEmbedOptions` in `@/lib/embed/embed`. The
- * route is rendered per request because the framework lock, theme, and
- * scenario come from the query string.
- */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const entry = getCompareModelBySlug(slug);

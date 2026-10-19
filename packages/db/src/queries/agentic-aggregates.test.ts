@@ -19,14 +19,12 @@ describe('percentilesOf', () => {
   });
 
   it('computes percentiles for a simple integer range', () => {
-    // 1..100, evenly spaced — linear quantile is straightforward.
     const xs = Array.from({ length: 100 }, (_, i) => i + 1);
     const p = percentilesOf(xs);
     expect(p).not.toBeNull();
     expect(p!.n).toBe(100);
     expect(p!.mean).toBeCloseTo(50.5, 6);
     expect(p!.p50).toBeCloseTo(50.5, 6);
-    // For 100 sorted values, p75 = sorted[0.75 * 99] = sorted[74.25] interp.
     expect(p!.p75).toBeCloseTo(75.25, 6);
     expect(p!.p90).toBeCloseTo(90.1, 6);
     expect(p!.p95).toBeCloseTo(95.05, 6);
@@ -50,7 +48,6 @@ describe('extractIslOsl', () => {
           output_sequence_length: { value: 50, unit: 'tokens' },
         },
       }),
-      // cancelled profiling record — it did not complete and must be ignored
       JSON.stringify({
         metadata: { benchmark_phase: 'profiling', was_cancelled: true },
         metrics: {
@@ -65,7 +62,6 @@ describe('extractIslOsl', () => {
           output_sequence_length: { value: 75, unit: 'tokens' },
         },
       }),
-      // warmup record — should be ignored
       JSON.stringify({
         metadata: { benchmark_phase: 'warmup' },
         metrics: {
@@ -101,7 +97,7 @@ describe('extractServerMetricSamples', () => {
               timeslices: [
                 { start_ns: 0, rate: 80 },
                 { start_ns: 1, rate: 50 },
-                { start_ns: 2, rate: 0 }, // skipped because matching queries.rate is 0
+                { start_ns: 2, rate: 0 },
               ],
             },
           ],
@@ -110,8 +106,8 @@ describe('extractServerMetricSamples', () => {
           series: [
             {
               timeslices: [
-                { start_ns: 0, rate: 100 }, // hit rate = 0.8
-                { start_ns: 1, rate: 100 }, // hit rate = 0.5
+                { start_ns: 0, rate: 100 },
+                { start_ns: 1, rate: 100 },
                 { start_ns: 2, rate: 0 },
               ],
             },
@@ -172,7 +168,6 @@ describe('extractServerMetricSamples', () => {
   });
 });
 
-/** The write-back payload as bound to the UPDATE (a partial aggregate_stats). */
 interface WrittenStats {
   version: number;
   isl: unknown;
@@ -182,7 +177,6 @@ interface WrittenStats {
   e2elPerOsl: { p90: number; n: number } | null;
 }
 
-/** Capture SQL template text + bound values for the write-back assertions. */
 function mockSql(queue: unknown[][]): {
   sql: DbClient;
   calls: { text: string; values: unknown[] }[];
@@ -196,7 +190,6 @@ function mockSql(queue: unknown[][]): {
   return { sql, calls };
 }
 
-/** One aiperf profiling record for the fallback profile blob. */
 function profileRec(fields: {
   cid: string;
   isl: number;
@@ -237,8 +230,6 @@ describe('getAgenticAggregates write-back', () => {
       ),
     );
 
-    // Stale row with server AND derived fields we must NOT trust — the route
-    // recomputes both from the blobs, so nothing is carried forward.
     const staleStats = {
       version: STATS_VERSION - 1,
       isl: null,
@@ -250,39 +241,28 @@ describe('getAgenticAggregates write-back', () => {
     };
 
     const { sql, calls } = mockSql([
-      // fetchAggregateStatsRows
       [{ benchmark_result_id: 7, stats: staleStats }],
-      // Pass 1: profile blob (+ trace_replay_id for write-back)
       [{ benchmark_result_id: 7, trace_replay_id: 870, has_profile: true }],
       [{ parts: 0, inline_size: profileBlob.length }],
       [{ data: profileBlob }],
-      // Pass 2: server blob
       [{ benchmark_result_id: 7, server_blob: serverBlob }],
     ]);
 
     const result = await getAgenticAggregates(sql, [7]);
 
-    // Response reflects the fresh recompute (isl/osl + kv from the blobs).
     expect(result[7]?.isl?.n).toBe(2);
     expect(result[7]?.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
 
-    // 4 calls: stats read, profile read, server read, write-back UPDATE.
     expect(calls).toHaveLength(6);
     expect(calls[5]!.text).toContain('update agentic_trace_replay set aggregate_stats');
     expect(calls[5]!.text).toContain('::jsonb where id');
 
-    // The payload OBJECT is bound directly (not stringified — that would
-    // double-encode into a JSONB string).
     const [written, traceReplayId] = calls[5]!.values as [WrittenStats, number];
     expect(traceReplayId).toBe(870);
     expect(written.version).toBe(STATS_VERSION);
-    // Server field FRESHLY recomputed (0.25), not the stale 0.9 carried forward.
     expect(written.kvCacheUtil?.mean).toBeCloseTo(0.25, 6);
-    // Derived ratio bundle FRESHLY recomputed from the two turns:
-    // ratios (s/tok) = [1.0/50, 2.0/50] = [0.02, 0.04] → p90 = 0.038.
     expect(written.e2elPerOsl?.n).toBe(2);
     expect(written.e2elPerOsl?.p90).toBeCloseTo(0.038, 8);
-    // Retired legacy fields must not survive the recompute.
     expect(written).not.toHaveProperty('normalizedSessionTimeS');
     expect(written).not.toHaveProperty('p90PrefillTpsPerUser');
     expect(written).not.toHaveProperty('normalizedE2e400');
@@ -301,15 +281,12 @@ describe('getAgenticAggregates write-back', () => {
     };
     const { sql, calls } = mockSql([
       [{ benchmark_result_id: 7, stats: staleStats }],
-      // Pass 1: no profile blob → nothing to recompute, nothing to heal.
       [{ benchmark_result_id: 7, trace_replay_id: 870, profile_blob: null }],
-      // Pass 2: no server blob either.
       [{ benchmark_result_id: 7, server_blob: null }],
     ]);
 
     await getAgenticAggregates(sql, [7]);
 
-    // stats read + 2 blob reads only — no write-back (profile parse never succeeded).
     expect(calls).toHaveLength(3);
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });

@@ -60,7 +60,6 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
 
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
-/** Kernel timelines of stored `runId:index:revision` results. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
     queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],

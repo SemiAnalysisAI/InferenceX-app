@@ -8,31 +8,11 @@ import { extractSections, parseLlmsTxt, type SeedPage } from './extract';
 import { type SearchResult, SiteSearchIndex } from './search-index';
 import { tokenize } from './tokenize';
 
-/**
- * Progressive, client-only site search.
- *
- * 1. The page on screen is indexed from the live DOM the moment search opens.
- * 2. `/llms.txt` (about 20 KB, CDN-cached) seeds every curated page's title and
- *    summary, so the whole site is searchable at the metadata level at once.
- * 3. While the dialog is open, pages are fetched two at a time, parsed with an
- *    inert `DOMParser` during idle time, and their sections replace the seed.
- *    Pages that best match the current query are fetched first.
- *
- * Nothing runs until the user opens search, crawling pauses when it closes,
- * and Data Saver disables step 3. The index lives in memory for the tab's
- * lifetime, so client-side navigation keeps everything already indexed.
- */
-
 export interface SiteSearchStatus {
-  /** Pages whose full content is indexed (fetched or live DOM). */
   indexedPages: number;
-  /** Pages known to the index, fetched or not. */
   totalPages: number;
-  /** True while background fetching is active. */
   crawling: boolean;
-  /** True once the llms.txt seed list has loaded (or failed). */
   seeded: boolean;
-  /** Incremented on every index change so subscribers can re-run queries. */
   version: number;
 }
 
@@ -40,24 +20,15 @@ type Listener = (status: SiteSearchStatus) => void;
 
 const CONCURRENCY = 2;
 const MAX_CRAWLED_PAGES = 160;
-// Indexing a single HTML response well under this is typical; larger pages
-// (the API reference) are still fine but bigger ones are not worth parsing.
 const MAX_HTML_BYTES = 2_500_000;
 
-/** Core destinations crawled first so primary navigation is fully searchable. */
 const CORE_PATHS = ['/', '/agentx', '/overview', '/about', '/blog', '/ubenchx'];
 
-/**
- * Candidate `/zh` URL for an English path. `hasZhSibling` is a route-family
- * check, so some family members (untranslated blog posts) still 404 at the
- * candidate; the crawler only links a `/zh` URL after fetching it successfully.
- */
 function zhCandidate(path: string, locale: Locale): string | null {
   if (locale !== 'zh' || !hasZhSibling(path)) return null;
   return zhPath(path);
 }
 
-/** English canonical path for a (possibly `/zh`) pathname. */
 function canonicalPath(path: string): string {
   if (path === '/zh') return '/';
   return path.startsWith('/zh/') ? path.slice(3) : path;
@@ -127,12 +98,10 @@ export class SiteSearchEngine {
     return this.index.search(query, limit);
   }
 
-  /** Index (or re-index) the document currently on screen. */
   indexLiveDocument(path: string, doc: Document = document): void {
     const docs = extractSections(doc, path);
     if (docs.length === 0) return;
     const canonical = canonicalPath(path);
-    // A live /zh page supersedes its English seed.
     if (canonical !== path) this.index.removePage(canonical);
     this.index.replacePages(docs);
     this.crawled.add(canonical);
@@ -152,7 +121,6 @@ export class SiteSearchEngine {
     this.queue = this.queue.filter((p) => p !== path);
   }
 
-  /** Load the llms.txt seed list once; failures leave the live-page index usable. */
   seed(): Promise<void> {
     this.seeding ??= (async () => {
       for (const route of DASHBOARD_ROUTES) {
@@ -167,8 +135,6 @@ export class SiteSearchEngine {
           const origins = [SITE_URL, window.location.origin];
           const pages = parseLlmsTxt(await res.text(), origins);
           for (const page of pages) {
-            // Queue, seed and link by the English path, which always exists;
-            // the crawl swaps in the /zh URL once that page loads.
             const { path } = page;
             this.seeds.set(path, page);
             if (!this.crawled.has(path) && !this.index.hasPage(path)) {
@@ -182,22 +148,14 @@ export class SiteSearchEngine {
             this.enqueue(path);
           }
         }
-      } catch {
-        // Offline or blocked: search still covers the live page and core paths.
-      }
+      } catch {}
       this.seeded = true;
       this.emit();
     })();
     return this.seeding;
   }
 
-  /**
-   * Move pages whose seed metadata matches the query to the front of the
-   * queue, so the pages most likely to answer it are fetched next.
-   */
   prioritize(query: string): void {
-    // Remembered so seeds that arrive after the user started typing are
-    // reordered too (see `start`).
     this.lastQuery = query;
     const terms = new Set(tokenize(query));
     if (terms.size === 0 || this.queue.length === 0) return;
@@ -217,7 +175,6 @@ export class SiteSearchEngine {
     this.queue = scored.map((entry) => entry.path);
   }
 
-  /** Begin (or resume) background crawling. */
   start(): void {
     if (this.running) return;
     this.running = true;
@@ -228,7 +185,6 @@ export class SiteSearchEngine {
     this.emit();
   }
 
-  /** Pause crawling and abort in-flight requests; aborted pages are re-queued. */
   stop(): void {
     if (!this.running) return;
     this.running = false;
@@ -251,12 +207,6 @@ export class SiteSearchEngine {
     }
   }
 
-  /**
-   * Fetch one page as HTML and report the final same-origin path after
-   * redirects (`/ubenchx` lands on `/ubenchx/mem-bw`), so sections are indexed
-   * and deep-linked where they actually live. Returns null for errors,
-   * non-HTML responses, oversized bodies and cross-origin redirects.
-   */
   private async fetchHtml(
     url: string,
     signal: AbortSignal,
@@ -278,7 +228,6 @@ export class SiteSearchEngine {
     return html.length > MAX_HTML_BYTES ? null : { html, path };
   }
 
-  /** Crawl an English canonical path, preferring its `/zh` sibling for zh sessions. */
   private async crawl(path: string): Promise<void> {
     const controller = new AbortController();
     this.controllers.add(controller);
@@ -287,8 +236,6 @@ export class SiteSearchEngine {
       let page: { html: string; path: string } | null = null;
       if (zh) {
         page = await this.fetchHtml(zh, controller.signal);
-        // A missing /zh page can redirect elsewhere (e.g. the /zh home); only
-        // accept the candidate itself or a page beneath it.
         if (page && page.path !== zh && !page.path.startsWith(`${zh}/`)) page = null;
       }
       page ??= await this.fetchHtml(path, controller.signal);
@@ -298,7 +245,6 @@ export class SiteSearchEngine {
       }
       const { html, path: url } = page;
       const finalCanonical = canonicalPath(url);
-      // Redirected to a page the live DOM or an earlier crawl already indexed.
       if (finalCanonical !== path && this.crawled.has(finalCanonical)) {
         this.crawled.add(path);
         return;
@@ -309,14 +255,10 @@ export class SiteSearchEngine {
       const docs = extractSections(parsed, url);
       const seed = this.seeds.get(path);
       if (docs.length > 0) {
-        // Prefer the curated seed title when the page's <title> is generic.
         if (seed) for (const doc of docs) if (doc.pageTitle === url) doc.pageTitle = seed.title;
-        // The English seed is superseded by the /zh page when that loaded.
         if (url !== path) this.index.removePage(path);
         this.index.replacePages(docs);
       }
-      // Marked only after indexing, so an abort before this point re-queues
-      // the source and leaves the redirect destination eligible.
       this.crawled.add(path);
       if (finalCanonical !== path) {
         this.crawled.add(finalCanonical);
@@ -324,7 +266,6 @@ export class SiteSearchEngine {
       }
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
-        // Paused mid-flight: try again on the next open.
         this.queued.add(path);
         this.queue.unshift(path);
       } else {
@@ -338,7 +279,6 @@ export class SiteSearchEngine {
 
 const engines = new Map<Locale, SiteSearchEngine>();
 
-/** One engine per locale for the lifetime of the tab. */
 export function getSiteSearchEngine(locale: Locale): SiteSearchEngine {
   let engine = engines.get(locale);
   if (!engine) {

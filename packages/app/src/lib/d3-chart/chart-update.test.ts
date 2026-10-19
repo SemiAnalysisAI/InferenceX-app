@@ -38,7 +38,6 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 axisBottom/axisLeft create .tick groups and a .domain path
       expect(layout.xAxisGroup.select('.domain').empty()).toBe(false);
       expect(layout.yAxisGroup.select('.domain').empty()).toBe(false);
       expect(layout.xAxisGroup.selectAll('.tick').size()).toBeGreaterThan(0);
@@ -52,7 +51,6 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, { xTickCount: 3 });
 
-      // D3 .ticks(3) is a hint, not exact, but should produce roughly 3-5 ticks
       const tickCount = layout.xAxisGroup.selectAll('.tick').size();
       expect(tickCount).toBeGreaterThan(0);
       expect(tickCount).toBeLessThanOrEqual(8);
@@ -101,7 +99,6 @@ describe('renderAxes', () => {
         tickTexts.push(d3.select(this).text());
       });
       expect(tickTexts.length).toBeGreaterThan(0);
-      // Every formatted tick should start with $
       for (const t of tickTexts) {
         expect(t).toMatch(/^\$/u);
       }
@@ -133,7 +130,6 @@ describe('renderAxes', () => {
 
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 creates <line> inside each .tick with x2 = -tickSize for axisLeft
       const firstTickLine = layout.yAxisGroup.select('.tick line');
       if (!firstTickLine.empty()) {
         expect(Number(firstTickLine.attr('x2'))).toBe(-6);
@@ -206,7 +202,6 @@ describe('renderAxes', () => {
       });
       expect(tickTexts).toEqual(['Low', 'Med', 'High']);
 
-      // Default yTickSize for band is 0
       const firstTickLine = layout.yAxisGroup.select('.tick line');
       if (!firstTickLine.empty()) {
         expect(Number(firstTickLine.attr('x2'))).toBe(0);
@@ -246,7 +241,6 @@ describe('renderAxes', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // Should not throw — the transition path creates a d3 transition
       renderAxes(layout, xScale, yScale, { transitionDuration: 300 });
 
       expect(layout.xAxisGroup.select('.domain').empty()).toBe(false);
@@ -285,7 +279,6 @@ describe('renderAxes', () => {
       renderAxes(layout, xScale, yScale, {});
       renderAxes(layout, xScale, yScale, {});
 
-      // D3 axis replaces content, so there should be exactly 1 .domain per axis group
       expect(layout.xAxisGroup.selectAll('.domain').size()).toBe(1);
       expect(layout.yAxisGroup.selectAll('.domain').size()).toBe(1);
     });
@@ -298,12 +291,10 @@ describe('renderAxes', () => {
       renderAxes(layout, xScale, yScale, {});
       const ticks1 = layout.xAxisGroup.selectAll('.tick').size();
 
-      // Change to wider domain
       xScale.domain([0, 1000]);
       renderAxes(layout, xScale, yScale, {});
       const ticks2 = layout.xAxisGroup.selectAll('.tick').size();
 
-      // Both should have ticks; exact count may differ
       expect(ticks1).toBeGreaterThan(0);
       expect(ticks2).toBeGreaterThan(0);
     });
@@ -456,12 +447,10 @@ describe('renderGrid', () => {
       renderGrid(layout, xScale, yScale, 3);
       const hLines3 = layout.gridGroup.select('.grid-h').selectAll('line').size();
 
-      // Reset
       const layout2 = makeLayout();
       renderGrid(layout2, xScale, yScale, 10);
       const hLines10 = layout2.gridGroup.select('.grid-h').selectAll('line').size();
 
-      // More ticks requested should produce at least as many lines (D3 ticks() is a hint)
       expect(hLines3).toBeGreaterThan(0);
       expect(hLines10).toBeGreaterThan(0);
       expect(hLines10).toBeGreaterThanOrEqual(hLines3);
@@ -531,7 +520,6 @@ describe('renderGrid', () => {
       const vLines = vGroup.selectAll('line').size();
       expect(vLines).toBe(domain.length);
 
-      // Each line should be at band center
       const lineXPositions: number[] = [];
       vGroup.selectAll('line').each(function () {
         lineXPositions.push(Number(d3.select(this).attr('x1')));
@@ -555,7 +543,6 @@ describe('renderGrid', () => {
       const hLines = hGroup.selectAll('line').size();
       expect(hLines).toBe(domain.length);
 
-      // Each line should span full width
       hGroup.selectAll('line').each(function () {
         const line = d3.select(this);
         expect(Number(line.attr('x1'))).toBe(0);
@@ -614,7 +601,6 @@ describe('renderGrid', () => {
 
       renderGrid(layout, xScale, yScale);
 
-      // After first render, lines should match [0, 100] ticks
       const ticks1 = xScale.ticks();
       const positions1: number[] = [];
       layout.gridGroup
@@ -628,11 +614,9 @@ describe('renderGrid', () => {
         expect(positions1[i]).toBeCloseTo(xScale(ticks1[i]));
       }
 
-      // Change domain — same range, different mapping
       xScale.domain([0, 1000]);
       renderGrid(layout, xScale, yScale);
 
-      // After second render, lines should match [0, 1000] ticks
       const ticks2 = xScale.ticks();
       const positions2: number[] = [];
       layout.gridGroup
@@ -655,7 +639,6 @@ describe('renderGrid', () => {
       renderGrid(layout, xScale, yScale);
       const initialCount = layout.gridGroup.select('.grid-v').selectAll('line').size();
 
-      // Use a much narrower domain that produces fewer ticks
       xScale.domain([0, 2]);
       renderGrid(layout, xScale, yScale);
       const updatedCount = layout.gridGroup.select('.grid-v').selectAll('line').size();
@@ -672,7 +655,6 @@ describe('renderGrid', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // Should not throw and should produce grid lines
       renderGrid(layout, xScale, yScale, 5, 300);
 
       expect(layout.gridGroup.select('.grid-v').selectAll('line').size()).toBeGreaterThan(0);
@@ -684,10 +666,8 @@ describe('renderGrid', () => {
       const xScale = d3.scaleLinear().domain([0, 100]).range([0, layout.width]);
       const yScale = d3.scaleLinear().domain([0, 50]).range([layout.height, 0]);
 
-      // First render without transition
       renderGrid(layout, xScale, yScale);
 
-      // Second render with transition — exercises the update + transition branches
       xScale.domain([0, 200]);
       renderGrid(layout, xScale, yScale, 5, 200);
 

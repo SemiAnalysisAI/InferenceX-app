@@ -225,7 +225,6 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
 
   const layers: LayerConfig<ChartPoint>[] = useMemo(
     () => [
-      // Date marker — nightly runs ended
       {
         type: 'custom' as const,
         key: 'nightly-marker',

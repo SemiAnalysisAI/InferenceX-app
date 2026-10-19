@@ -16,28 +16,12 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/v1/views/gpu-specs
- *
- * Static chip specifications behind the `/gpu-specs` page (`lib/catalog/gpu-specs.ts`:
- * `GPU_SPECS`) plus the chartable metric metadata (`GPU_CHART_METRICS`).
- * No database read — the payload is compiled-in.
- *
- * Query params:
- * - metric — optional `GPU_CHART_METRICS` key (`memory`, `memoryBandwidth`,
- *            `fp4`, ...). When set, adds a `ranking` array of chips ordered
- *            by that metric (descending; chips without a value omitted).
- * - format — `json` (default) or `csv` (one flat row per chip).
- */
-
 const METRIC_KEYS = GPU_CHART_METRICS.map((metric) => metric.key);
 
-/** URL-safe chip key derived from the display name, e.g. `H100 SXM` → `h100-sxm`. */
 function chipKey(spec: GpuSpec): string {
   return spec.name.toLowerCase().replaceAll(/\s+/gu, '-');
 }
 
-/** Raw spec fields plus the numeric projections used by the page's charts. */
 function buildChip(spec: GpuSpec) {
   return {
     key: chipKey(spec),

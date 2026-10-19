@@ -1,17 +1,5 @@
-/**
- * Bulk "does this point have a trace_replay blob?" lookup. Used by the
- * inference scatter chart to decide whether to render a "View charts"
- * button in the pinned tooltip — a pure presence check that doesn't need
- * the multi-megabyte blob payload `getTraceHistograms` ships.
- *
- * Going through `trace-histograms` for this trips Neon's 64 MB
- * per-HTTP-response cap as soon as one chunk's combined gzip payload
- * exceeds the cap (high-conc 8×8 rows can be 13 MB compressed each).
- */
-
 import type { DbClient } from '../connection.js';
 
-/** Map of `benchmark_results.id` → true for each id that has a trace_replay blob. */
 export type TraceAvailabilityMap = Record<number, true>;
 
 export async function getTraceAvailability(

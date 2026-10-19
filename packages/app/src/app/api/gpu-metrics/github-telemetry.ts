@@ -1,4 +1,3 @@
-/** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
 import { isRecord } from '@semianalysisai/inferencex-db/lib/records';
 import {
   isMultinodePowerSamplesPath,
@@ -32,12 +31,9 @@ import {
 } from './artifact-selection';
 
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
-/** Bundles carry a whole sweep (215 MB seen for nw8); only the power entries are decoded. */
 const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
-/** Parallel artifact downloads; GitHub's zip redirects are latency-bound, not CPU-bound. */
 const DOWNLOAD_CONCURRENCY = 4;
 
-/** The GitHub path also carries the bundle series the timeline draws. */
 export interface GithubArtifactPayload {
   name: string;
   files: { name: string; data: GpuMetricRow[] }[];
@@ -58,7 +54,6 @@ type TelemetryResult =
   | { kind: 'csv'; parsed: GithubArtifactPayload }
   | { kind: 'bundle'; series: GpuPowerSeries[] };
 
-/** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
 async function downloadZip(
   artifact: GithubArtifact,
   githubToken: string,
@@ -91,7 +86,6 @@ async function downloadArtifact(
     const context: unknown = JSON.parse(contents);
     return isRecord(context) ? [{ name, context }] : [];
   });
-  // Ingest uses code-unit filename order, not archive order or the host locale.
   contextFiles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   for (const { name, context } of contextFiles) {
     const directory = name.slice(0, name.lastIndexOf('/') + 1);
@@ -146,12 +140,6 @@ async function downloadBundle(
   return series.length > 0 ? series : null;
 }
 
-/**
- * One artifact download and parse. A corrupt or truncated archive is that
- * artifact's failure alone: it is logged and skipped so the other series of
- * the run still reach the chart (the client would otherwise retry the whole
- * multi-hundred-megabyte request).
- */
 async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
   try {
     if (job.kind === 'csv' || job.kind === 'native') {
@@ -169,7 +157,6 @@ async function runJob(job: TelemetryJob, githubToken: string): Promise<Telemetry
   }
 }
 
-/** Downloads in listing order with a bounded number of requests in flight. */
 async function downloadTelemetry(
   jobs: TelemetryJob[],
   githubToken: string,
@@ -201,7 +188,6 @@ export async function fetchGpuMetricsFromGithub(
 
   const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
 
-  // `eval_gpu_metrics_*` artifacts are excluded by the bare `gpu_metrics` test.
   const wanted = prefix ? `${ARTIFACT_PREFIX}${prefix}` : 'gpu_metrics';
   const jobs: TelemetryJob[] = artifacts
     .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))

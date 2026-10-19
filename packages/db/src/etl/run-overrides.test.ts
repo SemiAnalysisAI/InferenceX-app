@@ -256,8 +256,6 @@ describe('audited run backfills', () => {
       cacheHitKeys.some((key) => key in (backfill.set.metricsMerge ?? {})),
     );
 
-    // Only the GB300 sweeps missed the backend worker metrics scrape; every
-    // other hardware measured its own hit rate and must never inherit one.
     expect(borrowed.length).toBe(14);
     for (const backfill of borrowed) {
       expect(backfill.config.hardware).toBe('gb300');
@@ -335,7 +333,6 @@ describe('audited run backfills', () => {
 
       const otherAttempt = applyBenchmarkPointBackfill(123, 2, point);
       expect(otherAttempt.backfillId).toBeNull();
-      // GCS fallback has no attempt metadata and intentionally matches by run + point.
       expect(applyBenchmarkPointBackfill(123, undefined, point).backfillId).toBe(backfill.id);
     } finally {
       registry.splice(registry.indexOf(backfill), 1);
@@ -490,7 +487,6 @@ describe('planBenchmarkPoint', () => {
       const plan = planBenchmarkPoint({ githubRunId: 123, runAttempt: 1 }, point, seen);
       expect(plan).toMatchObject({ kind: 'planned', backfillId: backfill.id });
       expect(plan.kind === 'planned' && plan.point.offloadMode).toBe('on');
-      // The artifact also carries the already-corrected row: same identity, other source.
       expect(() =>
         planBenchmarkPoint(
           { githubRunId: 123, runAttempt: 1 },
@@ -677,9 +673,7 @@ describe('isRunAttemptPurged', () => {
     for (const attempt of [undefined, 1, 2, 99]) {
       expect(isRunAttemptPurged(34819961093, attempt)).toBe(true);
     }
-    // The sibling H200 purge from #1183 stays registered alongside this one.
     expect(PURGED_RUNS.has(34819578354)).toBe(true);
-    // Adjacent ids and the 2026-09-13 H200 curve sources must remain ingestible.
     expect(isRunAttemptPurged(34819961092, 1)).toBe(false);
     expect(isRunAttemptPurged(34819961094, 1)).toBe(false);
     expect(isRunAttemptPurged(30781313910, 3)).toBe(false);
@@ -726,12 +720,10 @@ describe('isRunAttemptPurged', () => {
       for (const attempt of attempts) {
         expect(isRunAttemptPurged(runId, attempt)).toBe(true);
       }
-      // An attempt not in the set should not be purged (assuming the run isn't in PURGED_RUNS)
       const unlistedAttempt = Math.max(...attempts) + 1;
       if (!attempts.has(unlistedAttempt)) {
         expect(isRunAttemptPurged(runId, unlistedAttempt)).toBe(false);
       }
-      // Without an attempt, only whole-run purges count → false here
       expect(isRunAttemptPurged(runId)).toBe(false);
     }
   });

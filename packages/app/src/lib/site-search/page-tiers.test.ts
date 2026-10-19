@@ -19,13 +19,11 @@ describe('pageTier', () => {
     expect(pageTier('/blog')).toBe(PAGE_TIER.article);
     expect(pageTier('/blog/powerx#joules')).toBe(PAGE_TIER.article);
     expect(pageTier('/whitepaper/agentx')).toBe(PAGE_TIER.article);
-    // Prefixes match whole segments only.
     expect(pageTier('/blogroll')).toBe(PAGE_TIER.reference);
   });
 });
 
 describe('tier ordering in search', () => {
-  // Comparable relevance everywhere, so tier alone decides the order.
   const docs = [
     { url: '/blog/power-deep-dive', pageTitle: 'Power deep dive', text: 'GPU power per token' },
     { url: '/overview', pageTitle: 'Power overview', text: 'GPU power summary' },

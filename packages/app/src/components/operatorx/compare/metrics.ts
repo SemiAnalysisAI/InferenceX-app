@@ -9,12 +9,9 @@ export interface Metric {
   label: string;
   unit: string;
   better: 'higher' | 'lower';
-  /** Values span decades; charts default to a log scale. */
   log: boolean;
   value: (c: ComparisonCase, latencyUs: number, hardware: string) => number | null;
-  /** With the unit, for tooltips and labels. */
   format: (v: number) => string;
-  /** Without the unit, for axis ticks; the axis label carries the unit. */
   tick: (v: number) => string;
 }
 

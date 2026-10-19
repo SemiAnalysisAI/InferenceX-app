@@ -41,16 +41,13 @@ function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
 
 const CAPS = [2, 5, 10];
 
-/** The article's Figure 3 shape: B200 wins tight caps, GB300 wins looser ones. */
 const OFFICIAL = {
   b200_sglang: [
     makePoint({ hwKey: 'b200_sglang', ttft: 1.6, costh: 0.067 }),
-    // Cheaper but too slow to start — must only appear under caps ≥ 5 s.
     makePoint({ hwKey: 'b200_sglang', ttft: 4.2, costh: 0.06 }),
   ],
   'gb300_dynamo-trt': [
     makePoint({ hwKey: 'gb300_dynamo-trt', ttft: 8.9, costh: 0.045 }),
-    // Fails the interactivity floor: never eligible, however cheap.
     makePoint({ hwKey: 'gb300_dynamo-trt', ttft: 0.9, costh: 0.01, interactivity: 90 }),
   ],
   mi355x_sglang: [makePoint({ hwKey: 'mi355x_sglang', ttft: 1.4, costh: 0.127 })],
@@ -149,18 +146,14 @@ describe('selectFirstTokenWinners', () => {
 
   it('picks the cheapest row under each cap that also clears the interactivity floor', () => {
     const result = select();
-    // Under 2 s only the fast B200 row qualifies for NVIDIA; the cheap GB300
-    // row is too slow to start and the cheaper-still GB300 row is below 150 tok/s.
     expect(winnerOf(result, 2, 'vendor:NVIDIA')).toMatchObject({
       hwKey: 'b200_sglang',
       cost: 0.067,
     });
-    // At 5 s the slower-to-start, cheaper B200 row takes over.
     expect(winnerOf(result, 5, 'vendor:NVIDIA')).toMatchObject({
       hwKey: 'b200_sglang',
       cost: 0.06,
     });
-    // At 10 s GB300 finally clears the cap and is cheapest of all.
     expect(winnerOf(result, 10, 'vendor:NVIDIA')).toMatchObject({
       hwKey: 'gb300_dynamo-trt',
       cost: 0.045,
@@ -227,7 +220,6 @@ describe('selectFirstTokenWinners', () => {
       expect(winnerOf(result, cap, 'vendor:NVIDIA')?.hwKey).toBe(
         cap >= 10 ? 'gb300_dynamo-trt' : undefined,
       );
-    // The unreadable rows are not counted as measured either.
     expect(result.measuredRows).toBe(3);
   });
 
@@ -248,7 +240,6 @@ describe('selectFirstTokenWinners', () => {
   it('counts qualifying and measured rows for the subtitle', () => {
     const result = select();
     expect(result.measuredRows).toBe(5);
-    // The 90 tok/s GB300 row fails the floor.
     expect(result.qualifyingRows).toBe(4);
   });
 

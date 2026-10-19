@@ -38,9 +38,6 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
             autocapture: true,
             capture_dead_clicks: true,
             capture_performance: { network_timing: true, web_vitals: true },
-            // No PostHog surveys are configured for this product — without
-            // this flag posthog-js still pulls surveys.js (~32 KiB) on every
-            // load. Remove the flag if surveys are ever launched.
             disable_surveys: true,
           });
           registerAnalyticsClient(posthog);
@@ -92,7 +89,6 @@ function PageViewTracker() {
   return null;
 }
 
-/** Track SPA page views on route change (wrapped in Suspense for useSearchParams) */
 export function PostHogPageView() {
   return (
     <Suspense fallback={null}>

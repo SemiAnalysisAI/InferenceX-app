@@ -26,8 +26,6 @@ async function loadWorkflowInfo(date: string, benchmarkType?: 'agentic_traces') 
   return { runs, changelogs, configs, runConfigs };
 }
 
-// Scenario is an explicit cache dimension: fixed-sequence and Agentic Traces
-// requests for the same date must never share a cached runConfigs payload.
 const getCachedWorkflowInfo = cachedQuery(loadWorkflowInfo, 'workflow-info-v2');
 
 export async function GET(request: NextRequest) {

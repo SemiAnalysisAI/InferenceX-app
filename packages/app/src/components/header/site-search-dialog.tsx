@@ -85,10 +85,8 @@ export function SiteSearchDialog({
 
   useEffect(() => engine.subscribe(setStatus), [engine]);
 
-  // Index the page on screen, then crawl in the background only while open.
   useEffect(() => {
     if (!open) return;
-    // Wait a frame so the dialog portal exists and is excluded from extraction.
     const frame = requestAnimationFrame(() => engine.indexLiveDocument(pathname));
     engine.start();
     return () => {
@@ -101,8 +99,6 @@ export function SiteSearchDialog({
     engine.prioritize(query);
   }, [engine, query]);
 
-  // `status.version` changes whenever pages finish indexing, so results
-  // refresh live as the crawl progresses.
   const results: SearchResult[] = useMemo(
     () => (query.trim() ? engine.search(query, 20) : []),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- version is the index revision
@@ -110,8 +106,6 @@ export function SiteSearchDialog({
   );
 
   useEffect(() => setActiveIndex(0), [query]);
-  // The crawl can shrink the list under the cursor; clamp so the highlight and
-  // Enter always target a real row.
   const selected = results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1);
 
   useEffect(() => {
@@ -121,7 +115,6 @@ export function SiteSearchDialog({
       track('header_search_queried', { query: trimmed.slice(0, 100), results: results.length });
     }, QUERY_TRACK_DELAY_MS);
     return () => clearTimeout(timer);
-    // Track settled queries only, not every index revision.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 

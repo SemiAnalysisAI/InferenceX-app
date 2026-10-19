@@ -1,8 +1,3 @@
-/**
- * Cross-hardware comparison: the same cases measured on different GPU runners, aligned by
- * case identity (op args + backend) and grouped into workload sources. Pure; the caller
- * picks which run supplies each runner's results (newest first wins per case).
- */
 import { opLabels, usefulBytes, usefulFlops } from './describe';
 import {
   type OperatorXDataset,
@@ -14,29 +9,23 @@ import { topLevelModel, type WorkloadSource, workloadSources } from './workloads
 
 export type ComparisonOp = 'gemm' | 'moe';
 
-/** One GPU and the run(s) its results came from. */
 export interface ComparisonHardware {
-  /** Hardware key (h200, b200, mi355x, ...): the entity that is compared and colored. */
   id: string;
   runner: string;
   runs: { runId: string; generatedAt: string }[];
 }
 
-/** Arithmetic precision the math runs at, for peak-throughput lookups. */
 export type ComputePrecision = 'fp4' | 'fp8' | 'bf16' | 'other';
 
 export interface ComparisonRow {
-  /** Case identity shared by the same case on every runner. */
   caseKey: string;
   hardware: string;
   testlist: string;
   workloads: string[];
-  /** Models the case comes from, as InferenceX names them, with its roles in each. */
   sources: CaseSource<string>[];
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
-  /** Primary size axis: GEMM M, MoE tokens. */
   x: number | null;
   dims: Record<string, number>;
   status: OperatorXStatus;
@@ -50,16 +39,11 @@ export interface ComparisonRow {
   revision: string;
 }
 
-/**
- * A model a case comes from (a name, or an index into `ComparisonView.models`) and the
- * layers that run the case in it (`attn.wq_b`, `mlp`).
- */
 export interface CaseSource<M> {
   model: M;
   roles: string[];
 }
 
-/** Sources grouped by model: several checkpoints of one model merge. */
 function sourcesByModel(sources: OperatorXSource[]): CaseSource<string>[] {
   const byModel = new Map<string, Set<string>>();
   for (const s of sources) {
@@ -82,12 +66,10 @@ export interface Comparison {
 }
 
 export interface ComparisonInput {
-  /** Runner label as the sweep planned it (h200-dgxc, mi300x-amd, ...). */
   runner: string;
   dataset: OperatorXDataset;
 }
 
-/** Hardware key of a runner label: `h200-dgxc` -> `h200`, `mi300x-amd` -> `mi300x`. */
 export function hardwareKey(runner: string): string {
   return runner.split('-')[0];
 }
@@ -137,12 +119,10 @@ function dims(op: ComparisonOp, a: Args): Record<string, number> {
 
 const isObj = (v: unknown) => typeof v === 'object' && v !== null;
 
-/** GEMM operands are descriptors (`a`, `b`); MoE carries an `experts` block. */
 function isCurrentSchema(op: ComparisonOp, a: Args): boolean {
   return op === 'gemm' ? isObj(a.a) && isObj(a.b) : isObj(a.experts);
 }
 
-/** The identity used to choose one result per GPU, case, and backend. */
 export function comparisonCaseKey(
   op: ComparisonOp,
   runner: string,
@@ -152,7 +132,6 @@ export function comparisonCaseKey(
   return `${hardwareKey(runner)}|${stableJson(result.args)}|${result.backend}`;
 }
 
-/** Inputs newest first: the first runner's result for a case wins. */
 export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Comparison {
   const hardware = new Map<string, ComparisonHardware>();
   const rows = new Map<string, ComparisonRow>();
@@ -213,7 +192,6 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
   };
 }
 
-/** A case as every runner measured it: described once. */
 export interface ComparisonCase {
   key: string;
   testlist: string;
@@ -227,11 +205,9 @@ export interface ComparisonCase {
   bytes: number | null;
 }
 
-/** Per-GPU measurements, column arrays indexed like `ComparisonView.cases`. */
 export interface ComparisonColumns {
   status: (OperatorXStatus | null)[];
   latencyUs: (number | null)[];
-  /** Index into `ComparisonView.kernels`. */
   kernel: (number | null)[];
   cudaGraph: (boolean | null)[];
   runId: (string | null)[];
@@ -239,14 +215,12 @@ export interface ComparisonColumns {
   revision: (string | null)[];
 }
 
-/** One workload's cases across hardware, compact for transfer. */
 export interface ComparisonView {
   op: ComparisonOp;
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
   workload: string | null;
   cases: ComparisonCase[];
-  /** Models the cases come from. */
   models: string[];
   kernels: string[];
   measurements: Record<string, ComparisonColumns>;
@@ -271,7 +245,6 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   };
   for (const r of rows) {
     const seen = caseIndex.get(r.caseKey);
-    // Runners can list different layers for one case; the case names every one.
     if (seen !== undefined) {
       const merged = cases[seen].sources;
       for (const s of r.sources) {

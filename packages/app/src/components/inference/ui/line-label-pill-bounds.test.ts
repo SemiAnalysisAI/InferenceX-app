@@ -16,14 +16,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const PLOT = { width: 400, height: 300 };
 const CLIP_ID = 'clip-test-chart';
 
-/** Stubbed text metrics: 6px per character, 12px tall, centred on the baseline. */
 const CHAR_WIDTH = 6;
 const TEXT_HEIGHT = 12;
 
-/**
- * A chart skeleton shaped like `setupChartStructure` builds it: a clipPath
- * in <defs> sized to the plot and a `.zoom-group` that references it.
- */
 function renderChart(clip = true) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -63,7 +58,6 @@ const placement = (
   visible,
 });
 
-/** The pill's `.ll-bg` box in zoom-group coordinates, as the clip path sees it. */
 function pillBox(zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, key: string) {
   const node = zoomGroup.select<SVGGElement>(`.line-label[data-line-key="${key}"]`).node()!;
   const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
@@ -81,7 +75,6 @@ function pillBox(zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
 
 const overlaps = (a: RectBounds, b: RectBounds) => rectsStrictlyOverlap(a, b);
 
-/** Add a parallelism chip the way the roofline layer draws one, centred on (x, y). */
 function addParallelismChip(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   x: number,
@@ -110,9 +103,6 @@ const expectInsidePlot = (box: ReturnType<typeof pillBox>) => {
   expect(box.bottom).toBeLessThanOrEqual(PLOT.height);
 };
 
-// jsdom has no layout engine; give every text a deterministic box derived
-// from its content so the pill width tracks the label the way it does in a
-// browser.
 let originalGetBBox: PropertyDescriptor | undefined;
 beforeEach(() => {
   originalGetBBox = Object.getOwnPropertyDescriptor(SVGElement.prototype, 'getBBox');
@@ -208,9 +198,6 @@ describe('clamped pills do not stack on their neighbours', () => {
   });
 
   it('flips a pill below its anchor when the neighbour above was slid down onto it', () => {
-    // Bugbot's case: `placeLineLabels` cleared these two anchors (they are
-    // 26px apart, more than one collision height), but the top pill has to
-    // slide 19px down to stay in the plot, which puts it on the second one.
     const { zoomGroup } = renderChart();
     renderLineLabels(
       zoomGroup,
@@ -222,7 +209,6 @@ describe('clamped pills do not stack on their neighbours', () => {
     const next = pillBox(zoomGroup, 'next');
     expect(top.top).toBe(0);
     expect(overlaps(top, next)).toBe(false);
-    // The second pill kept its x and moved to the mirror slot below its anchor.
     expect(next.tx).toBe(218);
     expect(next.top).toBeGreaterThan(30);
     expectInsidePlot(top);
@@ -267,7 +253,6 @@ describe('clamped pills do not stack on their neighbours', () => {
       [placement('top', 200, 150, 'GB200 (Dynamo)'), placement('next', 210, 176, 'B300 (vLLM)')],
       { seriesAttribute: 'data-hw-key' },
     );
-    // Zoom drags both anchors to the top edge.
     updateRenderedLineLabels(zoomGroup, [
       placement('top', 200, 4, 'GB200 (Dynamo)'),
       placement('next', 210, 30, 'B300 (vLLM)'),
@@ -292,7 +277,6 @@ describe('clamped pills do not stack on their neighbours', () => {
       { seriesAttribute: 'data-hw-key' },
     );
 
-    // Nothing visible sits above it, so the second pill keeps its default slot.
     const next = pillBox(zoomGroup, 'next');
     expect(next.tx).toBe(218);
     expect(next.ty).toBe(16);
@@ -313,9 +297,6 @@ describe('line-label pills stay inside the plot bounding box', () => {
   });
 
   it('slides a pill anchored on the last point of a line back from the right edge', () => {
-    // The regression: a run whose label landed on its final point was drawn
-    // with the pill's right half past the plot, where the clip path cut it to
-    // "B300 (v".
     const { zoomGroup } = renderChart();
     renderLineLabels(zoomGroup, [placement('b300', 390, 150, 'B300 (vLLM)')], {
       seriesAttribute: 'data-hw-key',
@@ -355,7 +336,6 @@ describe('line-label pills stay inside the plot bounding box', () => {
     renderLineLabels(zoomGroup, [placement('b300', 200, 150, 'B300 (vLLM)')], {
       seriesAttribute: 'data-hw-key',
     });
-    // A zoomed-in scale can push the anchor itself past the plot edge.
     updateRenderedLineLabels(zoomGroup, [placement('b300', 395, 310, 'B300 (vLLM)')]);
 
     const box = pillBox(zoomGroup, 'b300');

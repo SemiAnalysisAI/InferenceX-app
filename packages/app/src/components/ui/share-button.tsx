@@ -45,7 +45,6 @@ export function ShareButton({ className }: { className?: string } = {}) {
     setUrl(next);
     setCopied(false);
     track('share_popover_opened');
-    // Auto-select the URL so Cmd/Ctrl+C just works.
     queueMicrotask(() => {
       inputRef.current?.focus();
       inputRef.current?.select();
@@ -93,7 +92,6 @@ export function ShareButton({ className }: { className?: string } = {}) {
         className="w-80"
         data-testid="share-popover"
         onOpenAutoFocus={(event) => {
-          // Keep focus on the URL input rather than the first focusable child.
           event.preventDefault();
           inputRef.current?.focus();
           inputRef.current?.select();

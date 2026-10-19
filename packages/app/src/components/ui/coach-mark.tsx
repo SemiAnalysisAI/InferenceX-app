@@ -18,9 +18,7 @@ const STRINGS = {
   zh: { close: '关闭提示' },
 } as const;
 
-/** Card width in px. Mirrors the `w-72` utility so placement can use it before paint. */
 const CARD_WIDTH = 288;
-/** Stop the pointer short of the anchor so the arrowhead doesn't cover the point. */
 const ARROW_STANDOFF = 13;
 
 interface CoachMarkProps {
@@ -28,9 +26,7 @@ interface CoachMarkProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  /** Fired by the X button and by Escape. */
   onDismiss: () => void;
-  /** Fired when the user clicks something matching `anchor.actionSelector`. */
   onAction?: () => void;
   testId?: string;
 }
@@ -48,16 +44,6 @@ function samePlacement(a: CoachMarkPlacement | null, b: CoachMarkPlacement | nul
   );
 }
 
-/**
- * A non-modal callout pinned to a live element: a small card plus a pointer
- * drawn to the anchor's centre.
- *
- * Deliberately *not* a focus trap and not backed by a scrim — the whole point
- * is to teach an interaction the user then performs on the element underneath,
- * so everything except the card itself stays `pointer-events: none`. The card
- * hides (without dismissing) whenever the anchor is missing or scrolled out of
- * view, and re-appears when it comes back.
- */
 export function CoachMark({
   anchor,
   icon,
@@ -79,7 +65,6 @@ export function CoachMark({
   const repositionEvents = anchor.repositionEvents;
   const actionSelector = anchor.actionSelector;
 
-  // ── Placement, kept in sync with the live chart ──────────────────────────
   useLayoutEffect(() => {
     let frame = 0;
 
@@ -121,15 +106,9 @@ export function CoachMark({
     measure();
 
     window.addEventListener('resize', schedule);
-    // Capture phase so scrolling inside any container (not just the document)
-    // repositions the pointer.
     window.addEventListener('scroll', schedule, { capture: true, passive: true });
     for (const event of repositionEvents ?? []) window.addEventListener(event, schedule);
 
-    // D3 coordinate transitions rewrite `transform` on every point each
-    // frame. Keep the selected anchor for those mutations and validate just
-    // that point. Structural, visibility, and trace-availability changes can
-    // change which point is eligible, so they invalidate the cached choice.
     const observer = new MutationObserver((records) => {
       if (
         records.some(
@@ -162,16 +141,8 @@ export function CoachMark({
     };
   }, [resolve, getRect, getMutationRoot, repositionEvents]);
 
-  /**
-   * Whether the callout is actually on screen. The card stays mounted while
-   * hidden — it has to be in the DOM to be measured, and it re-appears when
-   * its point comes back — so every input handler below is gated on this.
-   * Dismissal is permanent: reacting to a keypress or a click while nothing
-   * is visible would burn the first-visit tip the user never saw.
-   */
   const visible = placement !== null;
 
-  // ── Escape to dismiss ────────────────────────────────────────────────────
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
   useEffect(() => {
@@ -183,7 +154,6 @@ export function CoachMark({
     return () => window.removeEventListener('keydown', handler);
   }, [visible]);
 
-  // ── Clicking the thing the tip is about counts as taking the action ──────
   const onActionRef = useRef(onAction);
   onActionRef.current = onAction;
   useEffect(() => {
@@ -192,7 +162,6 @@ export function CoachMark({
       const target = event.target as Element | null;
       if (target?.closest?.(actionSelector)) onActionRef.current?.();
     };
-    // Capture phase: d3's own point handler calls stopPropagation().
     document.addEventListener('click', handler, true);
     return () => document.removeEventListener('click', handler, true);
   }, [actionSelector, visible]);
@@ -205,9 +174,6 @@ export function CoachMark({
   return (
     <div
       className="pointer-events-none fixed inset-0 z-50"
-      // The card is measured before it is ever placed, so it must be in the
-      // DOM from the first paint — `aria-hidden` keeps that measuring pass out
-      // of the accessibility tree.
       aria-hidden={visible ? undefined : 'true'}
       data-testid={testId ? `${testId}-layer` : undefined}
     >
@@ -247,9 +213,6 @@ export function CoachMark({
               />
             );
           })()}
-          {/* Pulsing ring on the anchor itself. Unlike the pointer line —
-              which stops short so its arrowhead doesn't cover the point — this
-              is centred exactly on what the tip is about. */}
           <circle
             data-testid={testId ? `${testId}-target` : undefined}
             cx={placement.arrowX2}

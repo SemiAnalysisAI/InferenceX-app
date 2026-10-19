@@ -1,11 +1,8 @@
 import { modelSelectionBenchmarks } from './model-selection-fixtures';
 
-// Synthetic navigation data: the captured Qwen fixtures only contain single-turn runs.
 const qwenAgenticRows = modelSelectionBenchmarks
   .filter((row) => row.model === 'dsv4')
   .map((row) => ({ ...row, model: 'qwen3.5', precision: 'fp8' }));
-// An off-scope FP4 winner reproduces production: ranking before the FP8 filter
-// selected Dynamo TRT and left the visible GB300 Dynamo SGLang line unchecked.
 qwenAgenticRows.push(
   ...qwenAgenticRows
     .filter((row) => row.hardware === 'gb300' && row.framework === 'dynamo-sglang')
@@ -39,7 +36,6 @@ export function interceptTpuLaunchData(
     model === 'Kimi-K3'
       ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
       : qwenAgenticRows;
-  // Preserve other models and any test-specific availability overrides.
   cy.intercept('GET', '/api/v1/availability*', (request) => {
     request.on('response', (response) => {
       response.body = [...response.body, ...rows.map(({ metrics: _metrics, ...row }) => row)];

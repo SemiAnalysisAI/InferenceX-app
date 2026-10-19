@@ -58,8 +58,6 @@ export function GET(request: NextRequest) {
       : [list.runs.find((r) => r.measured_cases > 0)?.run_id ?? list.runs[0]?.run_id].filter(
           (id): id is string => Boolean(id),
         );
-    // The discovered default is validated too: a malformed run id in the run
-    // list must fail loudly rather than fan out to an odd upstream path.
     assertRunIdList(runIds, 'runs');
     const datasets = await Promise.all(
       runIds.map(async (runId) =>

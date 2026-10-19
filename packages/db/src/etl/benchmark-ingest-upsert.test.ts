@@ -62,12 +62,6 @@ async function ingest(...rows: BenchmarkPersistenceInput[]) {
   return stored.rows.map((r) => r.power_audit);
 }
 
-/**
- * AgentX provenance is derived from the telemetry bundle and attached to the
- * per-job row before insert; no result row carries it. The upsert therefore
- * keeps it when the incoming agentic row has none (aggregate copy, re-ingest)
- * while every other lane stays artifact-authoritative.
- */
 describe('bulkIngestBenchmarkRows — power_audit on conflict', () => {
   it('keeps an agentic audit across a copy without one and lets a carried audit replace it', async () => {
     expect(await ingest(row({ powerAudit: AUDIT }))).toEqual([AUDIT]);

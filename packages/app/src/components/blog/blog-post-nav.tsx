@@ -16,7 +16,6 @@ interface PostLink {
 interface BlogPostNavProps {
   prev: PostLink | null;
   next: PostLink | null;
-  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
   labels?: { prev: string; next: string };
 }
@@ -74,7 +73,6 @@ function NavCard({
   );
 }
 
-/** Previous / next article cards under the post body. Slot stays empty at either end of the list. */
 export function BlogPostNav({
   prev,
   next,

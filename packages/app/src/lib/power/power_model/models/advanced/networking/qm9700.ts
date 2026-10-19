@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** QM9700 NDR switch with the project's provisional Quantum box-power budget. */
 
 import { Provenance } from '../../../base';
 import {

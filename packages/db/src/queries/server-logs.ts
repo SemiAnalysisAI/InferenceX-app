@@ -1,6 +1,5 @@
 import type { DbClient } from '../connection.js';
 
-/** Map of `benchmark_results.id` → true for each id with a linked log bundle. */
 export type ServerLogAvailabilityMap = Record<number, true>;
 
 export interface ServerLogChunk {
@@ -28,11 +27,9 @@ const isPreLogFilesSchema = (error: unknown): boolean => {
   return code === '42P01' || code === '42703';
 };
 
-/** Escape user text for PostgreSQL's POSIX regex engine. */
 export const escapePostgresRegexLiteral = (value: string): string =>
   value.replaceAll(/[\\^$.*+?()[\]{}|]/gu, String.raw`\$&`);
 
-/** Fetch a complete log file. Omit fileName for the primary/legacy stream. */
 export async function getServerLog(
   sql: DbClient,
   benchmarkResultId: number,
@@ -73,7 +70,6 @@ export async function getServerLog(
   }
 }
 
-/** List the artifact-relative filenames for one benchmark result, primary first. */
 export async function getServerLogFileNames(
   sql: DbClient,
   benchmarkResultId: number,
@@ -103,14 +99,6 @@ export async function getServerLogFileNames(
   }
 }
 
-/**
- * Fetch a bounded character range from one stored log file.
- *
- * Some production logs are hundreds of megabytes, so the UI must never read
- * the complete PostgreSQL text value just to render the first screen. Reading
- * one extra character reports whether another chunk exists without computing
- * the full log length.
- */
 export async function getServerLogChunk(
   sql: DbClient,
   benchmarkResultId: number,
@@ -194,7 +182,6 @@ export async function getServerLogChunk(
   }
 }
 
-/** Search every stored file without transferring complete logs out of PostgreSQL. */
 export async function searchServerLogs(
   sql: DbClient,
   benchmarkResultId: number,
@@ -349,7 +336,6 @@ export async function searchServerLogs(
   }
 }
 
-/** Lightweight bulk lookup used to decide whether a point exposes "View logs". */
 export async function getServerLogAvailability(
   sql: DbClient,
   benchmarkResultIds: number[],

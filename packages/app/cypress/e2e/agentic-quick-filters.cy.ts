@@ -107,7 +107,6 @@ describe('Agentic Quick Filters', () => {
   it('opens from the legend, omits spec decoding, and filters the rendered agentic points', () => {
     visitAgenticQuickFilters();
 
-    // A stale speculative-decoding URL selection is ignored for agentic data.
     cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
@@ -123,8 +122,6 @@ describe('Agentic Quick Filters', () => {
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
 
-    // An incompatible cross-group selection produces zero points. The dialog
-    // must stay mounted so the reader can recover without reloading the page.
     cy.get('[data-testid="quick-filter-framework-vllm"]').click();
     cy.get('[data-testid="scatter-empty-quick-filters"]').should('exist');
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');

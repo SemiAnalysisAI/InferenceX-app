@@ -1,71 +1,35 @@
-/**
- * Pre-compute the per-request timeline for the agentic detail page's
- * Gantt view. Output is stored as gzip-compressed JSON in
- * `agentic_trace_replay.request_timeline_gz` (see `request-timeline-codec.ts`)
- * and read by the timeline, request-chart-data, and trace-histograms routes.
- *
- * Shape is a thin array of compact per-request records. The largest
- * throughput runs contain hundreds of thousands of requests, so extraction
- * must not materialize the decompressed JSONL.
- *
- * Versioned so the backfill script knows which rows are stale. Bump
- * `REQUEST_TIMELINE_VERSION` whenever the extraction algorithm changes.
- */
-
 import { Readable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { createGunzip } from 'node:zlib';
 
-/** Bump when the extraction algorithm changes — backfill recomputes anything older. */
 export const REQUEST_TIMELINE_VERSION = 6;
 
 export interface RequestRecord {
-  /** Conversation id (groups turns of one agent session). */
   cid: string;
-  /** Compact replay-lane id derived from AIPerf's stable correlation id. */
   ri?: number;
-  /** Zero-based turn index within the conversation. */
   ti: number;
-  /** Source trace id from the original raw dataset, when distinct from replay cid. */
   srcTrace?: string;
-  /** Original raw top-level request index within srcTrace. */
   srcOuter?: number;
-  /** Original nested request index within srcOuter, for subagent children. */
   srcInner?: number;
-  /** Loader-specific source kind, e.g. weka_main or weka_flat. */
   srcKind?: string;
-  /** Worker id (concurrency slot that handled this request). */
   wid: string;
-  /** Sub-agent depth (0 = top-level). */
   ad: number;
-  /** `warmup` or `profiling`. */
   phase: string;
-  /** ns offset from timeline.startNs. Load gen decided to dispatch. */
   credit: number;
-  /** ns offset from timeline.startNs. HTTP send started. */
   start: number;
-  /** ns offset from timeline.startNs. First server acknowledgement (or null). */
   ack: number | null;
-  /** ns offset from timeline.startNs. Last byte received. */
   end: number;
-  /** Time-to-first-token in ms. */
   ttftMs: number | null;
-  /** Time per output token in ms. */
   tpotMs: number | null;
-  /** Input sequence length (tokens). */
   isl: number | null;
-  /** Output sequence length (tokens). */
   osl: number | null;
   cancelled: boolean;
 }
 
 export interface RequestTimeline {
   version: number;
-  /** Wall-clock ns of the earliest event (used as the relative-time origin). */
   startNs: number;
-  /** Wall-clock ns of the latest `request_end_ns`. */
   endNs: number;
-  /** Total span in seconds. */
   durationS: number;
   requests: RequestRecord[];
 }
@@ -105,7 +69,6 @@ interface RawRecord {
   };
 }
 
-/** Pull a numeric metric out of the `{value, unit}` envelope (or a bare number). */
 function readNum(v: unknown): number | undefined {
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
   if (v && typeof v === 'object' && 'value' in v) {
@@ -115,10 +78,6 @@ function readNum(v: unknown): number | undefined {
   return undefined;
 }
 
-/**
- * Correlation ancestry needed to reconstruct the root on older AIPerf exports
- * that do not repeat `root_correlation_id` on subagent records.
- */
 interface ReplayCorrelationMaps {
   parentByCorrelation: Map<string, string>;
   rootByCorrelation: Map<string, string>;
@@ -142,14 +101,6 @@ function resolveCorrelationRoot(id: string, maps: ReplayCorrelationMaps): string
   return id;
 }
 
-/**
- * AIPerf may sample the same source conversation into several concurrently
- * executing trajectory lanes. `conversation_id` intentionally stays the
- * source id, while the root correlation id identifies one replay across every
- * turn and subagent. For older exports, walk `parent_correlation_id` links from
- * the per-session `x_correlation_id` instead of treating each subagent session
- * as an independent replay.
- */
 function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | undefined {
   const explicitRoot = correlationId(meta.root_correlation_id);
   if (explicitRoot !== undefined) return explicitRoot;
@@ -157,11 +108,6 @@ function replayKey(meta: RawMetadata, maps: ReplayCorrelationMaps): string | und
   return session === undefined ? undefined : resolveCorrelationRoot(session, maps);
 }
 
-/**
- * Yield complete UTF-8 lines without retaining the decompressed profile.
- * `Readable.from([blob])` is intentional: without the array wrapper Node may
- * iterate the Buffer byte-by-byte instead of passing it as one chunk.
- */
 async function* gunzipLines(blob: Buffer | (() => AsyncIterable<Buffer>)): AsyncGenerator<string> {
   const decoder = new StringDecoder('utf8');
   let carry = '';
@@ -199,18 +145,11 @@ function parseRawRecord(line: string): RawRecord | null {
   }
 }
 
-/**
- * Parse the gzipped `profile_export.jsonl` blob into a chart-ready
- * timeline. Returns null on a missing or malformed blob.
- */
 export async function computeRequestTimeline(
   blob: Buffer | (() => AsyncIterable<Buffer>) | null,
 ): Promise<RequestTimeline | null> {
   if (!blob) return null;
 
-  // First pass: find the timeline bounds and the first dispatch for each
-  // replay. This deliberately stores only one entry per replay, not one entry
-  // per request, so a 400+ MB decompressed profile stays memory-bounded.
   let originNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
   let recordCount = 0;
@@ -226,8 +165,6 @@ export async function computeRequestTimeline(
       const rec = parseRawRecord(line);
       if (!rec) continue;
       const meta = rec.metadata ?? {};
-      // Use credit_issued_ns when available (the true start of the request's
-      // lifecycle), falling back to request_start_ns. Skip rows missing both.
       const cStart = meta.credit_issued_ns ?? meta.request_start_ns;
       const cEnd = meta.request_end_ns;
       if (typeof cStart !== 'number' || typeof cEnd !== 'number') continue;
@@ -260,9 +197,6 @@ export async function computeRequestTimeline(
   if (recordCount === 0) return null;
   if (!Number.isFinite(originNs)) originNs = 0;
 
-  // Assign compact deterministic replay ids. UUIDs would add substantial
-  // repeated payload to large timelines, so rank distinct correlation ids by
-  // their first dispatch and send only the numeric rank to the frontend.
   const replayFirstStart = new Map(explicitRootFirstStart);
   for (const [session, firstStart] of legacySessionFirstStart) {
     const key = resolveCorrelationRoot(session, correlationMaps);
@@ -278,10 +212,6 @@ export async function computeRequestTimeline(
     )
     .forEach(([key], index) => replayIndex.set(key, index));
 
-  // Second gzip pass: build only the final compact request objects. Re-reading
-  // costs some CPU but avoids simultaneously retaining the decompressed text,
-  // parsed source records, and output records — the previous peak-memory
-  // multiplier that made high-throughput backfills fail.
   const requests: RequestRecord[] = [];
   try {
     for await (const line of gunzipLines(blob)) {
@@ -325,7 +255,6 @@ export async function computeRequestTimeline(
     return null;
   }
 
-  // Stable order so backfill output is deterministic.
   requests.sort((a, b) => a.start - b.start);
 
   return {

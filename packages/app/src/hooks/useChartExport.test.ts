@@ -67,7 +67,6 @@ describe('useChartExport failure messages', () => {
     ['/inference', 'Failed to export image. Please try again.'],
     ['/zh/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
-    // Keep the hook mounted across locale navigation to catch a stale callback.
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));
     const error = new Error('PNG capture failed');

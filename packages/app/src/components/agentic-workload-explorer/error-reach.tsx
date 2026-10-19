@@ -2,8 +2,6 @@ import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { ErrorReach, ErrorReachCohort } from '@/lib/agentic-workload-explorer/api-types';
 import type { Locale } from '@/lib/i18n/i18n';
 
-// Cohorts are the proxy route (`metadata.client`), precomputed in the frozen
-// errors cache, so they are API providers rather than harnesses.
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   codex: 'Codex',

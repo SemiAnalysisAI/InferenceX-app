@@ -18,9 +18,6 @@ import {
   type OverlayTooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
 
-// ---------------------------------------------------------------------------
-// fixture factories
-// ---------------------------------------------------------------------------
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -304,9 +301,6 @@ describe('modeled system-power tooltip', () => {
   });
 });
 
-// ===========================================================================
-// getPointLabel
-// ===========================================================================
 describe('getPointLabel', () => {
   it('returns tp as string when no ep field', () => {
     expect(getPointLabel(pt({ tp: 8 }))).toBe('8');
@@ -384,23 +378,17 @@ describe('getPointLabel', () => {
         disagg: true,
       }),
     );
-    // falls back to d.tp=8 and d.ep=4 for both prefill and decode
-    // configSegmentLabel(8, 4, undefined): ep>1 && tp!==ep → "EP4"
     expect(result).toBe('1xEP4+1xEP4');
   });
 
   it('returns tp string when ep is explicitly undefined', () => {
     const d = pt({ tp: 4 });
-    // ensure ep and prefill_ep are not set
     delete (d as any).ep;
     delete (d as any).prefill_ep;
     expect(getPointLabel(d)).toBe('4');
   });
 });
 
-// ===========================================================================
-// generateTooltipContent
-// ===========================================================================
 describe('generateTooltipContent', () => {
   it('renders View charts as a same-tab anchor so browsers offer open-in-new-tab', () => {
     const html = generateTooltipContent(
@@ -529,8 +517,6 @@ describe('generateTooltipContent', () => {
   });
 
   it('omits View charts when the point id is non-persisted (0 / NaN), even if pinned + hasTrace', () => {
-    // Overlay agentic points arrive with id 0 / NaN — the button would otherwise
-    // link to /inference/agentic/0, a doomed lookup.
     for (const badId of [0, Number.NaN]) {
       const html = generateTooltipContent(
         tooltipConfig({
@@ -822,9 +808,6 @@ describe('generateTooltipContent', () => {
   });
 });
 
-// ===========================================================================
-// generateOverlayTooltipContent
-// ===========================================================================
 describe('generateOverlayTooltipContent', () => {
   function overlayConfig(overrides: Partial<OverlayTooltipConfig> = {}): OverlayTooltipConfig {
     return {
@@ -946,9 +929,6 @@ describe('generateOverlayTooltipContent', () => {
   });
 });
 
-// ===========================================================================
-// generateGPUGraphTooltipContent
-// ===========================================================================
 describe('generateGPUGraphTooltipContent', () => {
   it('includes "Chip Config:" label', () => {
     const html = generateGPUGraphTooltipContent(tooltipConfig());

@@ -132,7 +132,7 @@ by the repository's code license.
 
 ## Playable Minecraft
 
-The Minecraft banner launches an optional, full [playable Minecraft](./minecraft-game.md)
+The Minecraft banner launches an optional, full playable Minecraft
 (survival and creative, infinite seeded worlds, crafting, smelting, mobs, local
 saves). The game bundle and its assets load only after the launcher is pressed.
 Asset provenance is recorded in `packages/app/public/decorative/minecraft/game/README.md`.
@@ -154,7 +154,7 @@ Asset provenance and the maintainer-reported permission are recorded in
 
 ## Toggle accessibility
 
-The GTA banner also launches the optional [Bay Area heist game](./gta-heist.md).
+The GTA banner also launches the optional Bay Area heist game.
 The game loads on demand and does not alter benchmark controls or data.
 
 The trigger keeps `data-testid="theme-toggle"` and its

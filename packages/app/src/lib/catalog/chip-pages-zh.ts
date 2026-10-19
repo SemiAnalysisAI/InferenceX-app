@@ -1,10 +1,3 @@
-/**
- * Simplified Chinese content for the /zh/chips page family.
- *
- * 1:1 sibling of `chip-pages.ts` (see AGENTS.md "Chinese Website Pages" —
- * every English change there must be mirrored here in the same PR). Numbers
- * are generated from the same registries, so only prose is translated.
- */
 import {
   buildChipVsHighlights,
   type ChipFaqItem,
@@ -19,12 +12,9 @@ import {
 } from './chip-pages';
 
 export interface ChipPageTranslation {
-  /** Chinese meta-description base. */
   summary: string;
-  /** Translated overview paragraphs (same count as English). */
   overview: readonly string[];
   benchmarkContext: string;
-  /** Chinese-searcher keywords (SKUs stay in English). */
   keywords: readonly string[];
 }
 
@@ -219,7 +209,6 @@ export function getAllZhChipSlugs(): readonly string[] {
   return Object.keys(translations);
 }
 
-/** Localized labels for the data-derived versus highlight rows. */
 export const CHIP_VS_HIGHLIGHT_LABELS_ZH: Readonly<Record<ChipVsHighlight['key'], string>> = {
   memory: '单芯片显存',
   memoryBandwidth: '内存带宽',
@@ -233,7 +222,6 @@ export const CHIP_VS_HIGHLIGHT_LABELS_ZH: Readonly<Record<ChipVsHighlight['key']
 const NOT_SUPPORTED_ZH = '不支持';
 const CHIP_COUNT_PATTERN = /^(?<count>\d+) chips$/u;
 
-/** Localize the generated English cell values ("Not supported", "72 chips") for zh rendering. */
 export function localizeVsHighlightValueZh(value: string): string {
   if (value === 'Not supported') return NOT_SUPPORTED_ZH;
   const chipCount = CHIP_COUNT_PATTERN.exec(value)?.groups?.count;
@@ -241,7 +229,6 @@ export function localizeVsHighlightValueZh(value: string): string {
   return value;
 }
 
-/** Chinese FAQ, generated from the same registries as the English one. */
 export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   const spec = getChipSpec(entry);
   const hw = getChipHw(entry);
@@ -274,7 +261,6 @@ export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   ];
 }
 
-/** Chinese FAQ for a versus page. */
 export function buildZhChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   const highlights = buildChipVsHighlights(page);
   const memory = highlights.find((h) => h.key === 'memory');
@@ -296,7 +282,6 @@ export function buildZhChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   ];
 }
 
-/** Parity guard used by tests: every English chip page must have a zh translation. */
 export function assertZhChipParity(): void {
   for (const entry of getAllChipPages()) {
     const translation = translations[entry.slug];

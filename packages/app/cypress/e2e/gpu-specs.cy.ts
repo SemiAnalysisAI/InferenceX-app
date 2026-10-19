@@ -1,10 +1,3 @@
-/**
- * Hover a chart point until its tooltip opens, then assert the tooltip text.
- * The D3 charts re-render after the container is measured, which can detach
- * the hovered point (so the first synthetic mouseenter is lost) and can hide
- * the tooltip again before a retrying `:visible` assertion samples it — so
- * re-trigger (bounded) and assert the content at the moment it is displayed.
- */
 function hoverGpuSpecsPointAndAssertTooltip(
   pointSelector: string,
   tooltipSelector: string,
@@ -38,12 +31,10 @@ describe('GPU Specs Tab', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/gpu-specs');
-    // Wait for GPU Specs tab content to be present in the DOM
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
   it('specs table is visible with all GPUs', () => {
-    // Dismiss any open dialogs first
     cy.get('body').then(($body) => {
       if ($body.find('[role="dialog"]').length > 0) {
         cy.get('body').type('{esc}');
@@ -99,7 +90,6 @@ describe('GPU Specs Bar Chart View', () => {
     });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('Chip Specifications').should('exist');
-    // Dismiss any Radix Dialog scroll locks from topology diagram components
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -127,10 +117,8 @@ describe('GPU Specs Bar Chart View', () => {
   });
 
   it('FP4 metric excludes GPUs without FP4 support', () => {
-    // Change metric to FP4
     cy.get('[data-testid="gpu-specs-metric-select"]').click({ force: true });
     cy.get('[data-slot="select-item"]').contains('FP4').click({ force: true });
-    // FP4 should show fewer bars (H100, H200, MI300X, MI325X excluded)
     cy.get('[data-testid="gpu-specs-bar-chart"] svg .bar').should('have.length', 5);
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', 'without FP4 support');
   });
@@ -166,15 +154,12 @@ describe('GPU Specs Radar Chart View', () => {
   });
 
   it('toggling a GPU off via sidebar legend removes its polygon', () => {
-    // Count initial polygons (all 9 GPUs)
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 9);
-    // Toggle off H100 SXM by clicking its legend label
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('H100 SXM')
       .click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 8);
 
-    // GPU already toggled off from previous test
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('Reset filter')
       .click({ force: true });

@@ -62,35 +62,19 @@ import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 
-/**
- * Server-side equivalent of `useChartData`'s official-data path for the views
- * API: dedupe → transform → percentile remap → derived fields → quick filters →
- * GPU filter → pareto/best flags → group by hwKey. Every step reuses the same
- * pure functions the dashboard chart pipeline runs client-side.
- */
-
-/** X-axis modes the API serves. `e2e-normalized-interactivity` is trace-derived
- * client-side and has no server-side data source, so it is not accepted here. */
 export type SeriesXMode = 'interactivity' | 'ttft' | 'e2e' | 'e2e-normalized-interactivity';
 
 export interface InferenceSeriesOptions {
   readonly sequence: Sequence;
-  /** Latency percentile for agentic x fields (`p75` | `p90`). */
   readonly percentile: string;
-  /** Resolved precisions (already defaulted by the route). */
   readonly precisions: readonly string[];
   readonly metricConfigKey: MetricConfigKey;
   readonly xmode: SeriesXMode;
-  /** Fixed-sequence service-axis statistic; ignored for Agentic. */
   readonly fixedSequenceStatistic?: FixedSequenceStatistic;
-  /** TTFT x metric override (e.g. `p90_ttft`); used by `ttft` mode and input metrics. */
   readonly xmetric: string;
-  /** Explicit hwKey / bare-GPU selection; empty = all. */
   readonly gpus: readonly string[];
   readonly quickFilters: QuickFilters;
-  /** Return only frontier points (upper boundary for measured power). */
   readonly optimal: boolean;
-  /** Return only the best series per GPU SKU. */
   readonly best: boolean;
   readonly tcoBasis?: TcoBasis;
   readonly allPoints?: boolean;
@@ -156,18 +140,15 @@ export interface InferenceSeriesMetricMeta {
 
 export interface InferenceSeriesResult {
   readonly series: readonly InferenceSeriesEntry[];
-  /** All in Measured table population, including unavailable system estimates. */
   readonly tableRows?: readonly InferenceTableRow[];
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
   readonly xAxis: { mode: SeriesXMode; field: string; label: string; statistic: string };
-  /** Scoped observed points before frontier/best-only pruning; not a public raw-row payload. */
   readonly observedPoints: readonly InferenceData[];
   readonly count: number;
 }
 
-/** GitHub Actions run id parsed from a point's run_url, when present. */
 function runIdFromUrl(runUrl: string | undefined): number | undefined {
   if (!runUrl) return undefined;
   const match = /\/runs\/(?<runId>\d+)/u.exec(runUrl);
@@ -182,7 +163,6 @@ function extractMetricValue(point: InferenceData, metricKey: string): number | u
   return undefined;
 }
 
-/** Raw metric values shipped with each point: the selected metric + throughput bases. */
 function pointMetrics(point: InferenceData, metricKey: MetricKey): Record<string, number> {
   const keys = new Set<string>([metricKey, 'tpPerGpu', 'outputTputPerGpu', 'inputTputPerGpu']);
   const metrics: Record<string, number> = {};
@@ -193,11 +173,6 @@ function pointMetrics(point: InferenceData, metricKey: MetricKey): Record<string
   return metrics;
 }
 
-/**
- * Resolve the x-axis label the dashboard would render for this selection.
- * Mirrors the display-label ladder in `useChartData.stableChartDefinitions`
- * for the explicit x-axis modes supported by this API.
- */
 function resolveXAxisLabel(
   chartDef: ChartDefinition,
   branch: string,
@@ -240,15 +215,11 @@ export function buildInferenceSeries(
   const registryEntry = METRIC_REGISTRY[metricKey];
   const isAgentic = sequence === Sequence.AgenticTraces;
 
-  // 1. Scope rows to the sequence and keep only each series' newest run.
   const seqRows = rows.filter((row) => rowToSequence(row) === sequence);
   const deduped = dedupeRowsToLatestPerConfig([...seqRows]);
 
-  // 2. Full chart transform at the selected percentile (same as the dashboard).
   const { chartData } = transformBenchmarkRows(deduped, percentile, options.tcoBasis);
 
-  // 3. Pick the chart definition for the x mode (index order matches
-  //    `chartDefinitions`: [interactivity, e2e]).
   const chartIndex = xmode === 'interactivity' || xmode === 'e2e-normalized-interactivity' ? 0 : 1;
   const chartDef = chartDefinitions[chartIndex] as ChartDefinition;
   const effectiveXMetric = xmode === 'e2e' ? null : xmetric;
@@ -259,10 +230,6 @@ export function buildInferenceSeries(
     fixedSequenceStatistic: options.fixedSequenceStatistic,
   });
 
-  // 4. Precision + scope filters (GPU picks and vendor/framework/deployment/spec pills).
-  //    The dashboard's GPU selector passes full hardware keys (`b200_trt`), but
-  //    API callers may pass base registry keys (`b200`), so expand base keys to
-  //    every matching hardware key before reusing the dashboard scope filter.
   const precisionSet = new Set(precisions);
   const precisionScoped = (chartData[chartIndex] ?? []).filter((point) =>
     precisionSet.has(point.precision),
@@ -278,8 +245,6 @@ export function buildInferenceSeries(
         ),
     ),
   ];
-  // An empty expansion must stay a filter (match nothing), not become "all":
-  // fall back to the raw keys, which exact-match nothing by construction.
   const expandedGpus =
     gpus.length === 0 ? [] : matchedHwKeys.length > 0 ? matchedHwKeys : [...gpus];
   let scoped = applyScopeFilters(precisionScoped, expandedGpus, quickFilters);
@@ -290,7 +255,6 @@ export function buildInferenceSeries(
   if (usesTokenSalePricing(metricConfigKey))
     scoped = applyTokenRevenuePricing(scoped, options.pricing ?? null);
 
-  // 5. Metric coverage filter, then remap x/y to the selected metric and x field.
   const tokenType = tokenMetricTypeForConfigKey(metricConfigKey);
   const remapped = scoped
     .filter((point) => metricKey in point && supportsPointTokenMetric(point, tokenType))
@@ -312,8 +276,6 @@ export function buildInferenceSeries(
       return typeof x === 'number' && Number.isFinite(x) && x > 0 ? [{ ...point, x }] : [];
     });
 
-  // 6. Pareto direction: the chart's configured corner, flipped when the x-axis
-  //    good-direction reverses (same rule as useChartData).
   const configuredDirection = chartDef[`${metricConfigKey}_roofline` as keyof ChartDefinition] as
     | RooflineDirection
     | undefined;
@@ -325,8 +287,6 @@ export function buildInferenceSeries(
       ? flipRooflineDirection(configuredDirection)
       : (configuredDirection ?? null);
 
-  // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
-  // Measured power represents load demand, so retain its upper boundary.
   const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
   const maximizePowerX = direction !== null && paretoMaximizesX(direction);
   const frontierDirection = isMeasuredPower
@@ -354,10 +314,8 @@ export function buildInferenceSeries(
     }
   }
 
-  // 8. Best series per SKU over the full mapped point set.
   const bestHwKeys = direction ? bestSeriesPerSku(mapped, direction) : new Set<string>();
 
-  // 9. Group into series by hwKey.
   const byHwKey = new Map<string, InferenceData[]>();
   for (const point of mapped) {
     const bucket = byHwKey.get(point.hwKey);
@@ -418,12 +376,10 @@ export function buildInferenceSeries(
   }
 
   const count = series.reduce((total, entry) => total + entry.points.length, 0);
-  // Remapping retains nested metric objects, including for transient rows without IDs.
   const frontierMetrics = new Set([...frontierPoints].map((point) => point[metricKey]));
   const allInRows = isAllInMeasuredConfigKey(metricConfigKey)
     ? allInMeasuredTableData(scoped, metricKey, resolved.xAxisField)
     : undefined;
-  // Match the dashboard: ranked SKUs keep their winner and table-only SKUs stay.
   const tableHwKeys =
     allInRows && best && bestHwKeys.size > 0
       ? withUnrankedSkus(bestHwKeys, mapped, allInRows)

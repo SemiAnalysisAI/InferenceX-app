@@ -122,7 +122,6 @@ describe('ResultContext', () => {
         />,
       );
     });
-    // The caption term becomes the label for the editor's input.
     expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
     expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
       'Model License Fee Assumption:',
@@ -130,7 +129,6 @@ describe('ResultContext', () => {
     const util = container.querySelector('[data-testid="result-context-utilization"]');
     expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();
     expect(util?.querySelector('.export-only')?.textContent).toBe('60%');
-    // textContent reads as the plain caption, so exports and text assertions match.
     expect(util?.textContent).toBe('60%');
     const fee = container.querySelector('[data-testid="result-context-license-fee"]');
     expect(fee?.querySelector('.no-export [data-testid="fee-control"]')).not.toBeNull();

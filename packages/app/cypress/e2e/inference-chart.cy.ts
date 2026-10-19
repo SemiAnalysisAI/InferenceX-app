@@ -49,7 +49,6 @@ const boundaryRows = (runUrl: string | null) =>
     ...row,
     metrics: {
       ...row.metrics,
-      // C=8 lies below the power boundary and above the energy Pareto frontier.
       avg_power_w: [900, 200, 700, 650][index] + (runUrl ? 50 : 0),
       joules_per_output_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
     },
@@ -130,12 +129,9 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
-      // The metric runs straight into the x-axis phrase: no "(Owning - …)" tier
-      // between them. The scenario word varies with the default sequence.
       .should('contain.text', 'Total Tokens per $1 TCO vs.')
       .and('contain.text', 'Interactivity')
       .and('not.contain.text', '(Owning');
-    // The heading names the model, so the caption no longer repeats it.
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('h2')
@@ -479,8 +475,6 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
       run_started_at: '2026-09-01T21:32:27Z',
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219706372/attempts/2',
     };
-    // Include the stale row deliberately to exercise client replacement as well
-    // as the SQL regression covered by benchmark-snapshots.test.ts.
     cy.intercept('GET', '/api/v1/availability', { body: current.slice(0, 1) });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [old, ...current] });
     cy.intercept('GET', '/api/v1/workflow-info*', {
@@ -584,7 +578,6 @@ it('replots measured settings for official and unofficial data and preserves ove
 });
 
 it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
-  // The config has benchmarks but no power telemetry, like GB200/GB300 NVL72 on DSR1 8K/1K.
   interceptMeasuredComparison(singleTurnRows(null), []);
   cy.viewport(1440, 900);
   cy.visit(
@@ -819,7 +812,6 @@ const assertVisibleLoads = (expected: number[]) => {
 };
 
 describe('Date comparison with unofficial runs', () => {
-  // Every measurement is shown (i_optimal=0), so both runs plot all four loads.
   it('keeps ?unofficialrun= overlays on the date comparison', () => {
     interceptMeasuredComparison();
     cy.viewport(1440, 900);
@@ -875,8 +867,6 @@ describe('Staged Pareto deep links', () => {
         request.alias = 'stagedSnapshot';
         request.reply({ body: stagedRows });
       } else {
-        // The main chart includes other hardware and cannot stand in for the
-        // requested snapshot, even if the workflow picker selects the same run.
         request.reply({ body: [...otherRows, ...stagedRows] });
       }
     });

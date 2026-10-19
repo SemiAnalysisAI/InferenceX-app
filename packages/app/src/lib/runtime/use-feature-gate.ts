@@ -10,20 +10,6 @@ export const FEATURE_GATE_LOCKED_EVENT = 'inferencex:feature-gate:locked';
 
 const UNLOCK_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
 
-/**
- * Konami-style ↑↑↓↓ unlock for hidden features. State persists in
- * localStorage and is shared across components via custom DOM events
- * (FEATURE_GATE_UNLOCKED_EVENT / FEATURE_GATE_LOCKED_EVENT) so all
- * consumers flip together without each owning a keyboard listener.
- *
- * Used by tab-nav (GATED_TABS), feedback, and any chart surface that
- * should be visible only to insiders until the underlying data is stable.
- */
-/**
- * Re-lock the feature gate from any client surface. Owns the localStorage write
- * and the cross-component event dispatch so callers don't need to know the
- * key/event-name strings (which used to drift across three call sites).
- */
 export function relockFeatureGate(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(FEATURE_GATE_KEY);

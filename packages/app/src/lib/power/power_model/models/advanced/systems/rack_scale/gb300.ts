@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** GB300 NVL72 and its endpoint-based external fabric allocation. */
 
 import { validate_instance } from '../../../../base';
 import { NetworkGroup } from '../../networking/base';

@@ -1,17 +1,3 @@
-/**
- * @file resolveXAxisField.ts
- * @description Single source of truth for which data field a chart's x-axis
- * plots. Both the official pipeline (`useChartData.stableChartDefinitions`)
- * and the `?unofficialrun=` overlay pipeline (`processOverlayChartData`) call
- * this — they previously each carried a copy of the branch ladder held in sync
- * only by "must mirror" comments, and three of the four overlay-misalignment
- * bugs fixed on this branch were exactly that mirror drifting. Change the
- * resolution logic here and both paths move together.
- *
- * (`buildReplayTimeline.resolveXAxisField` is a third, older copy — replay is
- * fixed-seq-only today so its missing percentile handling is inert, but it
- * should adopt this resolver if replay ever grows agentic support.)
- */
 import { withPercentile } from '@/lib/benchmarks/benchmark-transform';
 
 import type { AggDataEntry, ChartDefinition } from '../types';
@@ -19,7 +5,6 @@ import type { XAxisMode } from '../hooks/useChartData';
 
 export type FixedSequenceStatistic = 'mean' | 'median';
 
-/** Which rung of the branch ladder chose the x field (drives label choice). */
 export type XAxisBranch =
   | 'natural'
   | 'user-input-override'
@@ -27,20 +12,13 @@ export type XAxisBranch =
   | 'e2e-ttft-override';
 
 export interface ResolvedXAxis {
-  /** The data field the x-axis plots (percentile-adjusted for agentic). */
   xAxisField: keyof AggDataEntry;
-  /** The chart's natural latency metric, percentile-adjusted. */
   naturalX: keyof AggDataEntry;
   isInputMetric: boolean;
   isTtftOverride: boolean;
   branch: XAxisBranch;
 }
 
-/**
- * A service-metric field at the selected statistic: the percentile for agentic
- * rows, mean or median for fixed sequences. Fixed-sequence mean interactivity
- * is reciprocal mean TPOT, never the raw arithmetic-mean interactivity field.
- */
 export function resolveServiceField(
   field: string,
   opts: { isAgentic: boolean; percentile: string; fixedSequenceStatistic?: FixedSequenceStatistic },
@@ -52,26 +30,6 @@ export function resolveServiceField(
   ) as keyof AggDataEntry;
 }
 
-/**
- * Resolve the x-axis data field for a chart definition + metric selection.
- *
- * Rules, in order:
- * - The global x-axis mode takes precedence over legacy per-input-metric
- *   overrides. Fixed-sequence service axes use the selected mean/median statistic.
- * - Natural x = the chart's latency metric at the selected percentile for
- *   agentic, mean or median for fixed-sequence. Mean interactivity uses
- *   reciprocal mean TPOT, never the raw arithmetic-mean interactivity field.
- * - Without a global mode, input metrics on the interactivity chart override x to a TTFT column:
- *   the user-picked metric for fixed-seq (the manual dropdown is hidden in
- *   agentic mode), else the config default.
- * - Any *_ttft `effectiveXMetric` overrides the e2e chart's x (the 'ttft'
- *   x-axis mode) — the percentile prefix was already reconciled by the
- *   x-axis-mode picker.
- * - Agentic: the resolved field is rewritten to the selected percentile.
- *   Idempotent for overrides that already carry it (e.g. p90_ttft), and
- *   carries it onto config-default overrides (median_ttft → p90_ttft) and
- *   the natural intvty/e2el field.
- */
 export function resolveXAxisField(
   chartDef: ChartDefinition,
   selectedYAxisMetric: string,
@@ -90,8 +48,6 @@ export function resolveXAxisField(
   const metricTitle =
     (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
   const isInputMetric = metricTitle.toLowerCase().includes('input');
-  // Any *_ttft metric counts — the x-axis-mode picker can select any
-  // percentile (median/p75/p90/p99) depending on sequence kind.
   const hasTtftOverride =
     typeof effectiveXMetric === 'string' && effectiveXMetric.endsWith('_ttft');
 

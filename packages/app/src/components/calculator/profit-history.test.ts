@@ -39,7 +39,6 @@ function availability(overrides: Partial<AvailabilityRow> = {}): AvailabilityRow
   };
 }
 
-/** An agentic sweep point on a date; `hardware` must be a registry chip. */
 function agenticRow(
   date: string,
   hardware: string,
@@ -127,17 +126,13 @@ describe('profitHistoryChipOptions', () => {
   const rows = [
     availability({ hardware: 'gb300', framework: 'sglang' }),
     availability({ hardware: 'b200', framework: 'sglang' }),
-    // Another model's rows never leak in.
     availability({ hardware: 'mi355x', framework: 'vllm', model: 'glm5.2' }),
-    // Single-turn rows are not what the estimator prices.
     availability({ hardware: 'h200', framework: 'vllm', benchmark_type: 'single_turn', isl: 1024 }),
-    // A precision outside the selection is not offered either.
     availability({ hardware: 'b300', framework: 'vllm', precision: 'fp8' }),
   ];
 
   it('offers known agentic configs for the model at the selected precisions, in registry order', () => {
     const options = profitHistoryChipOptions(rows, KIMI_KEYS, ['fp4']);
-    // HW_REGISTRY sorts the newest chip first, as the /inference selector does.
     expect(options.map((o) => o.value)).toEqual(['gb300_sglang', 'b200_sglang']);
     expect(options[0]!.label).toContain('GB300');
   });
@@ -239,8 +234,6 @@ describe('buildProfitHistoryResults', () => {
       date: '2026-06-14',
       clamped: false,
     });
-    // Monotone Hermite between the two knots, the same spline the current bars
-    // use, so the value lands between them rather than on the chord.
     expect(results[0]!.value).toBeGreaterThan(400);
     expect(results[0]!.value).toBeLessThan(800);
   });
@@ -256,7 +249,6 @@ describe('buildProfitHistoryResults', () => {
           agenticRow('2026-06-14', 'b200', 80, 400, {
             run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
           }),
-          // A later run the same day supersedes the earlier one.
           agenticRow('2026-06-14', 'b200', 40, 1600, {
             id: 9001,
             run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/200',
@@ -272,8 +264,6 @@ describe('buildProfitHistoryResults', () => {
     ];
     const results = buildProfitHistoryResults(rowsByDate, options);
     expect(results.map((r) => r.hwKey)).toEqual(['b200_sglang']);
-    // Only the later run's curve (1600 → 800) is priced, so the value clears
-    // the earlier run's best point.
     expect(results[0]!.value).toBeGreaterThan(800);
     expect(results[0]!.value).toBeLessThan(1600);
   });
@@ -291,7 +281,6 @@ describe('buildProfitHistoryResults', () => {
       currentRunIds: { b200_sglang: '200', gb300_sglang: '150' },
     });
     expect(results.map((r) => r.resultKey)).toEqual(['gb300_sglang|2026-06-14~r200']);
-    // A plain date entry is never a duplicate of a run.
     expect(
       buildProfitHistoryResults([{ date: '2026-06-14', rows }], {
         ...options,
@@ -429,8 +418,6 @@ describe('profitHistoryCurrentRunIds', () => {
       runConfigs: [
         rc({ github_run_id: 27480000002, run_started_at: '2026-08-10T12:00:00Z' }),
         rc({ github_run_id: 27480000001, run_started_at: '2026-08-10T03:00:00Z' }),
-        // A later sparse run that only covered H200: it is H200's current run,
-        // not B200's.
         rc({
           github_run_id: 27480000009,
           run_started_at: '2026-08-10T20:00:00Z',
@@ -485,12 +472,7 @@ describe('dropCurrentRunEntries', () => {
 });
 
 describe('profitHistoryLegendKeys', () => {
-  const rows = [
-    { hwKey: 'b200_sglang' },
-    { hwKey: 'gb300_sglang' },
-    // Priced only on a comparison date; today's run has no row for it.
-    { hwKey: 'mi355x_vllm' },
-  ];
+  const rows = [{ hwKey: 'b200_sglang' }, { hwKey: 'gb300_sglang' }, { hwKey: 'mi355x_vllm' }];
   const today = ['gb300_sglang', 'b200_sglang', 'h200_vllm'];
 
   it("lists today's priced chips in availability order without a comparison", () => {
@@ -533,7 +515,6 @@ describe('profitHistoryMissing', () => {
     const rows = [
       { hwKey: 'b200_sglang', date: undefined },
       { hwKey: 'gb300_sglang', date: undefined },
-      // GB300 sits on run 150 today, so run 200 is a real extra bar for it.
       { hwKey: 'gb300_sglang', date: '2026-08-31~r200' },
     ];
     expect(

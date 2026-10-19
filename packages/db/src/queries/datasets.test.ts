@@ -20,7 +20,6 @@ describe('escapeLikePattern', () => {
 
   it('escapes backslash first to avoid double-escaping', () => {
     expect(escapeLikePattern('\\')).toBe(String.raw`\\`);
-    // A backslash followed by % must become \\\% in the escaped output.
     expect(escapeLikePattern(String.raw`\%`)).toBe(String.raw`\\\%`);
   });
 
@@ -33,11 +32,6 @@ describe('escapeLikePattern', () => {
   });
 });
 
-/**
- * Mock DbClient: returns canned result sets in call order. Each call to the
- * tagged-template `sql` shifts the next queued rows array. The query text is
- * ignored — these tests assert the JS-side shaping/coercion, not SQL.
- */
 function mockSql(queue: unknown[][]): DbClient {
   const responses = [...queue];
   return (() => Promise.resolve(responses.shift() ?? [])) as unknown as DbClient;
@@ -66,14 +60,14 @@ describe('listDatasets', () => {
 
 describe('listConversations', () => {
   it('returns null when the dataset slug is unknown', async () => {
-    const sql = mockSql([[]]); // datasets lookup → no rows
+    const sql = mockSql([[]]);
     expect(await listConversations(sql, 'missing')).toBeNull();
   });
 
   it('returns total + numerically-coerced items', async () => {
     const sql = mockSql([
-      [{ id: 'ds-id' }], // datasets lookup
-      [{ n: 2 }], // count
+      [{ id: 'ds-id' }],
+      [{ n: 2 }],
       [
         {
           conv_id: 'c1',
@@ -84,7 +78,7 @@ describe('listConversations', () => {
           total_out: '200',
           total_cached: '900',
         },
-      ], // items
+      ],
     ]);
     const out = await listConversations(sql, 'b', { sort: 'tokens' });
     expect(out).not.toBeNull();

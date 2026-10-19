@@ -7,7 +7,6 @@ export interface ReliabilityRow {
   total: number;
 }
 
-/** Get all run_stats rows for reliability aggregation (latest attempt only). */
 export async function getReliabilityStats(sql: DbClient): Promise<ReliabilityRow[]> {
   const rows = await sql`
     SELECT rs.hardware, rs.date::text, rs.n_success, rs.total

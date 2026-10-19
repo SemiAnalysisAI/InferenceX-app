@@ -15,16 +15,9 @@ import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } f
 
 export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 
-/**
- * What the measured + modeled budget was measured on: an eight-GPU chassis
- * measures the GPU boards and models the rest; an NVL72 tray takes an equal
- * share of a modeled rack and measures its Grace sockets when telemetry allows.
- */
 export interface ProfitPowerSource {
   topology: SystemPowerUnit;
-  /** Grace sockets on NVL72 trays: measured, or the model's profile. Chassis CPUs are always modeled. */
   cpu: 'measured' | 'modeled';
-  /** Facility PUE the estimate applied once after IT power. */
   pue: number;
   modelRevision: string;
 }
@@ -35,7 +28,6 @@ export interface ProfitPlanningPower {
   extrapolated: boolean;
 }
 
-/** Identity of a source for deduplicating notes and refusing to mix bases between knots. */
 export function powerSourceKey(source: ProfitPowerSource): string {
   return [source.topology, source.cpu, source.pue, source.modelRevision].join('|');
 }
@@ -64,8 +56,6 @@ function planningPower(point: GPUDataPoint): PlanningPower {
       }
     }
   }
-  // Partial allocations must tile one host; fully measured multi-host estimates
-  // retain their validated worker-hosts or uniform-hosts topology.
   const unitGpus = estimate.modeledGpuCount / estimate.chassisCount;
   if (
     estimate.chassisBasis === 'extrapolated' &&
@@ -84,7 +74,6 @@ function planningPower(point: GPUDataPoint): PlanningPower {
   };
 }
 
-/** Select a compatible power-valid frontier within the caller's selected curve. */
 export function interpolateProfitForGPU(
   points: GPUDataPoint[],
   target: number,
@@ -104,17 +93,14 @@ export function interpolateProfitForGPU(
     cohorts.set(key, cohort);
   }
   let best: InterpolatedResult | null = null;
-  // Source ordering makes equal-throughput selection independent of input order.
   for (const key of [...cohorts.keys()].toSorted()) {
     const candidate = interpolateForGPU(cohorts.get(key)!, target, mode, costProvider);
     if (!candidate || 'reason' in modeledPowerAtTarget(candidate, target)) continue;
     if (!best || candidate.value > best.value) best = candidate;
   }
-  // Preserve provisioned-only fallback and the existing unavailability reason.
   return best ?? original;
 }
 
-/** Read power from the same selected knots as throughput, without extrapolation. */
 export function modeledPowerAtTarget(result: InterpolatedResult, target: number): PlanningPower {
   if (result.clamped) return { reason: 'outside-measured-range' };
   const exact = result.nearestPoints.find((p) => Math.abs(p.interactivity - target) < 1e-9);
@@ -206,7 +192,6 @@ export function estimateProfitByPower(
         power.extrapolated ? { ...modeled, powerLabel: labels.extrapolated } : modeled,
       );
   }
-  // Sorting paired rows by profit would separate estimates of the same configuration.
   if (powerBasis !== 'compare')
     output.rows.sort((a, b) => b.profit - a.profit || a.resultKey.localeCompare(b.resultKey));
   return output;

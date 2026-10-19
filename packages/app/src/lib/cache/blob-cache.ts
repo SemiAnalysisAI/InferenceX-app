@@ -8,7 +8,6 @@ function getPrefix(): string {
   return `${process.env.BLOB_CACHE_PREFIX}/`;
 }
 
-/** Read a cached value from blob storage. Returns null on miss or when blob is not configured. */
 export async function blobGet<T>(key: string): Promise<T | null> {
   if (!blobEnabled()) return null;
   const path = `${getPrefix()}${key}.json`;
@@ -22,7 +21,6 @@ export async function blobGet<T>(key: string): Promise<T | null> {
   }
 }
 
-/** Write a value to blob storage. No-ops when blob is not configured. */
 export async function blobSet(key: string, data: unknown): Promise<void> {
   if (!blobEnabled()) return;
   const path = `${getPrefix()}${key}.json`;
@@ -38,7 +36,6 @@ export async function blobSet(key: string, data: unknown): Promise<void> {
   }
 }
 
-/** Delete all cached blobs. Returns 0 when blob is not configured. */
 export async function blobPurge(): Promise<number> {
   if (!blobEnabled()) return 0;
   const prefix = getPrefix();

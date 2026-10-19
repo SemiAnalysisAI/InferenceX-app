@@ -56,7 +56,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
   }
 
   try {
-    // Ensure may have inserted or refreshed this run, so read from the same primary.
     const row = await getCollectiveXRun(getCollectiveXWriteDb(), version, runId);
     if (row === null) {
       if (ensureError) {
@@ -74,8 +73,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     if (ensureError) {
       console.error('CollectiveX run refresh failed; serving stored run:', ensureError);
     }
-    // Short window like the sibling routes: a GitHub re-run of failed shards
-    // refreshes this run's stored contents, and deletion must not linger.
     return cachedJson(collectiveXDatasetFromRow(row), {
       tag: collectiveXCacheTag(),
       cacheControl: COLLECTIVEX_CACHE_CONTROL,
@@ -86,14 +83,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
   }
 }
 
-/**
- * Admin deletion of an ingested run. Authenticated with a dedicated Bearer
- * secret — the token is remembered in browser localStorage, so it must not
- * be the CI-held INVALIDATE_SECRET (scoped blast radius, independently
- * rotatable). Deletion tombstones the run (lazy discovery must never
- * re-ingest it) and purges the CollectiveX cache scope so the run table and
- * latest views drop it immediately.
- */
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ runId: string }> },

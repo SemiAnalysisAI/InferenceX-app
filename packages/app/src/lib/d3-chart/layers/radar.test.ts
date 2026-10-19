@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { asMock, createMockGroup } from './test-helpers';
 import { renderRadar, type RadarConfig } from './radar';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 interface TestGpu {
   name: string;
   color: string;
@@ -34,14 +32,11 @@ function makeConfig(overrides?: Partial<RadarConfig<TestGpu>>): RadarConfig<Test
   };
 }
 
-// ── renderRadar ──────────────────────────────────────────────────────
-
 describe('renderRadar', () => {
   it('creates a radar-center group', () => {
     const group = createMockGroup();
     renderRadar(group as any, SAMPLE_DATA, 400, 400, makeConfig());
 
-    // The function uses group.select (not selectAll), so check children directly
     const root = group.elements[0];
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     expect(centerGroup).toBeDefined();
@@ -203,7 +198,6 @@ describe('renderRadar', () => {
     const group = createMockGroup();
     renderRadar(group as any, SAMPLE_DATA, 400, 400, makeConfig());
 
-    // 2 GPUs x 4 axes = 8 dots (all values are non-null)
     const root = group.elements[0];
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
@@ -218,7 +212,6 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
 
-    // First 4 dots belong to GPU-A (#f00), next 4 to GPU-B (#0f0)
     for (let i = 0; i < 4; i++) {
       expect(dots[i].attrs['fill']).toBe('#f00');
     }
@@ -279,7 +272,6 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
 
-    // Only 2 non-null values
     expect(dots).toHaveLength(2);
   });
 
@@ -291,32 +283,26 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     expect(centerGroup).toBeDefined();
 
-    // No polygons or dots
     const polygons = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-polygon');
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
     expect(polygons).toHaveLength(0);
     expect(dots).toHaveLength(0);
 
-    // Grid and spokes should still exist
     const gridCircles = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-grid');
     expect(gridCircles).toHaveLength(5);
   });
 
   it('handles zero-size chart gracefully', () => {
     const group = createMockGroup();
-    // With labelMargin=30 (default), size=0 means radius=(0-60)/2=-30 which is <=0
     const result = asMock(renderRadar(group as any, SAMPLE_DATA, 0, 0, makeConfig()));
 
-    // Should return an empty dot selection
     expect(result.elements).toHaveLength(0);
   });
 
   it('handles very small chart (radius <= 0)', () => {
     const group = createMockGroup();
-    // With labelMargin=30, chart needs to be > 60 for positive radius
     const result = asMock(renderRadar(group as any, SAMPLE_DATA, 50, 50, makeConfig()));
 
-    // radius = (50 - 60) / 2 = -5, which is <= 0
     expect(result.elements).toHaveLength(0);
   });
 
@@ -335,28 +321,24 @@ describe('renderRadar', () => {
 
   it('uses custom labelMargin', () => {
     const group = createMockGroup();
-    // With labelMargin=0, radius = min(400,400)/2 = 200
     renderRadar(group as any, SAMPLE_DATA, 400, 400, makeConfig({ labelMargin: 0 }));
 
     const root = group.elements[0];
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     expect(centerGroup).toBeDefined();
 
-    // Just verify it renders without error
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
     expect(dots).toHaveLength(8);
   });
 
   it('uses non-square dimensions correctly (min of width, height)', () => {
     const group = createMockGroup();
-    // 600 wide, 200 tall -> size = 200
     renderRadar(group as any, SAMPLE_DATA, 600, 200, makeConfig());
 
     const root = group.elements[0];
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     expect(centerGroup).toBeDefined();
 
-    // Center should be at (300, 100)
     expect(centerGroup!.attrs['transform']).toBe('translate(300,100)');
   });
 
@@ -368,7 +350,6 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const gridCircles = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-grid');
 
-    // The outermost grid circle (level 5) should have stroke-dasharray = 'none'
     const outerCircle = gridCircles.at(-1);
     expect(outerCircle!.attrs['stroke-dasharray']).toBe('none');
   });
@@ -381,7 +362,6 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const gridCircles = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-grid');
 
-    // All except the last should have '2,3' dasharray
     for (let i = 0; i < gridCircles.length - 1; i++) {
       expect(gridCircles[i].attrs['stroke-dasharray']).toBe('2,3');
     }
@@ -400,7 +380,6 @@ describe('renderRadar', () => {
 
     expect(polygons).toHaveLength(1);
     const d = String(polygons[0].attrs['d']);
-    // Should still produce a valid closed path
     expect(d.startsWith('M')).toBe(true);
   });
 
@@ -413,7 +392,7 @@ describe('renderRadar', () => {
     const centerGroup = root.children.find((c) => c.attrs['class'] === 'radar-center');
     const dots = centerGroup!.children.filter((c) => c.attrs['class'] === 'radar-dot');
 
-    const radius = (Math.min(400, 400) - 30 * 2) / 2; // 170
+    const radius = (Math.min(400, 400) - 30 * 2) / 2;
     const numAxes = 4;
     const angleSlice = (Math.PI * 2) / numAxes;
 

@@ -27,10 +27,8 @@ export async function GET(request: NextRequest) {
   const model = params.get('model') ?? '';
   const date = params.get('date') ?? undefined;
   const exact = params.get('exact') === 'true';
-  // Numeric GitHub run id only — anything else is ignored (treated as "latest").
   const runIdParam = params.get('runId');
   const runId = runIdParam && /^\d+$/u.test(runIdParam) ? runIdParam : undefined;
-  // exactRun=true → return this run's logical snapshot, including append-only ancestors.
   const exactRun = params.get('exactRun') === 'true';
   const view = params.get('view');
   const sequence = params.get('sequence') ?? '';
@@ -45,8 +43,6 @@ export async function GET(request: NextRequest) {
   if (powerValidFilter === undefined) {
     return NextResponse.json({ error: 'Unknown powerValid filter' }, { status: 400 });
   }
-  // The calculator cache stores rows already trimmed to an allowlist that
-  // excludes power_valid, so post-cache filtering cannot work there.
   if (view === 'calculator' && powerValidFilter !== null) {
     return NextResponse.json(
       { error: 'powerValid cannot be combined with view=calculator' },

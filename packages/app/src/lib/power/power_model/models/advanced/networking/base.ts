@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** External networking power allocated to the modeled cluster, counted once. */
 
 import {
   DEFAULT_OPERATING_STATE,
@@ -38,10 +37,8 @@ export abstract class ScaleOutNetworkingGear extends FrozenModel {
     this.provenance = provenance;
   }
 
-  /** Resolve the equipment's power state for this scenario. */
   abstract for_operating_state(state: OperatingState): ScaleOutNetworkingGear;
 
-  /** Return modeled network components and their total power. */
   abstract estimate_breakdown(): PowerComponentBreakdown;
 
   protected fields(): Record<string, unknown> {
@@ -49,7 +46,6 @@ export abstract class ScaleOutNetworkingGear extends FrozenModel {
   }
 }
 
-/** A device count or fractional allocation of a shared network device. */
 export class NetworkGroup extends FrozenModel {
   static override readonly typeName: string = 'NetworkGroup';
   readonly gear: ScaleOutNetworkingGear;

@@ -11,10 +11,6 @@ import {
 import { createMockUnofficialRunContext } from '../support/mock-data';
 import { createMockRouter } from '../support/mock-router';
 
-/**
- * Mount TabNav with the provided URL search string written into the window
- * via history.replaceState. Set the URL before the live route/query snapshot mounts.
- */
 function mountTabNav(opts: {
   pathname?: string;
   search?: string;
@@ -118,7 +114,6 @@ describe('TabNav — attached unofficial-run banner', () => {
 
 describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
   afterEach(() => {
-    // Reset URL between specs so leftover query strings don't leak.
     cy.window().then((win) => win.history.replaceState(null, '', '/'));
   });
 
@@ -131,8 +126,6 @@ describe('TabNav — unofficialrun URL preservation (issue #319)', () => {
       'href',
       '/profit-estimator',
     );
-    // TCO Calculator, Fleet Lifecycle, and Historical Trends live in the
-    // footer, not the tab bar.
     cy.get('[data-testid="tab-trigger-calculator"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-fleet"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
@@ -289,7 +282,6 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
-    // Gated links are inside the closed popover, so they're not yet in the DOM.
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('have.attr', 'href', '/submissions');

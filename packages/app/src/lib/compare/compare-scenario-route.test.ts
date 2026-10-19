@@ -12,8 +12,6 @@ import { KNOWN_SEQUENCES } from './compare-ssr';
 
 describe('compare scenario segments', () => {
   it('covers every sequence the query param accepts', () => {
-    // If a sequence can be expressed as `?i_seq=`, it needs a path segment
-    // too — otherwise a workload exists that the routes cannot address.
     const mapped = new Set<string>(Object.values(SCENARIO_SEGMENT_TO_SEQUENCE));
     expect(mapped).toEqual(new Set(KNOWN_SEQUENCES));
   });
@@ -38,7 +36,6 @@ describe('compare scenario segments', () => {
   it('rejects unknown segments so the route can 404', () => {
     expect(sequenceForScenarioSegment('bogus')).toBeNull();
     expect(sequenceForScenarioSegment('')).toBeNull();
-    // The raw sequence key is not a valid segment — a slash cannot live in one.
     expect(sequenceForScenarioSegment('8k/1k')).toBeNull();
   });
 
@@ -52,8 +49,6 @@ describe('compare scenario segments', () => {
 
 describe('compareScenarioPath', () => {
   it('emits the bare slug URL for the default workload', () => {
-    // The default view keeps exactly one address rather than gaining a second,
-    // identical one at a scenario segment.
     expect(
       compareScenarioPath('/compare', 'dsv4-b200-vs-h200', 'agentic-traces', 'agentic-traces'),
     ).toBe('/compare/dsv4-b200-vs-h200');

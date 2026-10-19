@@ -96,9 +96,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
   const locale = useLocale();
   const pathname = usePathname();
   const t = STRINGS[locale];
-  // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
-  // Embeds render one chart inside a third-party iframe; no site chrome.
   if (isEmbedPathname(pathname)) return null;
   return (
     <footer
@@ -106,9 +104,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
       className="relative mt-auto w-full overflow-visible pt-16 md:pt-20"
     >
       <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
-        {/* Main grid */}
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
-          {/* Left — Brand */}
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
             <Link
               data-testid="footer-brand-link"
@@ -132,7 +128,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </p>
           </div>
 
-          {/* Center — Links */}
           <div
             data-testid="footer-links"
             className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
@@ -225,9 +220,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.visualization}
               </a>
             </div>
-            {/* "More" holds many links, so it gets a double-width column with
-                the links flowing in two sub-columns. This keeps every group on
-                one balanced row instead of wrapping below the others. */}
             <div
               data-testid="footer-links-more"
               className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
@@ -390,7 +382,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </div>
           </div>
 
-          {/* Right — CTA + Social */}
           <div
             data-testid="footer-cta"
             className="flex min-w-0 flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between lg:col-span-2"
@@ -412,7 +403,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div
           data-testid="footer-bottom-bar"
           className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"

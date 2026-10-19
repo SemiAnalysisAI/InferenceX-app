@@ -19,12 +19,6 @@ const getCachedResidentSequenceLengths = cachedQuery(
   CACHE_KEY_PREFIX,
 );
 
-/**
- * GET /api/v1/resident-sequence-lengths?ids=1,2,3
- *
- * Returns one mergeable ISL/OSL sketch for the requested resident chart
- * points. The client chunks large charts and merges these bounded payloads.
- */
 export const GET = idsQueryRoute({
   maxIds: 200,
   logLabel: 'resident sequence lengths',

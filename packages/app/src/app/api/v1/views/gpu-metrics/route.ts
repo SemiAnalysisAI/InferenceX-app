@@ -24,7 +24,6 @@ import { type NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Stored and live metrics bypass response caching so repairs remain observable. */
 export function GET(request: NextRequest) {
   return runViewsRoute('gpu-metrics', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['gpu-metrics']);
@@ -79,7 +78,6 @@ export function GET(request: NextRequest) {
       'gpuIndex',
     );
     const direction = parseEnumParam(s.get('direction'), 'direction', ['asc', 'desc'], 'asc');
-    // Statistics use all chips; chart visibility does not filter them.
     const stats = (
       selected?.series
         ? storedGpuStatsForMetric(selected.series.stats, metric)

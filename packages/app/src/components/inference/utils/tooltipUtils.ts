@@ -39,63 +39,30 @@ import {
 } from '@/components/inference/utils/runtime-metadata-labels';
 
 export interface TooltipConfig {
-  /** The data point to display */
   data: InferenceData;
-  /** Whether the tooltip is pinned (enables text selection) */
   isPinned: boolean;
-  /** X-axis label for the chart */
   xLabel: string;
-  /** Y-axis label for the chart */
   yLabel: string;
-  /** Currently selected Y-axis metric */
   selectedYAxisMetric: string;
-  /** Hardware configuration for looking up labels */
   hardwareConfig: HardwareConfig;
-  /** URL to the GitHub Actions workflow run */
   runUrl?: string;
-  /**
-   * Whether this agentic point has a stored trace_replay blob. Controls
-   * visibility of the "View charts" button — the actual distributions are
-   * rendered on the detail page, not inline, so all the tooltip needs is a
-   * presence boolean (sourced from the bulk `/api/v1/trace-availability`
-   * call so we don't ship megabytes of profile JSONL just for this check).
-   */
   hasTrace?: boolean;
-  /** Whether this official DB-backed point has a linked `server_logs` row. */
   hasLog?: boolean;
-  /** Opt in only when the host handles the dialog action. */
   showPowerTelemetry?: boolean;
-  /** Page locale for tooltip metadata labels. Defaults to English. */
   locale?: Locale;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
-  /** Overlay data containing label and run URL */
   overlayData: OverlayData;
 }
 
-// `dp_attention` is `boolean | string` on InferenceData (DB sends raw, the
-// transform narrows "true"/"false" → boolean). Coerce to a plain boolean for
-// the shared labeler, treating the legacy string form correctly.
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
   typeof v === 'string' ? v === 'true' : v;
 
-/**
- * Returns the short label for a data point on the chart.
- * - Non-multinode: e.g. "TP8", "EP8", "TEP8", "DEP8", "DPAEP8"
- * - Multinode disagg: e.g. "2xEP4+1xDPAEP32"
- * - Old data (no ep field): falls back to tp value
- *
- * Delegates to the shared {@link parallelismLabel} so the chart points and the
- * agentic sibling navigator describe a config identically.
- */
 export const getPointLabel = (d: InferenceData): string => {
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   const label = parallelismLabel({
-    // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
-    // into it for aggregated rows) — the label wants the actual TP width, so
-    // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
     tp: d.decode_tp ?? d.tp,
     dp: d.dp,
     ep: d.ep,
@@ -146,8 +113,6 @@ const formatTooltipDate = (value: string, locale: Locale): string => {
   return `${Number(match.groups.year)}年${Number(match.groups.month)}月${Number(match.groups.day)}日`;
 };
 
-/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
- *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
 export const fmt = (v: number): string => {
   if (!Number.isFinite(v)) return String(v);
   const rounded = parseFloat(v.toFixed(3));
@@ -198,11 +163,6 @@ const TOOLTIP_STRINGS = {
   },
 } as const;
 
-/**
- * Which comparison series (`i_pcompare`) a point belongs to, for the clones a
- * boundary / role comparison appends. On the energy axis a role clone also
- * reports its share of the reconstructed request energy (utils/role-energy.ts).
- */
 const powerVariantHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
@@ -226,19 +186,12 @@ const powerVariantHTML = (
   return html;
 };
 
-/**
- * Measured-power certification tier line. Rendered only while a Measured
- * Energy y-axis is selected and the point carries a tier — non-measured axes
- * and telemetry-free points stay unchanged.
- */
 const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
   const t = TOOLTIP_STRINGS[locale];
   return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
 };
 
-/** Escape strings that arrive from artifact JSONB (worker role / hosts)
- *  before interpolating them into tooltip HTML. */
 const escapeHtml = (s: string): string =>
   s
     .replaceAll('&', '&amp;')
@@ -430,10 +383,6 @@ const WORKER_POWER_STRINGS = {
 
 const WORKER_ROWS_LIMIT = 8;
 
-/**
- * Render worker telemetry only in pinned tooltips so hover tooltips stay lean.
- * Missing or empty worker payloads produce no section.
- */
 const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
   if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';
   const t = WORKER_POWER_STRINGS[locale];
@@ -451,8 +400,6 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
       );
     }
     if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
-    // avg_mem_used_mb follows the nvidia-smi/telemetry convention (MiB despite
-    // the _mb suffix), so divide by 1024 when displaying GiB.
     if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
     return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
@@ -492,10 +439,6 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-/**
- * Cache configuration and hit-rate rows shared by fixed-sequence, agentic,
- * official, comparison, and unofficial-run tooltips.
- */
 const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
   const t = CACHE_STRINGS[locale];
   const parts: string[] = [];
@@ -532,10 +475,6 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   return parts.join('');
 };
 
-/**
- * Agentic-only request success and token totals. Cache metadata is rendered
- * separately because fixed-sequence rows can carry it too.
- */
 const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative Decoding',
@@ -588,10 +527,6 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
     parts.push(tooltipLine(t.generatedTokens, formatNumber(d.total_generation_tokens)));
   }
 
-  // Histograms + time-series live on the dedicated detail page now; the
-  // "View charts" button (rendered by the wrapper when pinned + has trace
-  // data) takes the user there.
-
   return parts.join('');
 };
 
@@ -619,17 +554,7 @@ const pointDetailActionLink = (action: TooltipAction, href: string, label: strin
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
   ">${label} &rarr;</a>`;
 
-/**
- * Outer shell for pinned/hover chart tooltips. Caps width and height to the
- * viewport so stacked action buttons (logs / PowerX / power trace) stay
- * reachable on narrow mobile viewports — `computeTooltipPosition` can only
- * clamp top/left, so a taller-than-viewport shell would still overflow.
- */
-export const tooltipShellStyle = (opts: {
-  isPinned: boolean;
-  /** Hex/CSS color; omit for the default border token. */
-  border?: string;
-}): string => {
+export const tooltipShellStyle = (opts: { isPinned: boolean; border?: string }): string => {
   const border = opts.border ?? '1px solid var(--border)';
   return [
     'background: var(--popover)',
@@ -647,11 +572,6 @@ export const tooltipShellStyle = (opts: {
   ].join('; ');
 };
 
-/**
- * Whether a point on the measured-power / energy scatter can jump to its
- * per-second telemetry on the Timeline display. Overlay points qualify too:
- * the trace is keyed by run id and audit name, not by a persisted row id.
- */
 export const showsPowerTraceAction = (
   point: Pick<InferenceData, 'power_audit' | 'run_url'>,
   selectedYAxisMetric: string,
@@ -660,12 +580,6 @@ export const showsPowerTraceAction = (
   getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
   traceKeyForPoint(point) !== null;
 
-/**
- * Same-tab click is intercepted by the chart (in-page metric switch); the href
- * keeps open-in-new-tab landing on the Timeline display of THIS chart. The
- * address bar is stripped of chart state after load, so the share-link store
- * is layered over the live location first (`chartStateHref`).
- */
 const powerTraceHref = (): string =>
   typeof window === 'undefined' ? '#' : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY });
 
@@ -674,21 +588,11 @@ interface ViewActionsInput {
   hasTraceData: boolean;
   hasLogData: boolean;
   point: InferenceData;
-  /**
-   * Metric the chart currently plots, when that chart can switch to the
-   * Timeline display in place (the scatter). Omitted by charts that cannot,
-   * so they never render a "View power trace" link nothing would handle.
-   */
   powerTraceMetric?: string;
   showPowerTelemetry?: boolean;
   locale: Locale;
 }
 
-/**
- * Point-detail links rendered only on pinned tooltips. "View charts" and
- * "View logs" need a persisted row id (overlay points have none); "View power
- * trace" needs only the run and audit source, so it works for overlays too.
- */
 const viewActionsHTML = ({
   isPinned,
   hasTraceData,
@@ -790,12 +694,6 @@ const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): str
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
-/**
- * Generates HTML for the parallelism configuration section of a tooltip.
- * Falls back to GPU count for old data without parallelism fields.
- * Pipeline parallelism is only rendered when > 1 (pp of 0/1 means "no PP",
- * matching the point-label rule in {@link parallelismLabel}).
- */
 const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
   const t = PARALLELISM_STRINGS[locale];
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
@@ -855,7 +753,6 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
 
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 
-/** Raw tooltip HTML must not trust producer-supplied reason codes. */
 const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
   const codes = d.power_invalid_reasons
@@ -867,12 +764,6 @@ const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   return tooltipLine(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '));
 };
 
-/**
- * Generates HTML content for official data point tooltips.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,
@@ -939,13 +830,6 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
   `;
 };
 
-/**
- * Generates HTML content for overlay (unofficial run) data point tooltips.
- * These tooltips have a distinct red border and "UNOFFICIAL" label.
- *
- * @param config - Configuration for the overlay tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
   const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
@@ -990,13 +874,6 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
   `;
 };
 
-/**
- * Generates HTML content for GPU graph tooltips (date comparison view).
- * Similar to regular tooltips but shows "GPU Config" instead of hardware label at top.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,

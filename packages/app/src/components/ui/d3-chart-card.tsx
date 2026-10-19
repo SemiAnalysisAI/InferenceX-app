@@ -20,7 +20,6 @@ interface D3ChartCardProps<T> {
   filename?: string;
 }
 
-/** Shared D3 rendering, export and expansion without a second SVG zoom implementation. */
 export function D3ChartCard<T>({
   title,
   subtitle,
