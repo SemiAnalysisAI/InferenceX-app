@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
@@ -1549,7 +1547,7 @@ const GPUGraph = React.memo(
               selectedYAxisMetric,
               hardwareConfig,
               showPowerTelemetry: showPowerTelemetryRef.current,
-              runUrl: showRunLink(d.run_url, d.hwKey) ? updateRepoUrl(d.run_url) : undefined,
+              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
               hasTrace: isPersistedBenchmarkId(d.id)
                 ? traceAvailabilityRef.current?.[d.id] === true
                 : false,

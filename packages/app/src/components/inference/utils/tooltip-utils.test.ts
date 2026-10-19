@@ -1306,27 +1306,16 @@ describe('power tier tooltip line', () => {
   });
 });
 
-describe('TPU run links', () => {
-  const url =
-    'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/38997727079/attempts/1';
-  it.each(['en', 'zh'] as const)(
-    'hides official and overlay TPU links in %s without changing provenance',
-    (locale) => {
-      const config = tooltipConfig({ locale, runUrl: url });
-      expect(generateTooltipContent(config)).not.toContain(url);
-      const overlayData = {
-        label: 'TPU run',
-        hardwareConfig: mockHardwareConfig,
-        data: [],
-        runUrl: url,
-      };
-      expect(
-        generateOverlayTooltipContent({ ...config, overlayData } as OverlayTooltipConfig),
-      ).not.toContain(url);
-      expect(config.runUrl).toBe(url);
-      expect(overlayData.runUrl).toBe(url);
-      const publicUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
-      expect(generateTooltipContent({ ...config, runUrl: publicUrl })).toContain(publicUrl);
-    },
+it.each(['en', 'zh'] as const)('routes TPU result links to logs in %s', (locale) => {
+  const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/1';
+  const html = generateTooltipContent(
+    tooltipConfig({
+      locale,
+      runUrl,
+      data: pt({ id: 123, hwKey: 'tpuv7_vllm', benchmark_type: 'agentic_traces' }),
+    }),
   );
+  expect(html).toContain(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/123?view=logs`);
+  expect(html).not.toContain(runUrl);
+  expect(html).toContain(locale === 'zh' ? '查看日志' : 'View Logs');
 });

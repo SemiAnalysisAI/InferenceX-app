@@ -1,4 +1,4 @@
-import { showRunLink } from '@/lib/benchmarks/run-link';
+import { pointRunLink } from '@/lib/benchmarks/run-link';
 import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
 import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
@@ -125,12 +125,14 @@ export const getPointLabel = (d: InferenceData): string => {
   return label;
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware?: string) =>
-  showRunLink(runUrl, hardware)
+const runLinkHTML = (runUrl: string | undefined, locale: Locale, point: InferenceData) => {
+  const link = pointRunLink(runUrl, point, locale);
+  return link
     ? `<div style="font-size: 11px; margin-top: 4px;">
-        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
+        <a href="${link.href}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${link.isLog ? (locale === 'zh' ? '查看日志' : 'View Logs') : locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
       </div>`
     : '';
+};
 
 const labelColon = (label: string) => (/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':');
 
@@ -926,7 +928,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale, d.hwKey)}
+      ${runLinkHTML(runUrl, locale, d)}
       ${viewActionsHTML({
         isPinned,
         hasTraceData: Boolean(hasTrace),
@@ -1049,7 +1051,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale, d.hwKey)}
+      ${runLinkHTML(runUrl, locale, d)}
       ${viewActionsHTML({
         isPinned,
         hasTraceData: Boolean(hasTrace),

@@ -779,27 +779,3 @@ describe('getComparableTpPerMwForType', () => {
     expect(getComparableTpPerMwForType(rankResult({ inputTokenShare: -1 }), 'input')).toBe(0);
   });
 });
-
-it('hides TPU workflow links for official and unofficial calculator results', () => {
-  const privateUrl =
-    'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/38997727079/attempts/1';
-  const publicUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
-  for (const isOverlay of [false, true]) {
-    const tpu = makeResult({ hwKey: 'tpuv7_vllm', isOverlay, runUrl: privateUrl });
-    const gpu = makeResult({ hwKey: 'h100', isOverlay, runUrl: publicUrl });
-    expect(
-      generateTooltipHTML(
-        tpu,
-        {},
-        'interactivity_to_throughput',
-        'throughput',
-        'total',
-        privateUrl,
-      ),
-    ).not.toContain(privateUrl);
-    expect(
-      generateTooltipHTML(gpu, {}, 'interactivity_to_throughput', 'throughput', 'total', publicUrl),
-    ).toContain(publicUrl);
-    expect(tpu.runUrl).toBe(privateUrl);
-  }
-});

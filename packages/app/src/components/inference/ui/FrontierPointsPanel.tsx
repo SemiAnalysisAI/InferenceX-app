@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import * as d3 from 'd3';
 import { useMemo } from 'react';
 
@@ -138,7 +136,7 @@ export default function FrontierPointsPanel({
                   <td className="p-2 align-top">{number(point.x)}</td>
                   <td className="p-2 align-top">{number(point.y)}</td>
                   <td className="p-2 align-top">
-                    {showRunLink(point.run_url, point.hwKey) && runId ? (
+                    {point.run_url && runId ? (
                       <a
                         href={point.run_url}
                         target="_blank"

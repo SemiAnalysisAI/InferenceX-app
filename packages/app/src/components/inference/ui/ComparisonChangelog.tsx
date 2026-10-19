@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import { ChevronDown, ChevronUp, FileText, Lock, Minus, Plus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -86,7 +84,7 @@ function renderRunLinks(locale: Locale, headRef?: string, runUrl?: string) {
           <ExternalLinkIcon />
         </a>
       )}
-      {showRunLink(runUrl) && (
+      {runUrl && (
         <a
           href={updateRepoUrl(runUrl)}
           target="_blank"

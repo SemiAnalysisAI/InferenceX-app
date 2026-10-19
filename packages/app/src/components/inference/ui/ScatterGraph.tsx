@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
@@ -2467,7 +2465,7 @@ const ScatterGraph = React.memo(
             selectedYAxisMetric,
             hardwareConfig,
             showPowerTelemetry: interactionRef.current.showPowerTelemetry,
-            runUrl: showRunLink(d.run_url, d.hwKey) ? updateRepoUrl(d.run_url) : undefined,
+            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace:
               d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
                 ? (interactionRef.current.traceAvailability?.[d.id] ?? false)

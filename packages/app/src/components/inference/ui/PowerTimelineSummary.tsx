@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import * as d3 from 'd3';
 import { useMemo } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
@@ -145,18 +143,14 @@ export default function PowerTimelineSummary({
                             </span>
                           </th>
                           <td className="p-2 align-top" rowSpan={summary.pools.length}>
-                            {showRunLink(point.run_url, point.hwKey) ? (
-                              <a
-                                href={point.run_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline decoration-dotted"
-                              >
-                                {`run ${trace.runId}`}
-                              </a>
-                            ) : (
-                              <span>{`run ${trace.runId}`}</span>
-                            )}
+                            <a
+                              href={point.run_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline decoration-dotted"
+                            >
+                              {`run ${trace.runId}`}
+                            </a>
                             {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
                             <span className="block break-all text-muted-foreground">
                               {name ? `power_validation_${name}.json` : '—'}

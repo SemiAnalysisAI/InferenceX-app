@@ -161,18 +161,3 @@ describe('PointSummary', () => {
     expect(html).toContain('SGLang Router 0.3.2');
   });
 });
-
-it('hides TPU run links and retains non-TPU run links', () => {
-  const run_url =
-    'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/38997727079/attempts/1';
-  const html = renderToStaticMarkup(
-    createElement(PointSummary, { meta: meta({ hardware: 'tpuv7', run_url }) }),
-  );
-  expect(html).not.toContain(run_url);
-  const publicUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1';
-  expect(
-    renderToStaticMarkup(
-      createElement(PointSummary, { meta: meta({ hardware: 'b200', run_url: publicUrl }) }),
-    ),
-  ).toContain(publicUrl);
-});

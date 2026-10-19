@@ -247,16 +247,3 @@ describe('formatRowValue', () => {
     expect(formatRowValue(123456.7)).toBe('123,456.7');
   });
 });
-
-it('omits TPU workflow navigation while retaining internal point navigation', () => {
-  const point = pt({
-    hwKey: 'tpuv7_vllm',
-    run_url: 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/1',
-    benchmark_type: 'single_turn',
-  });
-  expect(pointDetailHref(point, false)).toEqual({ href: null, isExternal: false });
-  expect(pointDetailHref({ ...point, benchmark_type: 'agentic_traces', id: 123 }, false)).toEqual({
-    href: '/inference/agentic/123',
-    isExternal: false,
-  });
-});

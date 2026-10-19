@@ -1,7 +1,5 @@
 'use client';
 
-import { showRunLink } from '@/lib/benchmarks/run-link';
-
 import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
@@ -602,7 +600,6 @@ const FleetLifecycleChart = React.memo(
                   // that was never purged would sit — have no audit trail
                   // anywhere in the UI.
                   const links = info.runUrls
-                    .filter((url) => showRunLink(url))
                     .map(
                       (url, i) =>
                         `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${

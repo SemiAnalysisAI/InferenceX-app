@@ -1,4 +1,3 @@
-import { showRunLink } from '@/lib/benchmarks/run-link';
 import { ChevronDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
@@ -185,7 +184,7 @@ export default function WorkflowInfoDisplay() {
                   e.preventDefault();
                   e.stopPropagation();
                   const runUrl = availableRuns[selectedRunId]?.runUrl;
-                  if (showRunLink(runUrl)) {
+                  if (runUrl) {
                     window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
                   }
                 }
@@ -205,8 +204,7 @@ export default function WorkflowInfoDisplay() {
                       if (target.closest('[data-external-link]')) {
                         e.preventDefault();
                         e.stopPropagation();
-                        if (showRunLink(runUrl))
-                          window.open(runUrl, '_blank', 'noopener,noreferrer');
+                        window.open(runUrl, '_blank', 'noopener,noreferrer');
                       }
                     }}
                   >
@@ -216,14 +214,12 @@ export default function WorkflowInfoDisplay() {
                         locale={locale}
                       />
                       {t.runCount(index + 1, runIds.length)}
-                      {showRunLink(runUrl) && (
-                        <span
-                          data-external-link
-                          className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
-                        >
-                          <ExternalLinkIcon />
-                        </span>
-                      )}
+                      <span
+                        data-external-link
+                        className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
+                      >
+                        <ExternalLinkIcon />
+                      </span>
                     </span>
                   </SelectItem>
                 );
