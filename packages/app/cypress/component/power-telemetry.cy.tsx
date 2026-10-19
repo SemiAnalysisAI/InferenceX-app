@@ -201,6 +201,9 @@ describe('PowerX telemetry interactions', () => {
       enabled: true,
     });
     cy.get(chart).screenshot('power-telemetry-all-in-line');
+    // The reference line must not shift the tooltip off the point hit targets.
+    cy.get(chart).find('circle.point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible').should('contain.text', 'Chip 0');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {

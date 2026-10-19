@@ -387,68 +387,64 @@ const GpuMetricsChart = React.memo(
         }}
         yAxis={{ label: getGpuMetricYAxisLabel(metricConfig, locale), tickCount: 8 }}
         layers={[
-          // TDP reference line (power metric only)
+          // Power reference lines: TDP, plus the all-in provisioned line when switched on.
+          // One layer for both keeps the tooltip's attachToLayer index on the points.
           {
             type: 'custom',
-            key: 'tdp-line',
+            key: 'reference-lines',
             render: (group, ctx) => {
-              group.selectAll('.tdp-line').remove();
-              if (!tdpInfo) return;
+              group.selectAll('.tdp-line, .all-in-line').remove();
               const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-              const tdpY = yScale(tdpInfo.tdp);
-              const tdpGroup = group.append('g').attr('class', 'tdp-line');
-              tdpGroup
-                .append('line')
-                .attr('x1', 0)
-                .attr('x2', ctx.width)
-                .attr('y1', tdpY)
-                .attr('y2', tdpY)
-                .attr('stroke', '#ef4444')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '6,4');
-              tdpGroup
-                .append('text')
-                .attr('x', ctx.width - 4)
-                .attr('y', tdpY - 6)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#ef4444')
-                .attr('font-size', '11px')
-                .attr('font-weight', '600')
-                .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
-            },
-          },
-          {
-            type: 'custom',
-            key: 'all-in-line',
-            render: (group, ctx) => {
-              group.selectAll('.all-in-line').remove();
-              if (allInWatts === null || !hardware) return;
-              const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-              const lineY = yScale(allInWatts);
-              const lineGroup = group
-                .append('g')
-                .attr('class', 'all-in-line')
-                .attr('data-testid', 'gpu-power-all-in-line');
-              lineGroup
-                .append('line')
-                .attr('x1', 0)
-                .attr('x2', ctx.width)
-                .attr('y1', lineY)
-                .attr('y2', lineY)
-                .attr('stroke', '#f59e0b')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '2,3');
-              lineGroup
-                .append('text')
-                .attr('x', ctx.width - 4)
-                .attr('y', lineY - 6)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#f59e0b')
-                .attr('font-size', '11px')
-                .attr('font-weight', '600')
-                .text(
-                  `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
-                );
+              const references: {
+                className: string;
+                watts: number;
+                color: string;
+                dash: string;
+                label: string;
+              }[] = [];
+              if (tdpInfo) {
+                references.push({
+                  className: 'tdp-line',
+                  watts: tdpInfo.tdp,
+                  color: '#ef4444',
+                  dash: '6,4',
+                  label: `${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`,
+                });
+              }
+              if (allInWatts !== null && hardware) {
+                references.push({
+                  className: 'all-in-line',
+                  watts: allInWatts,
+                  color: '#f59e0b',
+                  dash: '2,3',
+                  label: `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
+                });
+              }
+              for (const reference of references) {
+                const lineY = yScale(reference.watts);
+                const lineGroup = group.append('g').attr('class', reference.className);
+                if (reference.className === 'all-in-line') {
+                  lineGroup.attr('data-testid', 'gpu-power-all-in-line');
+                }
+                lineGroup
+                  .append('line')
+                  .attr('x1', 0)
+                  .attr('x2', ctx.width)
+                  .attr('y1', lineY)
+                  .attr('y2', lineY)
+                  .attr('stroke', reference.color)
+                  .attr('stroke-width', 1.5)
+                  .attr('stroke-dasharray', reference.dash);
+                lineGroup
+                  .append('text')
+                  .attr('x', ctx.width - 4)
+                  .attr('y', lineY - 6)
+                  .attr('text-anchor', 'end')
+                  .attr('fill', reference.color)
+                  .attr('font-size', '11px')
+                  .attr('font-weight', '600')
+                  .text(reference.label);
+              }
             },
           },
           // GPU lines
