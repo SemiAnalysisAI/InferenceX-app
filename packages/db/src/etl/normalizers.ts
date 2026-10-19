@@ -21,12 +21,19 @@ export { GPU_KEYS };
  * @returns The canonical GPU key (e.g. `"h200"`, `"mi355x"`), or `null` if the
  *   stripped base is not in `GPU_KEYS`.
  */
+/** Runner hardware ids whose base segment differs from the canonical GPU key. */
+const HW_ALIASES: Record<string, string> = {
+  // NVIDIA review sweeps label Vera Rubin NVL72 runners `vrnvl72-nv`.
+  vrnvl72: 'vr200',
+};
+
 export function hwToGpuKey(hw: string): string | null {
   // v3 agentic artifacts scope the hw id (`cluster:b300-nv`) — drop everything
   // up to the last `:` first. Then take the first segment before `-` as the
   // canonical key; that subsumes all the prior explicit suffix strips
   // (-nv, -amds, -dgxc-slurm, -p1, -cw, …).
-  const base = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const base = HW_ALIASES[raw] ?? raw;
   return GPU_KEYS.has(base) ? base : null;
 }
 
