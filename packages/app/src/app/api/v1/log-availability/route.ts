@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 const getCachedServerLogAvailability = cachedQuery(
   (ids: number[]): Promise<ServerLogAvailabilityMap> => getServerLogAvailability(getDb(), ids),
-  'server-log-availability',
+  'server-log-availability:k3-preview',
 );
 
 /**

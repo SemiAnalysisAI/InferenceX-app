@@ -9,18 +9,22 @@ import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 
 export const dynamic = 'force-dynamic';
 
-const getCachedServerLog = cachedQuery((id: number) => getServerLog(getDb(), id), 'server-log', {
-  blobOnly: true,
-});
+const getCachedServerLog = cachedQuery(
+  (id: number) => getServerLog(getDb(), id),
+  'server-log:k3-preview',
+  {
+    blobOnly: true,
+  },
+);
 const getCachedNamedServerLog = cachedQuery(
   (id: number, fileName: string) => getServerLog(getDb(), id, fileName),
-  'server-log-file',
+  'server-log-file:k3-preview',
   { blobOnly: true },
 );
 const getCachedServerLogChunk = cachedQuery(
   (id: number, offset: number, limit: number, fileName: string | null) =>
     getServerLogChunk(getDb(), id, offset, limit, fileName ?? undefined),
-  'server-log-chunk',
+  'server-log-chunk:k3-preview',
 );
 
 export const DEFAULT_SERVER_LOG_CHUNK_SIZE = 64 * 1024;

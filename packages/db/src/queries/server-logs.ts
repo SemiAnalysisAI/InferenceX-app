@@ -23,6 +23,26 @@ export interface ServerLogSearchResult {
   truncated: boolean;
 }
 
+// PREVIEW ONLY -- DO NOT MERGE. Kimi-K3 TPU7x run 38997727079 server logs are staged in
+// server_logs (ids 19849-19857) but not linked from benchmark_results. Resolve them only on
+// Vercel preview deployments and local dev so production keeps them hidden.
+const PREVIEW_LOG_LINKS: readonly (readonly [number, number])[] =
+  process.env.VERCEL_ENV === 'preview' || process.env.NODE_ENV === 'development'
+    ? [
+        [445233, 19849],
+        [445234, 19850],
+        [445235, 19851],
+        [445236, 19852],
+        [445237, 19853],
+        [445238, 19854],
+        [445239, 19855],
+        [445240, 19856],
+        [445241, 19857],
+      ]
+    : [];
+const PREVIEW_POINT_IDS = PREVIEW_LOG_LINKS.map(([pointId]) => pointId);
+const PREVIEW_LOG_IDS = PREVIEW_LOG_LINKS.map(([, logId]) => logId);
+
 const isPreLogFilesSchema = (error: unknown): boolean => {
   const code = (error as { code?: unknown })?.code;
   return code === '42P01' || code === '42703';
@@ -44,13 +64,13 @@ export async function getServerLog(
       with selected_log as (
         select sl.file_name, sl.server_log as log_text, 0 as priority
         from benchmark_results br
-        join server_logs sl on sl.id = br.server_log_id
+        join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
           and (${requestedFile}::text is null or sl.file_name = ${requestedFile})
         union all
         select slf.file_name, slf.log_text, 1 as priority
         from benchmark_results br
-        join server_log_files slf on slf.server_log_id = br.server_log_id
+        join server_log_files slf on slf.server_log_id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
           and ${requestedFile}::text is not null
           and slf.file_name = ${requestedFile}
@@ -66,7 +86,7 @@ export async function getServerLog(
     const rows = (await sql`
       select sl.server_log
       from benchmark_results br
-      join server_logs sl on sl.id = br.server_log_id
+      join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
       where br.id = ${benchmarkResultId}
     `) as { server_log: string }[];
     return rows[0]?.server_log ?? null;
@@ -84,12 +104,12 @@ export async function getServerLogFileNames(
       from (
         select sl.file_name, 0 as priority
         from benchmark_results br
-        join server_logs sl on sl.id = br.server_log_id
+        join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
         union all
         select slf.file_name, 1 as priority
         from benchmark_results br
-        join server_logs sl on sl.id = br.server_log_id
+        join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         join server_log_files slf on slf.server_log_id = sl.id
         where br.id = ${benchmarkResultId}
           and slf.file_name <> sl.file_name
@@ -132,7 +152,7 @@ export async function getServerLogChunk(
           substring(sl.server_log from ${offset + limit + 1}::integer for 1) <> '' as has_more,
           0 as priority
         from benchmark_results br
-        join server_logs sl on sl.id = br.server_log_id
+        join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
           and (${requestedFile}::text is null or sl.file_name = ${requestedFile})
         union all
@@ -146,7 +166,7 @@ export async function getServerLogChunk(
           substring(slf.log_text from ${offset + limit + 1}::integer for 1) <> '' as has_more,
           1 as priority
         from benchmark_results br
-        join server_log_files slf on slf.server_log_id = br.server_log_id
+        join server_log_files slf on slf.server_log_id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
           and ${requestedFile}::text is not null
           and slf.file_name = ${requestedFile}
@@ -177,7 +197,7 @@ export async function getServerLogChunk(
           ) as server_log,
           substring(sl.server_log from ${offset + limit + 1}::integer for 1) <> '' as has_more
         from benchmark_results br
-        join server_logs sl on sl.id = br.server_log_id
+        join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
         where br.id = ${benchmarkResultId}
       )
       select server_log, char_length(server_log) as char_count, has_more
@@ -228,7 +248,7 @@ export async function searchServerLogs(
                     substring(sl.server_log from ${offset + 1}::integer for ${chunkSize}::integer) as chunk_text,
                     substring(sl.server_log from ${offset + chunkSize + 1}::integer for 1) <> '' as has_more
                   from benchmark_results br
-                  join server_logs sl on sl.id = br.server_log_id
+                  join server_logs sl on sl.id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
                   where br.id = ${benchmarkResultId}
                     and sl.file_name = ${fileName}
                   limit 1
@@ -266,7 +286,7 @@ export async function searchServerLogs(
                     substring(slf.log_text from ${offset + 1}::integer for ${chunkSize}::integer) as chunk_text,
                     substring(slf.log_text from ${offset + chunkSize + 1}::integer for 1) <> '' as has_more
                   from benchmark_results br
-                  join server_log_files slf on slf.server_log_id = br.server_log_id
+                  join server_log_files slf on slf.server_log_id = coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id))
                   where br.id = ${benchmarkResultId}
                     and slf.file_name = ${fileName}
                   limit 1
@@ -360,7 +380,7 @@ export async function getServerLogAvailability(
     select br.id
     from benchmark_results br
     where br.id = any(${benchmarkResultIds}::bigint[])
-      and br.server_log_id is not null
+      and coalesce(br.server_log_id, (select m.log_id from unnest(${PREVIEW_POINT_IDS}::bigint[], ${PREVIEW_LOG_IDS}::bigint[]) as m(id, log_id) where m.id = br.id)) is not null
   `) as { id: number }[];
 
   const result: ServerLogAvailabilityMap = {};

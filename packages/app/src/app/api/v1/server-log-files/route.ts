@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const getCachedServerLogFileNames = cachedQuery(
   (id: number) => getServerLogFileNames(getDb(), id),
-  'server-log-files',
+  'server-log-files:k3-preview',
 );
 
 /** GET /api/v1/server-log-files?id=1 — artifact-relative .log/.out filenames. */
