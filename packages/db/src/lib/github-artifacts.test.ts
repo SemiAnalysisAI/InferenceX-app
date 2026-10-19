@@ -19,8 +19,6 @@ describe('RUNNER_SUFFIX_RE', () => {
   });
 
   it('does not over-match across earlier underscore separators', () => {
-    // The (conc, offload) variant tokens must survive — only the final
-    // `_<pool>_<digits>` pair is stripped.
     expect('bmk_agentic_glm5_offload_on_b200-nb_2'.replace(RUNNER_SUFFIX_RE, '')).toBe(
       'bmk_agentic_glm5_offload_on',
     );

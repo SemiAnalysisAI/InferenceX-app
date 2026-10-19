@@ -40,7 +40,6 @@ export interface LegendSwitchConfig {
   label: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  /** Optional explainer rendered as an info-icon tooltip next to the label. */
   infoTooltip?: React.ReactNode;
   advanced?: boolean;
 }
@@ -58,11 +57,9 @@ export interface ChartLegendProps {
   switches?: LegendSwitchConfig[];
   actions?: LegendActionConfig[];
   grouped?: boolean;
-  /** Optional extra key/legend explanation rendered below the display switches. */
   keyIndicators?: React.ReactNode;
   enableTooltips?: boolean;
   maxHeight?: number;
-  /** Override styles on the outer legend container (e.g. maxHeight to constrain scrollable area) */
   containerStyle?: React.CSSProperties;
   variant?: 'overlay' | 'sidebar';
   disableActiveSort?: boolean;
@@ -70,18 +67,7 @@ export interface ChartLegendProps {
   onItemHoverEnd?: () => void;
   onItemRemove?: (name: string) => void;
   onAdvancedExpandedChange?: (expanded: boolean) => void;
-  /**
-   * Suppress the ATOM engine footnote even when a legend label carries the ¹
-   * marker. Inference charts pass this because they render the footnote in
-   * the axis-metric info footer below the chart instead of in the legend.
-   */
   hideAtomFootnote?: boolean;
-  /**
-   * Render the legend as a plain key: no display switches, no action buttons,
-   * no per-series remove / points-table affordances, no changelog tooltips.
-   * Items stay clickable so a reader can still isolate a series. Used by the
-   * `/embed` chart, which hands every other control to the host page.
-   */
   readOnly?: boolean;
 }
 
@@ -121,8 +107,6 @@ export default function ChartLegend({
             ...item,
             onShowPoints: undefined,
             tooltip: null,
-            // Highlight marks the run selected in the changelog, which a
-            // read-only legend has no way to change.
             isHighlighted: false,
           }))
         : legendItems,
@@ -133,12 +117,7 @@ export default function ChartLegend({
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
 
-  // Sidebar items stay on one line. The in-flow panel fits their content up to
-  // the wrapper's width cap; unusually long names retain a title tooltip.
   const itemsExpanded = isSidebar ? false : isLegendExpanded;
-  // Counts only removable series: the guard below exists to stop the user
-  // emptying the chart, and label-only entries (unofficial runs) are not
-  // something removing leaves you without.
   const activeCount = useMemo(
     () => items.filter((item) => item.isActive && item.isRemovable !== false).length,
     [items],
@@ -157,7 +136,6 @@ export default function ChartLegend({
     return () => observer.disconnect();
   }, []);
 
-  // Sort items for sidebar mode (active-first); filtering is done via CSS hide
   const sortedItems = useMemo(() => {
     if (!isSidebar) return items;
     return filterAndSortLegendItems(items, '', !disableActiveSort);
@@ -171,7 +149,6 @@ export default function ChartLegend({
     const result = uniqueNames.map((name) =>
       source.filter((item) => item.name.split(' ')[0] === name),
     );
-    // In sidebar mode, sort groups so those with active items come first
     if (isSidebar && !disableActiveSort) {
       result.sort((a, b) => {
         const aHasActive = a.some((item) => item.isActive) ? 0 : 1;
@@ -186,9 +163,6 @@ export default function ChartLegend({
     onExpandedChange(!isLegendExpanded);
   };
 
-  // Sidebar: a fixed in-flow panel that takes layout space next to the plot
-  // It never overlays the chart. Collapsing removes the panel contents while
-  // preserving the toggle's inset, so the chart reclaims the remaining width.
   const outerClasses = isSidebar
     ? cn(
         'px-2 py-3 rounded-md border bg-background text-sm flex flex-col w-full',
@@ -215,7 +189,6 @@ export default function ChartLegend({
     ...containerStyle,
   };
 
-  // Show ATOM footnote when any legend item label contains the ¹ marker
   const hasAtomFootnote = useMemo(
     () => !hideAtomFootnote && items.some((item) => item.label.includes(ATOM_FOOTNOTE_MARKER)),
     [items, hideAtomFootnote],
@@ -259,8 +232,6 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  // Keep the same button mounted in the same padded header in both states.
-  // Only its arrow and accessible label change; focus and pointer position stay put.
   const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
   const panelHeader =
     isSidebar && !readOnly ? (
@@ -358,7 +329,6 @@ export default function ChartLegend({
       </div>
     ) : null;
 
-  // Compute li className for a legend item (shared by tooltip and non-tooltip paths)
   const itemClassName = (item: CommonLegendItemProps) =>
     cn(
       'transition-opacity duration-300',
@@ -372,7 +342,6 @@ export default function ChartLegend({
       itemsExpanded && 'md:w-full md:block',
     );
 
-  // Render a single legend item, optionally wrapped with a tooltip
   const renderItem = (item: CommonLegendItemProps) => {
     const legendItem = (
       <ChartLegendItem
@@ -402,8 +371,6 @@ export default function ChartLegend({
         {enableTooltips ? (
           <TooltipRoot>
             <TooltipTrigger asChild>
-              {/* Full width when the row carries a points-table icon so the
-                  ml-auto icon pins to a consistent right-edge column. */}
               <div className={item.onShowPoints ? 'w-full' : 'w-fit max-w-full'}>{legendItem}</div>
             </TooltipTrigger>
             {item.isHighlighted && item.tooltip && (
@@ -419,14 +386,11 @@ export default function ChartLegend({
     );
   };
 
-  // Display controls stay immediately below the series instead of being
-  // pushed to the bottom of a chart-height panel. Overlay actions stay here.
   const hasBottomControls =
     switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
-      // Display options wrap within the label-sized panel rather than widening it.
       className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
     >
       {!isSidebar && actionElements}
@@ -436,7 +400,6 @@ export default function ChartLegend({
     </div>
   ) : null;
 
-  // Scroll container content
   const scrollContent =
     grouped && rows ? (
       <div

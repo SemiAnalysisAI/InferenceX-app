@@ -51,8 +51,6 @@ function Blur(props: { children?: ReactNode }) {
   return <div className="blur-sm select-none pointer-events-none">{props.children}</div>;
 }
 
-/** `[label](https://…)` inside a `<Figure caption>`. Captions are plain strings, so MDX
- *  never sees them — without this, source credits would render as literal brackets. */
 const CAPTION_LINK = /\[(?<label>[^\]]+)\]\((?<href>https?:\/\/[^\s)]+)\)/gu;
 
 export function renderCaption(caption: string): ReactNode[] {
@@ -79,7 +77,6 @@ export function renderCaption(caption: string): ReactNode[] {
   return nodes;
 }
 
-/** Creates a fresh set of MDX components with clean heading dedup state per render. */
 export function createMdxComponents(
   locale: Locale = 'en',
 ): Record<string, React.ComponentType<any>> {

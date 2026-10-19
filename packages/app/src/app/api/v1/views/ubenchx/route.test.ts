@@ -95,7 +95,6 @@ describe('ubenchx view', () => {
   });
 
   it('filters the test=all TPC Skyline section by a case-insensitive GPU key', async () => {
-    // B200 SXM is the one GPU every ubenchX test covers, so test=all accepts it.
     const response = await GET(request({ gpu: 'b200 sxm' }));
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -143,19 +142,16 @@ describe('ubenchx view', () => {
   });
 
   it("derives MBU from each GPU's own peak bandwidth", async () => {
-    // H100 SXM: 16 GiB row: bandwidth 3053.14 GB/s, peak 3350 GB/s
     const h100Res = await GET(request({ test: 'mem-bw', gpu: 'H100 SXM' }));
     const h100Body = await h100Res.json();
     const h100Last = h100Body.gpus[0].rows.at(-1);
     expect(h100Last.mbuPercent).toBeCloseTo((3053.14 / 3350) * 100, 4);
 
-    // B300 SXM: 16 GiB row: bandwidth 6655.80 GB/s, peak 8000 GB/s
     const b300Res = await GET(request({ test: 'mem-bw', gpu: 'B300 SXM' }));
     const b300Body = await b300Res.json();
     const b300Last = b300Body.gpus[0].rows.at(-1);
     expect(b300Last.mbuPercent).toBeCloseTo((6655.8 / 8000) * 100, 4);
 
-    // H200 SXM: 16 GiB row: bandwidth 4305.39 GB/s, peak 4800 GB/s
     const h200Res = await GET(request({ test: 'mem-bw', gpu: 'H200 SXM' }));
     const h200Body = await h200Res.json();
     const h200Last = h200Body.gpus[0].rows.at(-1);

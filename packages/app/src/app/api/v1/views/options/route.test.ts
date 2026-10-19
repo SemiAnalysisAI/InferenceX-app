@@ -93,7 +93,6 @@ describe('GET /api/v1/views/options', () => {
       percentile: 'p90',
       xmode: 'interactivity',
     });
-    // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
     expect(body.quickFilters.deployments).toEqual(['single-node', 'multi-node', 'disagg']);
     expect(body.fleet.defaults).toEqual({

@@ -1,18 +1,9 @@
-/**
- * Pure utility functions for legend filtering and sorting.
- * Used by ChartLegend component for sidebar mode processing.
- */
-
 interface LegendItem {
   label: string;
   title?: string;
   isActive: boolean;
 }
 
-/**
- * Filters legend items by search query (case-insensitive, matches label and title),
- * then optionally sorts active items to the top while preserving relative order.
- */
 export function filterAndSortLegendItems<T extends LegendItem>(
   items: T[],
   searchQuery: string,

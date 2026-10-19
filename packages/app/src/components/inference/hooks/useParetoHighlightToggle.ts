@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 
-/** Each new switch-on alternates plain and playful; switching off always hides it. */
 export function useParetoHighlightToggle(initialParam: string | null | undefined = '') {
   const [state, setState] = useState(() => ({
     visible: initialParam === '1' || initialParam === '2',

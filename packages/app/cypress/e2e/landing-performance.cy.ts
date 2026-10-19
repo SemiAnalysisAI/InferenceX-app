@@ -118,9 +118,6 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
         false,
       );
-      // The landing AgentX ledger has five lazy model marks. A mobile viewport may
-      // fetch any visible subset, but the text-only supporter strip must not pull
-      // in its former logo set.
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
@@ -139,12 +136,6 @@ describe('Landing page performance', () => {
 
   it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
-      // Next emits resource preloads as a `Link` response header (when `/` renders
-      // dynamically) and/or as inlined <link rel="preload"> tags in the document
-      // <head> (when `/` is statically prerendered) — and a production build can
-      // surface the same resource in BOTH places at once. Collect a deduplicated
-      // set of preloaded URLs per `as` type, keyed by URL, so the assertion holds
-      // in every render mode and never double-counts a resource listed twice.
       const linkHeader = String(response.headers.link ?? '');
       const body = String(response.body ?? '');
 
@@ -156,7 +147,6 @@ describe('Landing page performance', () => {
         else if (as === 'image' && url.startsWith('/logos/')) logos.add(url);
       };
 
-      // `Link` header entries: <url>; rel=preload; as="font"|"image"; ...
       for (const entry of linkHeader.split(',')) {
         if (!/\brel=preload\b/u.test(entry)) continue;
         add(
@@ -165,7 +155,6 @@ describe('Landing page performance', () => {
         );
       }
 
-      // Inlined <link rel="preload"> tags.
       for (const tag of body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? []) {
         add(
           tag.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
@@ -174,8 +163,6 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      // The supporters band no longer renders a quote block, so no supporter
-      // logo is visible on the landing page and none should be preloaded.
       expect([...logos]).to.have.length(0);
     });
   });

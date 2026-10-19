@@ -33,7 +33,6 @@ const METRIC_LABELS_ZH: Record<string, string> = {
   Concurrency: '并发数',
 };
 
-/** True when the field shows a positive finite number strictly outside [min, max]. */
 export function isInteractivityInputOutOfRange(
   inputValue: string,
   min: number,
@@ -58,16 +57,7 @@ export interface CompareInterpolatedTableProps {
   interactivityRange: { min: number; max: number };
   gpuDataPointsA: GPUDataPoint[];
   gpuDataPointsB: GPUDataPoint[];
-  /** When set, only metric rows whose `label` is in this list are rendered.
-   *  Undefined (the default) shows all four metrics. The /compare-per-dollar
-   *  variant passes ['Cost ($/M tok)', 'Concurrency'] to slim the table down
-   *  to the cost-efficiency view; /compare omits the prop. */
   visibleMetricLabels?: string[];
-  /** Per-route display-label overrides keyed by the metric's internal `label`.
-   *  Lets routes render a longer / more descriptive name in the cell without
-   *  forking the METRICS table. Example: /compare-per-dollar overrides
-   *  'Cost ($/M tok)' → 'Dollar per Million Tokens' so the page reads in full
-   *  English to match its "Performance per Dollar" framing. */
   metricLabelOverrides?: Record<string, string>;
 }
 
@@ -85,7 +75,6 @@ interface MetricRow {
   label: string;
   extract: (r: InterpolatedResult) => number;
   format: (v: number) => string;
-  /** 'higher' = higher is better, 'lower' = lower is better */
   direction: 'higher' | 'lower';
 }
 
@@ -173,10 +162,6 @@ export function CompareInterpolatedTable({
     [columnIntents, gpuDataPointsA, gpuDataPointsB, ssrRows],
   );
 
-  /**
-   * Commit the current inputValue for a column: parse, clamp, and re-interpolate.
-   * Returns true if the value was valid and state was updated.
-   */
   const commitColumnTarget = useCallback(
     (colIndex: number): boolean => {
       let committed = false;
@@ -208,10 +193,6 @@ export function CompareInterpolatedTable({
     [interactivityRange],
   );
 
-  /**
-   * Handle input change: update inputValue immediately and re-interpolate if valid.
-   * Consistent with calculator page behavior where typing updates results in real-time.
-   */
   const handleInputChange = useCallback(
     (colIndex: number, value: string) => {
       setColumnIntents((prev) => {
@@ -249,7 +230,6 @@ export function CompareInterpolatedTable({
       e.preventDefault();
       const didCommit = commitColumnTarget(colIndex);
       if (didCommit) {
-        // Blur after a microtask so React flushes the state update first
         queueMicrotask(() => {
           e.currentTarget.blur();
         });

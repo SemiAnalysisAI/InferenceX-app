@@ -13,7 +13,6 @@ export interface BarConfig<T> {
   keyFn?: (d: T) => string;
 }
 
-/** Render vertical bars using D3 enter/update/exit. */
 export function renderBars<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -38,7 +37,6 @@ export function renderBars<T>(
     .attr('cursor', 'pointer');
 }
 
-/** Update bar positions on zoom (Y-only rescale). */
 export function updateBarsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   yScale: ContinuousScale,

@@ -413,8 +413,6 @@ describe('rowToAggDataEntry', () => {
   });
 
   it('leaves measured power fields undefined for rows that predate the metric', () => {
-    // Distinguishing "no measurement" from "0 W" matters: createChartDataPoint
-    // uses typeof===number to decide whether to emit the measuredAvgPower field.
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.avg_power_w).toBeUndefined();
     expect(entry.joules_per_output_token).toBeUndefined();
@@ -626,8 +624,6 @@ describe('rowToAggDataEntry', () => {
       }),
     );
     expect(entry.power_tier).toBe('legacy');
-    // The tier is informational only: historical telemetry remains visible
-    // so users can distinguish measurement status without losing older data.
     expect(entry.avg_power_w).toBe(560);
   });
 
@@ -643,8 +639,6 @@ describe('rowToAggDataEntry', () => {
         },
       }),
     );
-    // Role watts render, but their provenance predates the versioned
-    // whole-deployment energy contract.
     expect(entry.power_tier).toBe('legacy');
     expect(entry.prefill_avg_power_w).toBe(612.3);
     expect(entry.joules_per_output_token).toBeUndefined();
@@ -705,8 +699,6 @@ describe('rowToAggDataEntry', () => {
   });
 
   it('defensively drops a non-array workers payload', () => {
-    // The DB JSONB column is untyped at the wire boundary, so guard against a
-    // malformed row reaching downstream consumers.
     const entry = rowToAggDataEntry(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       makeRow({ workers: 'oops' as any }),
@@ -715,9 +707,6 @@ describe('rowToAggDataEntry', () => {
   });
 
   it('leaves multinode role-split scalars and workers undefined for legacy rows', () => {
-    // Single-node configs predating the multinode runner don't emit any of
-    // the role-split fields; transform must yield undefined (not 0) so the
-    // chart layer can distinguish "no measurement" from a real zero.
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.prefill_avg_power_w).toBeUndefined();
     expect(entry.decode_avg_power_w).toBeUndefined();
@@ -744,9 +733,6 @@ describe('rowToAggDataEntry', () => {
   });
 
   it('leaves cluster-wide temp/util/mem fields undefined when absent (legacy rows)', () => {
-    // Same undefined-vs-zero distinction as the measured-power scalars —
-    // historic rows predate the perfmon CSV scrape, so missing values must
-    // not be silently coerced to 0.
     const entry = rowToAggDataEntry(makeRow({ metrics: {} }));
     expect(entry.avg_temp_c).toBeUndefined();
     expect(entry.peak_temp_c).toBeUndefined();
@@ -780,14 +766,11 @@ describe('rowToAggDataEntry', () => {
     expect(entry.workers![0].hosts).toEqual(['pn0']);
     expect(entry.workers![0].avg_temp_c).toBe(71.2);
     expect(entry.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
-    // Optional telemetry fields stay undefined when source omits them.
     expect(entry.workers![1].avg_temp_c).toBeUndefined();
   });
 });
 
 describe('rowToAggDataEntry — agentic measured power', () => {
-  // AgentX (agentic_traces) rows carry the same measured-power contract as
-  // fixed-seq rows; nothing in the transform may key off benchmark_type.
   const agenticPowerMetrics = {
     tput_per_gpu: 100,
     power_valid: 1,
@@ -890,7 +873,7 @@ describe('rowToAggDataEntry — agentic measured power', () => {
 describe('transformBenchmarkRows', () => {
   it('returns empty arrays for empty input', () => {
     const { chartData, hardwareConfig } = transformBenchmarkRows([]);
-    expect(chartData).toHaveLength(2); // one per chart definition (e2e + interactivity)
+    expect(chartData).toHaveLength(2);
     expect(chartData[0]).toHaveLength(0);
     expect(chartData[1]).toHaveLength(0);
     expect(Object.keys(hardwareConfig)).toHaveLength(0);
@@ -899,7 +882,6 @@ describe('transformBenchmarkRows', () => {
   it('produces InferenceData with x, y, hwKey fields', () => {
     const rows = [makeRow()];
     const { chartData } = transformBenchmarkRows(rows);
-    // At least one chart type should have data
     const hasData = chartData.some((d) => d.length > 0);
     expect(hasData).toBe(true);
 
@@ -914,7 +896,6 @@ describe('transformBenchmarkRows', () => {
     const rows = [makeRow({ hardware: 'h200', framework: 'trt' })];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     expect(Object.keys(hardwareConfig).length).toBeGreaterThan(0);
-    // hwKey should be constructed from hardware + framework
     const hwKeys = Object.keys(hardwareConfig);
     expect(hwKeys.some((k) => k.includes('h200'))).toBe(true);
   });
@@ -946,9 +927,6 @@ describe('transformBenchmarkRows', () => {
   });
 
   it('folds pp into the total GPU count and the point label (overlay path)', () => {
-    // This is the same pipeline `?unofficialrun=` overlays run through
-    // (buildChartData → transformBenchmarkRows), so it exercises the overlay
-    // rendering path for PP configs end to end.
     const base = makeRow();
     const rows = [
       makeRow({
@@ -959,7 +937,6 @@ describe('transformBenchmarkRows', () => {
     ];
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData.find((d) => d.length > 0)![0];
-    // tp8 × pp2 = 16 total GPUs
     expect(point.tp).toBe(16);
     expect(point.pp).toBe(2);
     expect(getPointLabel(point)).toBe('TP8PP2');
@@ -1003,10 +980,6 @@ describe('transformBenchmarkRows', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Additional edge-case tests for rowToAggDataEntry
-// ---------------------------------------------------------------------------
-
 describe('rowToAggDataEntry — extended edge cases', () => {
   it('maps precision field from row', () => {
     const entry = rowToAggDataEntry(makeRow({ precision: 'fp4' }));
@@ -1015,7 +988,6 @@ describe('rowToAggDataEntry — extended edge cases', () => {
 
   it('initializes hwKey as empty string', () => {
     const entry = rowToAggDataEntry(makeRow());
-    // hwKey is set to '' inside rowToAggDataEntry — it gets resolved later in transformBenchmarkRows
     expect(entry.hwKey).toBe('');
   });
 
@@ -1121,7 +1093,6 @@ describe('rowToAggDataEntry — extended edge cases', () => {
   });
 
   it('maps all known DB model keys to their display names', () => {
-    // Test a few known models from DB_MODEL_TO_DISPLAY to verify the lookup works
     const llama = rowToAggDataEntry(makeRow({ model: 'llama70b' }));
     expect(llama.model).toBe('Llama-3.3-70B-Instruct-FP8');
 
@@ -1198,10 +1169,6 @@ describe('rowToAggDataEntry — extended edge cases', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Additional edge-case tests for transformBenchmarkRows
-// ---------------------------------------------------------------------------
-
 describe('transformBenchmarkRows — deployment topology', () => {
   it('renders multinode aggregate TP8PP2 as 16 total GPUs without prefill/decode roles', () => {
     const base = makeRow();
@@ -1243,10 +1210,9 @@ describe('transformBenchmarkRows — deployment topology', () => {
       }),
     ];
     const { chartData } = transformBenchmarkRows(rows);
-    // createChartDataPoint sets tp = num_prefill_gpu + num_decode_gpu when disagg is true
     const point = chartData.flat().find((p) => p.disagg === true);
     expect(point).toBeDefined();
-    expect(point!.tp).toBe(4 + 12); // 16, not decode_tp=8
+    expect(point!.tp).toBe(4 + 12);
   });
 
   it('sets disagg fields on data points when disagg is true', () => {
@@ -1270,7 +1236,6 @@ describe('transformBenchmarkRows — deployment topology', () => {
     const rows = [makeRow({ disagg: false, num_prefill_gpu: 8, num_decode_gpu: 8 })];
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData.flat()[0];
-    // createChartDataPoint sets disagg to undefined when false, and omits GPU counts
     expect(point.disagg).toBeUndefined();
     expect(point.num_prefill_gpu).toBeUndefined();
     expect(point.num_decode_gpu).toBeUndefined();
@@ -1281,7 +1246,6 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
   it('constructs hwKey from hardware + framework', () => {
     const rows = [makeRow({ hardware: 'h200', framework: 'trt' })];
     const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
-    // getHardwareKey normalizes: h200 + trt => h200_trt
     const point = chartData.flat()[0];
     expect(point.hwKey).toBe('h200_trt');
     expect(hardwareConfig).toHaveProperty('h200_trt');
@@ -1387,14 +1351,12 @@ describe('transformBenchmarkRows — hardware key resolution', () => {
   });
 
   it('falls back to unknown config for completely unrecognized hardware', () => {
-    // Suppress expected console warnings from getHardwareConfig
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
     const rows = [makeRow({ hardware: 'zzz999', framework: 'mystery' })];
     const { hardwareConfig } = transformBenchmarkRows(rows);
     const hwKeys = Object.keys(hardwareConfig);
-    // Should still produce an entry — getHardwareConfig returns HARDWARE_CONFIG.unknown
     expect(hwKeys.length).toBe(1);
     const config = hardwareConfig[hwKeys[0]];
     expect(config.label).toBe('Unknown');
@@ -1412,12 +1374,10 @@ describe('transformBenchmarkRows — hardware config caching', () => {
       makeRow({ hardware: 'h200', framework: 'trt', conc: 128 }),
     ];
     const { hardwareConfig, chartData } = transformBenchmarkRows(rows);
-    // All three rows produce the same hwKey, so hardwareConfig should have exactly 1 entry
     const hwKeys = Object.keys(hardwareConfig);
     expect(hwKeys).toHaveLength(1);
     expect(hwKeys[0]).toBe('h200_trt');
 
-    // But all 3 data points should appear in each chart
     for (const chart of chartData) {
       expect(chart).toHaveLength(3);
     }
@@ -1450,7 +1410,6 @@ describe('transformBenchmarkRows — data point values', () => {
       }),
     ];
     const { chartData } = transformBenchmarkRows(rows);
-    // Chart 0 is interactivity (x = median_intvty), Chart 1 is e2e (x = median_e2el)
     const interactivityPoint = chartData[0][0];
     const e2ePoint = chartData[1][0];
     expect(interactivityPoint.x).toBe(25);
@@ -1470,7 +1429,6 @@ describe('transformBenchmarkRows — data point values', () => {
       }),
     ];
     const { chartData } = transformBenchmarkRows(rows);
-    // Both chart defs have y: "tput_per_gpu"
     expect(chartData[0][0].y).toBe(600);
     expect(chartData[1][0].y).toBe(600);
   });
@@ -1491,13 +1449,10 @@ describe('transformBenchmarkRows — data point values', () => {
     ];
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData[0][0];
-    // tpPerGpu should match tput_per_gpu from the entry
     expect(point.tpPerGpu).toBeDefined();
     expect(point.tpPerGpu.y).toBe(400);
-    // tpPerMw should be computed from tput_per_gpu and power
     expect(point.tpPerMw).toBeDefined();
     expect(point.tpPerMw.y).toBeGreaterThan(0);
-    // Cost fields should be computed
     expect(point.costh).toBeDefined();
     expect(point.costh.y).toBeGreaterThan(0);
     expect(point.costr).toBeDefined();
@@ -1531,7 +1486,6 @@ describe('transformBenchmarkRows — data point values', () => {
       makeRow({ hardware: 'mi300x', framework: 'vllm', conc: 32 }),
     ];
     const { chartData } = transformBenchmarkRows(rows);
-    // All points should have their hwKey set correctly
     for (const chart of chartData) {
       const h200Points = chart.filter((p) => p.hwKey === 'h200_trt');
       const mi300xPoints = chart.filter((p) => p.hwKey === 'mi300x_vllm');
@@ -1549,7 +1503,6 @@ describe('transformBenchmarkRows — spec decoding variants', () => {
   });
 
   it('appends non-mtp spec_method as suffix', () => {
-    // Suppress expected console warnings from getHardwareConfig fallback
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
 
@@ -1607,9 +1560,6 @@ describe('mergeRunScopedRows', () => {
     const runRows = [vllmRun({ id: 10, conc: 32 }), vllmRun({ id: 11, conc: 64 })];
     const baseRows = [vllmRun({ id: 90, conc: 32 }), vllmRun({ id: 91, conc: 128 })];
     const merged = mergeRunScopedRows(runRows, baseRows);
-    // All vllm base rows dropped (incl. conc=128 the run didn't cover) — a
-    // partial-sweep run must fully own its config or the DISTINCT-ON mixing
-    // the scoping exists to prevent comes right back.
     expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 11]);
   });
 
@@ -1685,10 +1635,6 @@ describe('mergeRunScopedRows', () => {
 });
 
 describe('rowToAggDataEntry — agentic interactivity invariant', () => {
-  // Agentic artifacts have shipped *_intvty under two definitions across harness
-  // versions (slow-tail 1/p(ITL) vs fast-tail p(1/ITL)). The chart's
-  // interactivity selector is slow-tail, so we always derive intvty = 1/itl and
-  // discard the artifact value. Mirrors the ingest mapper + backfill.
   const agentic = (metrics: Record<string, number>) =>
     rowToAggDataEntry(
       makeRow({
@@ -1701,10 +1647,10 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
 
   it('overrides an artifact-supplied (fast-tail) *_intvty with 1/*_itl', () => {
     const entry = agentic({
-      p90_itl: 0.0893, // slow-tail 1/itl ≈ 11.198
-      p90_intvty: 23.91, // fast-tail contamination — must be discarded
+      p90_itl: 0.0893,
+      p90_intvty: 23.91,
       p75_itl: 0.0692,
-      p75_intvty: 19, // must be discarded
+      p75_intvty: 19,
     });
     expect(entry.p90_intvty).toBeCloseTo(1 / 0.0893, 6);
     expect(entry.p75_intvty).toBeCloseTo(1 / 0.0692, 6);
@@ -1723,13 +1669,9 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   });
 
   it('DROPS a stale artifact *_intvty when the matching *_itl is absent (overlay mirror of the ETL fix)', () => {
-    // Artifact carries intvty (possibly the drifted p(1/ITL) definition) but no
-    // itl for that percentile — the value can't be reconciled to 1/p(ITL), so it
-    // must be discarded, not passed through. rowToAggDataEntry then coerces the
-    // now-missing key to 0.
     const entry = agentic({ p90_intvty: 42, p95_itl: 0.2 });
-    expect(entry.p90_intvty).toBe(0); // dropped → default 0
-    expect(entry.p95_intvty).toBeCloseTo(5, 6); // derived from itl
+    expect(entry.p90_intvty).toBe(0);
+    expect(entry.p95_intvty).toBeCloseTo(5, 6);
   });
 
   it('DROPS a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
@@ -1738,9 +1680,6 @@ describe('rowToAggDataEntry — agentic interactivity invariant', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// rowToAggDataEntry — persisted-id guard (overlay rows carry no DB id)
-// ---------------------------------------------------------------------------
 describe('rowToAggDataEntry — id coercion', () => {
   it('coerces a stringified bigint id to a number', () => {
     const entry = rowToAggDataEntry(makeRow({ id: '206863' as unknown as number }));
@@ -1758,9 +1697,6 @@ describe('rowToAggDataEntry — id coercion', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// mergeRunScopedRows — offload-aware scoping (data-loss guard)
-// ---------------------------------------------------------------------------
 describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () => {
   const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
     makeRow({
@@ -1775,12 +1711,10 @@ describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () 
     });
 
   it('a full run snapshot replaces old points across offload variants', () => {
-    // A selected AgentX snapshot already contains its complete point set.
-    // A removed offload-off point must not be borrowed from the base snapshot.
     const runRows = [agenticRow({ id: 10, offload_mode: 'on' })];
     const baseRows = [
-      agenticRow({ id: 90, offload_mode: 'on' }), // same series as the run → replaced
-      agenticRow({ id: 91, offload_mode: 'off' }), // old point → replaced
+      agenticRow({ id: 90, offload_mode: 'on' }),
+      agenticRow({ id: 91, offload_mode: 'off' }),
     ];
     const merged = mergeRunScopedRows(runRows, baseRows);
     expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10]);

@@ -1,5 +1,4 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
-// The website advertises the verified public release, which can lag the source candidate.
 import PUBLISHED_SKILL from '../../src/lib/api/published-inferencex-skills.json';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
@@ -8,8 +7,6 @@ describe('API documentation', () => {
   it('exposes Pareto boundaries without promoting legacy fixtures or chart share params', () => {
     const query =
       '/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max';
-    // Local fixtures omit benchmark_type. The endpoint must keep that as an empty
-    // selection rather than inventing a single_turn workload for dominance math.
     cy.request<BenchmarkRow[]>('/api/v1/benchmarks?model=DeepSeek-R1-0528').then(
       ({ body: rows }) => {
         expect(rows.length).to.be.greaterThan(0);
@@ -97,7 +94,6 @@ describe('API documentation', () => {
           cy.stub(win.navigator.clipboard, 'writeText').as('copyAgentExample').resolves();
         },
       });
-      // The reference is server-rendered; wait for the shell's client mount before copying.
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
         .and('contain', 'currently');

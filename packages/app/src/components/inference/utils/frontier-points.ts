@@ -2,11 +2,6 @@ import type { InferenceData } from '../types';
 import { runAttemptFromUrl, runIdFromUrl } from './powerTimeline';
 import { pointTopologyKey } from './topology-filter';
 
-/**
- * CSV export of a cross-platform frontier (PowerX Figure 16): the chart's own
- * global non-dominated set, one row per observation with its provenance.
- * Stable export columns: identity first, then plotted coordinates and provenance.
- */
 export const FRONTIER_EXPORT_HEADERS = [
   'hardware',
   'framework',

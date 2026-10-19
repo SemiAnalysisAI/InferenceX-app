@@ -95,8 +95,6 @@ function estimatedEnergy(
     )
   )
     return { status: 'unavailable', reason: 'audit-does-not-match-measured-input' };
-  // Energy belongs to the measured GPUs: an extrapolated chassis contributes
-  // only their share at the modeled per-GPU rate.
   const it = modeled.deploymentItWatts * w.integration_duration_s;
   const facility = modeled.deploymentFacilityWatts * w.integration_duration_s;
   if (!finite(it) || !finite(facility))
@@ -147,7 +145,6 @@ export function buildComparison(input: ComparisonInput) {
         : row.metrics.power_valid === 0
           ? 'invalid'
           : 'unverified';
-    // NVL72 Grace-side keys carry their own verdict.
     const cpuValid = row.metrics.cpu_power_valid === 1;
     return {
       id: entry.id,
@@ -306,7 +303,6 @@ const csvValue = (item: unknown) =>
     ? ''
     : `"${(typeof item === 'object' ? JSON.stringify(item) : String(item)).replaceAll('"', '""')}"`;
 
-/** RFC 4180 quoting; null/absent values remain blank rather than becoming zero. */
 export function csv(records: Record<string, unknown>[]): string {
   const columns = [...new Set(records.flatMap(Object.keys))];
   return `${[columns.map(csvValue).join(','), ...records.map((row) => columns.map((key) => csvValue(row[key])).join(','))].join('\r\n')}\r\n`;
@@ -314,8 +310,6 @@ export function csv(records: Record<string, unknown>[]): string {
 
 type Comparison = ReturnType<typeof buildComparison>;
 
-/** One CSV record per row: the comparison row flattened with the export's provenance. */
-/** The TypeScript port; hashed as one digest over its sorted files. */
 const POWER_MODEL_DIR = 'packages/app/src/lib/power/power_model/';
 
 export function flatRows(

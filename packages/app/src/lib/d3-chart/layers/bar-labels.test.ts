@@ -4,8 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { createMockGroup } from './test-helpers';
 import { renderBarLabels, updateBarLabelsOnZoom, type BarLabelConfig } from './bar-labels';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 interface TestDatum {
   label: string;
   value: number;
@@ -32,8 +30,6 @@ function makeScales() {
   const yScale = d3.scaleLinear().domain([0, 100]).range([200, 0]);
   return { xScale, yScale };
 }
-
-// ── renderBarLabels ──────────────────────────────────────────────────
 
 describe('renderBarLabels', () => {
   it('creates text elements with bar-label class', () => {
@@ -183,7 +179,6 @@ describe('renderBarLabels', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
     const height = 200;
-    // Value of 5 -> barHeight = 200 - yScale(5) = 200 - 190 = 10 -> 10*0.3=3 -> clamped to 8
     const data: TestDatum[] = [{ label: 'A', value: 5, displayLabel: '5%' }];
     renderBarLabels(group as any, data, xScale, yScale, height, makeConfig());
 
@@ -195,7 +190,6 @@ describe('renderBarLabels', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
     const height = 200;
-    // Value of 100 -> barHeight = 200 - 0 = 200 -> 200*0.3=60 -> clamped to 14
     const data: TestDatum[] = [{ label: 'A', value: 100, displayLabel: '100%' }];
     renderBarLabels(group as any, data, xScale, yScale, height, makeConfig());
 
@@ -203,8 +197,6 @@ describe('renderBarLabels', () => {
     expect(labels.elements[0].attrs['font-size']).toBe('14px');
   });
 });
-
-// ── updateBarLabelsOnZoom ────────────────────────────────────────────
 
 describe('updateBarLabelsOnZoom', () => {
   it('re-renders labels (delegates to renderBarLabels)', () => {
@@ -215,11 +207,9 @@ describe('updateBarLabelsOnZoom', () => {
 
     renderBarLabels(group as any, SAMPLE_DATA, xScale, yScale, height, config);
 
-    // Change the scale to simulate zoom
     const newYScale = d3.scaleLinear().domain([0, 200]).range([200, 0]);
     updateBarLabelsOnZoom(group as any, SAMPLE_DATA, xScale, newYScale, height, config);
 
-    // After zoom, positions should reflect the new scale
     const labels = group.selectAll('.bar-label');
     for (let i = 0; i < SAMPLE_DATA.length; i++) {
       const barHeight = height - newYScale(SAMPLE_DATA[i].value);

@@ -1,11 +1,5 @@
 import { assertShareLinkParams } from '../support/share-link';
 
-// The Measured Power "Timeline" display (`y_measuredPowerTimeline`) restores its
-// shared view on a `?unofficialrun=` trace. Intercepted rows carry the
-// `power_audit.source` / `run_url` provenance that names each point's
-// `gpu_metrics_*` artifact; `/api/gpu-metrics?series=power` returns matching
-// one-second series.
-
 const MODEL = 'dsv4';
 const DATE = '2026-09-01';
 const RUN_ID = '34716669498';
@@ -14,7 +8,6 @@ const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 const START_MS = Date.UTC(2026, 8, 1, 20, 0, 0);
 
-/** conc, interactivity (tok/s/user), output tok/s per GPU, measured W per GPU */
 const CONFIGS: [number, number, number, number][] = [
   [16, 90, 200, 500],
   [64, 60, 400, 600],

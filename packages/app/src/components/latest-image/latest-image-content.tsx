@@ -152,16 +152,10 @@ const STRINGS = {
 
 type NodeType = 'single' | 'disagg' | 'all';
 
-/** Human label for a scenario key — AgentX rows read "Agentic"/"智能体", never "null/null". */
 function sequenceOptionLabel(seq: string, locale: 'en' | 'zh'): string {
   return seq === Sequence.AgenticTraces ? getSequenceLabel(Sequence.AgenticTraces, locale) : seq;
 }
 
-/**
- * Filter options from the active catalog. Scenarios are derived separately per
- * selected model (`sequenceOptionsForModel`) so a retired model × scenario
- * pair never appears in the ISL/OSL dropdown.
- */
 function deriveOptions(data: LatestImageRow[]) {
   const models = new Set<string>();
   const precisions = new Set<string>();
@@ -207,28 +201,18 @@ export function CurrentImageContent() {
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
   const [selectedHardware, setSelectedHardware] = useState<string>('all');
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('all');
-  // Empty array = no framework filter (matches every row); any non-empty array
-  // limits the table to rows whose base framework is in the set.
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
-  // Only model × scenario pairs InferenceX still benchmarks. Retired pairs keep
-  // their newest image in the DB, but that image is not a refresh candidate.
   const activeRows = useMemo(() => data?.filter(isActiveImageRow), [data]);
 
   const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
 
-  // Scenario choices follow the selected model: picking MiniMax M3 offers
-  // Agentic only, because its 8K/1K sweep is retired.
   const sequenceOptions = useMemo(
     () => (activeRows ? sequenceOptionsForModel(activeRows, selectedModel) : []),
     [activeRows, selectedModel],
   );
-  // When the model does not run the chosen scenario, filter on the first one
-  // it does run instead of showing an empty table for a phantom selection.
   const effectiveSequence = resolveSelectedSequence(sequenceOptions, selectedSequence);
 
-  // Stable "today" per render — recomputed on each mount, which is fine for the
-  // page's read-only display (no need to tick every minute).
   const today = useMemo(() => new Date(), []);
 
   const imageFilters = useMemo<ImageFilters>(
@@ -255,8 +239,6 @@ export function CurrentImageContent() {
   const filtered = useMemo(() => {
     if (!activeRows) return [];
     const rows = activeRows.filter((row) => matchesImageFilters(row, imageFilters));
-    // Sort oldest-image first so the most stale entries surface at the top —
-    // users primarily care about "what hasn't been refreshed in a while".
     return rows.toSorted((a, b) => a.date.localeCompare(b.date));
   }, [activeRows, imageFilters]);
 
@@ -326,8 +308,6 @@ export function CurrentImageContent() {
                     onValueChange={(v) => {
                       track('current_image_model_changed', { model: v });
                       setSelectedModel(v);
-                      // Commit the scenario fallback so it sticks when the user
-                      // later widens the model filter again.
                       const next = sequenceOptionsForModel(activeRows ?? [], v);
                       if (next.length > 0 && !next.includes(selectedSequence)) {
                         setSelectedSequence(next[0]);
@@ -578,7 +558,6 @@ export function CurrentImageContent() {
                   const actualLatest = getActualLatestTag(row.framework, releases);
                   const outdated = isOutdated(row.image, actualLatest);
                   const ageDays = daysSince(row.date, today);
-                  // Preserve the existing age and image-status rules; only the presentation changes.
                   const staleAgentx = isStaleAgentx(row.benchmark_type, ageDays);
                   const stale = outdated || staleAgentx;
                   const ageStyle = stale ? ageColorStyle(ageDays) : undefined;

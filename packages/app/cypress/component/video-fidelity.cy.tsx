@@ -3,8 +3,6 @@ import FidelityResults from '@/components/video-benchmark/FidelityResults';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 import { at } from '@/components/video-benchmark/bundle';
 
-// Synthetic non-playable bytes validate controls, URL binding, and accounting only.
-// Actual decoded video/audio playback is verified separately using retained CI output.
 const mount = (props: React.ComponentProps<typeof FidelityResults>, locale = '/video') =>
   cy.mount(
     <PathnameContext.Provider value={locale}>

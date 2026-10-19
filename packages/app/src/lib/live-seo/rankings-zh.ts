@@ -1,11 +1,3 @@
-/**
- * @file rankings-zh.ts
- * @description Simplified Chinese copy builders for the `/zh/rankings/<slug>`
- * pages. Same structure as the English builders in `rankings.ts`; model
- * names, hardware SKUs, and framework names stay in English per
- * `docs/chinese-copy.md`.
- */
-
 import type { RankingPageEntry } from '@/lib/live-seo/rankings';
 
 export function rankingPageTitleZh(entry: RankingPageEntry): string {
@@ -20,8 +12,6 @@ export function rankingPageHeadingZh(entry: RankingPageEntry): string {
     : `${entry.model.seoName} 最低成本 GPU 排行`;
 }
 
-/** Static fallback meta description; the route swaps in a stat-led one when
- *  live numbers are available. */
 export function rankingPageDescriptionZh(entry: RankingPageEntry): string {
   return entry.kind === 'fastest-gpu'
     ? `哪款 GPU 跑 ${entry.model.seoName} 最快？基于实测单 GPU 每秒 token 数对 NVIDIA 与 AMD 硬件持续排名，数据持续更新。`

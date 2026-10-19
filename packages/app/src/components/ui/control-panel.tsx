@@ -2,7 +2,6 @@ import { type ComponentProps, type ReactNode } from 'react';
 
 import { cn } from '@/lib/shared/utils';
 
-/** A named group of related controls; callers own the responsive column layout. */
 export function ControlPanel({
   legend,
   className,

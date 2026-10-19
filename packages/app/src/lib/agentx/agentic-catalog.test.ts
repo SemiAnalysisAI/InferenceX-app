@@ -29,7 +29,6 @@ describe('groupAgenticCatalog', () => {
     expect(groups).toHaveLength(1);
     const [group] = groups;
     expect(group.key).toBe('dsv4');
-    // Same label the AgentX ledger uses, so the two catalogs agree.
     expect(group.label).toBe('DeepSeekv4 Pro 0813 1.6T');
     expect(group.totalPoints).toBe(15);
     expect(group.cards.map((card) => card.label)).toEqual(['B200 · vLLM', 'H200 · SGLang']);
@@ -65,8 +64,6 @@ describe('groupAgenticCatalog', () => {
   });
 
   it('drops rows whose model or hardware is unknown to the registries', () => {
-    // A card we cannot label is a card the reader cannot act on. Dropping beats
-    // rendering "undefined · vLLM" or a raw DB key.
     const groups = groupAgenticCatalog([
       entry({ id: 1, model: 'not-a-model' }),
       entry({ id: 2, hardware: 'not-a-gpu' }),

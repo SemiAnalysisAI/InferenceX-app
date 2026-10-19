@@ -1,4 +1,3 @@
-/** Emit the exact staged chart links consumed by the InferenceX callback. */
 import { appendFileSync } from 'node:fs';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { getStagedChartScopes } from '@semianalysisai/inferencex-db/queries/staged-chart-links';

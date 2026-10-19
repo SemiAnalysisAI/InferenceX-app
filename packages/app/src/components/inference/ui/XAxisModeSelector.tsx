@@ -59,7 +59,6 @@ export function XAxisModeSelector() {
   useEffect(() => setMounted(true), []);
   const locale = useLocale();
   const t = STRINGS[locale];
-  // Match SSR and the initial client render before URL-backed scenario state settles.
   const options = X_AXIS_OPTIONS.filter(
     ({ value: option }) => !mounted || isAgentic || !isAgenticOnlyXAxisMode(option),
   );

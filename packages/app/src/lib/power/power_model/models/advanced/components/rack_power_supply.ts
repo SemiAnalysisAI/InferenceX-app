@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Parallel Titanium supplies; fans and shelf controls are added before facility PUE. */
 
 import {
   FrozenModel,
@@ -78,7 +77,6 @@ export class RackPSU extends FrozenModel {
     const load = validate_watts(output_w) / this.capacity_w;
     const minimum = this.efficiency_curve[0].load_fraction;
     if (load < minimum) {
-      // Python's `{minimum:.0%}`: a whole percentage, rounded half to even.
       throw new ValueError(
         `Rack PSU load below ${percent(minimum)} requires a calibrated low-load profile`,
       );
@@ -228,7 +226,6 @@ export class RackPowerSupply extends FrozenModel {
     if (load > this.redundant_capacity_w) {
       throw new ValueError('Rack bus load exceeds redundant power-shelf capacity');
     }
-    // Check the surviving bank with its own fan load, not the normal operating fan watts.
     const reserve = this.shelf.estimate_overhead(load / this.surviving_shelves);
     const current = this.shelf
       .estimate_overhead(load / this.active_shelves)

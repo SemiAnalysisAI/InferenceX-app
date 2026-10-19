@@ -28,10 +28,6 @@ import {
   type ThroughputSeriesKey,
 } from './time-series-math';
 
-/**
- * Phase-sliced server series (+ matching durationS). Null while the trace
- * blob is loading or absent — cards render a skeleton until it arrives.
- */
 type SlicedServerSeries = PhaseSlicedSeries<ServerSeriesLike> | null;
 
 export type RequestActivityView = 'queue' | 'completed';
@@ -115,22 +111,16 @@ const ZH_THROUGHPUT_SERIES_NAMES: Record<string, string> = {
   'Total running avg (60s burn-in)': '总吞吐量平均值（剔除前 60 秒）',
 };
 
-/** Localize display-only series names while preserving the math helper's stable English output. */
 export function localizeThroughputSeriesName(name: string, locale: Locale): string {
   return locale === 'zh' ? (ZH_THROUGHPUT_SERIES_NAMES[name] ?? name) : name;
 }
 
-/** Compact token count for chart labels: 306808 → "307K tok", 3.2e6 → "3.2M tok". */
 const fmtTokensCompact = (n: number): string => {
   if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M tok`;
   if (n >= 1e3) return `${Math.round(n / 1e3)}K tok`;
   return `${Math.round(n)} tok`;
 };
 
-// Per-DP-rank color palette for DEP runs (one distinct color per rank in
-// the KV cache utilization overlay). Mirrors the request-timeline row
-// palette so the same DP index reads as the same color across both views.
-// Wraps mod-N if more than 12 ranks ever land.
 const DP_RANK_PALETTE = [
   '#3b82f6',
   '#ef4444',
@@ -146,11 +136,6 @@ const DP_RANK_PALETTE = [
   '#eab308',
 ];
 
-/**
- * Bare DP ranks read as "DP 3"; disaggregated runs get role- or worker-
- * qualified labels from the ETL ("decode", "prefill 0", "0 (a01a)") that
- * already name themselves, so those pass through untouched.
- */
 function engineSeriesName(engineLabel: string): string {
   return /^\d+$/u.test(engineLabel) ? `DP ${engineLabel}` : engineLabel;
 }
@@ -165,45 +150,24 @@ export function KvCacheUtilizationCard({ sliced }: { sliced: SlicedServerSeries 
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
         const serverSeries = sliced.series;
-        // For SGLang hicache rows we have both GPU (HBM) util and
-        // host (CPU offload pool) util — overlay them as two lines.
         const hasHost = serverSeries.hostKvCacheUsage.length > 0;
-        // DEP runs report one series per engine. When there's more
-        // than one, draw one line per rank in distinct colors so
-        // load skew is visible at a glance; cluster-average sits on
-        // top in white so it stands out.
         const allEngines = serverSeries.kvCacheUsageByEngine ?? [];
-        // Decide off the point's own engine count, not the phase-sliced one:
-        // this also drives the average line's name, color and stroke, so
-        // keying it to the slice would make the chart change identity when
-        // you switch between the Warmup and Profiling tabs.
         const hasPerEngine = allEngines.length > 1;
-        // Colors come from the unsliced position so a rank keeps its color
-        // across phases; engines with no points in this phase are dropped
-        // afterwards so they don't take a legend slot with no line.
         const perEngine = allEngines
           .map((e, i) => ({
             name: engineSeriesName(e.engineLabel),
             data: rollingAverage(e.points, 50),
             color: DP_RANK_PALETTE[i % DP_RANK_PALETTE.length]!,
-            // Thin + translucent so the Avg line on top reads as
-            // the headline number, not just one more series.
             strokeWidth: 1,
             strokeOpacity: 0.5,
           }))
           .filter((s) => s.data.length > 0);
-        // Render order matters: per-engine first → average drawn on top.
         const series = [
           ...(hasPerEngine ? perEngine : []),
           {
             name: hasHost ? t.hbmAvg : hasPerEngine ? t.avg : t.chipKv,
             data: rollingAverage(serverSeries.kvCacheUsage, 50),
-            // Skip raw scatter when per-engine overlay is on — the
-            // DP-rank lines already convey the spread, dots would be noise.
             rawData: hasPerEngine ? undefined : serverSeries.kvCacheUsage,
-            // Bold red Avg sits on top of the translucent per-DP lines.
-            // DP 1 in the palette is #ef4444 (lighter red); the darker
-            // #dc2626 here plus the heavier stroke keeps it distinct.
             color: hasPerEngine ? '#dc2626' : '#3b82f6',
             strokeWidth: hasPerEngine ? 3.5 : 2,
           },
@@ -245,7 +209,6 @@ export function RequestActivityCard({
   sliced: SlicedServerSeries;
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
-  /** Failure message for the Completed view when the timeline query errored. */
   timelineError?: string;
   view: RequestActivityView;
   onViewChange: (view: RequestActivityView) => void;
@@ -282,8 +245,6 @@ export function RequestActivityCard({
         if (view === 'completed') {
           if (!phaseTimeline) {
             if (timelineLoading) return <ChartSkeleton />;
-            // A failed timeline query is not "no data" — surface the failure;
-            // the page-level banner above the cards carries the retry action.
             return <ChartEmpty message={timelineError} />;
           }
           return (
@@ -366,8 +327,6 @@ export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries 
       serverSeries.prefillTps,
       50,
     );
-    // Older stored rows may not have the component rate series. Preserve
-    // their existing chart rather than turning it into an empty state.
     return weighted.length > 0 ? weighted : rollingAverage(serverSeries.prefixCacheHitRate, 50);
   }, [sliced]);
 
@@ -511,15 +470,6 @@ export function CumulativeUniqueInputTokensCard({ sliced }: { sliced: SlicedServ
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
         const serverSeries = sliced.series;
-        // Unique = total prompt tokens received minus tokens served from
-        // any cache tier — i.e. the freshly prefill-computed tokens. Prefer
-        // the promptTokensBySource breakdown (its buckets sum to the real
-        // prompt-token total, so subtracting cache tiers is exact). Fall
-        // back to cumsum(prefillTps - prefixCacheHitsTps) only for older
-        // data without the breakdown: vllm:prefix_cache_hits re-counts
-        // tokens across scheduler passes, so its cumulative can exceed the
-        // prompt tokens received, driving the diff negative and freezing
-        // the monotonic-clamped line after a few seconds.
         const uniqueFromBreakdown = cumulativeUniqueInputTokens(serverSeries.promptTokensBySource);
         const uniqueData =
           uniqueFromBreakdown.length > 0
@@ -555,7 +505,6 @@ export function InflightUniqueTokensCard({
 }: {
   phaseTimeline: RequestChartData | null;
   timelineLoading: boolean;
-  /** Nominal KV-pool capacity in tokens — drawn as a constant ceiling. */
   kvCachePoolTokens: number | null;
 }) {
   const t = SERVER_STRINGS[useLocale()];
@@ -577,18 +526,8 @@ export function InflightUniqueTokensCard({
         if (!phaseTimeline) {
           return timelineLoading ? <ChartSkeleton /> : <ChartEmpty />;
         }
-        // Step function: at each request start/end, sum the ISLs of
-        // currently-active requests across distinct cids. Within one
-        // cid turns are sequential so each cid contributes at most
-        // one in-flight ISL; across cids we treat content as
-        // independent (cross-conv prefix sharing adds <1pp in
-        // practice). Smooth with a 30s time-weighted rolling average
-        // so brief turn-handoff dips don't dominate the chart.
         const raw = inflightSeries?.raw ?? [];
         const smoothed = inflightSeries?.smoothed ?? [];
-        // KV-cache pool size drawn as a constant ceiling so
-        // you can see how close the working set gets to eviction
-        // pressure. Phase-independent — it's a static config value.
         const pool = kvCachePoolTokens;
         return (
           <TimeSeriesChart

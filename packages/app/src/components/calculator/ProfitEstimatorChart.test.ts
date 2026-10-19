@@ -91,7 +91,6 @@ describe('barMarkHeight', () => {
     expect(barMarkHeight(40)).toBe(BAR_ICON_MIN_HEIGHT);
     expect(barMarkHeight(100)).toBeCloseTo(30, 5);
     expect(barMarkHeight(400)).toBe(BAR_ICON_MAX_HEIGHT);
-    // The headroom the domain reserves follows the mark.
     expect(stackHeadroomPx(BAR_ICON_MAX_HEIGHT) - STACK_HEADROOM_PX).toBe(
       BAR_ICON_MAX_HEIGHT - BAR_ICON_MIN_HEIGHT,
     );
@@ -104,9 +103,6 @@ describe('stackTopValue', () => {
   });
 
   it('is TCO plus the license fee for a loss bar, so above-bar labels clear the drawn stack', () => {
-    // Kimi K3 per-GW case: $4.4B revenue against $9.5B TCO and a $1.3B license
-    // fee. Anchoring the revenue figure to max(revenue, tco) put it inside the
-    // license-fee segment, on top of that segment's own label.
     const loss = row({ revenue: 4.4, tco: 9.5, grossMargin: -5.1, labCut: 1.3, profit: -6.4 });
     expect(stackTopValue(loss)).toBeCloseTo(10.8);
     expect(stackTopValue(loss)).toBeGreaterThan(Math.max(loss.revenue, loss.tco));
@@ -129,14 +125,11 @@ describe('profitYDomain', () => {
   });
 
   it('sizes the headroom to the label stack in pixels once the plot height is known', () => {
-    // 1000 of data in (500 - headroom) px; the headroom is then exactly STACK_HEADROOM_PX tall.
     const [, top] = profitYDomain([row()], 500);
     const pxPerUnit = 500 / top;
     expect((top - 1000) * pxPerUnit).toBeCloseTo(STACK_HEADROOM_PX, 5);
-    // A taller plot needs proportionally less data-space headroom.
     expect(profitYDomain([row()], 1000)[1]).toBeLessThan(top);
     expect(top).toBeLessThan(1300);
-    // A bigger vendor mark asks for more headroom at the same plot height.
     const [, roomy] = profitYDomain([row()], 500, stackHeadroomPx(BAR_ICON_MAX_HEIGHT));
     expect(roomy).toBeGreaterThan(top);
     expect((roomy - 1000) * (500 / roomy)).toBeCloseTo(stackHeadroomPx(BAR_ICON_MAX_HEIGHT), 5);
@@ -146,11 +139,8 @@ describe('profitYDomain', () => {
     const losing = row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 0, profit: -100 });
     const [bottom, top] = profitYDomain([losing], 500);
     const pxPerUnit = 500 / (top - bottom);
-    // The loss figure hangs LOSS_FOOTROOM_PX below the hatch, so the floor sits that far under it.
     expect((-100 - bottom) * pxPerUnit).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
-    // The headroom above the stack is unchanged by the footroom.
     expect((top - 400) * pxPerUnit).toBeCloseTo(STACK_HEADROOM_PX, 5);
-    // A loss that fills nearly the whole plot still keeps its figure clear of the axis.
     const deep = row({ revenue: 100, tco: 2000, grossMargin: -1900, labCut: 0, profit: -1900 });
     const [deepBottom, deepTop] = profitYDomain([deep], 300);
     expect((-1900 - deepBottom) * (300 / (deepTop - deepBottom))).toBeCloseTo(LOSS_FOOTROOM_PX, 5);
@@ -324,7 +314,6 @@ describe('segmentLabelLines', () => {
   });
 
   it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
-    // "Compute Expense" is 15 glyphs; at 11px that is ~91px plus padding.
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 200)).toEqual([
       'Compute Expense',
       '$400',
@@ -397,17 +386,13 @@ describe('contrastingTextColor', () => {
 
 describe('barLabelSlotPx', () => {
   it('lets a label overhang a wide bar by the gap allowance', () => {
-    // Desktop: 100px bars 43px apart; the allowance is the binding limit.
     expect(barLabelSlotPx(100, 143)).toBe(112);
   });
 
   it('stops short of the neighbouring label when the gap is narrower than the allowance', () => {
-    // Phone: seven bars in a 273px plot, 26px wide and 11px apart. Two labels
-    // each borrowing 6px of an 11px gap would meet; the slot leaves air instead.
     const slot = barLabelSlotPx(26.2, 37.4);
     expect(slot).toBeLessThan(26.2 + 12);
     expect(slot).toBeCloseTo(37.4 - 4);
-    // Neighbouring labels centred on their bars cannot overlap.
     expect(slot).toBeLessThan(37.4);
   });
 
@@ -418,12 +403,9 @@ describe('barLabelSlotPx', () => {
   });
 });
 
-/** Width the chart budgets for a weight-700 revenue figure: the regular estimate plus 10%. */
 const boldWidth = (text: string, fontPx: number) => estimateTextWidth(text, fontPx) * 1.1;
 
 describe('revenueLabelStyle', () => {
-  // The bars from the phone screenshot that overlapped: three tall NVIDIA
-  // stacks within 30% of each other and three AMD stacks within 20%.
   const phoneRows = [137.1e9, 110.3e9, 108.7e9, 38.5e9, 33.7e9, 32.7e9, 21.7e9].map((revenue) =>
     row({ revenue }),
   );
@@ -442,8 +424,6 @@ describe('revenueLabelStyle', () => {
   it('narrows every figure until the widest fits a phone-width slot', () => {
     const slot = barLabelSlotPx(26.2, 37.4);
     const style = revenueLabelStyle(phoneRows, 'gw-year', slot);
-    // "$110.3B" and "$108.7B" no longer fit side by side; the whole chart drops
-    // to one narrower style rather than mixing sizes between neighbours.
     expect(style).not.toEqual({ digits: 1, fontPx: CHART_TYPE.axisLabel });
     for (const r of phoneRows) {
       const text = formatProfitUsd(r.revenue, 'gw-year', style.digits);
@@ -489,9 +469,6 @@ describe('revenueLabelStyle', () => {
 });
 
 describe('lossLabelStyle', () => {
-  // The DeepSeek V4.1 Flash chart on a phone: two of five bars lose money,
-  // one by $561.2M and the last by $4.9B, and "Loss -$561.2M" ran across
-  // both neighbouring bands.
   const flashRows = [
     row({ revenue: 14e9, profit: 5.14e9 }),
     row({ revenue: 11.9e9, profit: 1.46e9 }),
@@ -516,7 +493,6 @@ describe('lossLabelStyle', () => {
     for (const losing of flashRows.filter((r) => r.profit < 0)) {
       const text = lossLabelText(losing.profit, 'Loss', 'gw-year', style, phoneSlot);
       expect(boldWidth(text, CHART_TYPE.annotation)).toBeLessThanOrEqual(phoneSlot);
-      // The sign and the compact unit survive every rung.
       expect(text).toMatch(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
     }
   });
@@ -526,7 +502,6 @@ describe('lossLabelStyle', () => {
     expect(style).toEqual({ word: false, digits: 0 });
     expect(lossLabelText(-561.2e6, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$561M');
     expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', style, phoneSlot)).toBe('-$4.9B');
-    // Without a slot to test against, the style is applied as given.
     expect(lossLabelText(-4.9e9, 'Loss', 'gw-year', { word: true, digits: 0 })).toBe('Loss -$5B');
   });
 
@@ -595,7 +570,6 @@ describe('chartHeightForViewport', () => {
   });
 
   it('shrinks to fit a laptop viewport so title and x labels share the screen', () => {
-    // A 13-inch MacBook browser viewport is roughly 870px tall.
     expect(chartHeightForViewport(872)).toBe(872 - CHART_VIEWPORT_RESERVE);
     expect(chartHeightForViewport(872)).toBeLessThan(CHART_HEIGHT);
   });

@@ -72,7 +72,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-/** A three-point interactivity curve for one hardware on one snapshot date. */
 function curve(date: string, hardware: string, framework: string, scale = 1): BenchmarkRow[] {
   return [
     [10, 500],
@@ -132,7 +131,6 @@ describe('GET /api/v1/views/historical', () => {
     expect(body.series.length).toBe(2);
     const h200 = body.series.find((s: { hwKey: string }) => s.hwKey.startsWith('h200'));
     expect(h200.points).toHaveLength(2);
-    // Target 35 sits exactly on a sample point: value equals that point's metric.
     expect(h200.points[0]).toMatchObject({ date: '2026-02-01', value: 300 });
     expect(h200.points[1].date).toBe('2026-03-01');
     expect(body.hwKeysWithData.length).toBe(2);
@@ -187,7 +185,6 @@ describe('GET /api/v1/views/historical', () => {
     );
     const early = await earlyRes.json();
     expect(early.params.end).toBe('2026-02-15');
-    // Only the February snapshot survives; no extension beyond it.
     for (const series of early.series) {
       expect(series.points).toHaveLength(1);
       expect(series.points[0].date).toBe('2026-02-01');

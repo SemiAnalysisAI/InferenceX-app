@@ -1,13 +1,3 @@
-/**
- * Simplified Chinese port of `agentx-optimizations.ts`.
- *
- * Translations are keyed by framework slug and section id, and carry only the
- * prose: PR references, figure assets, and link targets come from the English
- * registry, so a PR list can never drift between the two languages.
- * `agentx-optimizations.test.ts` fails if a section, highlight, paragraph, or
- * link here does not line up with its English counterpart.
- */
-
 import {
   AGENTX_OPTIMIZATION_FRAMEWORKS,
   OPTIMIZATIONS_OVERVIEW,
@@ -23,14 +13,12 @@ interface SectionTranslation {
   heading: string;
   paragraphs: readonly string[];
   figure?: OptimizationFigureCopy;
-  /** Link labels, in the same order as the English section's `links`. */
   links?: readonly string[];
 }
 
 interface FrameworkTranslation {
   summary: string;
   lead: string;
-  /** Highlight labels, in order. The values stay in English (units, numbers). */
   highlights: readonly string[];
   sections: Readonly<Record<string, SectionTranslation>>;
 }
@@ -603,7 +591,6 @@ function localizeSection(
   };
 }
 
-/** The overview content for a locale, with English structure and localized prose. */
 export function getOptimizationsOverview(locale: Locale): OptimizationsOverview {
   if (locale === 'en') return OPTIMIZATIONS_OVERVIEW;
   return {
@@ -627,7 +614,6 @@ export function getOptimizationsOverview(locale: Locale): OptimizationsOverview 
   };
 }
 
-/** One framework's content for a locale. */
 export function getLocalizedFramework(
   framework: OptimizationFramework,
   locale: Locale,
@@ -650,12 +636,10 @@ export function getLocalizedFramework(
   };
 }
 
-/** Every framework for a locale, in registry order. */
 export function getLocalizedFrameworks(locale: Locale): readonly OptimizationFramework[] {
   return AGENTX_OPTIMIZATION_FRAMEWORKS.map((framework) =>
     getLocalizedFramework(framework, locale),
   );
 }
 
-/** Exported for the parity test, which walks the same keys the resolvers read. */
 export const OPTIMIZATIONS_ZH_INTERNALS = { OVERVIEW_ZH, FRAMEWORKS_ZH };

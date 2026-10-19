@@ -24,7 +24,6 @@ interface InferenceTableProps {
   selectedYAxisMetric: string;
 }
 
-/** Format a number for table display — picks sensible precision and groups thousands. */
 export function formatInferenceTableNumber(value: number | null, decimals?: number): string {
   if (value === null || !Number.isFinite(value)) return '—';
   const fixedDecimals =
@@ -73,8 +72,6 @@ export default function InferenceTable({
     () => sortRowsByYMetric(data, chartDefinition, selectedYAxisMetric),
     [data, chartDefinition, selectedYAxisMetric],
   );
-  // Boundary / role clones (`i_pcompare`) share every config column with their
-  // base row; the series column is what tells them apart.
   const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
@@ -141,7 +138,6 @@ export default function InferenceTable({
       {
         header: headers.yMetric,
         align: 'right',
-        // Comparison clones keep the source metrics; y holds the plotted role/boundary.
         cell: (row) => formatInferenceTableNumber(inferenceTableYValue(row, yPath)),
         sortValue: (row) => inferenceTableYValue(row, yPath) ?? '',
         className: showAllInMeasured ? 'tabular-nums min-w-36' : 'tabular-nums',

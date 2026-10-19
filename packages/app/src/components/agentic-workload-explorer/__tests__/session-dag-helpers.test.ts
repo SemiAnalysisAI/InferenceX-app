@@ -37,10 +37,6 @@ function makeNode(overrides: Partial<MessageNode> = {}): MessageNode {
   };
 }
 
-// ---------------------------------------------------------------------------
-// truncate
-// ---------------------------------------------------------------------------
-
 describe('truncate', () => {
   it('returns [stripped] for null', () => {
     expect(truncate(null, 10)).toBe('[stripped]');
@@ -75,10 +71,6 @@ describe('truncate', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// tokenSummary
-// ---------------------------------------------------------------------------
-
 describe('tokenSummary', () => {
   it('returns empty string when all null', () => {
     expect(tokenSummary(null, null, null, null)).toBe('');
@@ -111,10 +103,6 @@ describe('tokenSummary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// formatCost
-// ---------------------------------------------------------------------------
-
 describe('formatCost', () => {
   it('returns <$0.01 for small costs', () => {
     expect(formatCost(0.005)).toBe('<$0.01');
@@ -130,10 +118,6 @@ describe('formatCost', () => {
     expect(formatCost(0.12345)).toBe('$0.123');
   });
 });
-
-// ---------------------------------------------------------------------------
-// messageNodeSummary
-// ---------------------------------------------------------------------------
 
 describe('messageNodeSummary', () => {
   it('truncates user content at 60 chars', () => {
@@ -177,10 +161,6 @@ describe('messageNodeSummary', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getToolArg
-// ---------------------------------------------------------------------------
-
 describe('getToolArg', () => {
   it('returns empty string when no toolInput', () => {
     const node = makeNode({ toolInput: undefined });
@@ -216,10 +196,6 @@ describe('getToolArg', () => {
     expect(getToolArg(node)).toBe(' \u00B7 a.ts');
   });
 });
-
-// ---------------------------------------------------------------------------
-// subagentSummary
-// ---------------------------------------------------------------------------
 
 function makeGroup(overrides: Partial<SubagentGroupNode> = {}): SubagentGroupNode {
   return {

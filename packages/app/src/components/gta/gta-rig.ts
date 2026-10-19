@@ -1,10 +1,6 @@
 import * as T from 'three';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
-// The GTADevs ped exports are static A-pose meshes with no skeleton. This
-// builds a human skeleton from the mesh proportions, skins every vertex to
-// the nearest limb segments and drives a procedural walk / run / idle cycle.
-
 const BONES = [
   'root',
   'pelvis',
@@ -152,11 +148,9 @@ export interface Rig {
   root: T.Group;
   bones: Record<BoneName, T.Bone>;
   height: number;
-  /** Pose the character: phase in radians, speed in m/s. */
   pose: (phase: number, speed: number, time: number, down?: boolean) => void;
 }
 
-/** Convert a static GTA ped scene into an animated skinned character. */
 const L = (a: T.Vector3) => a.clone();
 const R = (a: T.Vector3) => new T.Vector3(-a.x, a.y, a.z);
 
@@ -241,7 +235,6 @@ export function rigPed(source: T.Object3D): Rig {
     sm.bind(skeleton, new T.Matrix4());
   }
   const height = j.end.head.y - j.pos.root.y;
-  // Feet stand on y = 0 in the returned group.
   bones.root.position.y = 0;
   const pose = makePose(bones);
   pose(0, 0, 0);
@@ -269,7 +262,6 @@ function makePose(bones: Record<BoneName, T.Bone>) {
     const walk = Math.min(1, speed / 1.2);
     const s = Math.sin(phase),
       c = Math.cos(phase);
-    // Arms hang naturally from the A-pose.
     b.armL.rotation.z = -0.5 + run * 0.12;
     b.armR.rotation.z = 0.5 - run * 0.12;
     const breathe = Math.sin(time * 1.7) * 0.012;
@@ -283,7 +275,6 @@ function makePose(bones: Record<BoneName, T.Bone>) {
     const hip = (0.42 + run * 0.35) * walk;
     b.thighL.rotation.x = -s * hip;
     b.thighR.rotation.x = s * hip;
-    // Knee flexes during swing (leg moving forward) and lightly at heel strike.
     const kneeL = Math.max(0, Math.sin(phase + 1.4)) * (0.7 + run * 0.9) + 0.06;
     const kneeR = Math.max(0, Math.sin(phase + Math.PI + 1.4)) * (0.7 + run * 0.9) + 0.06;
     b.shinL.rotation.x = kneeL * walk;
@@ -305,7 +296,6 @@ function makePose(bones: Record<BoneName, T.Bone>) {
   };
 }
 
-/** Cheap copy of a rig that shares geometry and materials with the original. */
 export function cloneRig(rig: Rig): Rig {
   const root = cloneSkinned(rig.root) as T.Group;
   const bones = {} as Record<BoneName, T.Bone>;

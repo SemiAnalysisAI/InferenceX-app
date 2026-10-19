@@ -1,8 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { FloatingBlocks } from './minecraft-blocks';
 
-// This background has no pointer interaction. Avoid connecting DOM listeners
-// after an asynchronous Canvas initialization races with theme removal.
 const decorativeEvents = () => ({ enabled: false, priority: 0 });
 
 export default function MinecraftScene() {

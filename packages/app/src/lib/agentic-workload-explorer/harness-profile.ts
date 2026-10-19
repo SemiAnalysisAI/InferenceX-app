@@ -1,6 +1,5 @@
 import { HARNESSES, type Harness } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
 
-/** Same hues as the harness badges on /sessions and the /graphs harness stack. */
 export const HARNESS_COLORS: Record<Harness, string> = {
   'claude-code': '#f97316',
   codex: '#8b5cf6',
@@ -19,13 +18,11 @@ export interface ShareRow {
   count: number;
 }
 
-/** Harnesses present in `rows`, in canonical order. */
 export function presentHarnesses(rows: { harness: Harness }[]): Harness[] {
   const seen = new Set(rows.map((r) => r.harness));
   return HARNESSES.filter((h) => seen.has(h));
 }
 
-/** Quantile read off log buckets, interpolated geometrically inside the bucket. */
 export function bucketQuantile(buckets: LogBucket[], perDecade: number, q: number): number | null {
   const sorted = buckets.toSorted((a, b) => a.bucket - b.bucket);
   const total = sorted.reduce((sum, b) => sum + b.count, 0);
@@ -42,10 +39,6 @@ export function bucketQuantile(buckets: LogBucket[], perDecade: number, q: numbe
   return 10 ** ((sorted.at(-1)!.bucket + 1) / perDecade);
 }
 
-/**
- * The `n` largest keys with their share of the total, plus one `restLabel`
- * row holding everything else (omitted when empty).
- */
 export function topShares(
   rows: ShareRow[],
   n: number,

@@ -1,7 +1,5 @@
 # Agentic Workload Explorer
 
-**English** | [中文](agentic-workload-explorer_zh.md)
-
 The Agentic Workload Explorer (`/agentic-workload-explorer`, `/zh/agentic-workload-explorer`)
 is a feature-gated dashboard in **Hidden** (↑↑↓↓ unlock). It is a port of the standalone
 [ProxyTrace-ReadOnly](https://github.com/SemiAnalysisAI/ProxyTrace-ReadOnly) dashboard. It
@@ -35,33 +33,11 @@ When the snapshot is reloaded: rebuild the derived tables and caches on the repl
 update `AS_OF_ISO` / `SNAPSHOT_START_ISO`, and redeploy. Successful responses carry a one-day CDN
 `s-maxage`, so a redeploy starts with an empty CDN cache.
 
-## Code layout
-
-| Concern                       | Location                                                                          |
-| ----------------------------- | --------------------------------------------------------------------------------- |
-| Queries (Kysely), types       | `packages/db/src/proxytrace/`                                                     |
-| Pricing, classifiers, as-of   | `packages/db/src/proxytrace/shared/` (also imported by client code)               |
-| API routes (`page-bff`)       | `packages/app/src/app/api/v1/agentic-workload-explorer/`                          |
-| Pages (EN / ZH)               | `packages/app/src/app/(dashboard)/agentic-workload-explorer/`, `zh/(dashboard)/…` |
-| Views and charts              | `packages/app/src/components/agentic-workload-explorer/`                          |
-| Hooks, helpers, page metadata | `packages/app/src/{hooks,lib}/agentic-workload-explorer/`                         |
+## Implementation notes
 
 The queries use Kysely, unlike the rest of `packages/db`, because the ported query layer is
 written against it. `getDb()` uses the Neon HTTP driver for Neon hosts. `createDirectDb()` opens a
 `pg` pool for full-history analytics that issue many statements per request; callers `destroy()` it.
 
-Pages are thin server wrappers around shared client views, so English and Chinese render the same
-component. User-visible strings come from component-local `STRINGS = { en, zh }` dictionaries
-selected with `useLocale()`. In-explorer links go through `explorerHref()` / `useExplorerHref()`
-so `/zh` pages link to `/zh` siblings. Only the explorer root is indexable and in the sitemap; session
-pages are `noindex`. The explorer renders inside `DashboardShell` with standalone providers and
-`tabNav: false` (`DASHBOARD_SHELL_CAPABILITY_ROUTES`), so the InferenceX dashboard tab strip is hidden:
-the explorer's own section nav (number-key hotkeys 1–0) and the global `?version=` trace-version
-filter sit directly under the site header.
-
-## API coverage
-
-The `/api/v1/agentic-workload-explorer/*` routes are page-owned (`page-bff` in
-`api-route-catalog.ts`). Their response shapes follow the pages, so they are not published in the
-OpenAPI reference or the `inferencex-skills` read-only view API. `DASHBOARD_API_COVERAGE` records the
-exclusion.
+In-explorer links go through `explorerHref()` / `useExplorerHref()` so `/zh` pages link to `/zh`
+siblings.

@@ -25,12 +25,6 @@ export interface LineLabelPlacement {
   color: string;
   x: number;
   y: number;
-  /**
-   * `placeLineLabels` always emits `true`: every series it is given keeps its
-   * pill, overlapping if it must. The only producer of `false` is the caller's
-   * de-duplication pass, which keeps a hidden data-join entry for a curve that
-   * lost the one-label-per-hardware contest (GH #470).
-   */
   visible: boolean;
 }
 
@@ -45,7 +39,6 @@ export function rectsOverlap(a: RectBounds, b: RectBounds): boolean {
   return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 }
 
-/** Like {@link rectsOverlap}, but rectangles that only share an edge do not count. */
 export function rectsStrictlyOverlap(a: RectBounds, b: RectBounds): boolean {
   return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
 }
@@ -60,11 +53,6 @@ export function firstNonCollidingRect(
   return null;
 }
 
-/**
- * Horizontal shift that slides `rect` fully inside `bounds`, or `null` when it
- * is wider than the bounds and cannot fit at any offset. Zero when it already
- * fits; positive moves right, negative moves left.
- */
 export function horizontalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): number | null {
   if (rect.right - rect.left > bounds.right - bounds.left) return null;
   if (rect.left < bounds.left) return bounds.left - rect.left;
@@ -72,11 +60,6 @@ export function horizontalShiftIntoBounds(rect: RectBounds, bounds: RectBounds):
   return 0;
 }
 
-/**
- * Vertical shift that slides `rect` fully inside `bounds`, or `null` when it
- * is taller than the bounds and cannot fit at any offset. Zero when it already
- * fits; positive moves down, negative moves up.
- */
 export function verticalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): number | null {
   if (rect.bottom - rect.top > bounds.bottom - bounds.top) return null;
   if (rect.top < bounds.top) return bounds.top - rect.top;
@@ -84,21 +67,10 @@ export function verticalShiftIntoBounds(rect: RectBounds, bounds: RectBounds): n
   return 0;
 }
 
-/** Whether `rect` lies fully inside `bounds` on the vertical axis. */
 export function fitsVertically(rect: RectBounds, bounds: RectBounds): boolean {
   return rect.top >= bounds.top && rect.bottom <= bounds.bottom;
 }
 
-/**
- * Translation that keeps a line-label pill fully inside the plot.
- *
- * `rect` is the pill's background box in zoom-group coordinates, i.e. its
- * group translate plus the `.ll-bg` offset. A pill that would spill past an
- * edge slides back until it touches that edge; a pill larger than the plot on
- * an axis (a very narrow or very short chart) is pinned to the plot's top-left
- * on that axis so its start stays readable rather than being clipped at an
- * arbitrary point.
- */
 export function pillShiftIntoBounds(rect: RectBounds, bounds: RectBounds): CartesianPoint {
   return {
     x: horizontalShiftIntoBounds(rect, bounds) ?? bounds.left - rect.left,
@@ -106,10 +78,6 @@ export function pillShiftIntoBounds(rect: RectBounds, bounds: RectBounds): Carte
   };
 }
 
-/**
- * The `.ll-bg` box of a rendered pill, in the pill group's own coordinates, or
- * `null` before the sizing pass has run (or when the rect is degenerate).
- */
 function pillLocalBox(node: SVGGElement): RectBounds | null {
   const background = node.querySelector<SVGRectElement>('.ll-bg');
   if (!background) return null;
@@ -122,7 +90,6 @@ function pillLocalBox(node: SVGGElement): RectBounds | null {
   return { left: x, top: y, right: x + width, bottom: y + height };
 }
 
-/** A pill's local `.ll-bg` box moved to the group translate (`tx`, `ty`). */
 function pillBoxAt(local: RectBounds, tx: number, ty: number): RectBounds {
   return {
     left: tx + local.left,
@@ -132,36 +99,11 @@ function pillBoxAt(local: RectBounds, tx: number, ty: number): RectBounds {
   };
 }
 
-/** A pill group together with the placement that anchors it this frame. */
 interface PillLayoutItem {
   node: SVGGElement;
   label: LineLabelPlacement;
 }
 
-/**
- * Position every pill in `items`: anchor offset first, slid back inside
- * `bounds`, then checked against the pills already placed this frame.
- *
- * `placeLineLabels` only knows anchor points and a nominal collision width,
- * so two pills that cleared its check can still end up on top of each other
- * once one of them is clamped to an edge (the default upward offset makes the
- * top edge the usual culprit: a pill slid down lands on the neighbour just
- * below it). Each pill therefore tries, in order: its default spot, the
- * mirror image below/above its anchor, the mirror image on the other side of
- * its anchor, and both mirrors together. Every candidate is clamped into
- * `bounds` before the overlap test, so nothing leaves the plot. When every
- * mirrored candidate collides, nearby rows are tried before the default spot
- * is kept: an overlapped label is still better than a missing one, and the
- * fallback matches what the anchor pass already tolerates.
- *
- * With no bounds — a chart that clips nothing — the anchor offset is applied
- * unchanged and the collision pass is skipped, preserving that chart's
- * existing layout.
- *
- * Hidden pills get their default transform and occupy no space, so a label
- * that later becomes visible reappears where the anchor pass put it. Only the
- * caller's de-duplication pass hides pills; the anchor pass never does.
- */
 function layoutPills(
   items: readonly PillLayoutItem[],
   offsetX: number,
@@ -180,8 +122,6 @@ function layoutPills(
       continue;
     }
 
-    // Mirror the pill's box across the anchor on each axis: the pill's far
-    // edge ends up as close to the anchor as its near edge was.
     const mirrorX = 2 * label.x - tx0 - local.left - local.right;
     const mirrorY = 2 * label.y - ty0 - local.top - local.bottom;
     const candidates: [number, number][] = [
@@ -190,8 +130,6 @@ function layoutPills(
       [mirrorX, ty0],
       [mirrorX, mirrorY],
     ];
-    // Larger labels can fill both mirrored slots in a dense cluster. Try
-    // nearby rows using the measured pill height before accepting overlap.
     const rowHeight = local.bottom - local.top + 4;
     for (let row = 1; row <= 3; row++) {
       for (const cx of [tx0, mirrorX]) {
@@ -205,8 +143,6 @@ function layoutPills(
       const ty = cy + shift.y;
       return { tx, ty, box: pillBoxAt(local, tx, ty) };
     });
-    // Pills that merely share an edge are fine: the anchor pass spaces rows
-    // exactly one collision height apart, so touching is its normal output.
     const chosen =
       clamped.find(
         (candidate) => !placed.some((other) => rectsStrictlyOverlap(candidate.box, other)),
@@ -217,12 +153,6 @@ function layoutPills(
   }
 }
 
-/**
- * The plot area in zoom-group coordinates — the strict bounding box every
- * point label must stay inside. Read from the clip rect `setupChart` puts on
- * the zoom group; `null` for charts that do not clip (`clipContent: false`),
- * where nothing is painted away and no constraint applies.
- */
 export function plotAreaBounds(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
 ): RectBounds | null {
@@ -231,25 +161,16 @@ export function plotAreaBounds(
   return size ? { left: 0, top: 0, right: size.width, bottom: size.height } : null;
 }
 
-/** A drawn pill box, as centre point + half-width, for overlap tests. */
 export interface PlacedBox {
   x: number;
   y: number;
   halfW: number;
 }
 
-/**
- * Centre + half-width of every visible parallelism pill inside `root`.
- *
- * Line labels are placed greedily against a list of boxes they must not sit on
- * top of. The pills are drawn before the label layers run, so seeding that
- * list from the DOM is what keeps a run name off a "TP8 / PP2" chip.
- */
 export function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
   const boxes: PlacedBox[] = [];
   if (!root) return boxes;
   for (const node of root.querySelectorAll<SVGGElement>('.parallelism-label')) {
-    // Hidden pills stay in the DOM but must not push labels around.
     if (node.style.opacity === '0') continue;
     const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
       node.getAttribute('transform') ?? '',
@@ -264,23 +185,12 @@ export function parallelismLabelBoxes(root: SVGGElement | null): PlacedBox[] {
   return boxes;
 }
 
-/**
- * Bounding boxes of the pills drawn over the plot: run-name labels
- * (`.line-label`) and parallelism labels (`.parallelism-label`).
- *
- * Both are positioned by the roofline layer, which always runs before point
- * label collision avoidance, so reading the DOM gives their final placement
- * for the current frame. The group carries a `translate(...)` and the
- * `.ll-bg`/`.pl-bg` rect carries an offset sized to its text; summing the two
- * puts the box in the same space as a point label's centre.
- */
 function pillObstacles(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   selector = '.line-label, .parallelism-label',
 ): RectBounds[] {
   const boxes: RectBounds[] = [];
   zoomGroup.selectAll<SVGGElement, unknown>(selector).each(function () {
-    // A hidden pill is still in the DOM but covers nothing.
     if (this.style.opacity === '0') return;
     const match = /translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u.exec(
       this.getAttribute('transform') ?? '',
@@ -299,12 +209,6 @@ function pillObstacles(
   return boxes;
 }
 
-/**
- * Preferred anchor fractions along a line, from left to right. Each series
- * starts at a different slot (rotated by its index) so labels spread across
- * the plot instead of all racing for the same spot, then falls back to the
- * remaining slots on collision.
- */
 const ANCHOR_SLOTS = [0.25, 0.5, 0.75, 1] as const;
 
 function lineCandidates<TPoint extends CartesianPoint>(
@@ -313,8 +217,6 @@ function lineCandidates<TPoint extends CartesianPoint>(
 ): TPoint[] {
   const last = points.length - 1;
   if (last <= 0) return [points[0]];
-  // Clamp to index >= 1 so a label never sits on the line's first point,
-  // which typically hugs the axis.
   const at = (fraction: number) => points[Math.max(1, Math.min(last, Math.round(fraction * last)))];
   const candidates: TPoint[] = [];
   for (let slot = 0; slot < ANCHOR_SLOTS.length; slot++) {
@@ -324,21 +226,6 @@ function lineCandidates<TPoint extends CartesianPoint>(
   return candidates;
 }
 
-/**
- * Anchor one pill per series along its line.
- *
- * Each series tries `ANCHOR_SLOTS` fractions along its own points, rotated by
- * its index so converging curves spread out instead of stacking at the
- * endpoint. A series that finds a clear slot takes it. A series that finds none
- * is deferred and placed afterwards on its least crowded slot, so it never
- * steals a clear slot from a series that could have used it.
- *
- * Every series gets a visible pill. The overlap that survives here is resolved
- * by `layoutPills`, which runs later with the pills' real measured boxes; the
- * crude nominal box used here is far too small to decide that a label is
- * unplaceable — a rendered pill is routinely two to three times
- * `collisionWidth`.
- */
 export function placeLineLabels<TPoint extends CartesianPoint>(
   series: readonly LineLabelSeries<TPoint>[],
   xScale: (value: number) => number,
@@ -348,7 +235,6 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     collisionHeight?: number;
     anchors?: Map<string, number>;
     pinAnchors?: boolean;
-    /** Pill boxes already on the plot that labels must not cover. */
     obstacles?: readonly PlacedBox[];
   },
 ): LineLabelPlacement[] {
@@ -366,11 +252,6 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
         Math.abs(other.y - y) < collisionHeight &&
         Math.abs(other.x - x) < other.halfW + labelHalfWidth,
     );
-  /**
-   * Nominal overlap area against the labels already placed. The same crude box
-   * model as `collides`, scored instead of thresholded, so a slot that clips one
-   * neighbour is preferred over one that sits on three.
-   */
   const collisionCost = (x: number, y: number) =>
     placed.reduce((cost, other) => {
       const dx = other.halfW + labelHalfWidth - Math.abs(other.x - x);
@@ -393,7 +274,6 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
     });
   };
 
-  /** Series with no clear slot, deferred to a second pass — see below. */
   const crowded: { entry: LineLabelSeries<TPoint>; candidates: TPoint[] }[] = [];
 
   for (const [seriesIndex, entry] of sorted.entries()) {
@@ -429,23 +309,9 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
       continue;
     }
 
-    // No clear slot. Defer rather than claim one now: a series that is going to
-    // overlap something must not take a slot a later series could have had to
-    // itself.
     crowded.push({ entry, candidates });
   }
 
-  // Every series keeps a pill. `layoutPills` runs after this with the real
-  // measured boxes and can still mirror it, shift it a row and clamp it into the
-  // plot — "an overlapped label is still better than a missing one". Emitting the
-  // crowded ones last also hands that pass the clean labels first, so the crowded
-  // ones do the moving.
-  //
-  // This is where the chart stopped promising that line labels never overlap
-  // (#132 introduced the drop as the only way to honour that, #434 restated it).
-  // The promise was worth less than it cost: a dropped pill is silent, and with
-  // line labels on, PNG export omits the legend, so the series loses its only
-  // identifier. An overlapping pill at least announces itself.
   for (const { entry, candidates } of crowded) {
     emit(
       entry,
@@ -461,17 +327,14 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
   return result;
 }
 
-/** Full-color icon rendered on a white chip at the left edge of a pill. */
 export interface LineLabelIconSpec {
   href: string;
   width: number;
   height: number;
 }
 
-/** Gap between the icon and the label text. */
 const ICON_TEXT_GAP = 4;
 
-/** Horizontal space an icon occupies to the left of the label text. */
 function iconSpace(icon: LineLabelIconSpec | undefined): number {
   return icon ? icon.width + ICON_TEXT_GAP : 0;
 }
@@ -484,7 +347,6 @@ export function renderLineLabels(
     opacity?: number;
     offsetX?: number;
     offsetY?: number;
-    /** Optional full-color icon (e.g. vendor mark) per label. */
     iconFor?: (label: LineLabelPlacement) => LineLabelIconSpec | undefined;
     configureText?: (
       text: d3.Selection<SVGTextElement, LineLabelPlacement, null, undefined>,
@@ -494,11 +356,6 @@ export function renderLineLabels(
       labelGroup: d3.Selection<SVGGElement, LineLabelPlacement, null, undefined>,
       label: LineLabelPlacement,
     ) => void;
-    /**
-     * Strict bounding box, in zoom-group coordinates, every pill must lie
-     * fully inside. Defaults to the plot's clip rect ({@link plotAreaBounds});
-     * pass `null` to skip the constraint (charts that clip nothing).
-     */
     bounds?: RectBounds | null;
   },
 ): void {
@@ -539,8 +396,6 @@ export function renderLineLabels(
     const labelGroup = d3.select<SVGGElement, LineLabelPlacement>(this);
     options.configureGroup?.(labelGroup, label);
     const text = labelGroup.select<SVGTextElement>('.ll-text');
-    // Shift the text right to leave room for the icon chip; the background
-    // sizing pass below expands the pill back over that space.
     const space = iconSpace(options.iconFor?.(label));
     if (space > 0) text.attr('x', space);
     else text.attr('x', null);
@@ -565,8 +420,6 @@ export function renderLineLabels(
       .attr('height', bbox.height + 6)
       .attr('fill', label.color);
 
-    // Full-color mark drawn directly on the pill — transparent background, so
-    // the icon shares the label's own fill shade (including gradient fills).
     labelGroup
       .selectAll<SVGImageElement, LineLabelIconSpec>('.ll-logo')
       .data(icon ? [icon] : [])
@@ -580,11 +433,6 @@ export function renderLineLabels(
       .attr('height', (d) => d.height);
   }
 
-  // Now that every pill has its final size, slide each back inside the plot
-  // if the anchor offset pushed any part of it past an edge — a label anchored
-  // on the last point of a line otherwise pokes out past the right edge and
-  // the clip path slices the run name in half — and keep the shifted pills
-  // off one another and off the parallelism chips.
   layoutPills(
     measured.map(({ node, label }) => ({ node, label })),
     offsetX,
@@ -601,7 +449,6 @@ export function updateRenderedLineLabels(
     opacity?: number;
     offsetX?: number;
     offsetY?: number;
-    /** See {@link renderLineLabels}. */
     bounds?: RectBounds | null;
   } = {},
 ): void {
@@ -621,10 +468,6 @@ export function updateRenderedLineLabels(
     element.style('opacity', label.visible ? opacity : 0);
     items.push({ node: this, label });
   });
-  // The pills keep the size they were given on render, so the zoom pass only
-  // needs to move them — inside the plot and off one another, as on render.
-  // Lay them out in the placement order the anchor pass produced (top-most
-  // series first), not DOM order, so both passes resolve ties the same way.
   const order = new Map(labels.map((label, index) => [label.key, index]));
   items.sort((a, b) => (order.get(a.label.key) ?? 0) - (order.get(b.label.key) ?? 0));
   layoutPills(
@@ -636,39 +479,13 @@ export function updateRenderedLineLabels(
   );
 }
 
-/**
- * Marks a `.point-label` that {@link placePointLabels} hid because no slot fit
- * (as opposed to one hidden by the label toggle or a legend hover), so the
- * next pass knows it may un-hide it.
- */
 export const PLACEMENT_HIDDEN_ATTR = 'data-placement-hidden';
 
 export interface PointLabelPlacementOptions {
-  /**
-   * Strict bounding box, in zoom-group coordinates, that every label must lie
-   * fully inside. Defaults to the plot's clip rect ({@link plotAreaBounds});
-   * pass `null` to skip the constraint (charts that clip nothing).
-   */
   bounds?: RectBounds | null;
-  /**
-   * Whether labels also avoid each other and the run-name / parallelism pills.
-   * The single-run scatter keeps this on; the compare chart only needs the
-   * bounding box.
-   */
   avoidCollisions?: boolean;
 }
 
-/**
- * Lay out every visible `.point-label` inside `zoomGroup`.
- *
- * Each label tries a fixed ladder of vertical slots around its point (above,
- * below, further above, further below). A slot is only eligible when the label
- * fits inside `bounds` — sliding horizontally as far as needed to stay inside,
- * so labels near the left/right edge hug the edge instead of spilling past
- * it — and, with `avoidCollisions`, when it overlaps nothing placed so far.
- * A label with no eligible slot is hidden rather than drawn partly outside
- * the plot: the clip path would otherwise slice it in half.
- */
 export function placePointLabels(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   options: PointLabelPlacementOptions = {},
@@ -694,12 +511,6 @@ export function placePointLabels(
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
     const label = this.querySelector<SVGTextElement>('.point-label');
     if (!label) return;
-    // A label this pass hid on an earlier frame (no slot fit, or its point had
-    // left the plot) is only provisionally hidden: it is reconsidered now that
-    // the layout may have changed. Labels hidden for any other reason (toggle
-    // off, legend hover, faded series) stay put. Its hidden state is released
-    // only if it is skipped below; placed labels settle it once at the end, so
-    // a label that stays hidden (or visible) writes nothing.
     const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
     const release = () => {
       if (!placementHidden) return;
@@ -723,10 +534,6 @@ export function placePointLabels(
       return;
     }
     const lineCount = tspans.length;
-    // No reset to the centred default before measuring: `getBBox().width`
-    // depends on neither the first tspan's `dy` nor the `x` shift, which every
-    // tspan shares. Resetting would emit two mutation records per label per
-    // pass even when nothing moves (see `@/lib/d3-chart/chart-update`).
     pending.push({
       element: label,
       tspans,
@@ -743,10 +550,6 @@ export function placePointLabels(
     width: label.element.getBBox().width,
   }));
   labels.sort((a, b) => a.centerX - b.centerX);
-  // Seed with the run-name and parallelism pills so a point label that would
-  // sit underneath one is pushed to its next candidate slot (or hidden) rather
-  // than being drawn through it. Point-label-vs-point-label behaviour below is
-  // unchanged; the pills simply occupy space before the first label is placed.
   const placed: RectBounds[] = avoidCollisions ? pillObstacles(zoomGroup) : [];
 
   for (const label of labels) {
@@ -767,8 +570,6 @@ export function placePointLabels(
       };
       let dx = 0;
       if (bounds) {
-        // The bounding box is strict: a slot that would leave any part of the
-        // label outside the plot is not a slot at all.
         if (!fitsVertically(box, bounds)) continue;
         const shift = horizontalShiftIntoBounds(box, bounds);
         if (shift === null) continue;
@@ -789,7 +590,6 @@ export function placePointLabels(
         ? 0
         : null;
     if (index === null) {
-      // Park the tspans at the centred default, as the pre-measure reset did.
       setAttrIfChanged(label.tspans[0], 'dy', `${label.defaultFirstY}px`);
       for (const tspan of label.tspans) setAttrIfChanged(tspan, 'x', '0');
       setStyleIfChanged(label.element, 'opacity', '0');
@@ -805,10 +605,6 @@ export function placePointLabels(
   }
 }
 
-/**
- * Point-label layout for the single-run scatter: strict plot bounding box
- * plus collision avoidance against other labels and the drawn pills.
- */
 export function avoidPointLabelCollisions(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   bounds?: RectBounds | null,
@@ -816,11 +612,6 @@ export function avoidPointLabelCollisions(
   placePointLabels(zoomGroup, { bounds, avoidCollisions: true });
 }
 
-/**
- * Point-label layout for charts without collision avoidance (the GPU compare
- * chart): only the strict plot bounding box is enforced, so a label at the
- * top edge flips below its point and one at a side edge slides inward.
- */
 export function keepPointLabelsInPlot(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   bounds?: RectBounds | null,

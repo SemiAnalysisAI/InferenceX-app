@@ -5,22 +5,12 @@ import { CHART_TYPE, px } from './typography';
 export type LabelSplitMode = 'last-space' | 'newline' | 'parens';
 
 export interface TwoRowLabelOptions {
-  /** How to split labels into rows. Default: 'last-space' */
   split?: LabelSplitMode;
-  /** Vertical offset in px. Default: 0 */
   yOffset?: number;
-  /** CSS font-size for the first row. Default: CHART_TYPE.axisLabel. */
   primarySize?: string;
-  /** CSS font-size for the second row. Default: CHART_TYPE.axisLabelSub. */
   secondarySize?: string;
 }
 
-/**
- * Split a label into [primary, secondary] based on the split mode.
- * - 'last-space': splits at the last space
- * - 'newline': splits at first \n (remaining lines joined with spaces)
- * - 'parens': splits "Base (suffix)" into ["Base", "(suffix)"]
- */
 export function splitLabel(label: string, mode: LabelSplitMode): [string, string | null] {
   if (mode === 'newline') {
     const idx = label.indexOf('\n');
@@ -32,21 +22,12 @@ export function splitLabel(label: string, mode: LabelSplitMode): [string, string
     if (!match) return [label, null];
     return [match[1], match[2].trim()];
   }
-  // last-space
   const lastSpace = label.lastIndexOf(' ');
   if (lastSpace <= 0) return [label, null];
   return [label.slice(0, lastSpace), label.slice(lastSpace + 1)];
 }
 
-/**
- * Y-axis label customizer that splits labels into two rows.
- * First row: bold (font-weight 600).
- * Second row: muted (muted-foreground).
- *
- * Supports three split modes: last-space, newline, and parens.
- */
 export function twoRowYAxisLabels(options: TwoRowLabelOptions | number = {}) {
-  // Backwards compat: accept bare number as yOffset
   const opts = typeof options === 'number' ? { yOffset: options } : options;
   const {
     split = 'last-space',

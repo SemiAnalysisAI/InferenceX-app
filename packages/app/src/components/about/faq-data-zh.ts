@@ -2,8 +2,6 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 
 import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
-/* ---------- FAQ content (Simplified Chinese) ---------- */
-
 export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     id: 'faq-what-is-inferencex',

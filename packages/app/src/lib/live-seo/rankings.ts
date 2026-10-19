@@ -1,25 +1,3 @@
-/**
- * @file rankings.ts
- * @description Slug registry, ranking derivation, and copy builders for the
- * indexable `/rankings/<slug>` pages.
- *
- * Two ranking kinds exist per model, matching the two questions people
- * actually type into a search box:
- *
- *   - `fastest-gpu-for-<model>`  — hardware ranked by measured tokens/s per
- *     GPU at the overview's primary interactivity tier.
- *   - `cheapest-gpu-for-<model>` — hardware ranked by $ per million total
- *     tokens at hyperscaler $/GPU/hr pricing, same tier.
- *
- * The ranking engine is NOT reimplemented here: rows come from
- * `buildOverviewModelSummary`, the exact same derivation the /overview
- * leaderboard renders, so a ranking page can never disagree with the
- * dashboard. This module only sorts, filters, and words the result.
- *
- * Model slugs reuse `INFERENCE_MODEL_SLUGS` — the /inference, /compare, and
- * /run vocabulary — so every ranking row can deep-link to its pair page.
- */
-
 import { getAllChipPages, type ChipPageEntry } from '@/lib/catalog/chip-pages';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { INFERENCE_MODEL_SLUGS, type InferenceModelSlug } from '@/lib/routing/inference-model-slug';
@@ -33,12 +11,9 @@ export const RANKING_KINDS = ['fastest-gpu', 'cheapest-gpu'] as const;
 export type RankingKind = (typeof RANKING_KINDS)[number];
 
 export interface RankingPageEntry {
-  /** Canonical URL slug under /rankings/, e.g. 'fastest-gpu-for-kimi-k3'. */
   slug: string;
   kind: RankingKind;
-  /** Model registry entry — same slug vocabulary as /inference/<model>. */
   model: InferenceModelSlug;
-  /** DB keys to fetch benchmark rows for, from the compare registry. */
   dbKeys: string[];
 }
 
@@ -76,26 +51,15 @@ export function rankingPagePath(entry: RankingPageEntry): string {
   return `/rankings/${entry.slug}`;
 }
 
-// ---------------------------------------------------------------------------
-// Ranking derivation (pure — operates on the overview summary shape)
-// ---------------------------------------------------------------------------
-
 export interface RankingRow {
   rank: number;
-  /** HW_REGISTRY key, e.g. 'gb200'. */
   hardware: string;
   hardwareLabel: string;
-  /** /chips/<slug> registry entry when one exists for this hardware. */
   chip: ChipPageEntry | null;
-  /** Measured tokens/s per GPU at the ranking tier; null when unavailable. */
   throughputPerGpu: number | null;
-  /** $ per million total tokens at hyperscaler $/GPU/hr; null when unavailable. */
   costPerMtok: number | null;
-  /** Precision of the winning config, e.g. 'fp4'. */
   precision: string | null;
-  /** Framework label of the winning config, e.g. 'SGLang'. */
   framework: string | null;
-  /** Whether the winning config runs disaggregated prefill/decode. */
   disagg: boolean | null;
 }
 
@@ -121,9 +85,6 @@ function toRankingRow(platform: OverviewPlatformResult, rank: number): RankingRo
   };
 }
 
-/** Sort and rank the overview platforms for one ranking kind. Platforms with
- *  no measurement for the metric are dropped rather than ranked last, so an
- *  under-swept GPU is never presented as "slowest". */
 export function buildRankingRows(summary: OverviewModelSummary, kind: RankingKind): RankingRow[] {
   const measurable = summary.platforms.filter((platform) =>
     kind === 'fastest-gpu' ? platform.read.value !== null : platform.costPerMtok !== null,
@@ -137,8 +98,6 @@ export function buildRankingRows(summary: OverviewModelSummary, kind: RankingKin
   return sorted.map((platform, index) => toRankingRow(platform, index + 1));
 }
 
-/** Human wording for the overview scenario a ranking or run page is read
- *  from. EN and ZH variants live together so the two locales cannot drift. */
 export function scenarioLabel(scenario: OverviewScenario, locale: 'en' | 'zh'): string {
   if (scenario === 'agentx') {
     return locale === 'zh' ? 'AgentX coding agent 工作负载' : 'the AgentX agentic coding workload';
@@ -147,10 +106,6 @@ export function scenarioLabel(scenario: OverviewScenario, locale: 'en' | 'zh'): 
     ? '单轮对话工作负载（8k 输入 / 1k 输出）'
     : 'a single-turn chat workload (8k input / 1k output)';
 }
-
-// ---------------------------------------------------------------------------
-// English copy
-// ---------------------------------------------------------------------------
 
 export function rankingPageTitle(entry: RankingPageEntry): string {
   return entry.kind === 'fastest-gpu'
@@ -164,8 +119,6 @@ export function rankingPageHeading(entry: RankingPageEntry): string {
     : `Cheapest GPU for ${entry.model.seoName}`;
 }
 
-/** Static fallback meta description; the route swaps in a stat-led one when
- *  live numbers are available. */
 export function rankingPageDescription(entry: RankingPageEntry): string {
   return entry.kind === 'fastest-gpu'
     ? `Which GPU serves ${entry.model.seoName} fastest? Live ranking of NVIDIA and AMD hardware by measured tokens per second per GPU, re-benchmarked continuously.`

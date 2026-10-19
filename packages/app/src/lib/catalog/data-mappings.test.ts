@@ -29,9 +29,6 @@ import {
   EvalBenchmark,
 } from '@/lib/catalog/data-mappings';
 
-// ===========================================================================
-// getModelAndSequence
-// ===========================================================================
 describe('getModelAndSequence', () => {
   it('parses artifact name with 70b model and 1k1k sequence', () => {
     const result = getModelAndSequence('results_70b_1k1k_fp8');
@@ -104,9 +101,6 @@ describe('getModelAndSequence', () => {
   });
 });
 
-// ===========================================================================
-// getModelAndSequenceFromArtifact
-// ===========================================================================
 describe('getModelAndSequenceFromArtifact', () => {
   it('parses structured artifact with dsr1 prefix and 1k/1k ISL/OSL', () => {
     const result = getModelAndSequenceFromArtifact({
@@ -172,9 +166,6 @@ describe('getModelAndSequenceFromArtifact', () => {
   });
 });
 
-// ===========================================================================
-// isModelDeprecated
-// ===========================================================================
 describe('isModelDeprecated', () => {
   it('returns true for deprecated model Llama3_3_70B', () => {
     expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
@@ -209,9 +200,6 @@ describe('isModelDeprecated', () => {
   });
 });
 
-// ===========================================================================
-// isModelMaintenance
-// ===========================================================================
 describe('isModelMaintenance', () => {
   it('returns true for maintenance-mode models', () => {
     expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
@@ -224,9 +212,6 @@ describe('isModelMaintenance', () => {
   });
 });
 
-// ===========================================================================
-// isSequenceDeprecated
-// ===========================================================================
 describe('isSequenceDeprecated', () => {
   it('returns true for deprecated sequence OneK_EightK', () => {
     expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
@@ -241,9 +226,6 @@ describe('isSequenceDeprecated', () => {
   });
 });
 
-// ===========================================================================
-// per-model sequence retirement
-// ===========================================================================
 describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   it('marks 8K/1K deprecated for MiniMax M3 (retired 2026-08-04, InferenceX#2493)', () => {
     expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(true);
@@ -287,9 +269,6 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
   });
 });
 
-// ===========================================================================
-// per-model Best per SKU default
-// ===========================================================================
 describe('isBestPerSkuDefaultOff', () => {
   it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
     expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
@@ -308,9 +287,6 @@ describe('isBestPerSkuDefaultOff', () => {
   });
 });
 
-// ===========================================================================
-// per-model TCO Basis selector
-// ===========================================================================
 describe('showsTcoBasisSelector', () => {
   it.each([Model.Qwen3_5, Model.Kimi_K3])(
     'shows the selector for %s only on 8K/1K and AgentX',
@@ -350,13 +326,10 @@ describe('comparison exclusions', () => {
   it('guards only vLLM and SGLang on both 8K/1K and Agentic', () => {
     expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
     expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toEqual(['vllm', 'sglang']);
-    // Deprecated fixed sequences carry no scenario rule of their own; only the
-    // model-level MTP spec applies there.
     expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
   });
 
   it('shares one STP spec between the scenarios that carry it', () => {
-    // The scenarios differ only in which families they guard, not in the rule.
     expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
       getSequenceExclusion(Sequence.AgenticTraces),
     );
@@ -375,9 +348,6 @@ describe('comparison exclusions', () => {
   });
 });
 
-// ===========================================================================
-// getModelLabel
-// ===========================================================================
 describe('getModelLabel', () => {
   it('returns correct label for each known model', () => {
     expect(getModelLabel(Model.Llama3_3_70B)).toBe('Llama 3.3 70B Instruct');
@@ -402,7 +372,6 @@ describe('getOpenRouterModelId', () => {
   it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
       if (model === Model.Muse_Spark_Open) {
-        // Do not substitute the hosted Spark model for Spark Open.
         expect(getOpenRouterModelId(model)).toBeNull();
         continue;
       }
@@ -412,9 +381,6 @@ describe('getOpenRouterModelId', () => {
   });
 });
 
-// ===========================================================================
-// getSequenceLabel
-// ===========================================================================
 describe('getSequenceLabel', () => {
   it('returns correct label for each known sequence', () => {
     expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
@@ -433,9 +399,6 @@ describe('getSequenceLabel', () => {
   });
 });
 
-// ===========================================================================
-// getPrecisionLabel
-// ===========================================================================
 describe('getPrecisionLabel', () => {
   it('returns correct label for each known precision', () => {
     expect(getPrecisionLabel(Precision.FP4)).toBe('FP4');
@@ -451,9 +414,6 @@ describe('getPrecisionLabel', () => {
   });
 });
 
-// ===========================================================================
-// getEvalBenchmarkLabel
-// ===========================================================================
 describe('getEvalBenchmarkLabel', () => {
   it('returns correct label for GSM8K', () => {
     expect(getEvalBenchmarkLabel(EvalBenchmark.GSM8K)).toBe('GSM8K');

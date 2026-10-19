@@ -12,13 +12,6 @@ export interface StagedChartLink {
 export const STAGING_CHART_ORIGIN =
   'https://inferencemax-app-git-staging-semianalysisai.vercel.app';
 
-/**
- * One link per visible Pareto line, rather than one link to the sweep's date.
- * Use the chart's own model, workload and hardware identities: agentic lines
- * combine speculative methods and topologies; fixed-sequence lines keep spec.
- * The run-qualified comparison entry pins the logical snapshot, including any
- * carried-forward points of an append-only run, independently of today's data.
- */
 export function buildStagedChartLinks(
   runId: string,
   scopes: readonly StagedChartScope[],

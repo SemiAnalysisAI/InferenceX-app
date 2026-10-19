@@ -1,7 +1,6 @@
 import { QuotesContent } from '@/components/quotes/quotes-content';
 import { QUOTES } from '@/components/quotes/quotes-data';
 
-/** Mirror of the anchor-id helper in quotes-content.tsx. */
 function orgAnchorId(org: string): string {
   const slug = org
     .toLowerCase()
@@ -81,8 +80,6 @@ describe('QuotesContent', () => {
 
     cy.get(`button[aria-label="Jump to ${targetOrg}’s quote"]`).click();
 
-    // Cypress auto-scrolls the clicked button into view too, so assert that at
-    // least one call targeted the anchored quote element for that org.
     cy.get('@scrollIntoView').should((stub) => {
       const calls = (stub as unknown as { getCalls: () => { thisValue: Element }[] }).getCalls();
       const scrolledToAnchor = calls.some((c) => c.thisValue.id === orgAnchorId(targetOrg));

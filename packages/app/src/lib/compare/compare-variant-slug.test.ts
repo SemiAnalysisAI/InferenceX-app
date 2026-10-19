@@ -16,10 +16,6 @@ import {
 const DEEPSEEK_R1 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'deepseek-r1')!;
 const GLM_51 = COMPARE_MODEL_SLUGS.find((m) => m.slug === 'glm-5-1')!;
 
-// ---------------------------------------------------------------------------
-// PRECISION_SLUG_ORDER
-// ---------------------------------------------------------------------------
-
 describe('PRECISION_SLUG_ORDER', () => {
   it('has the expected tokens in ascending bit-width order', () => {
     expect(PRECISION_SLUG_ORDER).toEqual([
@@ -33,10 +29,6 @@ describe('PRECISION_SLUG_ORDER', () => {
     ]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// orderPrecisionPair
-// ---------------------------------------------------------------------------
 
 describe('orderPrecisionPair', () => {
   it('returns lower-index precision first', () => {
@@ -57,10 +49,6 @@ describe('orderPrecisionPair', () => {
     expect(orderPrecisionPair('unknown', 'fp4')).toEqual(['fp4', 'unknown']);
   });
 });
-
-// ---------------------------------------------------------------------------
-// parsePrecisionCompareSlug — canonical model prefix
-// ---------------------------------------------------------------------------
 
 describe('parsePrecisionCompareSlug — canonical model prefix', () => {
   it('parses a canonical model-prefixed slug', () => {
@@ -117,10 +105,6 @@ describe('parsePrecisionCompareSlug — canonical model prefix', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// parsePrecisionCompareSlug — alias model slugs
-// ---------------------------------------------------------------------------
-
 describe('parsePrecisionCompareSlug — alias model slugs', () => {
   it('resolves the deepseek alias to deepseek-r1 with isAliasModel=true', () => {
     const parsed = parsePrecisionCompareSlug('deepseek-h100-fp8-vs-bf16');
@@ -149,10 +133,6 @@ describe('parsePrecisionCompareSlug — alias model slugs', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// parsePrecisionCompareSlug — rejection cases
-// ---------------------------------------------------------------------------
 
 describe('parsePrecisionCompareSlug — rejection cases', () => {
   it('returns null for unknown GPU keys', () => {
@@ -183,10 +163,6 @@ describe('parsePrecisionCompareSlug — rejection cases', () => {
     expect(parsePrecisionCompareSlug('deepseek-r1-h100-fp8-and-bf16')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// canonicalPrecisionCompareSlug
-// ---------------------------------------------------------------------------
 
 describe('canonicalPrecisionCompareSlug', () => {
   it('returns precisions in PRECISION_SLUG_ORDER regardless of input order', () => {
@@ -231,10 +207,6 @@ describe('canonicalPrecisionCompareSlug', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// precisionDisplayLabel
-// ---------------------------------------------------------------------------
-
 describe('precisionDisplayLabel', () => {
   it('returns known Precision enum labels', () => {
     expect(precisionDisplayLabel('fp8')).toBe('FP8');
@@ -252,10 +224,6 @@ describe('precisionDisplayLabel', () => {
     expect(precisionDisplayLabel('mxfp4')).toBe('MXFP4');
   });
 });
-
-// ---------------------------------------------------------------------------
-// parseSpecDecodeCompareSlug
-// ---------------------------------------------------------------------------
 
 describe('parseSpecDecodeCompareSlug — canonical form', () => {
   it('parses {model}-{gpu}-{precision}-{method}-vs-none', () => {
@@ -349,7 +317,6 @@ describe('parseSpecDecodeCompareSlug — rejection cases', () => {
   });
 
   it('returns null for missing precision token', () => {
-    // Old format without precision — no precision token between gpu and method.
     expect(parseSpecDecodeCompareSlug('deepseek-r1-h100-mtp-vs-none')).toBeNull();
   });
 
@@ -364,10 +331,6 @@ describe('parseSpecDecodeCompareSlug — rejection cases', () => {
     expect(parseSpecDecodeCompareSlug('deepseek-r1-h100-fp8-mtp-and-none')).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// canonicalSpecDecodeCompareSlug
-// ---------------------------------------------------------------------------
 
 describe('canonicalSpecDecodeCompareSlug', () => {
   it('produces {model}-{gpu}-{precision}-{method}-vs-none', () => {
@@ -399,10 +362,6 @@ describe('canonicalSpecDecodeCompareSlug', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// specMethodDisplayLabel
-// ---------------------------------------------------------------------------
 
 describe('specMethodDisplayLabel', () => {
   it('returns Off for none', () => {

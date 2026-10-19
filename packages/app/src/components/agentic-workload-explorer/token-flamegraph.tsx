@@ -21,19 +21,16 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
 const COLORS = {
-  input: '#0ea5e9', // sky-500
-  cacheRead: '#10b981', // emerald-500
-  cacheWrite: '#f59e0b', // amber-500
-  output: '#8b5cf6', // violet-500
+  input: '#0ea5e9',
+  cacheRead: '#10b981',
+  cacheWrite: '#f59e0b',
+  output: '#8b5cf6',
 } as const;
 
-// Ratio-mode color bands. Emerald = hash chain length (after padding) matches
-// provider billing within 10%; amber = noticeable drift; rose = significant
-// drift, usually a sign that calibration or padding is off for that model.
 const RATIO_COLORS = {
-  good: '#10b981', // emerald-500
-  warn: '#f59e0b', // amber-500
-  bad: '#f43f5e', // rose-500
+  good: '#10b981',
+  warn: '#f59e0b',
+  bad: '#f43f5e',
 } as const;
 
 const STRINGS = {
@@ -165,7 +162,7 @@ const ROW_GAP = 2;
 const LABEL_WIDTH = 180;
 const COST_WIDTH = 70;
 const BAR_LEFT = LABEL_WIDTH + 8;
-const CLASSIFIER_COLOR = '#f97316'; // orange-500
+const CLASSIFIER_COLOR = '#f97316';
 
 type FlamegraphMode = 'api' | 'hash' | 'ratio';
 type FlamegraphLayout = 'chronological' | 'grouped';
@@ -270,7 +267,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
   const allLegends = useMemo(() => buildLegendItems(t), [t]);
   const legendItems = allLegends[mode];
 
-  // Build flat list of visible rows with nesting info
   const visibleRows = useMemo(() => {
     const result: {
       key: string;
@@ -417,11 +413,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
     [visibleRows],
   );
 
-  // Ratio-mode x-axis domain. Anchor at [0, 2] so 1.0 sits at the midpoint
-  // of the bar track — undercounted bars come up short of center, overcounted
-  // bars extend past it. Extend past 2 if any outlier (e.g. Web Search Agent
-  // on Haiku 4.5) actually reaches further; we don't clip, so the magnitude
-  // of an overshoot stays readable.
   const maxRatio = useMemo(() => {
     let observed = 0;
     for (const r of visibleRows) {
@@ -474,10 +465,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
 
   return (
     <div className="space-y-4">
-      {/* Section header — sticks to the top of the viewport while the chart
-          scrolls beneath. The dashboard <main> has `py-5` (top padding 1.25rem),
-          so we use a negative `top` so the bar lands flush against the global
-          header instead of 20px below it. */}
       <div className="sticky -top-5 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-2 px-2 pt-5 pb-2 space-y-2 border-b border-border">
         <div className="flex items-center gap-3">
           <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
@@ -486,7 +473,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Legend + group controls */}
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center border border-border rounded overflow-hidden">
             <button
@@ -605,14 +591,11 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
         </div>
       </div>
 
-      {/* Chart container */}
       <div
         ref={containerRef}
         className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
       >
         <svg width={containerWidth - 32} height={svgHeight} className="block">
-          {/* Ratio-mode reference line at 1.0 — spans the full chart height so
-              it's easy to scan whether bars over- or under-shoot the target. */}
           {mode === 'ratio' && barWidth > 0 && (
             <>
               <line
@@ -675,7 +658,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                 onMouseMove={(e) => handleMouseMove(e, row)}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Indented purple border line for child rows */}
                 {row.indent === 1 && (
                   <line
                     x1={8}
@@ -688,7 +670,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   />
                 )}
 
-                {/* Row label — for groups: triangle toggles expand, label text navigates */}
                 {row.isGroup && (
                   <text
                     x={labelX + 4}
@@ -726,7 +707,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   {row.label}
                 </text>
 
-                {/* Background track */}
                 <rect
                   x={barX}
                   y={y + 2}
@@ -737,7 +717,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   style={{ color: 'var(--color-border)', opacity: 0.3 }}
                 />
 
-                {/* Token segments — hidden for group header rows (summed bar is misleading) */}
                 {!row.isGroup &&
                   mode !== 'ratio' &&
                   segments.map((seg, si) =>
@@ -775,10 +754,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                     ) : null,
                   )}
 
-                {/* Ratio bar — single bar from 0 to ratio. 1.0 lands at the
-                    dashed reference line (rendered above the row map). Bars
-                    past the line are overcounts; bars short of it are
-                    undercounts. */}
                 {!row.isGroup && mode === 'ratio' && row.ratio !== null && ratioW > 0 && (
                   <rect
                     x={barX}
@@ -796,7 +771,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   </rect>
                 )}
 
-                {/* Cost label */}
                 <text
                   x={barX + barWidth + 8}
                   y={y + ROW_HEIGHT / 2}
@@ -822,10 +796,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
           })}
         </svg>
 
-        {/* Tooltip — rendered via portal at <body> so it escapes the chart
-            container's `overflow-x-auto` (which per CSS spec also clips on
-            the y-axis). Positioned with `fixed` using viewport coordinates;
-            flips above/below the cursor based on available viewport space. */}
         {tooltip &&
           mounted &&
           createPortal(

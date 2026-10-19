@@ -1,4 +1,3 @@
-/** Stable anchor id for an org's quote on the quotes page (first occurrence wins). */
 export function orgAnchorId(org: string): string {
   const slug = org
     .toLowerCase()
@@ -9,11 +8,9 @@ export function orgAnchorId(org: string): string {
 
 export interface Quote {
   text: string;
-  /** Simplified Chinese translation of `text`, shown on /zh pages. */
   textZh?: string;
   name: string;
   title: string;
-  /** Simplified Chinese translation of `title`, shown on /zh pages. */
   titleZh?: string;
   org: string;
   logo?: string;
@@ -581,11 +578,6 @@ export const QUOTES: Quote[] = [
   },
 ];
 
-/**
- * Orgs featured in the landing page carousel. Display order comes from the
- * QUOTES array above (carousel orgs are listed first there); this list only
- * controls membership.
- */
 export const CAROUSEL_ORGS = [
   'Anyscale',
   'MiniMax',
@@ -613,13 +605,6 @@ export const CAROUSEL_ORGS = [
   'Mooncake',
 ] as const;
 
-/**
- * Display label overrides for carousel orgs.
- *
- * `Together AI` is not currently in CAROUSEL_ORGS, so its override is inert —
- * it is kept so the card reads "Tri Dao" rather than "Together AI" if the org
- * is added back to the carousel.
- */
 export const CAROUSEL_LABELS: Record<string, string> = {
   'Together AI': 'Tri Dao',
   'PyTorch Foundation': 'PyTorch',

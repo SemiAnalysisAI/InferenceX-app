@@ -3,7 +3,6 @@ import {
   type BenchmarkCurveInput,
 } from '@semianalysisai/inferencex-constants';
 
-/** Fields needed to select one workflow run for a rendered benchmark series. */
 export interface BenchmarkSeriesRow extends BenchmarkCurveInput {
   date: string;
   workflow_run_id?: number;
@@ -51,7 +50,6 @@ function isWinningRun(row: BenchmarkSeriesRow, winner: BenchmarkSeriesRow): bool
   );
 }
 
-/** Keep only the newest date for each chart series and, for agentic, one workflow run. */
 export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: T[]): T[] {
   const winnerPerGroup = new Map<string, T>();
   for (const row of rows) {
@@ -76,7 +74,6 @@ export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: 
   });
 }
 
-/** For historical views, keep one agentic workflow run per series on each calendar date. */
 export function dedupeAgenticHistoryRuns<T extends BenchmarkSeriesRow>(rows: T[]): T[] {
   const winnerPerDateAndSeries = new Map<string, T>();
   for (const row of rows) {

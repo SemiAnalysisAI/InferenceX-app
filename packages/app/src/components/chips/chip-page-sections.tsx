@@ -1,11 +1,3 @@
-/**
- * Server-rendered sections shared by the /chips and /zh/chips pages.
- *
- * Locale is passed as a prop per AGENTS.md rule 5 (server components take an
- * optional `locale`); all prose comes from `chip-pages.ts` (en) and
- * `chip-pages-zh.ts` (zh), and every number is derived from GPU_SPECS and
- * HW_REGISTRY so the pages can never drift from the dashboard.
- */
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/seo/json-ld';

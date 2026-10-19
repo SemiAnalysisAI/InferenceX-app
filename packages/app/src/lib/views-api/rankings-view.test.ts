@@ -80,8 +80,6 @@ describe('buildRankingsViewEntries', () => {
   });
 
   it('follows the curated overview scenarios when no scenario is given', () => {
-    // Kimi K3 is curated to agentx only — the default must not add a
-    // single-turn entry even though single-turn rows exist.
     const entries = buildRankingsViewEntries(
       entryFor('cheapest-gpu', 'kimi-k3'),
       ROWS.map((r) => ({ ...r, model: 'kimik3' })),

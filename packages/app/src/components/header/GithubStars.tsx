@@ -39,7 +39,6 @@ export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
       }}
       className={`${hasStarred ? '' : 'star-button-glow hover:border-primary/50 dark:hover:border-primary/50 '}flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-400 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
     >
-      {/* Star Icon */}
       <svg
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"

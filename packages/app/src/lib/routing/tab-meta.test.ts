@@ -32,7 +32,6 @@ describe('per-model profit estimator metadata', () => {
     expect(modelTabCanonicalPath('profit-estimator', deepseek)).toBe(
       `/profit-estimator/${deepseek.slug}`,
     );
-    // The app-wide default model is not this tab's default, so it keeps a slug.
     expect(modelTabCanonicalPath('calculator', deepseek)).toBe('/calculator');
   });
 

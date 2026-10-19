@@ -149,8 +149,6 @@ describe('request chart data', () => {
   });
 
   it('scans a legacy JSONB timeline above 250,000 requests in Node instead of SQL', async () => {
-    // Trace row 3811 (point 444941) holds 459,630 requests; its SQL projection
-    // was 71.5 MB, over Neon's 64 MiB response cap.
     const encoded = JSON.stringify(timeline);
     const { sql, calls } = mockSql([
       [legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS + 1)],

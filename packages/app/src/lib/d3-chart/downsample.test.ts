@@ -58,7 +58,6 @@ describe('lttbDownsample', () => {
     const result = lttbDownsample(data, 20, getX, getY);
     const maxY = Math.max(...result.map(getY));
     const minY = Math.min(...result.map(getY));
-    // Downsampled data should still capture ~full amplitude
     expect(maxY).toBeGreaterThan(0.9);
     expect(minY).toBeLessThan(-0.9);
   });
@@ -66,7 +65,6 @@ describe('lttbDownsample', () => {
   it('preserves spike anomaly', () => {
     const data = Array.from({ length: 100 }, (_, i) => ({ x: i, y: i === 50 ? 100 : 1 }));
     const result = lttbDownsample(data, 10, getX, getY);
-    // The spike at x=50 should be picked as the most visually significant point
     expect(result.some((p) => p.y === 100)).toBe(true);
   });
 

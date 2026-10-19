@@ -2,10 +2,6 @@ import AdmZip from 'adm-zip';
 
 import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-/**
- * DO NOT ADD CACHING around these GitHub artifact fetches.
- * Workflow run metadata/artifacts can change while a run is still in progress.
- */
 const GITHUB_HEADERS = {
   Accept: 'application/vnd.github.v3+json',
 } as const;
@@ -19,12 +15,10 @@ export interface GithubArtifact {
 export interface GithubWorkflowRun {
   id: number;
   name: string;
-  // GitHub can return null here for detached refs or in-progress runs.
   head_branch: string | null;
   head_sha: string;
   created_at: string;
   html_url: string;
-  // conclusion/status may be null while a workflow run is still active.
   conclusion: string | null;
   status: string | null;
 }
@@ -91,7 +85,6 @@ export async function fetchGithubRunArtifacts(
       },
     });
     if (!response.ok) {
-      // Preserve old route behavior: stop pagination on API failure and return what we have.
       break;
     }
 
@@ -120,11 +113,6 @@ export function downloadGithubArtifact(url: string, token: string): Promise<Resp
   });
 }
 
-/**
- * Decodes only the entries `predicate` selects, keyed by entry name. The rest
- * of the archive stays compressed, so picking a few small files out of a
- * multi-hundred-megabyte bundle costs the central directory, not the payload.
- */
 export function readZipEntries(
   buffer: Buffer,
   predicate: (entryName: string) => boolean,
@@ -144,7 +132,6 @@ export function extractZipEntries<T>(
   parseEntry: (entryName: string, contents: string) => T[],
   onParseError?: (entryName: string, error: unknown) => void,
 ): T[] {
-  // Preserve partial-success behavior: malformed matching files are skipped after optional reporting.
   const zip = new AdmZip(buffer);
   const rows: T[] = [];
 

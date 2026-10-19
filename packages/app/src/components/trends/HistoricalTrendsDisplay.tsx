@@ -127,13 +127,10 @@ export default function HistoricalTrendsDisplay() {
     setHighContrast,
   } = useInferenceActions();
 
-  // Graph definitions can outlive empty results; hardware metadata is built
-  // from source rows before selected-metric coverage and clipping filters.
   const hasInteractivityChart =
     Object.keys(hardwareConfig).length > 0 &&
     graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
 
-  // Get Y-axis label and title from chart definition
   const currentYLabel = useMemo(() => {
     if (graphs.length === 0) return '';
     return metricLabel(graphs[0].chartDefinition, selectedYAxisMetric, locale);
@@ -144,7 +141,6 @@ export default function HistoricalTrendsDisplay() {
     return metricChartTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
   }, [graphs, locale, selectedYAxisMetric]);
 
-  // Interactivity range from current chart data
   const interactivityRange = useMemo(() => {
     const g = graphs.find((graph) => graph.chartDefinition.chartType === 'interactivity');
     if (!g || g.data.length === 0) return { min: 0, max: 200 };
@@ -152,7 +148,6 @@ export default function HistoricalTrendsDisplay() {
     return { min: Math.ceil(Math.min(...xs)), max: Math.floor(Math.max(...xs)) };
   }, [graphs]);
 
-  // Slider state (dual: numeric value + string for input display)
   const [targetInteractivity, setTargetInteractivity] = useState(35);
   const [interactivityInput, setInteractivityInput] = useState('35');
 
@@ -183,7 +178,6 @@ export default function HistoricalTrendsDisplay() {
     track('historical_trend_target_input', { value: targetInteractivity });
   }, [interactivityInput, targetInteractivity, interactivityRange]);
 
-  // Interpolated trend data
   const {
     trendLines,
     loading: trendLoading,
@@ -201,7 +195,6 @@ export default function HistoricalTrendsDisplay() {
     tcoBasis,
   });
 
-  // High contrast color support
   const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
   const { resolveColor } = useThemeColors({
     highContrast,
@@ -209,7 +202,6 @@ export default function HistoricalTrendsDisplay() {
     activeKeys: activeHwKeys,
   });
 
-  // Line configs for TrendChart — one per visible GPU+precision combo
   const lineConfigs = useMemo(
     (): TrendLineConfig[] =>
       [...trendLines.keys()]
@@ -239,9 +231,6 @@ export default function HistoricalTrendsDisplay() {
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
   const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
 
-  // Check `error` before the loading skeleton: a failed benchmark query never
-  // produces rows, so `loading` (which includes "no rows yet") would otherwise
-  // pin the page on the skeleton forever instead of surfacing the error card.
   if (error) {
     return (
       <section data-testid="historical-trends-display">
@@ -322,7 +311,6 @@ export default function HistoricalTrendsDisplay() {
 
   return (
     <section data-testid="historical-trends-display" className="flex flex-col gap-4">
-      {/* Controls card — same selectors as Inference Performance tab */}
       <Card className="relative z-30">
         <div className="flex flex-col gap-4">
           <DashboardSectionHeader
@@ -336,7 +324,6 @@ export default function HistoricalTrendsDisplay() {
             showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
           />
 
-          {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
             <TooltipProvider delayDuration={0}>
               <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
@@ -403,7 +390,6 @@ export default function HistoricalTrendsDisplay() {
         </div>
       </Card>
 
-      {/* Chart card */}
       {hasInteractivityChart ? (
         <section>
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
@@ -443,11 +429,8 @@ export default function HistoricalTrendsDisplay() {
                         const tier = metricCostTier(
                           selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                         );
-                        // Same copy as the selector so a PNG export matches it.
                         return tier ? costTierOptionLabel(tier, locale) : undefined;
                       })()}
-                      // The trend chart prices every point from the published
-                      // tiers, so Custom User Values is not offered here.
                       costTierControl={<CostTierSelector allowCustom={false} />}
                       target={`${targetInteractivity} tok/s/user`}
                       date={

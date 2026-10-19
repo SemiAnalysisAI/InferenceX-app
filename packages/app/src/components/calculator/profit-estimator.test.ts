@@ -23,7 +23,6 @@ import {
   type ProfitEstimatorRow,
 } from './profit-estimator';
 
-/** $1/M tok on both streams: revenue collapses to total throughput. */
 const FLAT_PRICING: TokenRevenuePricing = {
   source: 'normalized',
   inputPerMillion: 1,
@@ -31,7 +30,6 @@ const FLAT_PRICING: TokenRevenuePricing = {
   outputPerMillion: 1,
 };
 
-/** Asymmetric prices need the measured input share to split the streams. */
 const SPLIT_PRICING: TokenRevenuePricing = {
   source: 'openrouter',
   inputPerMillion: 0.5,
@@ -40,14 +38,13 @@ const SPLIT_PRICING: TokenRevenuePricing = {
   openRouterModelId: 'test/model',
 };
 
-// B200 figures from HW_REGISTRY: 1.71 kW all-in, $1.73/GPU/hr hyperscaler.
 const B200 = { powerKwPerGpu: 1.71, costPerGpuHour: 1.73 };
 const B200_GPU_HOURS = (1_000_000 / 1.71) * HOURS_PER_YEAR;
 
 const result = {
   hwKey: 'b200',
   resultKey: 'b200',
-  value: 1_000, // total tok/s/GPU -> $3.60/GPU/hr at $1/M flat
+  value: 1_000,
   inputTokenShare: 0.8,
   cacheHitRate: undefined,
 };
@@ -94,7 +91,6 @@ describe('estimateSkuProfit', () => {
     expect(r.grossMargin).toBeCloseTo((3.6 - 1.73) * B200_GPU_HOURS, 0);
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
     expect(r.profit).toBeCloseTo(r.revenue - r.tco - r.labCut, 3);
-    // The three segments are exactly the revenue bar.
     expect(r.tco + r.labCut + r.profit).toBeCloseTo(r.revenue, 3);
   });
 
@@ -144,7 +140,6 @@ describe('estimateSkuProfit', () => {
         basis: 'gw-year',
       }),
     );
-    // 1000 tok/s * 3600 / 1e6 * $0.2 = $0.72/GPU/hr, then 60% -> well below $1.73.
     expect(r.grossMargin).toBeLessThan(0);
     expect(r.labCut).toBeCloseTo(0.3 * r.revenue, 3);
     expect(r.profit).toBeCloseTo(r.grossMargin - r.labCut, 9);
@@ -182,7 +177,6 @@ describe('estimateSkuProfit', () => {
         basis: 'gw-year',
       }),
     );
-    // 800 input tok/s at $0.5/M + 200 output tok/s at $2/M, per hour.
     const expected = ((800 * 0.5 + 200 * 2) * 3_600) / 1_000_000;
     expect(r.revenuePerGpuHour).toBeCloseTo(expected, 9);
   });
@@ -252,8 +246,6 @@ describe('estimateProfitRows', () => {
     const specs: Record<string, { powerKwPerGpu: number; costPerGpuHour: number }> = {
       b200: B200,
       h200: { powerKwPerGpu: 1.37, costPerGpuHour: 1.22 },
-      // Same power as the B200 so it books less revenue per GW-year, but a
-      // fraction of the TCO, so it clears more P&L. Profit order must win.
       cheap: { powerKwPerGpu: 1.71, costPerGpuHour: 0.4 },
       ghost: { powerKwPerGpu: 0, costPerGpuHour: 1 },
     };
@@ -269,7 +261,6 @@ describe('estimateProfitRows', () => {
       { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' },
     );
     expect(rows.map((r) => r.resultKey)).toEqual(['cheap', 'b200', 'h200']);
-    // Revenue alone would have put the B200 first.
     expect(rows.toSorted((a, b) => b.revenue - a.revenue).map((r) => r.resultKey)).toEqual([
       'b200',
       'cheap',
@@ -448,9 +439,6 @@ describe('profitModelDefaults', () => {
       cachedInputPerMillion: 0.26,
       outputPerMillion: 4.4,
     });
-    // The explicit cache price is honoured rather than the 10% default: a chip
-    // producing 1M tokens per hour at a 50/50 input/output split with every
-    // input token cached earns 0.5 x $0.26 + 0.5 x $4.40.
     const priced = row(
       estimateSkuProfit(
         {
@@ -478,7 +466,7 @@ describe('applyCacheHitMode', () => {
 
   it('returns items unchanged in actual mode', () => {
     const applied = applyCacheHitMode(items, 'actual');
-    expect(applied).toBe(items); // same reference
+    expect(applied).toBe(items);
   });
 
   it('replaces cacheHitRate with theoreticalCacheHitRate in theoretical mode', () => {
@@ -506,15 +494,10 @@ describe('applyCacheHitMode', () => {
       cacheHitRate: 0.5,
       theoreticalCacheHitRate: 0.97,
     };
-    // With a higher cache hit rate, more input tokens are billed at the lower
-    // cached price, so revenue changes.
     const [actual] = applyCacheHitMode([actualResult], 'actual');
     const [theoretical] = applyCacheHitMode([actualResult], 'theoretical');
     expect(actual.cacheHitRate).toBe(0.5);
     expect(theoretical.cacheHitRate).toBe(0.97);
-    // Both feed into estimateSkuProfit — the cache discount lowers input revenue,
-    // so theoretical (higher cache hit) should yield lower revenue when cached
-    // price is less than input price.
     const pricingWithDiscount: TokenRevenuePricing = {
       source: 'normalized',
       inputPerMillion: 2,
@@ -527,7 +510,6 @@ describe('applyCacheHitMode', () => {
     const theoreticalRow = row(
       estimateSkuProfit(theoretical, specs, pricingWithDiscount, assumptions),
     );
-    // Higher cache hit = more tokens at $0.2 instead of $2 = lower revenue
     expect(theoreticalRow.revenue).toBeLessThan(actualRow.revenue);
   });
 });

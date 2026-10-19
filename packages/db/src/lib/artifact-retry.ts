@@ -11,7 +11,6 @@ const defaultWait = (delayMs: number) =>
     setTimeout(resolve, delayMs);
   });
 
-/** Retry transient artifact-store operations with bounded exponential backoff. */
 export async function retryArtifactOperation<T>(
   label: string,
   operation: () => T | Promise<T>,

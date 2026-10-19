@@ -3,8 +3,6 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-// analytics.track lazy-imports posthog-js, which is irrelevant here — stub it
-// out so an unlock side-effect doesn't fire a network call in jsdom.
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import {
@@ -15,8 +13,6 @@ import {
   useFeatureGate,
 } from './use-feature-gate';
 
-// Lightweight renderHook — TLR isn't installed, so we mount a 1-component root
-// and capture the latest hook return value in a ref-style object.
 function renderHook<T>(hook: () => T): { result: { current: T }; unmount: () => void; root: Root } {
   const result = { current: undefined as unknown as T };
   function TestComponent() {
@@ -100,7 +96,6 @@ describe('useFeatureGate', () => {
   it('ignores partial / out-of-order sequences', () => {
     const { result, unmount } = renderHook(() => useFeatureGate());
     act(() => {
-      // Reversed direction — must not unlock.
       for (const key of ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key }));
       }

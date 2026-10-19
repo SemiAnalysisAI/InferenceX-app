@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** GB200 board variant. */
 
 import { ValidationError } from '../../../../base';
 import { BiancaBoard, type BiancaBoardFields } from './bianca';

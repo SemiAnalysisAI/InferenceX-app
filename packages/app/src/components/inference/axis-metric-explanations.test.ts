@@ -24,11 +24,9 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(entry.description.zh.length).toBeGreaterThan(10);
     expect(entry.formula.en.length).toBeGreaterThan(5);
     expect(entry.formula.zh.length).toBeGreaterThan(5);
-    // Chinese strings must actually be Chinese, not copied English.
     expect(entry.description.zh).toMatch(CJK);
     expect(entry.formula.zh).toMatch(CJK);
     expect(entry.description.en).not.toMatch(CJK);
-    // Formulas are structural: they must show a computation, not a number soup.
     expect(entry.formula.en).toMatch(/[÷×=]/u);
   });
 
@@ -118,8 +116,6 @@ describe('resolveXAxisKind', () => {
   });
 
   it('interactivity chart keeps interactivity for input metrics without a TTFT override', () => {
-    // Input metric with no `*_x` config override: `resolveXAxisField` falls
-    // back to the chart's natural x, so the footer must say interactivity.
     expect(resolveXAxisKind('interactivity', { ...base, xAxisField: 'p90_intvty' })).toBe(
       'interactivity',
     );

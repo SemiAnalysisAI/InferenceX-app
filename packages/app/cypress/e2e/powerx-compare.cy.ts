@@ -1,20 +1,10 @@
 import { assertShareLinkParams } from '../support/share-link';
 
-// The PowerX article panels inside the gated Measured Energy group.
-// Deterministic disaggregated rows carry validated whole-deployment and
-// per-role telemetry; the overlay run adds H200 rows.
-
 const MODEL = 'dsv4';
 const DATE = '2026-09-01';
 const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 
-/**
- * conc, interactivity (tok/s/user), output tok/s per GPU, measured W per GPU,
- * prefill W per GPU, decode W per GPU, J per output token, decode J per output token.
- * Input tokens outnumber output tokens 8:1, so J/in = J/out ÷ 8 and the prefill
- * pool's J/in reconstructs to J/out − decode J/out on the output-token axis.
- */
 const CONFIGS: [number, number, number, number, number, number, number, number][] = [
   [16, 90, 200, 500, 800, 400, 2.4, 1.6],
   [64, 60, 400, 600, 820, 450, 1.6, 1],
@@ -100,7 +90,6 @@ function interceptRows(officialRunUrl: string) {
   });
 }
 
-/** Overlay rows 10% cheaper per token than the official rows, so they own the frontier. */
 function interceptCheaperOverlayRows() {
   const cheaper = rows(OVERLAY_RUN_URL, 'h200').map((row) => ({
     ...row,
@@ -170,7 +159,6 @@ describe('PowerX article panels', () => {
     cy.get('[data-testid^="equal-service-"]').should('not.exist');
     cy.get('[data-testid^="matched-concurrency"]').should('not.exist');
 
-    // Role power: prefill and decode W/GPU for both sources; the overlay in its run colour.
     cy.get('[data-testid="chart-0-role-power-plot"] circle.point').should(
       'have.length',
       CONFIGS.length * 4,
@@ -184,8 +172,6 @@ describe('PowerX article panels', () => {
       CONFIGS.length * 2,
     );
 
-    // Output per allocated GPU is output per decode GPU × 4 ÷ 8: 100, 200 and 400 tok/s.
-    // W/GPU 500, 600, 700 → P0 450 W, m 0.643 J/token, R² 0.964.
     cy.get('[data-testid="power-fit-row"]').should('have.length', 2);
     cy.get('[data-testid="power-fit-row"]')
       .filter(':contains("B200")')
@@ -198,7 +184,6 @@ describe('PowerX article panels', () => {
       .filter(':contains("H200")')
       .should('contain.text', '64% · 700 W');
 
-    // The cheaper overlay rows own the frontier; each lists its run.
     cy.get('[data-testid="frontier-points-row"]')
       .should('have.length', CONFIGS.length)
       .each(($row) => {
@@ -217,8 +202,6 @@ describe('PowerX article panels', () => {
   });
 });
 
-// Aggregate role counts describe shared devices: B200 TP8 × PP2, H200 TP16 × 2 workers.
-// GB200 TP8 on one node is not whole four-GPU NVL72 compute trays, so it has no All in Measured.
 const agenticRows = [
   ['b200', 'dynamo-vllm', 8, 2, 1, 16, 760],
   ['h200', 'vllm', 16, 1, 2, 32, 168],
@@ -232,7 +215,6 @@ const agenticRows = [
   framework,
   benchmark_type: 'agentic_traces',
   disagg: false,
-  // GB200 TP8 runs on one node; a multinode row would be two whole trays.
   is_multinode: hardware !== 'gb200',
   isl: null,
   osl: null,
@@ -322,7 +304,6 @@ describe('AgentX All in Measured chart and table', () => {
           'contain.text',
           locale === 'en' ? 'not been calibrated against measured AgentX' : '尚未用 AgentX',
         );
-      // A fixed page header otherwise repeats over the stitched element capture.
       cy.get('header').invoke('css', 'visibility', 'hidden');
       cy.get('[data-testid="chart-figure"]')
         .first()
@@ -392,7 +373,6 @@ describe('AgentX All in Measured chart and table', () => {
         }
       });
       cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(width));
-      // A selection containing only GPU measurements must still have a usable table.
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [agenticRows[2]] }).as('missingOnly');
       cy.intercept('GET', '/api/unofficial-run*', {
         body: {

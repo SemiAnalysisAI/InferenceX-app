@@ -35,7 +35,6 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// Two current matrix shards: NVIDIA scale-up EP8 + AMD scale-out EP16.
 const shardA = makeRawShard({ backend: 'deepep-v2', ep: 8 });
 const shardB = makeRawShard({
   sku: 'mi355x',
@@ -84,7 +83,6 @@ function runObject(overrides: Record<string, unknown> = {}) {
     id: 160,
     name: 'CollectiveX Sweep',
     path: '.github/workflows/collectivex-sweep.yml',
-    // Deliberately a feature branch: lazy ingest accepts runs from ANY branch.
     head_branch: 'collectivex-fp8-precision',
     head_sha: 'a'.repeat(40),
     status: 'completed',
@@ -95,7 +93,6 @@ function runObject(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** One page of the run listing. A Response body reads once, so build a fresh one per call. */
 function runListing(...runs: ReturnType<typeof runObject>[]) {
   return Response.json({ total_count: runs.length, workflow_runs: runs });
 }
@@ -128,8 +125,6 @@ beforeEach(() => {
   mockInsert.mockReset().mockResolvedValue(true);
   mockRefresh.mockReset().mockResolvedValue(true);
   process.env.GITHUB_TOKEN = 'test-token';
-  // Module-level state outlives a case; without this every test after the first
-  // would be answered from the discovery cooldown and issue no requests.
   resetCollectiveXDiscoveryCooldown();
 });
 
@@ -214,7 +209,6 @@ describe('ensureLatestCollectiveXRun', () => {
   it('skips runs tagged for another version', async () => {
     mockFetch
       .mockResolvedValueOnce(twoRunListing())
-      // Run 161 carries a v2 matrix — requesting v1 must move on.
       .mockResolvedValueOnce(Response.json(artifactsBody(161)))
       .mockResolvedValueOnce(new Response(matrixZipV2))
       .mockResolvedValueOnce(new Response(shardZipV2))
@@ -281,8 +275,6 @@ describe('ensureLatestCollectiveXRun', () => {
     await ensureLatestCollectiveXRun(1);
 
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    // 4 fetches total: runs, artifacts, matrix, ONE shard — the attempt-1
-    // archive is superseded and never downloaded.
     expect(mockFetch).toHaveBeenCalledTimes(4);
     expect(mockFetch.mock.calls[3][0]).toBe('https://example.test/shard-attempt2.zip');
   });
@@ -349,7 +341,6 @@ describe('discovery cooldown', () => {
     expect(collectiveXSweepErrorCode(first)).toBe('unavailable');
     const afterFirst = mockFetch.mock.calls.length;
 
-    // Same error object, and no fresh requests while the failure window holds.
     const second = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
     expect(second).toBe(first);
     expect(mockFetch.mock.calls.length).toBe(afterFirst);

@@ -280,7 +280,6 @@ function OverviewPageContent() {
   return (
     <div className="space-y-5">
       {modelFilterBar}
-      {/* Stats grid */}
       <section>
         <SectionHeader label={t.stats} count={plainCards.length + 3} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -292,7 +291,6 @@ function OverviewPageContent() {
               tooltip={card.tooltip}
             />
           ))}
-          {/* Total Tokens — expandable */}
           <StatCard
             label={t.totalTokens}
             value={formatNumber(
@@ -311,7 +309,6 @@ function OverviewPageContent() {
             isExpanded={expanded === 'tokens'}
             onClick={() => toggle('tokens')}
           />
-          {/* Read:Write:Out — expandable */}
           <StatCard
             label={t.readWriteOut}
             value={(() => {
@@ -322,7 +319,6 @@ function OverviewPageContent() {
             isExpanded={expanded === 'ratio'}
             onClick={() => toggle('ratio')}
           />
-          {/* Est. Cost — expandable */}
           <StatCard
             label={t.estCost}
             value={formatDollars(stats.totalCost ?? 0)}
@@ -341,7 +337,6 @@ function OverviewPageContent() {
           ))}
         </div>
 
-        {/* Expanded mix bar */}
         {(expanded === 'tokens' || expanded === 'ratio') && (
           <div className="mt-2">
             <MixBar segments={tokenSegments} formatValue={formatNumber} />
@@ -354,7 +349,6 @@ function OverviewPageContent() {
         )}
       </section>
 
-      {/* Usage over a selectable period */}
       <UsagePanel stats={stats} t={t} />
     </div>
   );
@@ -427,8 +421,6 @@ function StatCard({
   );
 }
 
-// -- Usage Panel (single chart, selectable period) ---------------------------
-
 type UsagePeriod = '24h' | 'lastDay' | 'prevDay' | '14d';
 type T = (typeof STRINGS)[keyof typeof STRINGS];
 
@@ -473,7 +465,6 @@ function UsagePanel({ stats, t }: { stats: OverviewStats; t: T }) {
     { id: 'sessions', label: t.sessionsMode },
   ];
 
-  // Total over the selected period, from the same buckets the chart draws.
   const buckets =
     period === '24h'
       ? fillHourBuckets(stats.usageHistogram)
@@ -543,8 +534,6 @@ function UsagePanel({ stats, t }: { stats: OverviewStats; t: T }) {
     </section>
   );
 }
-
-// -- Usage Histogram ---------------------------------------------------------
 
 const HIST_W = 600;
 const HIST_H = 160;
@@ -796,8 +785,6 @@ function UsageHistogram({
   );
 }
 
-// -- UTC Day Usage Histogram (today/yesterday, 24 fixed hourly slots) --------
-
 function fillUtcDayHourBuckets(
   data: UsageBucket[],
   dayOffset: number,
@@ -821,8 +808,6 @@ function fillUtcDayHourBuckets(
   const bucketMap = new Map<number, UsageBucket>();
   for (const d of data) {
     const t = new Date(d.hour);
-    // Normalize against UTC wall-clock so timestamps returned without a TZ
-    // suffix don't drift on non-UTC clients.
     const utcKey = Date.UTC(
       t.getUTCFullYear(),
       t.getUTCMonth(),
@@ -970,8 +955,6 @@ function UtcDayUsageHistogram({
   );
 }
 
-// -- Daily Usage Histogram (14d) ------------------------------------------------
-
 const DAILY_NUM_DAYS = 14;
 
 function fmtDateUTC(d: Date) {
@@ -1114,7 +1097,6 @@ function DailyUsageHistogram({
             );
           })}
 
-          {/* Baseline */}
           <line
             x1={0}
             x2={HIST_PLOT_W}

@@ -19,7 +19,6 @@ export class StoredTelemetryIncompleteError extends Error {
   }
 }
 
-/** Compare storage against the original parsed artifact, not only surviving host rows. */
 function checkSeriesInventory(artifact: string, series: readonly GpuMetricSeries[]): void {
   for (const entry of series) {
     const inventory = entry.sidecars.seriesInventory;
@@ -42,7 +41,6 @@ function checkSeriesInventory(artifact: string, series: readonly GpuMetricSeries
   }
 }
 
-/** Reconstruct only source/window evidence retained by the pre-validation ingest. */
 function storedValidations(series: readonly GpuMetricSeries[]) {
   const validations = new Map<string, Record<string, unknown>>();
   for (const entry of series) {
@@ -53,8 +51,6 @@ function storedValidations(series: readonly GpuMetricSeries[]) {
       }
     }
   }
-  // New ingests carry the complete original documents, including role overrides.
-  // The legacy path has source + the selected serving window and manifest roles.
   if (validations.size > 0) return validations;
   for (const entry of series) {
     for (const audit of entry.powerAudits ?? []) {
@@ -146,7 +142,6 @@ function storedBundle(artifact: string, series: readonly GpuMetricSeries[]): Gpu
   );
 }
 
-/** Apply the artifact path's existing cuts and one-second means to persisted rows. */
 export function storedPowerSeries(series: readonly GpuMetricSeries[]): GpuPowerSeries[] {
   const groups = new Map<string, GpuMetricSeries[]>();
   for (const entry of series) {

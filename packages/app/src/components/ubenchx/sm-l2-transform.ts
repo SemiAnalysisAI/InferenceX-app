@@ -1,10 +1,3 @@
-/**
- * Shared pure transform for ubenchX SM-to-SM L2 latency distance.
- *
- * Used by both the UI component and the read-only API route so they cannot
- * silently calculate different results (AGENTS.md read-only coverage rule).
- */
-
 import type { SmL2Run, SmL2SmInfo, SmL2GpcBound } from './sm-l2-data';
 
 export interface SmL2ViewResult {
@@ -14,7 +7,6 @@ export interface SmL2ViewResult {
   readonly orderedSms: readonly number[];
   readonly smInfo: readonly SmL2SmInfo[];
   readonly gpcBounds: readonly SmL2GpcBound[];
-  /** Symmetric matrix[i][j] = mean |diff| per L2 address (cycles). */
   readonly matrix: readonly (readonly number[])[];
   readonly metadata: SmL2Run['metadata'];
   readonly stats: SmL2Stats;
@@ -29,10 +21,6 @@ export interface SmL2Stats {
   readonly crossDieMean: number;
 }
 
-/**
- * Compute summary statistics from the distance matrix.
- * This is the shared pure function for the read-only coverage rule.
- */
 export function computeSmL2Stats(run: SmL2Run): SmL2Stats {
   const n = run.numSms;
   const info = run.smInfo;
@@ -84,9 +72,6 @@ export function computeSmL2Stats(run: SmL2Run): SmL2Stats {
   };
 }
 
-/**
- * Transform an SM-L2 run into the view result consumed by both UI and API.
- */
 export function transformSmL2Run(gpuKey: string, run: SmL2Run): SmL2ViewResult {
   return {
     gpu: gpuKey,

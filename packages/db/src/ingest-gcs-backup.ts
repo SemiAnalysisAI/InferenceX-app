@@ -1,33 +1,3 @@
-/**
- * Ingest raw GCS backup ZIP artifacts into the Postgres database.
- *
- * Reads the local mirror of gs://inferencemax-gha-backup/:
- *   {gcs_dir}/{date}/{workflow_dir}/artifacts/*.zip
- *
- * ZIP categories processed:
- *   bmk_*                  → single benchmark result dict (new format, 2025-12-17+)
- *   results_*              → compiled result array (old + new formats)
- *   run-stats_*            → reliability stats dict: { hw: { n_success, total } }
- *   run_stats_*            → same, alternate naming convention
- *   eval_results_all_*     → compiled eval aggregate (agg_eval_all.json, flat rows)
- *   eval_*                 → single eval result (meta_env.json + results_*.json)
- *   changelog-metadata_*   → changelog entries (base_ref, head_ref, entries[])
- *   server_logs_*          → every recursively nested .log/.out file
- *   multinode_server_logs_* → same, including files inside multinode_server_logs.tar.gz
- *
- * All inserts are idempotent (ON CONFLICT DO UPDATE/NOTHING), so re-running is safe.
- *
- * Processing is split into two parallel phases:
- *   Phase 1 (CONCURRENCY):    ZIP reading, JSON parsing, row mapping, GitHub API fetches.
- *   Phase 2 (DB_CONCURRENCY): DB writes (config resolution, bulk inserts, server log upserts).
- *
- * Sync GCS bucket first (incremental, skips existing files):
- *   gsutil -m rsync -r gs://inferencemax-gha-backup/ ./gcs/
- *
- * Usage:
- *   bun run admin:db:ingest:gcs
- */
-
 import fs from 'fs';
 import path from 'path';
 
@@ -74,8 +44,6 @@ const sql = createAdminSql({
   idle_timeout: 60,
 });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 type ChangelogEntry = ReturnType<typeof parseChangelogEntries>[number];
 
 interface WorkflowMapResult {
@@ -87,30 +55,18 @@ interface WorkflowMapResult {
   headSha: string | undefined;
   createdAt: string;
   ghInfo: GithubRunInfo | null;
-  /** Per-ZIP benchmark rows, ready for configId lookup + bulk insert in phase 2. */
   bmkZips: {
     zipFile: string;
     rows: BenchmarkParams[];
     serverLogArtifact?: { zipPath: string; artifactName: string };
   }[];
   statsRows: { hardware: string; nSuccess: number; total: number }[];
-  /**
-   * Each eval row carries the matching `samples_<task>_*.jsonl` text when the
-   * source ZIP includes it (per-config eval ZIPs do; agg ZIPs don't).
-   */
   evalRows: { params: EvalParams; samplesText: string | null }[];
   changelogs: { baseRef: string; headRef: string; entries: ChangelogEntry[] }[];
-  /** True when the changelog declares evals-only — benchmark/stats data is dropped. */
   evalsOnly: boolean;
-  /**
-   * Skip counts from the mapping phase. `dbError` is tracked separately in phase 2,
-   * and `telemetryError` never applies here: the GCS backup path ingests no
-   * `gpu_metrics_*` artifacts.
-   */
   localSkips: Omit<Skips, 'dbError' | 'telemetryError'>;
   localUnmappedModels: Set<string>;
   localUnmappedHws: Set<string>;
-  /** Pre-formatted [WARN] lines to print at the start of phase 2 for this dir. */
   warnings: string[];
 }
 
@@ -128,13 +84,6 @@ interface WriteResult {
   localUnmappedHws: string[];
 }
 
-// ── Concurrency helper ────────────────────────────────────────────────────────
-
-/**
- * Run `fn` over `items` with at most `concurrency` tasks in-flight at once.
- * Result order matches input order. Per-item errors are logged and returned as
- * `null`, unless failOnError requests a terminal error after in-flight work ends.
- */
 async function pMap<T, R>(
   items: T[],
   fn: (item: T) => Promise<R | null>,
@@ -162,8 +111,6 @@ async function pMap<T, R>(
   return results;
 }
 
-// ── Phase 1: map a single workflow dir (no DB) ────────────────────────────────
-
 async function mapWorkflowDir(
   dateDir: string,
   workflowDir: string,
@@ -173,16 +120,11 @@ async function mapWorkflowDir(
   const artifactsPath = path.join(datePath, workflowDir, 'artifacts');
   if (!fs.existsSync(artifactsPath)) return null;
 
-  // ── Resolve workflow run metadata ─────────────────────────────────────────
   let githubRunId: number | null = null;
   let headBranch: string | undefined;
   let headSha: string | undefined;
   let createdAt = `${dateDir}T00:00:00Z`;
 
-  // Build artifact-id → created_at index so we can sort ZIPs by creation time.
-  // When multiple artifacts map to the same DB config (e.g. same benchmark re-run
-  // across attempts on different runners), processing newest last ensures the
-  // ON CONFLICT DO UPDATE keeps the latest attempt's result.
   const artifactCreatedAt = new Map<number, string>();
   const metaPath = path.join(artifactsPath, 'artifacts_metadata.json');
   if (fs.existsSync(metaPath)) {
@@ -201,9 +143,7 @@ async function mapWorkflowDir(
           createdAt = meta[0].created_at ?? createdAt;
         }
       }
-    } catch {
-      /* ignore malformed metadata */
-    }
+    } catch {}
   }
   if (!githubRunId) {
     const match = workflowDir.match(/_(?<runId>\d{10,})$/u);
@@ -218,7 +158,6 @@ async function mapWorkflowDir(
     return null;
   }
 
-  // ── Classify artifact ZIPs ────────────────────────────────────────────────
   const zipFiles = fs.readdirSync(artifactsPath).filter((f) => f.endsWith('.zip'));
   const bmkZipFiles = zipFiles.filter((f) => f.startsWith('bmk_'));
   const resultZips = zipFiles.filter((f) => f.startsWith('results_'));
@@ -252,15 +191,11 @@ async function mapWorkflowDir(
       .replaceAll('_', ' ')
       .trim() || `Run ${githubRunId}`;
 
-  // GitHub API fetch — the main reason this runs concurrently
   const ghInfo = await fetchGithubRun(githubRunId);
 
-  // Local skip tracker — mutations stay isolated to this task
   const local = createSkipTracker();
   const warnings: string[] = [];
 
-  // ── Index server log ZIPs (deferred read — too large for memory) ─────────
-  // Map configKey → ZIP metadata. .log/.out files are extracted lazily in phase 2.
   const serverLogArtifacts = new Map<string, { zipPath: string; artifactName: string }>();
   for (const zipFile of serverLogZips) {
     const artifactName = zipFile.replace(/_\d+_\d+\.zip$/u, '');
@@ -272,10 +207,6 @@ async function mapWorkflowDir(
     });
   }
 
-  // ── Map benchmark ZIPs ────────────────────────────────────────────────────
-  // Sort bmk ZIPs by artifact created_at ascending so that when multiple
-  // artifacts map to the same DB conflict key, the newest is processed last
-  // and wins the ON CONFLICT DO UPDATE (latest-attempt-wins).
   const sortedBmkZips = [...bmkZipFiles].toSorted((a, b) => {
     const idA = a.match(/_(?<artifactId>\d{10,})\.zip$/u)?.[1];
     const idB = b.match(/_(?<artifactId>\d{10,})\.zip$/u)?.[1];
@@ -284,18 +215,10 @@ async function mapWorkflowDir(
     return tsA.localeCompare(tsB);
   });
 
-  // Skip compiled results_ ZIPs when individual bmk_ ZIPs exist.
-  // The compiled ZIPs aggregate all job artifacts (including carried-over ones
-  // from prior attempts) into a single array with no per-artifact timestamps,
-  // so duplicate rows for the same config can appear in arbitrary order and the
-  // wrong one can win the within-batch dedup. Individual bmk_ ZIPs are sorted
-  // by created_at above, guaranteeing the latest attempt's result wins.
   const bmkSources = sortedBmkZips.length > 0 ? sortedBmkZips : resultZips;
 
   const bmkZips: WorkflowMapResult['bmkZips'] = [];
   for (const zipFile of bmkSources) {
-    // bmk_ ZIPs can contain multiple JSON files (one per concurrency level).
-    // Read all of them, not just the first, so every concurrency is ingested.
     const allJsons = readZipJsonMap(path.join(artifactsPath, zipFile));
     if (!allJsons || allJsons.size === 0) {
       local.skips.badZip++;
@@ -329,7 +252,6 @@ async function mapWorkflowDir(
       );
     }
     if (rows.length > 0) {
-      // Match server log by config key (bmk_ files only — results_ compiled zips have no matching logs)
       let serverLogArtifact: { zipPath: string; artifactName: string } | undefined;
       if (zipFile.startsWith('bmk_')) {
         const bmkConfigKey = zipFile.replace(/^bmk_/u, '').replace(/_\d+_\d+\.zip$/u, '');
@@ -341,7 +263,6 @@ async function mapWorkflowDir(
     }
   }
 
-  // ── Map run_stats ZIPs ────────────────────────────────────────────────────
   const statsRows: WorkflowMapResult['statsRows'] = [];
   for (const zipFile of statsZips) {
     const data = readZipJson(path.join(artifactsPath, zipFile));
@@ -361,7 +282,6 @@ async function mapWorkflowDir(
     }
   }
 
-  // ── Map individual eval ZIPs ──────────────────────────────────────────────
   const evalRows: WorkflowMapResult['evalRows'] = [];
   for (const zipFile of evalZips) {
     const zipPath = path.join(artifactsPath, zipFile);
@@ -420,7 +340,6 @@ async function mapWorkflowDir(
     }
   }
 
-  // ── Map compiled eval ZIPs ────────────────────────────────────────────────
   for (const zipFile of evalAggZips) {
     const contents = readZipJsonAndText(path.join(artifactsPath, zipFile));
     if (!contents) {
@@ -453,7 +372,6 @@ async function mapWorkflowDir(
     }
   }
 
-  // ── Parse changelog ZIPs ──────────────────────────────────────────────────
   const newestChangelogZip = [...changelogZips]
     .toSorted((a, b) => {
       const idA = a.match(/_(?<artifactId>\d+)\.zip$/u)?.[1];
@@ -509,7 +427,6 @@ async function mapWorkflowDir(
       unmappedHw: local.skips.unmappedHw,
       noIslOsl: local.skips.noIslOsl,
       failedRun: local.skips.failedRun,
-      // GCS backup doesn't ingest aiperf trace files; counter stays 0.
       traceReplayMissing: local.skips.traceReplayMissing,
     },
     localUnmappedModels: new Set(local.unmappedModels),
@@ -517,8 +434,6 @@ async function mapWorkflowDir(
     warnings,
   };
 }
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   validateRunBackfills();
@@ -560,7 +475,6 @@ async function main(): Promise<void> {
     .toSorted();
   console.log(`  ${dateDirs.length} date directories  (${dateDirs[0]} → ${dateDirs.at(-1)})`);
 
-  // Build flat task list with a sync FS walk
   interface Task {
     dateDir: string;
     workflowDir: string;
@@ -576,7 +490,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // ── Phase 1: parallel ZIP reading + mapping ───────────────────────────────
   process.stdout.write(`\n  Phase 1: mapping ${tasks.length} workflow dirs...`);
   const phase1Start = Date.now();
   const rawResults = await pMap(
@@ -587,7 +500,6 @@ async function main(): Promise<void> {
   );
   console.log(` ${Math.round((Date.now() - phase1Start) / 1000)}s`);
 
-  // Group by dateDir, preserving intra-date order from the task list
   const byDate = new Map<string, WorkflowMapResult[]>();
   for (const result of rawResults) {
     if (!result) continue;
@@ -596,7 +508,6 @@ async function main(): Promise<void> {
     byDate.set(result.dateDir, arr);
   }
 
-  // ── Phase 2: parallel DB writes ───────────────────────────────────────────
   const phase2Start = Date.now();
 
   let totalNewBmk = 0,
@@ -678,10 +589,8 @@ async function main(): Promise<void> {
           wr.newBmk += newCount;
           wr.dupBmk += dupCount;
 
-          // Only track as inserted after successful bulk insert
           allInserted.push(...toInsert);
 
-          // Attach every .log/.out file (read lazily to bound phase-1 memory).
           if (serverLogArtifact && insertedIds.length > 0) {
             const logFiles = readServerLogArtifactZip(
               serverLogArtifact.zipPath,
@@ -695,7 +604,6 @@ async function main(): Promise<void> {
       }
     }
 
-    // Upsert availability rows only for successfully resolved configs
     const availRows: {
       model: string;
       isl: number | null;
@@ -786,7 +694,6 @@ async function main(): Promise<void> {
     return wr;
   }
 
-  // Run all workflow dirs in parallel (up to CONCURRENCY at once).
   const allResults = [...byDate.values()].flat();
   let writesDone = 0;
   const writeOutputs = await pMap(
@@ -801,7 +708,6 @@ async function main(): Promise<void> {
     true,
   );
 
-  // Accumulate totals per date, then print one line per date in sorted order.
   interface DateTotal {
     newBmk: number;
     dupBmk: number;
@@ -887,7 +793,6 @@ async function main(): Promise<void> {
   await sql.unsafe('VACUUM FULL benchmark_results, run_stats');
   console.log(` ${Math.round((Date.now() - vacuumEnd) / 1000)}s done`);
 
-  // ── Summary ───────────────────────────────────────────────────────────────
   const [configCount] = await sql`select count(*)::int as n from configs`;
   const [resultCount] = await sql`select count(*)::int as n from benchmark_results`;
   const [statsCount] = await sql`select count(*)::int as n from run_stats`;

@@ -34,10 +34,8 @@ export interface DistributionStats {
   max: number;
   mean: number;
   median: number;
-  /** Added in chart_data v2. */
   p75?: number;
   p90: number;
-  /** Added in chart_data v2. */
   p95?: number;
 }
 
@@ -65,11 +63,9 @@ export type DatasetDetail = RawDatasetDetail & {
 
 export type ConversationSort = NonNullable<ListConversationsOpts['sort']>;
 
-// Dataset contents only change on (rare) re-ingest, so cache aggressively.
 const DAY = 24 * 60 * 60 * 1000;
 const CONVERSATION_QUERY_GC_TIME = 5 * 60 * 1000;
 
-/** Shared fetch for the per-dataset endpoints: 404 → null, other errors throw. */
 async function fetchJsonOr404<T>(
   url: string,
   label: string,
@@ -81,7 +77,6 @@ async function fetchJsonOr404<T>(
   return (await res.json()) as T;
 }
 
-/** All ingested datasets (registry cards). */
 export function useDatasets() {
   return useQuery({
     queryKey: ['datasets'] as const,
@@ -94,7 +89,6 @@ export function useDatasets() {
   });
 }
 
-/** One dataset incl. chart_data. */
 export function useDataset(slug: string | null) {
   return useQuery({
     queryKey: ['dataset', slug] as const,
@@ -113,7 +107,6 @@ export interface UseConversationsArgs {
   sort?: ConversationSort;
 }
 
-/** Paginated conversation list for a dataset (counts only). */
 export function useDatasetConversations({
   slug,
   search = '',
@@ -143,7 +136,6 @@ export function useDatasetConversations({
   });
 }
 
-/** One conversation's flamegraph structure. */
 export function useDatasetConversation(slug: string | null, convId: string | null) {
   return useQuery({
     queryKey: ['dataset-conversation', slug, convId] as const,

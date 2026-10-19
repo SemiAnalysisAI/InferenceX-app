@@ -1,17 +1,3 @@
-/**
- * Restore runtime component metadata that older app ingest versions dropped.
- *
- * The benchmark producer began emitting nested router/offload component objects
- * and `kv_p2p_transfer` on 2026-07-13. The raw GitHub Actions benchmark
- * artifacts remain authoritative, so this script downloads only the small
- * benchmark-result artifacts and merges those metadata keys into matching DB
- * rows. It never replaces measured metrics or topology/config data.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-runtime-metadata
- *   bun run --cwd packages/db db:backfill-runtime-metadata --yes
- */
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

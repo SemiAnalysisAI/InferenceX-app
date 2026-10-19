@@ -41,16 +41,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = blogDescription(meta);
 
   return {
-    // `absolute` keeps a short " | InferenceX" suffix instead of the long
-    // "%s | InferenceX by SemiAnalysis" root template, leaving more room for
-    // the headline before Google truncates the SERP title.
     title: { absolute: `${meta.title} | ${SITE_NAME}` },
     description,
     keywords: meta.tags,
     authors: [{ name: AUTHOR_NAME }],
     alternates: {
       canonical: `${SITE_URL}/blog/${slug}`,
-      // hreflang to the Chinese translation when one exists under content/blog/zh/.
       ...(hasZhTranslation(slug) && { languages: languageAlternates(`/blog/${slug}`) }),
     },
     openGraph: {

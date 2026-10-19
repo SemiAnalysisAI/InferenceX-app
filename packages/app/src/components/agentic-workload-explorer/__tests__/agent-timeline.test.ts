@@ -39,10 +39,6 @@ function makeSessionRequest(overrides: Partial<SessionRequest> = {}): SessionReq
   };
 }
 
-// ---------------------------------------------------------------------------
-// getAgentColor
-// ---------------------------------------------------------------------------
-
 describe('getAgentColor', () => {
   it('returns mapped color for known agents', () => {
     expect(getAgentColor('Main')).toBe('#6b7280');
@@ -54,10 +50,6 @@ describe('getAgentColor', () => {
     expect(getAgentColor('Unknown Agent')).toBe('#ec4899');
   });
 });
-
-// ---------------------------------------------------------------------------
-// getToolColor
-// ---------------------------------------------------------------------------
 
 describe('getToolColor', () => {
   it('returns mapped color for known tools', () => {
@@ -79,10 +71,6 @@ describe('getToolColor', () => {
     expect(getToolColor('thinking')).toBe('#eab308');
   });
 });
-
-// ---------------------------------------------------------------------------
-// getDominantTool
-// ---------------------------------------------------------------------------
 
 describe('getDominantTool', () => {
   it('returns tool name from Anthropic tool_use block', () => {
@@ -153,10 +141,6 @@ describe('getDominantTool', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// formatTickLabel
-// ---------------------------------------------------------------------------
-
 describe('formatTickLabel', () => {
   it('formats sub-second as ms', () => {
     expect(formatTickLabel(0)).toBe('+0ms');
@@ -181,10 +165,6 @@ describe('formatTickLabel', () => {
     expect(formatTickLabel(120000)).toBe('+2.0m');
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildTimelineRows
-// ---------------------------------------------------------------------------
 
 describe('buildTimelineRows', () => {
   it('splits parallel Codex subagents into separate timeline rows', () => {

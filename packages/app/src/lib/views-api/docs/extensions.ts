@@ -22,7 +22,6 @@ const imageAgePoint: ApiSchema = {
   additionalProperties: false,
 };
 
-/** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
   model: [
     'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
@@ -604,7 +603,6 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
   },
 );
 
-/** Keep legacy detailed contracts and add every newly implemented selector. */
 export function extendViewOperations(baseOperations: readonly ApiOperation[]): ApiOperation[] {
   return baseOperations.map((operation) => {
     const view = operation.path.split('/').at(-1) as ReadonlyView;

@@ -1,11 +1,3 @@
-/**
- * Shared scaffolding for the one-shot `backfill-*.ts` CLI scripts (invoked
- * via the `db:backfill-*` package scripts). Each script keeps only its
- * candidate query and per-row recompute; flag parsing, the `--yes`
- * confirmation gate, per-row progress logging, and the exit-code summary
- * live here so every backfill behaves identically on the command line.
- */
-
 import { confirm, hasYesFlag } from '../cli-utils.js';
 import type { Sql } from '../etl/db-utils.js';
 import { retryArtifactOperation } from './artifact-retry.js';
@@ -43,7 +35,6 @@ export function retainPopulatedFields<T extends object>(
   }
 }
 
-/** Restrict a backfill to one GitHub run; malformed selectors must never scan all rows. */
 export function parseRunIdFlag(argv: readonly string[] = process.argv): number | undefined {
   const index = argv.indexOf('--run-id');
   if (index === -1) return undefined;
@@ -55,7 +46,6 @@ export function parseRunIdFlag(argv: readonly string[] = process.argv): number |
   return runId;
 }
 
-/** Parse the standard `--limit N` / `--force` backfill flags from argv. */
 export function parseLimitForceFlags(): LimitForceFlags {
   let limit: number | null = null;
   let force = false;
@@ -96,10 +86,6 @@ export function parseLimitForceFlags(): LimitForceFlags {
   return { limit, force, shardCount, shardIndex };
 }
 
-/**
- * Print the candidate-count line, then gate on `--yes` or an interactive
- * y/N prompt. Returns false (after logging "Aborted.") when declined.
- */
 export async function confirmProceed(candidatesLabel: string): Promise<boolean> {
   console.log(`\n  ${candidatesLabel}`);
   if (hasYesFlag()) return true;
@@ -108,15 +94,6 @@ export async function confirmProceed(candidatesLabel: string): Promise<boolean> 
   return ok;
 }
 
-/**
- * Iterate candidate row ids one at a time (the recomputed blobs can be
- * hundreds of MB decompressed, and serial processing keeps memory bounded),
- * logging per-row progress and a final summary. `processRow` returns 'ok'
- * (counts toward the ✓ log) or 'skipped' (for example a vanished row, whose
- * callback logs its own warning). A throw marks the row failed without
- * stopping the run. The summary lists every failed id, and
- * `process.exitCode = 1` is set when any row failed.
- */
 export async function runPerIdBackfill(
   ids: readonly number[],
   processRow: (id: number) => Promise<'ok' | 'skipped'>,
@@ -145,12 +122,6 @@ export async function runPerIdBackfill(
   }
 }
 
-/**
- * Load candidate ids, handle the standard empty/confirmation gates, then
- * process the ids serially. The callbacks deliberately stop at orchestration:
- * each script still owns its candidate, fetch, and update SQL. Returns true
- * only when the candidates passed the confirmation gate and were processed.
- */
 export async function runCandidateIdBackfill(
   loadCandidateIds: () => Promise<readonly number[]>,
   processRow: (id: number) => Promise<'ok' | 'skipped'>,
@@ -166,11 +137,6 @@ export async function runCandidateIdBackfill(
   return true;
 }
 
-/**
- * List a candidate run's GitHub artifacts with transient-failure retry.
- * Returns `null` when GitHub returns 404: the run may be deleted or inaccessible
- * to the token. Historical sweeps report that gap without aborting.
- */
 export function listBackfillRunArtifacts(
   repository: string,
   runId: number,
@@ -179,23 +145,16 @@ export function listBackfillRunArtifacts(
     try {
       return listRunArtifacts(repository, String(runId));
     } catch (error) {
-      // A 404 is final, so return before the backoff; `gh` writes `gh: Not Found (HTTP 404)`.
       if (/\(HTTP 404\)/u.test(String((error as { stderr?: unknown } | null)?.stderr))) return null;
       throw error;
     }
   });
 }
 
-/**
- * jsonb parameter for a freshly computed value. `structuredClone` strips
- * class instances/prototypes so postgres.js serializes plain data only —
- * matches what the inline ingest path stores.
- */
 export function jsonbParam(sql: Sql, value: unknown): ReturnType<Sql['json']> {
   return sql.json(structuredClone(value) as unknown as Parameters<typeof sql.json>[0]);
 }
 
-/** Standard `main().catch(…).finally(sql.end())` trailer for backfill CLIs. */
 export function runBackfillMain(name: string, sql: Sql, main: () => Promise<void>): void {
   main()
     .catch((error) => {

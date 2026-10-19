@@ -1,7 +1,3 @@
-/**
- * OperatorX runs from a directory of raw bundles (`<runId>.json`), for development and
- * offline review. Files are the same shape every source returns.
- */
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 

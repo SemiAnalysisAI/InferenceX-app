@@ -37,9 +37,7 @@ interface SegmentedToggleProps<TValue extends string> {
   buttonClassName?: string;
   activeButtonClassName?: string;
   inactiveButtonClassName?: string;
-  /** Compact chart toolbars still retain full touch targets on phones. */
   size?: 'sm' | 'default';
-  /** Use pressed buttons for value filters, tabs for chart/table view switches. */
   role?: 'tablist' | 'group';
 }
 
@@ -78,7 +76,6 @@ export function SegmentedToggle<TValue extends string>({
           title={option.title}
           disabled={option.disabled}
           className={cn(
-            // Match the outer curve after its border/padding inset, including square themes.
             'inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-[max(0px,calc(var(--radius)-var(--segmented-inset)))] px-2 py-1 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:py-0.5',
             size === 'sm' ? 'md:min-h-6' : 'md:min-h-7',
             buttonClassName,

@@ -21,7 +21,6 @@ function localePrefix(locale: Locale): string {
   return locale === 'zh' ? '/zh' : '';
 }
 
-/** Renders `**text**` spans in section prose as bold; everything else stays plain text. */
 function RichText({ text }: { text: string }) {
   return text.split(/\*\*(?<bold>.+?)\*\*/u).map((part, index) =>
     index % 2 === 1 ? (
@@ -205,7 +204,6 @@ function FrameworkCard({
   );
 }
 
-/** The /agentx/optimizations index: why the work happened, plus every project. */
 export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
   const overview = getOptimizationsOverview(locale);
   const frameworks = getLocalizedFrameworks(locale);
@@ -275,7 +273,6 @@ export function AgentXOptimizationsIndex({ locale }: { locale: Locale }) {
   );
 }
 
-/** One project's page: /agentx/optimizations/<slug>. */
 export function AgentXOptimizationsArticle({ slug, locale }: { slug: string; locale: Locale }) {
   const overview = getOptimizationsOverview(locale);
   const frameworks = getLocalizedFrameworks(locale);

@@ -14,7 +14,6 @@ export interface GuardViolation {
   readonly missingFromZh?: readonly string[];
 }
 
-/** Intentional one-sided pages, separated so a waiver cannot hide the opposite direction. */
 export interface RouteParityExceptions {
   readonly englishOnly?: ReadonlySet<string>;
   readonly chineseOnly?: ReadonlySet<string>;
@@ -84,7 +83,6 @@ function pageRoute(file: string): { locale: 'en' | 'zh'; route: string } | null 
   return { locale, route: segments.length === 0 ? '/' : `/${segments.join('/')}` };
 }
 
-/** Compare real App Router page files after removing route groups. */
 export function findRoutePairViolations(
   pageFiles: readonly string[],
   exceptions: RouteParityExceptions = {},
@@ -179,7 +177,6 @@ function parseSource(file: string, source: string): ts.SourceFile {
   return ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
 }
 
-/** Find direct object-literal `en` / `zh` siblings and compare their explicit key shape. */
 export function findDictionaryParityViolations(file: string, source: string): GuardViolation[] {
   const sourceFile = parseSource(file, source);
   const violations: GuardViolation[] = [];
@@ -221,7 +218,6 @@ export function findDictionaryParityViolations(file: string, source: string): Gu
   return violations;
 }
 
-/** Ordered raw initializers retain distinct dictionary identity and catch cross-dictionary swaps. */
 function englishSubtrees(file: string, source: string): string[] {
   const sourceFile = parseSource(file, source);
   const found: string[] = [];
@@ -245,10 +241,6 @@ function isEnglishSurfaceFile(file: string): boolean {
   return /\.(?:[cm]?[jt]sx?|json)$/u.test(normalized);
 }
 
-/**
- * Chinese-only mode protects complete English MDX files and ordered raw `en` initializers.
- * Locale-neutral code and Chinese subtrees deliberately remain outside this comparison.
- */
 export function compareEnglishSurfaces(
   file: string,
   baseSource: string,
@@ -444,7 +436,6 @@ function addDifference(
   }
 }
 
-/** Compare objective structural invariants in one English/Chinese MDX pair. */
 export function compareBlogPair(file: string, en: string, zh: string): GuardViolation[] {
   let enStructure: BlogStructure;
   let zhStructure: BlogStructure;

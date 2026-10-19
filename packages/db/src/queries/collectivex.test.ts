@@ -19,7 +19,6 @@ interface Captured {
   values: unknown[];
 }
 
-/** Tagged-template stub: records each query, replays queued row sets. */
 function fakeSql(rowsQueue: Record<string, unknown>[][]) {
   const calls: Captured[] = [];
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -98,8 +97,6 @@ describe('insertCollectiveXRun', () => {
     await expect(insertCollectiveXRun(sql, runInsert, docs)).resolves.toBe(true);
 
     expect(calls[0].text).toContain('ON CONFLICT (run_id) DO NOTHING');
-    // Raw objects: a pre-stringified value would double-encode under
-    // postgres.js; a bare array would become a PG array literal under neon.
     expect(calls[0].values).toContainEqual(runInsert.matrix);
     expect(calls[0].values).toContainEqual({ docs });
     expect(
@@ -144,19 +141,12 @@ describe('deleteCollectiveXRun', () => {
   });
 
   it('cannot reach anything but the one run it is given', async () => {
-    // The delete route's Bearer token is held in browser localStorage, so the
-    // blast radius of a stolen token is whatever this statement can touch. It
-    // must stay: one run, in the two CollectiveX tables, and recoverable by
-    // re-ingesting the run from its GitHub artifacts.
     const { sql, calls } = fakeSql([[{ runs_deleted: 1 }]]);
     await deleteCollectiveXRun(sql, '160');
-    // The run id is the only value bound into the statement — no other row is nameable.
     expect(calls[0].values).toEqual(['160']);
-    // Documents go only via the tombstoned CTE, never a free-standing predicate.
     expect(calls[0].text).toContain(
       'DELETE FROM cx_run_docs WHERE run_id IN (SELECT run_id FROM tombstoned)',
     );
-    // No table outside the CollectiveX pair is referenced, and nothing is dropped.
     expect(new Set([...calls[0].text.matchAll(/\bcx_[a-z_]+/gu)].map((match) => match[0]))).toEqual(
       new Set(['cx_runs', 'cx_run_docs']),
     );

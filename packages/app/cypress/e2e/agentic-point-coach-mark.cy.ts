@@ -32,7 +32,6 @@ describe('Agentic chart without the retired point callout', () => {
       cy.visit(`${prefix}/inference?i_seq=agentic-traces`, { onBeforeLoad: freshVisitor });
       cy.get(AGENTIC_POINTS).should('have.length.greaterThan', 0);
       cy.get('[data-testid="scatter-graph"]').scrollIntoView();
-      // Wait past the retired timer and post-render delays before asserting absence.
       cy.wait(1500);
       cy.get(COACH_MARK).should('not.exist');
       cy.window().then((win) => {

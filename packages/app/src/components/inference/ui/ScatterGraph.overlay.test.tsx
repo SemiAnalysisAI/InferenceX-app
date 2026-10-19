@@ -248,7 +248,6 @@ describe('ScatterGraph unofficial overlays', () => {
     expect(container.querySelectorAll('.unofficial-overlay-pt')).toHaveLength(2);
     expect(container.querySelectorAll('.overlay-roofline-path').length).toBeGreaterThan(0);
 
-    // Toggling an official hw must not rebuild or disturb overlay markers.
     inferenceState.current = {
       ...inferenceState.current,
       activeHwTypes: new Set(['h100']),
@@ -414,8 +413,6 @@ describe('ScatterGraph unofficial overlays', () => {
         { id: '123', branch: 'test-branch', url: 'https://github.com/o/r/actions/runs/123' },
       ],
     };
-    // Overlay points are all NVIDIA (h100); an AMD-only quick filter must hide them,
-    // exactly as it would the official points.
     inferenceState.current = {
       ...baseInferenceState(),
       quickFilters: { vendors: ['AMD'], frameworks: [], deployment: [], spec: [], power: [] },

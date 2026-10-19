@@ -43,8 +43,6 @@ describe('power chart semantics', () => {
         definition.y_measuredAvgPower_roofline as ParetoDirection | undefined,
       );
       expect(watts.map((sample) => sample.conc).toSorted((a, b) => a - b)).toEqual([1, 4, 16]);
-      // TDP is fixed within each hardware series. Converting its watts to a
-      // percentage must neither admit the dominated point nor drop a tradeoff.
       for (const tdp of [700, 1000, 1400]) {
         const percentages = samples.map((sample) => ({ ...sample, y: (sample.y / tdp) * 100 }));
         const percentFrontier = chartFrontier(
@@ -78,7 +76,6 @@ describe('power chart semantics', () => {
 
 describe('upper power envelope', () => {
   it('removes concurrency backtracking across configurations without changing measurements', () => {
-    // H100-style sweep: more concurrency can move both left and right on X.
     const fast = point(1, 172.49, 252.22, { tp: 8 });
     const middle = point(2, 149.32, 291.38);
     const peak = point(128, 25.69, 502.54, { decode_ep: 8 });
@@ -95,9 +92,6 @@ describe('upper power envelope', () => {
     const middle = point(8, 2, 700);
     const plateau = point(16, 3, 700);
     const slow = point(32, 4, 950);
-    // Measured watts: a tie at the running maximum is a repeat marker, so the
-    // plateau leaves the boundary and Optimal Only can collapse it; a repeated
-    // X keeps only its first vertex.
     const samples = [slow, plateau, point(4, 2, 500), middle, { ...middle }, fast];
     expect(upperPowerEnvelope(samples, 'lower_left')).toEqual([fast, middle, slow]);
     expect(
@@ -106,7 +100,6 @@ describe('upper power envelope', () => {
         'lower_right',
       ).map((p) => p.y),
     ).toEqual([950, 700, 350]);
-    // A gauge keeps the plateau: it is part of the outer edge it draws.
     expect(upperPowerEnvelope(samples, 'lower_left', true)).toEqual([fast, middle, plateau, slow]);
   });
 

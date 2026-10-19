@@ -42,8 +42,6 @@ describe('Compare precision index page', () => {
       .should('contain.text', '8K/1K')
       .and('have.attr', 'href')
       .and('match', /\/8k-1k$/u);
-    // Vendor logos render beside each hardware label in the pair cards:
-    // NVIDIA uses the full-color green mark, AMD its monochrome brand mark.
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
@@ -94,15 +92,11 @@ describe('Compare precision index + slug page', () => {
       .then((href) => {
         const slug = (href as string).replace('/compare-precision/', '');
 
-        // Visit the slug page.
         cy.visit(href as string);
         cy.location('pathname').should('eq', href);
 
-        // Interpolated comparison table renders.
         cy.get('[data-testid="compare-interpolated-table"]').should('exist');
 
-        // Both precision labels appear in the table body rows (side labels
-        // render in tbody cells, same as GPU labels on /compare/[slug]).
         const parts = slug.split('-vs-');
         const precA = parts[0].split('-').pop()!;
         const precB = parts[1];
@@ -112,10 +106,8 @@ describe('Compare precision index + slug page', () => {
           expect(text).to.contain(precB.toUpperCase());
         });
 
-        // Hero PNG image present.
         cy.get('img[src$=".png"]').should('exist');
 
-        // JSON-LD script present.
         cy.get('script[type="application/ld+json"]').should('exist');
       });
   });
@@ -127,15 +119,12 @@ describe('Compare precision index + slug page', () => {
       .invoke('attr', 'href')
       .then((href) => {
         const slug = (href as string).replace('/compare-precision/', '');
-        // Reverse the precision tokens around '-vs-'.
         const vsIdx = slug.indexOf('-vs-');
         const left = slug.slice(0, vsIdx);
         const right = slug.slice(vsIdx + 4);
-        // Extract the precisions (last token of left side, full right side).
         const leftParts = left.split('-');
         const precA = leftParts.pop()!;
         const modelGpu = leftParts.join('-');
-        // Build reversed slug: {model}-{gpu}-{right}-vs-{precA}.
         const reversedSlug = `${modelGpu}-${right}-vs-${precA}`;
         cy.visit(`/compare-precision/${reversedSlug}`);
         cy.location('pathname').should('eq', href);

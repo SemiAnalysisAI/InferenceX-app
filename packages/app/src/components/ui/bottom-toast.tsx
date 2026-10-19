@@ -8,25 +8,18 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const DISMISS_EVENT = 'inferencex:dismiss-toast';
 
-/** Horizontal swipe distance (px) that dismisses the toast on touch screens. */
 const SWIPE_DISMISS_PX = 80;
 
 interface BottomToastProps {
-  /** Icon to display on the left */
   icon: React.ReactNode;
-  /** Title text */
   title: string;
-  /** Description text */
   description: string;
-  /** Optional action button */
   action?: {
     label: string;
     icon?: React.ReactNode;
     onClick: () => void;
   };
-  /** Called only when dismissed via X button or external event (not after action click) */
   onDismiss?: () => void;
-  /** data-testid for the toast container */
   testId?: string;
 }
 
@@ -56,7 +49,6 @@ export function BottomToast({
     }, 300);
   }, [title]);
 
-  // On mount: dismiss any existing toast, then animate in
   useEffect(() => {
     window.dispatchEvent(new CustomEvent(DISMISS_EVENT));
     requestAnimationFrame(() => setAnimate(true));
@@ -94,8 +86,6 @@ export function BottomToast({
         setDrag({ dx: touch.clientX - start.x, dy: touch.clientY - start.y });
       }}
       onTouchEnd={(event) => {
-        // Measure from the gesture's own end point: the `drag` state can lag
-        // the last touchmove, and a quick flick may never set it at all.
         const start = touchStartRef.current;
         const touch = event.changedTouches[0];
         touchStartRef.current = null;
@@ -103,8 +93,6 @@ export function BottomToast({
         if (!start || !touch) return;
         const dx = touch.clientX - start.x;
         const dy = touch.clientY - start.y;
-        // Horizontal-dominant swipes only: vertical motion belongs to page
-        // scroll (`touch-pan-y`), so it must never dismiss the toast.
         if (Math.abs(dx) > SWIPE_DISMISS_PX && Math.abs(dx) > Math.abs(dy)) {
           dismiss();
         }

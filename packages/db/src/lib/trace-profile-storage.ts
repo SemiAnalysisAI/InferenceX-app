@@ -9,11 +9,9 @@ import type { TransactionSql } from 'postgres';
 
 type ProfileSql = DbClient | Sql | TransactionSql<Record<string, never>>;
 
-/** Stay below Neon's 64 MiB response cap even after bytea hex encoding. */
 export const PROFILE_INLINE_BYTES = 16 * 1024 * 1024;
 export const PROFILE_CHUNK_BYTES = 4 * 1024 * 1024;
 
-/** Called inside the transaction that creates and links the trace row. */
 export async function writeTraceProfileChunks(
   sql: ProfileSql,
   traceReplayId: number,
@@ -42,11 +40,6 @@ export async function writeTraceProfileChunks(
     throw new Error(`Cannot attach chunks to trace profile ${traceReplayId}`);
 }
 
-/**
- * Read immutable chunked profiles or legacy inline profiles in bounded queries.
- * Validate every chunk and the complete checksum before a consumer completes.
- * New rows and their chunks are committed atomically by the ingest transaction.
- */
 export async function* readTraceProfileChunks(
   sql: ProfileSql,
   traceReplayId: number,
@@ -94,14 +87,12 @@ export async function* readTraceProfileChunks(
   }
 }
 
-/** Compatibility helper; streaming consumers should use readTraceProfileChunks. */
 export async function readTraceProfileGz(sql: ProfileSql, id: number): Promise<Buffer | null> {
   const chunks: Buffer[] = [];
   for await (const chunk of readTraceProfileChunks(sql, id)) chunks.push(chunk);
   return chunks.length > 0 ? Buffer.concat(chunks) : null;
 }
 
-/** Decode the raw JSONL incrementally, preserving exact source records. */
 export async function* readTraceProfileLines(sql: ProfileSql, id: number): AsyncGenerator<string> {
   const source = Readable.from(readTraceProfileChunks(sql, id));
   const decoder = new StringDecoder('utf8');

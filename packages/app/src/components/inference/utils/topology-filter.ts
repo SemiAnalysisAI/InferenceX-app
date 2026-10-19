@@ -7,7 +7,6 @@ function topologyValue(value: number | boolean | undefined) {
     : Number(value);
 }
 
-/** Load is deliberately excluded: a topology filter retains its whole concurrency sweep. */
 export function pointTopologyKey(point: InferenceData): string {
   const fields: [string, number | boolean | undefined][] = [
     ['GPU', point.physicalChips ?? point.tp],
@@ -54,7 +53,6 @@ export function pointTopologyKey(point: InferenceData): string {
   ].join('|');
 }
 
-/** Values stay human-readable in share links and exported filter metadata. */
 export function topologyLabel(
   key: string,
   locale: 'en' | 'zh',
@@ -65,7 +63,6 @@ export function topologyLabel(
     locale === 'zh'
       ? { PD: '分离式', Multi: '多节点', Single: '单节点' }
       : { PD: 'Disaggregated', Multi: 'Multi-node', Single: 'Single-node' };
-  // Hide shared detail, never a difference: defaults and unknowns distinguish options too.
   const peers = availableKeys?.filter((sibling) => sibling.split('|')[0] === mode);
   const visible = parts.filter((part) => {
     const name = part.split('=')[0];
@@ -75,7 +72,6 @@ export function topologyLabel(
       !peers.every((sibling) => sibling.split('|').includes(part))
     );
   });
-  // Numbers and unknowns join their name (TP4, DP?); word values need a space (offload off).
   return [
     modes[mode as keyof typeof modes] ?? mode,
     ...visible.map((part) => part.replace(/=(?=\p{L})/u, ' ').replace('=', '')),

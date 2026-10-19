@@ -8,16 +8,10 @@ import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { cn } from '@/lib/shared/utils';
 
-/**
- * Tracked interactive elements for the whitepaper pages. All events use the
- * `whitepaper_` prefix per the analytics convention in AGENTS.md.
- */
-
 interface WhitepaperPdfButtonProps {
   href: string;
   slug: string;
   label: string;
-  /** Where on the page the button sits, so hero vs. closing clicks separate. */
   placement: 'hero' | 'closing' | 'card' | 'sidebar';
   size?: 'default' | 'lg' | 'sm';
   variant?: 'default' | 'outline';
@@ -56,7 +50,6 @@ interface WhitepaperEstimatorLinkProps {
   className?: string;
 }
 
-/** Secondary call to action into the live profit estimator per gigawatt tab. */
 export function WhitepaperEstimatorLink({
   href,
   slug,
@@ -117,13 +110,11 @@ interface WhitepaperCardProps {
   slug: string;
   href: string;
   title: string;
-  /** Cover thumbnail rendered in the left column. */
   thumbnail?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
-/** Index card. The whole card links to the landing page; the PDF button inside stops propagation. */
 export function WhitepaperCard({
   slug,
   href,

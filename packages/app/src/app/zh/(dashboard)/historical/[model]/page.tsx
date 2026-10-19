@@ -13,9 +13,6 @@ import {
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
 import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
-/** Chinese sibling of `/historical/<model>` (see that page for the routing
- *  and client-side model-switch behavior). */
-
 interface Props {
   params: Promise<{ model: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -40,8 +37,6 @@ export default async function ZhHistoricalModelPage({ params, searchParams }: Pr
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  // Keep share-link params through the 308; awaited only on this branch so
-  // the canonical slugs stay statically generated.
   if (resolved.isAlias) {
     permanentRedirect(
       pathWithSearchParams(

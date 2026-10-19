@@ -18,12 +18,6 @@ const CHANGELOG_FRAMEWORK_KEYS = [
   ...Object.keys(FRAMEWORK_ALIASES),
 ].toSorted((a, b) => b.length - a.length);
 
-/**
- * Convert a changelog config key into the canonical hardware key used by chart
- * points and the legend. Agentic config keys append scenario details such as
- * `agentic`, `hicache`, and `pcp` after the serving framework; those are not
- * framework labels and must not become part of the legend identity.
- */
 export function changelogConfigToHwKey(
   configKey: string,
   benchmarkType?: 'single_turn' | 'agentic_traces',
@@ -72,10 +66,6 @@ export function formatChangelogDescription(desc: string | string[]) {
   );
 }
 
-/**
- * Check if a changelog config key matches a hwKey.
- * Normalizes both to hyphen-separated form for comparison.
- */
 export function configKeyMatchesHwKey(
   configKey: string,
   hwKey: string,
@@ -98,9 +88,6 @@ export function formatConfigKeys(key: string) {
     return `${gpu} (${frameworkLabel}) ${modelLabel} ${getPrecisionLabel(precision as Precision)}`;
   }
 
-  // Use the same hardware entry builder and display combiner as the legend so
-  // aliases, compound framework names, and model-specific spec labels cannot
-  // drift between the two surfaces.
   const hardwareLabel = getDisplayLabel(getHardwareConfig(hwKey, modelLabel));
   return `${hardwareLabel} ${modelLabel} ${getPrecisionLabel(precision as Precision)}`;
 }

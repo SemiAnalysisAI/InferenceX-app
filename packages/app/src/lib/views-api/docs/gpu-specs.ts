@@ -13,14 +13,6 @@ import {
 } from '@/lib/api/api-documentation-helpers';
 import { GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 
-/**
- * Docs fragment for GET /api/v1/views/gpu-specs.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const METRIC_KEYS = GPU_CHART_METRICS.map((metric) => metric.key);

@@ -13,8 +13,6 @@ import {
   type ExclusionSpec,
 } from './exclusion';
 
-// The dsv4 MTP rule: `*_mtp` keys participate, dynamo-/mori- prefixes are
-// stripped, and ATOM shares SGLang's comparability group.
 const MTP_SPEC: ExclusionSpec[] = [
   {
     suffix: '_mtp',
@@ -219,7 +217,6 @@ describe('AgentX STP engine exclusion', () => {
   it('keeps whichever engine family the sticky set names when a load conflicts', () => {
     const proposed = new Set(['b300_sglang', 'overlay:b300_vllm']);
 
-    // Official-sticky prev: the official engine wins, overlay dropped.
     const officialSticky = resolveExclusionGroups(
       proposed,
       new Set(['b300_sglang']),
@@ -230,8 +227,6 @@ describe('AgentX STP engine exclusion', () => {
     expect(officialSticky.keptGroup).toBe('sglang');
     expect(officialSticky.droppedGroups).toEqual(['vllm']);
 
-    // Overlay-sticky prev (what ScatterGraph passes while an unofficial run is
-    // loaded): the run's engine wins and the official series is dropped.
     const overlaySticky = resolveExclusionGroups(
       proposed,
       new Set(['overlay:b300_vllm']),
@@ -244,9 +239,6 @@ describe('AgentX STP engine exclusion', () => {
   });
 });
 
-// ATOM and SGLang share the upstream ROCm MTP path, so they belong to one
-// comparability group: they may co-exist on a graph and are jointly exclusive
-// with other engines (vLLM). Only enforced where the model has an exclusion rule.
 describe('ATOM/SGLang comparability group', () => {
   it('treats ATOM + SGLang MTP as a single group (coexist, no drop)', () => {
     const set = new Set(['mi355x_atom_mtp', 'mi355x_sglang_mtp', 'mi355x_vllm']);
@@ -304,16 +296,11 @@ describe('ATOM/SGLang comparability group', () => {
     ]);
     const active = new Set(['mi355x_sglang', 'mi355x_sglang_mtp']);
     const out = effectiveLegendItems(all, active, ex);
-    // sglang_mtp active → sglang group active → atom_mtp (same group) kept,
-    // vllm_mtp (different group) dropped.
     expect([...out].toSorted()).toEqual(['mi355x_atom_mtp', 'mi355x_sglang', 'mi355x_sglang_mtp']);
   });
 });
 
 describe('participatingFamilies', () => {
-  // The fixed-sequence STP rule: only the literal vLLM and SGLang families block
-  // each other. Every other engine — ATOM included, even though the spec aliases
-  // it onto SGLang's group — sits outside the rule entirely.
   const limitedEx = buildExclusion([{ ...STP_SPEC[0], participatingFamilies: ['vllm', 'sglang'] }]);
 
   it('ignores keys whose family is outside the list', () => {
@@ -368,8 +355,6 @@ describe('participatingFamilies', () => {
   );
 
   it('narrows a layered rule set when composed onto every spec', () => {
-    // The 8K/1K composition: the scenario's allowlist lands on the model MTP
-    // rule as well as the STP rule, so TRTLLM and ATOM are free for both.
     const fixedSeqEx = buildExclusion(
       [...MTP_SPEC, ...STP_SPEC].map((spec) => ({
         ...spec,
@@ -387,8 +372,6 @@ describe('participatingFamilies', () => {
 });
 
 describe('scenario-narrowed rule set', () => {
-  // The 8K/1K composition: the scenario's allowlist is applied to every spec, so
-  // only vLLM and SGLang are guarded — on standard-token AND MTP keys.
   const narrowedEx = buildExclusion(
     [...MTP_SPEC, ...STP_SPEC].map((spec) => ({
       ...spec,
@@ -527,8 +510,6 @@ describe('pickStickyGroup', () => {
   });
 
   it('prefers the fallback group when prev names several candidate groups', () => {
-    // `prev` carried over from a laxer scope (both engines active), so it is not
-    // an engine choice — the fallback decides instead of the alphabetical order.
     const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
     const prev = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
     const out = pickStickyGroup(proposed, prev, ex, 'vllm');
@@ -547,8 +528,6 @@ describe('pickStickyGroup', () => {
   });
 
   it('prefers the fallback group when the correlated prev is ambiguous', () => {
-    // Global MTP scope with no direct prior key: both groups correlate through a
-    // hardware-scoped prev key, so the fallback breaks the tie.
     const proposed = new Set(['h100_vllm_mtp', 'gb300_sglang_mtp']);
     const prev = new Set(['h100_vllm', 'gb300_sglang']);
     const out = pickStickyGroup(proposed, prev, agenticEx, 'vllm');
@@ -598,7 +577,7 @@ describe('effectiveLegendItems', () => {
 
   it('drops participating keys whose group is not active (default DSv4 state)', () => {
     const all = new Set(['h100_vllm', 'gb300_sglang', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
-    const active = new Set(['h100_vllm', 'gb300_sglang']); // no MTP active
+    const active = new Set(['h100_vllm', 'gb300_sglang']);
     const out = effectiveLegendItems(all, active, ex);
     expect([...out].toSorted()).toEqual(['gb300_sglang', 'h100_vllm']);
   });
@@ -650,9 +629,6 @@ describe('effectiveLegendItems', () => {
   });
 
   it('makes computeToggle solo on click in the default-deselected state', () => {
-    // Default DSv4 state: all non-MTP active, MTP keys exist in data but
-    // are deselected. The effective universe matches active → computeToggle
-    // soloes the clicked item.
     const all = new Set(['h100_vllm', 'gb300_sglang', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
     const active = new Set(['h100_vllm', 'gb300_sglang']);
     const effective = effectiveLegendItems(all, active, ex);
@@ -687,8 +663,6 @@ describe('resolveExclusionToggle', () => {
   });
 
   it('silently resolves when solo→restore would surface multiple groups', () => {
-    // prev is a single non-MTP item; toggling it triggers "restore all", which
-    // would surface all items including two groups.
     const prev = new Set(['h100_vllm']);
     const all = new Set(['h100_vllm', 'h100_vllm_mtp', 'gb300_sglang_mtp']);
     const decision = resolveExclusionToggle(prev, 'h100_vllm', all, ex);

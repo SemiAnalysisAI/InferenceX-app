@@ -13,22 +13,8 @@ import { pointTopologyKey } from './topology-filter';
 
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
-/** Vendor display order for the quick-filter pills. */
 export const VENDOR_ORDER: readonly string[] = ['NVIDIA', 'AMD', 'OpenAI', 'Google'];
 
-/**
- * Quick filters let users narrow the chart to any combination of GPU vendor,
- * serving framework, deployment mode, speculative-decoding method, and
- * measured-power certification tier without
- * touching the legend or GPU-config selectors. They are coarse pre-filters
- * applied to the point set (official + unofficial-run overlay), so the legend,
- * rooflines, and Pareto all reflect only the matching configs.
- *
- * Empty array within a category = no constraint (show everything). Values within
- * a category are OR'd; categories are AND'd.
- */
-
-/** Referentially stable "no filters" value for defaults and resets. */
 export const EMPTY_QUICK_FILTERS: QuickFilters = {
   vendors: [],
   frameworks: [],
@@ -37,14 +23,8 @@ export const EMPTY_QUICK_FILTERS: QuickFilters = {
   power: [],
 };
 
-/** Measured-power tier display order for the quick-filter pills. */
 export const POWER_TIER_ORDER: readonly PowerTier[] = ['certified', 'legacy'];
 
-/**
- * Serving-framework families surfaced as quick filters, in display order. Each
- * family groups its base + variant engines (e.g. TRTLLM covers `trt`, `trtllm`,
- * `dynamo-trt`). Labels render exactly as the GPUs/engines are branded.
- */
 export const FRAMEWORK_FAMILIES = [
   { key: 'vllm', label: 'vLLM' },
   { key: 'sglang', label: 'SGLang' },
@@ -54,12 +34,6 @@ export const FRAMEWORK_FAMILIES = [
 
 const FRAMEWORK_FAMILY_ORDER = FRAMEWORK_FAMILIES.map((f) => f.key);
 
-/**
- * Compute, in a single pass, which quick-filter values actually have data in a
- * point list. Used to render only existing framework pills and to disable
- * vendor / deployment / spec options that would yield an empty chart. Each
- * category is returned in display order.
- */
 export function computeAvailableQuickFilters(
   points: Iterable<InferenceData>,
 ): AvailableQuickFilters {
@@ -105,7 +79,6 @@ export function computeAvailableQuickFilters(
   };
 }
 
-/** True when at least one category constrains the point set. */
 export function quickFiltersActive(f: QuickFilters): boolean {
   return (
     f.vendors.length > 0 ||
@@ -117,18 +90,10 @@ export function quickFiltersActive(f: QuickFilters): boolean {
   );
 }
 
-/** Resolve a point's GPU vendor from the base GPU in its hardware key. */
 export function pointVendor(hwKey: string): string | undefined {
   return GPU_VENDORS[hwKey.split('_')[0]];
 }
 
-/**
- * Classify a point for the spec-decoding filter. STP means *standard* decoding,
- * which the DB marks `none` (no spec suffix on the hwKey). Any other value means a
- * speculative method is active, so it groups under MTP (the "spec decoding on" pill).
- * Keying STP off `none` — rather than treating everything that isn't `mtp` as STP —
- * keeps non-standard methods (e.g. EAGLE) out of the standard bucket.
- */
 function pointSpecMode(point: InferenceData): SpecMode {
   const s = point.spec_decoding;
   const isStandard =
@@ -137,7 +102,6 @@ function pointSpecMode(point: InferenceData): SpecMode {
   return isStandard ? 'stp' : 'mtp';
 }
 
-/** Classify serving topology without conflating aggregate multinode with disaggregation. */
 export function pointDeploymentMode(
   point: Pick<InferenceData, 'disagg' | 'is_multinode'>,
 ): DeploymentMode {
@@ -145,7 +109,6 @@ export function pointDeploymentMode(
   return point.is_multinode ? 'multi-node' : 'single-node';
 }
 
-/** Parse deployment URL values while preserving legacy `agg` shared links. */
 export function parseDeploymentModes(values: readonly string[]): DeploymentMode[] {
   return [
     ...new Set(values.flatMap((mode) => (mode === 'agg' ? ['single-node', 'multi-node'] : [mode]))),
@@ -155,14 +118,12 @@ export function parseDeploymentModes(values: readonly string[]): DeploymentMode[
   );
 }
 
-/** Parse `i_power` URL values, deduping and dropping unknown strings. */
 export function parsePowerTiers(values: readonly string[]): PowerTier[] {
   return [...new Set(values)].filter(
     (tier): tier is PowerTier => tier === 'certified' || tier === 'legacy',
   );
 }
 
-/** Whether a single data point satisfies every active quick-filter category. */
 export function matchesQuickFilters(point: InferenceData, f: QuickFilters): boolean {
   if (f.topologies?.length && !f.topologies.includes(pointTopologyKey(point))) return false;
   if (f.vendors.length > 0) {
@@ -182,7 +143,6 @@ export function matchesQuickFilters(point: InferenceData, f: QuickFilters): bool
   return true;
 }
 
-/** Apply quick filters to a point list (no-op when nothing is selected). */
 export function applyQuickFilters<T extends InferenceData>(data: T[], f: QuickFilters): T[] {
   if (!quickFiltersActive(f)) return data;
   return data.filter((d) => matchesQuickFilters(d, f));

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** The eight-GPU UBB interface with component-owned board power. */
 
 import {
   FrozenModel,
@@ -13,7 +12,6 @@ import {
 import { COMPONENT_INPUT, GPU_INPUT } from '../../profiles';
 
 export interface UniversalBaseBoardFields {
-  /** Maximum design power of one GPU module in watts at the GPU boundary. */
   gpu_tdp_w?: number | null;
   gpu_count?: number;
   non_gpu_power_w: number;
@@ -46,12 +44,10 @@ export abstract class UniversalBaseBoard extends FrozenModel {
     }
   }
 
-  /** Boards without state-dependent components retain their fixed inventory. */
   for_operating_state(_state: OperatingState): UniversalBaseBoard {
     return this;
   }
 
-  /** Return the inventory contributing non-GPU board power. */
   abstract _non_gpu_components(): PowerComponentBreakdown[];
 
   estimate_breakdown(gpu_level_power_per_gpu: number): PowerComponentBreakdown {

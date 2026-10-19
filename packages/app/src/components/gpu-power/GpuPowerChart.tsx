@@ -59,12 +59,10 @@ const STRINGS = {
   },
 } as const;
 
-/** A second time series drawn over the telemetry on its own right-hand axis. */
 export interface TelemetryOverlaySeries {
   label: string;
   unit: string;
   color: string;
-  /** Absolute-time samples; the chart re-bases them onto its own t=0. */
   points: TimedSample[];
 }
 
@@ -73,23 +71,14 @@ interface GpuMetricsChartProps {
   visibleGpus: Set<number>;
   metricKey: GpuMetricKey;
   artifactName: string;
-  /**
-   * Hardware key of the benchmark point (`b200`, `h200`, …). Multinode bundle
-   * names are hash-truncated and carry no SKU token, so callers that know the
-   * point pass it explicitly; the artifact-name sniff stays the fallback.
-   */
   hardware?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Max interactive points before LTTB downsampling. Infinity to disable. */
   maxPoints?: number;
-  /** Raw samples vs. time-window rolling average. Defaults to raw samples. */
   display?: TelemetryDisplayState;
-  /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
   overlay?: TelemetryOverlaySeries | null;
 }
 
-/** Mean across the visible chips, aligned by nearest sample within one poll interval. */
 function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): ParsedPoint[] {
   const arrays = [...groups.values()];
   if (arrays.length === 0) return [];
@@ -105,15 +94,12 @@ function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): Pars
   }));
 }
 
-/** Replace each point's value with its centered time-window mean. */
 function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
   const averaged = rollingTimeAverage(points, windowS * 1000);
   return points.map((point, i) => ({ ...point, value: averaged[i]!.value, raw: null }));
 }
 
-/** Per-chip palette shared with legends that toggle chips on and off. */
 export const GPU_COLORS = d3.schemeTableau10;
-/** Pseudo chip index and line key for the mean across visible chips. */
 const MEAN_INDEX = -1;
 const MEAN_KEY = 'mean';
 const MEAN_COLOR = 'var(--foreground)';
@@ -127,7 +113,6 @@ function colorFor(gpuIndex: number): string {
 }
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
-/** Room for the overlay's right axis ticks and rotated title. */
 const MARGIN_WITH_OVERLAY = { ...MARGIN, right: 84 };
 
 interface OverlayPoint {
@@ -155,11 +140,6 @@ function overlayLine(
     .curve(d3.curveMonotoneX);
 }
 
-/**
- * Draw the overlay path inside the clipped zoom group and its axis in the
- * unclipped root group. Both are removed first so toggling the overlay off
- * (or re-rendering) never leaves a stale axis behind.
- */
 function renderOverlay(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   ctx: RenderContext,
@@ -227,8 +207,6 @@ const GpuMetricsChart = React.memo(
       [data, visibleGpus, metricKey],
     );
 
-    // Displayed series keyed by chip index (MEAN_INDEX for the mean line):
-    // per-chip and/or mean, then optionally smoothed.
     const groupedData = useMemo(() => {
       const series = new Map<number, ParsedPoint[]>();
       if (showChips) for (const [gpuIndex, points] of rawGroups) series.set(gpuIndex, points);
@@ -252,7 +230,6 @@ const GpuMetricsChart = React.memo(
       return pts;
     }, [groupedData]);
 
-    // Build line data as Record<string, {x,y}[]> for the line layer
     const lineData = useMemo(() => {
       const result: Record<string, { x: number; y: number }[]> = {};
       for (const [gpuIndex, points] of groupedData) {
@@ -261,9 +238,6 @@ const GpuMetricsChart = React.memo(
       return result;
     }, [groupedData]);
 
-    // Overlay samples, smoothed with the same window as the chip lines when
-    // averaging so both series answer the same "how much over N seconds"
-    // question, then re-based onto the telemetry's t=0.
     const overlaySamples = useMemo<TimedSample[]>(() => {
       if (!overlay) return [];
       return rolling ? rollingTimeAverage(overlay.points, display.windowS * 1000) : overlay.points;
@@ -314,7 +288,6 @@ const GpuMetricsChart = React.memo(
         </>
       ) : undefined;
 
-    // Scale domains
     const xDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(allPoints, (d) => d.seconds) as [number, number];
@@ -330,7 +303,6 @@ const GpuMetricsChart = React.memo(
       if (allPoints.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(allPoints, (d) => d.value) as [number, number];
       const range = ext[1] - ext[0];
-      // Constant telemetry and floating-point noise still need a readable axis.
       const padding = Math.max(
         range * 0.05,
         Math.max(Math.abs(ext[0]), Math.abs(ext[1])) * 0.01,
@@ -372,7 +344,6 @@ const GpuMetricsChart = React.memo(
         }}
         yAxis={{ label: getGpuMetricYAxisLabel(metricConfig, locale), tickCount: 8 }}
         layers={[
-          // TDP reference line (power metric only)
           {
             type: 'custom',
             key: 'tdp-line',
@@ -402,7 +373,6 @@ const GpuMetricsChart = React.memo(
                 .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
             },
           },
-          // GPU lines
           {
             type: 'line',
             key: 'gpu-lines',
@@ -414,24 +384,20 @@ const GpuMetricsChart = React.memo(
               isDefined: (point) => Number.isFinite(point.y),
             },
           },
-          // GPU data points
           {
             type: 'point',
             key: 'gpu-points',
             data: allPoints,
             config: {
-              getCx: () => 0, // overridden by getX at render time via onRender
+              getCx: () => 0,
               getCy: () => 0,
               getX: (d) => d.seconds,
               getY: (d) => d.value,
-              // Averaged mode draws lines only; the circles stay as invisible
-              // hover targets so the tooltip and crosshair keep working.
               getColor: (d) => (rolling ? 'transparent' : colorFor(d.gpuIndex)),
               getRadius: () => (rolling ? 3 : 2),
               maxPoints,
             },
           },
-          // Secondary series on a right-hand axis (e.g. decode throughput)
           {
             type: 'custom',
             key: 'telemetry-overlay',

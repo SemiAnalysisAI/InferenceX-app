@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Public construction of a power model from scenario inputs. */
 
 import { type PowerModel, ValueError, WorkloadState } from '../base';
 import { OSSAllinPowerModel } from './advanced/model';

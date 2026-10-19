@@ -45,7 +45,6 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     if (!bytes) throw new Error(`Missing artifact file: ${path}`);
     return new Blob([new Uint8Array(bytes).buffer]);
   };
-  // Verify the outer export index and every contained source before selecting a result.
   const sums = await read('SHA256SUMS').text();
   const verified = new Set<string>();
   for (const line of sums.trim().split('\n')) {

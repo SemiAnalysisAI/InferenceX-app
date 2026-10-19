@@ -41,7 +41,6 @@ describe('bucketPowerSeries', () => {
       row('2026/09/12 20:20:41.817', 0, 194.4),
       row('2026/09/12 20:20:41.820', 1, 192.4),
       row('2026/09/12 20:20:42.816', 0, 300),
-      // GPU 1 skipped this tick; GPU 0 sampled twice in the next one.
       row('2026/09/12 20:20:43.815', 0, 400),
       row('2026/09/12 20:20:43.900', 0, 500),
       row('2026/09/12 20:20:43.818', 1, 350),
@@ -77,7 +76,6 @@ describe('sumPowerAt', () => {
   };
 
   it('returns null for a partial pool, an unsampled bucket, an empty pool or an unknown row', () => {
-    // GPU 0 and 2 have no sample in bucket 1: a partial sum would read as a dip.
     expect(sumPowerAt(series, [0, 1, 2], 1)).toBeNull();
     expect(sumPowerAt(series, [0, 1], 2)).toBeNull();
     expect(sumPowerAt(series, [0, 2], 1)).toBeNull();
