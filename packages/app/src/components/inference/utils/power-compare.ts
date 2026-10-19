@@ -45,9 +45,7 @@ export type PowerSeriesField = keyof Pick<
   | 'measuredJPerOutputToken'
   | 'measuredDecodeJPerOutputToken'
   | 'reconstructedPrefillJPerOutputToken'
-  | 'gpuProvisionedWatts'
   | 'gpuProvisionedJPerOutputToken'
-  | 'utilityProvisionedWatts'
   | 'utilityProvisionedJPerOutputToken'
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken'
@@ -140,15 +138,16 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
   if (base.kind === 'basis') {
     const quantity = comparableQuantity(metric);
     if (!quantity) return [];
-    return POWER_BASES.filter((basis) => basis !== base.id).map((basis) => ({
-      variant: { kind: 'basis', id: basis },
-      field:
+    return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
+      if (basis === base.id) return [];
+      const field =
         basis === 'gpu-measured'
           ? quantity === 'watts'
             ? 'measuredAvgPower'
             : 'measuredJPerOutputToken'
-          : POWER_BASIS_FIELDS[basis][quantity],
-    }));
+          : POWER_BASIS_FIELDS[basis][quantity];
+      return field ? [{ variant: { kind: 'basis', id: basis }, field }] : [];
+    });
   }
   const fields = config.family === 'power' ? ROLE_WATT_FIELDS : ROLE_ENERGY_FIELDS;
   return ROLES.filter((role) => role !== base.id).map((role) => ({

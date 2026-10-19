@@ -966,13 +966,13 @@ describe('createChartDataPoint power-boundary fields', () => {
     joules_per_output_token: 10,
     modeledSystemPower: supportedModel,
   };
-  it('emits all six boundary fields for a validated official row', () => {
+  it('emits the boundary energies and All in Measured watts for a validated official row', () => {
     const p = boundaryPoint(
       entry({ output_tput_per_gpu: 400, benchmark_type: 'single_turn', ...validated }),
     );
-    expect(p.gpuProvisionedWatts).toEqual({ y: 700, roof: false });
+    expect(p).not.toHaveProperty('gpuProvisionedWatts');
     expect(p.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(700 / 400, 10);
-    expect(p.utilityProvisionedWatts).toEqual({ y: 700_000, roof: false });
+    expect(p).not.toHaveProperty('utilityProvisionedWatts');
     expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo(700_000 / 400, 10);
     // B4 W = deployment facility ÷ measured GPUs; J scales B1 by B4 W ÷ B1 W.
     expect(p.utilityModeledWatts).toEqual({ y: 877.5, roof: false });
@@ -1006,7 +1006,6 @@ describe('createChartDataPoint power-boundary fields', () => {
         num_decode_gpu: 4,
       }),
     );
-    expect(agentic.gpuProvisionedWatts?.y).toBe(700);
     expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
     expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
   });

@@ -138,8 +138,8 @@ describe('power boundaries through the derived-field builder', () => {
       const { entry, fields } = derive(row({ hardware: 'gb200', benchmark_type }));
       expect(entry.modeledSystemPower).toMatchObject({ status: 'unsupported', reason: 'topology' });
       expect(fields.measuredAvgPower).toBeDefined();
-      expect(fields.gpuProvisionedWatts).toBeDefined();
-      expect(fields.utilityProvisionedWatts).toBeDefined();
+      expect(fields.gpuProvisionedJPerOutputToken).toBeDefined();
+      expect(fields.utilityProvisionedJPerOutputToken).toBeDefined();
       expect(fields.utilityModeledWatts).toBeUndefined();
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
     },
@@ -186,10 +186,11 @@ describe('power boundaries through the derived-field builder', () => {
     const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
     const point = chartData[0][0];
     const official = derive(row()).fields;
-    for (const basis of Object.values(POWER_BASIS_FIELDS)) {
-      expect(point[basis.watts]).toEqual(official[basis.watts]);
-      expect(point[basis.energy]).toEqual(official[basis.energy]);
-      expect(point[basis.watts]?.roof).toBe(false);
+    for (const field of Object.values(POWER_BASIS_FIELDS).flatMap((basis) =>
+      Object.values(basis),
+    )) {
+      expect(point[field]).toBeDefined();
+      expect(point[field]).toEqual(official[field]);
     }
   });
 });

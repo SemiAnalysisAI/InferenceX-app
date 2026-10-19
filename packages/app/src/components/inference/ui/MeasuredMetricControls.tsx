@@ -9,16 +9,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
-import {
-  ALL_IN_MEASURED_NOTE,
-  POWER_BASES,
-  POWER_BASIS_LABELS,
-  type PowerBasis,
-} from '@/lib/power/power-basis';
+import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS, type PowerBasis } from '@/lib/power/power-basis';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
+  measuredMetricBases,
   type MeasuredMetricConfigChange,
 } from '../measured-metric-config';
 import type { PowerCompare } from '../types';
@@ -29,6 +25,8 @@ const STRINGS = {
     basis: 'Boundary',
     basisHelp:
       'Choose GPU-only or all-in power, including server overhead and PUE. Provisioned values use rated capacity; measured values start from GPU telemetry. Points without the selected value are omitted.',
+    basisHelpPower:
+      'Choose GPU-only or all-in power, including server overhead and PUE. Both start from GPU telemetry. Rated TDP and all-in provisioned power are fixed per hardware, so the Timeline display draws them as reference lines. Points without the selected value are omitted.',
     scope: 'Scope',
     scopeHelp:
       'All GPUs measures the whole deployment. Prefill and decode select only GPUs serving that role.',
@@ -64,6 +62,8 @@ const STRINGS = {
     basis: '功耗边界',
     basisHelp:
       '选择仅统计 GPU，或计入服务器其他组件及 PUE 的整体功耗。预配值按额定容量计算，实测值以 GPU 遥测为基础。缺少所选数值的数据点不绘制。',
+    basisHelpPower:
+      '选择仅统计 GPU，或计入服务器其他组件及 PUE 的整体功耗。两者均以 GPU 遥测为基础。额定 TDP 与整体预配功耗是每种硬件的固定值，因此在“时间线”显示方式中以参考线绘制。缺少所选数值的数据点不绘制。',
     scope: '统计范围',
     scopeHelp: '全部 GPU 对应整个部署；预填充和解码仅统计承担相应任务的 GPU。',
     all: '全部 GPU',
@@ -135,7 +135,11 @@ export function MeasuredMetricControls({
       data-testid="measured-metric-controls"
     >
       <div className="flex min-w-0 flex-col gap-1.5">
-        <LabelWithTooltip htmlFor={basisId} label={t.basis} tooltip={t.basisHelp} />
+        <LabelWithTooltip
+          htmlFor={basisId}
+          label={t.basis}
+          tooltip={config.family === 'power' ? t.basisHelpPower : t.basisHelp}
+        />
         <SearchableSelect
           value={config.basis}
           triggerId={basisId}
@@ -150,7 +154,7 @@ export function MeasuredMetricControls({
           groups={[
             {
               label: '',
-              options: POWER_BASES.map((basis) => ({
+              options: measuredMetricBases(config.family).map((basis) => ({
                 value: basis,
                 label: POWER_BASIS_LABELS[basis][locale],
                 help:

@@ -228,6 +228,14 @@ describe('PowerTimeline', () => {
       cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
     });
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
+    // All-in references are the registry's all-in utility W, PUE already included.
+    cy.get('[data-testid="power-timeline-utility"]').click();
+    svg()
+      .find('.power-reference[data-reference="utility"]')
+      .should(($lines) => {
+        const watts = [...$lines].map((line) => Math.round(Number(line.dataset.watts)));
+        expect(watts.toSorted((a, b) => a - b)).to.deep.equal([1370, 1710]);
+      });
   });
 
   it('joins a run that arrives after mount without a hook-shape warning', () => {

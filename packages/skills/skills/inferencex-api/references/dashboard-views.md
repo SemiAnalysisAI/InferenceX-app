@@ -235,7 +235,11 @@ boundary, not evidence that those points are more energy efficient.
 The dashboard names its four boundaries GPU Level Measured, GPU Level Provisioned
 (TDP), All in Provisioned, and All in Measured. All in Measured combines measured
 GPU power with modeled unmeasured components and PUE; do not describe it as measured
-wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis`
+wall power. GPU Level Provisioned (TDP) and All in Provisioned publish only J per
+output token. Their watts are per-hardware constants (rated TDP, and the registry's
+all-in utility power with PUE already included), drawn only as power-timeline reference
+lines: `metric=y_gpuProvisionedWatts` and `metric=y_utilityProvisionedWatts` return 400.
+Other metric IDs and API selector values are unchanged. Profit `powerBasis`
 still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
 Expanding assumptions or unavailable-estimate details does not change returned data.
 

@@ -188,9 +188,9 @@ const STRINGS = {
     pools: '预填充 / 解码 GPU 池',
     poolsHelp:
       '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
-    utilityLines: '全电源配置参考线',
+    utilityLines: '整体预配功耗参考线',
     utilityHelp:
-      '按硬件注册表中每 GPU 的全电源配置（all-in）市电功率绘制虚线参考（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
+      '以虚线标出硬件注册表中每 GPU 的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
     loading: (runs: number) => `正在加载 ${runs} 个运行的 GPU 遥测数据……（可能需要约一分钟）`,
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',

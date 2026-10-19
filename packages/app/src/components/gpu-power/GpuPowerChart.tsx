@@ -1,5 +1,6 @@
 'use client';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 import { buildTelemetryData, type ParsedPoint } from './chart-data';
@@ -42,6 +43,7 @@ const STRINGS = {
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
     rightAxis: 'right axis',
+    allIn: 'All-in provisioned',
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -56,6 +58,7 @@ const STRINGS = {
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
     rightAxis: '右轴',
+    allIn: '整体预配功耗',
   },
 } as const;
 
@@ -87,6 +90,8 @@ interface GpuMetricsChartProps {
   display?: TelemetryDisplayState;
   /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
   overlay?: TelemetryOverlaySeries | null;
+  /** Draw the registry's all-in provisioned utility W per chip as a second power reference. */
+  showAllIn?: boolean;
 }
 
 /** Mean across the visible chips, aligned by nearest sample within one poll interval. */
@@ -112,6 +117,12 @@ function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
 }
 
 /** Per-chip palette shared with legends that toggle chips on and off. */
+/** All-in provisioned utility W per chip from the registry (PUE already included). */
+export function allInWattsForHardware(hardware: string | undefined): number | null {
+  const power = hardware ? HW_REGISTRY[hardware.toLowerCase()]?.power : undefined;
+  return power && power > 0 ? power * 1000 : null;
+}
+
 export const GPU_COLORS = d3.schemeTableau10;
 /** Pseudo chip index and line key for the mean across visible chips. */
 const MEAN_INDEX = -1;
@@ -214,6 +225,7 @@ const GpuMetricsChart = React.memo(
     maxPoints,
     display = DEFAULT_TELEMETRY_DISPLAY,
     overlay,
+    showAllIn = false,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -325,6 +337,8 @@ const GpuMetricsChart = React.memo(
       metricKey === 'power'
         ? (tdpForHardware(hardware) ?? detectTdpFromArtifactName(artifactName))
         : null;
+    const allInWatts =
+      metricKey === 'power' && showAllIn && hardware ? allInWattsForHardware(hardware) : null;
 
     const yDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
@@ -338,9 +352,10 @@ const GpuMetricsChart = React.memo(
       );
       const yMin = Math.max(0, ext[0] - padding);
       let yMax = ext[1] + padding;
-      if (tdpInfo && tdpInfo.tdp > yMax) yMax = tdpInfo.tdp * 1.05;
+      const ceiling = Math.max(tdpInfo?.tdp ?? 0, allInWatts ?? 0);
+      if (ceiling > yMax) yMax = ceiling * 1.05;
       return [yMin, yMax] as [number, number];
-    }, [allPoints, tdpInfo]);
+    }, [allPoints, tdpInfo, allInWatts]);
 
     if (allPoints.length === 0) {
       return (
@@ -400,6 +415,40 @@ const GpuMetricsChart = React.memo(
                 .attr('font-size', '11px')
                 .attr('font-weight', '600')
                 .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
+            },
+          },
+          {
+            type: 'custom',
+            key: 'all-in-line',
+            render: (group, ctx) => {
+              group.selectAll('.all-in-line').remove();
+              if (allInWatts === null || !hardware) return;
+              const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
+              const lineY = yScale(allInWatts);
+              const lineGroup = group
+                .append('g')
+                .attr('class', 'all-in-line')
+                .attr('data-testid', 'gpu-power-all-in-line');
+              lineGroup
+                .append('line')
+                .attr('x1', 0)
+                .attr('x2', ctx.width)
+                .attr('y1', lineY)
+                .attr('y2', lineY)
+                .attr('stroke', '#f59e0b')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-dasharray', '2,3');
+              lineGroup
+                .append('text')
+                .attr('x', ctx.width - 4)
+                .attr('y', lineY - 6)
+                .attr('text-anchor', 'end')
+                .attr('fill', '#f59e0b')
+                .attr('font-size', '11px')
+                .attr('font-weight', '600')
+                .text(
+                  `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
+                );
             },
           },
           // GPU lines

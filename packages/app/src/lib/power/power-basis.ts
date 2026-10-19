@@ -14,6 +14,8 @@
  * total output tok/s is the whole deployment's. B4 reuses the estimate that
  * `modelSystemPower` already attached to the entry — PUE is applied exactly
  * once inside that model, never here — and is withheld wherever B1 is.
+ * B2 and B3 watts are a fixed rating per hardware, so they become fields only
+ * through their energies; the power timelines draw the watts as reference lines.
  * Unavailable values are `null`; callers omit the field rather than plotting 0.
  */
 import type { AggDataEntry, InferenceData, PowerBasisFieldKey } from '@/components/inference/types';
@@ -52,16 +54,10 @@ export const ALL_IN_MEASURED_EMPTY = {
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
 export const POWER_BASIS_FIELDS: Record<
   Exclude<PowerBasis, 'gpu-measured'>,
-  Record<PowerQuantity, PowerBasisFieldKey>
+  Partial<Record<PowerQuantity, PowerBasisFieldKey>>
 > = {
-  'gpu-provisioned': {
-    watts: 'gpuProvisionedWatts',
-    energy: 'gpuProvisionedJPerOutputToken',
-  },
-  'utility-provisioned': {
-    watts: 'utilityProvisionedWatts',
-    energy: 'utilityProvisionedJPerOutputToken',
-  },
+  'gpu-provisioned': { energy: 'gpuProvisionedJPerOutputToken' },
+  'utility-provisioned': { energy: 'utilityProvisionedJPerOutputToken' },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
     energy: 'utilityModeledJPerOutputToken',
@@ -132,9 +128,7 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       : null;
 
   return {
-    gpuProvisionedWatts: tdp,
     gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
-    utilityProvisionedWatts: utility,
     utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
     utilityModeledWatts: modeled,
     utilityModeledJPerOutputToken: modeledEnergy,

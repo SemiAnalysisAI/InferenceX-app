@@ -398,19 +398,13 @@ export const METRIC_REGISTRY = {
     polarity: 'lower',
   },
   // Power boundaries beyond GPU-measured telemetry (`lib/power/power-basis.ts`).
-  // Each boundary publishes W per allocated GPU and J per output token; the
-  // Boundary select in the Measured controls resolves to these keys, so the
-  // metric key alone carries the boundary in share links. Keys deliberately
+  // Each boundary publishes J per output token and All in Measured also W per
+  // allocated GPU; provisioned watts are a fixed rating per hardware, drawn as
+  // reference lines on the power timelines instead. The Boundary select in the
+  // Measured controls resolves to these keys, so the metric key alone carries
+  // the boundary in share links. Keys deliberately
   // lack the `measured` prefix: they are spec constants or model output, not
   // telemetry, so the telemetry-only decorations must not treat them as such.
-  gpuProvisionedWatts: {
-    field: 'gpuProvisionedWatts.y',
-    label: 'GPU Level Provisioned Power per Chip (TDP, W)',
-    labelZh: '每芯片 GPU 额定功耗（TDP，W）',
-    title: 'GPU Level Provisioned Power per Chip (TDP)',
-    titleZh: '每芯片 GPU 额定功耗（TDP）',
-    polarity: 'lower',
-  },
   gpuProvisionedJPerOutputToken: {
     field: 'gpuProvisionedJPerOutputToken.y',
     label: 'GPU Level Provisioned J per Output Token (TDP, J/tok)',
@@ -419,16 +413,8 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
     polarity: 'lower',
   },
-  utilityProvisionedWatts: {
-    field: 'utilityProvisionedWatts.y',
-    label: 'All in Provisioned Power per Chip (W)',
-    labelZh: '每芯片整体预配功耗（W）',
-    title: 'All in Provisioned Power per Chip',
-    titleZh: '每芯片整体预配功耗',
-    polarity: 'lower',
-  },
-  // Unlike the ungated `jOutput`, which divides by output tokens per decode
-  // GPU, this normalizes by every allocated GPU (prefill + decode).
+  // Unlike the ungated `jOutput`, which divides IT watts by output tokens per
+  // decode GPU, this adds PUE and normalizes by every allocated GPU.
   utilityProvisionedJPerOutputToken: {
     field: 'utilityProvisionedJPerOutputToken.y',
     label: 'All in Provisioned J per Output Token, all GPUs (J/tok)',
@@ -488,6 +474,10 @@ const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
   y_inputTokensPerRmbH: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbN: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbR: 'y_inputTokensPerDollarR',
+  // Provisioned watts were flat lines on the Pareto chart; they are now
+  // reference lines on the power timelines, so shared links land on measured W.
+  y_gpuProvisionedWatts: 'y_measuredAvgPower',
+  y_utilityProvisionedWatts: 'y_measuredAvgPower',
 };
 
 /** Cost tier priced into a metric, or `undefined` for metrics without one. */
@@ -703,9 +693,7 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
  * tier tooltip line does not apply to them.
  */
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
-  'y_gpuProvisionedWatts',
   'y_gpuProvisionedJPerOutputToken',
-  'y_utilityProvisionedWatts',
   'y_utilityProvisionedJPerOutputToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',
