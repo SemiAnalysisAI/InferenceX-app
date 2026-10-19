@@ -930,8 +930,7 @@ describe('createChartDataPoint energy fields', () => {
 
 // ===========================================================================
 // createChartDataPoint — power-boundary fields (B2 GPU provisioned, B3 utility
-// provisioned, B4 utility modeled). Mock specs: tdp 700 W. B3 reads the real
-// registry: H100 all-in IT 1.37 kW, air-cooled, so 1,781 W at the utility meter.
+// provisioned, B4 utility modeled). Mock specs: tdp 700 W, power 700 "kW".
 // ===========================================================================
 const boundaryPoint = (e: AggDataEntry) =>
   createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
@@ -967,12 +966,14 @@ describe('createChartDataPoint power-boundary fields', () => {
     joules_per_output_token: 10,
     modeledSystemPower: supportedModel,
   };
-  it('emits the boundary fields for a validated official row, B3 at the utility meter', () => {
+  it('emits all six boundary fields for a validated official row', () => {
     const p = boundaryPoint(
       entry({ output_tput_per_gpu: 400, benchmark_type: 'single_turn', ...validated }),
     );
+    expect(p.gpuProvisionedWatts).toEqual({ y: 700, roof: false });
     expect(p.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(700 / 400, 10);
-    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((1370 * 1.3) / 400, 10);
+    expect(p.utilityProvisionedWatts).toEqual({ y: 700_000, roof: false });
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo(700_000 / 400, 10);
     // B4 W = deployment facility ÷ measured GPUs; J scales B1 by B4 W ÷ B1 W.
     expect(p.utilityModeledWatts).toEqual({ y: 877.5, roof: false });
     expect(p.utilityModeledJPerOutputToken?.y).toBeCloseTo((10 * 877.5) / 500, 10);
@@ -992,8 +993,9 @@ describe('createChartDataPoint power-boundary fields', () => {
       }),
     );
     expect(p.gpuProvisionedJPerOutputToken?.y).toBeCloseTo((700 * 8) / (400 * 4), 10);
-    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((1370 * 1.3 * 8) / (400 * 4), 10);
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((700_000 * 8) / (400 * 4), 10);
     expect(p.jOutput?.y).toBeCloseTo(700_000 / 400, 10);
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo(2 * p.jOutput!.y, 10);
 
     const agentic = boundaryPoint(
       entry({
@@ -1004,6 +1006,7 @@ describe('createChartDataPoint power-boundary fields', () => {
         num_decode_gpu: 4,
       }),
     );
+    expect(agentic.gpuProvisionedWatts?.y).toBe(700);
     expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
     expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
   });

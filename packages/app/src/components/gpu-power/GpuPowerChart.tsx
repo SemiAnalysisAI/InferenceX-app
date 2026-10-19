@@ -8,7 +8,6 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { allInProvisionedWatts } from '@/lib/power/system-power-model';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
   estimateSampleIntervalMs,
@@ -43,7 +42,6 @@ const STRINGS = {
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
     rightAxis: 'right axis',
-    allIn: 'All-in provisioned',
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -58,7 +56,6 @@ const STRINGS = {
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
     rightAxis: '右轴',
-    allIn: '整体预配功耗',
   },
 } as const;
 
@@ -90,8 +87,6 @@ interface GpuMetricsChartProps {
   display?: TelemetryDisplayState;
   /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
   overlay?: TelemetryOverlaySeries | null;
-  /** Draw the all-in provisioned W per chip (PUE included) as a second power reference. */
-  showAllIn?: boolean;
 }
 
 /** Mean across the visible chips, aligned by nearest sample within one poll interval. */
@@ -219,7 +214,6 @@ const GpuMetricsChart = React.memo(
     maxPoints,
     display = DEFAULT_TELEMETRY_DISPLAY,
     overlay,
-    showAllIn = false,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -331,8 +325,6 @@ const GpuMetricsChart = React.memo(
       metricKey === 'power'
         ? (tdpForHardware(hardware) ?? detectTdpFromArtifactName(artifactName))
         : null;
-    const allInWatts =
-      metricKey === 'power' && showAllIn && hardware ? allInProvisionedWatts(hardware) : null;
 
     const yDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
@@ -346,10 +338,9 @@ const GpuMetricsChart = React.memo(
       );
       const yMin = Math.max(0, ext[0] - padding);
       let yMax = ext[1] + padding;
-      const ceiling = Math.max(tdpInfo?.tdp ?? 0, allInWatts ?? 0);
-      if (ceiling > yMax) yMax = ceiling * 1.05;
+      if (tdpInfo && tdpInfo.tdp > yMax) yMax = tdpInfo.tdp * 1.05;
       return [yMin, yMax] as [number, number];
-    }, [allPoints, tdpInfo, allInWatts]);
+    }, [allPoints, tdpInfo]);
 
     if (allPoints.length === 0) {
       return (
@@ -409,40 +400,6 @@ const GpuMetricsChart = React.memo(
                 .attr('font-size', '11px')
                 .attr('font-weight', '600')
                 .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
-            },
-          },
-          {
-            type: 'custom',
-            key: 'all-in-line',
-            render: (group, ctx) => {
-              group.selectAll('.all-in-line').remove();
-              if (allInWatts === null || !hardware) return;
-              const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-              const lineY = yScale(allInWatts);
-              const lineGroup = group
-                .append('g')
-                .attr('class', 'all-in-line')
-                .attr('data-testid', 'gpu-power-all-in-line');
-              lineGroup
-                .append('line')
-                .attr('x1', 0)
-                .attr('x2', ctx.width)
-                .attr('y1', lineY)
-                .attr('y2', lineY)
-                .attr('stroke', '#f59e0b')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '2,3');
-              lineGroup
-                .append('text')
-                .attr('x', ctx.width - 4)
-                .attr('y', lineY - 6)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#f59e0b')
-                .attr('font-size', '11px')
-                .attr('font-weight', '600')
-                .text(
-                  `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
-                );
             },
           },
           // GPU lines

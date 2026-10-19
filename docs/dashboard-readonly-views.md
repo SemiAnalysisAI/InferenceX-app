@@ -168,10 +168,6 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 power-assumption notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
-All in Provisioned is the registry's all-in IT power × the PUE of the hardware's `cooling`
-(1.3 air, 1.1 liquid), the same meter as All in Measured. The two provisioned boundaries
-publish only J per output token: `y_gpuProvisionedWatts` and `y_utilityProvisionedWatts` are
-no longer metrics, and dashboard links that name them open `y_measuredAvgPower`.
 All in Measured watts and energy accept validated `single_turn` and AgentX rows
 through the shared chart/API transform, including historical and unofficial rows.
 AgentX uses the power model's agentic workload state without independent workload
@@ -402,9 +398,6 @@ those properties.
 @semianalysisai/inferencex-skills 包。所有仪表板路由（含隐藏和功能开关控制的
 视图）均在覆盖表中登记；上表列出各只读接口接受的全部查询参数名。
 接口复用现有计算函数，公开运行与非官方叠加数据保留各自来源。
-整体预配功耗为硬件注册表中的 all-in IT 功率乘以对应冷却方式的 PUE（风冷 1.3，液冷 1.1），
-与整体实测功耗同为市电侧口径。两个额定边界只提供每输出 token 能耗：`y_gpuProvisionedWatts`
-和 `y_utilityProvisionedWatts` 不再是指标，仪表板中引用它们的旧链接会打开 `y_measuredAvgPower`。
 整体实测指标的 `tableRows` 保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点，
 不按前沿或坐标轴显示范围裁剪。估算不可用时 `y` 为 null，`status` 为 `unavailable`，
 `unavailableReason` 给出原因；`measuredGpuWatts` 保留实测 GPU 功耗。CSV 导出同一组行，缺失值留空。

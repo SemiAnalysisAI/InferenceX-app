@@ -372,18 +372,21 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
    */
   powerVariant?: PowerVariant;
 
-  // Power boundaries beyond the GPU-measured telemetry above (B1): J per
-  // successful output token normalized by every allocated GPU (prefill + decode
-  // for disaggregation), plus B4's W per allocated GPU. Emitted only when the
+  // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
+  // W per allocated GPU plus J per successful output token, normalized by every
+  // allocated GPU (prefill + decode for disaggregation). Emitted only when the
   // value is finite and positive; see lib/power/power-basis.ts and
   // docs/data-transforms.md "Power boundaries".
+  /** B2 W/GPU: HW_REGISTRY tdp. */
+  gpuProvisionedWatts?: { y: number; roof: boolean };
   /** B2 J/out: tdp × N_alloc ÷ total output tok/s. */
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B3 W/GPU: HW_REGISTRY all-in power (kW × 1000). */
+  utilityProvisionedWatts?: { y: number; roof: boolean };
   /**
-   * B3 J/out: all-in W × PUE × N_alloc ÷ total output tok/s. Unlike `jOutput`,
-   * which divides one decode GPU's all-in IT W by that GPU's output, this
-   * counts every allocated GPU at the utility meter, so it is
-   * PUE × (P + D) / D × `jOutput` on disaggregated rows.
+   * B3 J/out: all-in W × N_alloc ÷ total output tok/s. Unlike `jOutput`, which
+   * divides one decode GPU's all-in W by that GPU's output, this counts every
+   * allocated GPU, so it is (P + D) / D × `jOutput` on disaggregated rows.
    */
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
   /** B4 W/GPU: modeled deployment facility watts (IT × PUE, applied once) ÷ measured GPUs. */
@@ -405,7 +408,9 @@ export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; i
 
 /** InferenceData keys carrying the B2–B4 power-boundary readings. */
 export type PowerBasisFieldKey =
+  | 'gpuProvisionedWatts'
   | 'gpuProvisionedJPerOutputToken'
+  | 'utilityProvisionedWatts'
   | 'utilityProvisionedJPerOutputToken'
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken';

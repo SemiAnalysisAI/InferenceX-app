@@ -1,10 +1,8 @@
-import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'vitest';
 
 import { create_power_model } from './power_model';
 import {
   AIR_COOLED_SYSTEM_PUE,
-  allInProvisionedWatts,
   estimateChassisPower,
   estimateRackPower,
   isRackPowerHardware,
@@ -72,29 +70,6 @@ describe('system power model adapter', () => {
   it('quotes the upstream cooling PUEs', () => {
     expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, STATE)!.pue);
     expect(LIQUID_COOLED_RACK_PUE).toBe(estimateRackPower('gb300', 700, null, STATE)!.pue);
-  });
-
-  it('carries the registry all-in allocation to the utility meter with the modeled PUE', () => {
-    const modeledPue = {
-      h100: estimateChassisPower('h100', 4000, STATE)!.pue,
-      h200: estimateChassisPower('h200', 4000, STATE)!.pue,
-      b200: estimateChassisPower('b200', 4000, STATE)!.pue,
-      b300: estimateChassisPower('b300', 4000, STATE)!.pue,
-      mi300x: estimateChassisPower('mi300x', 4000, STATE)!.pue,
-      mi325x: estimateChassisPower('mi325x', 4000, STATE)!.pue,
-      mi355x: estimateChassisPower('mi355x', 4000, STATE)!.pue,
-      gb200: estimateRackPower('gb200', 700, null, STATE)!.pue,
-      gb300: estimateRackPower('gb300', 700, null, STATE)!.pue,
-    };
-    for (const [hardware, pue] of Object.entries(modeledPue)) {
-      expect(allInProvisionedWatts(hardware)).toBeCloseTo(
-        HW_REGISTRY[hardware]!.power * 1000 * pue,
-        9,
-      );
-    }
-    expect(allInProvisionedWatts('h200_vllm')).toBeCloseTo(1781, 9);
-    expect(allInProvisionedWatts('tpuv7')).toBeCloseTo(1207 * 1.1, 9);
-    expect(allInProvisionedWatts('unknown')).toBeNull();
   });
 
   it('returns null where the upstream model rejects the input', () => {

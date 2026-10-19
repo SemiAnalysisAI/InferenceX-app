@@ -37,7 +37,6 @@ import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 import { availableOverlaySources } from './overlay-sources';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { allInProvisionedWatts } from '@/lib/power/system-power-model';
 
 const STRINGS = {
   en: {
@@ -58,9 +57,6 @@ const STRINGS = {
     chip: 'Chip',
     secondsUnit: 's',
     resetFilter: 'Show all chips',
-    allInLine: 'All-in provisioned line',
-    allInHelp:
-      'Dashed reference at the all-in provisioned power per chip: the hardware registry’s all-in IT allocation × PUE, the utility meter All in Measured uses. Off by default because it compresses the traces.',
     overlayToggle: 'Overlay server metric',
     overlayNone: 'None',
     overlayLoading: 'Loading server metrics…',
@@ -87,9 +83,6 @@ const STRINGS = {
     chip: '芯片',
     secondsUnit: '秒',
     resetFilter: '显示全部芯片',
-    allInLine: '整体预配功耗参考线',
-    allInHelp:
-      '以虚线标出每芯片的整体预配功耗，即硬件注册表中的 all-in IT 功率 × PUE，与整体实测功耗同为市电侧口径。默认关闭，因为它会压缩曲线的纵向分辨率。',
     overlayToggle: '叠加服务端指标',
     overlayNone: '无',
     overlayLoading: '正在加载服务端指标……',
@@ -186,7 +179,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   };
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
-  const [showAllIn, setShowAllIn] = useState(false);
 
   // Server-metric overlay. The series are fetched as soon as the tab opens so
   // the menu can list exactly the metrics this point has; one source at a time.
@@ -403,7 +395,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
           maxPoints={2000}
           display={display}
           overlay={overlay}
-          showAllIn={showAllIn}
           legendElement={
             <ChartLegend
               variant="sidebar"
@@ -424,22 +415,6 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 setIsLegendExpanded(expanded);
                 track('inference_agentic_power_legend_expanded', { id, expanded });
               }}
-              switches={
-                metricKey === 'power' && hardware && allInProvisionedWatts(hardware) !== null
-                  ? [
-                      {
-                        id: 'power-telemetry-all-in',
-                        label: t.allInLine,
-                        checked: showAllIn,
-                        onCheckedChange: (checked) => {
-                          setShowAllIn(checked);
-                          track('inference_agentic_power_all_in_toggled', { id, enabled: checked });
-                        },
-                        infoTooltip: t.allInHelp,
-                      },
-                    ]
-                  : undefined
-              }
               actions={
                 hiddenGpus.size === 0
                   ? []

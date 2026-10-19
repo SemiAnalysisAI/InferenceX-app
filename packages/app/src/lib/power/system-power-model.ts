@@ -4,8 +4,6 @@
  * revision by power-model-parity.test.ts); this module maps InferenceX hardware
  * names onto its systems and turns its out-of-domain errors into null.
  */
-import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
-
 import manifest from './power-model.manifest.json';
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
@@ -36,22 +34,6 @@ export type RackPowerHardware = keyof typeof RACK_SYSTEMS;
 export const AIR_COOLED_SYSTEM_PUE = SYSTEMS.hopper.default_cooling.pue;
 /** Every supported NVL72 rack is liquid-cooled upstream. */
 export const LIQUID_COOLED_RACK_PUE = SYSTEMS['gb200-nvl72'].default_cooling.pue;
-
-const COOLING_PUE = {
-  air: AIR_COOLED_SYSTEM_PUE,
-  liquid: LIQUID_COOLED_RACK_PUE,
-} as const satisfies Record<HwEntry['cooling'], number>;
-
-/**
- * All in Provisioned W per GPU at the utility meter: the registry's all-in IT
- * allocation (chip plus its share of host and NICs) × the PUE of the
- * hardware's cooling, the same meter All in Measured reports at. Null for
- * hardware outside the registry or without an allocation.
- */
-export function allInProvisionedWatts(hardware: string): number | null {
-  const entry = HW_REGISTRY[hardware.toLowerCase().split(/[-_]/u)[0]!];
-  return entry && entry.power > 0 ? entry.power * 1000 * COOLING_PUE[entry.cooling] : null;
-}
 
 export const isSystemPowerHardware = (hardware: string): hardware is SystemPowerHardware =>
   Object.hasOwn(CHASSIS_SYSTEMS, hardware);

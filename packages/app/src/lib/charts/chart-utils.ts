@@ -22,7 +22,6 @@ import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib
 import { getVendor, type Vendor } from '@/lib/charts/dynamic-colors';
 import type { Locale } from '@/lib/i18n/i18n';
 import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power/power-basis';
-import { allInProvisionedWatts } from '@/lib/power/system-power-model';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
 // ---------------------------------------------------------------------------
@@ -418,11 +417,11 @@ export function buildDerivedChartFields(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
-  // jOutput keeps the historical TCO definition: all-in IT W without PUE, and
-  // for disaggregated rows output_tput_per_gpu is per decode GPU, so it ignores
-  // the prefill pool. The power-boundary field utilityProvisionedJPerOutputToken
-  // carries the same all-in W to the utility meter (× PUE) and counts every
-  // allocated GPU, so the two differ by PUE × (P + D) / D.
+  // jOutput keeps the historical per-GPU normalization: for disaggregated rows
+  // output_tput_per_gpu is per decode GPU, so this is all-in W of one decode GPU
+  // per output token and ignores the prefill pool. The power-boundary field
+  // utilityProvisionedJPerOutputToken uses the same all-in W but counts every
+  // allocated GPU, so the two differ on disaggregated rows by (P + D) / D.
   if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
@@ -438,10 +437,7 @@ export function buildDerivedChartFields(
     if (wants(key)) fields[key] = value;
   }
 
-  const powerBasis = buildPowerBasisChartFields(entry, {
-    tdpWatts: specs.tdp,
-    utilityWatts: allInProvisionedWatts(currentHwKey),
-  });
+  const powerBasis = buildPowerBasisChartFields(entry, specs);
   for (const [key, value] of Object.entries(powerBasis) as [
     keyof PowerBasisChartFields,
     { y: number; roof: boolean },

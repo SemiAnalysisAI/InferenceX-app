@@ -56,12 +56,13 @@ describe('InferenceTable sorting logic', () => {
         measuredAvgPower: { y: 708.1, roof: false },
         measuredPrefillAvgPower: { y: 760.442, roof: false },
         measuredDecodeAvgPower: { y: 690.652, roof: false },
-        utilityModeledWatts: { y: 1920, roof: false },
+        gpuProvisionedWatts: { y: 1400, roof: false },
+        utilityProvisionedWatts: { y: 1920, roof: false },
       });
       const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', mode);
       const sorted = sortRowsByYMetric(points, chartDefinitions[0], 'y_measuredAvgPower');
       expect(sorted.map((point) => point.y)).toEqual(
-        mode === 'roles' ? [690.652, 708.1, 760.442] : [708.1, 1920],
+        mode === 'roles' ? [690.652, 708.1, 760.442] : [708.1, 1400, 1920],
       );
 
       const html = renderToStaticMarkup(
@@ -86,7 +87,8 @@ describe('InferenceTable sorting logic', () => {
             ]
           : [
               ['GPU Level Measured', '708'],
-              ['All in Measured', '1,920'],
+              ['GPU Level Provisioned (TDP)', '1,400'],
+              ['All in Provisioned', '1,920'],
             ],
       );
       expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);

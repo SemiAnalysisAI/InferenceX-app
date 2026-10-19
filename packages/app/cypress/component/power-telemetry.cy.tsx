@@ -187,22 +187,6 @@ describe('PowerX telemetry interactions', () => {
     );
   });
 
-  it('draws the all-in provisioned line at the utility meter only when switched on', () => {
-    cy.intercept('GET', endpoint, { body: payload });
-    mountPoint();
-    cy.get(chart).find('svg').should('contain.text', 'B200 TDP: 1000W');
-    cy.get(chart).find('[data-testid="gpu-power-all-in-line"]').should('not.exist');
-    cy.get('[data-testid="power-telemetry-all-in"]').click();
-    cy.get(chart)
-      .find('[data-testid="gpu-power-all-in-line"]')
-      .should('contain.text', 'B200 All-in provisioned: 2223W');
-    cy.get('@capture').should('have.been.calledWith', 'inference_agentic_power_all_in_toggled', {
-      id: ID,
-      enabled: true,
-    });
-    cy.get(chart).screenshot('power-telemetry-all-in-line');
-  });
-
   it('shows a genuine missing point without offering an error retry', () => {
     cy.intercept('GET', endpoint, { statusCode: 404, body: {} });
     mountPoint();
