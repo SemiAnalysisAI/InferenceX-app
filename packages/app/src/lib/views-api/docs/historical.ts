@@ -20,8 +20,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'line returns the original trend series. waterfall also returns baseline, record-setting changes, and best-observed steps with source runs and strictly matched PR links. Synthetic extensions and recoveries are excluded. Lower-is-better metrics use descending changes. Links identify source curves, not isolated causal effects.',
-      'line 返回原始趋势线。waterfall 还返回基线、刷新最佳纪录的变化及最佳观测值，并附源运行记录及严格匹配的 PR 链接。不包含补齐点及性能恢复。越低越好的指标使用下降变化量。链接标识源曲线，不代表单个变更的独立效果。',
+      'line returns the original trend series. waterfall also returns baseline, record-setting changes, and best-observed steps with source runs and strictly matched PR links. Synthetic extensions and recoveries are excluded. Output-only metrics exclude curves without recorded output throughput; excludedPointCount reports omitted dates. Lower-is-better metrics use descending changes. Links identify source curves, not isolated causal effects.',
+      'line 返回原始趋势线。waterfall 还返回基线、刷新最佳纪录的变化及最佳观测值，并附源运行记录及严格匹配的 PR 链接。不包含补齐点及性能恢复。输出 token 指标会排除缺少输出吞吐量实测记录的曲线，excludedPointCount 报告省略的日期数。越低越好的指标使用下降变化量。链接标识源曲线，不代表单个变更的独立效果。',
     ),
     schema: { type: 'string', enum: ['line', 'waterfall'], default: 'line' },
     example: 'waterfall',
@@ -208,6 +208,7 @@ const responseSchema = objectSchema(
               linksAvailable: booleanSchema,
             }),
           ),
+          excludedPointCount: integerSchema,
         },
         ['key', 'hwKey', 'label', 'points'],
       ),

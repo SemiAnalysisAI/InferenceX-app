@@ -25,6 +25,7 @@ const STRINGS = {
     noGain: 'No improvement after the baseline.',
     run: 'Run',
     noSource: 'Source unavailable',
+    excluded: 'dates omitted: output throughput was not recorded for the full source curve.',
     noPr: 'No PR',
     loading: 'Loading PR links…',
     failed: 'PR links unavailable',
@@ -41,6 +42,7 @@ const STRINGS = {
     noGain: '基线之后暂无性能提升。',
     run: '运行',
     noSource: '无来源记录',
+    excluded: '个日期已省略：源曲线缺少完整的输出吞吐量记录。',
     noPr: '无关联 PR',
     loading: '正在加载 PR 链接…',
     failed: 'PR 链接暂不可用',
@@ -71,6 +73,9 @@ export default function ImprovementWaterfallChart({
   }, []);
   const [selectedId, setSelectedId] = useState('');
   const config = lineConfigs.find((line) => line.id === selectedId) ?? lineConfigs[0];
+  const excludedCount = (config ? (trendLines.get(config.id) ?? []) : []).filter(
+    (point) => !point.synthetic && point.waterfallEligible === false,
+  ).length;
   const steps = useMemo(
     () => buildImprovementWaterfall(config ? (trendLines.get(config.id) ?? []) : [], lowerIsBetter),
     [config, trendLines, lowerIsBetter],
@@ -343,6 +348,11 @@ export default function ImprovementWaterfallChart({
             </div>
           )}
           {steps.length === 2 && <p className="mt-2 text-sm text-muted-foreground">{t.noGain}</p>}
+          {excludedCount > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {excludedCount} {t.excluded}
+            </p>
+          )}
         </div>
       </div>
     </div>
