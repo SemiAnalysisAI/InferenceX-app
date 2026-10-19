@@ -481,7 +481,7 @@ CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网�
 的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
 不可用与待验证的配置。注释同时包含 `en` 和 `zh`。
 
-TPU result-level run links in tooltips, point details, and point tables open the stored
-logs instead of GitHub. Overlays without a persisted point omit that link. This is
-presentation-only: API `run_url`, exports, calculations, and run-level navigation
-remain unchanged. No selector, schema, or route catalog change is required.
+TPU result tooltips and point-detail headers omit the external GitHub run link.
+Existing View Logs/View Charts actions still depend on stored data availability.
+This is presentation-only: API `run_url`, exports, calculations, point-table and
+run-level navigation remain unchanged; no schema or route catalog change is needed.

@@ -1306,16 +1306,22 @@ describe('power tier tooltip line', () => {
   });
 });
 
-it.each(['en', 'zh'] as const)('routes TPU result links to logs in %s', (locale) => {
+it.each(['en', 'zh'] as const)('keeps only the existing TPU log/chart actions in %s', (locale) => {
   const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/1';
-  const html = generateTooltipContent(
-    tooltipConfig({
-      locale,
-      runUrl,
-      data: pt({ id: 123, hwKey: 'tpuv7_vllm', benchmark_type: 'agentic_traces' }),
-    }),
-  );
-  expect(html).toContain(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/123?view=logs`);
-  expect(html).not.toContain(runUrl);
-  expect(html).toContain(locale === 'zh' ? '查看日志' : 'View Logs');
+  for (const available of [true, false]) {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        locale,
+        runUrl,
+        isPinned: true,
+        hasTrace: available,
+        hasLog: available,
+        data: pt({ id: 123, hwKey: 'tpuv7_vllm', benchmark_type: 'agentic_traces' }),
+      }),
+    );
+    expect(html).not.toContain(runUrl);
+    expect(html.match(/data-action="view-logs"/g) ?? []).toHaveLength(available ? 1 : 0);
+    expect(html.match(/data-action="view-charts"/g) ?? []).toHaveLength(available ? 1 : 0);
+    expect(html.match(/View [Ll]ogs|查看日志/g) ?? []).toHaveLength(available ? 1 : 0);
+  }
 });

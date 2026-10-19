@@ -1,4 +1,3 @@
-import { pointRunLink } from '@/lib/benchmarks/run-link';
 import { updateRepoUrl } from '@/lib/shared/utils';
 import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
@@ -61,12 +60,10 @@ export function pointDetailHref(
   locale: Locale = 'en',
 ): { href: string | null; isExternal: boolean } {
   if (isOverlay) return { href: null, isExternal: false };
-  const link = pointRunLink(d.run_url, d, locale);
-  if (link?.isLog) return { href: link.href, isExternal: false };
   if (d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)) {
     return { href: agenticDetailHref(d.id, locale), isExternal: false };
   }
-  if (link) return { href: updateRepoUrl(link.href), isExternal: !link.isLog };
+  if (d.run_url) return { href: updateRepoUrl(d.run_url), isExternal: true };
   return { href: null, isExternal: false };
 }
 

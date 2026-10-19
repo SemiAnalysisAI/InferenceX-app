@@ -1,7 +1,5 @@
 'use client';
 
-import { pointRunLink } from '@/lib/benchmarks/run-link';
-
 import type { ReactNode } from 'react';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
@@ -76,7 +74,6 @@ function offloadDisplay(meta: PointMeta, locale: Locale): string {
 export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
   const t = POINT_SUMMARY_STRINGS[locale];
-  const runLink = pointRunLink(meta.run_url, meta, locale);
   const showCpuCacheHit = isKvOffloadEnabled(meta);
   const showCombinedCacheHit = showCpuCacheHit && frameworkFamily(meta.framework) === 'trt';
   const offloadBackend = versionedComponentLabel(
@@ -102,14 +99,14 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
               className="text-xs text-muted-foreground hover:text-foreground underline"
             />
           )}
-          {runLink && (
+          {meta.run_url && !meta.hardware.startsWith('tpu') && (
             <a
-              href={runLink.href}
+              href={meta.run_url}
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-muted-foreground hover:text-foreground underline"
             >
-              {runLink.isLog ? (locale === 'zh' ? '查看日志' : 'View Logs') : t.githubRun}
+              {t.githubRun}
             </a>
           )}
         </div>
