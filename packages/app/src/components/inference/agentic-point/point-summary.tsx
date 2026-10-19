@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import type { ReactNode } from 'react';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
@@ -99,7 +101,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
               className="text-xs text-muted-foreground hover:text-foreground underline"
             />
           )}
-          {meta.run_url && (
+          {showRunLink(meta.run_url, meta.hardware) && (
             <a
               href={meta.run_url}
               target="_blank"

@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { useCallback, useMemo, useState } from 'react';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
@@ -590,7 +592,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       {
         header: t.colRun,
         cell: (r) =>
-          r.runUrl ? (
+          showRunLink(r.runUrl) ? (
             <a
               href={r.runUrl}
               target="_blank"

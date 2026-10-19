@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { track } from '@/lib/analytics/analytics';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
@@ -61,7 +63,7 @@ export const formatEvaluationEmptyStateDate = (dateStr: string, locale: Locale) 
 };
 
 const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
-  runUrl
+  showRunLink(runUrl)
     ? `<div style="font-size: 11px; margin-top: 4px;">
         <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
       </div>`

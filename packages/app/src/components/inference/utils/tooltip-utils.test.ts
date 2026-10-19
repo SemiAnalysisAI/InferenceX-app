@@ -1305,3 +1305,28 @@ describe('power tier tooltip line', () => {
     expect(gpuGraphOffAxis).not.toContain('Power Measurement');
   });
 });
+
+describe('TPU run links', () => {
+  const url =
+    'https://github.com/SemiAnalysisAI/InferenceX-Private-TPU/actions/runs/38997727079/attempts/1';
+  it.each(['en', 'zh'] as const)(
+    'hides official and overlay TPU links in %s without changing provenance',
+    (locale) => {
+      const config = tooltipConfig({ locale, runUrl: url });
+      expect(generateTooltipContent(config)).not.toContain(url);
+      const overlayData = {
+        label: 'TPU run',
+        hardwareConfig: mockHardwareConfig,
+        data: [],
+        runUrl: url,
+      };
+      expect(
+        generateOverlayTooltipContent({ ...config, overlayData } as OverlayTooltipConfig),
+      ).not.toContain(url);
+      expect(config.runUrl).toBe(url);
+      expect(overlayData.runUrl).toBe(url);
+      const publicUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+      expect(generateTooltipContent({ ...config, runUrl: publicUrl })).toContain(publicUrl);
+    },
+  );
+});

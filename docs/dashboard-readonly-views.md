@@ -480,3 +480,10 @@ combinations from pending qualification. Footnotes contain both `en` and `zh`.
 CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网站共用人工维护
 的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
 不可用与待验证的配置。注释同时包含 `en` 和 `zh`。
+
+TPU run-link visibility is presentation-only. Inference/evaluation tooltips, point-detail
+headers, point tables, frontier/power panels, workflow selectors/changelogs, calculator
+views, and unofficial-run banners omit external TPU workflow links in both locales.
+Internal point-detail navigation remains available. API rows, exports, run URLs and
+producer identities remain unchanged for diagnostics, comparisons and overlay grouping;
+there is no new data selector or OpenAPI schema change.

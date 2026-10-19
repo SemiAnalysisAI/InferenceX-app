@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { useCallback, useMemo, useState } from 'react';
 
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
@@ -434,7 +436,7 @@ function CacheReuseInner() {
       {
         header: t.colRun,
         cell: (r) =>
-          r.runUrl ? (
+          showRunLink(r.runUrl) ? (
             <a
               href={r.runUrl}
               target="_blank"

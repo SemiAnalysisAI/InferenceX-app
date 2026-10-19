@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import { BarChart3, Table2 } from 'lucide-react';
@@ -489,6 +491,7 @@ function configLabel(result: InterpolatedResult): string {
 
 /** A run date, linked to its workflow run when one is recorded. */
 function runLink(date: string, runUrls: string[]) {
+  runUrls = runUrls.filter((url) => showRunLink(url));
   if (runUrls.length === 0) return <>{date}</>;
   return (
     <Link href={runUrls[0]!} target="_blank" className="underline hover:text-foreground">

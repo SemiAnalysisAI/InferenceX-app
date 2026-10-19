@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import * as d3 from 'd3';
@@ -352,7 +354,7 @@ export function generateTooltipHTML(
     : locale === 'zh'
       ? '在 GitHub 查看原始结果'
       : 'View raw result on GitHub';
-  const runLinkHtml = effectiveRunUrl
+  const runLinkHtml = showRunLink(effectiveRunUrl, d.hwKey)
     ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
     : '';
 

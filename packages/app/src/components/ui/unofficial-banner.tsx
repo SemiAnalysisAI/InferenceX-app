@@ -1,5 +1,7 @@
 'use client';
 
+import { showRunLink } from '@/lib/benchmarks/run-link';
+
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
@@ -111,17 +113,21 @@ function RunChip({
         className="inline-block size-2 shrink-0 rounded-full border border-white/40"
         style={{ backgroundColor: color }}
       />
-      <a
-        href={run.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => track('unofficial_banner_view_run', { branch: run.branch })}
-        className="inline-flex min-h-11 min-w-0 items-center gap-1.5 py-1 underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:min-h-7"
-        aria-label={`View workflow run for ${run.branch}`}
-      >
-        <span className="min-w-0 [overflow-wrap:anywhere]">{run.branch}</span>
-        <ExternalLink aria-hidden className="size-3 shrink-0 opacity-70" />
-      </a>
+      {showRunLink(run.url) ? (
+        <a
+          href={run.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => track('unofficial_banner_view_run', { branch: run.branch })}
+          className="inline-flex min-h-11 min-w-0 items-center gap-1.5 py-1 underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:min-h-7"
+          aria-label={`View workflow run for ${run.branch}`}
+        >
+          <span className="min-w-0 [overflow-wrap:anywhere]">{run.branch}</span>
+          <ExternalLink aria-hidden className="size-3 shrink-0 opacity-70" />
+        </a>
+      ) : (
+        <span className="min-w-0 py-1 [overflow-wrap:anywhere]">{run.branch}</span>
+      )}
       {onDismiss && (
         <button
           type="button"
