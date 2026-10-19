@@ -11,8 +11,10 @@ export interface HwEntry {
   sort: number;
   /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
-  /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
-   * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
+  /** All-in kW per GPU at the utility meter: chip plus its share of host, networking
+   * and cooling, with PUE already included, so never multiply it by PUE again.
+   * SemiAnalysis AI Cloud TCO Model, "Chip Specifications" sheet, Power → "All-In (W)"
+   * column; the dashboard cites it as the SemiAnalysis Datacenter Industry Model. */
   power: number;
   /** $/GPU/hr — owning at large hyperscaler volume */
   costh: number;
