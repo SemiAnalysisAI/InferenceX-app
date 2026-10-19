@@ -41,6 +41,8 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  38825822770, // 2026-10-19 | Muse Spark B200 TP4: user-requested removal of the 256k AgentX corpus run
+  38851010434, // 2026-10-19 | Muse Spark B200 TP8: user-requested removal of the 256k AgentX corpus run
   32403083041, // 2026-09-30 | Reason: dsv4 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
   33219708211, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
   31927376673, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
