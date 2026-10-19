@@ -15,6 +15,18 @@ const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const parameters: readonly ApiParameter[] = [
   {
+    name: 'chart',
+    location: 'query',
+    required: false,
+    type: 'enum',
+    description: text(
+      'line returns the original trend series. waterfall also returns baseline, record-setting changes, and best-observed steps with source runs and strictly matched PR links. Synthetic extensions and recoveries are excluded. Lower-is-better metrics use descending changes. Links identify source curves, not isolated causal effects.',
+      'line 返回原始趋势线。waterfall 还返回基线、刷新最佳纪录的变化及最佳观测值，并附源运行记录及严格匹配的 PR 链接。不包含补齐点及性能恢复。越低越好的指标使用下降变化量。链接标识源曲线，不代表单个变更的独立效果。',
+    ),
+    schema: { type: 'string', enum: ['line', 'waterfall'], default: 'line' },
+    example: 'waterfall',
+  },
+  {
     name: 'model',
     location: 'query',
     required: true,
@@ -135,8 +147,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one flat row per line point.',
-      '响应编码。csv 为每条趋势线的每个点返回一行平面数据。',
+      'Response encoding. csv returns one row per line point, or per waterfall step with JSON-encoded runUrls and prLinks arrays.',
+      '响应编码。csv 为每个趋势点或瀑布图步骤返回一行。瀑布图的 runUrls 和 prLinks 列为 JSON 编码的数组。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -173,6 +185,28 @@ const responseSchema = objectSchema(
               },
               ['date', 'value'],
             ),
+          ),
+          steps: arraySchema(
+            objectSchema({
+              kind: { type: 'string', enum: ['baseline', 'gain', 'best'] },
+              date: stringSchema,
+              from: numberSchema,
+              to: numberSchema,
+              delta: numberSchema,
+              sources: arraySchema(
+                objectSchema({
+                  date: stringSchema,
+                  runId: integerSchema,
+                  model: stringSchema,
+                  precision: stringSchema,
+                  hwKey: stringSchema,
+                  benchmarkType: stringSchema,
+                  runUrl: stringSchema,
+                }),
+              ),
+              prLinks: arraySchema(stringSchema),
+              linksAvailable: booleanSchema,
+            }),
           ),
         },
         ['key', 'hwKey', 'label', 'points'],

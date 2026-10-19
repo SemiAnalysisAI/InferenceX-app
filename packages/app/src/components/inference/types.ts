@@ -15,6 +15,7 @@ export type { WorkerPower };
 export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
 
 export interface AggDataEntry {
+  trendSource?: TrendSource;
   rawMetricKeys?: string[];
   id?: number;
   recipe_fingerprint?: string;
@@ -483,11 +484,22 @@ export type UserCostInputs = Record<string, string | undefined>;
 
 export type HardwareConfig = Record<string, HardwareEntry>;
 
+export interface TrendSource {
+  date: string;
+  runId: number;
+  runUrl: string;
+  model: string;
+  precision: string;
+  hwKey: string;
+  benchmarkType: 'single_turn' | 'agentic_traces';
+}
+
 export interface TrendDataPoint {
   date: string;
   value: number;
   x: number;
   synthetic?: boolean;
+  sources?: TrendSource[];
 }
 
 export interface TrendLineConfig {
