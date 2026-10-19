@@ -54,6 +54,7 @@ import { lttbDownsample } from '@/lib/d3-chart/downsample';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { allInProvisionedWatts } from '@/lib/power/system-power-model';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
@@ -127,7 +128,7 @@ const STRINGS = {
       'One line per worker-role pool: the summed board power of the prefill GPUs and of the decode GPUs of a config. Dashed references are pool size × rated TDP.',
     utilityLines: 'All-in provisioned lines',
     utilityHelp:
-      'Dashed reference at the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
+      'Dashed reference at the all-in provisioned power per GPU: the hardware registry’s all-in IT allocation (SemiAnalysis Datacenter Industry Model) × PUE, the utility meter All in Measured uses. Off by default because it compresses the traces.',
     loading: (runs: number) =>
       `Loading GPU telemetry for ${runs} run${runs === 1 ? '' : 's'}… (may take a minute)`,
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
@@ -188,9 +189,9 @@ const STRINGS = {
     pools: '预填充 / 解码 GPU 池',
     poolsHelp:
       '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
-    utilityLines: '全电源配置参考线',
+    utilityLines: '整体预配功耗参考线',
     utilityHelp:
-      '按硬件注册表中每 GPU 的全电源配置（all-in）市电功率绘制虚线参考（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
+      '以虚线标出每 GPU 的整体预配功耗，即硬件注册表中的 all-in IT 功率（SemiAnalysis 数据中心行业模型）× PUE，与整体实测功耗同为市电侧口径。默认关闭，因为它会压缩曲线的纵向分辨率。',
     loading: (runs: number) => `正在加载 ${runs} 个运行的 GPU 遥测数据……（可能需要约一分钟）`,
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
@@ -1083,8 +1084,9 @@ export default function PowerTimeline({
           pools: pool?.roles,
         });
       }
-      if (showUtility && specs.power > 0) {
-        const watts = pool ? Math.round(specs.power * 1000) * size : specs.power * 1000;
+      const allIn = allInProvisionedWatts(base);
+      if (showUtility && allIn !== null) {
+        const watts = pool ? Math.round(allIn) * size : allIn;
         lines.push({
           id: `utility:${id}`,
           watts,

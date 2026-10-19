@@ -7,13 +7,15 @@
  * | ---------------------- | ------------------------------------------------ | ----------------------------------------- |
  * | B1 gpu-measured        | `avg_power_w` (existing `measuredAvgPower`)      | `joules_per_output_token` (existing)      |
  * | B2 gpu-provisioned     | `HW_REGISTRY.tdp`                                | W × N_alloc ÷ total output tok/s          |
- * | B3 utility-provisioned | `HW_REGISTRY.power` × 1000                       | W × N_alloc ÷ total output tok/s          |
+ * | B3 utility-provisioned | `allInProvisionedWatts`: registry all-in × PUE   | W × N_alloc ÷ total output tok/s          |
  * | B4 utility-modeled     | modeled `deploymentFacilityWatts` ÷ `gpuCount`   | B1 J/out × (B4 W ÷ B1 W)                  |
  *
  * N_alloc counts every allocated GPU (prefill + decode for disaggregation);
  * total output tok/s is the whole deployment's. B4 reuses the estimate that
  * `modelSystemPower` already attached to the entry — PUE is applied exactly
  * once inside that model, never here — and is withheld wherever B1 is.
+ * B2 and B3 watts are a fixed rating per hardware, so they become fields only
+ * through their energies; the power timelines draw the watts as reference lines.
  * Unavailable values are `null`; callers omit the field rather than plotting 0.
  */
 import type { AggDataEntry, InferenceData, PowerBasisFieldKey } from '@/components/inference/types';
@@ -52,16 +54,10 @@ export const ALL_IN_MEASURED_EMPTY = {
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
 export const POWER_BASIS_FIELDS: Record<
   Exclude<PowerBasis, 'gpu-measured'>,
-  Record<PowerQuantity, PowerBasisFieldKey>
+  Partial<Record<PowerQuantity, PowerBasisFieldKey>>
 > = {
-  'gpu-provisioned': {
-    watts: 'gpuProvisionedWatts',
-    energy: 'gpuProvisionedJPerOutputToken',
-  },
-  'utility-provisioned': {
-    watts: 'utilityProvisionedWatts',
-    energy: 'utilityProvisionedJPerOutputToken',
-  },
+  'gpu-provisioned': { energy: 'gpuProvisionedJPerOutputToken' },
+  'utility-provisioned': { energy: 'utilityProvisionedJPerOutputToken' },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
     energy: 'utilityModeledJPerOutputToken',
@@ -71,7 +67,7 @@ export const POWER_BASIS_FIELDS: Record<
 export interface PowerBasisInput {
   /** B2 W/GPU: HW_REGISTRY tdp. 0 means the spec is not yet available. */
   tdpWatts: number | null;
-  /** B3 W/GPU: HW_REGISTRY all-in power, already in watts. */
+  /** B3 W/GPU at the utility meter: `allInProvisionedWatts`, PUE included. */
   utilityWatts: number | null;
   /** Every GPU the deployment occupies (prefill + decode for disaggregation). */
   allocatedGpus: number | null;
@@ -132,9 +128,7 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       : null;
 
   return {
-    gpuProvisionedWatts: tdp,
     gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
-    utilityProvisionedWatts: utility,
     utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
     utilityModeledWatts: modeled,
     utilityModeledJPerOutputToken: modeledEnergy,
@@ -208,11 +202,10 @@ export type PowerBasisChartFields = Partial<Pick<InferenceData, PowerBasisFieldK
  */
 export function buildPowerBasisChartFields(
   entry: PowerBasisEntry,
-  specs: { tdp?: number; power?: number },
+  ratings: Pick<PowerBasisInput, 'tdpWatts' | 'utilityWatts'>,
 ): PowerBasisChartFields {
   const values = computePowerBasisFields({
-    tdpWatts: specs.tdp ?? null,
-    utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
+    ...ratings,
     ...powerBasisNormalization(entry),
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,

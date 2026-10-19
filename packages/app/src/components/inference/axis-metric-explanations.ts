@@ -441,21 +441,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: 'W(t) = 每个一秒时间桶内各 GPU 功耗采样值的平均',
     },
   },
-  gpuProvisionedWatts: {
-    description: {
-      en:
-        'Rated accelerator TDP from the hardware registry, shown as a flat per-chip value so ' +
-        'measured power can be read against the GPU-only provisioning boundary. It does not ' +
-        'depend on the run.',
-      zh:
-        '取硬件注册表中的加速器额定 TDP，以每芯片恒定值显示，用于对照 GPU 侧的额定供电边界与实测功耗。' +
-        '该值与具体运行无关。',
-    },
-    formula: {
-      en: 'W/GPU = rated TDP (W)',
-      zh: 'W/GPU = 额定 TDP（W）',
-    },
-  },
   gpuProvisionedJPerOutputToken: {
     description: {
       en:
@@ -471,34 +456,21 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: 'J/tok = 额定 TDP（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
     },
   },
-  utilityProvisionedWatts: {
-    description: {
-      en:
-        'All-in provisioned power per chip from the hardware registry: the utility-side capacity ' +
-        'a data center reserves for one accelerator including host, networking, cooling and ' +
-        'power-conversion overheads. It is a flat value independent of the run.',
-      zh:
-        '取硬件注册表中的每芯片整体预配功耗（all-in）：数据中心为单张加速器预留的电源侧容量，' +
-        '包含主机、网络、散热与电源转换开销。该值为恒定值，与运行无关。',
-    },
-    formula: {
-      en: 'W/GPU = all-in provisioned power per GPU (kW) × 1000',
-      zh: 'W/GPU = 每 GPU 整体预配功耗（kW）× 1000',
-    },
-  },
   utilityProvisionedJPerOutputToken: {
     description: {
       en:
-        'Energy per output token at the all-in provisioned power boundary, normalized by every ' +
-        'allocated accelerator. It differs from the public All-in Provisioned J per Output Token ' +
-        'metric only for disaggregated runs, where that metric normalizes by decode GPUs alone.',
+        'Energy per output token at the all-in provisioned power boundary: the registry’s all-in IT ' +
+        'allocation per accelerator, carried to the utility meter with the PUE of its cooling and ' +
+        'normalized by every allocated accelerator. The public All-in Provisioned J per Output Token ' +
+        'metric excludes PUE and, for disaggregated runs, normalizes by decode GPUs alone.',
       zh:
-        '在整体预配功耗边界下的每输出 token 能耗，按全部已分配加速器归一。' +
-        '仅在分离式运行中与公开的 All-in Provisioned J per Output Token 指标不同，后者只按 decode GPU 归一。',
+        '在整体预配功耗边界下的每输出 token 能耗：取硬件注册表中每张加速器的 all-in IT 配置功率，' +
+        '按其冷却方式乘以 PUE 换算到市电侧，再按全部已分配加速器归一。' +
+        '公开的 All-in Provisioned J per Output Token 指标不含 PUE，且在分离式运行中只按 decode GPU 归一。',
     },
     formula: {
-      en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ total output tokens per second',
-      zh: 'J/tok = 每 GPU 整体预配功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+      en: 'J/tok = all-in IT power per GPU (W) × PUE × allocated GPUs ÷ total output tokens per second',
+      zh: 'J/tok = 每 GPU 整体 IT 功耗（W）× PUE × 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
     },
   },
   utilityModeledWatts: {

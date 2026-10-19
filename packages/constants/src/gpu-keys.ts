@@ -12,8 +12,11 @@ export interface HwEntry {
   /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
   /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
-   * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
+   * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column. This is IT
+   * power: it excludes the facility overhead that PUE adds. */
   power: number;
+  /** How the deployed system is cooled; picks the PUE that carries `power` to the utility meter. */
+  cooling: 'air' | 'liquid';
   /** $/GPU/hr — owning at large hyperscaler volume */
   costh: number;
   /** $/GPU/hr — retail tier */
@@ -29,6 +32,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: -1,
     tdp: 1800,
     power: 3.3,
+    cooling: 'liquid',
     costh: 3.61,
     costr: 8.5,
   },
@@ -39,6 +43,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 7,
     tdp: 700,
     power: 1.37,
+    cooling: 'air',
     costh: 1.17,
     costr: 2,
   },
@@ -49,6 +54,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 5,
     tdp: 700,
     power: 1.37,
+    cooling: 'air',
     costh: 1.22,
     costr: 2.9,
   },
@@ -59,6 +65,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 3,
     tdp: 1000,
     power: 1.71,
+    cooling: 'air',
     costh: 1.73,
     costr: 3.7,
   },
@@ -69,6 +76,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 2,
     tdp: 1200,
     power: 1.9,
+    cooling: 'air',
     costh: 2.26,
     costr: 4.25,
   },
@@ -79,6 +87,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 1,
     tdp: 1200,
     power: 1.87,
+    cooling: 'liquid',
     costh: 1.86,
     costr: 4,
   },
@@ -89,6 +98,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 0,
     tdp: 1400,
     power: 2.12,
+    cooling: 'liquid',
     costh: 2.31,
     costr: 5,
   },
@@ -99,6 +109,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 8,
     tdp: 750,
     power: 1.39,
+    cooling: 'air',
     costh: 0.95,
     costr: 1.3,
   },
@@ -109,6 +120,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 6,
     tdp: 1000,
     power: 1.69,
+    cooling: 'air',
     costh: 1.1,
     costr: 1.6,
   },
@@ -119,6 +131,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 4,
     tdp: 1400,
     power: 2.09,
+    cooling: 'air',
     costh: 1.5,
     costr: 2.9,
   },
@@ -133,6 +146,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 9,
     tdp: 600,
     power: 0.975,
+    cooling: 'air',
     costh: 0.68,
     costr: 0.52,
   },
@@ -144,6 +158,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 10,
     tdp: 700,
     power: 1.125,
+    cooling: 'air',
     costh: 1.27,
     costr: 1.27,
   },
@@ -154,6 +169,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     sort: 11,
     tdp: 980,
     power: 1.207,
+    cooling: 'liquid',
     costh: 1.21,
     /** GCP 3-year commit rental rate per chip-hour (SemiAnalysis AI Cloud TCO Model). */
     costr: 2,

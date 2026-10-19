@@ -16,9 +16,7 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
-  // Provisioned / modelled boundary gauges: same upper-envelope curve as measured watts.
-  'y_gpuProvisionedWatts',
-  'y_utilityProvisionedWatts',
+  // Modelled boundary gauge: same upper-envelope curve as measured watts.
   'y_utilityModeledWatts',
 ]);
 

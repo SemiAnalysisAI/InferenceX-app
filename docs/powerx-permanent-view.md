@@ -26,8 +26,8 @@ group stays out of the selector otherwise. The boundary metrics are members of t
 | Basis (`PowerBasis`)  | Selector label              | W / GPU metric                               | J / output token metric                           | Source                                                                                           |
 | --------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `gpu-measured`        | GPU Level Measured          | `y_measuredAvgPower` (+P75/P90, roles, %TDP) | `y_measuredJPerOutputToken` (+ input/total/query) | runner telemetry; existing metrics, unchanged                                                    |
-| `gpu-provisioned`     | GPU Level Provisioned (TDP) | `y_gpuProvisionedWatts`                      | `y_gpuProvisionedJPerOutputToken`                 | `HW_REGISTRY.tdp`                                                                                |
-| `utility-provisioned` | All in Provisioned          | `y_utilityProvisionedWatts`                  | `y_utilityProvisionedJPerOutputToken`             | `HW_REGISTRY.power` (all-in kW per GPU)                                                          |
+| `gpu-provisioned`     | GPU Level Provisioned (TDP) | none (timeline reference line)               | `y_gpuProvisionedJPerOutputToken`                 | `HW_REGISTRY.tdp`                                                                                |
+| `utility-provisioned` | All in Provisioned          | none (timeline reference line)               | `y_utilityProvisionedJPerOutputToken`             | `HW_REGISTRY.power` (all-in IT kW per GPU) × PUE of `cooling`                                    |
 | `utility-modeled`     | All in Measured             | `y_utilityModeledWatts`                      | `y_utilityModeledJPerOutputToken`                 | `modelSystemPower` IT power × system PUE (1.3 chassis, 1.1 NVL72; applied once), ÷ measured GPUs |
 
 Formulas, the all-GPU normalization (`N_alloc` = prefill + decode GPUs for disaggregated
@@ -38,14 +38,17 @@ NVL72 tray models themselves in [PowerX System Power](./powerx-system-power.md).
 `all GPUs` label keep the two distinguishable in the selector, the availability list and CSV
 headers.
 
+Provisioned watts are one rating per hardware, so they are not Pareto axes. The Boundary select
+offers only GPU Level Measured and All in Measured for power, and old `y_gpuProvisionedWatts` /
+`y_utilityProvisionedWatts` links resolve to `y_measuredAvgPower`. The rated TDP and all-in lines
+live on the power timelines instead.
+
 Every boundary metric has `polarity: 'lower'`. Energy metrics therefore get the usual
-lower-is-better Pareto frontier. The three watt keys are listed in `POWER_CURVE_METRICS`
+lower-is-better Pareto frontier. The All in Measured watt key is listed in `POWER_CURVE_METRICS`
 (`utils/powerCurves.ts`), so `ScatterGraph`/`GPUGraph` draw the upper power envelope for them
 exactly as for `y_measuredAvgPower`, and Optimal Only keeps every load point; the declared
 `lower_*` roofline only drives the ascending Table sort. `measured-power-direction.test.ts` pins
-both halves. A flat provisioned series
-(TDP or all-in W is one constant per hardware) has a single envelope vertex per hardware, so no
-envelope line is drawn for it — only the points.
+both halves.
 
 ## Why the metric key carries the boundary
 
@@ -93,14 +96,14 @@ the selection has no measured GPU power (`noMeasuredDataHint`) instead of the ge
 Base: `/inference?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
 selection. Append:
 
-| Figure | Content                                       | Parameters                                                                                                                                                               |
-| ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2      | H200 W/GPU, all four boundaries on one chart  | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` (one boundary at a time: `&i_metric=y_gpuProvisionedWatts` / `y_utilityProvisionedWatts` / `y_utilityModeledWatts`) |
-| 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                       |
-| 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                 |
-| 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                          |
-| 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                            |
-| 1      | Measured power over the benchmark job         | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                                      |
+| Figure | Content                                       | Parameters                                                                                                                                                                                                   |
+| ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2      | H200 W/GPU, measured boundaries + rated lines | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` draws GPU Level Measured and All in Measured; the rated lines are on the timeline (`&i_metric=y_measuredPowerTimeline`, all-in switch `&i_ptutility=1`) |
+| 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                                                           |
+| 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                                                     |
+| 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                                                              |
+| 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                                                                |
+| 1      | Measured power over the benchmark job         | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                                                                          |
 
 Pinned official dashboard points now offer **View PowerX** when the feature gate is unlocked
 or a measured-metric share link is active. The lazy in-page dialog reads the existing
@@ -240,7 +243,7 @@ config is `display: 'timeline'`.
   `?unofficialrun=` rows; legend toggles follow `activeHwTypes` / `activeOverlayHwTypes`
   exactly as in `ScatterGraph`. The whole job is drawn faint and the `power_audit` window
   emphasized (`data-segment="full" | "window"`). Rated TDP is a dashed reference per hardware;
-  the all-in provisioned line is an opt-in legend switch because it halves the traces'
+  the all-in provisioned line (registry all-in IT W × PUE) is an opt-in legend switch because it halves the traces'
   vertical resolution. X axis: wall clock (UTC) when the visible traces come from one run,
   otherwise seconds since each trace's start; both are a toolbar toggle. `c<conc>` labels sit
   at the end of the emphasized segment; labels that would overprint stack one row apart
