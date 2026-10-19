@@ -1,7 +1,18 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
+import {
+  Car,
+  Crosshair,
+  Flame,
+  Moon,
+  Pickaxe,
+  Shield,
+  Skull,
+  Sun,
+  Type,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -17,6 +28,8 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   gta: Car,
   doom: Skull,
   halo: Shield,
+  inferact: Type,
+  radixark: Flame,
 };
 
 /** Neutral half-moon shown before hydration, when the saved theme is unknown. */

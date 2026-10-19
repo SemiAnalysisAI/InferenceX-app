@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *, .radixark *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -311,7 +311,8 @@ html[data-inferencex-embed] .autumn-leaves {
 .csgo,
 .gta,
 .doom,
-.halo {
+.halo,
+.radixark {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;

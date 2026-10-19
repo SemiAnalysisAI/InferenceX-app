@@ -1,0 +1,262 @@
+@font-face {
+  font-family: 'RadixArk Sans';
+  src: url('/decorative/radixark/hanken-grotesk-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* Visual reference: https://radixark.ai, inspected 2026-10-16. */
+.radixark {
+  --background: #080706;
+  --foreground: #f8f2ea;
+  --card: #100d0b;
+  --card-foreground: #f8f2ea;
+  --popover: #17120f;
+  --popover-foreground: #f8f2ea;
+  --primary: #dc6b32;
+  --primary-foreground: #080706;
+  --brand: #ee9b70;
+  --secondary: #ee9b70;
+  --secondary-foreground: #080706;
+  --muted: #231b16;
+  --muted-foreground: #c5b7ac;
+  --accent: #352116;
+  --accent-foreground: #f8f2ea;
+  --border: #514237;
+  --input: #625044;
+  --ring: #ee9b70;
+  --radixark-heading: 'RadixArk Sans', Arial, sans-serif;
+}
+.radixark body {
+  font-family: var(--font-dm-sans), Arial, sans-serif;
+  background: #080706;
+}
+.radixark .shiki,
+.radixark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+.radixark header {
+  background: #160c06e8;
+  border-color: #514237;
+  backdrop-filter: blur(16px);
+}
+.radixark header nav a {
+  font-family: var(--radixark-heading);
+}
+.radixark :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--radixark-heading);
+  letter-spacing: -0.025em;
+}
+.radixark [data-slot='card'] {
+  border-radius: 0;
+  box-shadow: none;
+  border-color: #514237;
+}
+.radixark main > .container {
+  gap: 2.5rem;
+}
+.radixark :is(button, [role='combobox'], [data-slot='select-trigger']) {
+  border-radius: 999px;
+}
+.radixark :is(button, a, input, textarea, [role='combobox']):focus-visible {
+  outline: 2px solid #ee9b70;
+  outline-offset: 3px;
+}
+.radixark [data-slot='dashboard-navigation'] [data-tab-active='true'] {
+  color: #f8f2ea;
+  background: #442515;
+}
+.radixark .halloween-wordmark {
+  color: #f8f2ea;
+  font-family: var(--radixark-heading);
+}
+.radixark .halloween-wordmark-x {
+  color: #d55816;
+}
+.radixark .halloween-wordmark-pumpkin,
+.radixark .autumn-leaves,
+.radixark .circuit-bg {
+  display: none;
+}
+.radixark-theme-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: min(760px, 80svh);
+  display: grid;
+  place-items: center;
+  margin-bottom: 3rem;
+  background: #100904;
+}
+.radixark-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 18%, #4c2308 0, #211105 47%, #080706 86%);
+}
+.radixark-smoke {
+  position: absolute;
+  width: 95%;
+  height: 80%;
+  left: 5%;
+  top: -15%;
+  background: radial-gradient(ellipse at 42% 45%, #c1631a35, transparent 65%);
+  filter: blur(40px);
+  animation: radixark-smoke 22s ease-in-out infinite alternate;
+}
+.radixark-smoke.smoke-two {
+  top: 20%;
+  left: -20%;
+  width: 125%;
+  opacity: 0.55;
+  animation-delay: -12s;
+  animation-direction: alternate-reverse;
+}
+.radixark-horizon {
+  position: absolute;
+  top: 58%;
+  left: -15%;
+  width: 130%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #a55316 20%,
+    #f7b53c 43%,
+    #fff7c1 50%,
+    #f7b53c 57%,
+    #a55316 80%,
+    transparent
+  );
+  box-shadow:
+    0 0 8px 2px #e98829,
+    0 0 35px 9px #a95822;
+  animation: radixark-horizon 8s ease-in-out infinite alternate;
+}
+.radixark-flare {
+  position: absolute;
+  left: calc(50% - 1px);
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(
+    transparent,
+    #f2971d30 20%,
+    #fdc34a95 58%,
+    #e76d1020 70%,
+    transparent
+  );
+  box-shadow: 0 0 22px 8px #b7691b30;
+}
+.radixark-dust {
+  position: absolute;
+  inset: 0;
+  opacity: 0.13;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.65' d='M0 0h180v180H0z'/%3E%3C/svg%3E");
+  mask-image: linear-gradient(transparent 52%, #000 58%, transparent 64%);
+}
+.radixark-title-block {
+  width: 100%;
+  text-align: center;
+  padding: 2rem 1rem;
+  transform: translateY(2%);
+}
+.radixark-wordmark {
+  font-family: var(--radixark-heading);
+  font-size: clamp(3.5rem, 10vw, 9rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.065em;
+  background: linear-gradient(110deg, #7d6655 5%, #f8f2ea 47%, #a8927b 80%);
+  color: #f8f2ea;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-bottom: 0.1em;
+}
+.radixark-wordmark span {
+  background: linear-gradient(#f68429, #b94e15);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.radixark-tagline {
+  margin-top: 2.5rem;
+  color: #f8f2ea;
+  font-family: var(--radixark-heading);
+  font-weight: 400;
+  font-size: clamp(0.75rem, 1.3vw, 1.2rem);
+  letter-spacing: 0.65em;
+  padding-left: 0.65em;
+}
+.radixark-theme-banner.is-compact {
+  min-height: 160px;
+  margin-bottom: 1.5rem;
+}
+.radixark-theme-banner.is-compact .radixark-wordmark {
+  font-size: 3rem;
+}
+.radixark-theme-banner.is-compact .radixark-tagline {
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.25em;
+}
+.radixark-theme-banner[data-motion='paused'] * {
+  animation-play-state: paused;
+}
+@keyframes radixark-smoke {
+  from {
+    transform: translate(-5%, -5%) scale(0.9) rotate(-8deg);
+    opacity: 0.4;
+  }
+  to {
+    transform: translate(5%, 8%) scale(1.2) rotate(8deg);
+    opacity: 0.9;
+  }
+}
+@keyframes radixark-horizon {
+  from {
+    opacity: 0.7;
+    transform: scaleX(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1.06);
+  }
+}
+@media (max-width: 640px) {
+  .radixark-theme-banner {
+    min-height: 560px;
+    margin-bottom: 2rem;
+  }
+  .radixark-wordmark {
+    font-size: clamp(3rem, 13.3vw, 5rem);
+  }
+  .radixark-tagline {
+    letter-spacing: 0.32em;
+    font-size: 0.75rem;
+    margin-top: 2rem;
+  }
+  .radixark-horizon {
+    top: 55%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .radixark-theme-banner * {
+    animation: none !important;
+  }
+}
+@media (forced-colors: active) {
+  .radixark-atmosphere {
+    display: none;
+  }
+  .radixark-wordmark,
+  .radixark-wordmark span {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+  }
+}
