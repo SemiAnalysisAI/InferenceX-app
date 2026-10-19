@@ -500,6 +500,8 @@ export interface TrendDataPoint {
   x: number;
   synthetic?: boolean;
   sources?: TrendSource[];
+  /** False when a legacy fallback would make a waterfall comparison ambiguous. */
+  waterfallEligible?: boolean;
 }
 
 export interface TrendLineConfig {

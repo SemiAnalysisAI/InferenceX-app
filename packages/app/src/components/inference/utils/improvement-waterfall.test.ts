@@ -40,6 +40,15 @@ const workflow = (changelogs: WorkflowInfoResponse['changelogs']): WorkflowInfoR
 });
 
 describe('improvement waterfall', () => {
+  it('excludes legacy total-as-output fallbacks from comparable output gains', () => {
+    const steps = buildImprovementWaterfall([
+      { ...point('2025-09-01', 10000), waterfallEligible: false },
+      { ...point('2025-10-01', 100), waterfallEligible: true },
+      { ...point('2025-11-01', 120), waterfallEligible: true },
+    ]);
+    expect(steps.map((step) => step.to)).toEqual([100, 120, 120]);
+    expect(steps[0].date).toBe('2025-10-01');
+  });
   it('sorts observations, skips regressions and recoveries, and telescopes to the best', () => {
     const steps = buildImprovementWaterfall([
       point('2026-01-05', 140),

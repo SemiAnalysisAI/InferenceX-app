@@ -451,6 +451,14 @@ export function buildTrendLines(
         value: interpolated,
         x: targetInteractivity,
         sources,
+        waterfallEligible:
+          !trendMetricKey.toLowerCase().includes('output') ||
+          frontier.every(
+            (point) =>
+              typeof point.output_tput_per_gpu === 'number' &&
+              Number.isFinite(point.output_tput_per_gpu) &&
+              point.output_tput_per_gpu > 0,
+          ),
       });
     }
   }

@@ -30,7 +30,13 @@ export function buildImprovementWaterfall(
   lowerIsBetter = false,
 ): ImprovementStep[] {
   const points = data
-    .filter((point) => !point.synthetic && Number.isFinite(point.value) && point.value > 0)
+    .filter(
+      (point) =>
+        !point.synthetic &&
+        point.waterfallEligible !== false &&
+        Number.isFinite(point.value) &&
+        point.value > 0,
+    )
     .toSorted((a, b) => a.date.localeCompare(b.date));
   if (points.length === 0) return [];
   let best = points[0];

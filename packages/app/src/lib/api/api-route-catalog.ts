@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '2d5b00a19de69376199ad970c1de81304a49c8127453ad9013ec7c71a6e6c743',
+    sourceSha256: '1df1148aa6f143f99f9834fac5e8291f6798fea25e0ca28e323522a17df826ad',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -1333,7 +1333,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: 'a1c5b32e1ed7950eea62e2409d35ce1dc7a089422994bb196ccad076eaf305f2',
+    sourceSha256: '20069cd3134a62342679f0aaa882c7860d0dc161519b3506b83faea1a3d5aaa0',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

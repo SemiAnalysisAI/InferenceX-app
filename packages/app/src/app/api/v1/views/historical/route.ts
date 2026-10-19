@@ -222,6 +222,9 @@ export function GET(request: NextRequest) {
       chart === 'waterfall'
         ? series.map((entry) => ({
             ...entry,
+            excludedPointCount: (trendLines.get(entry.key) ?? []).filter(
+              (point) => !point.synthetic && point.waterfallEligible === false,
+            ).length,
             steps: buildImprovementWaterfall(
               trendLines.get(entry.key) ?? [],
               registryEntry?.polarity === 'lower',
