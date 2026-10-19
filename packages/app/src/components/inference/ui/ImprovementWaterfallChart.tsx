@@ -110,6 +110,9 @@ export default function ImprovementWaterfallChart({
 
   return (
     <div id={chartId} className="min-w-0 p-4" data-testid="improvement-waterfall">
+      <div className="max-h-0 overflow-hidden" aria-hidden="true">
+        <div id={`${chartId}-export`} className="p-4" />
+      </div>
       <figcaption className="mb-4">{caption}</figcaption>
       <div className="min-w-0">
         <div ref={plotRef} className="min-w-0">

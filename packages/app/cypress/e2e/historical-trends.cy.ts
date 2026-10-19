@@ -14,6 +14,7 @@ describe('Historical improvement waterfall', () => {
     cy.get('[data-testid="historical-view-line"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="historical-view-waterfall"]').click();
     cy.get('[data-testid="waterfall-chart-svg"]').should('be.visible');
+    cy.get('#historical-trend-export').should('exist');
     cy.get('[data-testid="waterfall-step"][data-kind="baseline"]').should('have.length', 1);
     cy.get('[data-testid="waterfall-step"][data-kind="best"]').should('have.length', 1);
     cy.get('[data-testid="waterfall-series"] option').then(($options) => {
