@@ -831,7 +831,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-log-availability',
-    sourceSha256: '9137745fa6826a14ec63e6b483666688949b4cef9140e64ff2eae8fd7b4164ef',
+    sourceSha256: '4ee5d5f9f458e523a34602f9e657cfd6a76a44666c44ae08456810f03f46a7d9',
   },
   {
     source: 'src/app/api/v1/overview/route.ts',
@@ -899,7 +899,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log-files',
-    sourceSha256: '52d57c3f09f17b7eef652476e92d1ab193b772acc5aeeddca370a8f970efb2af',
+    sourceSha256: '29301691924960bfeec9ce9d51b692b4b6ad534a9311add1046c10c108d20790',
   },
   {
     source: 'src/app/api/v1/server-log-search/route.ts',
@@ -915,7 +915,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '07ef1ac2fcb6818ab9734b85ac5eb4f8b34420adbcc0089e3265bb3a59745454',
+    sourceSha256: 'dff94297fdaf4dec83ad725265bf4c7133d97ea527414b69550e64653d5d1223',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -1662,7 +1662,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '7a6f6b0b3c60e1713f73f6d543745931886654f060cf55d6dc4be9619a64b479',
+    sourceSha256: 'ef59e5dca80dd055fdacfe95f43d5bb475cfef01d0de45804d4086a97ea4ae44',
     reviewArea: {
       en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',

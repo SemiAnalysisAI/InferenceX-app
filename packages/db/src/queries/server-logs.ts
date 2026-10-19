@@ -40,8 +40,12 @@ const PREVIEW_LOG_LINKS: readonly (readonly [number, number])[] =
         [445241, 19857],
       ]
     : [];
-const PREVIEW_POINT_IDS = PREVIEW_LOG_LINKS.map(([pointId]) => pointId);
-const PREVIEW_LOG_IDS = PREVIEW_LOG_LINKS.map(([, logId]) => logId);
+// Bind NULL rather than an empty array when the mapping is off: unnest(NULL) yields no rows,
+// and no driver has to serialize an empty array parameter.
+const PREVIEW_POINT_IDS =
+  PREVIEW_LOG_LINKS.length > 0 ? PREVIEW_LOG_LINKS.map(([pointId]) => pointId) : null;
+const PREVIEW_LOG_IDS =
+  PREVIEW_LOG_LINKS.length > 0 ? PREVIEW_LOG_LINKS.map(([, logId]) => logId) : null;
 
 const isPreLogFilesSchema = (error: unknown): boolean => {
   const code = (error as { code?: unknown })?.code;
