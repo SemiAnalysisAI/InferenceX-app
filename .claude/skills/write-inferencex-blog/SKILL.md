@@ -36,9 +36,7 @@ Common gotchas:
 - **Workload mismatch**: chart headers can mislead. Verify ISL/OSL from the data itself — 1k/1k and 8k/1k give wildly different `tok/s/GPU` and `$/M tokens` numbers. The blog title, lede, tables, and chart caption must all use the same ISL/OSL.
 - **Latest run only**: `/api/v1/benchmarks` already returns the latest result per point. When you work from history, filter to the highest `run_attempt` per `github_run_id`, then take the latest `date` per `(config_id, conc, isl, osl)`.
 - **Model spec verification**: never invent parameter counts. Always `WebSearch` the model's released specs (total params, active params, expert count, attention type) before writing the architecture paragraph. Cite sources. GLM-5 is _not_ GLM-4.5 — the numbers changed.
-- **TCO values**: pull from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/). Current values (verify if older than a quarter):
-  - H100 $1.30, H200 $1.41, B200 $1.95, B300 $2.34, GB200 $2.21, GB300 $2.652
-  - MI300X $1.12, MI325X $1.28, MI355X $1.48
+- **TCO values**: use the dashboard's [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) rates, `costh` (owning at hyperscaler volume) in `HW_REGISTRY` (`packages/constants/src/gpu-keys.ts`), so table costs match the chart.
 - **Cost per million tokens formula**: `$/M tok = TCO_$/GPU/hr * 1e6 / (3600 * tput_per_gpu)`. Equivalently in Python: `cost = tco / (3600 * tput / 1e6)`. Throughput is per-GPU, so GPU count cancels out for aggregated configs.
 - **Bandwidth units — keep uni-di vs bi-di and GB/s vs Gbit/s consistent.** This is the single most common factor-of-two or factor-of-eight error in scale-up vs scale-out comparisons, and Cursor Bugbot will catch it. NVLink 5 per-GPU is **900 GB/s uni-directional** (1.8 TB/s bi-directional). ConnectX-7 InfiniBand / RoCEv2 Ethernet per-GPU is **400 Gbit/s = 50 GB/s uni-directional** (100 GB/s bi-di). The NVLink-to-IB/RoCE ratio is **18x in either direction**, not 36x. A previous post (gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200.mdx) shipped with 36x because it compared NVLink bi-di against IB uni-di — flag this if you encounter it in older posts. House rule for new posts: always state "uni-directional" or "uni-di" explicitly, and convert Gbit/s to GB/s in the same sentence so readers can audit the math.
 
@@ -51,7 +49,7 @@ The dashboard chart uses a **monotone cubic Hermite spline (Steffen 1990, identi
 ```bash
 python3 .claude/skills/write-inferencex-blog/iso_interactivity.py
 # stdin:  {"points": [{"interactivity": .., "throughput": .., "cost_per_M": ..}, ...],
-#          "target_iv": 18.0, "metric_key": "cost_per_M"}
+#          "target_iv": 18.0, "metric_key": "cost_per_M", "reciprocal_of": "throughput"}
 # stdout: {"value": 0.22}  // or null when target is outside frontier range
 ```
 
@@ -60,21 +58,9 @@ Or import it as a module from a small wrapper script if you're computing many ro
 Rules to follow because the helper enforces them — but you need to interpret them correctly when writing the table:
 
 - **No extrapolation.** When the target interactivity falls outside the frontier's `[min x, max x]`, the helper returns `null`. Render those cells as `_unreachable_` (and the ratio column as `_∞_` if comparing two dates/configs). Do not invent a value. This is the whole reason the chart code returns `null` — the recipe physically can't reach that operating point.
-- **Frontier is always built on (interactivity, throughput).** Even when interpolating cost or TPOT or energy, the frontier itself is the upper-left envelope on throughput-vs-interactivity. Other metrics are derived values at frontier knots. This matches `interpolateForGPU` in the chart code: one frontier, many metrics interpolated against it.
 - **Multiple recipes (TP=4, TP=8, etc.) for the same hardware go into one points list together.** The Pareto operation collapses them into a single combined frontier, exactly as the chart does when both recipes are toggled on.
-- **The Y values are clamped to the frontier's min/max** to prevent cubic-spline overshoot above/below the data. Don't be surprised when the interpolated value sits at a knot value rather than between two knots — that's the spline saying "any value here would overshoot the data."
 
-The canonical source of truth is `packages/app/src/components/calculator/interpolation.ts` (functions `paretoFrontUpperLeft`, `monotoneSlopes`, `hermiteInterpolate`) and `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` (function `interpolateMetricAtInteractivity`). If you ever need to change the algorithm, change all three files — the TS pair plus the Python helper — in the same PR. The repository's `AGENTS.md` codifies this as a hard rule.
-
-#### How the Pareto frontier behaves between the knots
-
-The frontier is the set of measured `(interactivity, throughput)` points that are **not dominated** by any other point — a point is dominated if some other point in the dataset has both higher interactivity AND higher throughput. Geometrically, you sort the points by interactivity ascending, walk from left to right, and keep popping the previous point off the stack as long as the new point's throughput is greater or equal. What survives is the upper-left envelope: a staircase of points where as interactivity decreases (moving left), throughput increases (moving up), monotonically. Everything "inside" that envelope was a worse operating point on both axes simultaneously and is discarded — it could never be chosen in production.
-
-The chart then draws a smooth curve **through these surviving knots only**. The curve is a piecewise cubic — between each adjacent pair of frontier knots `(xᵢ, yᵢ)` and `(xᵢ₊₁, yᵢ₊₁)`, the chart draws a Hermite cubic specified by the two endpoint values and two tangent slopes `mᵢ`, `mᵢ₊₁` at each end. The tangents are computed by Steffen's 1990 monotone construction (identical to d3's `curveMonotoneX`), which has one critical property: the cubic between two knots **never overshoots** the throughput values at those knots. If two adjacent knots have throughputs 3,000 and 4,000, the curve between them stays inside `[3,000, 4,000]` — no spurious bumps above 4,000 or dips below 3,000, even if the slopes from neighboring segments would push it that way. This is why simple cubic splines aren't used: they wiggle, and the chart would imply throughput values that the silicon never actually produced.
-
-So when you interpolate at `target_iv = 18`, the helper does this: (1) finds the bracket `[xᵢ, xᵢ₊₁]` containing 18, (2) evaluates the Hermite cubic `h₀₀·yᵢ + h₁₀·hh·mᵢ + h₀₁·yᵢ₊₁ + h₁₁·hh·mᵢ₊₁` at `t = (18 − xᵢ) / (xᵢ₊₁ − xᵢ)`, and (3) clamps the result to the metric's `[min, max]` across the entire frontier as a final safety net against any residual overshoot. If 18 is to the left of the smallest frontier x or to the right of the largest, the helper returns `null` — there is no extrapolation, because the chart code itself draws no curve outside the data range.
-
-What this means for the blog tables: the interpolated values you publish track the **shape of the rendered curve** between knots, not a straight line. At iso-interactivity points that happen to sit very close to a knot, the published number will land very close to that knot's measured value. In the middle of a wide segment, the spline can sit noticeably above or below the linear-interpolation guess — sometimes by 10% or more on steep parts of the curve. That difference is what readers see in the chart, so it's what the table must show.
+The helper's docstring explains the algorithm and its options for other metric types. If you ever need to change the algorithm, change the TypeScript chart code and this Python helper in the same PR, as the Chart Interpolation section of `AGENTS.md` requires.
 
 ## Step 2: Slug and image directory
 
@@ -97,25 +83,7 @@ Never use numeric names (`figure1`, `figure2`) — they break when figures get r
 
 ## Step 3: Frontmatter
 
-```yaml
----
-title: 'Punchy headline with the number — under ~75 chars'
-subtitle: 'One-sentence explanation of the mechanism, the workload, and the comparator — ~150-200 chars'
-date: '2026-MM-DD'
-publishDate: '2026-MM-DD'
-tags:
-  - benchmark
-  - gpu
-  - inference
-  - {model-slug, e.g. glm5, kimi, deepseek}
-  - {vendor, e.g. amd, nvidia}
-  - {hardware-slug, e.g. mi355x, b200, gb200}
-  - {framework, e.g. sglang, vllm, trtllm}
-  - {os/runtime, e.g. rocm} (optional)
----
-```
-
-Use `date` == `publishDate` == ISO YYYY-MM-DD. The same date appears in the lede ("measured on InferenceX on 2026-MM-DD").
+Field rules are in [docs/blog.md](../../../docs/blog.md). Keep `title` under ~75 chars and `subtitle` to one sentence of ~150-200 chars covering the mechanism, the workload and the comparator. Set `date` and `publishDate` to the same ISO `YYYY-MM-DD`, and use that date in the lede ("measured on InferenceX on 2026-MM-DD"). Tags start with `benchmark`, `gpu` and `inference`, then add the model, vendor, hardware and framework slugs (e.g. `glm5`, `amd`, `mi355x`, `sglang`) and an optional runtime such as `rocm`.
 
 **Title and subtitle prefer model name + headline ratio + the interactivity point at which it peaks.** Not a laundry list of framework + precision + workload + parallelism — those belong in the body. Compare:
 
@@ -229,7 +197,7 @@ Table columns: `Conc | tok/s/GPU | tok/s/user | TPOT (ms) | $/M tokens`. Right-a
 
 This is where the headline ratio gets made explicit. One short intro sentence ("Throughput per GPU at matched interactivity, interpolated along each SKU's Pareto frontier."), one sentence on the `_unreachable_` convention if it appears in the table, then the table(s) — MTP and non-MTP if both are in scope, otherwise one.
 
-> 🚫 **BANNED PHRASES — do not put the interpolation algorithm in the published prose.** The SKILL's earlier sections describe the algorithm at length because the agent writing the post needs to understand it; the **reader** does not. Mentioning the algorithm in the post is slop and gets cut in review every time.
+> 🚫 **BANNED PHRASES — do not put the interpolation algorithm in the published prose.** The agent writing the post needs to understand the algorithm. The **reader** does not. Mentioning the algorithm in the post is slop and gets cut in review every time.
 >
 > Specifically banned anywhere in the MDX body, table captions, figure captions, intro sentences, FAQ answers, or anywhere else readers will see:
 >
@@ -332,17 +300,17 @@ When the user gives the green light, **stop the editor process first** so its au
 lsof -ti tcp:4747 | xargs -r kill   # or TaskStop on the bash background id
 ```
 
-Then run the git sequence in one shot:
+Write the required Simplified Chinese sibling at `packages/app/content/blog/zh/{slug}.mdx` (see the Chinese Website Pages rules in `AGENTS.md`) and check it with `review-zh-copy`. Then run the git sequence in one shot:
 
 ```bash
 git checkout -b blog/{slug} origin/master
-git add packages/app/content/blog/{slug}.mdx packages/app/public/images/{slug}/
+git add packages/app/content/blog/{slug}.mdx packages/app/content/blog/zh/{slug}.mdx packages/app/public/images/{slug}/
 git commit -m "feat(blog): {title-ish}"
 git push -u origin blog/{slug}
 gh pr create --title "feat(blog): ..." --body "..."
 ```
 
-The pre-commit hook runs `oxlint`, `oxfmt`, and `tsc --noEmit`. All three must pass. If lint/format fails, run `bun run lint:fix && bun run fmt:fix` and re-commit (don't `--no-verify`).
+The pre-commit hook runs `oxlint`, `oxfmt`, `tsc --noEmit`, and the typography check (`bun run check:typography`). All four must pass. If lint/format fails, run `bun run lint:fix && bun run fmt:fix` and re-commit (don't `--no-verify`).
 
 After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose (numeric overstatement, claims contradicted by tables, wrong attribution). Treat its findings as real review comments — fix them in a follow-up commit, then resolve the threads. Branch protection on master requires resolved review threads before auto-merge fires.
 
@@ -359,7 +327,7 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
 - Use em-dashes `—` not double-hyphens.
 - Link the upstream PRs and InferenceX recipe PRs every time. Reader wants the receipts.
 - **Cross-links go where the prose motivates them, not in the lede.** Link `/gpu-specs`, prior InferenceX posts, kernel-recipe docs, and SemiAnalysis models _next to the sentence that earns the click_ — when the post discusses NVLink fanout, the `/gpu-specs` link goes in that paragraph, not in the headline number sentence. The lede is for the headline ratio and the workload; navigation belongs in the body. Link each cross-target once at the first place it's contextually motivated, not at every mention of the SKU/model/topic.
-- **Write tight first, expand only on request.** Default to 1-3 short paragraphs per explanation; trust the reader to ask for more detail in review. Long preemptive expansions get trimmed back by the reviewer (and overwritten by the browser editor's auto-save while you wait). The compute-comm-overlap framing template in the "Reusable technical framings" section is the upper bound — don't go longer than that even for the most central technical argument.
+- **Write tight first, expand only on request.** Default to 1-3 short paragraphs per explanation; trust the reader to ask for more detail in review. Long preemptive expansions get trimmed back by the reviewer (and overwritten by the browser editor's auto-save while you wait).
 - **Don't restate the table contents in prose.** If the reader can see "4,130 vs 941 tok/s/GPU = 4.39x at 125 tok/s/user" in the iso-interactivity row, don't also write it in the closing paragraph after the table. Use the prose around tables to explain the WHY, not to summarize the WHAT. A closing paragraph that just restates the headline number gets removed in editorial review.
 - Don't apologize for non-coverage in the lede — save it for "What's Next".
 - **Don't use the "X, not Y" antithesis construction for emphasis.** AI writing tics this hard — phrases like "the gap is silicon × precision, **not** framework", "every gain came from the kernels, **not** the silicon", "it's a software story, **not** a hardware one", "this is a real lever, **not** a paper one". Reads as performatively contrarian flexing and is one of the loudest AI-prose tells. State the thing on its own; if the "Y" the reader might have guessed is actually plausible-but-wrong, address it on its merits in a separate sentence (or skip it — usually the table that follows kills the wrong guess on its own).
@@ -370,42 +338,13 @@ After the PR opens, expect Cursor Bugbot to flag correctness issues in the prose
   - Avoid: "The lift came from the kernels, not the silicon."
   - Use instead: "Same hardware on both dates — every gain came from the kernels."
 
-## Reusable technical framings
-
-These are explainer templates that come up repeatedly. Adapt the prose to the specific workload, but the underlying mechanic and the structure of the argument carry over.
-
-### "Why rack-scale NVL72 wins in the medium-batch / medium-interactivity band on a sparse MoE"
-
-Use for any GB200 NVL72 / GB300 NVL72 vs HGX node comparison on a many-routed-expert MoE (DeepSeek R1, Kimi K2.5, GLM-5, etc.). The mechanic:
-
-1. **Three regimes on the throughput-vs-interactivity curve, mapped correctly to batch size.** Read the x-axis as interactivity, but always think of it as "small batch on the right, huge batch on the left" — that's what determines the bottleneck.
-   - **Right end of chart (high interactivity, small batch) = weight-bandwidth-bound.** Each decode step loads the full expert weights from HBM but only computes on a handful of tokens. Per-token cost is dominated by HBM reads of weights you barely use before reloading the next set. This is the regime where wider EP is most attractive in theory (smaller per-rank expert footprint → less weight loading per step), but it doesn't help in practice because the per-step latency floor is already pinned by attention and a single MoE dispatch, and adding ranks just adds collective overhead.
-   - **Middle of chart (medium interactivity, medium batch with wide EP enabled) = network-bound on the EP dispatch and combine collectives.** This is where the rack-scale fabric advantage lives. The compute-comm overlap mechanic in step 3 below is the entire story here.
-   - **Left end of chart (low interactivity, huge batch) = compute-bound + KV-cache-bandwidth-bound + (for disagg) cross-rack KV transfer.** Weights are amortized across thousands of tokens per step, so weight bandwidth stops mattering. The bottleneck shifts to tensor-core saturation on the MoE GEMMs and HBM reads of the per-user KV cache (which is enormous at high batch). For disaggregated serving, the prefill→decode KV transfer also becomes meaningful here. Both NVL72 and HGX-disagg-multinode collapse onto narrow EP=4 + DP attention in this regime — wide EP buys you nothing because weight amortization is already happening for free at high batch.
-   - **Watch out: do not flip these regimes.** The most common mistake (and one I've made on prior drafts) is to label the left end as weight-bandwidth-bound. It is the _opposite_ — large batch is where weight bandwidth stops being the bottleneck because each loaded weight serves many tokens. The right end is where weight bandwidth bites.
-2. **What dispatch and combine actually do.** Each MoE layer fires two all-to-all collectives per token: a **dispatch** routing each token to the K of N experts it was assigned to (on remote ranks under wide EP), and a **combine** gathering the expert outputs back to each token's home rank. Across L MoE layers that is roughly 2×L collectives per token. Spell out the per-token collective count — readers anchor on it.
-3. **Compute-comm overlap on fast networks.** When the cross-rank network is fast enough, the runtime issues the dispatch, starts the expert GEMM on tokens that have already arrived, finishes the GEMM in roughly the time it takes for the remaining bytes to land, then issues the combine. The collective latency disappears from the critical path because the GPU was busy throughout. NVLink 5 at 900 GB/s per GPU uni-di is in this regime for EP=16 or EP=32 medium-batch decode.
-4. **Exposed comms on slow networks.** Drop the network bandwidth by 18x (ConnectX-7 RoCEv2 Ethernet or IB at 50 GB/s uni-di) and the same collective takes 18x longer per byte moved, no longer fits inside the GEMM budget, and exposes itself as raw communication time. Profilers show this as visible gaps in the GPU timeline. Widening EP makes it strictly worse because every additional rank adds more exposed-comm time than it saves in HBM bandwidth — so single-node multinode HGX recipes have to drop back to single-node EP=8 where the collective stays on intra-node NVLink, at the cost of a much smaller wide-EP throughput win.
-5. **The cross-regime structure of the gap.** Peak throughput (low interactivity, huge batch) gap is small because both SKUs converge on narrow EP=4 + DP attention — at this batch size weight loading is already amortized across thousands of tokens, so wide EP buys nothing and the only differences left are tensor-core throughput, KV-cache bandwidth, and (for disagg) the cross-rack prefill→decode KV transfer. NVL72 wins this band modestly (typically 1.1x–1.2x) on the KV transfer alone. Middle-of-the-band gap (medium interactivity, medium batch) is large because that's where compute-comm overlap on the EP collectives is the deciding factor — see step 3. High-interactivity (small batch) gap inverts because small batches fit on one NVLink island, the cross-rack hop becomes pure overhead, and the per-step latency floor is already pinned by attention + a single MoE dispatch regardless of fabric. Always call out the inversion explicitly — the curves crossing is the most honest part of the post.
-
-Existing posts using this framing as a template: `gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200.mdx`, `gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt.mdx`.
-
 ## Reference posts — REQUIRED reading before drafting
 
-**Before writing a single word, read every existing post in `packages/app/content/blog/*.mdx`.** This is not optional and not "open when in doubt." The InferenceX voice — the cadence framing, the "speed is the moat" close, the way technical PRs get cited with author handles, the table → iso-interactivity → "What's Next" arc, the willingness to call out where the headline gap inverts — is set by the existing posts. A draft that hasn't absorbed them will read like a generic vendor comparison and get flagged. Use `ls packages/app/content/blog/` to enumerate, then `Read` each MDX in full.
+Read these three posts in full before writing a word. They set the InferenceX voice and the table → iso-interactivity → "What's Next" arc that new posts follow:
 
-**Two of the existing posts are foundational and must be read heavily** — multiple passes, paying attention to structure and tone, not just skimming for facts:
-
-- **`packages/app/content/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx`** — the launch piece for InferenceXv2 (formerly InferenceMAX). Sets the editorial voice for the whole series: the "composability" framing for AMD's gaps, the rack-scale vs single-node distinction, the way TCO and per-GPU economics get woven into the technical discussion, the Acknowledgments style that names individual NVIDIA and AMD engineers by first name, and the "key observations and results" overview that anchors everything in the actual benchmark dataset. Every later post implicitly assumes the reader has seen this one. Match its tone.
-- **`packages/app/content/blog/inferencemax-open-source-inference-benchmarking.mdx`** — the origin story for the open-source benchmark. Establishes why InferenceX exists (continuous benchmarking vs point-in-time studies), what "the loop" is (upstream PR → InferenceX recipe → next benchmark run within days), and why "speed is the moat" is the recurring close — software cadence on the same hardware moves the curve more than silicon upgrades on any given quarter. Borrow its framing about why benchmark cadence matters.
-
-After the two foundational posts, the closest structural templates per post type:
-
-- `packages/app/content/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200.mdx` — AMD wins on TCO, single-node, MTP + non-MTP, with iso-interactivity tables and honest gap-inversion call-out. Closest template for AMD-vs-NVIDIA single-node cost posts.
-- `packages/app/content/blog/mi355x-kimi-k2-5-vllm-aiter-7x-speedup.mdx` — Single-PR speedup story, 25-day cadence, iso-throughput interpolation. Closest template for "one PR moved the curve" posts.
-- `packages/app/content/blog/sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x.mdx` — Same-hardware version-bump story. Closest template for "framework release X is N% faster than X-1" posts.
-- `packages/app/content/blog/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200.mdx` — Rack-scale wide EP story. Closest template for "scale-up fabric unlocks a new operating regime" posts.
-- `packages/app/content/blog/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x.mdx` — Three-date version-bump time series with the spline iso-interactivity comparison and the `_unreachable_` cell convention for out-of-frontier interactivities.
+- `packages/app/content/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper.mdx`, the InferenceXv2 launch piece that sets the editorial voice for the series. Match its tone.
+- `packages/app/content/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200.mdx`, the closest template for AMD-vs-NVIDIA single-node cost posts with MTP and non-MTP iso-interactivity tables.
+- `packages/app/content/blog/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x.mdx`, a three-date version-bump time series that uses the `_unreachable_` cell convention.
 
 ## When the user has only a chart image
 

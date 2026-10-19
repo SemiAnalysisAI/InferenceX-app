@@ -77,27 +77,8 @@ Key invariants:
   Bearer token (deliberately not `INVALIDATE_SECRET`, since it is remembered in browser
   localStorage), and `GITHUB_TOKEN` authorizes artifact reads.
 
-## Multi-run explorer
+## Known-support matrix
 
-The frontend loads every stored live run summary for the selected benchmark version and keeps
-refetching while recent GitHub history is still being ingested. The summary query has no arbitrary
-row cap and does not load artifact documents. Each table row has a visibility checkbox; checking a
-run fetches its cached dataset through `/api/v1/collectivex/runs/[runId]`. Checked datasets are
-combined client-side, and the EP, phase, kernel mode, precision, SKU, and backend controls filter
-their combined series. Shift-clicking a checkbox applies its new state to every row between it and the
-previously clicked row, in the table's current (suite-filtered) order.
-
-Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
-independently toggleable. Configuration color stays consistent across runs; run identity is encoded
-by the active selection order: the first checked run is solid and each additional checked run gets
-the next non-repeating dash pattern. Removing a run compacts those style slots, so a lone remaining
-run is always solid. Active patterns appear in both the run table and legend, keeping run ids out of
-visible legend labels while retaining them in the legend item's accessible title.
-The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
-cannot blank the initial explorer. Deletion is available per row or as one confirmed action for all
-currently shown runs; both paths keep the same tombstone semantics described above.
-The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
-both appears under both filters, and changing the filter does not alter the checked-run selection.
 The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
 throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of which runs are
 checked. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
@@ -117,8 +98,6 @@ read-time assembly can never drift; shipping raw docs to the client would only m
 same shared transform across the wire.
 
 ## vLLM swap_blocks
-
-**English** | [中文](./collectivex-swap-blocks_zh.md)
 
 Standalone `backend=swap-blocks` sweep runs are discovered through the same matrix/shard
 artifact path. Their execution-only matrix (`include` with one or more swap-blocks cells) maps to
