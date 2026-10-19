@@ -66,6 +66,37 @@ describe('Historical improvement waterfall', () => {
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked').click();
     cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'unchecked');
   });
+
+  it('opens waterfall controls even when the line-chart legend was collapsed', () => {
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-close-button"]').click();
+    cy.get('#historical-high-contrast').should('not.exist');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast').should('be.visible').click();
+    cy.get('[data-testid="waterfall-controls"] [data-testid="legend-open-button"]').should(
+      'not.exist',
+    );
+    cy.get('[data-testid="waterfall-controls"] [data-testid="legend-close-button"]').should(
+      'not.exist',
+    );
+    cy.get('[data-testid="waterfall-controls"] label[for^="checkbox-"]').first().click();
+    cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click().click();
+    cy.get('#historical-high-contrast')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'checked');
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-open-button"]').should(
+      'be.visible',
+    );
+    cy.get('#historical-high-contrast').should('not.exist');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'checked');
+  });
 });
 
 const visitHistoricalWithSetup = () => {

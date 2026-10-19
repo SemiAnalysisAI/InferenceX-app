@@ -493,6 +493,7 @@ export default function HistoricalTrendsDisplay() {
                 legendElement={
                   <ChartLegend
                     variant="sidebar"
+                    collapsible={chartView === 'line'}
                     onItemRemove={removeHwType}
                     legendItems={Object.entries(hardwareConfig)
                       .filter(([key]) => hwTypesWithData.has(key))
