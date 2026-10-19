@@ -613,6 +613,17 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it.each([38878624849, 38925660934])(
+    'purges every attempt of Muse Spark H100 256k corpus run %s',
+    (runId) => {
+      for (const attempt of [undefined, 1, 2, 99]) {
+        expect(isRunAttemptPurged(runId, attempt)).toBe(true);
+      }
+      expect(isRunAttemptPurged(runId - 1, 1)).toBe(false);
+      expect(isRunAttemptPurged(runId + 1, 1)).toBe(false);
+    },
+  );
+
   it.each([
     32403083041, 33219708211, 31927376673, 34413290524, 33716849615, 33219706372, 32346724519,
   ])(

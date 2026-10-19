@@ -41,6 +41,11 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  38878624849, // 2026-10-19 | Muse Spark H100 | Reason: 256k corpus used for 1M context length model
+  38925660934, // 2026-10-19 | Muse Spark H100 HiCache | Reason: 256k corpus used for 1M context length model
+  38819015342, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38835086328, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38826180170, // 2026-10-19 | Muse Spark H200 TP8 | Reason: 256k corpus used for 1M context length model
   38825818513, // 2026-10-19 | Muse Spark B300 TP4 | Reason: 256k corpus used for 1M context length model
   38824954621, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
   38834513220, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
