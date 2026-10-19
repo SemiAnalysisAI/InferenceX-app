@@ -16,6 +16,7 @@ import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import TrendChart from '@/components/inference/ui/TrendChart';
+import ImprovementWaterfallChart from '@/components/inference/ui/ImprovementWaterfallChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
@@ -53,12 +54,16 @@ import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
 import {
   costTierOptionLabel,
   metricCostTier,
+  METRIC_REGISTRY,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
 const STRINGS = {
   en: {
+    chartView: 'Chart view',
+    line: 'Trend line',
+    waterfall: 'Improvement waterfall',
     heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point.',
@@ -80,6 +85,9 @@ const STRINGS = {
     targetHint: 'Adjust the operating point used by the trend interpolation.',
   },
   zh: {
+    chartView: '图表视图',
+    line: '趋势线',
+    waterfall: '性能提升瀑布图',
     heading: '历史趋势',
     description: '将交互性固定在指定水平后，展示各项性能指标随时间的变化；数据经插值计算。',
     targetLabel: '目标交互性（tok/s/user）',
@@ -109,6 +117,8 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 }
 
 export default function HistoricalTrendsDisplay() {
+  const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
+  const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
   const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -395,6 +405,26 @@ export default function HistoricalTrendsDisplay() {
           <figure data-testid="historical-trend-figure" className="relative rounded-lg">
             <ChartButtons
               chartId="historical-trend"
+              hideZoomReset={chartView === 'waterfall'}
+              leadingControls={
+                <div role="group" aria-label={t.chartView} className="flex gap-1">
+                  {(['line', 'waterfall'] as const).map((view) => (
+                    <Button
+                      key={view}
+                      size="sm"
+                      variant={chartView === view ? 'secondary' : 'ghost'}
+                      aria-pressed={chartView === view}
+                      data-testid={`historical-view-${view}`}
+                      onClick={() => {
+                        setChartView(view);
+                        track('historical_chart_view_changed', { view });
+                      }}
+                    >
+                      {t[view]}
+                    </Button>
+                  ))}
+                </div>
+              }
               analyticsPrefix="historical"
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
@@ -410,8 +440,12 @@ export default function HistoricalTrendsDisplay() {
               }}
             />
             <Card>
-              <TrendChart
+              <PerformanceChart
                 chartId="historical-trend"
+                lowerIsBetter={
+                  METRIC_REGISTRY[selectedYAxisMetric.replace(/^y_/u, '') as MetricKey]
+                    ?.polarity === 'lower'
+                }
                 caption={
                   <>
                     <Heading as="h2" level="card">
@@ -484,15 +518,19 @@ export default function HistoricalTrendsDisplay() {
                       track('historical_legend_expanded', { expanded });
                     }}
                     switches={[
-                      {
-                        id: 'historical-log-scale',
-                        label: t.logScale,
-                        checked: logScale,
-                        onCheckedChange: (checked: boolean) => {
-                          setLogScale(checked);
-                          track('historical_log_scale_toggled', { enabled: checked });
-                        },
-                      },
+                      ...(chartView === 'line'
+                        ? [
+                            {
+                              id: 'historical-log-scale',
+                              label: t.logScale,
+                              checked: logScale,
+                              onCheckedChange: (checked: boolean) => {
+                                setLogScale(checked);
+                                track('historical_log_scale_toggled', { enabled: checked });
+                              },
+                            },
+                          ]
+                        : []),
                       {
                         id: 'historical-high-contrast',
                         label: t.highContrast,

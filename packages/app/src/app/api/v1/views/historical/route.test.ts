@@ -25,10 +25,37 @@ vi.mock('@/lib/cache/api-cache', () => ({
 }));
 
 import { GET } from './route';
+import { buildImprovementWaterfall } from '@/components/inference/utils/improvement-waterfall';
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));
 }
+
+it('exposes the same waterfall steps as the dashboard without changing the default series', async () => {
+  const path = '/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu&target=35';
+  const response = await GET(request(`${path}&chart=waterfall`));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.params.chart).toBe('waterfall');
+  expect(body.series.length).toBeGreaterThan(0);
+  for (const series of body.series) {
+    const expected = buildImprovementWaterfall(
+      series.points.map((point: { date: string; value: number; synthetic?: boolean }) => ({
+        ...point,
+        x: 35,
+      })),
+    );
+    expect(
+      series.steps.map(
+        ({ linksAvailable: _links, prLinks: _prs, ...step }: Record<string, unknown>) => step,
+      ),
+    ).toEqual(expected);
+  }
+  const csv = await GET(request(`${path}&chart=waterfall&format=csv`));
+  expect(await csv.text()).toContain('runUrls,prLinks,linksAvailable');
+  const invalid = await GET(request(`${path}&chart=invalid`));
+  expect(invalid.status).toBe(400);
+});
 
 let nextId = 1;
 

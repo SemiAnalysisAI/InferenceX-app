@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '2a1de92d1c05201dbd10ce543c0d74a83fdab9713de707c054d1fcc105463002',
+    sourceSha256: '2d5b00a19de69376199ad970c1de81304a49c8127453ad9013ec7c71a6e6c743',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -1333,7 +1333,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '86ef873a7c7f5542a7e88960c43172e8d29ff648b0404265bf0db6a215568cce',
+    sourceSha256: 'a1c5b32e1ed7950eea62e2409d35ce1dc7a089422994bb196ccad076eaf305f2',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1414,7 +1414,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '48cc9e1aef031ca1d00aaf0bf15b98a9c3421507d62fc89daa4eb2c1e42f9449',
+    sourceSha256: '291e1cc1bca965f658f31506ef0ab720fb8305e3cade52c8be6d83546fb81dc6',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

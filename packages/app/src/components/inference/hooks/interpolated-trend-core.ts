@@ -62,6 +62,11 @@ export function rowToLightweightPoint(
       ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
       : entry;
   if (!isKnownGpu(hwKey)) return null;
+  // workflow_run_id is a database ID, not a GitHub Actions ID. Preserve the
+  // actual producer URL (including repository and attempt), never the snapshot ID.
+  const runMatch = row.run_url?.match(
+    /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/,
+  );
 
   const point = {
     x: row.metrics.median_intvty ?? 0,
@@ -74,6 +79,17 @@ export function rowToLightweightPoint(
     dp: entry.dp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
+    trendSource: runMatch
+      ? {
+          date: row.date,
+          runId: Number(runMatch.groups!.id),
+          runUrl: row.run_url!,
+          model: row.model,
+          precision: row.precision,
+          hwKey,
+          benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : 'single_turn',
+        }
+      : undefined,
     tput_per_gpu: entry.tput_per_gpu,
     input_tput_per_gpu: entry.input_tput_per_gpu,
     output_tput_per_gpu: entry.output_tput_per_gpu,
@@ -415,11 +431,26 @@ export function buildTrendLines(
         tokenRevenuePricing,
       );
       if (interpolated === null) continue;
+      // Preserve the source curve's provenance, including reused points from older runs.
+      const frontierKey = PROPORTIONAL_TO_THROUGHPUT[trendMetricKey] ?? 'tpPerGpu';
+      const frontier = paretoFrontUpperLeft(
+        points,
+        (point) => point.x,
+        (point) => extractMetric(point, frontierKey)!,
+      );
+      const sources = [
+        ...new Map(
+          frontier
+            .flatMap((point) => (point.trendSource ? [point.trendSource] : []))
+            .map((source) => [`${source.date}:${source.runId}:${source.hwKey}`, source]),
+        ).values(),
+      ];
       if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
       resultMap.get(groupKey)!.set(date, {
         date,
         value: interpolated,
         x: targetInteractivity,
+        sources,
       });
     }
   }

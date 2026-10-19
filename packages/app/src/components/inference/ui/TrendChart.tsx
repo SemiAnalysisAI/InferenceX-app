@@ -22,7 +22,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
-interface TrendChartProps {
+export interface TrendChartProps {
   trendLines: Map<string, TrendDataPoint[]>;
   lineConfigs: TrendLineConfig[];
   yLabel: string;
@@ -31,6 +31,7 @@ interface TrendChartProps {
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
   selectedPrecisions?: readonly string[];
+  lowerIsBetter?: boolean;
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
