@@ -18,6 +18,7 @@ const number = formatLargeNumber;
 const STRINGS = {
   en: {
     series: 'Waterfall series',
+    controls: 'Hardware and display controls',
     baseline: 'Baseline',
     gain: 'Gain',
     best: 'Best observed',
@@ -35,6 +36,7 @@ const STRINGS = {
   },
   zh: {
     series: '瀑布图配置',
+    controls: '硬件与显示设置',
     baseline: '基线',
     gain: '性能提升',
     best: '最佳观测值',
@@ -58,6 +60,7 @@ export default function ImprovementWaterfallChart({
   yLabel,
   chartId = 'historical-trend',
   caption,
+  legendElement,
   lowerIsBetter = false,
 }: TrendChartProps) {
   const locale = useLocale();
@@ -352,6 +355,14 @@ export default function ImprovementWaterfallChart({
             <p className="mt-2 text-sm text-muted-foreground">
               {excludedCount} {t.excluded}
             </p>
+          )}
+          {legendElement && (
+            <details className="no-export mt-4" data-testid="waterfall-controls">
+              <summary className="w-fit cursor-pointer rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4">
+                {t.controls}
+              </summary>
+              <div className="mt-2 max-w-sm">{legendElement}</div>
+            </details>
           )}
         </div>
       </div>
