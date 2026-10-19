@@ -304,6 +304,12 @@ export function useChartExport({
       if (!exportElement) throw new Error('Export container not found');
 
       const clone = element.cloneNode(true) as HTMLElement;
+      // cloneNode drops each <select>'s current choice, and html-to-image
+      // renders the clone's value, so the image would show the first option.
+      const liveSelects = element.querySelectorAll('select');
+      clone.querySelectorAll('select').forEach((select, i) => {
+        select.value = liveSelects[i].value;
+      });
       clone.removeAttribute('id');
       // Remove duplicate export container from the clone to avoid DOM id conflicts
       const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
