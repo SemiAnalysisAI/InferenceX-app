@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
 
+import GpuMetricsChart from '@/components/gpu-power/GpuPowerChart';
 import { TelemetryDisplayControls } from '@/components/gpu-power/TelemetryDisplayControls';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
@@ -201,9 +202,24 @@ describe('PowerX telemetry interactions', () => {
       enabled: true,
     });
     cy.get(chart).screenshot('power-telemetry-all-in-line');
-    // The reference line must not shift the tooltip off the point hit targets.
-    cy.get(chart).find('circle.point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible').should('contain.text', 'Chip 0');
+  });
+
+  it('keeps point tooltips on the samples while the all-in line is drawn', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/inference/agentic/206887">
+        <GpuMetricsChart
+          data={series(1, 'host-a', 500).data}
+          visibleGpus={new Set([0, 1])}
+          metricKey="power"
+          artifactName="gpu_metrics_qwen35_b200"
+          hardware="b200"
+          showAllIn
+        />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
+    cy.get('circle.point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {
