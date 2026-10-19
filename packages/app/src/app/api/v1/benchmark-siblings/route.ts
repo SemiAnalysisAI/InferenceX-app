@@ -13,9 +13,18 @@ export const dynamic = 'force-dynamic';
 
 const getCachedSiblings = cachedQuery(
   (id: number): Promise<BenchmarkSiblings | null> => getBenchmarkSiblings(getDb(), id),
+  // v3 adds DCP/PCP. Roll the blob namespace so cached sibling payloads gain
+  // the complete parallelism mapping used by chart point labels.
   'benchmark-siblings-v3',
 );
 
+/**
+ * GET /api/v1/benchmark-siblings?id=N
+ *
+ * Returns the SKU (hw/framework/model/precision/spec/benchmark_type) of the
+ * benchmark_result + all sibling rows that share that SKU within the same
+ * workflow_run. Used by the agentic detail page to render a navigator.
+ */
 export const GET = idQueryRoute({
   logLabel: 'benchmark siblings',
   fetch: getCachedSiblings,

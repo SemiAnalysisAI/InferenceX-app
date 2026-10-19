@@ -1,3 +1,8 @@
+/**
+ * API client functions for the v1 endpoints.
+ * Each function is a thin fetch wrapper returning typed data.
+ */
+
 import {
   COLLECTIVEX_DEFAULT_VERSION,
   type CollectiveXDataset,
@@ -43,6 +48,11 @@ export interface DateConfigRow {
   disagg: boolean;
 }
 
+/**
+ * Per-(run, config) coverage for a date — which workflow runs produced benchmark
+ * data for which configs. Data-driven, so a run that shipped data without a
+ * changelog entry still appears (used to enumerate every run on a date).
+ */
 export interface RunConfigRow {
   github_run_id: number;
   run_started_at: string | null;
@@ -82,6 +92,7 @@ export function fetchBenchmarks(
   exact?: boolean,
   signal?: AbortSignal,
   runId?: string,
+  /** When true with a runId, fetch exactly that run's results (GPU comparison). */
   exactRun?: boolean,
   view?: { type: 'calculator'; sequence: string },
 ) {
@@ -103,6 +114,11 @@ export function fetchBenchmarkHistory(
   osl: number,
   signal?: AbortSignal,
   benchmarkType?: 'agentic_traces',
+  /**
+   * Trims the response to the calculator's metric allowlist — a ~24% smaller
+   * payload. Callers that plot measured power must leave this off; those
+   * metrics are not in the allowlist.
+   */
   view?: 'calculator',
 ) {
   const params = new URLSearchParams({
@@ -154,8 +170,20 @@ export interface EvalSampleRow {
   docId: number;
   prompt: string | null;
   target: string | null;
+  /** Filtered answer that was actually scored against `target`. */
   response: string | null;
+  /**
+   * Full unfiltered model output. Often identical to `response`, but for failed
+   * samples (degenerate output, control bytes, repetition loops) this is where
+   * the real signal lives — the filter may strip it down to nothing.
+   */
   rawResponse: string | null;
+  /**
+   * Few-shot demonstrations parsed server-side from lm-eval `arguments.gen_args_0.arg_0`.
+   * Handles both the multi-turn chat-array shape and the pre-concatenated
+   * single-message shape. `null` when the task isn't 5-shot or the prompt format
+   * doesn't match either known shape — the bare `prompt` field is sufficient there.
+   */
   demonstrations: { question: string; answer: string }[] | null;
   passed: boolean | null;
   score: number | null;
@@ -168,6 +196,7 @@ export interface EvalSamplesResponse {
   passedTotal: number;
   failedTotal: number;
   source: 'db' | 'github_artifact';
+  /** Actual page offset; present when the server resolves a shared doc id. */
   offset?: number;
 }
 
@@ -191,6 +220,7 @@ export function fetchEvalSamples(
   return fetchJson<EvalSamplesResponse>(`/api/v1/eval-samples?${params}`, signal);
 }
 
+/** Identifying fields used by the live route to locate the right eval artifact. */
 export interface EvalSamplesLiveContext {
   runId: string;
   task: string;
@@ -203,6 +233,10 @@ export interface EvalSamplesLiveContext {
   conc: number | null;
 }
 
+/**
+ * Live-fetch variant for unofficial runs — same response shape as `fetchEvalSamples`,
+ * but the server reads samples from the workflow's GHA artifact rather than the DB.
+ */
 export function fetchEvalSamplesLive(
   ctx: EvalSamplesLiveContext,
   filter: EvalSamplesFilter,
@@ -231,6 +265,7 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
+/** Stored sweep runs plus whether lazy discovery has reached the end of history. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,
@@ -242,6 +277,7 @@ export function fetchCollectiveXRunList(
   }>(`/api/v1/collectivex/runs?version=${version}`, signal);
 }
 
+/** Resolve a specific ingested sweep run's neutral view dataset by run_id. */
 export function fetchCollectiveXRun(
   version: CollectiveXVersion,
   runId: string,
@@ -253,6 +289,12 @@ export function fetchCollectiveXRun(
   );
 }
 
+/**
+ * Admin deletion of an ingested run. Requires the dedicated CollectiveX admin
+ * Bearer secret (COLLECTIVEX_ADMIN_SECRET — deliberately not the CI-held
+ * INVALIDATE_SECRET); resolves false on 401 so callers can clear a stale
+ * stored token, throws on other failures.
+ */
 export async function deleteCollectiveXRun(runId: string, token: string): Promise<boolean> {
   const response = await fetch(`/api/v1/collectivex/runs/${runId}`, {
     method: 'DELETE',
@@ -284,8 +326,10 @@ export interface LatestImageRow {
   precision: string;
   spec_method: string;
   disagg: boolean;
+  /** Null for agentic (AgentX) rows — the trace replay has no fixed sequence lengths. */
   isl: number | null;
   osl: number | null;
+  /** `single_turn` for fixed-sequence rows, `agentic_traces` for AgentX rows. */
   benchmark_type: string;
   image: string;
   date: string;

@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
   }
   if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-latest'));
 
+  // Discovery failures must not take the page down — serve whatever the DB
+  // already holds and only surface the error when there is no fallback.
   let ensureError: unknown = null;
   try {
     await ensureLatestCollectiveXRun(version);
@@ -32,6 +34,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Discovery may have persisted a run, so read from the same primary.
     const row = await getLatestCollectiveXRun(getCollectiveXWriteDb(), version);
     if (row !== null) {
       if (ensureError)

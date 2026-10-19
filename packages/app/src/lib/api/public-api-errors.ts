@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+/** Stable error strings exposed by public read endpoints and documented in OpenAPI. */
 export const PUBLIC_API_ERRORS = {
   internal: 'Internal server error',
   notFound: 'Not found',

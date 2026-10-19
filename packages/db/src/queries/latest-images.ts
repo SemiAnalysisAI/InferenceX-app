@@ -7,13 +7,21 @@ export interface LatestImageRow {
   precision: string;
   spec_method: string;
   disagg: boolean;
+  /** Null for agentic (AgentX) rows — the trace replay has no fixed sequence lengths. */
   isl: number | null;
   osl: number | null;
+  /** `single_turn` for fixed-sequence rows, `agentic_traces` for AgentX rows. */
   benchmark_type: string;
   image: string;
   date: string;
 }
 
+/**
+ * Fetch the latest non-null image tag per unique (model, hardware, framework, precision,
+ * spec_method, disagg, benchmark_type, isl, osl). Uses the latest_benchmarks materialized view for
+ * fast lookups. `benchmark_type` is part of the line key so agentic (null isl/osl) rows
+ * stay distinct from fixed-sequence rows and the frontend can label them as AgentX.
+ */
 export async function getLatestImages(sql: DbClient): Promise<LatestImageRow[]> {
   const rows = await sql`
     SELECT DISTINCT ON (c.model, c.hardware, c.framework, c.precision, c.spec_method, c.disagg, lb.benchmark_type, lb.isl, lb.osl)
@@ -36,6 +44,11 @@ export async function getLatestImages(sql: DbClient): Promise<LatestImageRow[]> 
   return rows as unknown as LatestImageRow[];
 }
 
+/**
+ * One successful image-bearing observation per configuration/day, plus the last
+ * pre-window observation. The seed retains ages older than the 90-day window.
+ * Parallelism and concurrency do not add votes to the displayed configuration.
+ */
 export async function getImageAgeObservations(
   sql: DbClient,
   asOf: string,

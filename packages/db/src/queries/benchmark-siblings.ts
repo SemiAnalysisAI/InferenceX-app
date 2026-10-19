@@ -1,8 +1,16 @@
+/**
+ * Find all benchmark_results that share the same SKU (hardware + framework +
+ * model + precision + spec_method + disagg + benchmark_type + workflow_run)
+ * as the given point. Used by the detail page to render a "switch between
+ * concs / parallelisms" navigator within a single run.
+ */
+
 import type { DbClient } from '../connection.js';
 
 export interface BenchmarkSibling {
   id: number;
   conc: number;
+  /** "on" | "off" | null. */
   offload_mode: string | null;
   decode_tp: number;
   decode_ep: number;
@@ -23,9 +31,16 @@ export interface BenchmarkSibling {
   num_decode_gpu: number;
   disagg: boolean;
   is_multinode: boolean;
+  /** Throughput per GPU (tok/s/gpu) for this point; null if the metric is absent. */
   tput_per_gpu: number | null;
+  /**
+   * Total requests for this point — `total_requests_completed` (aiperf runner)
+   * falling back to the legacy `num_requests_total`; null if neither is present.
+   */
   total_requests: number | null;
+  /** True if this row IS the point passed in. */
   is_current: boolean;
+  /** Whether the row has a stored trace_replay blob (for navigation hint). */
   has_trace: boolean;
 }
 
@@ -36,8 +51,10 @@ export interface BenchmarkSku {
   precision: string;
   spec_method: string;
   benchmark_type: string;
+  /** Human-readable workflow_run summary so the page header can hint at provenance. */
   github_run_id: number;
   date: string;
+  /** Slug of the source dataset this run replayed (run_datasets), or null. */
   dataset_slug: string | null;
 }
 
@@ -50,6 +67,7 @@ export async function getBenchmarkSiblings(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<BenchmarkSiblings | null> {
+  // Step 1: resolve the SKU defining fields for the requested point.
   const seed = (await sql`
     select
       c.hardware, c.framework, c.model, c.precision, c.spec_method,
@@ -75,6 +93,7 @@ export async function getBenchmarkSiblings(
   const root = seed[0];
   if (!root) return null;
 
+  // Step 2: pull every sibling row sharing the SKU within the same workflow_run.
   const rows = (await sql`
     select
       br.id, br.conc, br.offload_mode,

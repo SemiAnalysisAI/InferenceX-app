@@ -56,8 +56,20 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Fixed internals, matching the dashboard context the Fleet Lifecycle page runs
+ * under (`FleetLifecycle.tsx` + `LIFECYCLE_DEFAULTS`): the fleet is sized at the
+ * default 35 tok/s/user target on H100-rental pricing over total tokens, and the
+ * two seeded prices keep the published 4x output:input ratio.
+ */
 const OUTPUT_PRICE_MULTIPLE = LIFECYCLE_DEFAULTS.outputPriceMultiple;
 
+/**
+ * Same history rows the dashboard's `useHistoricalBest` consumes, through the
+ * cache slots `/api/v1/benchmarks/history` owns. Fixed sequences are trimmed to
+ * the calculator allowlist after the cache; agentic history has no ISL/OSL to
+ * key on and no sequence to trim by, so it comes back whole.
+ */
 async function fleetHistoryRows(modelKeys: string[], sequence: Sequence): Promise<BenchmarkRow[]> {
   if (FIXTURES_MODE) return loadFixture<BenchmarkRow[]>('benchmarks-history');
   const islOsl = sequenceToIslOsl(sequence);
@@ -141,6 +153,11 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions);
 
+    // Stage one/two of `useHistoricalBest`: per-(hwKey, date) frontiers, then each
+    // hwKey's best-so-far staircase at the target. The rank accessor is
+    // `getComparableTpPerMwForType(result, 'total')`, which for the fixed 'total'
+    // basis is exactly `result.tpPerMw` — inlined here because that accessor
+    // lives in a 'use client' d3 module.
     const groups = groupHistoryByHwKeyAndDate({
       rows,
       sequence,
@@ -157,6 +174,8 @@ export function GET(request: NextRequest): Promise<Response> {
     }).filter((progression) => matchesHardware(progression.hwKey, gpus));
     const chips = mergeProgressionsByChip(progressions);
 
+    // Month 0 = the model's release date, so every chip's line starts where the
+    // market did; models without one anchor at their earliest measured sweep.
     const releaseDate = getModelReleaseDate(model.displayName);
     let anchorDate: string | null = releaseDate;
     if (!anchorDate) {
@@ -167,6 +186,8 @@ export function GET(request: NextRequest): Promise<Response> {
     }
     const anchorMs = anchorDate ? Date.parse(`${anchorDate}T00:00:00Z`) : Number.NaN;
 
+    // A cached input token sells for a tenth of a fresh one; only agentic traces
+    // measure a cached fraction for the discount to apply to.
     const isAgentic = sequence === Sequence.AgenticTraces;
     const cacheReadRatio = isAgentic ? Math.min(1, cache / 100) : 1;
 
@@ -185,6 +206,8 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const availability = availabilityFromInterrupts(mtbi, recovery);
 
+    // Competitive floor: the cheapest fleet's break-even at its latest config,
+    // interrupts included — the price the default seeds sit on.
     const breakEvenOf = (fleet: (typeof fleets)[number]): number | null => {
       const latest = fleet.steps.at(-1);
       if (!latest) return null;
@@ -204,6 +227,8 @@ export function GET(request: NextRequest): Promise<Response> {
       if (value !== null && (breakEven === null || value < breakEven)) breakEven = value;
     }
 
+    // Price seeding mirrors the dashboard: give one price and the other derives
+    // through the fixed 4x multiple; give neither and both seed from break-even.
     const inputPrice =
       price ?? (oprice === undefined ? (breakEven ?? 0) : oprice / OUTPUT_PRICE_MULTIPLE);
     const outputPrice =
@@ -212,6 +237,8 @@ export function GET(request: NextRequest): Promise<Response> {
         ? (breakEven ?? 0) * OUTPUT_PRICE_MULTIPLE
         : price * OUTPUT_PRICE_MULTIPLE);
 
+    // Horizon default: a short tail past the last measured sweep so the final
+    // step is readable — `max(1, ceil(measuredMonths + 2))`, like the page.
     let measuredMonths: number | null = null;
     if (Number.isFinite(anchorMs)) {
       let latest = -Infinity;
@@ -282,6 +309,7 @@ export function GET(request: NextRequest): Promise<Response> {
       ];
     });
 
+    // Latest run date in the fetched rows — a stable, cache-friendly timestamp.
     const generatedAt = rows.reduce<string | null>(
       (latest, row) => (latest === null || (row.date && row.date > latest) ? row.date : latest),
       null,

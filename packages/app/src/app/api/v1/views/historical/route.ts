@@ -59,6 +59,24 @@ import { hardwareLegendLabel } from '@/lib/views-api/legend';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/historical
+ *
+ * Interpolated historical trend lines — the Historical Trends dashboard's
+ * math, run server-side: for every benchmark snapshot date, the selected
+ * metric is interpolated at a target interactivity per hardware config, then
+ * assembled into date-sorted lines (shared `interpolated-trend-core`).
+ *
+ * Query params: model (required), sequence (default 8k/1k), metric (default
+ * tokensPerDollarN), target (tok/s/user interactivity, default 35), precisions
+ * (default: densest-precision auto-resolution), gpus, vendors, frameworks,
+ * deployment, start, end (YYYY-MM-DD snapshot-date bounds), format (json|csv).
+ *
+ * Like the dashboard, lines extend to the current UTC date unless extendToDate
+ * is provided. Synthetic extension points carry `synthetic: true` and do not
+ * represent additional measurements.
+ */
+
 const DEFAULT_TARGET_INTERACTIVITY = 35;
 
 export function GET(request: NextRequest) {
@@ -109,6 +127,7 @@ export function GET(request: NextRequest) {
         ? await getCachedAgenticBenchmarkHistory([...dbModelKeys])
         : await getCachedBenchmarkHistory([...dbModelKeys], islOsl?.isl ?? 0, islOsl?.osl ?? 0);
 
+    // Precision auto-resolution mirrors the dashboard's densest-precision default.
     const availablePrecisions = [...new Set(allRows.map((row) => row.precision))].toSorted();
     const resolvedPrecisions = resolveEffectivePrecisions({
       selectedPrecisions: [...precisions],
@@ -131,6 +150,8 @@ export function GET(request: NextRequest) {
       start !== undefined ||
       end !== undefined;
 
+    // Same vendor/family/topology classification as the dashboard quick filters
+    // (`matchesQuickFilters`), applied to raw rows before trend grouping.
     const rowFilter = hasRowFilter
       ? (row: BenchmarkRow): boolean => {
           const date = benchmarkCurveDate(row);

@@ -36,6 +36,15 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/overview — documented public projection of the /overview
+ * cost matrix. Unlike the page BFF at /api/v1/overview (which silently
+ * normalizes unknown values), invalid options here are a 400 with the allowed
+ * list, per the views-API convention. `getOverviewPageData` already caches the
+ * derived matrix (cachedDerivedData, blob-backed row reads underneath), so
+ * this handler adds no cache layer of its own.
+ */
+
 const TIER_VALUES = OVERVIEW_TIERS.map(String);
 const COMPARE_VALUES = ['hardware', ...OVERVIEW_HISTORY_WINDOWS] as const;
 

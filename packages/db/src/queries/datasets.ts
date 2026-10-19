@@ -1,3 +1,12 @@
+/**
+ * Read queries for the agentic-benchmark source datasets (the HF cc-traces-weka
+ * corpora ingested by ingest-weka-dataset.ts). Back the /datasets area:
+ *   - listDatasets      → registry cards (no per-conversation rows)
+ *   - getDataset        → one dataset incl. precomputed chart_data
+ *   - listConversations → paginated conversation list (counts only, no structure)
+ *   - getConversation   → one conversation's flamegraph structure
+ */
+
 import type { DbClient } from '../connection.js';
 import type { ConversationStructure } from '../etl/weka-structure.js';
 export type { ConversationStructure, StructureNode } from '../etl/weka-structure.js';
@@ -34,6 +43,7 @@ export interface DatasetRecord {
 }
 
 export interface DatasetDetail extends DatasetRecord {
+  /** Precomputed distribution bins + stats keyed by metric (see ingest buildChartData). */
   chart_data: Record<string, unknown>;
 }
 
@@ -63,6 +73,7 @@ export interface ConversationDetail {
   structure: ConversationStructure;
 }
 
+/** All ingested datasets, newest first. Excludes the (large) chart_data blob. */
 export async function listDatasets(sql: DbClient): Promise<DatasetRecord[]> {
   const rows = (await sql`
     select id, slug, label, variant, description, hf_url, license,
@@ -73,6 +84,7 @@ export async function listDatasets(sql: DbClient): Promise<DatasetRecord[]> {
   return rows.map((r) => ({ ...r, conversation_count: Number(r.conversation_count) }));
 }
 
+/** One dataset by slug, including chart_data. Null if not found. */
 export async function getDataset(sql: DbClient, slug: string): Promise<DatasetDetail | null> {
   const rows = (await sql`
     select id, slug, label, variant, description, hf_url, license,
@@ -89,11 +101,26 @@ export interface ListConversationsOpts {
   search?: string;
   limit?: number;
   offset?: number;
+  /** 'tokens' (total_in desc), 'turns' (num_turns desc), or 'id' (conv_id asc). */
   sort?: 'tokens' | 'turns' | 'subagents' | 'id';
 }
 
 const MAX_LIMIT = 200;
 
+/**
+ * Escape Postgres LIKE metacharacters in a user-supplied search string so that
+ * the pattern performs a literal substring match, not a wildcard match.
+ *
+ * Postgres LIKE special characters are: % (any sequence), _ (any single char),
+ * and \ (the default escape character). We escape \ first so our own escape
+ * sequences are not double-escaped, then % and _.
+ *
+ * postgres.js parameterization already prevents SQL injection; this escaping
+ * fixes wildcard-semantics only (e.g. searching for literal '%' must not match
+ * every row).
+ *
+ * @example escapeLikePattern('50%_off') === '50\\%\\_off'
+ */
 export function escapeLikePattern(raw: string): string {
   return raw
     .replaceAll('\\', String.raw`\\`)
@@ -101,6 +128,11 @@ export function escapeLikePattern(raw: string): string {
     .replaceAll('_', String.raw`\_`);
 }
 
+/**
+ * Paginated conversation list for a dataset (by slug). Returns counts only —
+ * the per-conversation `structure` blob is fetched separately by
+ * getConversation so the list stays light.
+ */
 export async function listConversations(
   sql: DbClient,
   slug: string,
@@ -115,6 +147,8 @@ export async function listConversations(
   const limit = Math.min(MAX_LIMIT, Math.max(1, opts.limit ?? 50));
   const offset = Math.max(0, opts.offset ?? 0);
   const search = opts.search?.trim();
+  // Escape LIKE metacharacters so user input is treated as a literal substring.
+  // Backslash is escaped first to prevent double-escaping our own escape sequences.
   const like = search ? `%${escapeLikePattern(search)}%` : null;
 
   const totalRows = (await sql`
@@ -125,6 +159,9 @@ export async function listConversations(
   `) as unknown as { n: number }[];
   const total = totalRows[0]?.n ?? 0;
 
+  // Separate queries per sort (literal ORDER BY) — the neon HTTP driver doesn't
+  // compose nested sql fragments the way postgres.js does, so we can't splice an
+  // order-by fragment. The sort key is an enum, never raw user input.
   const sort = opts.sort ?? 'tokens';
   let items: ConversationListItem[];
   if (sort === 'turns') {
@@ -174,6 +211,7 @@ export async function listConversations(
   };
 }
 
+/** One conversation's full flamegraph structure. Null if dataset/conv missing. */
 export async function getConversation(
   sql: DbClient,
   slug: string,

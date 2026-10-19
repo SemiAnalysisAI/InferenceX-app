@@ -30,6 +30,21 @@ import { hardwareLegendLabel } from '@/lib/views-api/legend';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/reliability
+ *
+ * Aggregated benchmark-run success rates per hardware over a date-range
+ * preset — the same numbers the `/reliability` dashboard chart renders,
+ * computed by the shared `aggregateByDateRange` (components/reliability).
+ *
+ * Query params:
+ * - range  — `last-3-days|last-7-days|last-month|last-3-months|all-time`
+ *            (default `last-3-months`).
+ * - format — `json` (default) or `csv` (one flat row per hardware).
+ */
+
+// Same cache key as /api/v1/reliability: both routes read the identical raw
+// run_stats rows, so they intentionally share one cached payload.
 const getCachedReliabilityRows = cachedQuery(() => getReliabilityStats(getDb()), 'reliability');
 
 export function GET(request: NextRequest) {
@@ -50,6 +65,8 @@ export function GET(request: NextRequest) {
       ? loadFixture<ReliabilityRow[]>('reliability')
       : await getCachedReliabilityRows();
 
+    // Wall-clock cutoffs mirror the dashboard; the cache key covers only the
+    // raw rows, so `now` never leaks into a cache key.
     const bucket = aggregateByDateRange(rows, asOf ? Date.parse(asOf) : Date.now())[range] ?? {};
     const hardware = Object.entries(bucket)
       .filter(([key]) => matchesHardware(key, gpus))

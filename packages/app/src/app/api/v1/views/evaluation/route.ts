@@ -28,6 +28,29 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/evaluation
+ *
+ * Aggregated evaluation chart rows for a model, benchmark, and run date — the
+ * same latest-per-config, retry-averaged bars the `/evaluation` dashboard
+ * renders, computed by the shared `buildEvaluationChartRows` +
+ * `aggregateEvaluationChartRows` (components/evaluation/chart-data).
+ *
+ * Query params:
+ * - model      — required; display name (case-insensitive) or compare slug.
+ * - benchmark  — eval task key; default: first available benchmark for the
+ *                model (alphabetical). Unknown values are a 400 listing the
+ *                model's available benchmarks.
+ * - date       — `YYYY-MM-DD`; resolved to the nearest available eval date
+ *                like the dashboard (`resolveEvaluationDate`). Default:
+ *                latest available date.
+ * - precisions — comma list (`fp4,fp8,...`); default: every precision present
+ *                in the model's eval rows.
+ * - format     — `json` (default) or `csv` (one flat row per config).
+ */
+
+// Same cache key as /api/v1/evaluations: both routes read the identical raw
+// eval_results rows, so they intentionally share one cached payload.
 const getCachedEvalRows = cachedQuery(() => getAllEvalResults(getDb()), 'evaluations');
 
 interface EvaluationBar {
@@ -42,6 +65,12 @@ interface EvaluationBar {
   date: EvaluationChartData['date'];
 }
 
+/**
+ * One source's bars: the dashboard's latest-per-config → retry-averaged
+ * pipeline over `sourceRows`, narrowed to the `gpus` filter, with `n` = how
+ * many repeated runs (retries/reruns) each aggregated bar averages. Official
+ * rows pass the resolved snapshot date; an unofficial run is a single snapshot.
+ */
 function aggregatedBars(
   source: string,
   sourceRows: EvalRow[],

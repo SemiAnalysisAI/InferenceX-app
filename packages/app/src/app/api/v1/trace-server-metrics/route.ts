@@ -12,8 +12,21 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
+// The slow path re-parses `server_metrics_json_gz`, which reaches 448 MB
+// compressed (several GB of JSON) on the largest agentic points and takes
+// minutes to stream. That only happens for rows whose stored `chart_series`
+// predates the current version — i.e. after a version bump, until
+// `db:backfill-chart-series` drains them — but the platform default would
+// cut those requests off mid-parse and the blob cache only populates on
+// success, so every visitor would re-pay. Ask for the maximum instead.
 export const maxDuration = 300;
 
+// Key derived from TRACE_SERVER_METRICS_VERSION (governs chart_series plus
+// the separately queried point-metadata payload).
+// The blob cache is write-once with no post-backfill purge, so the
+// version-derived key is what rolls the namespace on a bump — a hand-written
+// string would serve stale blob-cached series forever.
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
 export const CACHE_KEY_PREFIX = `trace-server-metrics-v${TRACE_SERVER_METRICS_VERSION}`;
 
 const getCachedTraceServerMetrics = cachedQuery(
@@ -22,6 +35,14 @@ const getCachedTraceServerMetrics = cachedQuery(
   { blobOnly: true },
 );
 
+/**
+ * GET /api/v1/trace-server-metrics?id=N
+ *
+ * Returns parsed time-series for the agentic detail view: KV cache usage,
+ * prefix cache hit rate per interval, queue depth, and per-source prompt
+ * token rates. Times are in seconds from benchmark start. 404 if the point
+ * has no stored server_metrics_export.json blob.
+ */
 export const GET = idQueryRoute({
   logLabel: 'trace server metrics',
   fetch: getCachedTraceServerMetrics,

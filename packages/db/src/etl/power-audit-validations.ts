@@ -1,3 +1,4 @@
+/** Pure normalization of legacy and retained AgentX power-audit documents. */
 import { isRecord } from '../lib/records';
 
 const LEGACY_VALIDATION = /^power_validation_[^/]+\.json$/u;
@@ -30,6 +31,7 @@ function hasWindowTimes(value: unknown): value is Record<string, unknown> & {
   );
 }
 
+/** Only documents needed to identify a validation and its recorded result/window. */
 export function isPowerAuditValidationEntry(name: string): boolean {
   return (
     LEGACY_VALIDATION.test(name) ||
@@ -39,6 +41,11 @@ export function isPowerAuditValidationEntry(name: string): boolean {
   );
 }
 
+/**
+ * Legacy top-level documents keep their names and contents. A nested AgentX
+ * document gains a canonical alias only when its result and retained window
+ * agree; path annotations retain the original document's provenance.
+ */
 export function normalizePowerAuditValidations(
   artifactName: string,
   files: ReadonlyMap<string, string>,
@@ -88,12 +95,14 @@ export function normalizePowerAuditValidations(
   return validations;
 }
 
+/** The `PowerAudit` subset a retained AgentX window recovers; `source` is always the alias. */
 export interface RecoveredPowerAudit {
   source: string;
   window_start_unix: number;
   window_end_unix: number;
 }
 
+/** Recover source/window metadata only from a normalized nested validation. */
 export function recoveredPowerAudit(
   source: string,
   validation: Record<string, unknown>,

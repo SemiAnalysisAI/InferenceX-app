@@ -16,10 +16,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
   try {
+    // Reuse the raw endpoint's cache, fixture mode, snapshot and power-validity semantics.
     const url = new URL('/api/v1/benchmarks', request.url);
     url.search = parsed.sourceParams.toString();
     const response = await getBenchmarks(new NextRequest(url));
     if (!response.ok) return response;
+    // Direct handler calls do not pass through fetch's automatic decompression.
+    // cachedJson streams gzip even for fixture responses.
     const decoded =
       response.headers.get('Content-Encoding') === 'gzip' && response.body
         ? new Response(response.body.pipeThrough(new DecompressionStream('gzip')))

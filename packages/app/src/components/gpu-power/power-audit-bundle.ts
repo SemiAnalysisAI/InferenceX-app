@@ -1,3 +1,18 @@
+/**
+ * Cuts per-config power series out of a `power_audit_<RESULT_FILENAME>` bundle.
+ *
+ * Slurm / Dynamo disaggregated runners do not publish one `gpu_metrics_*` CSV
+ * per config. Their DCGM collector writes one bundle per concurrency sweep:
+ * `LOGS/power/samples.csv` holds ~1 Hz watts for every GPU across the whole
+ * sweep, `LOGS/power/manifest.json` names the devices and their worker role,
+ * and one top-level `power_validation_*.json` per concurrency records the
+ * validated measurement window. Each validation file becomes one
+ * `GpuPowerSeries` whose `source` is that file's basename, so the timeline
+ * joins it to the chart row carrying the same `power_audit.source`.
+ *
+ * Pure: the route hands over the extracted entry texts; nothing here reads
+ * the network or the zip.
+ */
 import { parseNvidiaTimestamp } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
 import {
   isPowerAuditValidationEntry,
@@ -13,11 +28,13 @@ import {
 } from './power-series';
 import { parseCsvData, type GpuMetricRow } from './types';
 
+/** Seconds of telemetry kept on each side of a validated window (ramp-up / drain context). */
 export const BUNDLE_WINDOW_PAD_SECONDS = 60;
 
 export const BUNDLE_SAMPLES_ENTRY = 'LOGS/power/samples.csv';
 export const BUNDLE_MANIFEST_ENTRY = 'LOGS/power/manifest.json';
 
+/** Zip entries the route must extract for `cutPowerAuditBundle`; everything else stays compressed. */
 export function isPowerAuditBundleEntry(entryName: string): boolean {
   return (
     entryName === BUNDLE_SAMPLES_ENTRY ||
@@ -38,12 +55,14 @@ function isContextEntry(entryName: string): boolean {
 }
 
 export interface PowerAuditSample {
+  /** Unix seconds. */
   time: number;
   deviceId: string;
   power: number;
 }
 
 export interface PowerAuditDevice {
+  /** `<hostname>/<GPU-uuid>`, the form `power_audit.observed_gpu_ids` uses. */
   id: string;
   hostname: string;
   gpuIndex: number;
@@ -51,6 +70,7 @@ export interface PowerAuditDevice {
 
 interface ParsedSamples {
   samples: PowerAuditSample[];
+  /** Devices in first-seen order. */
   devices: Map<string, PowerAuditDevice>;
 }
 
@@ -58,6 +78,7 @@ const SAMPLE_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'gpu_uuid', '
 
 const NUMERIC_CELL = /^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/iu;
 
+/** A CSV cell as a number, or NaN for anything that is not a plain numeral (`Number('')` is 0). */
 function numericCell(cell: string): number {
   const text = cell.trim();
   return NUMERIC_CELL.test(text) ? Number(text) : Number.NaN;
@@ -67,6 +88,7 @@ function splitCsvLines(text: string): string[] {
   return text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
 }
 
+/** Header-driven parse of `samples.csv`; malformed rows are skipped. */
 function parseSamples(csv: string): ParsedSamples {
   const lines = splitCsvLines(csv);
   const headerIndex = lines.findIndex((line) => line.trim().length > 0);
@@ -126,6 +148,7 @@ function manifestSlot(hostname: string, gpuIndex: number): string {
   return `${hostname}#${gpuIndex}`;
 }
 
+/** `expected_devices[].assignments[0].worker_role`, keyed by hostname + gpu_index. */
 function manifestRoles(manifest: Record<string, unknown> | null): Map<string, GpuPowerRole> {
   const roles = new Map<string, GpuPowerRole>();
   const expected = manifest?.expected_devices;
@@ -152,6 +175,7 @@ interface TimeWindow {
   end: number;
 }
 
+/** `selected_window`, else `benchmark_window`; `null` when neither has a finite range. */
 function validationWindow(validation: Record<string, unknown>): TimeWindow | null {
   for (const key of ['selected_window', 'benchmark_window']) {
     const window = validation[key];
@@ -182,6 +206,7 @@ function compareText(a: string, b: string): number {
   return a > b ? 1 : 0;
 }
 
+/** Prefill, then decode, then unassigned; within a role by hostname, then gpu_index. */
 function orderDevices(
   devices: readonly GpuPowerDevice[],
   byId: ReadonlyMap<string, PowerAuditDevice>,
@@ -199,6 +224,12 @@ function basename(entryName: string): string {
   return entryName.slice(entryName.lastIndexOf('/') + 1);
 }
 
+/**
+ * Normalize NVIDIA's unzoned wall-clock timestamps to ISO UTC, matching the ingest
+ * parser: the adjacent collector context supplies the offset and missing or UTC
+ * context means zero. Live and stored reads then agree, so a run does not shift by
+ * the browser timezone before ingest. ISO and AMD timestamps pass through unchanged.
+ */
 export function parsePowerCsvData(
   text: string,
   context: Record<string, unknown> | null,
@@ -217,6 +248,14 @@ export function parsePowerCsvData(
   });
 }
 
+/**
+ * One series per validation file that has a window and samples within
+ * `BUNDLE_WINDOW_PAD_SECONDS` of it. Rows follow `devices`, ordered prefill,
+ * decode, unassigned (hostname, then gpu_index inside a role); `gpus` are the
+ * row indices `0..n-1`. Roles come from the validation's `per_gpu_role`, else
+ * the manifest's `expected_devices`. Malformed JSON skips that file; a
+ * missing or empty `samples.csv` yields `[]`. Output is ordered by window start.
+ */
 export function cutPowerAuditBundle(
   artifact: string,
   files: ReadonlyMap<string, string>,
@@ -240,6 +279,7 @@ export function cutPowerAuditBundle(
       return { name, data };
     })
     .filter((file) => file.data.length > 0);
+  // Ingest prefers the richer SMI CSV when the bundle carries both collectors.
   if (smiFiles.length > 0) return cutPowerAuditCsvs(artifact, smiFiles, validations, manifest);
   const samplesText = files.get(BUNDLE_SAMPLES_ENTRY);
   if (samplesText === undefined) return [];
@@ -248,6 +288,7 @@ export function cutPowerAuditBundle(
   return cutPowerAuditSamples(artifact, samples, devices, validations, manifest);
 }
 
+/** Apply bundle window cuts to the richer SMI CSVs without requiring DCGM UUID sidecars. */
 export function cutPowerAuditCsvs(
   artifact: string,
   files: readonly { name: string; data: readonly GpuMetricRow[] }[],
@@ -269,6 +310,7 @@ export function cutPowerAuditCsvs(
   return cutPowerAuditSamples(artifact, samples, devices, validations, manifest);
 }
 
+/** The same window/device/bucketing transform for persisted samples and artifact CSVs. */
 export function cutPowerAuditSamples(
   artifact: string,
   samples: readonly PowerAuditSample[],
@@ -305,6 +347,8 @@ export function cutPowerAuditSamples(
     }));
     const series = bucketPowerSeries(artifact, rows);
     if (!series) continue;
+    // The synthetic `index` is the device's position in `ordered`, so each
+    // bucketed row maps back to its device; `gpus` becomes plain row indices.
     cut.push({
       start: window.start,
       series: {

@@ -23,6 +23,15 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/rankings — JSON form of the /rankings/<slug> pages.
+ *
+ * Same derivation the pages use (overview model summary → ranking rows via
+ * `lib/live-seo/rankings.ts`), parameterized by kind, model, and scenario. Default
+ * scenario is "all curated scenarios per model", mirroring the /overview
+ * matrix rows the ranking pages are read from.
+ */
+
 const SCENARIO_VALUES = ['single_turn_8k1k', 'agentx'] as const;
 const SCENARIO_ALLOWED = [...SCENARIO_VALUES, '8k-1k', 'agentic'] as const;
 const SCENARIO_ALIASES: Readonly<Record<string, OverviewScenario>> = {
@@ -49,6 +58,12 @@ interface RankingsView {
   entries: RankingsViewEntry[];
 }
 
+/**
+ * `modelDisplayName === null` means every ranking-page model; entries with no
+ * measurable hardware are dropped there (an under-swept model is noise in the
+ * all-models feed) but kept for an explicit model so the response stays
+ * self-describing.
+ */
 async function loadRankingsView(
   kind: RankingKind,
   modelDisplayName: string | null,

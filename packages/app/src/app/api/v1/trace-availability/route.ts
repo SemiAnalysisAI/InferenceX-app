@@ -15,6 +15,13 @@ const getCachedTraceAvailability = cachedQuery(
   'trace-availability',
 );
 
+/**
+ * GET /api/v1/trace-availability?ids=1,2,3
+ *
+ * Returns `{[id]: true}` for ids that have a stored trace_replay blob.
+ * Lightweight presence check used by the scatter tooltip to decide whether
+ * to render the "View charts" button — see queries/trace-availability.ts.
+ */
 export const GET = idsQueryRoute({
   maxIds: 500,
   logLabel: 'trace availability',

@@ -2,6 +2,7 @@ import type { DbClient } from '../connection.js';
 import { buildDatasetFromNeutral } from '../collectivex/reader';
 import type { CollectiveXDataset, CollectiveXRunSummary } from '../collectivex/types';
 
+/** One cx_runs row with its raw documents, ready for reader assembly. */
 export interface CollectiveXRunRow {
   run_id: string;
   run_attempt: number;
@@ -14,6 +15,7 @@ export interface CollectiveXRunRow {
   docs: unknown[];
 }
 
+/** Row metadata + raw docs as written by the lazy ingest. */
 export interface CollectiveXRunInsert {
   run_id: string;
   run_attempt: number;
@@ -26,6 +28,11 @@ export interface CollectiveXRunInsert {
   summary: CollectiveXRunSummary;
 }
 
+/**
+ * Known-run state. Runs are discovered lazily from GitHub on read, so a
+ * deleted run keeps a tombstoned cx_runs row — otherwise the next discovery
+ * pass would re-ingest it.
+ */
 type CollectiveXRunState = 'live' | 'deleted';
 
 interface CollectiveXRunStateRow {
@@ -39,6 +46,17 @@ function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
   return { ...rest, docs: Array.isArray(docs) ? docs : [] };
 }
 
+/**
+ * The most recent visible live run for a version. Zero-case summaries contain
+ * no AMD/NVIDIA data and stay hidden. Ordered by run_id — GitHub run ids
+ * increase monotonically with creation, matching lazy discovery's newest-first
+ * walk (completion time would let a long-failing older run shadow a newer
+ * successful one).
+ *
+ * Row and documents come back in ONE query, with docs filtered to the row's
+ * CURRENT run_attempt: a reader can never observe one attempt's metadata with
+ * another attempt's documents, even while a refresh commits concurrently.
+ */
 export async function getLatestCollectiveXRun(
   sql: DbClient,
   version: number,
@@ -62,6 +80,10 @@ export async function getLatestCollectiveXRun(
   return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
+/**
+ * One specific visible live run by id, or null when absent, tombstoned, on
+ * another version, or carrying no supported-vendor cases.
+ */
 export async function getCollectiveXRun(
   sql: DbClient,
   version: number,
@@ -84,6 +106,11 @@ export async function getCollectiveXRun(
   return rows.length === 0 ? null : toRunRow(rows[0]);
 }
 
+/**
+ * Every visible live run summary for a version, newest-first, straight from
+ * the precomputed `summary` column — no document loading. Runs whose reader
+ * summary contains no AMD/NVIDIA cases stay hidden.
+ */
 export async function listCollectiveXRuns(
   sql: DbClient,
   version: number,
@@ -98,6 +125,7 @@ export async function listCollectiveXRuns(
   return rows.map((row) => row.summary as CollectiveXRunSummary);
 }
 
+/** State of each known run id (live or tombstoned); absent ids are omitted. */
 export async function getCollectiveXRunStates(
   sql: DbClient,
   runIds: readonly string[],
@@ -120,6 +148,17 @@ export async function getCollectiveXRunStates(
   );
 }
 
+/**
+ * Atomically persist one run and its raw documents in a single statement
+ * (data-modifying CTEs), so concurrent lazy ingests can race safely:
+ * `ON CONFLICT DO NOTHING` turns the loser into a clean no-op, and a partial
+ * run can never become visible. Returns true when this call inserted the run.
+ *
+ * The `::jsonb`-cast parameters must be raw objects: both drivers
+ * JSON-serialize objects exactly once, while pre-stringified values get
+ * double-encoded by postgres.js. `docs` is wrapped in an object because the
+ * neon driver would serialize a bare JS array as a Postgres array literal.
+ */
 export async function insertCollectiveXRun(
   sql: DbClient,
   run: CollectiveXRunInsert,
@@ -147,6 +186,16 @@ export async function insertCollectiveXRun(
   return (rows[0]?.runs_inserted as number) > 0;
 }
 
+/**
+ * Replace a live run's contents when GitHub reports a NEWER attempt (a re-run
+ * of failed shards after the run was already ingested). Single statement with
+ * `FOR UPDATE` + an attempt guard: concurrent refreshers serialize on the row
+ * lock and the loser re-evaluates the guard to a no-op. Readers filter docs
+ * by the row's current run_attempt, so any superseded docs this statement's
+ * snapshot could not see (and therefore could not DELETE) stay invisible until
+ * the next refresh garbage-collects them. Tombstoned runs are never refreshed.
+ * Returns true when replaced.
+ */
 export async function refreshCollectiveXRunAttempt(
   sql: DbClient,
   run: CollectiveXRunInsert,
@@ -185,6 +234,14 @@ export async function refreshCollectiveXRunAttempt(
   return (rows[0]?.runs_updated as number) > 0;
 }
 
+/**
+ * Tombstone a run: mark it deleted (so lazy discovery never re-ingests it)
+ * and drop its documents to free space — one atomic statement, so a partial
+ * failure can never tombstone the run while leaving its documents orphaned
+ * behind an unretryable 404. Returns false when the run is absent or already
+ * tombstoned. Re-ingesting via the CLI intentionally clears the tombstone
+ * (operator override; its hard DELETE also cascades any leftover docs).
+ */
 export async function deleteCollectiveXRun(sql: DbClient, runId: string): Promise<boolean> {
   const rows = await sql`
     WITH tombstoned AS (
@@ -200,6 +257,7 @@ export async function deleteCollectiveXRun(sql: DbClient, runId: string): Promis
   return (rows[0]?.runs_deleted as number) > 0;
 }
 
+/** Assemble a stored run's raw documents into the dashboard dataset. */
 export function collectiveXDatasetFromRow(row: CollectiveXRunRow): CollectiveXDataset {
   return buildDatasetFromNeutral(row.matrix, row.docs, {
     run_id: row.run_id,

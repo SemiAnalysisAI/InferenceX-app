@@ -3,6 +3,7 @@ import { at, ROLES, rows, text, type Json } from './bundle';
 import { participatingGpuCount, perGpuHour, selectServingRecord, servingCells } from './serving';
 import { storedBundle, storedFidelityBundle, type StoredSource } from './stored';
 
+/** Data behind the public result panels, without browser-only media state. */
 export function selectVideoEvidence(
   source: StoredSource,
   selection: {

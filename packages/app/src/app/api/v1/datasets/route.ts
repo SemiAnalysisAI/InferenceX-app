@@ -6,6 +6,7 @@ import { cachedReadRoute } from '@/lib/api/cached-read-route';
 
 export const dynamic = 'force-dynamic';
 
+/** GET /api/v1/datasets — all ingested cc-traces-weka datasets (registry cards). */
 export const GET = cachedReadRoute<DatasetRecord[]>({
   cacheKey: 'datasets',
   fetch: () => listDatasets(getDb()),

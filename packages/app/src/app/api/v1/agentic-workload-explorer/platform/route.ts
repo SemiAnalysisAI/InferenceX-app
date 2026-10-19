@@ -8,6 +8,10 @@ import {
 import { withExplorerRoute } from '@/lib/agentic-workload-explorer/api';
 import { parseTraceVersion } from '@/lib/agentic-workload-explorer/request';
 
+// Served from stats_cache (cron-warmed ~every 15 min, self-healing on miss).
+// Both queries scan `sessions` (small) but pay the sessionsVisFilter EXISTS
+// tax per session when a trace version is set. Payload is bounded (distinct
+// os/version combos + 30-day per-os series), so cached wholesale. See stats.ts.
 export const maxDuration = 300;
 
 export const GET = withExplorerRoute(async ({ vis, req }) => {

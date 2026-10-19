@@ -11,6 +11,10 @@ import {
   supportsChartTokenMetric,
   type TokenMetricType,
 } from '@/lib/benchmarks/supplemental-benchmarks';
+/**
+ * Chart x-axis variant selected by the dropdown in the Chart panel. The
+ * inference provider and ChartDisplay import this single definition.
+ */
 export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
 
 export const X_AXIS_MODES: readonly XAxisMode[] = [
@@ -20,10 +24,16 @@ export const X_AXIS_MODES: readonly XAxisMode[] = [
   'e2e-normalized-interactivity',
 ];
 
+/**
+ * Modes whose x metric is derived from persisted per-request traces —
+ * these only exist for agentic scenarios (fixed-seq rows have no
+ * trace_replay blob to derive them from).
+ */
 export function isAgenticOnlyXAxisMode(mode: XAxisMode): boolean {
   return mode === 'e2e-normalized-interactivity';
 }
 
+/** Build deduplicated comparison dates, excluding the main run date. */
 export function buildComparisonDates(
   selectedGPUs: string[],
   selectedDates: string[],
@@ -31,11 +41,15 @@ export function buildComparisonDates(
   selectedRunDate: string | undefined,
 ): string[] {
   if (selectedGPUs.length === 0) return [];
+  // The primary query supplies only a plain-date series and may merge results
+  // from other runs. A run-qualified entry always needs its exact snapshot and
+  // date~rRUN series key, even when the run picker selected that same run.
   return resolveComparisonEntries(selectedDates, selectedDateRange).filter(
     (entry) => entry !== selectedRunDate,
   );
 }
 
+/** Filter data by GPU key, resolving aliases to canonical keys. */
 export function filterByGPU<T extends { hwKey: unknown }>(
   data: T[],
   selectedGPUs: string[],
@@ -51,6 +65,7 @@ export function filterByGPU<T extends { hwKey: unknown }>(
   });
 }
 
+/** Restrict one snapshot to the exact serving envelope selected by Overview. */
 export function filterOverviewHistoryRows<T extends OverviewServingSeriesRow>(
   rows: T[],
   configKey: string | undefined,
@@ -68,10 +83,19 @@ export const FLIP_MAP: Record<RooflineDirection, RooflineDirection> = {
   lower_right: 'lower_left',
 };
 
+/** Flip roofline direction when the x-axis is swapped. */
 export function flipRooflineDirection(dir: RooflineDirection): RooflineDirection {
   return FLIP_MAP[dir];
 }
 
+/**
+ * Roofline corner for a trace-derived x-axis mode. Derived modes render on the
+ * e2e chart definition, whose corners assume lower-x-is-better; when the
+ * derived metric is higher-is-better (E2E Normalized Interactivity) the corner mirrors
+ * horizontally. This keeps the y-metric's own good direction — throughput and
+ * tokens-per-dollar purchasing power land on an upper corner, while cost and
+ * joules land on a lower one.
+ */
 export function derivedModeRoofline(
   configuredE2eCorner: RooflineDirection | undefined,
   higherXIsBetter: boolean,
@@ -80,14 +104,26 @@ export function derivedModeRoofline(
   return flipRooflineDirection(configuredE2eCorner);
 }
 
+// Statistic words that may already prefix an x-axis label (from chart config
+// or the TTFT override label). Trailing whitespace is consumed so a replace
+// never doubles the separator space.
 const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu;
 
+/**
+ * Agentic sequences plot percentile fields (e.g. `p90_intvty`, `p75_e2el`),
+ * so the x-axis label must carry the selected percentile. Replaces an
+ * existing leading statistic word (e.g. the TTFT override's "P90 Time To
+ * First Token (s)") or prefixes the percentile when the configured label has
+ * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
+ * Also used for the explicit Mean/Median labels on fixed-sequence service axes.
+ */
 export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
   return X_LABEL_STAT_PREFIX_RE.test(label)
     ? label.replace(X_LABEL_STAT_PREFIX_RE, `${pctlWord} `)
     : `${pctlWord} ${label}`;
 }
 
+/** The dedup key fields a chart series is identified by. */
 interface DedupeRow {
   hardware: string;
   framework: string;
@@ -101,10 +137,21 @@ interface DedupeRow {
   run_started_at?: string | null;
 }
 
+// AgentX replacement scope matches benchmark_curve_scope in the SQL layer.
+/**
+ * Keep only the newest workflow run for each chart series. AgentX treats topology,
+ * speculative decoding and offload as point properties within a complete curve.
+ */
 export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
   return dedupeLatestBenchmarkSeries(rows);
 }
 
+/**
+ * Coarse filters that apply to every y-axis metric: the explicit GPU picks, the
+ * vendor / deployment / spec quick-filter pills, and the two-GPU compare scope.
+ * Deliberately excludes the y-metric coverage filter, so the result is the set
+ * of configs the user could have selected regardless of which axis is drawn.
+ */
 export function applyScopeFilters(
   points: InferenceData[],
   selectedGPUs: string[],
@@ -119,6 +166,7 @@ export function applyScopeFilters(
   return scoped;
 }
 
+/** Apply snapshot-scoped metric support using the source date, not its display date. */
 export function supportsPointTokenMetric(
   point: Pick<InferenceData, 'hwKey' | 'date' | 'actualDate'>,
   tokenType: TokenMetricType,

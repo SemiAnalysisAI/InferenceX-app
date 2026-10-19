@@ -16,6 +16,7 @@ const ALLOWED_FILTERS: Readonly<Record<EvalSampleFilter, true>> = {
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
 
+/** Parse the pagination/filter contract shared by stored and live evaluation samples. */
 export function parseEvalSampleWindow(
   params: URLSearchParams,
 ): EvalSampleWindow | { readonly error: string } {

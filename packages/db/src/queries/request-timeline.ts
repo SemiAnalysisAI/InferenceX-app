@@ -1,4 +1,17 @@
 import { readTraceProfileChunks } from '../lib/trace-profile-storage';
+/**
+ * Per-request timeline for the agentic detail page's Gantt view.
+ *
+ * Backed by `agentic_trace_replay.request_timeline_gz`: gzip of the JSON
+ * document pre-computed at ingest time (see `etl/compute-request-timeline.ts`),
+ * versioned by the `request_timeline_version` column. The compressed bytes are
+ * read in bounded `substring()` slices because Neon's HTTP driver hex-encodes
+ * bytea and rejects responses over 64 MiB. Rows that
+ * `db:backfill-request-timeline` has not converted yet still hold the legacy
+ * `request_timeline` JSONB, which is read as bounded text chunks. The slow
+ * path re-computes from `profile_export_jsonl_gz` and is only taken when
+ * neither stored copy has the current `REQUEST_TIMELINE_VERSION`.
+ */
 
 import {
   REQUEST_TIMELINE_VERSION,
@@ -16,6 +29,7 @@ export type { RequestTimeline, RequestRecord } from '../etl/compute-request-time
 interface RawMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
+  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
   gz_bytes: number | null;
   timeline_version: number | null;
 }
@@ -25,11 +39,23 @@ interface RawTimelineChunkRow {
   chunk_chars: number;
 }
 
+/**
+ * Raw bytes per `request_timeline_gz` read. Neon hex-encodes bytea, so one
+ * slice is about 32 MiB on the wire, half of its 64 MiB response cap.
+ */
 export const REQUEST_TIMELINE_GZ_SLICE_BYTES = 16 * 1024 * 1024;
 
+// JSONB can be far smaller on disk than its serialized response due to TOAST
+// compression, so every current legacy timeline uses bounded chunks. Timeline
+// fields are compact identifiers/numbers; 16 MiB leaves ample room for
+// JSON-string escaping under Neon's 64 MiB per-query response cap.
 const TIMELINE_TEXT_CHUNK_CHARS = 16 * 1024 * 1024;
 const MAX_TIMELINE_TEXT_CHUNKS = 64;
 
+/**
+ * Report a stored timeline that could not be read. Callers then serve no data
+ * for the point instead of failing the whole response.
+ */
 export function logRequestTimelineReadFailure(traceReplayId: number, error: unknown): void {
   console.error(
     `[request timeline] could not read the stored timeline for trace_replay_id=${traceReplayId}: ${
@@ -38,6 +64,12 @@ export function logRequestTimelineReadFailure(traceReplayId: number, error: unkn
   );
 }
 
+/**
+ * Read a stored `request_timeline_gz` value of `byteLength` bytes through
+ * bounded `substring()` slices and concatenate them. Never selects the whole
+ * value. Throws when the row disappears or the value changes length between
+ * slices; a same-length rewrite fails the gzip checksum when decoded.
+ */
 export async function readRequestTimelineGz(
   sql: DbClient | Sql,
   traceReplayId: number,
@@ -65,6 +97,10 @@ export async function readRequestTimelineGz(
   return Buffer.concat(slices, byteLength);
 }
 
+/**
+ * Stream the exact stored JSON gzip without expanding the full request array.
+ * Return null for legacy/stale rows so callers retain the existing fallback.
+ */
 export async function getStoredRequestTimelineGz(
   sql: DbClient,
   benchmarkResultId: number,
@@ -104,6 +140,10 @@ export async function getStoredRequestTimelineGz(
   })();
 }
 
+/**
+ * Yield a legacy `request_timeline` JSONB as text in bounded chunks. Throws
+ * when the timeline is missing or longer than the chunk limit.
+ */
 export async function* legacyRequestTimelineText(
   sql: DbClient,
   traceReplayId: number,
@@ -133,6 +173,10 @@ export async function* legacyRequestTimelineText(
   throw new Error(`legacy request_timeline is longer than ${MAX_TIMELINE_TEXT_CHUNKS} text chunks`);
 }
 
+/**
+ * Read a current stored timeline from the column that holds it: the gzip
+ * copy when `gzBytes` (its `octet_length`) is non-null, else the legacy JSONB.
+ */
 async function readStoredRequestTimeline(
   sql: DbClient,
   traceReplayId: number,
@@ -150,6 +194,9 @@ export async function getRequestTimeline(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<RequestTimeline | null> {
+  // The gzip copy wins whenever it exists, and its version is a scalar column,
+  // so picking a path never detoasts it. The legacy JSONB version is read only
+  // for rows without a gzip copy.
   const rows = (await sql`
     select
       atr.id as trace_replay_id,
@@ -166,6 +213,10 @@ export async function getRequestTimeline(
   const row = rows[0];
   if (!row) return null;
 
+  // A current timeline is read from the column that holds it, gzip in bounded
+  // byte slices and legacy JSONB in bounded text chunks. Never choose the JSONB
+  // path by compressed storage size: a small TOAST value can still serialize
+  // past Neon's per-query response limit.
   if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
     try {
       return await readStoredRequestTimeline(
@@ -181,10 +232,20 @@ export async function getRequestTimeline(
 
   if (!row.has_blob) return null;
 
+  // Slow path only: fetch the large profile blob after establishing that the
+  // pre-computed timeline is stale or missing. Long trace runs can have blobs
+  // large enough to exceed Neon's 64 MiB encoded-response limit, so the fast
+  // path must never select the blob alongside the stored timeline.
   const timeline = await computeRequestTimeline(() =>
     readTraceProfileChunks(sql, row.trace_replay_id),
   );
 
+  // Self-heal the stored gzip timeline so the next request (and the
+  // trace-histograms and request-chart-data routes, which read the same
+  // columns) takes the fast path. Only write a complete recompute:
+  // `computeRequestTimeline` returns null for a missing/malformed blob, which
+  // we must not persist over good data. Best-effort and not awaited, so the
+  // response is not delayed (no-ops on a read-only replica).
   if (timeline !== null) {
     void writeBackRequestTimeline(sql, row.trace_replay_id, timeline);
   }

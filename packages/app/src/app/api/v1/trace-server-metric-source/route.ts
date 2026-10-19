@@ -12,6 +12,7 @@ import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
+/** Version-derived blob-cache key namespace (exported for the key-derivation test). */
 export const CACHE_KEY_PREFIX = `trace-server-metric-source-v${CHART_SERIES_VERSION}`;
 
 const getCachedMetricSource = cachedQuery(
@@ -21,6 +22,7 @@ const getCachedMetricSource = cachedQuery(
   { blobOnly: true },
 );
 
+/** GET /api/v1/trace-server-metric-source?id=N&source=SOURCE_ID */
 export async function GET(request: NextRequest): Promise<Response> {
   const id = Number(request.nextUrl.searchParams.get('id'));
   const source = request.nextUrl.searchParams.get('source')?.trim();

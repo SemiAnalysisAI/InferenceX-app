@@ -3,6 +3,7 @@ import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import type { Locale } from '@/lib/i18n/i18n';
 import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
 
+/** Table candidates keep GPU measurements even when the all-in model cannot run. */
 export function allInMeasuredTableData(
   data: readonly InferenceData[],
   metricKey: YAxisMetricKey,
@@ -12,6 +13,7 @@ export function allInMeasuredTableData(
     .filter((point) => Number.isFinite(point.measuredAvgPower?.y) && point.measuredAvgPower!.y > 0)
     .map((point) => ({
       ...remapInferencePoint(point, metricKey, xAxisField),
+      // InferenceData requires a number. This sentinel is table-only; exports use null/blank.
       y: point[metricKey]?.y ?? NaN,
     }));
 }

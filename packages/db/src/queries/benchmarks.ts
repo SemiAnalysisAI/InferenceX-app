@@ -2,9 +2,17 @@ import type { DbClient } from '../connection.js';
 import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
+/**
+ * One entry in `BenchmarkRow.workers` — mirrors the runner's aggregate_power.py
+ * per-worker payload. Structurally identical to the ingest-side {@link WorkerPower},
+ * so it is aliased to that single definition rather than redeclared, keeping the
+ * shape from drifting within this package. The read side keeps the
+ * `BenchmarkWorkerRow` name used by `BenchmarkRow.workers`.
+ */
 export type BenchmarkWorkerRow = WorkerPower;
 
 export interface BenchmarkRow {
+  /** Stable benchmark_results id used for agentic detail lookups. */
   id: number;
   hardware: string;
   framework: string;
@@ -29,15 +37,26 @@ export interface BenchmarkRow {
   conc: number;
   offload_mode: string;
   image: string | null;
+  /** Producer-generated identity for the complete recipe; null on legacy rows. */
   recipe_fingerprint?: string | null;
   metrics: Record<string, number>;
+  /**
+   * Per-worker measured-power breakdown emitted on multinode / disagg runs.
+   * Stored in the dedicated `workers` JSONB column on `benchmark_results`
+   * (added in migration 006). Null for single-node runs and any run predating
+   * aggregate_power.py's multinode patch — surfaced as undefined here.
+   */
   workers?: BenchmarkWorkerRow[];
+  /** Producer reason codes for withheld power; null/undefined on other rows. */
   power_invalid_reasons?: string[] | null;
+  /** Narrowed measurement-window audit; null/undefined on legacy rows. */
   power_audit?: PowerAudit | null;
   date: string;
+  /** Producer identity and timestamp; preserved for per-point provenance. */
   workflow_run_id?: number;
   run_started_at?: string | null;
   run_url: string | null;
+  /** Logical snapshot identity. Set when an append-only run carries older points forward. */
   curve_date?: string;
   curve_workflow_run_id?: number;
   curve_run_started_at?: string | null;
@@ -51,6 +70,11 @@ interface SqlPiece {
   readonly values: unknown[];
 }
 
+/**
+ * Compose static SQL fragments before invoking a database driver. The final
+ * DbClient call receives one ordinary TemplateStringsArray plus bound values;
+ * neither Neon HTTP nor postgres.js has to interpret driver-specific fragments.
+ */
 function sqlPiece(strings: TemplateStringsArray, ...values: unknown[]): SqlPiece {
   const composedStrings = [strings[0] ?? ''];
   const composedValues: unknown[] = [];
@@ -328,15 +352,38 @@ function queryRecursiveBenchmarks(
   }
 }
 
+/**
+ * Fetch the latest benchmark results for one or more model DB keys across ALL sequences,
+ * up to a given date. Multiple keys support point-release grouping — e.g. passing
+ * `['glm5', 'glm5.1']` unions both buckets under the one display.
+ *
+ * Selection unit is the LINE, not the point. Normally each line comes entirely from
+ * its newest workflow run. Runs explicitly marked append-only are the sole exception:
+ * their new points extend the immediately preceding same-image curve, including a
+ * consecutive chain of append-only runs back to the nearest full snapshot.
+ *
+ * The frontend filters by sequence client-side. This eliminates API round-trips when
+ * switching sequences — the data is already cached by React Query.
+ */
 export async function getLatestBenchmarks(
   sql: DbClient,
   modelKey: string | string[],
   date?: string,
   exact?: boolean,
+  /**
+   * GitHub run id to view the chart "as of" — restricts results to runs that
+   * started no later than this one, so selecting an earlier same-day run shows
+   * the state of the data at that point in time (later runs don't render yet).
+   * No-op when this is the latest run (the filter then includes everything).
+   * Only applied on the date-filtered (non-`exact`) path used by the main chart.
+   */
   asOfRunId?: string,
 ): Promise<BenchmarkRow[]> {
   const modelKeys = Array.isArray(modelKey) ? modelKey : [modelKey];
   if (date) {
+    // The latest variant chooses one seed per line under the requested cutoff.
+    // Its recursive history remains unrestricted so an append-only seed can
+    // still reach the nearest earlier full same-image snapshot.
     const rows = await queryRecursiveBenchmarks(sql, modelKeys, {
       kind: 'latest',
       date,
@@ -346,6 +393,7 @@ export async function getLatestBenchmarks(
     return rows as unknown as BenchmarkRow[];
   }
 
+  // No date filter: use materialized view for instant lookups
   const rows = await sql`
     SELECT
       lb.id,
@@ -396,6 +444,11 @@ export async function getLatestBenchmarks(
   return rows as unknown as BenchmarkRow[];
 }
 
+/**
+ * Fetch the curve snapshot represented by one workflow run. Ordinary runs return
+ * exactly their own points; append-only runs also include the immediately preceding
+ * same-image curve chain. Used by GPU comparison for same-day run snapshots.
+ */
 export async function getBenchmarksForRun(
   sql: DbClient,
   modelKey: string | string[],
@@ -409,6 +462,7 @@ export async function getBenchmarksForRun(
   return rows as unknown as BenchmarkRow[];
 }
 
+/** Fetch every logical curve snapshot across time for historical views. */
 export async function getAllBenchmarksForHistory(
   sql: DbClient,
   modelKey: string | string[],

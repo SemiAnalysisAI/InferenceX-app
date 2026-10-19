@@ -1,3 +1,15 @@
+/**
+ * Time-series view of one agentic benchmark point: chart-ready arrays for
+ * KV utilization, prefix-cache hit rate, queue depth, prefill + decode TPS,
+ * and per-source prompt-token counts.
+ *
+ * Backed by `agentic_trace_replay.chart_series` (pre-computed at ingest
+ * time, see `etl/compute-chart-series.ts`). The fast path is a single SQL
+ * row read; the slow path re-computes from `server_metrics_json_gz` and is
+ * only taken when the column is missing or the stored
+ * `CHART_SERIES_VERSION` is stale (the backfill script should drain that).
+ */
+
 import {
   CHART_SERIES_VERSION,
   computeChartSeries,
@@ -16,6 +28,9 @@ export type {
   TimeSeriesPoint,
 } from '../etl/compute-chart-series';
 
+// The endpoint payload combines chart_series with separately queried point
+// metadata. Keep a composite response version so metadata-shape changes roll
+// the blob-cache namespace without forcing an expensive chart_series backfill.
 const POINT_META_VERSION = 6;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
@@ -55,27 +70,56 @@ export interface PointMeta {
   osl: number | null;
   benchmark_type: string;
   date: string;
+  /** GitHub Actions run URL for jumping to the source. */
   run_url: string | null;
+  /** Cumulative end-of-run cache-hit number the dashboard already shows. */
   server_gpu_cache_hit_rate: number | null;
+  /** Cumulative end-of-run CPU offload cache-hit. */
   server_cpu_cache_hit_rate: number | null;
 }
 
 export interface TraceServerMetrics {
+  /** Point context — hardware, model, conc, etc. for the page header. */
   meta: PointMeta;
+  /** ns wall-clock of the first window's start; for debugging only. */
   startNs: number;
+  /** ns wall-clock of the last window's end. */
   endNs: number;
+  /** Total benchmark window in seconds. */
   durationS: number;
+  /** Number of 1Hz windows captured. */
   timeslicesCount: number;
+  /** vllm:kv_cache_usage_perc avg per scrape, values in 0..1. */
   kvCacheUsage: TimeSeriesPoint[];
+  /** Per-window prefix-cache hit rate computed as Δhits / Δqueries (0..1). */
   prefixCacheHitRate: TimeSeriesPoint[];
+  /** Request queue depth: running, waiting, total per scrape. */
   queueDepth: QueueDepthPoint[];
+  /**
+   * Per-source prompt-token counts over time (counter rate per scrape).
+   * Keyed by the value of the `source` label (typically `local_cache_hit`,
+   * `external_cache_hit`, `miss`, etc.). Plot as stacked area.
+   */
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  /** Prefill throughput: vllm:prompt_tokens rate (tokens/sec) per scrape. */
   prefillTps: TimeSeriesPoint[];
+  /** Decode throughput: vllm:generation_tokens rate (tokens/sec) per scrape. */
   decodeTps: TimeSeriesPoint[];
+  /** Tokens served from prefix cache per scrape (vllm:prefix_cache_hits rate). */
   prefixCacheHitsTps: TimeSeriesPoint[];
+  /** Host (CPU offload) KV cache utilization, 0..1. SGLang hicache only. */
   hostKvCacheUsage: TimeSeriesPoint[];
+  /**
+   * Per-DP-rank KV cache utilization. Empty for single-engine deployments —
+   * the cluster-average `kvCacheUsage` line covers that case alone.
+   */
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
+  /**
+   * Deployment KV-pool capacity in tokens, derived at ingestion for vLLM/ATOM.
+   * Nominal capacity: ATOM checkpoints can share this pool with token KV.
+   */
   kvCachePoolTokens: number | null;
+  /** Orchestrator-normalized metrics grouped by endpoint/worker. */
   metricSources: MetricSourceDescriptor[];
 }
 
@@ -90,6 +134,7 @@ interface RawMetaRow extends PointMeta {
   has_blob: boolean;
   chart_series: Omit<ChartSeries, 'metricSources'> | null;
   metric_sources: KvMetricSource[];
+  /** Derived from startup logs, plus allocated block counts for ATOM. */
   kv_cache_pool_tokens: string | null;
 }
 
@@ -157,17 +202,24 @@ function merge(
     promptTokensBySource: series.promptTokensBySource,
     prefillTps: series.prefillTps,
     decodeTps: series.decodeTps,
+    // v2 chart_series rows pre-backfill don't have this field — default to []
     prefixCacheHitsTps: series.prefixCacheHitsTps ?? [],
     hostKvCacheUsage: series.hostKvCacheUsage ?? [],
+    // v8+ field; older chart_series rows lack it → omit per-engine overlay.
     kvCacheUsageByEngine: series.kvCacheUsageByEngine ?? [],
+    // v9+ field; old rows are served without a source selector until backfilled.
     metricSources,
   };
 }
 
+/** Mean of several engine series, matched on scrape instant. */
 function meanOfEngines(engines: readonly { points: TimeSeriesPoint[] }[]): TimeSeriesPoint[] {
   const active = engines.filter((engine) => engine.points.length > 0);
   if (active.length === 0) return [];
   if (active.length === 1) return active[0]!.points;
+  // Engines inside one worker are scraped together, so they share instants and
+  // a pointwise mean is exact. A `t` only some of them reported averages those,
+  // rather than counting the absent ones as zero.
   const byT = new Map<number, { sum: number; n: number }>();
   for (const engine of active) {
     for (const point of engine.points) {
@@ -185,6 +237,25 @@ function meanOfEngines(engines: readonly { points: TimeSeriesPoint[] }[]): TimeS
     .map(([t, { sum, n }]) => ({ t, value: sum / n }));
 }
 
+/**
+ * All-endpoints KV overlay: one line per WORKER, averaged over the ranks it
+ * owns.
+ *
+ * `chart_series.kvCacheUsageByEngine` is per rank, which stops being readable
+ * on a PD-disaggregated run — 6 prefill workers at DP4 plus a decode worker is
+ * 28 lines, and ranks inside one worker track each other closely, so the
+ * comparison worth seeing is worker-vs-worker.
+ *
+ * Derived here rather than in the ETL because everything it needs is already
+ * stored: each source carries its own per-rank breakdown, and this layer is
+ * the last place that sees it before `metricSources` is trimmed to
+ * descriptors. Keeping it out of `chart_series` means no version bump and no
+ * backfill for what is a presentation choice.
+ *
+ * Returns null when collapsing would not help — a single worker, or a run with
+ * no per-source data, keeps the per-rank overlay, which is exactly where rank
+ * skew is the signal.
+ */
 function collapseKvByWorker(
   sources: readonly KvMetricSource[],
 ): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
@@ -192,6 +263,9 @@ function collapseKvByWorker(
   const entries = sources
     .map((entry) => ({
       source: entry.source,
+      // Single-pool workers intentionally omit the per-engine array because
+      // it would duplicate their aggregate line. Preserve that worker when a
+      // sibling with multiple ranks makes the all-endpoints collapse useful.
       engines:
         entry.kvCacheUsageByEngine?.length > 0
           ? entry.kvCacheUsageByEngine
@@ -201,6 +275,8 @@ function collapseKvByWorker(
     }))
     .filter((entry) => entry.engines.length > 0);
   if (entries.length < 2) return null;
+  // Already one engine per worker — nothing to average, so leave the stored
+  // labels alone rather than relabelling for no gain.
   const totalEngines = entries.reduce((sum, entry) => sum + entry.engines.length, 0);
   if (totalEngines <= entries.length) return null;
 
@@ -212,6 +288,8 @@ function collapseKvByWorker(
   return entries.map(({ source, engines }, index) => {
     const worker = source.workerId;
     const short = worker && worker.length > 4 ? worker.slice(-4) : worker;
+    // Qualify by worker only when the role actually has several, so a lone
+    // decode worker reads "decode" rather than "decode 0842".
     const base =
       (workersPerRole.get(source.role) ?? 0) > 1 && short
         ? `${source.role} ${short}`
@@ -290,11 +368,16 @@ export async function getTraceServerMetrics(
   const kvCachePoolTokens =
     row.kv_cache_pool_tokens === null ? null : Number(row.kv_cache_pool_tokens);
 
+  // Fast path: pre-computed chart_series at the current version.
   if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
     const summary = summarizeSeries(row.chart_series, row.metric_sources);
     return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
   }
 
+  // Slow path only: fetch the large raw blob after establishing that the
+  // pre-computed series is missing or stale. Disaggregated blobs can be tens
+  // of MB compressed, so selecting this in the metadata query defeats the
+  // fast path even when chart_series is current.
   const blobRows = (await sql`
     select server_metrics_json_gz as blob
     from agentic_trace_replay
@@ -303,12 +386,18 @@ export async function getTraceServerMetrics(
   const blob = blobRows[0]?.blob;
   if (!blob) return null;
 
+  // `computeChartSeries` streams blobs that exceed its in-memory fast-path
+  // ceiling so high-conc TP+EP rows succeed before the backfill drains them.
   const series = await computeChartSeries(blob, {
     framework: row.framework,
     disagg: row.disagg,
   });
   if (!series) return null;
 
+  // Self-heal the stored chart_series so the next request takes the fast path
+  // instead of re-decompressing this (tens-of-MB) blob. `series` is complete
+  // and stamped at CHART_SERIES_VERSION here; fire-and-forget and best-effort
+  // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
   writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
 
   const summary = summarizeSeries(series, series.metricSources);
@@ -324,6 +413,7 @@ interface RawMetricSourceRow {
   metric_source: MetricSourceSeries | null;
 }
 
+/** Fetch one source's full series only after the user selects it. */
 export async function getTraceServerMetricSource(
   sql: DbClient,
   benchmarkResultId: number,

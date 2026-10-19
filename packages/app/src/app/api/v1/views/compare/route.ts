@@ -36,6 +36,15 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/compare — JSON form of the /compare/<slug> pages.
+ *
+ * Pair selection accepts either the page slug (`slug=deepseek-v4-b200-vs-mi355x`)
+ * or `model=` + `gpus=<a>,<b>`; both are canonicalized the way the pages
+ * redirect, so the two spellings of a pair return identical payloads. All
+ * interpolation reuses `lib/compare/compare-page-data.server.ts` / `lib/compare/compare-ssr.ts`.
+ */
+
 const MAX_CUSTOM_TIERS = 12;
 
 function parseTiersParam(value: string | null): number[] | null {
@@ -114,6 +123,8 @@ function resolvePair(searchParams: URLSearchParams): ResolvedPair {
     modelEntry = entry;
     [a, b] = gpus;
   }
+  // Canonicalize GPU order exactly like the page redirect so both spellings
+  // of a pair produce one payload (summary sides included).
   const canonical = parseCompareSlug(canonicalCompareSlug(modelEntry.slug, a, b));
   if (canonical) ({ a, b } = canonical);
   return { modelEntry, a, b };
@@ -170,6 +181,8 @@ export function GET(request: NextRequest) {
     const summary: Record<string, unknown> = {
       a: derived.summaryA,
       b: derived.summaryB,
+      // Head-to-head is always read at the page's default targets so it stays
+      // stable regardless of any custom tiers requested for the table.
       headToHead: projectCompareStat(computeCompareStat(a, b, derived.ssrRows)),
     };
     if (variant === 'precision' && derived.sequence) {

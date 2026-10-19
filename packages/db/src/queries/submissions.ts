@@ -28,6 +28,8 @@ export interface SubmissionVolumeRow {
   datapoints: number;
 }
 
+/** Get per-run config submissions (one row per config × date).
+ *  Uses benchmark_results with error/workflow filters to include full history. */
 export async function getSubmissionSummary(sql: DbClient): Promise<SubmissionSummaryRow[]> {
   const rows = await sql`
     SELECT
@@ -60,6 +62,8 @@ export async function getSubmissionSummary(sql: DbClient): Promise<SubmissionSum
   return rows as unknown as SubmissionSummaryRow[];
 }
 
+/** Get daily datapoint counts by hardware for volume charts.
+ *  Uses benchmark_results with error/workflow filters to include full history. */
 export async function getSubmissionVolume(sql: DbClient): Promise<SubmissionVolumeRow[]> {
   const rows = await sql`
     SELECT

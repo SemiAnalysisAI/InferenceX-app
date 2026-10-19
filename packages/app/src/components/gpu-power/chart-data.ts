@@ -1,10 +1,14 @@
 import type { GpuMetricKey, GpuMetricRow } from './types';
 export interface ParsedPoint {
   seconds: number;
+  /** Absolute sample time in ms; smoothing and alignment work in this space. */
   ms: number;
+  /** NaN marks an unavailable reading so chart lines retain the gap. */
   value: number;
   gpuIndex: number;
+  /** The raw sample behind this point; null once the value has been averaged. */
   raw: GpuMetricRow | null;
+  /** For the mean line: how many chips contributed at this timestamp. */
   count?: number;
 }
 
@@ -23,6 +27,8 @@ export function buildTelemetryData(
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
 ): { t0Ms: number; groups: Map<number, ParsedPoint[]> } {
+  // t=0 is the first sample of the whole series, not of the visible chips, so
+  // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
   const parsed: { row: GpuMetricRow; ms: number }[] = [];
   for (const row of data) {
@@ -51,6 +57,7 @@ export function buildTelemetryData(
   return { t0Ms: minTime, groups };
 }
 
+/** Keep the read-only view's serialized point shape while sharing chart preparation. */
 export function buildGroupedData(
   data: GpuMetricRow[],
   visibleGpus: Set<number>,

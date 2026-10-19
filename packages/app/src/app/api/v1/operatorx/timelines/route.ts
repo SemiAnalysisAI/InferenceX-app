@@ -11,6 +11,11 @@ const OPS = new Set(['gemm', 'moe']);
 const REF = /^[\w.-]{1,128}:\d+:[\w.-]{1,128}$/;
 const MAX_REFS = 32;
 
+/**
+ * Kernel timelines of stored results named `runId:index:revision` (comma-separated
+ * `r`). A replaced comparison row can still refer to its original run. A result
+ * removed or replaced by re-ingest is not cached by the HTTP response.
+ */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const op = params.get('op') ?? '';

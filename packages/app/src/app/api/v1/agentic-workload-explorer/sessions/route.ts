@@ -29,8 +29,12 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
   const minReqs = parseMinReqs(searchParams.get('minReqs'));
   const sort = parseSort(searchParams);
 
+  // Privacy-mode filtering is admin-only upstream; the read-only viewer only
+  // ever sees anonymized sessions, so it is always unfiltered here.
   const privacyMode = null;
 
+  // Infinite-scroll pages (offset > 0) only read `sessions`; the header stats
+  // come from the first page, so don't recount them on every scroll.
   const [sessions, stats] = await Promise.all([
     getRecentSessions(
       limit,

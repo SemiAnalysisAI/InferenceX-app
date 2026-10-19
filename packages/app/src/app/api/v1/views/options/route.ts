@@ -60,6 +60,14 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/views/options
+ *
+ * Static discovery endpoint for the views API: every option domain the other
+ * `/api/v1/views/*` endpoints accept, straight from the same registries the
+ * dashboard renders its controls from. No database access, JSON only.
+ */
+
 const COMPARE_SLUG_BY_DISPLAY = new Map(
   COMPARE_MODEL_SLUGS.map((entry) => [entry.displayName, entry.slug]),
 );
@@ -71,6 +79,7 @@ for (const group of METRIC_CONTROL_GROUPS) {
   }
 }
 
+/** Fleet-lifecycle defaults as the views expose them (cache ratio as a percent). */
 const lifecycleDefaults = {
   rampMonths: LIFECYCLE_DEFAULTS.rampMonths,
   cachedInputPricePercent: LIFECYCLE_DEFAULTS.cachedInputPct,

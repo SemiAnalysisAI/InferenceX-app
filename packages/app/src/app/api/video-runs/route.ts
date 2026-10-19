@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       !videoStorageEnabled() &&
       (!artifactId || media)
     ) {
+      // Production checks repository visibility; local reads must never publish on a cache miss.
       const url = new URL('/api/video-runs', SITE_URL);
       if (runId) url.searchParams.set('run', runId);
       if (artifactId) {
@@ -90,6 +91,7 @@ export async function GET(request: NextRequest) {
       }
       return NextResponse.json(data, { status: response.status, headers });
     }
+    // This public viewer must never expose artifacts from a repository that becomes private.
     const repository = await github('');
     const repo = repository.ok ? await repository.json() : null;
     if (repo?.private !== false)

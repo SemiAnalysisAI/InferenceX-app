@@ -8,6 +8,12 @@ import {
   type EqualServiceSource,
 } from './equal-service-comparison';
 
+/**
+ * Pairs two sources' observations at the same concurrency (PowerX Figures 6,
+ * 7 and 9). Matched load is a diagnostic next to the equal-service comparison,
+ * not a replacement: the two sources usually serve different speeds at one
+ * concurrency. Nothing is interpolated, averaged or carried between rows.
+ */
 export const MATCHED_CONCURRENCY_METRICS = [
   'joulesPerOutputToken',
   'meanWattsPerGpu',
@@ -19,12 +25,14 @@ export type MatchedConcurrencyValues = Record<MatchedConcurrencyMetric, number |
 export type MatchedConcurrencySide =
   | { status: 'observed'; point: InferenceData; values: MatchedConcurrencyValues }
   | { status: 'missing' }
+  /** Several observations of one source at one load disagree; none is chosen. */
   | { status: 'ambiguous'; points: InferenceData[] };
 
 export interface MatchedConcurrencyRow {
   concurrency: number;
   baseline: MatchedConcurrencySide;
   comparator: MatchedConcurrencySide;
+  /** `100 × (comparator ÷ baseline − 1)`; null unless both values were observed. */
   changePercent: MatchedConcurrencyValues;
 }
 
@@ -33,6 +41,7 @@ export type MatchedConcurrencyReason = 'same-source' | 'unknown-source';
 export interface MatchedConcurrencyTable {
   baseline: EqualServiceSource | null;
   comparator: EqualServiceSource | null;
+  /** Streaming-speed field read for the `interactivity` column (selected statistic). */
   interactivityField: keyof AggDataEntry;
   reason?: MatchedConcurrencyReason;
   rows: MatchedConcurrencyRow[];

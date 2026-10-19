@@ -9,6 +9,11 @@ import {
 import { analyzeToolSequences } from '@semianalysisai/inferencex-db/proxytrace/sequence-insights';
 import { withExplorerRoute } from '@/lib/agentic-workload-explorer/api';
 
+// Cache-only, same design as ../route.ts — sequence analysis scans every tool
+// event per session and is only ever recomputed by the main ProxyTrace
+// deployment.
+// Standardized: always anon visibility, all trace versions, single cache row.
+// `?harness=` runs live over the same session sample as ../route.ts.
 export const maxDuration = 300;
 
 const VIS: string[] = [];

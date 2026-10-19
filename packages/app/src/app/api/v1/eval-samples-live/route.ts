@@ -1,3 +1,8 @@
+/**
+ * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
+ * It fetches live GitHub Actions artifacts which change while a run is in progress —
+ * same policy as `/api/unofficial-run`.
+ */
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { extractDemonstrations } from '@/lib/evaluation/eval-sample-utils';
@@ -11,6 +16,25 @@ import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github/github-art
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * GET /api/v1/eval-samples-live
+ *   ?run_id=<numeric>
+ *   &task=<eval task, e.g. gsm8k>
+ *   &model=<model key>
+ *   &framework=<framework>
+ *   &hardware=<hw key>
+ *   &precision=<precision>
+ *   &spec_method=<spec>
+ *   &disagg=true|false
+ *   &conc=<int>
+ *   &filter=all|passed|failed
+ *   &offset=0&limit=200
+ *
+ * Live-fetch path for unofficial runs. Locates the per-config eval artifact for
+ * the requested workflow run, downloads it, parses `samples_<task>_*.jsonl`,
+ * and returns the same response shape as `/api/v1/eval-samples` so the drawer
+ * doesn't need to know which backend served it.
+ */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const runId = params.get('run_id') ?? '';
@@ -79,6 +103,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Compute pass/fail totals across the full set, then slice the requested filter.
     let passedTotal = 0;
     let failedTotal = 0;
     for (const s of allSamples) {
@@ -99,6 +124,10 @@ export async function GET(request: NextRequest) {
         prompt: s.prompt,
         target: s.target,
         response: s.response,
+        // For the live path we don't separately surface the unfiltered response
+        // — pre-mapper data carries `resps[0][0]` inside `data`, but the shape
+        // mirrors the DB route's "response equals raw" fallback so the drawer
+        // renders cleanly.
         rawResponse: (s.data as Record<string, unknown>)?.resps ? extractRawResponse(s.data) : null,
         demonstrations: extractDemonstrations((s.data as Record<string, unknown>)?.arguments),
         passed: s.passed,
@@ -116,6 +145,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** Pull `resps[0][0]` out of the mapper's preserved `data` blob — same as the DB query does in SQL. */
 function extractRawResponse(data: Record<string, unknown>): string | null {
   const resps = data.resps;
   if (!Array.isArray(resps) || resps.length === 0) return null;

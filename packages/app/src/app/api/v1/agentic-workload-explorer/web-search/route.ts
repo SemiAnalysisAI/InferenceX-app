@@ -8,6 +8,10 @@ import {
 import { withExplorerRoute } from '@/lib/agentic-workload-explorer/api';
 import { parseTraceVersion } from '@/lib/agentic-workload-explorer/request';
 
+// Served from stats_cache (cron-warmed ~every 15 min, self-healing on miss).
+// The old inline path fired four full-history scans (summary, 30-day daily,
+// per-model, top-20 sessions). Payload is bounded, so the finished JSON is
+// cached wholesale. sanitizeModels is applied at compute time. See stats.ts.
 export const maxDuration = 300;
 
 export const GET = withExplorerRoute(async ({ vis, req }) => {

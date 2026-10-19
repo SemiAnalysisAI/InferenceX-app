@@ -26,6 +26,7 @@ export interface GpuPowerRunInfo {
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
+  /** Only database-backed artifacts carry full-record statistics. */
   series?: Omit<GpuMetricSeries, 'data'>;
 }
 
@@ -67,6 +68,7 @@ export function getGpuMetricYAxisLabel(metric: GpuMetricConfig, locale: 'en' | '
   return locale === 'zh' ? metric.yAxisLabelZh : metric.yAxisLabel;
 }
 
+/** Common metrics available on both NVIDIA and AMD GPUs. */
 export const GPU_METRIC_OPTIONS: GpuMetricConfig[] = [
   {
     key: 'power',
@@ -118,6 +120,7 @@ export const GPU_METRIC_OPTIONS: GpuMetricConfig[] = [
   },
 ];
 
+/** AMD-specific metrics (only present when data comes from amd-smi). */
 export const AMD_METRIC_OPTIONS: GpuMetricConfig[] = [
   {
     key: 'edgeTemp',
@@ -185,23 +188,34 @@ export const AMD_METRIC_OPTIONS: GpuMetricConfig[] = [
   },
 ];
 
+/** All metric options combined. */
 export const ALL_METRIC_OPTIONS: GpuMetricConfig[] = [...GPU_METRIC_OPTIONS, ...AMD_METRIC_OPTIONS];
 
+/**
+ * Returns the metric options that have data in the given dataset.
+ * A metric is shown only when at least one row has a finite reading.
+ */
 export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   if (data.length === 0) return GPU_METRIC_OPTIONS;
   return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
 }
 
+/** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
 export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
   const key = hardware?.toLowerCase();
   const entry = key ? HW_REGISTRY[key] : undefined;
   return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
 }
 
+/**
+ * Detect GPU SKU from an artifact name and return its TDP in watts.
+ * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
+ */
 export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {
   const lower = artifactName.toLowerCase();
+  // Sorted longest-first to avoid partial matches (e.g., gb200 before b200)
   const keys = Object.keys(HW_REGISTRY).toSorted((a, b) => b.length - a.length);
   for (const key of keys) {
     if (lower.includes(key)) {
@@ -219,6 +233,10 @@ function parseTimestampToMs(raw: string): number | null {
   return null;
 }
 
+/**
+ * Build a column-index lookup from a CSV header line.
+ * Returns a map of header name → column index.
+ */
 function buildColumnMap(headerLine: string): Map<string, number> {
   const headers = splitCsvLine(headerLine);
   const map = new Map<string, number>();
@@ -228,6 +246,11 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   return map;
 }
 
+/**
+ * Parse NVIDIA nvidia-smi CSV format.
+ * Columns: timestamp, index, power.draw [W], temperature.gpu,
+ * clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]
+ */
 function parseNvidiaCsv(lines: string[]): GpuMetricRow[] {
   const columns = buildColumnMap(lines[0]);
   const col = (name: string) => columns.get(name) ?? -1;
@@ -257,12 +280,19 @@ function parseNvidiaCsv(lines: string[]): GpuMetricRow[] {
   return results;
 }
 
+/** Missing, unparseable and nonfinite readings stay absent; measured zero is valid. */
 function safeFloat(val: string | undefined): number | undefined {
   if (val === undefined || val === 'N/A' || val === '') return undefined;
   const n = parseFloat(val);
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Parse AMD amd-smi CSV format.
+ * Key columns: timestamp, gpu, socket_power, gfx_activity, umc_activity,
+ * gfx_0_clk, mem_0_clk, hotspot, edge, mem, gfx_voltage, soc_voltage,
+ * mem_voltage, fclk_0_clk, socclk_0_clk, mm_activity
+ */
 function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow[] {
   const col = (name: string) => colMap.get(name) ?? -1;
   const iTimestamp = col('timestamp');
@@ -291,6 +321,7 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
 
     const index = parseInt(cols[iGpu], 10);
     const power = safeFloat(cols[iPower]);
+    // Prefer hotspot temp, fall back to edge
     const temperature = safeFloat(cols[iHotspot]) ?? safeFloat(cols[iEdge]);
     const smClock = safeFloat(cols[iGfxClk]);
     const memClock = safeFloat(cols[iMemClk]);
@@ -299,12 +330,14 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
 
     if (!Number.isInteger(index) || index < 0 || power === undefined) continue;
 
+    // Round epoch fractions exactly as ingest does before constructing the dedup key.
     const timestampMs = parseAmdTimestamp(cols[iTimestamp]);
     if (timestampMs === null) continue;
     const date = new Date(timestampMs);
     if (!Number.isFinite(date.getTime())) continue;
     const timestamp = date.toISOString();
 
+    // AMD-specific metrics
     const edgeTemp = iEdge >= 0 ? safeFloat(cols[iEdge]) : undefined;
     const memTemp = iMemTemp >= 0 ? safeFloat(cols[iMemTemp]) : undefined;
     const gfxVoltage = iGfxVoltage >= 0 ? safeFloat(cols[iGfxVoltage]) : undefined;
@@ -336,6 +369,10 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
   return results;
 }
 
+/**
+ * Parse CSV text from gpu_metrics artifacts into structured rows.
+ * Auto-detects NVIDIA (nvidia-smi) vs AMD (amd-smi) format from the header.
+ */
 export function parseCsvData(csvText: string): GpuMetricRow[] {
   const lines = csvText
     .split('\n')
@@ -349,8 +386,11 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
     headerLower.includes('socket_power') || headerLower.includes('gfx_activity')
       ? parseAmdCsv(lines, buildColumnMap(lines[0]))
       : parseNvidiaCsv(lines);
+  // Normalize one CSV at a time: host-local indices may repeat in other files.
+  // Keep the first device/timestamp sample, matching the stored samples.
   const seen = new Set<string>();
   return rows.filter((row) => {
+    // NVIDIA's naive collector clock must not use the reader's local DST rules.
     const ms = parseNvidiaTimestamp(row.timestamp) ?? parseTimestampToMs(row.timestamp);
     if (ms === null || !Number.isFinite(ms)) return false;
     const key = `${row.index}:${ms}`;
@@ -359,6 +399,8 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
     return true;
   });
 }
+
+// --- Statistics ---
 
 export type GpuStats = Omit<GpuMetricStatRow, 'metric'>;
 

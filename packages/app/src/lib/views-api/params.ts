@@ -24,10 +24,24 @@ import {
 
 import { ViewsApiParamError } from './errors';
 
+/**
+ * Shared query-parameter parsing for the read-only views API.
+ *
+ * Conventions:
+ * - Unknown enum values are a 400 (`ViewsApiParamError` with the allowed list),
+ *   never a silent fallback — API consumers must find typos immediately.
+ * - List parameters are comma-separated, trimmed, deduplicated, and returned in
+ *   a canonical (sorted) order so logically identical requests share cache keys.
+ * - Model accepts the dashboard display name (case-insensitive) plus the
+ *   public compare-page slugs and their aliases (e.g. `deepseek-v4`).
+ */
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
 export interface ResolvedModel {
+  /** Canonical display name, e.g. `DeepSeek-V4-Pro`. */
   readonly displayName: string;
+  /** DB model keys behind the display name. */
   readonly dbModelKeys: readonly string[];
 }
 
@@ -39,6 +53,7 @@ const SLUG_TO_DISPLAY = new Map(
   COMPARE_MODEL_SLUGS.map((entry) => [entry.slug, entry.displayName]),
 );
 
+/** Canonical model-name vocabulary accepted by `model=` (display names). */
 export const VIEWS_MODEL_NAMES: readonly string[] = DISPLAY_NAMES.toSorted();
 
 export function resolveModelParam(value: string | null, param = 'model'): ResolvedModel {
@@ -101,6 +116,7 @@ export function parseEnumParam<T extends string>(
   throw new ViewsApiParamError(param, `Unknown ${param}: ${value}`, allowed);
 }
 
+/** Comma list restricted to `allowed`; returns canonical sorted unique values. */
 export function parseListParam<T extends string>(
   value: string | null,
   param: string,
@@ -122,6 +138,12 @@ export function parseListParam<T extends string>(
   return [...new Set(resolved)].toSorted();
 }
 
+/**
+ * Free-form comma list (e.g. hardware keys); canonical lowercase sorted unique
+ * values. Case-folding happens BEFORE dedup/sort so `B200,b200` collapses to
+ * one entry and mixed-case input yields the same canonical list (and thus the
+ * same derived-data cache key) as lowercase input.
+ */
 export function parseFreeListParam(value: string | null): string[] {
   if (!value) return [];
   const items = value
@@ -185,6 +207,7 @@ export function parseDateParam(value: string | null, param: string): string | un
 
 const METRIC_CONFIG_VALUES = ['y', 'y_*', 'see /api/v1/views/options metrics[].configKey'];
 
+/** Accepts `y_costh`, `costh`, and the legacy `y` alias; unknown metrics are a 400. */
 export function parseMetricParam(
   value: string | null,
   fallback: MetricConfigKey = DEFAULT_METRIC_CONFIG_KEY,
@@ -199,12 +222,17 @@ export function parseMetricParam(
 }
 
 const RUN_ID_PATTERN = /^[1-9]\d*$/u;
+/** Upper bound on run ids one request may overlay or compare. */
 export const MAX_RUN_ID_LIST = 8;
 
 function isValidRunId(value: string): boolean {
   return RUN_ID_PATTERN.test(value) && Number.isSafeInteger(Number(value));
 }
 
+/**
+ * Optional GitHub Actions run id: positive digits only (no sign, exponent, or
+ * hex), returned as the string the DB queries key on. Empty means "latest".
+ */
 export function parseRunIdParam(value: string | null, param = 'runId'): string | undefined {
   if (value === null || value === '') return undefined;
   if (!isValidRunId(value)) {
@@ -213,6 +241,7 @@ export function parseRunIdParam(value: string | null, param = 'runId'): string |
   return value;
 }
 
+/** Bounded list of positive safe run ids (unofficial-run overlays, CollectiveX runs). */
 export function assertRunIdList(ids: readonly string[], param: string): void {
   if (ids.length > MAX_RUN_ID_LIST || ids.some((id) => !isValidRunId(id))) {
     throw new ViewsApiParamError(
@@ -222,6 +251,7 @@ export function assertRunIdList(ids: readonly string[], param: string): void {
   }
 }
 
+/** Comma list of run ids, deduplicated in caller order (overlay precedence is stable). */
 export function parseRunIdListParam(value: string | null, param: string): string[] {
   if (!value) return [];
   const ids = [
@@ -236,8 +266,10 @@ export function parseRunIdListParam(value: string | null, param: string): string
   return ids;
 }
 
+/** Percentile tiers the TCO calculator publishes (the dashboard exposes no others there). */
 export const CALCULATOR_PERCENTILE_VALUES = [Percentile.P75, Percentile.P90] as const;
 
+/** URL modes are hyphenated; the interpolation engine's are underscored. */
 export const CALCULATOR_MODE_VALUES = [
   'interactivity-to-throughput',
   'throughput-to-interactivity',
@@ -247,6 +279,7 @@ export const CALCULATOR_MODE_TO_INTERNAL: Record<CalculatorModeParam, Calculator
   'interactivity-to-throughput': 'interactivity_to_throughput',
   'throughput-to-interactivity': 'throughput_to_interactivity',
 };
+/** Default interactivity target (tok/s/user) for the calculator view and its docs. */
 export const CALCULATOR_DEFAULT_TARGET = 35;
 
 export const TCO_BASIS_VALUES = ['internal', 'external'] as const satisfies readonly TcoBasis[];
@@ -268,19 +301,27 @@ export function parseCostTypeParam(value: string | null, param = 'costType'): Co
 }
 
 const REGISTRY_VENDORS = new Set(Object.values(GPU_VENDORS));
+/**
+ * Vendors known to the hardware registry, in the dashboard's quick-filter pill
+ * order; any registry vendor the pill order does not list follows, sorted.
+ */
 export const VENDOR_VALUES: readonly string[] = [
   ...VENDOR_ORDER.filter((vendor) => REGISTRY_VENDORS.has(vendor)),
   ...[...REGISTRY_VENDORS].filter((vendor) => !VENDOR_ORDER.includes(vendor)).toSorted(),
 ];
+/** Serving-framework families, keyed like the dashboard's quick-filter pills. */
 export const FRAMEWORK_FAMILY_VALUES: readonly string[] = FRAMEWORK_FAMILIES.map(
   (family) => family.key,
 ).toSorted();
+/** Deployment modes the dashboard's quick-filter pills expose. */
 export const DEPLOYMENT_MODES = [
   'single-node',
   'multi-node',
   'disagg',
 ] as const satisfies readonly DeploymentMode[];
+/** Deployment modes plus the legacy `agg` alias shared dashboard links still carry. */
 export const DEPLOYMENT_VALUES = ['agg', ...DEPLOYMENT_MODES] as const;
+/** Speculative-decoding quick-filter modes. */
 export const SPEC_MODES = ['mtp', 'stp'] as const satisfies readonly SpecMode[];
 
 export function parseVendorsParam(value: string | null, param = 'vendors'): string[] {
@@ -291,6 +332,7 @@ export function parseFrameworkFamiliesParam(value: string | null, param = 'frame
   return parseListParam(value, param, FRAMEWORK_FAMILY_VALUES);
 }
 
+/** `agg` expands to both aggregate modes, mirroring `parseDeploymentModes` in the dashboard. */
 export function parseDeploymentParam(value: string | null, param = 'deployment'): DeploymentMode[] {
   return parseDeploymentModes(parseListParam(value, param, DEPLOYMENT_VALUES)).toSorted();
 }
@@ -299,6 +341,11 @@ export function parseSpecModesParam(value: string | null, param = 'spec'): SpecM
   return parseListParam(value, param, SPEC_MODES);
 }
 
+/**
+ * Hardware filter shared by every view with a `gpus=` list: a lowercase entry
+ * matches either the full hwKey (`b200_sglang`) or its base chip (`b200`).
+ * Empty list matches everything.
+ */
 export function matchesHardware(hwKey: string, gpus: readonly string[]): boolean {
   if (gpus.length === 0) return true;
   const lowered = hwKey.toLowerCase();
@@ -313,6 +360,7 @@ export function parseFormatParam(value: string | null): ViewsFormat {
   return parseEnumParam(value, 'format', VIEWS_FORMATS, 'json');
 }
 
+/** Reject misspelled, unsupported, or repeated controls instead of changing scope silently. */
 export function validateParams(search: URLSearchParams, allowed: readonly string[]): void {
   for (const key of search.keys()) {
     if (!allowed.includes(key))

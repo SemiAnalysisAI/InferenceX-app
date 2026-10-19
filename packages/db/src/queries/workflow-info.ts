@@ -32,6 +32,7 @@ export interface DateConfigRow {
   disagg: boolean;
 }
 
+/** Get benchmark workflow runs for a specific date (latest attempt per run, any completed conclusion). */
 export async function getWorkflowRunsByDate(
   sql: DbClient,
   date: string,
@@ -46,6 +47,7 @@ export async function getWorkflowRunsByDate(
   return rows as unknown as WorkflowRunRow[];
 }
 
+/** Get changelog entries for a set of workflow run DB IDs. */
 export async function getChangelogByDate(sql: DbClient, date: string): Promise<ChangelogRow[]> {
   const rows = await sql`
     SELECT
@@ -78,6 +80,12 @@ export interface RunConfigRow {
   disagg: boolean;
 }
 
+/**
+ * Per-(run, config) coverage for a date: which workflow runs produced benchmark
+ * data for which configs. Data-driven (joins benchmark_results) so a run that
+ * shipped data without a changelog entry still surfaces — the comparison UI uses
+ * this to enumerate every run on a date, not just runs with changelog notes.
+ */
 export async function getRunConfigsByDate(
   sql: DbClient,
   date: string,
@@ -106,6 +114,7 @@ export async function getRunConfigsByDate(
   return rows as unknown as RunConfigRow[];
 }
 
+/** Get distinct model/sequence/precision/hardware combos for a date. */
 export async function getDateConfigs(sql: DbClient, date: string): Promise<DateConfigRow[]> {
   const rows = await sql`
     SELECT DISTINCT
@@ -128,6 +137,7 @@ export async function getDateConfigs(sql: DbClient, date: string): Promise<DateC
 
 export interface AvailabilityRow {
   model: string;
+  // Null for agentic_traces rows; numeric for single_turn fixed-seq rows.
   isl: number | null;
   osl: number | null;
   precision: string;
@@ -139,6 +149,7 @@ export interface AvailabilityRow {
   date: string;
 }
 
+/** Get available (model, ISL/OSL, precision, hardware, framework, spec_method, benchmark_type, date) combos for the availability API. */
 export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRow[]> {
   const rows = await sql`
     SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.benchmark_type, a.date::text

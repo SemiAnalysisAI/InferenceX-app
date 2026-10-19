@@ -1,3 +1,7 @@
+/**
+ * Transforms raw BenchmarkRow[] from the API into InferenceData[] for charts.
+ */
+
 import { benchmarkCurveScope, DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions from '@/components/inference/metric-registry';
@@ -21,8 +25,30 @@ import { resolvePowerTier } from '@/lib/power/power-tier';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { BenchmarkRow } from '@/lib/api/api';
 
+/**
+ * Producer schema version whose unprefixed `joules_per_*` fields are documented
+ * as whole-deployment energy. Mirrors `POWER_METRIC_SCHEMA_VERSION` in the
+ * runner's `utils/aggregate_power.py`; bump both together when the semantics of
+ * those fields change again.
+ */
 const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
 
+/**
+ * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
+ * but not the intvty/e2el/tpot keys the chart pipeline expects. Bridge them here:
+ *   e2el   ≡ ttlt   (time-to-last-token == end-to-end latency)
+ *   tpot   ≡ itl    (time-per-output-token == inter-token-latency for single-output)
+ *   intvty ≡ 1/itl  (tok/s from the user's perspective)
+ *
+ * e2el/tpot only fill gaps (existing fields win). `intvty` is ALWAYS 1/itl:
+ * derived where itl is valid, overriding any artifact-supplied value, AND any
+ * artifact `*_intvty` is DROPPED where itl is absent/zero/invalid rather than
+ * passed through. The harness definition of `*_intvty` has drifted (some versions
+ * emit `p(1/ITL)`, which inverts percentile order), so for a slow-tail selector
+ * interactivity must be `1/p(ITL)`. This matches the ingest mapper for official
+ * rows; doing it here keeps overlay / `?unofficialrun=` rows (transformed live
+ * from raw artifacts, never through the DB) on the same single definition.
+ */
 function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, number> {
   const m: Record<string, number> = { ...raw };
   const hasFullResponseItl = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9'].some(
@@ -56,9 +82,15 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
   return m;
 }
 
+/** Convert a DB benchmark row to an AggDataEntry. */
 export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
+  // Non-disaggregated multinode artifacts historically stored their one
+  // aggregate engine topology in the prefill-shaped fields and left the
+  // decode-shaped fields at zero. Those names are only a transport/schema
+  // detail: aggregate serving has one TP/PP/EP topology. Select the populated
+  // side once and expose it through the canonical chart fields.
   const aggregateUsesPrefill =
     !row.disagg &&
     (row.decode_tp <= 0 ||
@@ -68,6 +100,9 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
         (row.prefill_num_workers > 0 || row.num_prefill_gpu > 0)));
   const aggregateTp = aggregateUsesPrefill ? row.prefill_tp : row.decode_tp;
   const aggregateEp = aggregateUsesPrefill ? row.prefill_ep : row.decode_ep;
+  // A few historical aggregate rows mirrored TP/EP into both schema halves
+  // before PP was mirrored. Since there is only one engine, prefer whichever
+  // side carries the meaningful (>1) PP value.
   const aggregatePp =
     !row.disagg && (m.prefill_pp !== undefined || m.decode_pp !== undefined)
       ? Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1)
@@ -77,9 +112,17 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   const aggregateDpAttention = aggregateUsesPrefill
     ? row.prefill_dp_attention
     : row.decode_dp_attention;
+  // An explicit invalid verdict is authoritative. Legacy rows without the
+  // verdict remain eligible so historical single-node measurements do not
+  // disappear. Unversioned disaggregated joules are withheld because their
+  // unprefixed fields changed from role-local to whole-deployment semantics.
   const measuredPowerValid = m.power_valid !== 0;
+  // Match the version exactly rather than `>= 2`: an open bound would silently
+  // admit a future schema whose semantics changed again, which is the exact
+  // failure that made versioning necessary in the first place.
   const hasWholeDeploymentEnergySemantics =
     !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
+  // Tier derivation must see exactly the measured values the chart can render.
   const avgPowerW = measuredPowerValid ? m.avg_power_w : undefined;
   const p75PowerW =
     m.power_valid === 1 && m.power_metric_schema_version === 2 ? m.p75_power_w : undefined;
@@ -108,6 +151,9 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     joulesPerTotalToken,
     joulesPerInputToken,
   ].some((value) => typeof value === 'number');
+  // Prefer the dedicated column (added in migration 004); fall back to the
+  // legacy stash inside `metrics` for any rows ingested before that column
+  // existed.
   const rawMetrics = row.metrics as Record<string, unknown>;
   const offloadMode =
     row.offload_mode ??
@@ -116,6 +162,11 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     const value = rawMetrics[key];
     return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
   };
+  // Postgres bigint comes through the SQL client as a string; coerce it. Overlay
+  // rows (transformed live from raw artifacts) carry no id, so `Number(undefined)`
+  // is NaN — collapse any non-persisted value to undefined so downstream link /
+  // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
+  // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   return {
     rawMetricKeys: Object.keys(m),
@@ -174,8 +225,12 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     p95_e2el: m.p95_e2el ?? 0,
     p99_e2el: m.p99_e2el ?? 0,
     'p99.9_e2el': m['p99.9_e2el'] ?? 0,
+    // Measured GPU telemetry (runner's aggregate_power.py). Left undefined for
+    // rows predating the field so downstream chart code can distinguish
+    // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     power_valid: m.power_valid,
     power_audit: row.power_audit ?? undefined,
+    // SQL NULL and omitted legacy fields both mean no diagnostic was supplied.
     power_invalid_reasons:
       Array.isArray(row.power_invalid_reasons) && row.power_invalid_reasons.length > 0
         ? row.power_invalid_reasons
@@ -193,6 +248,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     joules_per_successful_query: joulesPerSuccessfulQuery,
     joules_per_output_token: joulesPerOutputToken,
     joules_per_total_token: joulesPerTotalToken,
+    // Role power remains unambiguous across schema versions. Version 2 also
+    // publishes explicit role energy alongside whole-deployment joules.
     prefill_avg_power_w: prefillAvgPowerW,
     decode_avg_power_w: decodeAvgPowerW,
     joules_per_input_token: joulesPerInputToken,
@@ -202,10 +259,16 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     decode_joules_per_output_token: measuredPowerValid
       ? m.decode_joules_per_output_token
       : undefined,
+    // Cluster-wide GPU telemetry beyond power. Emitted when the perfmon CSVs
+    // include the corresponding sample columns; left undefined otherwise so
+    // the chart layer can distinguish "no measurement" from a real zero.
     avg_temp_c: measuredPowerValid ? m.avg_temp_c : undefined,
     peak_temp_c: measuredPowerValid ? m.peak_temp_c : undefined,
     avg_util_pct: measuredPowerValid ? m.avg_util_pct : undefined,
     avg_mem_used_mb: measuredPowerValid ? m.avg_mem_used_mb : undefined,
+    // Per-worker measured power. Surfaced on BenchmarkRow as a sibling of the
+    // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
+    // payload can't poison downstream consumers.
     workers: measuredPowerValid && Array.isArray(row.workers) ? row.workers : undefined,
     physicalChips: deploymentChipCount(
       {
@@ -222,6 +285,10 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     num_decode_gpu: row.num_decode_gpu,
     spec_decoding: row.spec_method,
     ep: aggregateEp,
+    // Pipeline parallelism has no configs-table column — the ingest mapper
+    // auto-captures the artifact's prefill_pp/decode_pp into the metrics
+    // JSONB, so both official DB rows and live-transformed overlay rows read
+    // it from there. Undefined for artifacts predating the field.
     pp: aggregatePp,
     dp_attention: aggregateDpAttention,
     dp: m.dp,
@@ -234,6 +301,10 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     decode_tp: row.disagg ? row.decode_tp : aggregateTp,
     decode_ep: row.disagg ? row.decode_ep : aggregateEp,
     decode_pp: row.disagg ? m.decode_pp : aggregatePp,
+    // Context-parallel widths are emitted by the runtime into metrics JSONB.
+    // Preserve both role-shaped values even for aggregate deployments: the
+    // tooltip collapses the transport-only role names for aggregate serving,
+    // while disaggregated serving displays the values per role.
     prefill_dcp_size: m.prefill_dcp_size ?? m.dcp_size,
     decode_dcp_size: m.decode_dcp_size ?? m.dcp_size,
     prefill_pcp_size: m.prefill_pcp_size ?? m.pcp_size,
@@ -275,10 +346,18 @@ interface PreparedEntry {
   derivedFields: DerivedChartFields;
 }
 
+/**
+ * Rewrite a chart x-axis key to use a different latency percentile prefix
+ * (`median_` → `p99_` etc). Only touches keys that start with a known
+ * percentile prefix; leaves everything else alone.
+ */
 export function withPercentile(key: string, percentile: string): string {
   return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
 }
 
+// Fixed-sequence replacement granularity is an exact generated topology.
+// An append-only run may touch one TP/EP search-space row while the displayed
+// curve also contains sibling topologies from the preceding snapshot.
 const runScopeKey = (r: BenchmarkRow): string =>
   JSON.stringify([
     r.model,
@@ -306,17 +385,39 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.metrics.dp ?? null,
   ]);
 
+/**
+ * Merge run-scoped benchmark rows with the normal latest-per-config rows.
+ *
+ * A selected AgentX run owns every point in its curve scope. Other engines,
+ * hardware, precisions and workloads retain their normal carry-forward rows.
+ * Fixed-sequence rows retain exact generated-topology replacement. This also
+ * keeps a same-day run selection from hiding unrelated curves.
+ */
 export function mergeRunScopedRows(
   runRows: BenchmarkRow[],
   baseRows: BenchmarkRow[],
 ): BenchmarkRow[] {
   if (runRows.length === 0) return baseRows;
+  // AgentX run reads already reconstruct the complete logical snapshot, including
+  // explicit append-only ancestors. Filling from the current base would reinsert
+  // removed topologies or points from a later run into a historical selection.
   const key = (row: BenchmarkRow) =>
     row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
   const claimed = new Set(runRows.map(key));
   return [...runRows, ...baseRows.filter((row) => !claimed.has(key(row)))];
 }
 
+/**
+ * Transform raw BenchmarkRow[] into chart-ready InferenceData[][] and HardwareConfig.
+ * Returns one InferenceData[] per chart definition (e2e, interactivity).
+ *
+ * Converts rows to AggDataEntry once, then reuses for each chart definition.
+ *
+ * @param percentile Optional latency percentile for the chart x-axis
+ *   (default 'median'). Swaps `median_intvty`/`median_e2el` in the chart
+ *   definition for the chosen percentile — only agentic rows carry the
+ *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
+ */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
@@ -327,6 +428,7 @@ export function transformBenchmarkRows(
 } {
   const gpuConfig: HardwareConfig = {};
 
+  // Phase 1: Convert rows once + resolve hardware keys.
   const entriesByHw = new Map<string, AggDataEntry[]>();
   const prepared: PreparedEntry[] = Array.from({ length: rows.length });
   for (let i = 0; i < rows.length; i++) {
@@ -347,6 +449,7 @@ export function transformBenchmarkRows(
     };
   }
 
+  // Labels depend on contributing runs, not only on the canonical hardware key.
   for (const [hwKey, entries] of entriesByHw) {
     gpuConfig[hwKey] = {
       ...getInferenceHardwareConfig(hwKey, entries[0].model, entries),
@@ -354,6 +457,7 @@ export function transformBenchmarkRows(
     };
   }
 
+  // Phase 2: Build chart data per chart definition (reusing prepared entries)
   const chartData = (chartDefinitions as ChartDefinition[]).map((chartDef) => {
     const xKey = withPercentile(chartDef.x, percentile);
     const groupedByHw: Record<string, InferenceData[]> = {};

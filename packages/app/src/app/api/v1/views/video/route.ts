@@ -37,10 +37,12 @@ function serializePoint({
   };
 }
 
+/** Published CI evidence only. Never accepts URLs, local bundles, or credentials. */
 export function GET(request: NextRequest) {
   return runViewsRoute('video', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['video']);
     const s = request.nextUrl.searchParams;
+    // GitHub run id and artifact id share the positive-digits rule.
     const run = parseRunIdParam(s.get('run'), 'run');
     const artifact = parseRunIdParam(s.get('artifact'), 'artifact');
     const page = String(parseNumberParam(s.get('page'), 'page', 1, { min: 1, integer: true }));

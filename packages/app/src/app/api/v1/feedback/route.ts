@@ -14,6 +14,7 @@ export const runtime = 'nodejs';
 
 const MAX_BODY_BYTES = 5 * 1024;
 
+// Opaque 5xx code for operator triage without log grep.
 type ServerErrorCode = 'E_CRYPTO' | 'E_INSERT';
 
 function serverError(code: ServerErrorCode) {
@@ -21,6 +22,7 @@ function serverError(code: ServerErrorCode) {
 }
 
 export async function POST(request: Request) {
+  // Pre-check header so oversized bodies don't get buffered.
   const contentLength = Number(request.headers.get('content-length') ?? '0');
   if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
     return NextResponse.json({ error: 'payload too large' }, { status: 400 });
@@ -49,6 +51,7 @@ export async function POST(request: Request) {
   }
   const body = result.value;
 
+  // Honeypot — bots fill hidden fields. Silent 204 discourages iteration.
   if (body.honeypotTripped) {
     return new NextResponse(null, { status: 204 });
   }

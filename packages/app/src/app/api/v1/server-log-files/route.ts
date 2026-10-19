@@ -12,6 +12,7 @@ const getCachedServerLogFileNames = cachedQuery(
   'server-log-files',
 );
 
+/** GET /api/v1/server-log-files?id=1 — artifact-relative .log/.out filenames. */
 export const GET = idQueryRoute({
   logLabel: 'server log filenames',
   fetch: getCachedServerLogFileNames,

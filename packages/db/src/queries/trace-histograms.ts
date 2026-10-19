@@ -1,3 +1,20 @@
+/**
+ * Per-request ISL/OSL arrays for a set of agentic benchmark points. Caller
+ * passes the `benchmark_results.id`s it wants and receives one entry per id
+ * whose stored request timeline or raw aiperf `profile_export.jsonl` blob
+ * could be read (others are silently skipped).
+ *
+ * Current request timelines supply the arrays: gzip timelines
+ * (`request_timeline_gz`) are decoded in Node, and legacy JSONB timelines are
+ * unnested in SQL. Points without a current timeline fall back to the gzipped
+ * profile blob, whose JSONL has one JSON object per request with the shape:
+ *   { metrics: { input_sequence_length: { value, unit }, output_sequence_length: {...}, ... } }
+ *
+ * Returns raw arrays rather than pre-binned histograms — payload stays tiny
+ * (~256 ints * 2 fields per point, ~2 KB compressed) and the frontend can bin
+ * however it wants.
+ */
+
 import { readTraceProfileLines } from '../lib/trace-profile-storage';
 
 import { REQUEST_TIMELINE_VERSION } from '../etl/compute-request-timeline';
@@ -7,26 +24,34 @@ import type { DbClient } from '../connection.js';
 import { logRequestTimelineReadFailure, readRequestTimelineGz } from './request-timeline';
 
 export interface TraceHistogramPoint {
+  /** benchmark_results.id this entry belongs to. */
   id: number;
+  /** Input sequence length (tokens) per completed request. */
   isl: number[];
+  /** Output sequence length (tokens) per completed request. */
   osl: number[];
 }
 
 export type TraceHistogramMap = Record<number, TraceHistogramPoint>;
 
 const QUERY_CHUNK_SIZE = 12;
+/** The only request fields a histogram needs from a scanned gzip timeline. */
 const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
 
 interface TimelineRow {
   benchmark_result_id: number;
   trace_replay_id: number;
+  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
   gz_bytes: number | null;
+  /** Version of the stored timeline, read WITHOUT shipping the document. */
   timeline_version: number | null;
+  /** Legacy JSONB only: ISL per completed request, unnested server-side. */
   isl: (number | null)[] | null;
   osl: (number | null)[] | null;
   has_blob: boolean;
 }
 
+/** Postgres hands back `number[]`; drop anything non-finite defensively. */
 function finiteNumbers(values: (number | null)[] | null): number[] {
   const out: number[] = [];
   for (const value of values ?? []) {
@@ -47,6 +72,14 @@ export async function getTraceHistograms(
   const fallbackRows: TimelineRow[] = [];
   for (let i = 0; i < benchmarkResultIds.length; i += QUERY_CHUNK_SIZE) {
     const chunk = benchmarkResultIds.slice(i, i + QUERY_CHUNK_SIZE);
+    // Project the two arrays out in SQL instead of selecting
+    // `atr.request_timeline` whole. The timeline carries ~18 fields per
+    // request, so shipping the document to extract two integers per request
+    // moved 61 MB of JSON for a 151k-request point — past the Neon HTTP
+    // driver's 64 MiB response cap, which failed the whole request with
+    // `507 response is too large` and left the distribution charts empty on
+    // exactly the biggest runs. Unnesting server-side sends ~600 KB instead.
+    // Rows with a gzip timeline never touch the legacy JSONB here.
     const chunkRows = (await sql`
       select
         br.id as benchmark_result_id,
@@ -88,6 +121,9 @@ export async function getTraceHistograms(
     }
   }
 
+  // Gzip timelines are scanned in Node one point at a time, keeping only each
+  // request's ISL and OSL. A timeline that cannot be read is logged and
+  // omitted, like a malformed blob below.
   for (const row of gzRows) {
     const isl: number[] = [];
     const osl: number[] = [];
@@ -105,6 +141,8 @@ export async function getTraceHistograms(
     result[id] = { id, isl, osl };
   }
 
+  // Compatibility fallback for pre-timeline rows. Stream one profile at a
+  // time through bounded queries, including profiles kept in permanent chunks.
   for (const row of fallbackRows) {
     try {
       const isl: number[] = [];
@@ -128,7 +166,9 @@ export async function getTraceHistograms(
         isl,
         osl,
       };
-    } catch {}
+    } catch {
+      // Drop malformed blobs silently — caller treats missing ids as "no data".
+    }
   }
   return result;
 }

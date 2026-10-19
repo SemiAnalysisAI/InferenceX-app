@@ -6,8 +6,13 @@ import {
 
 export { GPU_KEYS };
 
+const HW_ALIASES: Record<string, string> = {
+  vrnvl72: 'vr200',
+};
+
 export function hwToGpuKey(hw: string): string | null {
-  const base = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const base = HW_ALIASES[raw] ?? raw;
   return GPU_KEYS.has(base) ? base : null;
 }
 

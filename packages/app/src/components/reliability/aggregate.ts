@@ -2,6 +2,15 @@ import type { ReliabilityRow } from '@/lib/api/api';
 
 import type { DateRangeSuccessRateData } from './types';
 
+/**
+ * Pure reliability aggregation shared by the `/reliability` dashboard context
+ * and the read-only views API (`/api/v1/views/reliability`).
+ *
+ * Extracted from `ReliabilityContext.tsx` so server route handlers can reuse
+ * the exact dashboard math without importing a client component module.
+ */
+
+/** Date-range presets offered by the reliability chart, in display order. */
 export const RELIABILITY_RANGES = [
   'last-3-days',
   'last-7-days',
@@ -16,6 +25,7 @@ export const DEFAULT_RELIABILITY_RANGE: ReliabilityRange = 'last-3-months';
 
 const DAY_MS = 86_400_000;
 
+/** Rolling cutoff in days for each preset; `null` means no cutoff (all-time). */
 const RANGE_CUTOFF_DAYS: Readonly<Record<ReliabilityRange, number | null>> = {
   'last-3-days': 3,
   'last-7-days': 7,
@@ -24,6 +34,16 @@ const RANGE_CUTOFF_DAYS: Readonly<Record<ReliabilityRange, number | null>> = {
   'all-time': null,
 };
 
+/**
+ * Aggregate raw reliability rows into date-range buckets with success-rate
+ * percentages (2 decimal places). Hardware with zero total runs in a bucket is
+ * omitted from that bucket.
+ *
+ * @param rows raw `run_stats` rows (hardware, date, n_success, total)
+ * @param nowMs reference timestamp for the rolling cutoffs; defaults to the
+ *   wall clock (dashboard behavior). Pass a fixed value for deterministic
+ *   tests or reproducible server responses.
+ */
 export function aggregateByDateRange(
   rows: ReliabilityRow[],
   nowMs: number = Date.now(),

@@ -9,6 +9,16 @@ import {
 } from '@semianalysisai/inferencex-db/proxytrace/operations';
 import { withExplorerRoute } from '@/lib/agentic-workload-explorer/api';
 
+// Serves only from tool_analytics_cache — the underlying queries return one
+// row per tool event and can't run inline at production scale (Neon HTTP
+// 64 MB cap). The frozen snapshot is never recomputed: a miss returns
+// `warming: true`, which the page shows as "not available in this snapshot".
+//
+// Standardized: always uses anon visibility and all trace versions so every
+// user shares a single cache row per kind.
+//
+// `?harness=` has no cache row, so it runs the same queries live over a
+// session sample of that harness (see getHarnessToolSample).
 export const maxDuration = 300;
 
 const VIS: string[] = [];

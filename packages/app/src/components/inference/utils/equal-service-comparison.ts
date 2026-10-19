@@ -26,6 +26,7 @@ export type EqualServiceReason =
 export interface EqualServiceMetric {
   baseline: EqualServiceEstimate | null;
   comparator: EqualServiceEstimate | null;
+  /** Comparator change relative to baseline; negative energy means less energy. */
   changePercent: number | null;
   reason?: EqualServiceReason;
 }
@@ -49,20 +50,40 @@ export interface EqualServiceComparison {
 const serviceAxis = (field: string) =>
   field === 'mean_tpot_intvty' ||
   /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
+/**
+ * Trace-derived agentic axes (`p75_e2e_norm_intvty`, `p90_e2e_norm_intvty`)
+ * live only on `point.x`; no row field carries that name. The role panels
+ * plot observations, so they accept them; equal-service interpolation keeps
+ * its observed-field policy and reports `unsupported-axis`.
+ */
 const derivedAxis = (field: string) => /^p\d+_e2e_norm_intvty$/u.test(field);
 const roleAxisValue = (point: InferenceData, xField: keyof AggDataEntry) =>
   derivedAxis(xField) ? point.x : point[xField];
+/** A positive finite reading, or null: a missing value is never zero. */
 export const positiveOrNull = (value: unknown): number | null => (isPositive(value) ? value : null);
+/** Measured rows only: hidden rows and power-comparison clones are never sources. */
 export const observedPoints = (points: readonly InferenceData[]) =>
   points.filter((point) => !point.hidden && !point.powerVariant);
 
+/**
+ * The curve snapshot a row belongs to, or null when it carries none. An
+ * append-only run stitches new points onto an older run's curve; the chart
+ * draws them as one series, so the panels treat them as one source.
+ */
 const curveSnapshotId = (point: InferenceData): number | null =>
   point.curve_workflow_run_id ?? null;
+/** Snapshot date of a stitched curve, else the row's own measured date. */
 const sourceDate = (point: InferenceData): string =>
   (curveSnapshotId(point) === null ? undefined : point.curve_date) ??
   point.actualDate ??
   point.date;
 
+/**
+ * Concurrency is excluded; unknown run identity must never join distinct rows.
+ * Rows with a curve snapshot key by that snapshot instead of their own run.
+ * A snapshot can retain multiple telemetry producers; their hashes stay on the
+ * observations, while recipe, image and topology still distinguish configurations.
+ */
 export function equalServiceSourceKey(point: InferenceData): string {
   const snapshot = curveSnapshotId(point);
   const attempt = 'run_attempt' in point ? point.run_attempt : null;
@@ -110,6 +131,11 @@ const SOURCE_LABEL_WORDS = {
   },
 };
 
+/**
+ * Hardware and snapshot date, plus only the details that tell otherwise
+ * identical sources apart, in this order; the opaque key stays the exact
+ * identity. A stitched curve is named by its snapshot run, not each row's run.
+ */
 function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): string[] {
   const words = SOURCE_LABEL_WORDS[locale];
   const details: ((point: InferenceData, group: readonly InferenceData[]) => string | null)[] = [
@@ -152,6 +178,7 @@ function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): st
   return labels;
 }
 
+/** Labels are English by default: the read-only API has no locale. */
 export function getEqualServiceSources(
   points: readonly InferenceData[],
   locale: 'en' | 'zh' = 'en',
@@ -184,6 +211,7 @@ function deploymentOutput(point: InferenceData): number | undefined {
     ? point.output_tput_per_gpu * count
     : undefined;
 }
+/** The measured quantities every service panel compares, read from one point. */
 export const serviceMetricValue = {
   meanWattsPerGpu: (point: InferenceData) => point.measuredAvgPower?.y,
   outputTokensPerSecond: deploymentOutput,
@@ -228,6 +256,7 @@ function estimate(
     : { estimate: null, reason: 'missing-metric' };
 }
 
+/** Numerical linear interpolation of raw quantities, then ratios; never extrapolation. */
 export function buildEqualServiceComparison(
   points: readonly InferenceData[],
   options: EqualServiceOptions,
@@ -273,6 +302,7 @@ export function buildEqualServiceComparison(
   };
 }
 
+/** Knots are observed X values within both source ranges, not a fitted hardware model. */
 export function getEqualServiceComparisonCurve(
   points: readonly InferenceData[],
   options: Omit<EqualServiceOptions, 'target'>,
@@ -314,13 +344,21 @@ export interface RolePoint {
   x: number;
   sourceKey: string;
   point: InferenceData;
+  /** Mean board W/GPU inside each pool (role-local). */
   prefillWattsPerGpu: number | null;
   decodeWattsPerGpu: number | null;
+  /** Role-local energy: each pool's joules over its own token count. */
   prefillJoulesPerInputToken: number | null;
   decodeJoulesPerOutputToken: number | null;
+  /** Both pools on the output-token denominator, when reconstructable. */
   energy: ReconstructedRoleEnergy | null;
 }
 
+/**
+ * Validated disaggregated rows with any role measurement (PowerX Figures
+ * 12–14). Pool-local denominators stay separate from the additive
+ * output-token reconstruction; a missing figure is null, never zero.
+ */
 export function getRolePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,

@@ -11,6 +11,7 @@ interface CachedReadRouteOptions<T> {
   readonly fixture?: () => T;
 }
 
+/** Build the standard parameterless, public, cached database-read handler. */
 export function cachedReadRoute<T>(options: CachedReadRouteOptions<T>): () => Promise<Response> {
   const getCached = cachedQuery(options.fetch, options.cacheKey, {
     blobOnly: options.blobOnly,

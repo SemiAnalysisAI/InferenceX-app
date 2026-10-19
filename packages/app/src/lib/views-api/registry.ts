@@ -1,3 +1,7 @@
+/**
+ * Public query allowlists shared by handlers, OpenAPI and coverage tests.
+ * Update the matching view docs and skills reference with every selector change.
+ */
 export const VIEW_QUERY_PARAMS = {
   'cache-reuse': [
     'config',
@@ -249,6 +253,7 @@ export const VIEW_QUERY_PARAMS = {
 } as const;
 export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
+/** Every dashboard route, including hidden/public routes, has an explicit disposition. */
 export const DASHBOARD_API_COVERAGE = {
   inference: {
     view: 'inference',

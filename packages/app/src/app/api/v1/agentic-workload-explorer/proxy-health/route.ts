@@ -13,6 +13,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
   const traceVersion = parseTraceVersion(req.nextUrl.searchParams);
   const db = getDb();
 
+  // Route breakdown: endpoint, call count, success/error counts, avg/p95 latency
   const routeStats = await sql<{
     endpoint: string;
     total: number;
@@ -36,6 +37,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
     ORDER BY total DESC
   `.execute(db);
 
+  // Hourly request counts by endpoint (last 48h)
   const hourlyByEndpoint = await sql<{
     hour: string;
     endpoint: string;
@@ -53,6 +55,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
     ORDER BY hour
   `.execute(db);
 
+  // Status code distribution (last 7d)
   const statusDistribution = await sql<{
     status_group: string;
     count: number;
@@ -74,6 +77,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
     ORDER BY status_group
   `.execute(db);
 
+  // Recent errors (last 50 non-2xx requests)
   const recentErrors = await sql<{
     id: string;
     timestamp: string;

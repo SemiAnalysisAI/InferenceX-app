@@ -1,3 +1,7 @@
+/**
+ * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
+ * It fetches live GitHub Actions artifacts which change while a run is in progress.
+ */
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { artifactRunId } from '@semianalysisai/inferencex-db/etl/tpu-normalization';
@@ -22,8 +26,14 @@ import {
   type GithubWorkflowRun,
 } from '@/lib/github/github-artifacts';
 
+/**
+ * Batch size for downloading per-config `bmk_*` artifacts. Big agentic sweeps
+ * upload one artifact per config (dozens per run); a bounded batch keeps us
+ * clear of GitHub's secondary rate limits while still parallelizing.
+ */
 const PER_CONFIG_DOWNLOAD_BATCH_SIZE = 8;
 
+/** Normalize raw artifact rows into the BenchmarkRow shape the frontend expects. */
 export function normalizeArtifactRows(
   rawRows: Record<string, unknown>[],
   date: string,
@@ -41,6 +51,9 @@ export function normalizeArtifactRows(
     if (!params) continue;
     const { config } = params;
     results.push({
+      // Synthetic id — overlay rows aren't persisted, so trace_replay lookups
+      // (keyed on benchmark_results.id) will always miss, which is the
+      // intended behaviour: overlays never have stored trace_replay blobs.
       id: 0,
       hardware: config.hardware,
       framework: config.framework,
@@ -67,6 +80,8 @@ export function normalizeArtifactRows(
       image: params.image,
       recipe_fingerprint: params.recipeFingerprint,
       metrics: params.metrics,
+      // Surface the same per-worker payload the DB path emits so unofficial
+      // overlays carry the multinode measured-power breakdown too.
       workers: params.workers,
       power_invalid_reasons: params.powerInvalidReasons,
       power_audit: params.powerAudit,
@@ -98,6 +113,14 @@ function evalConfigKey(config: EvalParams['config']): string {
   ].join('|');
 }
 
+/**
+ * Normalize aggregate eval rows into the EvalRow shape the frontend expects.
+ *
+ * When merging rows from multiple runs, pass `configIdOffset` so synthetic config
+ * ids from this batch don't collide with ids already emitted by earlier batches.
+ * Returns the rows and the maximum config id assigned, so the caller can advance
+ * the offset for the next batch.
+ */
 export function normalizeEvalArtifactRows(
   rawRows: Record<string, unknown>[],
   date: string,
@@ -123,6 +146,9 @@ export function normalizeEvalArtifactRows(
     }
 
     rows.push({
+      // Synthetic id — unofficial rows are never persisted to eval_results, so
+      // there's no real PK to surface. -1 signals "no DB-side row" to the
+      // samples drawer (it'll skip the DB lookup and fall back to live fetch).
       id: -1,
       config_id: configIdOffset + localId,
       hardware: params.config.hardware,
@@ -154,6 +180,7 @@ export function normalizeEvalArtifactRows(
   return { rows, maxConfigId: configIdOffset + (nextLocalId - 1) };
 }
 
+/** Extract all valid JSON files from a ZIP buffer; malformed JSON entries are skipped. */
 function extractJsonFromZip(buffer: Buffer): Record<string, unknown>[] {
   return extractZipEntries(buffer, '.json', (_entryName, contents) => {
     const data = JSON.parse(contents) as Record<string, unknown> | Record<string, unknown>[];
@@ -177,6 +204,7 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
   return { rows, errorResponse: null };
 }
 
+/** Parse the runId query param into a list of unique numeric ids. */
 function parseRunIds(raw: string | null): { ids: string[]; error: string | null } {
   if (!raw) return { ids: [], error: 'runId must be provided' };
   const ids = [
@@ -193,6 +221,7 @@ function parseRunIds(raw: string | null): { ids: string[]; error: string | null 
   return { ids, error: null };
 }
 
+/** Fetch, download, and normalize data for a single run. Errors bubble as NextResponse. */
 async function processSingleRun(
   runId: string,
   githubToken: string,
@@ -250,6 +279,14 @@ async function processSingleRun(
     .filter((a) => a.name === 'eval_results_all')
     .toSorted((a, b) => b.id - a.id)[0];
 
+  // Agentic-only sweeps never run the collect-results merge job (run-sweep.yml
+  // only triggers it for fixed-seq sweeps), so they upload per-config
+  // `bmk_agentic_<config>` artifacts with no merged `results_bmk`. Fall back to
+  // downloading those directly. When `results_bmk` exists it already contains
+  // every `bmk_*` row (the merge job downloads the `bmk_*` pattern), so the
+  // fallback must stay off in that case — running both would double-count.
+  // Same-name re-uploads keep only the newest (highest id), mirroring the
+  // merged-artifact selection above.
   const perConfigBmkArtifacts: GithubArtifact[] = bmkArtifact
     ? []
     : [

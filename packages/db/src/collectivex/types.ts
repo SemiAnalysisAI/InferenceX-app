@@ -1,5 +1,15 @@
+/**
+ * CollectiveX neutral contract — the version-tagged shape shared by the sweep
+ * artifacts' reader, the ingest script, and the dashboard frontend.
+ *
+ * This module is pure TypeScript (no Node/DB imports) so it is safe to import
+ * from client components. UI-only types (chart points, axis modes, display
+ * label helpers) live in `packages/app/src/components/collectivex/types.ts`.
+ */
+
 export type CollectiveXPhase = 'decode' | 'prefill';
 export type CollectiveXPrecision = 'bf16' | 'fp8';
+/** Kernel mode: throughput-oriented `normal`, or decode-only `low-latency`. */
 export type CollectiveXMode = 'normal' | 'low-latency';
 export const COLLECTIVEX_VERSIONS = [1] as const;
 export type CollectiveXVersion = (typeof COLLECTIVEX_VERSIONS)[number];
@@ -28,7 +38,20 @@ export type CollectiveXPercentiles = Record<CollectiveXPercentile, number>;
 export interface CollectiveXComponent {
   latency_us: CollectiveXPercentiles;
   activation_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  /**
+   * Per-GPU bandwidth over the FULL logical payload (activation bytes plus any
+   * FP8 scale bytes), i.e. `total_logical_bytes / ep_size / latency`. Distinct
+   * from `activation_data_rate_gbps_at_latency_percentile`, which is aggregate
+   * and excludes scale bytes. Null when the component carries no byte
+   * provenance (e.g. an unavailable component).
+   */
   payload_data_rate_gbps_at_latency_percentile: CollectiveXPercentiles | null;
+  /**
+   * Aggregate total logical payload bytes for this component at this point
+   * (the numerator behind `payload_data_rate_*`). Carried raw so a consumer can
+   * fit latency vs bytes across the ladder (bandwidth-vs-overhead decomposition)
+   * without reconstructing bytes from a rate. Null when no byte provenance.
+   */
   payload_bytes: number | null;
 }
 
@@ -85,6 +108,7 @@ export interface CollectiveXCoverage {
   detail: string | null;
 }
 
+/** kv-transfer latency percentiles (the suite reports ms, not us). */
 export interface CollectiveXKvLatency {
   p50: number;
   p95: number;
@@ -93,6 +117,7 @@ export interface CollectiveXKvLatency {
   n: number;
 }
 
+/** One measured kv-transfer grid point (a burst of `batch` requests). */
 export interface CollectiveXKvRow {
   kind: 'paged' | 'bulk';
   isl: number;
@@ -103,12 +128,23 @@ export interface CollectiveXKvRow {
   req_bytes: number;
   prep_ms: number;
   latency_ms: CollectiveXKvLatency;
+  /**
+   * Each request's host-observed completion offset within its burst — the
+   * per-request latency distribution. Absent on rows measured before the
+   * harness recorded it; `latency_ms` (whole-burst) is a capacity quantity.
+   */
   request_ms?: CollectiveXKvLatency;
   gbps_p50: number;
+  /** Cold-path rate: descriptor/handle prep paid once per burst. */
   gbps_p50_incl_prep?: number;
   verify_passed: boolean;
 }
 
+/**
+ * One kv-transfer matrix case (2 nodes x 1 GPU: the per-worker prefill/decode
+ * pair). Fabric is the case's declared lane (`rdma` | `mnnvl`); rows are empty
+ * unless a successful shard measured the case.
+ */
 export interface CollectiveXKvCase {
   case_id: string;
   label: string;
@@ -140,6 +176,7 @@ export interface CollectiveXSwapPoint {
   payload_gbps_at_latency_percentile: CollectiveXPercentiles;
 }
 
+/** One verified swap_blocks artifact, with runtime provenance retained. */
 export interface CollectiveXSwapResult {
   result_id: string;
   sku: string;
@@ -175,6 +212,7 @@ export interface CollectiveXRun {
   terminal_points: number;
   measured_points: number;
   covered_skus: string[];
+  /** kv-transfer case counts; absent on datasets read before the kv suite. */
   swap_requested_cases?: number;
   swap_measured_cases?: number;
   kv_requested_cases?: number;
@@ -186,6 +224,7 @@ export interface CollectiveXDataset {
   run: CollectiveXRun;
   coverage: CollectiveXCoverage[];
   series: CollectiveXSeries[];
+  /** kv-transfer cases; absent on datasets captured before the kv suite. */
   kv?: CollectiveXKvCase[];
   swap_blocks?: CollectiveXSwapResult[];
 }
@@ -201,6 +240,7 @@ export interface CollectiveXRunSummary {
   requested_points: number;
   terminal_points: number;
   terminal_counts: { measured: number; unsupported: number; failed: number };
+  /** kv-transfer case counts; absent on summaries stored before the kv suite. */
   kv_cases?: { requested: number; measured: number };
   swap_cases?: { requested: number; measured: number };
 }
