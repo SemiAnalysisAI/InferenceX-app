@@ -99,7 +99,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
               className="text-xs text-muted-foreground hover:text-foreground underline"
             />
           )}
-          {meta.run_url && (
+          {meta.run_url && !meta.hardware.startsWith('tpu') && (
             <a
               href={meta.run_url}
               target="_blank"
