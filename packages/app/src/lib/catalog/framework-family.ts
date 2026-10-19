@@ -1,7 +1,3 @@
-/**
- * Map a raw framework string (for example `dynamo-trt`, `mori-sglang`, or
- * `mooncake-atom`) to its serving-engine family.
- */
 export function frameworkFamily(framework: string | undefined): string | undefined {
   if (!framework) return undefined;
   const normalized = framework.toLowerCase();

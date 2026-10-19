@@ -19,12 +19,9 @@ function ZhBarChartWrapper() {
 describe('GpuSpecsBarChart', () => {
   it('changing metric re-renders chart', () => {
     cy.mount(<BarChartWrapper initialMetric="fp8" />);
-    // Initially should show FP8 metric axis label
     cy.get('[data-testid="gpu-specs-bar-chart"]').contains('FP8').should('exist');
-    // Open metric selector and pick Memory
     cy.get('[data-testid="gpu-specs-metric-select"]').click();
     cy.get('[role="option"]').contains('Memory (GB)').click();
-    // Chart should now show Memory metric
     cy.get('[data-testid="gpu-specs-bar-chart"]').contains('Memory').should('exist');
   });
 

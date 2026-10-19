@@ -12,17 +12,9 @@ export interface BlogFrontmatter {
   subtitle: string;
   modifiedDate?: string;
   publishDate?: string;
-  /** Optional hand-written SEO/social meta description. When set it overrides
-   *  the auto-truncated `subtitle` for the SERP snippet — use it on posts whose
-   *  `subtitle` runs past ~155 chars and would otherwise truncate mid-sentence.
-   *  Keep it ≤155 chars (English) / ≤~78 CJK chars and compelling. */
   seoDescription?: string;
   tags?: string[];
-  /** Optional article-card thumbnail override: a `/images/...` path or an
-   *  allow-listed remote image. When absent the first `<Figure>` in the body is
-   *  used, then the first raster file under `public/images/<slug>/`. */
   thumbnail?: string;
-  /** Per-theme overrides; each falls back to `thumbnail`. */
   thumbnailLight?: string;
   thumbnailDark?: string;
 }
@@ -34,13 +26,10 @@ export interface BlogPostMeta extends BlogFrontmatter {
 
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'blog');
 const WORDS_PER_MINUTE = 265;
-// CJK prose has no word boundaries; reading speed studies put Chinese at
-// roughly 300-500 characters per minute — we use a middle value.
 const CJK_CHARS_PER_MINUTE = 400;
 
 export type BlogLocale = 'en' | 'zh';
 
-/** Simplified Chinese translations live alongside the originals, same filename. */
 function contentDir(locale: BlogLocale): string {
   return locale === 'zh' ? path.join(CONTENT_DIR, 'zh') : CONTENT_DIR;
 }
@@ -49,8 +38,6 @@ export function slugify(raw: string): string {
   return (
     raw
       .toLowerCase()
-      // Keep Han characters so Chinese headings get meaningful anchor ids
-      // instead of all collapsing to the empty-slug fallback.
       .replaceAll(/[^a-z0-9\p{Script=Han}]+/gu, '-')
       .replaceAll(/^-+|-+$/gu, '') || 'post'
   );
@@ -68,7 +55,6 @@ function countContentUnits(content: string): { cjkChars: number; words: number }
   return { cjkChars, words };
 }
 
-/** Counts whitespace-delimited words and each Han character as one word. */
 export function getWordCount(content: string): number {
   const { cjkChars, words } = countContentUnits(content);
   return words + cjkChars;
@@ -79,33 +65,17 @@ export function getReadingTime(content: string): number {
   return Math.max(1, Math.ceil(words / WORDS_PER_MINUTE + cjkChars / CJK_CHARS_PER_MINUTE));
 }
 
-/** Trailing whitespace + punctuation (any script), so a truncated snippet
- *  doesn't end in a dangling comma / dash / open bracket before the ellipsis. */
 const TRAILING_PUNCT_REGEX = /[\s\p{P}]+$/u;
 
-/**
- * Truncate to at most `max` characters (ellipsis included) without cutting a
- * word in half. Cuts at the last space that fits, strips trailing punctuation,
- * and appends "…" only when the text was actually shortened. CJK prose has no
- * spaces, so it falls back to a hard character cut (which is correct — there
- * are no word boundaries to preserve).
- */
 export function smartTruncate(text: string, max: number): string {
   const clean = text.trim();
   if (clean.length <= max) return clean;
-  // Reserve one char for the ellipsis so the result is guaranteed ≤ max.
   const slice = clean.slice(0, max - 1);
   const lastSpace = slice.lastIndexOf(' ');
   const boundary = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
   return `${boundary.replace(TRAILING_PUNCT_REGEX, '')}…`;
 }
 
-/**
- * SERP / social meta description for a post: the explicit `seoDescription`
- * frontmatter when present, otherwise the `subtitle` smart-truncated to a
- * SERP-safe length. Used for the `<meta name="description">`, OpenGraph, and
- * Twitter descriptions.
- */
 export function blogDescription(meta: Pick<BlogPostMeta, 'seoDescription' | 'subtitle'>): string {
   return meta.seoDescription ?? smartTruncate(meta.subtitle, 155);
 }
@@ -138,9 +108,6 @@ export function getAllPosts(locale: BlogLocale = 'en'): BlogPostMeta[] {
   );
   if (locale === 'en') return sorted;
 
-  // Chinese visibility derives from the English post (single source of truth
-  // for publishDate gating) plus the existence of a translation file. Title,
-  // subtitle, and reading time come from the translation.
   return sorted.flatMap((post) => {
     const zh = readPost(post.slug, 'zh');
     return zh ? [zh.meta] : [];
@@ -191,7 +158,7 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
   const headingRegex = /^(?<hashes>#{1,3})\s+(?<title>.+)$/gmu;
   const headings: TocHeading[] = [];
   const seen = new Set<string>();
-  const parents: string[] = []; // parents[level] = slug of most recent heading at that level
+  const parents: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = headingRegex.exec(stripped)) !== null) {
     const level = match[1].length as 1 | 2 | 3;
@@ -200,7 +167,6 @@ export function extractHeadings(rawMdx: string): TocHeading[] {
     parents[level] = base;
     let id = base;
     if (seen.has(id)) {
-      // prefix with nearest parent heading
       const parent = parents.slice(1, level).findLast(Boolean);
       id = parent ? `${parent}-${base}` : `${base}-${level}`;
     }
@@ -217,41 +183,18 @@ export function getPostBySlug(
   return readPost(slug, locale);
 }
 
-/** Whether a Simplified Chinese translation exists for a post (any visibility). */
 export function hasZhTranslation(slug: string): boolean {
   return fs.existsSync(path.join(contentDir('zh'), `${slugify(slug)}.mdx`));
 }
 
-// ---------------------------------------------------------------------------
-// Structured data (JSON-LD)
-//
-// Pure builders shared by the English (`/blog/[slug]`) and Chinese
-// (`/zh/blog/[slug]`) post pages. Kept here — not inline in the page — so the
-// recommended schema.org fields are unit-testable and the two language pages
-// can't drift on the shape.
-// ---------------------------------------------------------------------------
-
-/** Locale-aware route prefix for a post's canonical URL. */
 function blogPathPrefix(locale: BlogLocale): string {
   return locale === 'zh' ? '/zh/blog' : '/blog';
 }
 
-/**
- * Absolute URL of a post's Open Graph image. Next.js serves the
- * file-convention image at `<postUrl>/opengraph-image`; the `/zh` route has its
- * own segment that reuses the English card art (its Satori font has no CJK
- * glyphs), so each locale points at its own route.
- */
 export function blogOgImageUrl(slug: string, locale: BlogLocale = 'en'): string {
   return `${SITE_URL}${blogPathPrefix(locale)}/${slug}/opengraph-image`;
 }
 
-/**
- * schema.org `BlogPosting` for a post page. Includes the recommended Article
- * fields — `image`, `inLanguage`, `mainEntityOfPage`, and `publisher.logo` —
- * on top of the required headline/author/dates so posts qualify for Google's
- * Article rich results.
- */
 export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: BlogLocale = 'en') {
   const url = `${SITE_URL}${blogPathPrefix(locale)}/${meta.slug}`;
   return {
@@ -263,11 +206,6 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
     publisher: {
       '@type': 'Organization',
       name: AUTHOR_NAME,
-      // Dimensions are intentionally omitted: the OG_IMAGE asset's real size
-      // (1200×675) disagrees with the root layout's OG declaration (1200×630),
-      // so rather than assert a conflicting number we follow the existing
-      // Organization-logo precedent in layout.tsx and leave width/height off
-      // (both are optional in schema.org's ImageObject).
       logo: {
         '@type': 'ImageObject',
         url: OG_IMAGE,
@@ -275,9 +213,6 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
     },
     datePublished: `${meta.date}T00:00:00Z`,
     ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    // Keep structured-data description in sync with the SERP/OG/Twitter meta
-    // (both go through blogDescription) so they never diverge for posts with a
-    // seoDescription or a long subtitle.
     description: blogDescription(meta),
     url,
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
@@ -287,12 +222,6 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
   };
 }
 
-/**
- * schema.org `BreadcrumbList` for a post: Home → Blog → post title. Emitted as
- * a separate JSON-LD block alongside the BlogPosting so Google can render the
- * trail in search results (mirrors the compare pages' breadcrumb). Matches the
- * shape of `buildBreadcrumbJsonLd` in `compare-ssr.ts`.
- */
 export function buildBlogBreadcrumbJsonLd(slug: string, title: string) {
   return {
     '@context': 'https://schema.org',
@@ -305,8 +234,6 @@ export function buildBlogBreadcrumbJsonLd(slug: string, title: string) {
   };
 }
 
-/** Simplified Chinese port of `buildBlogBreadcrumbJsonLd` — 1:1 structural
- *  mirror with translated labels and `/zh` URLs. */
 export function buildBlogBreadcrumbJsonLdZh(slug: string, title: string) {
   return {
     '@context': 'https://schema.org',
@@ -319,12 +246,6 @@ export function buildBlogBreadcrumbJsonLdZh(slug: string, title: string) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Index / post-page helpers shared by the English and Chinese article pages.
-// Pure functions over `BlogPostMeta[]` so the two locales cannot drift.
-// ---------------------------------------------------------------------------
-
-/** Tags ranked by how many posts carry them (ties broken alphabetically). */
 export function getTopTags(posts: readonly Pick<BlogPostMeta, 'tags'>[], limit: number): string[] {
   const counts = new Map<string, number>();
   for (const post of posts) {
@@ -336,11 +257,6 @@ export function getTopTags(posts: readonly Pick<BlogPostMeta, 'tags'>[], limit: 
     .map(([tag]) => tag);
 }
 
-/**
- * Posts that share the most tags with `slug`, newest first among ties. Falls
- * back to the most recent other posts so the strip is never short when a post
- * has few or unusual tags.
- */
 export function getRelatedPosts(
   slug: string,
   posts: readonly BlogPostMeta[],
@@ -362,7 +278,6 @@ export function getRelatedPosts(
     .map((s) => s.post);
 }
 
-/** Locale-aware long date (`August 19, 2026` / `2026年8月19日`) for a YYYY-MM-DD string. */
 export function formatBlogDate(date: string, locale: BlogLocale = 'en'): string {
   return new Date(`${date}T00:00:00Z`).toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
     year: 'numeric',
@@ -372,13 +287,10 @@ export function formatBlogDate(date: string, locale: BlogLocale = 'en'): string 
   });
 }
 
-/** Relative URL of the post's generated Open Graph card, used as the index thumbnail. */
 export function blogOgImagePath(slug: string, locale: BlogLocale = 'en'): string {
   return `${blogPathPrefix(locale)}/${slug}/opengraph-image`;
 }
 
-/** Card thumbnail sources for a post, one per theme. Both keys hold the same
- *  path when the folder has a single theme-neutral figure. */
 export interface PostThumbnail {
   light?: string;
   dark?: string;
@@ -386,14 +298,12 @@ export interface PostThumbnail {
 
 const THUMBNAIL_EXTENSIONS = new Set(['.png', '.webp', '.jpg', '.jpeg']);
 
-/** Local figure path or an image on a host `next.config` already allows. */
 const THUMBNAIL_SRC_PATTERN =
   /^(?:\/images\/[\w./-]+|https:\/\/substack-post-media\.s3\.amazonaws\.com\/[\w./-]+)$/u;
 
 const FIGURE_TAG_PATTERN = /<Figure\b(?<attrs>[^>]*)\/?>/gu;
 const FIGURE_ATTR_PATTERN = /\b(?<name>src|srcLight|srcDark)\s*=\s*"(?<value>[^"]*)"/gu;
 
-/** Returns the source when it is a raster image at an allowed location, else undefined. */
 function safeThumbnailSrc(src: string | undefined): string | undefined {
   if (!src || !THUMBNAIL_SRC_PATTERN.test(src)) return undefined;
   const ext = path
@@ -402,11 +312,6 @@ function safeThumbnailSrc(src: string | undefined): string | undefined {
   return THUMBNAIL_EXTENSIONS.has(ext) ? src : undefined;
 }
 
-/**
- * First `<Figure>` in the post body with a usable raster source, in document
- * order, so the card shows the same image a reader meets first in the article.
- * `srcLight`/`srcDark` split per theme; a lone `src` serves both.
- */
 function firstFigureThumbnail(body: string): PostThumbnail | null {
   for (const tag of body.matchAll(FIGURE_TAG_PATTERN)) {
     const attrs: Record<string, string> = {};
@@ -420,11 +325,6 @@ function firstFigureThumbnail(body: string): PostThumbnail | null {
   return null;
 }
 
-/**
- * Folder fallback: first raster figure under `public/images/<slug>/`, sorted by
- * file name. Files named with `light` or `dark` are split per theme when both
- * exist; otherwise the first figure serves both.
- */
 function folderThumbnail(slug: string): PostThumbnail | null {
   const dir = path.join(process.cwd(), 'public', 'images', slug);
   if (!fs.existsSync(dir)) return null;
@@ -442,12 +342,6 @@ function folderThumbnail(slug: string): PostThumbnail | null {
   return only ? { light: only, dark: only } : null;
 }
 
-/**
- * Article-card thumbnail for a post: the `thumbnail` frontmatter override when
- * set, else the first `<Figure>` in the English MDX body (local or allow-listed
- * remote raster image), else the first raster file under `public/images/<slug>/`. Returns null when the post has no
- * usable figure. Server-only (reads the filesystem).
- */
 export function getPostThumbnail(slug: string): PostThumbnail | null {
   const mdxPath = path.join(CONTENT_DIR, `${slug}.mdx`);
   if (fs.existsSync(mdxPath)) {

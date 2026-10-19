@@ -148,9 +148,6 @@ describe('global filter requested and effective selectors', () => {
   });
 
   it('picks the newest run by start time, not by the greatest GitHub run id', () => {
-    // Production 2026-09-01 DSV4: the largest id (…526958) was created at 17:10Z
-    // while a smaller id (…433573) is the day's last sweep at 21:35Z. The old
-    // max-id rule opened a fresh page on the older run ("Run 2/3").
     const runs = {
       '33145139961': run('33145139961', '2026-09-01T17:04:07Z'),
       '33447526958': run('33447526958', '2026-09-01T17:10:19Z'),

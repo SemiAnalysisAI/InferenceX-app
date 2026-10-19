@@ -18,7 +18,6 @@ import {
 interface GpuStatsTableProps {
   data: GpuMetricRow[];
   metricKey: GpuMetricKey;
-  /** Full-record digest; omit only for live artifacts without stored statistics. */
   storedStats?: readonly GpuMetricStatRow[];
 }
 

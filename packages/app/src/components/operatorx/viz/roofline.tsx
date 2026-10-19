@@ -23,15 +23,12 @@ interface Point {
   i: number;
   x: number;
   y: number;
-  /** FLOP/byte and TFLOPS, as measured; x/y are these or their normalized forms. */
   ai: number;
   tflops: number;
 }
 
-/** Key of the one roofline every device shares once normalized. */
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
-/** ` · 42% of peak compute`, or nothing when the device's peak is unknown. */
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
@@ -50,8 +47,6 @@ function Roofline({ model }: { model: ComparisonModel }) {
     picked && precisions.includes(picked)
       ? picked
       : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
-  // Normalized, each device's intensity is divided by its ridge point (peak / bandwidth)
-  // and its throughput by its peak, so every roofline becomes min(1, x).
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {

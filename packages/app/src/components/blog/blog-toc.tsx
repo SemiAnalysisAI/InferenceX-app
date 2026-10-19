@@ -21,21 +21,13 @@ const STRINGS = {
   },
 } as const;
 
-/** Offset from the viewport top at which a heading counts as "current". */
 const ACTIVE_OFFSET_PX = 120;
-/** Scroll target offset so the heading clears the fixed navbar. */
 const SCROLL_OFFSET_PX = 88;
 
 interface BlogTocProps {
   headings: TocHeading[];
-  /** Heading label, e.g. '本页目录' on Chinese pages. */
   label?: string;
   locale?: Locale;
-  /**
-   * `inline` renders a collapsible list for narrow layouts, `sidebar` the
-   * always-open list for the sticky column. `both` renders each and lets CSS
-   * pick (inline below `lg`, sidebar from `lg`).
-   */
   variant?: 'inline' | 'sidebar' | 'both';
   className?: string;
 }
@@ -48,7 +40,6 @@ function handleClick(heading: TocHeading) {
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
-/** Tracks which heading is current: the last one whose top has passed the offset line. */
 function useActiveHeading(headings: TocHeading[]): string {
   const [activeId, setActiveId] = useState('');
   const rafRef = useRef(0);
@@ -105,8 +96,6 @@ export function BlogToc({
   const activeItemRef = useRef<HTMLLIElement | null>(null);
   const scrollBoxRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep the active item visible inside the sidebar's own scroll box without
-  // touching the window scroll position.
   useEffect(() => {
     const box = scrollBoxRef.current;
     const item = activeItemRef.current;

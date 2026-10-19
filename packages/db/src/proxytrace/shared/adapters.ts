@@ -44,9 +44,6 @@ function openaiOutputToContent(output: unknown): ContentBlock[] {
     if (it.type === 'message' && Array.isArray(it.content)) {
       for (const c of it.content as OpenAIResponsesItem[]) {
         if (c?.type !== 'output_text') continue;
-        // Pass through null text (anon-stripped) so downstream rendering can
-        // emit a "[content stripped]" placeholder instead of dropping the
-        // assistant turn entirely.
         if (typeof c.text === 'string') {
           blocks.push({ type: 'text', text: c.text });
         } else if (c.text === null) {
@@ -107,9 +104,6 @@ function openaiInputToMessages(
       const texts: ContentBlock[] = [];
       for (const c of it.content as OpenAIResponsesItem[]) {
         if (c?.type !== 'input_text') continue;
-        // Pass through anon-stripped null text — extractTextFromContent in
-        // conversation-view renders it as "[content stripped]" so the user
-        // turn still appears, just placeholdered.
         if (typeof c.text === 'string') {
           texts.push({ type: 'text', text: c.text });
         } else if (c.text === null) {
@@ -124,7 +118,6 @@ function openaiInputToMessages(
       } else if (Array.isArray(it.output)) {
         content = it.output as ContentBlock[];
       } else if (it.output === null) {
-        // anon-stripped tool result
         content = '[content stripped]';
       } else {
         continue;
@@ -189,8 +182,6 @@ export function normalizeDashboardTrace<T extends DashboardTraceLike>(trace: T):
   const provider = trace.metadata?.provider;
   if (provider === 'openai') return normalizeOpenAIResponsesTrace(trace);
 
-  // Historical rows written before provider metadata can still be recognized
-  // by the Responses API body shape.
   if (trace.requestBody && Array.isArray(trace.requestBody.input))
     return normalizeOpenAIResponsesTrace(trace);
   const body = trace.responseBody?.body as Record<string, unknown> | undefined;

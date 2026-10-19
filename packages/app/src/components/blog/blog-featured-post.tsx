@@ -21,13 +21,11 @@ export interface BlogFeaturedPostProps {
   tags?: string[];
   thumbnail: PostThumbnail | null;
   basePath?: string;
-  /** Localized strings: eyebrow ("Latest"), CTA ("Read article"), tag-list label. */
   labels: { eyebrow: string; read: string; tags: string };
 }
 
 const MAX_TAGS = 4;
 
-/** Wide two-column card for the newest post at the top of the index. */
 export function BlogFeaturedPost({
   slug,
   title,

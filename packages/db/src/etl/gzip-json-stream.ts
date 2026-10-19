@@ -1,12 +1,3 @@
-/**
- * Shared bounded and streaming parsers for gzipped server-metrics blobs.
- *
- * High-conc TP+EP rows can exceed 500 MB when decompressed. The bounded
- * synchronous helper preserves the historical Node string-size guard when
- * these scripts run under runtimes with larger string limits, while the
- * stream-json pipeline collects only the top-level subtrees callers need.
- */
-
 import { Readable } from 'node:stream';
 import { createGunzip, gunzipSync } from 'node:zlib';
 
@@ -18,7 +9,6 @@ import type { Token } from 'stream-json/parser.js';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamObject } from 'stream-json/streamers/stream-object.js';
 
-/** Bound peak memory while retaining the fast path for ordinary metric blobs. */
 const MAX_IN_MEMORY_JSON_BYTES = 128 * 1024 * 1024;
 
 function isSizeLimitError(error: unknown): boolean {
@@ -31,10 +21,6 @@ function isSizeLimitError(error: unknown): boolean {
   );
 }
 
-/**
- * Gunzip a JSON blob only while its output stays within the in-memory fast-path
- * ceiling. Returns null when the caller must use the streaming parser instead.
- */
 export function gunzipJsonWithinLimit(
   buffer: Buffer,
   maxOutputLength = MAX_IN_MEMORY_JSON_BYTES,
@@ -47,11 +33,6 @@ export function gunzipJsonWithinLimit(
   }
 }
 
-/**
- * Gunzip + stream-parse `buffer`, descending into the top-level `filter` key
- * (e.g. `metrics` / `warmup_metrics`) and collecting only the child entries
- * whose key is in `wanted`. Never materializes the full JSON string.
- */
 export async function streamCollectKeys<T>(
   buffer: Buffer,
   filter: string,
@@ -79,7 +60,6 @@ export async function streamCollectKeys<T>(
 export interface MetricPhaseMaps<T> {
   metrics: Record<string, T>;
   warmupMetrics: Record<string, T>;
-  /** True when the bounded fast path retained every metric in the document. */
   complete: boolean;
 }
 
@@ -101,12 +81,6 @@ function updateDepth(depth: number, token: Token): number {
   return depth;
 }
 
-/**
- * Consume the parser token stream once and assemble only selected direct
- * children of the two metric phase objects. Unselected metric subtrees still
- * have to be tokenized so the JSON can be validated, but they are never copied
- * to secondary streams or materialized as JavaScript objects.
- */
 async function streamCollectMetricPhases<T>(
   buffer: Buffer,
   wanted: ReadonlySet<string>,
@@ -121,9 +95,6 @@ async function streamCollectMetricPhases<T>(
   let valueTarget: Record<string, T> | null = null;
   let valueKey: string | null = null;
 
-  // Packed-only values avoid emitting start/chunk/end tokens in addition to
-  // their complete value token. This materially reduces the token count for
-  // metric-heavy multi-GiB documents.
   const tokens = chain([
     Readable.from(buffer),
     createGunzip(),
@@ -196,10 +167,6 @@ async function streamCollectMetricPhases<T>(
   return { metrics, warmupMetrics, complete: false };
 }
 
-/**
- * Gunzip and parse both server-metric phase blocks once. Large documents use a
- * single token consumer which materializes only the selected metric values.
- */
 export async function collectMetricPhases<T>(
   buffer: Buffer,
   wanted: ReadonlySet<string>,

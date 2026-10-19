@@ -40,8 +40,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = blogDescription(meta);
 
   return {
-    // Short " | InferenceX" suffix via `absolute` (mirrors the English page)
-    // so the headline keeps more of the SERP title before truncation.
     title: { absolute: `${meta.title} | ${SITE_NAME}` },
     description,
     keywords: meta.tags,

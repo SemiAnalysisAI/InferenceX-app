@@ -1,6 +1,5 @@
 import { safePath } from './bundle';
 
-// Report links are relative to report/index.html and may traverse within the bundle.
 export function reportPath(value: string): string | null {
   if (value.startsWith('/') || /[\\:%?#]/u.test(value)) return null;
   const parts = ['report'];

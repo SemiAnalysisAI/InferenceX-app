@@ -1,11 +1,3 @@
-/**
- * Storage steps of `backfill-request-timeline.ts`, kept out of the CLI so they
- * can run against a real schema in tests: convert a current legacy
- * `request_timeline` JSONB into `request_timeline_gz` without the profile
- * blob, store gzip timelines through the bounded upload protocol trace ingest
- * uses, and clear legacy JSONB only when it equals the decoded gzip copy.
- */
-
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createGunzip } from 'node:zlib';
@@ -19,13 +11,8 @@ import {
 } from '../etl/trace-replay-ingest.js';
 import { readRequestTimelineGz } from '../queries/request-timeline.js';
 
-/**
- * Requests fetched per query while converting a legacy timeline. Each query
- * returns roughly 10 MiB of JSON for the current record shape.
- */
 export const LEGACY_TIMELINE_SLICE_REQUESTS = 25_000;
 
-/** A gzip timeline and the scalar columns stored beside it. */
 export interface RequestTimelineGzRow {
   gz: Buffer;
   version: number;
@@ -37,10 +24,6 @@ interface LegacyHeaderRow {
   request_count: number | null;
 }
 
-/**
- * The legacy document without its `requests` array, plus that array's
- * length. Null when the row has no JSONB timeline with a requests array.
- */
 async function readLegacyHeader(
   sql: Sql,
   traceReplayId: number,
@@ -59,12 +42,6 @@ async function readLegacyHeader(
   return { header: row.header, requestCount: Number(row.request_count) };
 }
 
-/**
- * Yield a legacy timeline's requests in index ranges of `sliceRequests`.
- * Postgres detoasts the document for each range but returns only that range,
- * so the client never holds the full document text. Every range must come
- * back complete.
- */
 async function* legacyRequests(
   sql: Sql,
   traceReplayId: number,
@@ -99,12 +76,6 @@ async function* legacyRequests(
   }
 }
 
-/**
- * Re-encode a current-version legacy `request_timeline` JSONB as gzip without
- * reading the profile blob. Throws, leaving the row unchanged, unless the
- * streamed request count equals `jsonb_array_length` both before and after
- * streaming.
- */
 export async function convertLegacyRequestTimeline(
   sql: Sql,
   traceReplayId: number,
@@ -134,11 +105,6 @@ export async function convertLegacyRequestTimeline(
   return { gz: encoded.gz, version: REQUEST_TIMELINE_VERSION, requestCount };
 }
 
-/**
- * Store a gzip timeline and its scalars in one transaction, uploading the
- * bytes in the bounded parts trace ingest uses. A newer stored version is
- * never replaced. Returns false when the row is gone or holds a newer version.
- */
 export function writeRequestTimelineGz(
   sql: Sql,
   traceReplayId: number,
@@ -180,14 +146,6 @@ interface StoredTimelineRow {
   legacy_count: number | null;
 }
 
-/**
- * Set a row's legacy `request_timeline` JSONB to null only when it equals its
- * gzip copy. The stored gzip is read in bounded slices and its decompressed
- * JSON uploaded in bounded parts, so PostgreSQL parses and compares the two
- * documents and neither crosses the network whole. Throws, keeping the JSONB,
- * when the gzip copy is missing, stale, corrupt, or differs in version,
- * request count, or content.
- */
 export async function dropVerifiedLegacyRequestTimeline(
   sql: Sql,
   traceReplayId: number,
@@ -237,7 +195,6 @@ export async function dropVerifiedLegacyRequestTimeline(
         primary key (field, part)
       ) on commit drop
     `;
-    // Corrupt gzip throws here and rolls the transaction back.
     let part = 0;
     const json = Readable.from([gz]).pipe(
       createGunzip({ chunkSize: TRACE_REPLAY_UPLOAD_CHUNK_BYTES }),
@@ -250,8 +207,6 @@ export async function dropVerifiedLegacyRequestTimeline(
       `;
       part += 1;
     }
-    // jsonb equality ignores formatting and key order, so only content counts.
-    // The md5 pins the gzip bytes that were decoded above.
     const updated = await tx<{ id: number }[]>`
       update agentic_trace_replay
       set request_timeline = null

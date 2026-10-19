@@ -1,26 +1,12 @@
-/**
- * Mergeable, bounded-size histogram for positive integer token lengths.
- *
- * Each power-of-two interval is split into 256 linear buckets. This keeps the
- * relative bucket width below 0.4% while bounding a full 1..2^31 distribution
- * to fewer than 8,000 counters. Sketches can be merged by adding aligned
- * counters, which lets the dashboard pool request distributions across an
- * arbitrary set of benchmark points without reading their request timelines.
- */
-
 export const TOKEN_LENGTH_SKETCH_VERSION = 1;
 export const TOKEN_LENGTH_BINS_PER_OCTAVE = 256;
 
 export interface TokenLengthSketch {
   version: number;
   binsPerOctave: number;
-  /** Number of finite, non-negative samples represented by this sketch. */
   n: number;
-  /** Zero-length samples are kept outside the logarithmic bins. */
   zeroCount: number;
-  /** Global index represented by counts[0]. */
   minBin: number;
-  /** Dense counts from minBin through minBin + counts.length - 1. */
   counts: number[];
 }
 
@@ -47,8 +33,6 @@ function binValue(index: number, binsPerOctave: number): number {
   const lower = base * (1 + subBin / binsPerOctave);
   const upper = base * (1 + (subBin + 1) / binsPerOctave);
 
-  // Token lengths are integers. When a bucket spans integers, use the middle
-  // integer rather than a fractional geometric representative.
   const firstInteger = Math.ceil(lower);
   const lastInteger = Math.ceil(upper) - 1;
   if (firstInteger <= lastInteger) return (firstInteger + lastInteger) / 2;

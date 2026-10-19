@@ -38,9 +38,6 @@ vi.mock('@/lib/catalog/constants', async (importOriginal) => {
   };
 });
 
-// ---------------------------------------------------------------------------
-// minimal fixture factory
-// ---------------------------------------------------------------------------
 function makeEntry(overrides: Partial<AggDataEntry> = {}): AggDataEntry {
   return {
     hw: 'H100',
@@ -121,9 +118,6 @@ function makeInferenceData(overrides: Partial<InferenceData> = {}): InferenceDat
   };
 }
 
-// ===========================================================================
-// createChartDataPoint — energy fields
-// ===========================================================================
 describe('createChartDataPoint — energy fields (Joules per token)', () => {
   it('calculates jTotal = (power_kW * 1000) / tput_per_gpu', () => {
     const entry = makeEntry({ tput_per_gpu: 5000 });
@@ -135,8 +129,6 @@ describe('createChartDataPoint — energy fields (Joules per token)', () => {
       'h100',
     );
 
-    // H100 power = 1.73 kW → 1730 W
-    // J/tok = 1730 / 5000 = 0.346
     expect(point.jTotal).toBeDefined();
     expect(point.jTotal!.y).toBeCloseTo(0.346, 3);
     expect(point.jTotal!.roof).toBe(false);
@@ -152,7 +144,6 @@ describe('createChartDataPoint — energy fields (Joules per token)', () => {
       'h100',
     );
 
-    // J/tok = 1730 / 4000 = 0.4325
     expect(point.jOutput).toBeDefined();
     expect(point.jOutput!.y).toBeCloseTo(0.4325, 4);
   });
@@ -167,7 +158,6 @@ describe('createChartDataPoint — energy fields (Joules per token)', () => {
       'h100',
     );
 
-    // J/tok = 1730 / 1000 = 1.73
     expect(point.jInput).toBeDefined();
     expect(point.jInput!.y).toBeCloseTo(1.73, 2);
   });
@@ -229,7 +219,6 @@ describe('createChartDataPoint — energy fields (Joules per token)', () => {
       'h100',
     );
 
-    // Lower throughput should have higher J/tok
     expect(pointLow.jTotal!.y).toBeGreaterThan(pointHigh.jTotal!.y);
   });
 
@@ -250,22 +239,16 @@ describe('createChartDataPoint — energy fields (Joules per token)', () => {
       'b200',
     );
 
-    // B200 power = 2.17 kW → 2170 W; J/tok = 2170 / 5000 = 0.434
-    // H100 power = 1.73 kW → 1730 W; J/tok = 1730 / 5000 = 0.346
     expect(pointB200.jTotal!.y).toBeGreaterThan(pointH100.jTotal!.y);
     expect(pointB200.jTotal!.y).toBeCloseTo(0.434, 3);
   });
 });
 
-// ===========================================================================
-// computeEnergyFields — runtime fallback for historical data
-// ===========================================================================
 describe('computeEnergyFields', () => {
   it('computes jTotal for data missing energy fields', () => {
     const data = [makeInferenceData({ tpPerGpu: { y: 5000, roof: false } })];
     const result = computeEnergyFields(data);
 
-    // power = 1.73 kW → 1730 W; J/tok = 1730 / 5000 = 0.346
     expect(result[0].jTotal).toBeDefined();
     expect(result[0].jTotal!.y).toBeCloseTo(0.346, 3);
   });
@@ -302,7 +285,6 @@ describe('computeEnergyFields', () => {
     const data = [
       makeInferenceData({
         tpPerGpu: { y: 5000, roof: false },
-        // No outputTputPerGpu or inputTputPerGpu
       }),
     ];
     const result = computeEnergyFields(data);
@@ -324,7 +306,6 @@ describe('computeEnergyFields', () => {
     ];
     const result = computeEnergyFields(data);
 
-    // 1730 / 5000 = 0.346, 1730 / 10000 = 0.173
     expect(result[0].jTotal!.y).toBeCloseTo(0.346, 3);
     expect(result[1].jTotal!.y).toBeCloseTo(0.173, 3);
   });

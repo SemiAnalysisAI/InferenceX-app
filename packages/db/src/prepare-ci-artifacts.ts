@@ -151,13 +151,11 @@ function main(): void {
     console.log(`Downloading artifact: ${artifact.name}`);
     downloadWithRetries(artifact, artifactsPath);
   }
-  // Re-run attempts keep their artifacts; ingest only the latest copy of each point.
   for (const line of describeRetryCopySelection(
     dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
   )) {
     console.log(line);
   }
-  // This command precedes migrations: malformed required input must not reach any DB write.
   if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {
     console.log(`Source run ${sourceRunId} is purged; skipping required-power verification.`);
   } else {

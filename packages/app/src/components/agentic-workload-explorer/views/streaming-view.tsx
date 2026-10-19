@@ -26,8 +26,6 @@ import type {
 } from '@/lib/agentic-workload-explorer/api-types';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     stats: 'Stats',
@@ -123,13 +121,9 @@ const STRINGS = {
   },
 };
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
-
-// ── Nice tick generation ─────────────────────────────────────────
 
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
@@ -158,7 +152,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -174,8 +167,6 @@ function formatAxisValue(v: number): string {
   return v.toFixed(1);
 }
 
-// ── Section header ───────────────────────────────────────────────
-
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -186,8 +177,6 @@ function SectionHeader({ label }: { label: string }) {
     </div>
   );
 }
-
-// ── Stat card ────────────────────────────────────────────────────
 
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -201,15 +190,11 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
   );
 }
 
-// ── SVG chart constants ──────────────────────────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
 const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-// ── Streaming Ratio Line Chart ───────────────────────────────────
 
 function StreamingRatioChart({
   dailyRatio,
@@ -281,7 +266,6 @@ function StreamingRatioChart({
           />
         </div>
         <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-          {/* Y-axis grid lines + labels */}
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -311,7 +295,6 @@ function StreamingRatioChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -322,10 +305,8 @@ function StreamingRatioChart({
             strokeWidth={0.5}
           />
 
-          {/* Line */}
           <path d={pathD} fill="none" stroke="#06b6d4" strokeWidth={2} strokeLinejoin="round" />
 
-          {/* Dots */}
           {points.map((p, i) => (
             <circle key={p.day} cx={sx(i)} cy={sy(p.pct)} r={2.5} fill="#06b6d4">
               <title>
@@ -334,7 +315,6 @@ function StreamingRatioChart({
             </circle>
           ))}
 
-          {/* X-axis labels */}
           {points.map((p, i) => {
             if (i % labelInterval !== 0 && i !== points.length - 1) return null;
             const d = new Date(p.day);
@@ -356,7 +336,6 @@ function StreamingRatioChart({
             );
           })}
 
-          {/* Axis label */}
           <text
             x={MARGIN.left + PLOT_W / 2}
             y={CHART_H - 2}
@@ -374,8 +353,6 @@ function StreamingRatioChart({
     </Expandable>
   );
 }
-
-// ── SVG Histogram Component ──────────────────────────────────────
 
 const HIST_W = 520;
 const HIST_H = 200;
@@ -456,7 +433,6 @@ function Histogram({
           className="w-full"
           style={{ maxHeight: 220 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -486,7 +462,6 @@ function Histogram({
             </g>
           ))}
 
-          {/* Axes */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top}
@@ -506,7 +481,6 @@ function Histogram({
             strokeWidth={1}
           />
 
-          {/* Bars */}
           {buckets.map((bucket, i) => {
             const x = sx(bucket.min);
             const w = sx(bucket.max) - sx(bucket.min);
@@ -527,7 +501,6 @@ function Histogram({
             );
           })}
 
-          {/* Percentile lines */}
           {percentiles.map(({ label, value: val }) => {
             const px = sx(val);
             if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
@@ -556,7 +529,6 @@ function Histogram({
             );
           })}
 
-          {/* X-axis tick labels */}
           {xTicks.map((t) => {
             if (t < xMin || t > xMax) return null;
             return (
@@ -576,7 +548,6 @@ function Histogram({
             );
           })}
 
-          {/* Axis label */}
           <text
             x={MARGIN.left + PLOT_W / 2}
             y={CHART_H - 2}
@@ -591,7 +562,6 @@ function Histogram({
           </text>
         </svg>
 
-        {/* Percentile stats */}
         <div className="flex items-center gap-3 mt-1 text-3xs font-mono text-muted-foreground">
           {percentiles.map((p) => (
             <span key={p.label}>
@@ -603,8 +573,6 @@ function Histogram({
     </Expandable>
   );
 }
-
-// ── Streaming by Model Table ─────────────────────────────────────
 
 function ModelTable({
   byModel,
@@ -673,8 +641,6 @@ function ModelTable({
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────
-
 export default function StreamingPage() {
   return (
     <Suspense>
@@ -725,7 +691,6 @@ function StreamingPageContent() {
           />
         </div>
       )}
-      {/* Stats */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -803,7 +768,6 @@ function StreamingPageContent() {
 
       {data && (
         <>
-          {/* Streaming Ratio Over Time */}
           <StreamingRatioChart
             dailyRatio={data.dailyRatio}
             headerLabel={t.streamingRatioOverTime}
@@ -812,7 +776,6 @@ function StreamingPageContent() {
             exportTitle={t.exportStreamingRatio}
           />
 
-          {/* E2E Latency Comparison */}
           <div>
             <SectionHeader label={t.e2eLatencyComparison} />
             <div className="grid lg:grid-cols-2 gap-4">
@@ -847,7 +810,6 @@ function StreamingPageContent() {
             </div>
           </div>
 
-          {/* TTFT & TPOT & Prefill Speed Distributions */}
           <div>
             <SectionHeader label={t.ttftTpotPrefill} />
             <div className="grid lg:grid-cols-2 gap-4">
@@ -910,7 +872,6 @@ function StreamingPageContent() {
             </div>
           </div>
 
-          {/* Token Throughput */}
           <div className="rounded-md border border-border bg-surface p-3">
             <SectionHeader label={t.tokenThroughput} />
             <div className="text-3xs font-mono text-muted-foreground mb-2">
@@ -927,7 +888,6 @@ function StreamingPageContent() {
             />
           </div>
 
-          {/* Streaming by Model */}
           {data.byModel.length > 0 && <ModelTable byModel={data.byModel} strings={t} />}
         </>
       )}

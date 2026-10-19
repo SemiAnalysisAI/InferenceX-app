@@ -6,11 +6,6 @@ import {
   type CollectiveXVersion,
 } from '@/components/collectivex/types';
 
-/**
- * Every stored run summary for a version. While the server reports an
- * incomplete discovery pass, keep refetching the uncached endpoint so bounded
- * ingest batches progressively fill the table.
- */
 export function useCollectiveXRuns(version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION) {
   return useQuery({
     queryKey: ['collectivex-runs', version],
@@ -21,7 +16,6 @@ export function useCollectiveXRuns(version: CollectiveXVersion = COLLECTIVEX_DEF
   });
 }
 
-/** Resolve every checked run in parallel for the multi-run explorer. */
 export function useCollectiveXRunDatasets(version: CollectiveXVersion, runIds: readonly string[]) {
   return useQueries({
     queries: runIds.map((runId) => ({
@@ -33,11 +27,6 @@ export function useCollectiveXRunDatasets(version: CollectiveXVersion, runIds: r
   });
 }
 
-/**
- * Admin deletion of an ingested run. Resolves `false` on 401 (stale token —
- * the caller clears its stored copy); on success every CollectiveX query is
- * invalidated so the run table and selected datasets drop it immediately.
- */
 export function useDeleteCollectiveXRun() {
   const queryClient = useQueryClient();
   return useMutation({

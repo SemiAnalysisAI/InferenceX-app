@@ -12,7 +12,6 @@ interface RetryableQueryErrorProps {
   testId: string;
 }
 
-/** A query failure state that stays distinct from a valid empty response. */
 export function RetryableQueryError({
   message,
   analyticsEvent,

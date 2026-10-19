@@ -1,7 +1,3 @@
-/**
- * Tests for the "Historical Trends" tab.
- * Shows interpolated GPU performance over time at a user-selected interactivity level.
- */
 import type { BenchmarkRow } from '@/lib/api/api';
 
 const visitHistoricalWithSetup = () => {
@@ -112,8 +108,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .click('right');
     cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
     cy.get('[data-testid="cost-tier-rental"]').should('exist');
-    // The trend chart prices every point from the published tiers and has
-    // no TCO badges to type a custom $/chip/hr into.
     cy.get('[data-testid="cost-tier-custom"]').should('not.exist');
     cy.get('[data-testid="cost-tier-rental"]').click();
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
@@ -162,8 +156,6 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
-    // The figure wraps the caption too, whose Cost Tier help icon is also an
-    // SVG circle, so target a plotted point's hit area.
     cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '点击其他区域关闭')

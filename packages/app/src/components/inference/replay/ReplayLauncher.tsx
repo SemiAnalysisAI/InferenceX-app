@@ -8,8 +8,6 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-// Keep this in sync with REPLAY_HEIGHT + padding/header/controls in ReplayPanel
-// so the dialog doesn't resize as the panel transitions through its loading states.
 const REPLAY_PANEL_MIN_HEIGHT = 620;
 
 const ReplayPanel = dynamic(() => import('./ReplayPanel'), {
@@ -28,11 +26,6 @@ export interface ReplayLauncherHandle {
   open: () => void;
 }
 
-/**
- * Owns its own open state so callers only need a ref + .open() call instead of
- * a controlled boolean per chart instance. The dialog mounts the panel lazily,
- * keeping mp4-muxer and html-to-image out of the main inference bundle.
- */
 const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
   ({ parentChartId, chartDefinition, yLabel, xLabel }, ref) => {
     const [open, setOpen] = useState(false);

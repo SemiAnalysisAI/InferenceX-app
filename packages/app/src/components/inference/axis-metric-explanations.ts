@@ -1,16 +1,3 @@
-/**
- * @file axis-metric-explanations.ts
- * @description Bilingual plain-English explanations (and, for y-axis metrics,
- * structural formulas) backing the info buttons in axis metric dropdowns. Y-axis entries are keyed by `METRIC_REGISTRY`
- * keys; x-axis entries are keyed by the resolved x-axis kind. A unit test
- * asserts completeness against the registry, so adding a metric without an
- * explanation fails CI.
- *
- * Formulas are structural descriptions of the derived-field math in
- * `buildDerivedChartFields` (src/lib/charts/chart-utils.ts) and the glossary
- * (src/lib/content/glossary.ts) — they describe how a value is computed, they do not
- * restate assumed constants.
- */
 import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
@@ -19,13 +6,10 @@ export interface LocalizedText {
 }
 
 export interface MetricExplanation {
-  /** 1–3 sentence plain-language explanation of the metric. */
   description: LocalizedText;
-  /** Structural formula, rendered in monospace in metric help. */
   formula: LocalizedText;
 }
 
-/** Cost-basis flavor shared by the $ and cost-per-million metric families. */
 type CostBasis = 'h' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
@@ -184,7 +168,6 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
   };
 }
 
-/** Validation-status note appended to every Measured Energy explanation. */
 const MEASURED_TIER_NOTE_EN =
   ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
   "older measurements but lack the information needed to confirm today's method. Filter either " +
@@ -281,12 +264,6 @@ function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanati
   };
 }
 
-/**
- * Every `METRIC_REGISTRY` key gets a bilingual explanation and a structural
- * formula. Grounded in `buildDerivedChartFields` (src/lib/charts/chart-utils.ts) and
- * the glossary entries for throughput, cost per million tokens, tokens per
- * dollar, tokens per megawatt, and energy per token.
- */
 export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
@@ -504,11 +481,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   },
 };
 
-/**
- * The four logical x-axis metrics an inference chart can plot, independent of
- * the percentile prefix. Mirrors the branch logic in `resolveXAxisField` plus
- * the derived agentic x-axis mode handled in `ChartDisplay`.
- */
 export type XAxisKind = 'interactivity' | 'e2eLatency' | 'ttft' | 'e2eNormalizedInteractivity';
 
 export const X_AXIS_KINDS: readonly XAxisKind[] = [
@@ -519,7 +491,6 @@ export const X_AXIS_KINDS: readonly XAxisKind[] = [
 ];
 
 export interface XAxisExplanation {
-  /** Full metric name for contextual help; `pctl` is e.g. 'P90' | 'Median' | null. */
   name: {
     en: (pctl: string | null) => string;
     zh: (pctl: string | null) => string;
@@ -596,24 +567,10 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
   },
 };
 
-/**
- * Resolve which logical x-axis metric a chart is currently plotting.
- * Classifies off the x-axis data field that `resolveXAxisField` actually
- * resolved for the chart's current state, so contextual help can never disagree
- * with the drawn axis — `resolveXAxisField` is the single source of truth for
- * the field, including the input-metric fallback where a metric without a
- * `*_x` config override keeps plotting the chart's natural x. Trace-derived
- * agentic x-axis modes bypass that resolver entirely, so they arrive as an
- * explicit flag. Applies to both the official pipeline and `?unofficialrun=`
- * overlays — the overlay path shares the chart's resolved x-axis, so one
- * explanation describes both.
- */
 export function resolveXAxisKind(
   chartType: 'interactivity' | 'e2e',
   opts: {
-    /** Resolved x-axis data field from `resolveXAxisField` (e.g. `p90_ttft`). */
     xAxisField: string;
-    /** Agentic trace-derived normalized-interactivity x-axis mode. */
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
@@ -622,11 +579,6 @@ export function resolveXAxisKind(
   return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';
 }
 
-/**
- * Extract the percentile word from a resolved x-axis label (e.g.
- * "P90 Time To First Token (s)" → "P90"). The chart pipelines always render
- * percentiles in English; fixed-sequence statistics are localized on /zh.
- */
 export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
   if (xAxisLabel.startsWith('平均')) return 'Mean';
   if (xAxisLabel.startsWith('中位')) return 'Median';
@@ -640,7 +592,6 @@ export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
       : pctl.toUpperCase();
 }
 
-/** Locale-aware y-axis row label (metric plus cost tier) from the registry. */
 export function metricRowLabel(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   return metricOptionTitle(metricKey, locale);
 }

@@ -1,6 +1,5 @@
 import type { ParetoCoordinate } from './global-pareto';
 
-/** Include every hardware series tied at a frontier coordinate. */
 export function frontierHardwareKeys(
   visiblePoints: readonly (ParetoCoordinate & { hwKey: string })[],
   frontier: readonly ParetoCoordinate[],

@@ -62,7 +62,6 @@ const COLLECTIVEX_PHASE_LABELS_ZH: Record<CollectiveXPhase, string> = {
   prefill: '预填充',
 };
 
-/** Format every conclusion emitted by the GitHub Actions workflow-run API. */
 export function collectiveXConclusionLabel(conclusion: string | null, locale: Locale): string {
   if (conclusion === null) return locale === 'zh' ? '待处理' : 'pending';
   const labels = COLLECTIVEX_CONCLUSION_LABELS[locale];
@@ -73,11 +72,6 @@ export function collectiveXConclusionLabel(conclusion: string | null, locale: Lo
       : conclusion;
 }
 
-/**
- * CollectiveX artifacts identify runner pools in the SKU (for example,
- * `b200-nscale` or `h100-dgxc`). Collapse known hardware identifiers to the
- * canonical GPU key while leaving unknown SKU structure intact.
- */
 export function normalizeCollectiveXSku(sku: string): string {
   const normalized = sku.trim().toLowerCase();
   const base = normalized.split(':').at(-1)?.split('-')[0] ?? normalized;
@@ -92,12 +86,6 @@ export function collectiveXCaseLabel(label: string, sku: string): string {
   return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
 }
 
-/**
- * Stable within the newest-first run table. Preserve the six simple patterns,
- * then encode higher indexes as a unique dash/gap/accent tuple so two listed
- * runs never become visually identical merely because their indexes differ by
- * six.
- */
 export function collectiveXRunDasharray(runIndex: number): string {
   const normalized = Math.max(0, Math.trunc(runIndex));
   if (normalized < BASE_RUN_DASHARRAYS.length) return BASE_RUN_DASHARRAYS[normalized];
@@ -146,7 +134,6 @@ export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSe
   return `${series.system.vendor}_${normalizeCollectiveXSku(series.system.sku)}_${series.backend}_ep${series.system.ep_size}_${series.mode}_${series.phase}_${series.precision}`;
 }
 
-/** Namespace series ids and attach the run's current selection-order style index. */
 export function collectiveXSeriesForRun(
   series: readonly CollectiveXSeries[],
   runId: string,
@@ -193,15 +180,11 @@ export function metricValue(
 }
 
 interface CollectiveXFit {
-  /** Fixed per-call overhead (µs): the launch/sync/rendezvous floor. */
   alphaUs: number;
-  /** Per-GPU bandwidth term (GB/s): the slope of latency vs bytes. */
   betaGbps: number;
-  /** Points that entered the fit. */
   pointCount: number;
 }
 
-/** Ordinary least squares; returns [intercept, slope]. */
 function ols(xs: number[], ys: number[]): [number, number] {
   const n = xs.length;
   const meanX = xs.reduce((a, b) => a + b, 0) / n;
@@ -216,16 +199,6 @@ function ols(xs: number[], ys: number[]): [number, number] {
   return [meanY - slope * meanX, slope];
 }
 
-/**
- * Separate the bandwidth term (β) from the fixed overhead (α) for one operation
- * across a series' token ladder: latency(bytes) ≈ α + bytes/β. Regresses the
- * per-point latency against the per-GPU payload bytes (raw `payload_bytes` ÷
- * ep_size), so β lands in the same per-GPU GB/s units as the payload-rate axis
- * and α is the fixed overhead in µs. p50 by default (p99 carries tail noise).
- * Mirrors experimental/CollectiveX/bandwidth.py. Returns null when fewer than
- * three points, a degenerate (near-zero-variance) byte axis — e.g. a constant
- * payload across the ladder — or a non-positive slope leaves no bandwidth term.
- */
 export function fitAlphaBeta(
   series: CollectiveXSeries,
   operation: CollectiveXOperation,
@@ -243,8 +216,6 @@ export function fitAlphaBeta(
     latencies.push(latency);
   }
   if (bytesPerGpu.length < 3) return null;
-  // Reject a near-constant byte axis (constant payload across the ladder): a
-  // relative spread this small carries no real slope, only numeric noise.
   const min = Math.min(...bytesPerGpu);
   const max = Math.max(...bytesPerGpu);
   if (max - min <= 1e-9 * max) return null;
@@ -279,12 +250,6 @@ export function chartPoints(
   );
 }
 
-/**
- * The kv table cell selector, mirroring the harness's summarize: the
- * largest-ISL pull row of a (kind, page) family — the bandwidth-bound point —
- * at its smallest or largest measured batch. Null when the family was not
- * measured (e.g. a page size the sweep dropped).
- */
 export function collectiveXKvCell(
   rows: CollectiveXKvRow[],
   kind: CollectiveXKvRow['kind'],
@@ -302,7 +267,6 @@ export function collectiveXKvCell(
   return batch === 'min' ? pick((a, b) => a < b) : pick((a, b) => a > b);
 }
 
-/** A kv case namespaced by its run, with the run's selection-order style index. */
 export type CollectiveXKvRunCase = CollectiveXKvCase & { run_id: string; run_index: number };
 
 export interface CollectiveXKvChartSelection {
@@ -329,17 +293,9 @@ export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
   return `${collectiveXSkuLabel(kase.sku)} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
 }
 
-/**
- * Chart points for the kv view. Batch on the x axis reads at the largest
- * measured ISL (the bandwidth-bound point, where concurrency scaling is the
- * story); ISL on the x axis reads at batch 1 (a single request's handoff).
- * Paged rows only: the single-descriptor bulk ceiling stays a table column.
- */
 export interface CollectiveXKvFrontierSelection {
   op: 'pull' | 'push';
   pageTokens: number;
-  /** Overlap view only: pin the ladder to this ISL. Absent means each
-   * series reads at its own largest measured ISL. */
   isl?: number;
 }
 
@@ -348,16 +304,13 @@ export interface CollectiveXKvFrontierPoint {
   seriesLabel: string;
   colorKey: string;
   sku: string;
-  /** Aggregate burst bandwidth at p50 (GB/s). */
   x: number;
-  /** Burst p95 latency divided by requests in flight (ms per request). */
   y: number;
   onSeriesFrontier: boolean;
   onSkuFrontier: boolean;
   row: CollectiveXKvRow;
 }
 
-/** Strictly more aggregate bandwidth at the same operating ISL. */
 function frontierBeats(
   a: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
   b: Pick<CollectiveXKvFrontierPoint, 'x' | 'y'>,
@@ -365,16 +318,6 @@ function frontierBeats(
   return a.x === b.x && a.y > b.y;
 }
 
-/**
- * Bandwidth-against-ISL frontier points: every measured (ISL, batch) rung of
- * the selected op and page size becomes a point, with x the sequence length
- * and y the burst-aggregate GB/s at p50. The batch sweep folds into two
- * per-ISL tiers: onSeriesFrontier marks the backend's best batch at each ISL
- * (the achievable envelope the chart draws a line through), and onSkuFrontier
- * marks the best backend on that machine at each ISL. A backend that overlaps
- * requests lifts its envelope well above its batch-1 rung; a serializing
- * backend's rungs stack on top of each other.
- */
 export function collectiveXKvFrontierPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvFrontierSelection,
@@ -414,14 +357,6 @@ export function collectiveXKvFrontierPoints(
   return points;
 }
 
-/**
- * Overlap-gain points: aggregate bandwidth relative to the batch-1 rung at
- * one ISL of the selected direction and page size, so y is 1 at batch 1 by
- * construction. The ISL is `selection.isl` when set, else each series' own
- * largest measured ISL. An ideal overlapper tracks y = batch until the wire
- * saturates; a serializing backend stays flat at 1. A series without a
- * batch-1 rung at that ISL has no baseline and is dropped.
- */
 export function collectiveXKvOverlapPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvFrontierSelection,
@@ -454,12 +389,6 @@ export function collectiveXKvOverlapPoints(
   });
 }
 
-/**
- * Distinct measured ISLs of the paged rows matching the selected direction
- * and page size, ascending. Drives the overlap view's ISL selector; a series
- * with no rows at a chosen ISL simply drops from the chart via the missing
- * batch-1 baseline.
- */
 export function collectiveXKvIslValues(
   cases: readonly CollectiveXKvRunCase[],
   selection: Pick<CollectiveXKvFrontierSelection, 'op' | 'pageTokens'>,
@@ -479,12 +408,6 @@ export function collectiveXKvIslValues(
   return [...values].toSorted((a, b) => a - b);
 }
 
-/**
- * Distinct page sizes across the measured paged rows, descending. Drives the
- * page toggle and the table's paged columns: the sweep's page ladder has
- * already changed once (64/16 to the production block 256), and hardcoding it
- * left every view empty against the new rows.
- */
 export function collectiveXKvPageValues(cases: readonly CollectiveXKvRunCase[]): number[] {
   const values = new Set<number>();
   for (const kase of cases) {
@@ -501,16 +424,6 @@ export interface CollectiveXKvWireCeilingPoint {
   row: CollectiveXKvRow;
 }
 
-/**
- * Wire-ceiling lines for the envelope view: each series' bulk rows of the
- * selected direction across the ISL ladder, keyed by series id. A bulk row
- * moves the same bytes as the paged rungs at that ISL in one contiguous
- * descriptor, so it is what the fabric itself achieves; the gap from a paged
- * rung up to this line is per-descriptor software overhead, not the wire.
- * Bulk rows have no page size, so the page toggle does not apply. When
- * several bulk rows share an ISL (a batch ladder), the fastest one is the
- * ceiling.
- */
 export function collectiveXKvWireCeilings(
   cases: readonly CollectiveXKvRunCase[],
   op: 'pull' | 'push',

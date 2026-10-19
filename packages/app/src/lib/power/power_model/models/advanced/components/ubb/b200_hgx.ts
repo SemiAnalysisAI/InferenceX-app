@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** B200 HGX: eight GPUs, two Blackwell NVSwitches, and eight PCIe 5.0 x16 retimers. */
 
 import { type PowerComponentBreakdown, sum_watts, ValidationError } from '../../../../base';
 import { B200_BOARD_BASELINE } from '../../profiles';

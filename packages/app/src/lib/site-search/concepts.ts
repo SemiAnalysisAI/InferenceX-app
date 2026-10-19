@@ -1,15 +1,5 @@
 import { isCjkTerm, tokenize } from './tokenize';
 
-/**
- * Concept groups give the site search its semantic reach without shipping an
- * embedding model. A query term that belongs to a group also matches the
- * other members at a reduced weight, so "energy" finds "J/token" and "power"
- * pages, and "cheapest" finds TCO and $/M tok content.
- *
- * Keep groups tight: every member should be a reasonable answer when the user
- * types any other member. Multi-word phrases are tokenized and each resulting
- * term joins the group. Chinese terms let /zh queries reach the same concepts.
- */
 const CONCEPT_GROUPS: readonly (readonly string[])[] = [
   ['power', 'energy', 'watt', 'joule', 'efficiency', 'powerx', '功耗', '能耗', '能效', '功率'],
   ['cost', 'price', 'cheap', 'cheapest', 'tco', 'dollar', 'spend', 'pricing', '成本', '价格'],
@@ -46,7 +36,6 @@ export type ConceptMap = ReadonlyMap<string, readonly string[]>;
 function buildConceptMap(): ConceptMap {
   const map = new Map<string, Set<string>>();
   for (const group of CONCEPT_GROUPS) {
-    // Single Latin letters (from "tok/s", "p/d") are too ambiguous to expand.
     const terms = new Set(
       group.flatMap((phrase) => tokenize(phrase)).filter((t) => t.length > 1 || isCjkTerm(t)),
     );
@@ -61,13 +50,11 @@ function buildConceptMap(): ConceptMap {
 
 let cached: ConceptMap | null = null;
 
-/** Lazily built term -> related-terms map. */
 export function conceptMap(): ConceptMap {
   cached ??= buildConceptMap();
   return cached;
 }
 
-/** Related concept terms for a normalized query term (empty when none). */
 export function relatedTerms(term: string): readonly string[] {
   return conceptMap().get(term) ?? [];
 }

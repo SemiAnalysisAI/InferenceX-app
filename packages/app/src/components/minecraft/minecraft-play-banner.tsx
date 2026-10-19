@@ -8,7 +8,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const MinecraftGameDialog = dynamic(() => import('./game/minecraft-game-dialog'), { ssr: false });
 
-/** Launcher for the playable game; the game bundle and assets load only after a click. */
 export function MinecraftPlayBanner() {
   const locale = useLocale();
   const [open, setOpen] = useState(false);

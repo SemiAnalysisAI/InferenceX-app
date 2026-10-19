@@ -95,7 +95,6 @@ describe('parallelismLabel', () => {
   });
 
   it('single-node disagg uses the single (decode) segment, not worker syntax', () => {
-    // is_multinode false → no "NxPrefill+MxDecode" expansion.
     expect(
       parallelismLabel({ tp: 8, ep: 8, dpAttention: false, disagg: true, isMultinode: false }),
     ).toBe('TEP8');
@@ -148,9 +147,6 @@ describe('parallelismLabel', () => {
   });
 
   it('drops the decode segment when the decode pool is absent (0 workers, tp 0)', () => {
-    // Prefill-only agentic multinode runs (e.g. Kimi-K3 TP8 PP2 on b200-dgxc)
-    // emit decode_num_workers=0 / decode_tp=0 — the label is just the active
-    // side, without the 1x multiplier: "TP8PP2", not "1xTP8PP2+0xTP0".
     expect(
       parallelismLabel({
         tp: 0,

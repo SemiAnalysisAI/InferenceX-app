@@ -25,11 +25,6 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
   );
 }
 
-// Active/inactive recipe mirrors the top-of-page section nav
-// (data-testid="chart-section-tabs" in src/components/dashboard/tab-nav.tsx: tabLinkClass +
-// currentTabClass) so the two tab rows read as the same flat underline-strip
-// component: accent text + accent border-b-2 underline when active, muted text
-// with no background fill when inactive, and a faint border highlight on hover.
 function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger

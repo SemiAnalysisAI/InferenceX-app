@@ -1,6 +1,3 @@
-// Coalesces concurrent inline (request-thread) computes sharing the same
-// cache key: N parallel callers within one instance run the compute once and
-// all await the same promise.
 const inFlightComputes = new Map<string, Promise<unknown>>();
 
 export function coalesceCompute<T>(key: string, compute: () => Promise<T>): Promise<T> {

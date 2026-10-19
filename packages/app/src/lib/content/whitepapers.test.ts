@@ -84,12 +84,10 @@ describe('whitepaper registry', () => {
       expect(en.methodSteps.length).toBe(zh.methodSteps.length);
       expect(en.assumptions.length).toBe(zh.assumptions.length);
       expect(en.sources.length).toBe(zh.sources.length);
-      // Headline numbers are locale-independent; the Chinese cards keep them verbatim.
       expect(zh.kpis.map((kpi) => kpi.value)).toEqual(en.kpis.map((kpi) => kpi.value));
       expect(zh.comparison.items.map((item) => item.value)).toEqual(
         en.comparison.items.map((item) => item.value),
       );
-      // Chinese copy is real Chinese, English copy carries no Han characters.
       for (const text of [
         zh.title,
         zh.subtitle,
@@ -114,7 +112,6 @@ describe('whitepaper registry', () => {
       ]) {
         expect(text).not.toMatch(HAN);
       }
-      // External sources keep the same destinations; only internal ones may move to /zh.
       for (const [index, source] of en.sources.entries()) {
         const zhHref = zh.sources[index]!.href;
         expect(zhHref.replace(`${SITE_URL}/zh/`, `${SITE_URL}/`)).toBe(source.href);
@@ -257,7 +254,6 @@ describe('whitepaper JSON-LD', () => {
       inLanguage: 'zh-CN',
       url: `${SITE_URL}/zh/whitepaper/${MI355X_SLUG}`,
       headline: paper.zh.title,
-      // Organization attribution stays the English legal name in both locales.
       author: { name: WHITEPAPER_AUTHORS },
     });
   });

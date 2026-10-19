@@ -10,27 +10,20 @@ export interface TokenSplit {
 
 export interface TokenPoint {
   requestId: string;
-  /** 1-indexed within the selected agent's chronological requests. */
   turn: number;
   timestampMs: number;
-  /** Milliseconds since the first selected request. */
   elapsedMs: number;
-  /** Anthropic-reported cache split: cache_read_input_tokens vs cache_write + input. */
   api: TokenSplit;
-  /** Hash-chain split: prefix matched against any prior chain in the session. */
   hash: TokenSplit;
   subagentLabel: string | null;
 }
 
 export type TokenSplitMode = 'api' | 'hash';
 
-// Sub-agent run keys are prefixed, so they cannot collide with this main-agent sentinel.
 export const MAIN_AGENT_KEY = 'main' as const;
 
 interface AgentOption {
-  /** `MAIN_AGENT_KEY` for the main agent; otherwise the sub-agent run key. */
   key: string;
-  /** Label shown in the dropdown — already includes the agent-id suffix. */
   label: string;
   requestCount: number;
 }
@@ -54,7 +47,6 @@ export function buildAgentOptions(requests: SessionRequest[]): AgentOption[] {
   return options;
 }
 
-// Plot agents separately so unrelated prompt prefixes do not distort context growth.
 export function buildTokenPoints(
   requests: SessionRequest[],
   agentKey: string = MAIN_AGENT_KEY,
@@ -79,7 +71,6 @@ export function buildTokenPoints(
   );
   const t0 = new Date(sorted[0].timestamp).getTime();
 
-  // Include every prior chain when computing reuse, then emit only the selected agent.
   const allSorted = [...requests].toSorted(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
@@ -119,9 +110,7 @@ export function buildTokenPoints(
 }
 
 interface CacheHitRates {
-  /** API-reported cache hit rate, 0–100. */
   api: number;
-  /** Hash-prefix hit rate, 0–100, assuming unlimited cache TTL and capacity. */
   hash: number;
 }
 
@@ -142,7 +131,6 @@ export function computeCacheHitRates(points: TokenPoint[]): CacheHitRates {
   };
 }
 
-// Include all agents; sub-agent prefixes can reuse earlier main-agent requests.
 export function computeSessionCacheHitRates(requests: SessionRequest[]): CacheHitRates {
   if (requests.length === 0) return { api: 0, hash: 0 };
 
@@ -180,11 +168,6 @@ export function computeSessionCacheHitRates(requests: SessionRequest[]): CacheHi
   };
 }
 
-// ── Context Trajectories ────────────────────────────────────────────────────
-// Second chart on the same tab. Shows the main-agent's input-token line plus
-// one yellow trajectory per sub-agent invocation, so the user can see where
-// sub-agents fired in time and how their context grew during their lifetime.
-
 export interface TrajectoryPoint {
   requestId: string;
   elapsedMs: number;
@@ -192,29 +175,17 @@ export interface TrajectoryPoint {
 }
 
 export interface AgentTrajectory {
-  /**
-   * Stable grouping key from `buildRequestRuns` (e.g. `cc-agent::<uuid>`,
-   * `<label>::thread::<id>`, or `<label>::no-id`). Used to color each
-   * sub-agent distinctly in the chart legend.
-   */
   key: string;
-  /** null for the main-agent trajectory; subagent label otherwise. */
   label: string | null;
   points: TrajectoryPoint[];
 }
 
 export interface ContextTrajectories {
-  /** Main-agent trajectory (single line). Empty array if no main-agent rows. */
   main: TrajectoryPoint[];
-  /** One entry per sub-agent invocation (a contiguous run of same-labeled rows). */
   subagents: AgentTrajectory[];
-  /** elapsed-ms anchor (first request's timestamp, ms). 0 if no requests. */
   t0: number;
-  /** Max total-input-tokens across every plotted point — used as the y-domain. */
   maxTotal: number;
-  /** Max elapsed-ms across every plotted point — used as the x-domain. */
   maxElapsed: number;
-  /** Counts for the chart subtitle. */
   counts: {
     total: number;
     main: number;
@@ -227,20 +198,6 @@ function totalInput(req: SessionRequest): number {
   return (req.cacheReadInputTokens ?? 0) + (req.cacheWriteTokens ?? 0) + (req.inputTokens ?? 0);
 }
 
-/**
- * Build per-agent trajectories from a session's requests. Each sub-agent
- * invocation (a contiguous run of same-label, same-thread requests, per the
- * shared `buildRequestRuns` grouper) becomes one yellow trajectory; the main
- * agent's requests collapse into a single dark line.
- *
- * Three separate `Agent SDK` invocations separated by main-agent turns show up
- * as three distinct yellow lines, not one merged line. Codex sub-agents that
- * carry a `thread_id` header are split per-thread even within a single stretch.
- *
- * `elapsedMs` is anchored on the EARLIEST request in the session (sub-agent or
- * main) so sub-agent activity lines up correctly with the main-agent curve
- * when both are plotted on the same axes.
- */
 export function buildContextTrajectories(requests: SessionRequest[]): ContextTrajectories {
   if (requests.length === 0) {
     return {
@@ -253,9 +210,6 @@ export function buildContextTrajectories(requests: SessionRequest[]): ContextTra
     };
   }
 
-  // Anchor elapsedMs on the earliest request overall, not just the earliest
-  // main-agent one — otherwise sub-agents that fire before turn 1 plot at
-  // negative time. Compute t0 from the unsorted input min.
   let t0 = Number.POSITIVE_INFINITY;
   for (const req of requests) {
     const ts = new Date(req.timestamp).getTime();
@@ -288,9 +242,6 @@ export function buildContextTrajectories(requests: SessionRequest[]): ContextTra
     }
   }
 
-  // Keep main points in chronological order — buildRequestRuns interleaves
-  // mains and sub-agent groups in source order, so sequential mains stay sorted
-  // already; this is a defensive sort for any out-of-order edge cases.
   main.sort((a, b) => a.elapsedMs - b.elapsedMs);
 
   let maxTotal = 0;
@@ -317,10 +268,6 @@ export function buildContextTrajectories(requests: SessionRequest[]): ContextTra
   };
 }
 
-/**
- * Format a positive elapsed-ms value as `+MM:SS` (or `+H:MM:SS` for sessions
- * over an hour). Mirrors the NVIDIA-blog reference axis labels.
- */
 export function formatElapsedMMSS(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(totalSec / 3600);

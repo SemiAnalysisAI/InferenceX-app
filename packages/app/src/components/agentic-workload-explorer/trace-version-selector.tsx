@@ -21,13 +21,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Global trace-version selector. Mounted once in the dashboard layout header;
- * reads/writes `?version=` so every page sees the same selection.
- *
- * The read-only snapshot only contains the current trace version, so the
- * options are just `All` and `vN` (CURRENT_TRACE_VERSION).
- */
 export function TraceVersionSelector() {
   const { selection, setSelection } = useTraceVersion();
   const t = STRINGS[useLocale()];

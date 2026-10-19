@@ -12,8 +12,6 @@ describe('resolveLabelState', () => {
   });
 
   it('turns on parallelism labels for agentic scenarios, and keeps line labels', () => {
-    // Line labels name the curve, point labels name the point — the agentic
-    // view wants both, so it differs from fixed-seq only in the point labels.
     expect(resolveLabelState('agentic', {})).toEqual({
       showPointLabels: true,
       useAdvancedLabels: true,

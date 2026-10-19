@@ -68,7 +68,6 @@ const formatComparisonDate = (date: string, locale: Locale) => {
   return `${year}年${month}月${day}日`;
 };
 
-/** Git Commit and Workflow Run external links for a run, each shown when known. */
 function renderRunLinks(locale: Locale, headRef?: string, runUrl?: string) {
   const t = COMPARISON_CHANGELOG_STRINGS[locale];
   return (
@@ -99,7 +98,6 @@ function renderRunLinks(locale: Locale, headRef?: string, runUrl?: string) {
   );
 }
 
-/** One changelog entry's description. The GPU and run # are shown in the entry title. */
 function renderDescription(
   entry: { config_keys: string[]; description: string },
   key: number | string,
@@ -115,13 +113,6 @@ interface ComparisonChangelogProps {
   changelogs: ComparisonChangelogType[];
   selectedGPUs: string[];
   selectedPrecisions: string[];
-  /**
-   * DB model keys for the currently selected model (e.g. ['dsv4']). Changelog
-   * config keys are `<model>-<precision>-<gpu>-<framework>` and a GPU+framework
-   * like `b200-vllm` is shared across models, so without this filter the run list
-   * would offer other models' runs — which then plot nothing (the data fetch is
-   * model-scoped).
-   */
   modelDbKeys: string[];
   selectedSequence: SequenceType;
   loading?: boolean;
@@ -131,15 +122,8 @@ interface ComparisonChangelogProps {
   onAddDate: (date: string) => void;
   onRemoveDate: (date: string) => void;
   onAddAllDates: (dates: string[]) => void;
-  /** Initial expanded state of the changelog body (collapsed in embedded contexts). */
   defaultExpanded?: boolean;
-  /** Earliest date the selected GPU config has benchmark data */
   firstAvailableDate?: string;
-  /**
-   * Analytics section prefix for the panel's `track()` calls
-   * (`[section]_changelog_add_date`, …). Defaults to `inference`; other pages
-   * that embed the changelog pass their own section.
-   */
   analyticsSection?: string;
 }
 
@@ -168,8 +152,6 @@ export default function ComparisonChangelog({
   const changelogBenchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
-  // Filter changelog entries to only show those matching selected GPUs and precisions.
-  // Always keep range endpoints and first appearance date visible.
   const pinnedDates = useMemo(() => {
     const set = new Set<string>();
     if (selectedDateRange.startDate) set.add(selectedDateRange.startDate);
@@ -195,7 +177,6 @@ export default function ComparisonChangelog({
       ),
     }));
 
-    // Ensure pinned dates are always present
     for (const date of pinnedDates) {
       if (!mapped.some((item) => item.date === date)) {
         mapped.push({ date, entries: [], runs: [], runConfigs: [] });
@@ -221,9 +202,6 @@ export default function ComparisonChangelog({
     return set;
   }, [selectedDates, selectedDateRange]);
 
-  // True when a changelog entry touches one of the selected GPU configs at a
-  // selected precision — the same predicate used to filter the date list, reused
-  // to attach changelog notes to the runs that are worth offering as series.
   const entryMatchesSelection = useMemo(() => {
     const precSet = new Set(selectedPrecisions);
     return (configKeys: string[]): boolean =>
@@ -237,11 +215,6 @@ export default function ComparisonChangelog({
       });
   }, [modelDbKeys, selectedPrecisions, selectedGPUs, changelogBenchmarkType]);
 
-  /**
-   * Every run that produced data for the selected config on a date, earliest
-   * first, with its changelog notes (if any) attached. Data-driven so a run that
-   * shipped data without a changelog entry still appears as its own series.
-   */
   const runMetaFor = useMemo(
     () => (item: (typeof filteredChangelogs)[number]) => {
       const clByRun = new Map(item.runs.map((r) => [r.runId, r]));
@@ -263,8 +236,6 @@ export default function ComparisonChangelog({
     [modelDbKeys, selectedGPUs, selectedPrecisions, benchmarkType, entryMatchesSelection],
   );
 
-  // Entries the "Add all to chart" button would add: every run not yet on the
-  // chart (run-level for multi-run dates, the plain date for single-run dates).
   const addableEntries = useMemo(() => {
     const out: string[] = [];
     for (const item of filteredChangelogs) {
@@ -287,11 +258,8 @@ export default function ComparisonChangelog({
     track(`${analyticsSection}_comparison_changelog_toggled`, { expanded: newState });
   };
 
-  // All modelDbKeys for a comparison map to one display model, so [0] suffices
-  // for per-model suffix overrides (e.g. M3 MTP → EAGLE).
   const displayModel = DB_MODEL_TO_DISPLAY[modelDbKeys[0]] ?? modelDbKeys[0];
 
-  /** Display labels of the selected GPUs that a set of changelog entries touches. */
   const gpuLabelsFor = (entries: { config_keys: string[] }[]): string => {
     if (selectedGPUs.length <= 1) return '';
     return selectedGPUs
@@ -359,10 +327,6 @@ export default function ComparisonChangelog({
             filteredChangelogs.map((item) => {
               const runs = runMetaFor(item);
 
-              // Multiple runs produced data for the selected config on this date →
-              // render each run as its own first-class entry (its own #, changelog,
-              // and add/remove). Includes runs with no changelog notes so the newest
-              // run is never dropped just because it lacked an entry.
               if (runs.length > 1) {
                 return runs.map((run, idx) => {
                   const entry = makeRunComparisonEntry(item.date, run.runId);
@@ -421,10 +385,6 @@ export default function ComparisonChangelog({
                 });
               }
 
-              // Single (or no) matching run → one block keyed by the date. Link to
-              // the run that produced this config's data so a date with unrelated
-              // same-day runs never borrows another run's commit/run links. No
-              // matching run (e.g. a pinned endpoint) → no links.
               const { headRef, runUrl } = runs[0] ?? {};
               const dateGpuLabel = gpuLabelsFor(item.entries);
               return (

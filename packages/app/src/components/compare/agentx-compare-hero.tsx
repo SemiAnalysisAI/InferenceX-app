@@ -12,51 +12,17 @@ import {
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
-/**
- * Full-color brand marks for the ledger rows, sharing the `*-color.svg`
- * assets used by `/model` pages and inference chart captions. Keyed by
- * compare slug so a featured model without a registered mark simply renders
- * without one instead of breaking the row.
- */
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
-  // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
-  // mark rather than the Zhipu corporate dot cluster.
   'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
 
-/**
- * Full-color brand marks for the hero strip: the silicon platforms named
- * in the description (Google, OpenAI, AMD, NVIDIA), then SambaNova, followed
- * by Meta, Microsoft, and Oracle. The path data is copied from the shared brand assets under
- * `public/logos/` but inlined as SVG elements: the strip must add zero
- * `/logos/` image requests, because the mobile landing performance spec
- * budgets those fetches to the ledger's lazy `*-color.svg` model marks.
- * viewBoxes are cropped to the path content, so rendered sizes need no
- * canvas-padding compensation and the marks read optically equal.
- *
- * Google is the four-color "G" in the official brand palette (blue
- * #4285F4, red #EA4335, yellow #FBBC05, green #34A853), used as-is in both
- * themes. NVIDIA uses its official brand green (#76B900) as-is in both themes;
- * the OpenAI and AMD marks are black by brand design (neither has a
- * color variant), so they render in `currentColor` via `text-foreground`,
- * which reproduces the official reversed-white treatment in dark mode.
- * SambaNova is its purple ribbon mark (the current sambanova.ai header and
- * favicon; the shared `sambanova.webp` asset is raster only), traced into
- * three stacked flat fills sampled from the official gradient: deep plum
- * #2A1246, violet #7340B8, and lilac #CC8FF3 highlights. Used as-is in both themes.
- * Meta keeps the official blue-gradient fills from `meta-color.svg`
- * (gradient ids re-namespaced `agentx-meta-*` since inline defs land in
- * the page DOM), Microsoft its four-color window, and Oracle renders in
- * Oracle Red #C74634 (PMS 180 C per Oracle's brand guidelines — the
- * shared `oracle.svg` asset carries no fill of its own).
- */
 interface VendorMarkGradient {
   id: string;
   x1: string;
@@ -71,9 +37,7 @@ const VENDOR_MARKS: readonly {
   viewBox: string;
   width: number;
   height: number;
-  /** Linear gradients referenced by path fills; ids are namespaced to avoid DOM collisions. */
   gradients?: readonly VendorMarkGradient[];
-  /** Brand-color fills, or `currentColor` for marks that are monochrome by design. */
   paths: readonly { d: string; fill: string }[];
 }[] = [
   {
@@ -396,11 +360,11 @@ const VENDOR_MARKS: readonly {
   },
 ] as const;
 
-// Models kept off the landing ledger. Qwen 3.5 stays reachable through the TPU card.
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',
+  'minimax-m3',
 ]);
 
 const LANDING_HARDWARE_RESULTS = [
@@ -428,11 +392,23 @@ const LANDING_HARDWARE_RESULTS = [
     isNew: true,
   },
   {
+    id: 'rubin-glm-5-3',
+    vendor: 'NVIDIA',
+    title: 'Vera Rubin NVL72 GLM 5.3 Submission',
+    titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
+    subtitle: '744 Billion parameters AgentX',
+    subtitleZh: '7440 亿参数 AgentX',
+    href: '/inference/glm-5-3',
+    model: 'glm-5-3',
+    analyticsEvent: 'landing_rubin_results_clicked',
+  },
+  {
     id: 'rubin',
     vendor: 'NVIDIA',
-    title: 'Rubin Results',
-    titleZh: 'Rubin 结果',
-    subtitle: 'MiniMax M3 · AgentX',
+    title: 'Vera Rubin NVL72 MiniMax M3 Submission',
+    titleZh: 'Vera Rubin NVL72 MiniMax M3 提交结果',
+    subtitle: '428 Billion parameters AgentX',
+    subtitleZh: '4280 亿参数 AgentX',
     href: '/inference/minimax-m3',
     model: 'minimax-m3',
     analyticsEvent: 'landing_rubin_results_clicked',
@@ -474,11 +450,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * The hero leads `/compare` and the landing page. `/compare` owns the page
- * `h1`; the landing page renders the hero under its own section flow, so the
- * caller picks the heading level rather than shipping a second `h1`.
- */
 export function AgentXCompareHero({
   locale,
   headingLevel = 'h1',
@@ -491,7 +462,6 @@ export function AgentXCompareHero({
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
   const Heading = headingLevel;
-  // Landing curation must not change compare coverage or dashboard defaults.
   const ledgerModels =
     surface === 'landing'
       ? FEATURED_AGENTX_MODELS.filter((model) => !LANDING_HIDDEN_LEDGER_MODELS.has(model.slug))
@@ -505,9 +475,6 @@ export function AgentXCompareHero({
             <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               {t.eyebrow}
             </p>
-            {/* `relative` anchors the splash, which positions itself absolutely
-                at the top right. Landing only: /compare is not the launch
-                surface, and the announcement belongs on the front page. */}
             <div className="relative">
               <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
@@ -517,8 +484,6 @@ export function AgentXCompareHero({
             <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>
-            {/* Decorative: the description right above already names every
-                vendor, so the strip is hidden from assistive technology. */}
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
@@ -591,7 +556,6 @@ export function AgentXCompareHero({
           </div>
 
           <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
-            {/* Landing shows the hardware results first, above the model ledger. */}
             {surface === 'landing' && (
               <div className="divide-y divide-border/70 border-b border-border/70">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
@@ -651,8 +615,6 @@ export function AgentXCompareHero({
                 })}
               </div>
             )}
-            {/* The visible ledger header is dropped; `ledgerTitle` stays as the
-                nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
               {ledgerModels.map((model) => (
                 <CompareIndexTrackedLink

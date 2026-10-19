@@ -68,7 +68,6 @@ describe('TPU publication preview', () => {
     cy.contains('TP1/DP8').should('exist');
     cy.get('[aria-label="Dismiss tpuv7_updates"]').click();
     cy.get(overlayPoints).should('not.exist');
-    // Mainline now supplies official TPU results independently of the overlay.
     cy.get('[data-testid="tco-basis-toggle"]').should('have.length', 1);
     cy.get('[aria-label="Hide TPU7x (vLLM)"]').click();
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');

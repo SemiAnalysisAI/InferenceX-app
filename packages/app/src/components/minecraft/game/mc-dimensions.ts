@@ -33,7 +33,6 @@ export const PILLARS = Array.from({ length: 10 }, (_, i) => ({
   height: 74 + (i % 5) * 4,
 }));
 
-/** Pure chunk generation, independent of loading order and player edits. */
 export function dimensionBlocks(
   dimension: Dimension,
   seed: number,
@@ -72,7 +71,6 @@ export function dimensionBlocks(
           if (y === 112 && hash3(seed, wx, y, wz) < 0.03) id = B.glowstone;
           set(y, id);
         }
-        // Repeating fortress bridges and crossing platforms, reachable from any portal.
         const fx = (((wx % 128) + 128) % 128) - 64;
         const fz = (((wz % 128) + 128) % 128) - 64;
         if (

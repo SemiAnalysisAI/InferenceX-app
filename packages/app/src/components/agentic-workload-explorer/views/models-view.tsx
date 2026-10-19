@@ -20,8 +20,6 @@ import type {
 import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     stats: 'Stats',
@@ -89,11 +87,7 @@ const STRINGS = {
   },
 };
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function shortenModel(model: string): string {
-  // Strip provider prefix (claude- / openai- / gpt- is left as-is since that's
-  // the common-name root) and any trailing YYYYMMDD date suffix.
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
 
@@ -104,8 +98,6 @@ function buildModelColorMap(models: string[]): Record<string, string> {
   }
   return map;
 }
-
-// ── Section header ───────────────────────────────────────────────
 
 function SectionHeader({ label }: { label: string }) {
   return (
@@ -118,8 +110,6 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-// ── Stat card ────────────────────────────────────────────────────
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -131,8 +121,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// ── Token Distribution Bar ───────────────────────────────────────
 
 function TokenDistribution({
   data,
@@ -176,7 +164,6 @@ function TokenDistribution({
     <div className="rounded-md border border-border bg-surface p-3">
       <SectionHeader label={s.tokenDistByModel} />
       <div className="space-y-2 mt-3">
-        {/* Legend */}
         <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-2">
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-sky-500" /> {s.input}
@@ -259,8 +246,6 @@ function TokenDistribution({
   );
 }
 
-// ── Fast Mode Analysis ───────────────────────────────────────────
-
 function FastModeAnalysis({
   data,
   strings: s,
@@ -296,7 +281,6 @@ function FastModeAnalysis({
     <div className="rounded-md border border-border bg-surface p-3">
       <SectionHeader label={s.fastModeAnalysis} />
       <div className="space-y-3 mt-3">
-        {/* Legend */}
         <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground mb-1">
           <span className="flex items-center gap-1">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-muted" /> {s.regular}
@@ -362,8 +346,6 @@ function FastModeAnalysis({
   );
 }
 
-// ── Model Usage Over Time (SVG stacked bar chart) ────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -397,7 +379,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -426,7 +407,6 @@ function ModelUsageChart({
   const locale = useLocale();
   const svgRef = useRef<SVGSVGElement>(null);
   const { days, maxY, yTicks } = useMemo(() => {
-    // Group by day
     const dayMap = new Map<string, Record<string, number>>();
     for (const entry of timeSeries) {
       if (!dayMap.has(entry.day)) dayMap.set(entry.day, {});
@@ -434,11 +414,8 @@ function ModelUsageChart({
       dayData[entry.model] = (dayData[entry.model] || 0) + Number(entry.requestCount);
     }
 
-    // Sort days
-    // Days arrive as Date strings ("Wed Aug 26 2026 …"), so sort by time.
     const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
 
-    // Compute max stacked total
     let max = 0;
     for (const dayData of dayMap.values()) {
       let total = 0;
@@ -473,7 +450,6 @@ function ModelUsageChart({
   const sx = (i: number) => MARGIN.left + i * (barWidth + barGap) + barGap / 2;
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / maxY) * PLOT_H;
 
-  // Show up to ~6 x-axis labels
   const labelInterval = Math.max(1, Math.floor(days.length / 6));
 
   return (
@@ -495,7 +471,6 @@ function ModelUsageChart({
         />
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
         {allModels.map((model) => (
           <span key={model} className="flex items-center gap-1">
@@ -509,7 +484,6 @@ function ModelUsageChart({
       </div>
 
       <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {/* Y-axis grid lines + labels */}
         {yTicks.map((t) => (
           <g key={`y-${t}`}>
             {t > 0 && (
@@ -539,7 +513,6 @@ function ModelUsageChart({
           </g>
         ))}
 
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -550,7 +523,6 @@ function ModelUsageChart({
           strokeWidth={0.5}
         />
 
-        {/* Stacked bars */}
         {days.map(({ day, data }, i) => {
           let yOffset = 0;
           const rects: React.ReactNode[] = [];
@@ -580,10 +552,8 @@ function ModelUsageChart({
           return <g key={day}>{rects}</g>;
         })}
 
-        {/* X-axis labels */}
         {days.map(({ day }, i) => {
           if (i % labelInterval !== 0 && i !== days.length - 1) return null;
-          // Format as MM/DD
           const d = new Date(day);
           const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
           return (
@@ -603,7 +573,6 @@ function ModelUsageChart({
           );
         })}
 
-        {/* Axis label */}
         <text
           x={MARGIN.left + PLOT_W / 2}
           y={CHART_H - 2}
@@ -620,8 +589,6 @@ function ModelUsageChart({
     </div>
   );
 }
-
-// ── Main page ────────────────────────────────────────────────────
 
 export default function ModelsPage() {
   return (
@@ -658,7 +625,6 @@ function ModelsPageContent() {
 
   const colorMap = useMemo(() => buildModelColorMap(allModels), [allModels]);
 
-  // ── Compute stats ────────────────────────────────────────────
   let totalTokens = 0;
   let totalInput = 0;
   let totalCacheRead = 0;
@@ -685,8 +651,6 @@ function ModelsPageContent() {
     }
   }
 
-  // Token share: tokensByModel covers all time, while timeSeries covers only
-  // recent days, so a request share would mix windows.
   const fastModePct = totalTokens > 0 ? ((totalFastTokens / totalTokens) * 100).toFixed(1) : '0';
 
   const cacheHitRatio =
@@ -696,7 +660,6 @@ function ModelsPageContent() {
 
   return (
     <div className="space-y-5">
-      {/* Stats */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -743,15 +706,12 @@ function ModelsPageContent() {
 
       {data && (
         <>
-          {/* Token Distribution */}
           {data.tokensByModel.length > 0 && (
             <TokenDistribution data={data.tokensByModel} strings={t} />
           )}
 
-          {/* Fast Mode Analysis */}
           <FastModeAnalysis data={data.tokensByModel} strings={t} />
 
-          {/* Model Usage Over Time */}
           <Expandable title={t.modelUsageOverTime}>
             <ModelUsageChart
               timeSeries={data.timeSeries}

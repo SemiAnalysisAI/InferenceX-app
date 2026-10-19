@@ -22,10 +22,6 @@ describe('GPU metric localization registry', () => {
 const CSV_HEADER =
   'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
 
-// ---------------------------------------------------------------------------
-// parseCsvData
-// ---------------------------------------------------------------------------
-
 describe('parseCsvData', () => {
   it('parses real nvidia-smi CSV format with unit suffixes', () => {
     const csv = `${CSV_HEADER}
@@ -71,8 +67,6 @@ describe('parseCsvData', () => {
     expect(result[0].memUtil).toBe(0);
   });
 
-  // --- AMD amd-smi format ---
-
   it('auto-detects and parses AMD amd-smi CSV format', () => {
     const amdHeader =
       'timestamp,gpu,gfx_activity,umc_activity,mm_activity,socket_power,gfx_0_clk,gfx_0_min_clk,gfx_0_max_clk,mem_0_clk,mem_0_min_clk,mem_0_max_clk,edge,hotspot,mem';
@@ -83,7 +77,7 @@ describe('parseCsvData', () => {
     expect(result).toHaveLength(2);
     expect(result[0].index).toBe(0);
     expect(result[0].power).toBe(350);
-    expect(result[0].temperature).toBe(72); // hotspot
+    expect(result[0].temperature).toBe(72);
     expect(result[0].smClock).toBe(1980);
     expect(result[0].memClock).toBe(901);
     expect(result[0].gpuUtil).toBe(95);
@@ -100,7 +94,6 @@ describe('parseCsvData', () => {
 1772939616,0,0,0,135,133,901,N/A,40,41`;
     const result = parseCsvData(csv);
     expect(result).toHaveLength(1);
-    // Unix epoch 1772939616 → ISO string
     expect(result[0].timestamp).toContain('2026');
     expect(new Date(result[0].timestamp).getTime()).toBe(1772939616 * 1000);
   });
@@ -112,11 +105,10 @@ describe('parseCsvData', () => {
 1772939616,0,0,0,135,133,901,38,N/A,41`;
     const result = parseCsvData(csv);
     expect(result).toHaveLength(1);
-    expect(result[0].temperature).toBe(38); // falls back to edge
+    expect(result[0].temperature).toBe(38);
   });
 
   it('AMD: parses real-world amd-smi row with all columns', () => {
-    // Full amd-smi header with ~100+ columns
     const amdHeader =
       'timestamp,gpu,gfx_activity,umc_activity,mm_activity,vcn_activity,jpeg_activity,gfx_busy_inst_xcp_0,jpeg_busy_xcp_0,vcn_busy_xcp_0,socket_power,gfx_voltage,soc_voltage,mem_voltage,throttle_status,power_management,gfx_0_clk,gfx_0_min_clk,gfx_0_max_clk,gfx_0_clk_locked,gfx_0_deep_sleep,gfx_1_clk,gfx_1_min_clk,gfx_1_max_clk,gfx_1_clk_locked,gfx_1_deep_sleep,gfx_2_clk,gfx_2_min_clk,gfx_2_max_clk,gfx_2_clk_locked,gfx_2_deep_sleep,gfx_3_clk,gfx_3_min_clk,gfx_3_max_clk,gfx_3_clk_locked,gfx_3_deep_sleep,gfx_4_clk,gfx_4_min_clk,gfx_4_max_clk,gfx_4_clk_locked,gfx_4_deep_sleep,gfx_5_clk,gfx_5_min_clk,gfx_5_max_clk,gfx_5_clk_locked,gfx_5_deep_sleep,gfx_6_clk,gfx_6_min_clk,gfx_6_max_clk,gfx_6_clk_locked,gfx_6_deep_sleep,gfx_7_clk,gfx_7_min_clk,gfx_7_max_clk,gfx_7_clk_locked,gfx_7_deep_sleep,mem_0_clk,mem_0_min_clk,mem_0_max_clk,mem_0_clk_locked,mem_0_deep_sleep,vclk_0_clk,vclk_0_min_clk,vclk_0_max_clk,vclk_0_clk_locked,vclk_0_deep_sleep,vclk_1_clk,vclk_1_min_clk,vclk_1_max_clk,vclk_1_clk_locked,vclk_1_deep_sleep,vclk_2_clk,vclk_2_min_clk,vclk_2_max_clk,vclk_2_clk_locked,vclk_2_deep_sleep,vclk_3_clk,vclk_3_min_clk,vclk_3_max_clk,vclk_3_clk_locked,vclk_3_deep_sleep,dclk_0_clk,dclk_0_min_clk,dclk_0_max_clk,dclk_0_clk_locked,dclk_0_deep_sleep,dclk_1_clk,dclk_1_min_clk,dclk_1_max_clk,dclk_1_clk_locked,dclk_1_deep_sleep,dclk_2_clk,dclk_2_min_clk,dclk_2_max_clk,dclk_2_clk_locked,dclk_2_deep_sleep,dclk_3_clk,dclk_3_min_clk,dclk_3_max_clk,dclk_3_clk_locked,dclk_3_deep_sleep,fclk_0_clk,fclk_0_min_clk,fclk_0_max_clk,fclk_0_clk_locked,fclk_0_deep_sleep,socclk_0_clk,socclk_0_min_clk,socclk_0_max_clk,socclk_0_clk_locked,socclk_0_deep_sleep,edge,hotspot,mem';
     const row = `1772939616,0,0,0,N/A,"['N/A', 'N/A', 'N/A', 'N/A']","['N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']","[0, 0, 0, 0, 0, 0, 0, 0]","[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A', 'N/A']","[0, 0, 0, 0]",135,N/A,N/A,N/A,N/A,ENABLED,133,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,133,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,132,500,2100,DISABLED,ENABLED,901,900,1500,N/A,DISABLED,29,914,1680,N/A,ENABLED,29,914,1680,N/A,ENABLED,29,914,1680,N/A,ENABLED,29,914,1680,N/A,ENABLED,22,711,1400,N/A,ENABLED,22,711,1400,N/A,ENABLED,22,711,1400,N/A,ENABLED,22,711,1400,N/A,ENABLED,1300,1300,1800,N/A,DISABLED,28,889,1143,N/A,ENABLED,N/A,40,41`;
@@ -129,7 +121,7 @@ describe('parseCsvData', () => {
     expect(result[0].memClock).toBe(901);
     expect(result[0].gpuUtil).toBe(0);
     expect(result[0].memUtil).toBe(0);
-    expect(result[0].temperature).toBe(40); // hotspot
+    expect(result[0].temperature).toBe(40);
   });
 
   it('AMD: skips rows with N/A power', () => {
@@ -186,10 +178,6 @@ describe('parseCsvData', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getAvailableMetrics
-// ---------------------------------------------------------------------------
-
 describe('getAvailableMetrics', () => {
   it('returns common + AMD metrics for AMD data', () => {
     const amdRow: GpuMetricRow = {
@@ -218,7 +206,7 @@ describe('getAvailableMetrics', () => {
     expect(keys).toContain('fclk');
     expect(keys).toContain('socClk');
     expect(keys).toContain('mmActivity');
-    expect(keys.length).toBe(14); // 6 common + 8 AMD
+    expect(keys.length).toBe(14);
   });
 
   it('excludes AMD metrics that are undefined even on AMD data', () => {
@@ -233,7 +221,6 @@ describe('getAvailableMetrics', () => {
       memUtil: 80,
       edgeTemp: 38,
       memTemp: 65,
-      // voltages are N/A → undefined
     };
     const metrics = getAvailableMetrics([amdRow]);
     const keys = metrics.map((m) => m.key);
@@ -243,10 +230,6 @@ describe('getAvailableMetrics', () => {
     expect(keys).not.toContain('fclk');
   });
 });
-
-// ---------------------------------------------------------------------------
-// detectTdpFromArtifactName
-// ---------------------------------------------------------------------------
 
 describe('detectTdpFromArtifactName', () => {
   it('detects H200 from real artifact name', () => {
@@ -266,10 +249,6 @@ describe('detectTdpFromArtifactName', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// helper
-// ---------------------------------------------------------------------------
-
 function makeRow(
   overrides: Partial<GpuMetricRow> & { timestamp: string; index: number },
 ): GpuMetricRow {
@@ -283,10 +262,6 @@ function makeRow(
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// computeGpuStats
-// ---------------------------------------------------------------------------
 
 describe('computeGpuStats', () => {
   it('returns stats per GPU sorted by index', () => {
@@ -305,7 +280,6 @@ describe('computeGpuStats', () => {
   });
 
   it('computes correct p95 and p99 for a uniform distribution', () => {
-    // 100 values from 1 to 100
     const rows: GpuMetricRow[] = [];
     for (let i = 1; i <= 100; i++) {
       rows.push(makeRow({ timestamp: `2026/03/07 00:20:${i}.000`, index: 0, power: i }));
@@ -319,7 +293,6 @@ describe('computeGpuStats', () => {
   });
 
   it('computes stddev correctly for known values', () => {
-    // stddev of [2, 4, 4, 4, 5, 5, 7, 9] = 2.0 (population)
     const values = [2, 4, 4, 4, 5, 5, 7, 9];
     const rows = values.map((v, i) =>
       makeRow({ timestamp: `2026/03/07 00:20:${37 + i}.000`, index: 0, power: v }),

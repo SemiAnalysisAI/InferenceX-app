@@ -1,27 +1,4 @@
 import { readTraceProfileChunks } from './lib/trace-profile-storage';
-/**
- * Backfill `agentic_trace_replay.aggregate_stats` for rows that are missing it
- * or were computed by an older `STATS_VERSION`.
- *
- * The ingest path now computes stats inline, but existing rows (and rows
- * whose computation logic has since changed) still need this pass. Run after the agentic schema migration and any time `STATS_VERSION` bumps.
- *
- * Strategy:
- *   - Stream rows one at a time (server_metrics_json_gz can be hundreds of
- *     MB decompressed for TP+EP / high-conc points — keeping one in memory
- *     at a time avoids OOM).
- *   - Skip rows whose stored `aggregate_stats.version` already matches.
- *   - Recompute via the same `computeAggregateStats()` helper the ingest
- *     path uses, so behavior cannot drift.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-aggregate-stats
- *     [--limit N]   only process the first N candidate rows (useful for
- *                   smoke-tests on a fresh deploy)
- *     [--force]     recompute every row, even if version already matches
- *     [--run-id N] only process trace rows linked to one GitHub workflow run
- *     [--yes]       skip the confirmation prompt
- */
 
 import { hasNoSslFlag } from './cli-utils.js';
 import {
@@ -70,9 +47,6 @@ async function main(): Promise<void> {
             )
           `
         : sql``;
-      // Find candidates: rows missing stats, or whose stored version is stale.
-      // Using >>'version'::int comparison would error on null; coalesce to -1 so
-      // null-stats rows always count as stale.
       const candidates = flags.force
         ? await sql<{ id: number }[]>`
             select id
@@ -94,7 +68,6 @@ async function main(): Promise<void> {
       return candidates.map((candidate) => candidate.id);
     },
     async (id) => {
-      // Fetch one row at a time — the json_gz blob is the heavy field.
       const [row] = await sql<{ aggregate_stats: AggregateStats | null }[]>`
         select aggregate_stats from agentic_trace_replay where id = ${id}
       `;
@@ -108,8 +81,6 @@ async function main(): Promise<void> {
       );
 
       let stats: AggregateStats;
-      // Only carry server distributions from versions with the current parser.
-      // Earlier bundles need a server reparse to populate ATOM metrics.
       const storedVersion = row.aggregate_stats?.version;
       if (
         !flags.force &&

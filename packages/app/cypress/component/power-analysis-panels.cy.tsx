@@ -93,7 +93,6 @@ describe('PowerAnalysisPanels', () => {
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
     });
-    // URL state survives the previous component mount.
     writeUrlParams({ i_roleshare: '0', i_powerfit: '0' });
   });
 

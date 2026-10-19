@@ -129,7 +129,6 @@ function SectionBlock({
   );
 }
 
-/** The /agentx/telemetry tutorial. */
 export function AgentXTelemetryArticle({ locale }: { locale: Locale }) {
   const guide = getTelemetryGuide(locale);
   const prefix = localePrefix(locale);

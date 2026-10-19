@@ -1,23 +1,3 @@
-/**
- * Backfill every .log/.out file from GitHub and the historical GCS backup.
- *
- * The script pairs server_logs_/multinode_server_logs_ artifacts with their
- * bmk[_agentic]_ sibling, maps the raw benchmark rows through the production
- * mapper, and attaches the log bundle to the exact persisted points. Inserts
- * use filename conflicts plus files_complete metadata, so reruns are safe.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-server-log-files
- *   bun run --cwd packages/db db:backfill-server-log-files --run 31415828111 --yes
- *   bun run --cwd packages/db db:backfill-server-log-files --all --from-run 26606969606 --yes
- *   bun run --cwd packages/db db:backfill-server-log-files --all --source gcs --dry-run
- *   bun run --cwd packages/db db:backfill-server-log-files --all --source auto --yes
- *   bun run --cwd packages/db db:backfill-server-log-files --run 36470443155 --force --yes
- *
- * --force revisits bundles already marked complete; only missing filenames are
- * inserted, so it picks up files a newer artifact reader can see.
- */
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';

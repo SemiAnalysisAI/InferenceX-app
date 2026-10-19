@@ -1,16 +1,4 @@
-/**
- * E2E tests for the unified NudgeEngine.
- *
- * Covers: landing modals (priority ordering, dismissal persistence),
- * landing banner, dashboard toasts, evaluation toast, and the
- * permanent-suppress ("starred") cross-nudge mechanism.
- */
-
 import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
@@ -30,18 +18,10 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   }
 }
 
-// `cypress.config.ts` runs with `testIsolation: false` — the browser context
-// (incl. localStorage / sessionStorage) survives across tests in this spec.
-// Defensively clear before each test so a missed `onBeforeLoad` in any test
-// can't leak state into the next one.
 beforeEach(() => {
   cy.clearAllLocalStorage();
   cy.clearAllSessionStorage();
 });
-
-// ---------------------------------------------------------------------------
-// Landing — modal priority & dismissal
-// ---------------------------------------------------------------------------
 
 describe('Landing nudges — modals', { testIsolation: true }, () => {
   it('shows the launch banner on fresh first load', () => {
@@ -54,8 +34,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
-    // Banner + header-nav badges and both flashing TPU card badges — the shared
-    // pill must render at the same fixed size everywhere it appears.
     cy.get('[data-new-badge]')
       .should('have.length', 4)
       .then(($badges) => {
@@ -83,8 +61,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
           expect(horizontalOffset).to.be.closeTo(0, 0.1);
           expect(verticalOffset).to.eq(0);
 
-          // The label box can sit dead centre while the glyphs themselves spill
-          // out of it, so measure the rendered text and not just its container.
           const range = badge.ownerDocument.createRange();
           range.selectNodeContents(label!);
           const inkRect = range.getBoundingClientRect();
@@ -97,9 +73,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
         }
       });
 
-    // The persistent star CTA lives in the footer grid (footer-star-cta) and
-    // the header; the old immediate star modal duplicated it and covered the
-    // footer, so it must stay gone.
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
@@ -115,10 +88,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', '查看结果');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Landing — centered TPUv7 launch modal
-// ---------------------------------------------------------------------------
 
 const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
 const TPU_RESULTS_HREF =
@@ -136,8 +105,6 @@ function assertTpuResultsFilters() {
   cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'interactivity');
 }
 
-// cypress/support/e2e.ts seeds the modal key on every load; clearing it here
-// runs after that hook, so only these visits see the modal.
 function showLaunchModal(win: Cypress.AUTWindow) {
   clearAllNudgeStorage(win);
   win.localStorage.removeItem(LAUNCH_MODAL_KEY);
@@ -271,13 +238,11 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
       .and('contain.text', 'AgentX Preview Submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
-        // clientWidth/Height exclude the scrollbar, which the fixed overlay also excludes.
         const root = $modal[0].ownerDocument.documentElement;
         expect(Math.abs(rect.left + rect.width / 2 - root.clientWidth / 2)).to.be.lessThan(2);
         expect(Math.abs(rect.top + rect.height / 2 - root.clientHeight / 2)).to.be.lessThan(2);
       });
     cy.get('[data-new-badge="launch-modal"]').should('have.class', 'new-badge-flash');
-    // Focus moves into the dialog so keyboard users land on the action.
     cy.focused().should('have.attr', 'data-testid', 'launch-modal-action');
     cy.get('[data-testid="launch-modal-action"]').should('have.text', 'Qwen3.5').click();
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
@@ -356,10 +321,6 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
   }
 });
 
-// ---------------------------------------------------------------------------
-// Landing — banner
-// ---------------------------------------------------------------------------
-
 describe('Landing nudges — banner', { testIsolation: true }, () => {
   it('wraps the full launch banner title on mobile without clipping', () => {
     cy.viewport(375, 812);
@@ -393,7 +354,6 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
-      // Only the X button should persist a dismissal — show alone must not.
       expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
         null,
       );
@@ -407,8 +367,6 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.location('pathname').should('eq', '/inference/qwen-3-5');
     assertTpuResultsFilters();
 
-    // Body click must not write the dismissal key — the banner should still
-    // render after returning home and reloading the landing page.
     cy.get('[data-testid="nav-link-home"]').click();
     cy.location('pathname').should('eq', '/');
     cy.reload();
@@ -421,10 +379,6 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Dashboard — reproducibility toast
-// ---------------------------------------------------------------------------
-
 describe('Dashboard nudges — reproducibility toast', () => {
   it('reproducibility nudge is session-only — gone after reload', () => {
     cy.visit('/inference', {
@@ -432,12 +386,9 @@ describe('Dashboard nudges — reproducibility toast', () => {
         clearAllNudgeStorage(win);
       },
     });
-    // Should not be visible immediately
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
-    // After the timer fires (~1.5s + buffer)
     cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
 
-    // Session storage should be set
     cy.window().then((win) => {
       expect(win.sessionStorage.getItem('inferencex-reproducibility-nudge-shown')).to.not.equal(
         null,
@@ -449,13 +400,6 @@ describe('Dashboard nudges — reproducibility toast', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Dashboard — filter-hint toast (inference tab only, permanent dismissal)
-// ---------------------------------------------------------------------------
-
-// Only one overlay toast shows at a time and reproducibility (1.5s timer) wins
-// the slot on a fresh session. Suppress the competing dashboard toasts so the
-// filter-hint toast (2.5s timer) deterministically claims the overlay slot.
 function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
   clearAllNudgeStorage(win);
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
@@ -493,22 +437,16 @@ describe('Dashboard nudges — filter-hint toast', () => {
     cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
-    // The toast's exit animation delays the persisted write by ~300ms.
     cy.wait(400);
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-filter-hint-nudge-dismissed')).to.eq('1');
     });
 
-    // Keep the persisted dismissal but re-suppress competitors on reload.
     cy.reload();
     cy.wait(3500);
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Evaluation — eval-samples toast
-// ---------------------------------------------------------------------------
 
 describe('Evaluation nudges — eval-samples toast', () => {
   it('eval-samples open event refreshes the cooldown timestamp', () => {
@@ -519,8 +457,6 @@ describe('Evaluation nudges — eval-samples toast', () => {
     });
     cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
 
-    // Eval-samples uses `cooldownStartsOnShow: true` for an "every 7 days"
-    // reminder cadence — the timer starts at first show, not on dismissal.
     cy.window().then((win) => {
       const value = win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed');
       expect(value).to.not.equal(null);
@@ -531,7 +467,6 @@ describe('Evaluation nudges — eval-samples toast', () => {
       const before = Number(
         win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed') ?? '0',
       );
-      // Wait long enough that Date.now() has advanced past the first write.
       cy.wait(50);
       cy.window().then((win2) => {
         win2.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
@@ -543,10 +478,6 @@ describe('Evaluation nudges — eval-samples toast', () => {
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-// Cross-scope isolation
-// ---------------------------------------------------------------------------
 
 describe('Nudge scope isolation', () => {
   it('landing nudges do not appear on dashboard', () => {
@@ -561,12 +492,10 @@ describe('Nudge scope isolation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        // Dismiss all landing nudges so nothing blocks visibility checks
         win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });
-    // Wait a bit for any timer-based nudges
     cy.wait(2000);
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="star-nudge"]').should('not.exist');

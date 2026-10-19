@@ -27,8 +27,8 @@ describe('setupChartStructure', () => {
       const config = defaultConfig();
       const layout = setupChartStructure(svgEl, config);
 
-      expect(layout.width).toBe(800 - 50 - 30); // containerWidth - left - right
-      expect(layout.height).toBe(600 - 20 - 40); // containerHeight - top - bottom
+      expect(layout.width).toBe(800 - 50 - 30);
+      expect(layout.height).toBe(600 - 20 - 40);
       expect(layout.margin).toEqual(config.margin);
     });
 
@@ -119,7 +119,6 @@ describe('setupChartStructure', () => {
       expect(layout.zoomGroup.attr('class')).toBe('zoom-group');
       expect(layout.zoomGroup.attr('clip-path')).toBe('url(#clip-clip-test)');
 
-      // ClipPath should exist in defs
       const clipRect = layout.defs.select('#clip-clip-test rect');
       expect(clipRect.empty()).toBe(false);
       expect(Number(clipRect.attr('width'))).toBe(layout.width);
@@ -134,7 +133,6 @@ describe('setupChartStructure', () => {
       expect(layout.zoomGroup.empty()).toBe(false);
       expect(layout.zoomGroup.attr('clip-path')).toBeNull();
 
-      // No clipPath in defs
       const clipPath = layout.defs.select('clipPath');
       expect(clipPath.empty()).toBe(true);
     });
@@ -313,7 +311,6 @@ describe('setupChartStructure', () => {
 
     it('skips border line updates on second call when hideAxes is true', () => {
       const svgEl = makeSvgEl();
-      // First call with hideAxes true — no border lines created
       setupChartStructure(svgEl, defaultConfig({ hideAxes: true }));
       const layout2 = setupChartStructure(svgEl, defaultConfig({ hideAxes: true }));
 
@@ -329,7 +326,6 @@ describe('setupChartStructure', () => {
         defaultConfig({ clipContent: false, chartId: 'no-clip', containerWidth: 1000 }),
       );
 
-      // No clipPath should exist
       const clipPath = layout2.defs.select('#clip-no-clip');
       expect(clipPath.empty()).toBe(true);
     });
@@ -379,7 +375,6 @@ describe('setupChartStructure', () => {
     it('clears label text when label is omitted on second call', () => {
       const svgEl = makeSvgEl();
       setupChartStructure(svgEl, defaultConfig({ yLabel: 'Some Label', xLabel: 'Some X' }));
-      // Second call without labels — should clear text
       setupChartStructure(svgEl, defaultConfig());
 
       const svg = d3.select(svgEl);
@@ -405,7 +400,6 @@ describe('setupChartStructure', () => {
 
       const svg = d3.select(svgEl);
       const rect = svg.select('.watermark-rect');
-      // Rect is masked to the inner chart area, not the full container.
       const innerW = cfg.containerWidth - cfg.margin.left - cfg.margin.right;
       const innerH = cfg.containerHeight - cfg.margin.top - cfg.margin.bottom;
       expect(Number(rect.attr('x'))).toBe(cfg.margin.left);
@@ -497,8 +491,8 @@ describe('setupChartStructure', () => {
       const config = defaultConfig({ containerWidth: 100, containerHeight: 80 });
       const layout = setupChartStructure(svgEl, config);
 
-      expect(layout.width).toBe(100 - 50 - 30); // 20
-      expect(layout.height).toBe(80 - 20 - 40); // 20
+      expect(layout.width).toBe(100 - 50 - 30);
+      expect(layout.height).toBe(80 - 20 - 40);
     });
 
     it('preserves zoom-group children across updates', () => {
@@ -506,7 +500,6 @@ describe('setupChartStructure', () => {
       const config = defaultConfig();
       const layout1 = setupChartStructure(svgEl, config);
 
-      // Simulate a data layer adding content to zoomGroup
       layout1.zoomGroup.append('circle').attr('class', 'data-point').attr('r', 5);
 
       const layout2 = setupChartStructure(svgEl, config);

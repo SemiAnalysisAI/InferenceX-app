@@ -5,8 +5,6 @@ import { createAdminSql } from './etl/db-utils.js';
 import { prepareTraceReplay, persistPreparedTraceReplay } from './etl/trace-replay-ingest.js';
 import { confirmProceed, parseRunIdFlag, runBackfillMain } from './lib/backfill-runner.js';
 
-// The later evaluation artifact reused this name but omitted the trace files.
-// Recover the original benchmark artifact, not the smaller evaluation upload.
 const recovery = {
   runId: 31581562219,
   artifactId: 9140323247,
@@ -77,7 +75,6 @@ async function main(): Promise<void> {
   });
   if (!prepared.timelineRequests || !prepared.chartWindows)
     throw new Error('Recovered trace is empty');
-  // Attach only the missing sidecar; published benchmark measurements remain immutable.
   prepared.cacheHitRates = null;
   prepared.fullResponseMetrics = {};
   prepared.atomKvCacheBlocks = null;

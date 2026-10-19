@@ -121,8 +121,6 @@ describe('Current InferenceX Image localized routes', () => {
       image: 'lmsysorg/sglang:v0.5.2',
       date: today,
     },
-    // A model still sweeping 8K/1K. DeepSeek V4 Pro retired its 8k1k sweep on
-    // 2026-09-08 (InferenceX#2728), so it no longer qualifies here.
     {
       model: 'qwen3.5',
       hardware: 'b200',
@@ -147,7 +145,7 @@ describe('Current InferenceX Image localized routes', () => {
       osl: null,
       benchmark_type: 'agentic_traces',
       image: 'lmsysorg/sglang:v0.5.2',
-      date: '2026-08-01', // 22 days before fixedNow — past the 14-day AgentX budget.
+      date: '2026-08-01',
     },
   ];
 
@@ -247,8 +245,6 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('[data-testid="current-image-releases-error"]')
       .should('contain.text', '无法加载框架最新版本标签')
       .contains('button', '重试')
-      // Keep failures active until the user retries. A request from the previous
-      // page must not consume a count-based failure fixture (testIsolation=false).
       .then(($button) => {
         releasesSucceed = true;
         return cy.wrap($button);
@@ -319,8 +315,6 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
-    // The AgentX row is 22 days old — past the two-week budget — so it must be
-    // tinted stale even though its image tag matches the latest release.
     cy.get('table').should('contain.text', '22d');
     cy.get('td[title^="Last submission: 2026-08-01"]')
       .should('have.length', 1)
@@ -336,9 +330,7 @@ describe('Current InferenceX Image localized routes', () => {
     const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
     cy.intercept('GET', '**/api/v1/latest-images', [
       ...imageRows,
-      // DeepSeek V4 Pro retired its 8K/1K sweep on 2026-09-08 (InferenceX#2728).
       { ...imageRows[1], model: 'dsv4', image: retiredDeepSeekImage, date: '2026-09-08' },
-      // MiniMax M3 retired its 8K/1K sweep on 2026-08-04; AgentX stays active.
       {
         ...imageRows[0],
         model: 'minimaxm3',
@@ -356,9 +348,7 @@ describe('Current InferenceX Image localized routes', () => {
         image: activeMiniMaxImage,
         date: today,
       },
-      // Kimi K2.5 is a fully deprecated model: no scenario should surface it.
       { ...imageRows[1], model: 'kimik2.5', image: deprecatedModelImage },
-      // The globally retired 1K/1K sweep must not surface for any model.
       { ...imageRows[1], isl: 1024, osl: 1024, image: 'vllm/vllm-openai:v0.8.0-1k1k' },
     ]);
     cy.intercept('GET', '**/api/v1/framework-releases', {
@@ -367,7 +357,6 @@ describe('Current InferenceX Image localized routes', () => {
     });
     cy.visit('/current-inferencex-image');
 
-    // Agentic is the default; explicitly select the still-swept fixed scenario.
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-node-type-select').should('contain.text', 'All');
     selectFixedSequence();
@@ -387,8 +376,6 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'Kimi-K2.5');
     cy.get('[data-slot="select-item"]').contains('MiniMax-M3').click();
 
-    // Selecting MiniMax M3 removes 8K/1K from the scenario list and moves the
-    // table onto the model's only active scenario.
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('have.length', 1).and('contain.text', 'Agentic');

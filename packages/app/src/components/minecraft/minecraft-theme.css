@@ -4,8 +4,6 @@
   font-display: swap;
 }
 
-/* ── Minecraft Theme ── */
-
 .minecraft .splash-text {
   animation: splash-bounce 1.5s ease-in-out infinite;
 }
@@ -15,24 +13,20 @@
   }
 }
 
-/* Force pixel font on everything in minecraft mode */
 .minecraft,
 .minecraft * {
   font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
 }
 
-/* Minecraft text shadow on all text */
 .minecraft * {
   text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.4);
 }
 
-/* Disable font smoothing for crisp pixel font */
 .minecraft {
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: unset;
 }
 
-/* Minecraft-style beveled buttons — raised 3D effect */
 .minecraft button,
 .minecraft [role='button'],
 .minecraft a[class*='rounded'] {
@@ -50,29 +44,24 @@
   border-color: #37373780 #ffffff80 #ffffff80 #37373780 !important;
 }
 
-/* Force square corners on everything */
 .minecraft [class*='rounded'] {
   border-radius: 0 !important;
 }
 
-/* Pixelated rendering for images */
 .minecraft img {
   image-rendering: pixelated;
 }
 
-/* Minecraft header grass-block top accent */
 .minecraft header {
   border-bottom: 3px solid transparent !important;
   border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
 }
 
-/* Sunken slot effect on cards */
 .minecraft .border-border {
   border: 2px solid;
   border-color: #373737 #ffffff40 #ffffff40 #373737;
 }
 
-/* Input fields — sunken slot style */
 .minecraft input,
 .minecraft select,
 .minecraft textarea {
@@ -82,17 +71,10 @@
   background-color: rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Hide circuit background in minecraft mode */
 .minecraft .circuit-bg {
   display: none;
 }
 
-/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
- * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
- * and lands the dragon off-screen left so the GIF stops being rendered. The
- * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
- * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
- * up with a deliberate mid-screen pause rather than a moving target. */
 @keyframes mc-dragon-flyacross {
   0% {
     transform: translate(110vw, 0) scale(1);
@@ -128,7 +110,6 @@
   }
 }
 
-/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
 @keyframes splash-bounce {
   0%,
   100% {
@@ -139,7 +120,6 @@
   }
 }
 
-/* Playable Minecraft launcher banner (the game itself loads on click). */
 .mc-play-banner {
   position: relative;
   z-index: 1;

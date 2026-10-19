@@ -1,11 +1,3 @@
-/**
- * Fully reset the database: drop all application tables and schema_migrations.
- * After running this, you must run db:migrate before db:ingest.
- *
- * Usage:
- *   bun run admin:db:reset
- */
-
 import { TABLE_NAMES } from '@semianalysisai/inferencex-constants';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
@@ -38,7 +30,6 @@ async function reset(): Promise<void> {
 
   await sql`DROP MATERIALIZED VIEW IF EXISTS latest_benchmarks`;
   await sql`DROP VIEW IF EXISTS latest_workflow_runs`;
-  // Child-before-parent order (CASCADE handles the rest, but keep it FK-safe).
   await sql`DROP TABLE IF EXISTS
     ${sql(TABLE_NAMES.runDatasets)},
     ${sql(TABLE_NAMES.datasetConversations)},

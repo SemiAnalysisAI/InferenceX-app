@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** GPU system families and their common grouping interface. */
 
 export { GPUSystem, SystemGroup } from './base';
 export {

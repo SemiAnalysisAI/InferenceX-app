@@ -146,7 +146,6 @@ function centralSingleNodeFixture() {
   return dir;
 }
 const nativeNodes = { 'node-a': 'GPU-a', 'node-b': 'GPU-b' };
-/** Non-disagg two-node bundle whose telemetry is per-node nvidia-smi with signed receipts. */
 function nativeFixture() {
   const dir = fixture();
   changeArtifact(dir, benchmarkPath, (row) =>
@@ -197,7 +196,6 @@ function nativeFixture() {
       role: 'aggregate',
       energy_j: 500,
     }));
-    // The single-node gpu_metrics.csv must not stay declared: traces are counted per node.
     point.artifacts = [auditPath, benchmarkPath, ...files].map((file) => ({
       path: file,
       sha256: sha256(dir, file),
@@ -348,7 +346,6 @@ describe('required power publication contract', () => {
     changeArtifact(dir, nodeManifest, (value) => {
       value.lifecycle = 'partial';
     });
-    // Re-sign the receipt so only the lifecycle check can fire.
     changeArtifact(dir, auditPath, (audit) => {
       audit.nodes[0].manifest_sha256 = sha256(dir, nodeManifest);
     });

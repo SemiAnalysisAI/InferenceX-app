@@ -7,9 +7,6 @@ import {
   type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
 
-// "View power trace" on pinned tooltips: the deep link from a measured-power
-// scatter point to its per-second telemetry on the Timeline display.
-
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
 const AUDIT_NAME =
   'dsv4_8k1k_fp4_sglang_tp8-pp1-dcp1-pcp1-ep1-dpafalse_disagg-false_spec-none_conc64_b200-host-0123';

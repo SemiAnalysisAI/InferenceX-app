@@ -70,7 +70,6 @@ function offloadDisplay(meta: PointMeta, locale: Locale): string {
   return meta.offload_mode.toLowerCase() === 'on' ? t.enabledLegacy : t.disabledLegacy;
 }
 
-/** Selected-point header: runtime components, concurrency, cache hit rates, and ISL/OSL. */
 export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
   const t = POINT_SUMMARY_STRINGS[locale];

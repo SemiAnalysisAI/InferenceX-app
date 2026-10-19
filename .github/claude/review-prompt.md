@@ -121,7 +121,7 @@ When reviewing a PR diff, check if new code was added WITHOUT corresponding test
 
 **Check for missing tests:**
 
-- New functions in `packages/app/src/lib/` or `packages/app/src/scripts/` → must have colocated unit tests (e.g., `packages/app/src/lib/<module>.test.ts`)
+- New functions in `packages/app/src/lib/` or `packages/app/scripts/` → must have colocated unit tests (e.g., `packages/app/src/lib/<module>.test.ts`)
 - New UI components or features in `packages/app/src/components/` → should have E2E tests in `packages/app/cypress/e2e/`
 - Bug fixes → should have a regression test
 

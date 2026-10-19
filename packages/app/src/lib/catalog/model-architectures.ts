@@ -1,157 +1,52 @@
 import { Model } from '@/lib/catalog/data-mappings';
 
-/**
- * Model architecture types
- */
 export type ArchitectureType = 'dense' | 'moe';
 
-/**
- * Attention mechanism types used in modern LLMs
- */
 export type AttentionType = 'MHA' | 'GQA' | 'MLA' | 'Linear' | 'Hybrid' | 'AlternatingSinkGQA';
 
-/**
- * Describes one category of alternating transformer layers.
- * Used when a model interleaves different layer types (e.g., sliding vs full attention).
- */
 export interface AlternatingLayerSpec {
-  /** Short label for this layer type (e.g., "Sliding Attention + Sink") */
   label: string;
-  /** Longer description shown in the diagram */
   description: string;
-  /** Number of layers of this type */
   count: number;
-  /** Color key for visual distinction */
   colorKey: 'attention' | 'ffn' | 'norm' | 'router' | 'expert';
-  /**
-   * Sliding-window size (in tokens) for this layer type, when it includes a
-   * local sliding-window attention branch. Rendered as `window=N` in the
-   * diagram. Omit for layer types that use full / non-windowed attention.
-   */
   slidingWindow?: number;
 }
 
-/**
- * Model architecture specification
- */
 export interface ModelArchitecture {
-  /** Model enum value */
   model: Model;
-  /** Total parameter count (in billions) */
   totalParams: number;
-  /** Active parameters per forward pass (in billions, same as total for dense models) */
   activeParams: number;
-  /** Architecture type: dense or mixture-of-experts */
   architectureType: ArchitectureType;
-  /** Attention mechanism used */
   attentionType: AttentionType;
-  /** Number of transformer layers */
   numLayers?: number;
-  /** Hidden dimension size */
   hiddenSize?: number;
-  /** Number of attention heads */
   numHeads?: number;
-  /** Number of KV heads (for GQA/MQA) */
   numKVHeads?: number;
-  /** Per-head dimension. If not provided, inferred from hiddenSize/numHeads */
   headDim?: number;
-  /** Vocabulary size */
   vocabSize?: number;
-  /** FFN intermediate dimension (for dense models or expert FFN for MoE) */
   ffnDim?: number;
-  /** Number of experts (for MoE models) */
   numExperts?: number;
-  /** Number of active experts per token (for MoE models) */
   activeExperts?: number;
-  /** Whether the model uses a shared expert (DeepSeek-style) */
   hasSharedExpert?: boolean;
-  /** Number of initial transformer layers that use dense FFN instead of MoE (for MoE models) */
   denseFFNLayers?: number;
-  /** Intermediate dimension of the dense FFN layers (differs from MoE expert FFN dim) */
   denseFFNDim?: number;
-  /**
-   * Number of leading MoE layers that use hash routing (token-id → fixed experts)
-   * instead of the learned gate. Rendered as a separate stacked prefix block.
-   */
   hashRoutedLayers?: number;
-  /**
-   * Alternating layer type pattern (e.g., gpt-oss uses sliding_attention/full_attention).
-   * Each entry describes one category of layer and how many of that type exist.
-   */
   alternatingLayers?: AlternatingLayerSpec[];
-  /** Sliding window size in tokens (for models using sliding/local attention) */
   slidingWindow?: number;
-  /**
-   * Number of parallel residual streams for hyper-connections (mHC). When > 1,
-   * residual merges render as "mHC ×N" mixer nodes instead of a plain "+" add.
-   */
   hyperConnections?: number;
-  /** Context window size (in tokens) */
   contextWindow?: number;
-  /** Special architectural features */
   features?: string[];
-  // No `releaseDate` here, deliberately. A model's release date is the same fact
-  // the Fleet Lifecycle time axis anchors on, so it lives once in
-  // `MODEL_RELEASE_DATES` (`@semianalysisai/inferencex-constants`) and is read
-  // through `getModelReleaseDate(arch.model)`. While this file kept its own copy
-  // the two disagreed: DeepSeek-V4-Pro was listed here as releasing six weeks
-  // after its own first benchmark run, and both values were rendered to users.
-  /** Developer/Organization */
   developer?: string;
-  /** Link to model card or paper */
   sourceUrl?: string;
-  /** Override whether the attention block is expandable in diagrams. If not set, determined by attentionType. */
   attentionExpandable?: boolean;
-  /**
-   * Override whether the attention block *inside each alternating layer block*
-   * drills down to the hybrid local/compressed flow (`getHybridAttentionSubBlocks`).
-   * Defaults to expandable for `Hybrid` attention. Independent of
-   * `attentionExpandable`, which governs the single non-alternating block:
-   * DeepSeek V4 disables that one but keeps this one. Set false for hybrids
-   * that aren't CSA/HCA-shaped (Kimi K3's KDA + gated MLA stack).
-   */
   alternatingAttentionExpandable?: boolean;
-  /**
-   * Number of shared experts included in `numExperts`. Defaults to 1 when
-   * `hasSharedExpert` is set — the DeepSeek-style single shared expert every
-   * other MoE model here uses. Kimi K3's LatentMoE has 2.
-   */
   sharedExperts?: number;
-  /**
-   * Override the caption on the arrow between the two alternating blocks.
-   * Defaults to "alternating every layer", which is only true for an even 1:1
-   * interleave (gpt-oss, DeepSeek V4). Set it when the split is uneven.
-   */
   alternatingNote?: string;
-  /**
-   * Attention label for the dense-FFN prefix block, when that layer's mechanism
-   * differs from the model-wide `attentionType`. Only matters for hybrids whose
-   * dense layer belongs to one specific category — Kimi K3's dense layer is a
-   * KDA layer, so the model-wide "Hybrid Attention" label would misdescribe it.
-   */
   denseLayerAttentionLabel?: string;
-  /** GLU variant of the FFN / expert blocks. Defaults to `SwiGLU`. */
   ffnVariant?: string;
-  /** Elementwise activation applied to the gate projection. Defaults to `SiLU`. */
   ffnGateActivation?: string;
 }
 
-/**
- * Model architecture specifications for supported models.
- *
- * Sources:
- * - https://github.com/meta-llama/llama3/blob/main/llama/model.py
- * - https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct
- * - https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
- * - https://huggingface.co/deepseek-ai/DeepSeek-R1-0528
- * - https://github.com/deepseek-ai/DeepSeek-V3
- * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
- * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
- * - https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json (+ model card)
- * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
- * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
- * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
- */
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   [Model.DeepSeek_R1]: {
     model: Model.DeepSeek_R1,
@@ -180,29 +75,21 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
   [Model.DeepSeek_V4_Pro]: {
     model: Model.DeepSeek_V4_Pro,
-    totalParams: 1600, // 1.6T
+    totalParams: 1600,
     activeParams: 49,
     architectureType: 'moe',
     attentionType: 'Hybrid',
-    // Hybrid CSA/HCA is a bespoke compressed-attention stack, not the standard
-    // Q/K/V GQA layout — render it as static blocks, not the GQA drill-down.
     attentionExpandable: false,
     numLayers: 61,
     hiddenSize: 7168,
     numHeads: 128,
-    // Shared single-latent KV (MLA-lineage MQA): num_key_value_heads = 1.
     numKVHeads: 1,
     headDim: 512,
     vocabSize: 129280,
-    ffnDim: 3072, // moe_intermediate_size
-    numExperts: 385, // 384 routed + 1 shared
+    ffnDim: 3072,
+    numExperts: 385,
     activeExperts: 6,
     hasSharedExpert: true,
-    // First 3 layers use hash-routed MoE (shown as a separate prefix block); the
-    // remaining 58 learned-router layers interleave two compressed-attention
-    // variants. Every layer also carries a 128-token sliding-window branch plus a
-    // learnable attention sink. Counts below are the learned-router layers:
-    // 29 HCA + 29 CSA + 3 hash-routed = 61 (the extra MTP block is SWA-only).
     hashRoutedLayers: 3,
     alternatingLayers: [
       {
@@ -223,8 +110,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       },
     ],
     slidingWindow: 128,
-    hyperConnections: 4, // mHC: 4 parallel residual streams (hc_mult)
-    contextWindow: 1048576, // 1M
+    hyperConnections: 4,
+    contextWindow: 1048576,
     features: [
       'Hybrid CSA + HCA Attention',
       'Sliding window (128 tokens)',
@@ -342,13 +229,9 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
   [Model.Kimi_K3]: {
     model: Model.Kimi_K3,
-    totalParams: 2800, // 2.8T
+    totalParams: 2800,
     activeParams: 104,
     architectureType: 'moe',
-    // 69 Kimi Delta Attention (linear) layers interleaved with 24 gated-MLA
-    // layers. Neither the GQA drill-down nor the DeepSeek V4 CSA/HCA hybrid
-    // drill-down describes this stack, so both layer categories render as
-    // static attention blocks.
     attentionType: 'Hybrid',
     attentionExpandable: false,
     alternatingAttentionExpandable: false,
@@ -356,18 +239,13 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hiddenSize: 7168,
     numHeads: 96,
     vocabSize: 163840,
-    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
-    numExperts: 898, // 896 routed + 2 shared
+    ffnDim: 3072,
+    numExperts: 898,
     sharedExperts: 2,
     activeExperts: 16,
     hasSharedExpert: true,
-    denseFFNLayers: 1, // first_k_dense_replace
-    denseFFNDim: 33792, // intermediate_size (dense layer FFN)
-    // The dense-FFN layer (layer 1) is a KDA layer, and the diagram stacks the
-    // dense prefix block above both alternating blocks — so it is carved out of
-    // the KDA count here (68 + 24 + 1 dense = 93), the same partition DeepSeek
-    // V4 uses for its hash-routed prefix. Full layer composition is 69 KDA + 24
-    // gated MLA.
+    denseFFNLayers: 1,
+    denseFFNDim: 33792,
     alternatingLayers: [
       {
         label: 'Kimi Delta Attention (KDA)',
@@ -384,17 +262,11 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
         colorKey: 'norm',
       },
     ],
-    // Not a 1:1 interleave — full attention lands on layers 4, 8, … 92 plus the
-    // final layer 93.
     alternatingNote: 'gated MLA every 4th layer',
-    // The dense-FFN prefix is layer 1, which config.json lists under
-    // `kda_layers` — the model-wide "Hybrid Attention" label would be wrong for
-    // that single block.
     denseLayerAttentionLabel: 'Kimi Delta Attention (KDA)',
-    // hidden_act = "situ"; the model card calls the FFN SiTU-GLU.
     ffnVariant: 'SiTU-GLU',
     ffnGateActivation: 'SiTU',
-    contextWindow: 1048576, // 1M
+    contextWindow: 1048576,
     features: [
       'Kimi Delta Attention (KDA linear attention)',
       'Gated MLA (every 4th layer, NoPE)',
@@ -440,10 +312,6 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     totalParams: 428,
     activeParams: 23,
     architectureType: 'moe',
-    // MiniMax Sparse Attention (MSA) is built on a GQA projection layout
-    // (64 Q / 4 KV heads) with sparse KV selection layered on top. Render it as
-    // a static attention block, not the standard GQA Q/K/V drill-down — same
-    // treatment as the M2.5 entry.
     attentionType: 'GQA',
     attentionExpandable: false,
     numLayers: 60,
@@ -452,11 +320,11 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     numKVHeads: 4,
     headDim: 128,
     vocabSize: 200064,
-    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
-    numExperts: 129, // 128 routed + 1 shared
+    ffnDim: 3072,
+    numExperts: 129,
     activeExperts: 4,
     hasSharedExpert: true,
-    contextWindow: 1048576, // 1M
+    contextWindow: 1048576,
     features: [
       'MiniMax Sparse Attention (MSA)',
       'GQA with QK Norm',
@@ -470,16 +338,10 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
 };
 
-/**
- * Get architecture specification for a model
- */
 export function getModelArchitecture(model: Model): ModelArchitecture | undefined {
   return MODEL_ARCHITECTURES[model];
 }
 
-/**
- * Format parameter count for display (e.g., "671B" or "70B")
- */
 export function formatParamCount(params: number): string {
   if (params >= 1000) {
     return `${(params / 1000).toFixed(1)}T`;
@@ -487,9 +349,6 @@ export function formatParamCount(params: number): string {
   return `${params}B`;
 }
 
-/**
- * Get a human-readable architecture summary
- */
 export function getArchitectureSummary(arch: ModelArchitecture): string {
   if (arch.architectureType === 'moe') {
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
@@ -497,37 +356,23 @@ export function getArchitectureSummary(arch: ModelArchitecture): string {
   return `Dense ${formatParamCount(arch.totalParams)}`;
 }
 
-/** GLU variant of the FFN / expert blocks, e.g. `SwiGLU` or K3's `SiTU-GLU`. */
 export function ffnVariantLabel(arch: ModelArchitecture): string {
   return arch.ffnVariant ?? 'SwiGLU';
 }
 
-/** Elementwise activation on the gate projection, e.g. `SiLU` or K3's `SiTU`. */
 export function ffnGateActivationLabel(arch: ModelArchitecture): string {
   return arch.ffnGateActivation ?? 'SiLU';
 }
 
-/**
- * Attention label for the dense-FFN prefix block. Falls back to the model-wide
- * attention type, which is right for every uniform-attention model; hybrids
- * whose dense layer is one specific category override it.
- */
 export function denseLayerAttentionLabel(arch: ModelArchitecture): string {
   return arch.denseLayerAttentionLabel ?? getAttentionLabel(arch.attentionType);
 }
 
-/** Shared experts counted inside `numExperts`. Zero when the model has none. */
 export function sharedExpertCount(arch: ModelArchitecture): number {
   if (!arch.hasSharedExpert) return 0;
   return arch.sharedExperts ?? 1;
 }
 
-/**
- * Router sub-label for a MoE expert grid, e.g. `Top-8 of 384 routed + 1 shared`.
- * `numExperts` counts routed *and* shared experts, so the shared ones are
- * subtracted out of the routed figure — with the model's own shared count, not
- * an assumed 1 (Kimi K3 has 2).
- */
 export function expertRouterSummary(arch: ModelArchitecture): string {
   const shared = sharedExpertCount(arch);
   const routed = (arch.numExperts ?? 0) - shared;
@@ -535,9 +380,6 @@ export function expertRouterSummary(arch: ModelArchitecture): string {
   return `Top-${arch.activeExperts} of ${routed} routed${sharedSuffix}`;
 }
 
-/**
- * Get attention type label with description
- */
 export function getAttentionLabel(type: AttentionType): string {
   switch (type) {
     case 'MHA': {
@@ -564,9 +406,6 @@ export function getAttentionLabel(type: AttentionType): string {
   }
 }
 
-/**
- * Format context window for display (e.g., "128K" or "1M")
- */
 export function formatContextWindow(tokens: number): string {
   if (tokens >= 1000000) {
     return `${(tokens / 1000000).toFixed(0)}M`;
@@ -574,27 +413,13 @@ export function formatContextWindow(tokens: number): string {
   return `${(tokens / 1000).toFixed(0)}K`;
 }
 
-/**
- * Sub-block component of an architecture module (attention or FFN).
- * Used to render expanded drill-down views in architecture diagrams.
- */
 export interface ArchSubBlock {
-  /** Display name of the sub-component */
   name: string;
-  /** Technical detail (dimensions, ratios, etc.) */
   detail?: string;
-  /** Component type for color coding */
   type: 'projection' | 'activation' | 'operation' | 'attention';
-  /** When set, render as a circle with this symbol instead of a rectangular block (e.g., '\u00D7' for multiply, '+' for add) */
   circleSymbol?: string;
 }
 
-/**
- * Flow layout for sub-blocks, supporting both sequential and parallel rendering.
- * Sequential: all blocks rendered top-to-bottom with arrows.
- * Parallel: two independent paths (left/right) that converge into merge blocks.
- * ThreeWay: three independent paths that converge in two stages.
- */
 export type SubBlockFlow =
   | { layout: 'sequential'; blocks: ArchSubBlock[] }
   | {
@@ -610,25 +435,14 @@ export type SubBlockFlow =
       leftPath: ArchSubBlock[];
       middlePath: ArchSubBlock[];
       rightPath: ArchSubBlock[];
-      /** Where left + middle converge (e.g., RoPE for Q & K only) */
       intermediateMergeBlocks: ArchSubBlock[];
-      /** Where intermediate result + right converge (e.g., Grouped Attention) */
       finalMergeBlocks: ArchSubBlock[];
       leftLabel?: string;
       middleLabel?: string;
       rightLabel?: string;
     };
 
-/**
- * Generate attention mechanism sub-blocks based on model architecture.
- * Shows internal components like projections, RoPE, and attention computation.
- * GQA uses a three-way layout with independent Q, K, V paths.
- * Only Q and K go through RoPE; V bypasses directly to attention.
- * Ref: https://github.com/meta-llama/llama3/blob/main/llama/model.py
- */
 export function getAttentionSubBlocks(arch: ModelArchitecture): SubBlockFlow {
-  // Grouped Query Attention — Q, K, V are 3 INDEPENDENT parallel projections from hidden state
-  // Only Q and K go through RoPE; V bypasses RoPE and goes directly to attention
   const hd =
     arch.headDim ||
     (arch.hiddenSize && arch.numHeads ? Math.round(arch.hiddenSize / arch.numHeads) : undefined);
@@ -694,12 +508,6 @@ export function getAttentionSubBlocks(arch: ModelArchitecture): SubBlockFlow {
   };
 }
 
-/**
- * Generate FFN/Expert sub-blocks based on model architecture.
- * Shows the SwiGLU feedforward structure used in modern LLMs.
- * Gate and Up projections are parallel paths — SiLU is applied only to gate,
- * then element-wise multiplied with the up projection output.
- */
 export function getFFNSubBlocks(
   arch: ModelArchitecture,
   options?: { useDenseFFNDim?: boolean },
@@ -743,18 +551,6 @@ export function getFFNSubBlocks(
   };
 }
 
-/**
- * Hybrid attention sub-blocks (DeepSeek V4-style CSA / HCA layers).
- *
- * Unlike a standard GQA layer, every hybrid attention layer fuses two KV
- * sources for each query: a local sliding-window branch (recent uncompressed
- * tokens) and a compressed-KV branch, combined by a shared-KV MQA with a
- * learnable attention sink. The compressed branch depends on the layer type —
- * CSA runs a lightning indexer (sparse top-k) over lightly compressed KV, while
- * HCA attends densely over heavily compressed KV. Rendering this as a flow makes
- * the sliding-window attention an explicit, visible block rather than a one-line
- * `window=N` annotation.
- */
 export function getHybridAttentionSubBlocks(
   arch: ModelArchitecture,
   spec: AlternatingLayerSpec,
@@ -762,12 +558,6 @@ export function getHybridAttentionSubBlocks(
   const win = spec.slidingWindow ?? arch.slidingWindow;
   const isSparse = /sparse/iu.test(spec.label);
 
-  // Both branches are KV *sources* whose selected indices are unioned and fed to
-  // a single shared-KV MQA softmax — they are not two attentions merged after
-  // the fact. The local branch contributes the recent sliding-window tokens; the
-  // compressed branch contributes selected long-range tokens. CSA lightly
-  // compresses (1/4) then sparsely selects via the learned lightning indexer;
-  // HCA compresses heavily (1/128) and keeps the few resulting entries.
   const localPath: ArchSubBlock[] = [
     {
       name: 'Sliding Window',
@@ -789,9 +579,6 @@ export function getHybridAttentionSubBlocks(
     rightLabel: 'Compressed',
     leftPath: localPath,
     rightPath: compressedPath,
-    // The union of both branches' indices is consumed by one MQA softmax that
-    // carries a per-head learnable attention sink (a softmax-denominator bias,
-    // not literal sink tokens) — hence the sink lives on the MQA block here.
     mergeBlocks: [
       {
         name: 'Shared-KV MQA + Sink',

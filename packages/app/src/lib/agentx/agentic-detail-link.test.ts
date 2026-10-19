@@ -22,8 +22,6 @@ describe('agenticDetailHref', () => {
     setupWindow('', '/zh/inference');
     const { agenticDetailHref } = await import('@/lib/agentx/agentic-detail-link');
 
-    // Without the prefix the /zh chart handed readers to the English detail
-    // page, and every link out of that page kept them in English.
     expect(agenticDetailHref(440106, 'zh')).toBe('/zh/inference/agentic/440106');
     expect(agenticDetailHref(440106, 'en')).toBe('/inference/agentic/440106');
   });

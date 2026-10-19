@@ -39,8 +39,6 @@ describe('resolvePowerTier', () => {
       expected: undefined,
     },
     {
-      // Defensive: even if a caller passed surviving telemetry with pv=0,
-      // the explicit verdict stays authoritative.
       name: 'absent for an explicit invalid verdict regardless of telemetry',
       powerValid: 0,
       wholeDeploymentSemantics: true,

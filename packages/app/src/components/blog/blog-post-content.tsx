@@ -26,11 +26,6 @@ import { ReadingProgressBar } from './reading-progress-bar';
 
 const CTA_PATH = '/agentx';
 
-/**
- * Body text keeps a readable measure while figures, tables, and code blocks
- * span the full main column. Headings share the measure so they align with the
- * paragraphs beneath them.
- */
 const PROSE_CLASS = [
   'prose prose-neutral dark:prose-invert blog-prose max-w-none',
   'prose-p:max-w-[72ch] prose-ul:max-w-[72ch] prose-ol:max-w-[72ch] prose-blockquote:max-w-[72ch] prose-headings:max-w-[72ch]',
@@ -82,7 +77,6 @@ export function BlogPostContent({
       <ReadingProgressBar slug={slug} />
       <div className="container mx-auto flex flex-col gap-10 px-4 pb-16 lg:gap-12 lg:px-8">
         <section data-blog-section="true" className="flex flex-col gap-10 lg:gap-12">
-          {/* Hero */}
           <header
             className="flex flex-col gap-5 border-b border-border/40 pb-8 pt-4 lg:pb-10 lg:pt-8"
             data-testid="blog-post-hero"
@@ -143,7 +137,6 @@ export function BlogPostContent({
             />
           </header>
 
-          {/* Body */}
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-16 xl:grid-cols-[minmax(0,1fr)_18rem] xl:gap-20">
             <div className="flex min-w-0 flex-col gap-8">
               {headings.length > 0 && (

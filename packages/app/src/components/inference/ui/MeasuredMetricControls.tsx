@@ -103,7 +103,6 @@ export function MeasuredMetricControls({
 }: {
   metric: string;
   onChange: (metric: string) => void;
-  /** Comparison series overlaid on the metric (`i_pcompare`). */
   compare?: PowerCompare;
   onCompareChange?: (mode: PowerCompare) => void;
 }) {

@@ -63,7 +63,6 @@ const NVIDIA_CSV = [
   '2026/09/11 04:19:41.986, 1, 190.96 W, 39, 120 MHz, 3996 MHz, 0 %, 0 %',
   '2026/09/11 04:19:42.990, 0, 912.10 W, 61, 1965 MHz, 3996 MHz, 98 %, 74 %',
   '2026/09/11 04:19:42.994, 1, 905.30 W, 62, 1965 MHz, 3996 MHz, 97 %, 73 %',
-  // Duplicate flush of the last sample, as emitted when the monitor stops.
   '2026/09/11 04:19:42.994, 1, 905.30 W, 62, 1965 MHz, 3996 MHz, 97 %, 73 %',
 ].join('\n');
 
@@ -85,7 +84,6 @@ function writeArtifact(csv: string, contextZone = 'UTC') {
   return { artifactName, artifactDir };
 }
 
-// Multinode bundle: two hosts × two GPUs × two scrapes, host-local indices.
 const MULTINODE_POWER_CSV = [
   'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w',
   '1,1789194365.292,4,host-b,0,GPU-b0,401.5',
@@ -187,9 +185,7 @@ describe('prepareGpuMetricsArtifact', () => {
     expect(hostA!.startedAtMs).toBe(1789194365292);
     expect(hostA!.endedAtMs).toBe(1789194366292);
     expect(hostA!.sampleIntervalS).toBe(1);
-    // One deployment-wide CSV: both host series share its hash.
     expect(hostB!.csvSha256).toBe(hostA!.csvSha256);
-    // Only power was scraped; no zero-filled clock/temperature/utilization statistics.
     const stats = computeGpuMetricStats(hostA!.samples);
     expect(new Set(stats.map((s) => s.metric))).toEqual(new Set(['powerW']));
     expect(stats.find((s) => s.gpuIndex === 1)?.max).toBe(702);
@@ -382,7 +378,6 @@ describe('ingestGpuMetricsArtifact', () => {
       benchmarkResultIds: [10, 11],
     });
 
-    // Without replacement a second copy adds its series next to the first.
     const appended = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: 1,
       artifact: newer,
@@ -401,7 +396,6 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(point?.series.map((series) => series.artifactName)).toEqual([newer.artifactName]);
     const kept = await storedSeries(appended.seriesIds[0]!);
     expect(kept.links).toHaveLength(1);
-    // Other points keep their own links.
     const dropped = await storedSeries(first.seriesIds[0]!);
     expect(dropped.links).toMatchObject([{ benchmark_result_id: 11 }]);
   });
@@ -471,7 +465,6 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(relinked.map((l) => Number(l.benchmark_result_id))).toEqual([10, 11]);
     const [count] = await sql<{ n: number }[]>`select count(*)::int as n from gpu_metric_samples`;
     expect(count!.n).toBe(4);
-    // Models a parser change: the stored count no longer matches the unchanged CSV.
     await sql`update gpu_metric_series set sample_count = 5`;
     expect(
       await ingestGpuMetricsArtifact(sql, { workflowRunId: 1, artifact, benchmarkResultIds: [] }),
@@ -482,7 +475,6 @@ describe('ingestGpuMetricsArtifact', () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const input = { workflowRunId: 1, artifact, benchmarkResultIds: [10] };
     const first = await ingestGpuMetricsArtifact(sql, input);
-    // Values an earlier parser stored from the same CSV, sidecars and count.
     await sql`update gpu_metric_samples set power_w = 7`;
     expect(await ingestGpuMetricsArtifact(sql, { ...input, replace: true })).toEqual({
       seriesIds: first.seriesIds,
@@ -615,7 +607,6 @@ describe('ingestGpuMetricsArtifact', () => {
       JSON.stringify({ timestamp_timezone: '+02:00' }),
     );
 
-    // Point links are written last, after replacement metadata and samples.
     await expect(
       ingestGpuMetricsArtifact(sql, {
         workflowRunId: 1,
@@ -654,12 +645,9 @@ describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
       benchmarkResultIds: [10],
     });
     let reingest: GpuMetricsIngestResult | undefined;
-    // PGlite has one connection: committing the re-ingest before the series rows
-    // reach the reader models a concurrent writer between two autocommit reads.
     const reader: DbClient = async (strings, ...values) => {
       const rows = await sql(strings, ...values);
       if (!reingest && strings.join('').includes('from benchmark_result_gpu_metrics link')) {
-        // Same CSV and count, new timezone: only ingested_at marks the new version.
         reingest = await ingestGpuMetricsArtifact(sql, {
           workflowRunId: 1,
           artifact: writeArtifact(NVIDIA_CSV, '+02:00'),

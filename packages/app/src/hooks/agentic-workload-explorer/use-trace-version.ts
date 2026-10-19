@@ -6,8 +6,6 @@ import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/
 
 type TraceVersionSelection = number | 'all';
 
-// URL state keeps the page and layout selector in sync across navigation.
-// Omitted URL versions select the latest pipeline; a null API parameter means all versions.
 export function useTraceVersion() {
   const router = useRouter();
   const pathname = usePathname();
@@ -17,8 +15,6 @@ export function useTraceVersion() {
     const raw = searchParams.get('version');
     if (raw === null) return CURRENT_TRACE_VERSION;
     if (raw === 'all') return 'all';
-    // Only the current version exists in the snapshot; any other ?version=
-    // falls back to it.
     return CURRENT_TRACE_VERSION;
   }, [searchParams]);
 

@@ -15,17 +15,11 @@ const LABELS = {
   zh: { external: '外部', internal: '内部', aria: 'TCO 口径' },
 } as const;
 
-/**
- * Whether the current model/scenario exposes the TCO Basis selector. The basis
- * state itself is global; only the control is scoped to scenarios that
- * benchmark hardware with a distinct internal owner cost.
- */
 export function useShowsTcoBasisSelector(): boolean {
   const { selectedModel, effectiveSequence } = useGlobalFilterSelection();
   return showsTcoBasisSelector(selectedModel, effectiveSequence);
 }
 
-/** Global external customer pricing versus internal owner cost selection. */
 export function TcoBasisToggle({ source, className }: { source: string; className?: string }) {
   const { tcoBasis } = useGlobalFilterSelection();
   const { setTcoBasis } = useGlobalFilterActions();

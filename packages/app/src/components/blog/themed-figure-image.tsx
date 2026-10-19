@@ -18,12 +18,6 @@ interface ThemedFigureImageProps {
   className: string;
 }
 
-/**
- * The server leaves `src` out of the hydrated image, then a parser-time script
- * selects the saved root theme before first paint. Client-created figures use
- * the live theme or root class directly. The noscript image preserves article
- * content for non-JavaScript readers and crawlers.
- */
 export function ThemedFigureImage({
   srcLight,
   srcDark,

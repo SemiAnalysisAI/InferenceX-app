@@ -15,7 +15,6 @@ import {
 
 const STATE = { workload: 'agentic', scaleOut: true } as const;
 
-/** The port's own one-system estimate: the value the adapter must reproduce. */
 function upstream(system: string, gpuWattsPerGpu: number, socketWatts: number | null = null) {
   const estimate = create_power_model({
     system,
@@ -73,11 +72,9 @@ describe('system power model adapter', () => {
   });
 
   it('returns null where the upstream model rejects the input', () => {
-    // Negative and non-finite watts.
     expect(estimateChassisPower('h100', -8, STATE)).toBeNull();
     expect(estimateChassisPower('h100', Number.NaN, STATE)).toBeNull();
     expect(estimateRackPower('gb200', 700, Number.POSITIVE_INFINITY, STATE)).toBeNull();
-    // 2400 W/GPU exceeds the modeled Hopper PSU and the NVL72 power shelves.
     expect(estimateChassisPower('h100', 8 * 2400, STATE)).toBeNull();
     expect(estimateRackPower('gb300', 2400, null, STATE)).toBeNull();
   });

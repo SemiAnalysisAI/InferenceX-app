@@ -66,8 +66,6 @@ describe('isAnchorWithin', () => {
   });
 
   it('rejects a point outside the bounds', () => {
-    // Zooming pushes points beyond the plot, where a clip path hides them —
-    // they keep an ordinary bounding box, so bounds are what rule them out.
     expect(isAnchorWithin(point(1400, 300), plot)).toBe(false);
     expect(isAnchorWithin(point(500, 40), plot)).toBe(false);
   });
@@ -119,8 +117,6 @@ describe('computeCoachMarkPlacement', () => {
   });
 
   it('keeps the pointer origin within the card, not at its corner', () => {
-    // An anchor hard against the left edge pushes the card right; the pointer
-    // must still start inside the card rather than beyond its corner.
     const placement = computeCoachMarkPlacement(point(30, 300), CARD, VIEWPORT);
     expect(placement.arrowX1).toBeGreaterThan(placement.left);
     expect(placement.arrowX1).toBeLessThan(placement.left + CARD.width);

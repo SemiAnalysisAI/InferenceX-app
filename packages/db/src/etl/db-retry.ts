@@ -1,13 +1,3 @@
-/**
- * Retry helper for idempotent, transactional ingest writes that fail on
- * transient Neon/PostgreSQL connection errors.
- *
- * Only wrap work that is safe to repeat: a failed `sql.begin` transaction rolls
- * back, and the server-log and trace-replay writers re-check existing links
- * before inserting.
- */
-
-/** postgres.js client error codes and PostgreSQL SQLSTATEs for dropped or refused connections. */
 const TRANSIENT_CODES = new Set([
   'CONNECTION_CLOSED',
   'CONNECTION_ENDED',
@@ -17,13 +7,11 @@ const TRANSIENT_CODES = new Set([
   'ECONNREFUSED',
   'ETIMEDOUT',
   'EPIPE',
-  // SQLSTATE class 08: connection exception.
   '08000',
   '08001',
   '08003',
   '08004',
   '08006',
-  // SQLSTATE 57P01-57P03: admin shutdown, crash shutdown, cannot connect now.
   '57P01',
   '57P02',
   '57P03',
@@ -45,9 +33,7 @@ export function isTransientDbError(error: unknown): boolean {
 }
 
 export interface TransientRetryOptions {
-  /** Total attempts including the first. Default 3. */
   attempts?: number;
-  /** Delay before the first retry; doubles on each later retry. Default 2000 ms. */
   baseDelayMs?: number;
   sleep?: (ms: number) => Promise<void>;
   log?: (message: string) => void;
@@ -58,7 +44,6 @@ const defaultSleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
-/** Run `fn`, retrying with exponential backoff while it throws transient connection errors. */
 export async function withTransientDbRetry<T>(
   label: string,
   fn: () => Promise<T>,

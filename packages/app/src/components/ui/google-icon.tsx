@@ -1,4 +1,3 @@
-/** Four-color Google mark, matching the landing-page vendor strip. */
 export function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg

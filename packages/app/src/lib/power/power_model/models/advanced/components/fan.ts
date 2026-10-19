@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Fan power interface evaluated at each system's thermal load. */
 
 import {
   type Details,
@@ -19,7 +18,6 @@ export abstract class FanPower extends FrozenModel {
     this.provenance = provenance;
   }
 
-  /** Return fan watts for one system, excluding the fans from its own input. */
   abstract estimate_w(non_fan_power_w: number): number;
 
   estimate_breakdown(non_fan_power_w: number): PowerComponentBreakdown {

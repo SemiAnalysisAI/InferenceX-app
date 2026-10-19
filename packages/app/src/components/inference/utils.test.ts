@@ -57,9 +57,6 @@ describe('All in Measured table coverage', () => {
     ]);
   });
 });
-// ---------------------------------------------------------------------------
-// fixture factories
-// ---------------------------------------------------------------------------
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2024-01-01',
@@ -92,9 +89,6 @@ function chartDef(overrides: Partial<ChartDefinition> = {}): ChartDefinition {
   };
 }
 
-// ===========================================================================
-// filterDataByCostLimit
-// ===========================================================================
 describe('filterDataByCostLimit', () => {
   it('returns data unchanged when selectedYAxisMetric does not include "cost"', () => {
     const data = [pt(), pt({ x: 2 })];
@@ -110,9 +104,9 @@ describe('filterDataByCostLimit', () => {
 
   it('filters by costh.y <= y_cost_limit', () => {
     const data = [
-      pt({ costh: { y: 1, roof: false } }), // keep
-      pt({ costh: { y: 2.5, roof: false } }), // remove
-      pt({ costh: { y: 2, roof: false } }), // keep (equal to limit)
+      pt({ costh: { y: 1, roof: false } }),
+      pt({ costh: { y: 2.5, roof: false } }),
+      pt({ costh: { y: 2, roof: false } }),
     ];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costh');
     expect(result).toHaveLength(2);
@@ -141,7 +135,6 @@ describe('filterDataByCostLimit', () => {
   });
 
   it('does NOT filter y_costUser by cost limit (custom user metric bypasses the limit)', () => {
-    // y_costUser allows users to enter arbitrary costs; the hard-coded limit must not apply
     const data = [
       pt({ costUser: { y: 1, roof: false } }),
       pt({ costUser: { y: 999, roof: false } }),
@@ -151,14 +144,12 @@ describe('filterDataByCostLimit', () => {
   });
 
   it('includes points where the cost field is undefined (missing data passes through)', () => {
-    // point has no costhOutput field
-    const data = [pt()]; // costhOutput is undefined
+    const data = [pt()];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 0.1 }), 'y_costhOutput');
     expect(result).toHaveLength(1);
   });
 
   it('returns data unchanged for an unknown metric key even if it includes "cost"', () => {
-    // 'y_unknownCost' maps to metricKey 'unknownCost', not in costFieldMap
     const data = [pt(), pt()];
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1 }), 'y_unknownCost');
     expect(result).toHaveLength(2);
@@ -213,9 +204,6 @@ describe('partitionChartDataByLimits', () => {
   });
 });
 
-// ===========================================================================
-// processOverlayChartData
-// ===========================================================================
 describe('processOverlayChartData', () => {
   const prefillEnergyPoint = (interactivity: number, medianTtft?: number) =>
     pt({
@@ -226,8 +214,6 @@ describe('processOverlayChartData', () => {
       precision: 'fp4',
       disagg: true,
       power_valid: 1,
-      // These are the post-transform coordinates for a fixed-sequence row
-      // without P90 measurements. The stored median measurements survive.
       x: 0,
       p90_ttft: 0,
       median_ttft: medianTtft ?? 0,
@@ -295,7 +281,6 @@ describe('processOverlayChartData', () => {
   });
 
   it('filters out points missing the selected metric', () => {
-    // Both points have the selected latency; only one has the selected Y metric.
     const withMetric = pt({ inputTputPerGpu: { y: 5, roof: false }, p90_ttft: 0.25 });
     const withoutMetric = pt({ p90_ttft: 0.25 });
     const result = processOverlayChartData(
@@ -309,7 +294,6 @@ describe('processOverlayChartData', () => {
   });
 
   it('remaps x to config override for input metrics on interactivity chart', () => {
-    // inputTputPerGpu has x override to p90_ttft on interactivity chart
     const data = [
       pt({
         x: 100,
@@ -348,7 +332,6 @@ describe('processOverlayChartData', () => {
     ];
     const result = processOverlayChartData(data, 'e2e', 'y_inputTputPerGpu', null);
     expect(result).toHaveLength(1);
-    // e2e uses median_e2el as x (from chart config default), not p90_ttft
     expect(result[0].x).toBe(2.5);
   });
 
@@ -372,15 +355,11 @@ describe('processOverlayChartData', () => {
       pt({ tpPerGpu: { y: 5, roof: false }, p90_ttft: 999, median_e2el: 2 } as any),
     ];
     const result = processOverlayChartData(data, 'e2e', 'y_tpPerGpu', 'p90_ttft');
-    // y_latency_limit is 60 in the e2e chart config — the 999 outlier should be filtered
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.5);
   });
 
   it('does not filter interactivity points by latency limit when x-axis is default', () => {
-    // Regression: selectedXAxisMetric defaults to 'p90_ttft' but the interactivity
-    // chart's x-axis stays median_intvty for non-input metrics. The latency limit
-    // (60) must NOT apply to median_intvty values.
     const data = [
       pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200 } as any),
       pt({ tpPerGpu: { y: 10, roof: false }, median_intvty: 30 } as any),
@@ -390,14 +369,11 @@ describe('processOverlayChartData', () => {
   });
 
   it('applies latency limit on interactivity only when x-axis is actually overridden', () => {
-    // When an input metric IS selected and x-axis overrides to p90_ttft,
-    // the latency limit should apply.
     const data = [
       pt({ inputTputPerGpu: { y: 5, roof: false }, p90_ttft: 0.5, median_intvty: 10 } as any),
       pt({ inputTputPerGpu: { y: 3, roof: false }, p90_ttft: 999, median_intvty: 20 } as any),
     ];
     const result = processOverlayChartData(data, 'interactivity', 'y_inputTputPerGpu', 'p90_ttft');
-    // x-axis is overridden to p90_ttft for input metric — latency limit SHOULD filter 999
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.5);
   });
@@ -446,12 +422,6 @@ describe('processOverlayChartData', () => {
     expect(result.clippedData).toEqual([]);
   });
 
-  // Regression: overlay points must sit on the SAME x column as the official run.
-  // useChartData plots agentic interactivity at withPercentile('median_intvty',
-  // selectedPercentile) (e.g. p90_intvty). The overlay previously ignored the
-  // percentile and used the raw median_intvty, so an `?unofficialrun=` overlay of
-  // the very same run rendered to the right of its own official points on the
-  // "P90 Interactivity" chart. See InferenceX_GLM.png misalignment report.
   it('applies the selected percentile to the natural interactivity x-axis for agentic overlays', () => {
     const data = [
       pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
@@ -461,7 +431,6 @@ describe('processOverlayChartData', () => {
       selectedPercentile: 'p90',
     });
     expect(result).toHaveLength(1);
-    // Must land on p90_intvty (130), NOT the raw median_intvty (200).
     expect(result[0].x).toBe(130);
   });
 
@@ -476,8 +445,6 @@ describe('processOverlayChartData', () => {
   });
 
   it('keeps the natural median x-axis for non-agentic overlays regardless of percentile', () => {
-    // Fixed-seq rows have no p90_/p99_ columns; the percentile selector is hidden
-    // and forced to median. A stale 'p90' must NOT be applied to fixed-seq overlays.
     const data = [
       pt({ tpPerGpu: { y: 42, roof: false }, median_intvty: 200, p90_intvty: 130 } as any),
     ];
@@ -489,9 +456,6 @@ describe('processOverlayChartData', () => {
     expect(result[0].x).toBe(200);
   });
 
-  // Unofficial overlays do not carry persisted request traces, so they cannot
-  // establish membership in the normalized north-star frontier. They stay
-  // visible in show-all mode but must not draw a competing local frontier.
   it('marks agentic overlay points non-canonical when normalized traces are unavailable', () => {
     const A = pt({
       tpPerGpu: { y: 100, roof: false },
@@ -541,12 +505,12 @@ describe('processOverlayChartData', () => {
     } as any);
     const B = pt({
       tpPerGpu: { y: 150, roof: false },
-      p90_e2el: 3, // dominated on e2e? No — higher tput at higher e2el stays on upper_right
+      p90_e2el: 3,
       p90_ttft: 0.4,
     } as any);
     const C = pt({
       tpPerGpu: { y: 90, roof: false },
-      p90_e2el: 5, // dominated: lower tput than B at higher e2el
+      p90_e2el: 5,
       p90_ttft: 0.1,
     } as any);
     const result = processOverlayChartData([A, B, C], 'e2e', 'y_tpPerGpu', 'p90_ttft', {
@@ -583,11 +547,6 @@ describe('processOverlayChartData', () => {
   });
 
   it('leaves the canonical flag unset for metrics with no roofline direction', () => {
-    // A metric the chart config does not define has no `_roofline`, so no
-    // canonical restriction applies. The official path leaves the flag
-    // undefined and draws the roofline unrestricted; the overlay must do the
-    // same — an all-false stamping here would seed an EMPTY overlay frontier
-    // and (with Optimal Only on) hide every overlay point.
     const data = [
       pt({
         noRooflineDirection: { y: 700, roof: false },
@@ -605,8 +564,6 @@ describe('processOverlayChartData', () => {
   });
 
   it('applies the selected percentile to an agentic input-metric x override', () => {
-    // Input metrics on the interactivity chart override x to *_ttft; agentic must
-    // carry the chosen percentile onto that override (p90_ttft) too.
     const data = [
       pt({
         inputTputPerGpu: { y: 5, roof: false },

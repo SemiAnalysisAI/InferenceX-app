@@ -98,7 +98,6 @@ export function formatDisplayDate(dateStr: string, locale: Locale = 'en'): strin
 
 export function getLatestSelectableDate(availableDates?: string[], maxDate?: string): string {
   if (availableDates && availableDates.length > 0) {
-    // Callers provide ascending dates; first/last are the min/max selectable entries.
     return availableDates.at(-1)!;
   }
 
@@ -115,7 +114,6 @@ export function resolveCalendarDateBounds(
   const maxAllowedDate = maxDate ? parseCalendarDate(maxDate) : new Date();
   maxAllowedDate.setHours(23, 59, 59, 999);
 
-  // Callers provide ascending dates; first/last bound the month navigation range.
   const earliestMonth =
     availableDates && availableDates.length > 0
       ? parseCalendarDate(availableDates[0])
@@ -177,9 +175,6 @@ export function getInitialCalendarMonth(
   return maxAllowedDate >= today ? today : maxAllowedDate;
 }
 
-/**
- * `deps` are stringified into a reset key, so callers should pass stable primitive values only.
- */
 export function useCalendarMonth(
   selectedDate: string | undefined,
   availableDates: string[] | undefined,
@@ -215,7 +210,6 @@ export function getCalendarMonthNavState(
   currentMonth: Date,
   earliestMonth: Date,
   latestMonth: Date,
-  // For two-panel range pickers, pass the right-hand visible month so next-nav clamps correctly.
   nextButtonMonth = currentMonth,
 ) {
   const canGoPrevious =

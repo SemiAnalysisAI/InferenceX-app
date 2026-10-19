@@ -53,7 +53,6 @@ const STRINGS = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). */
 const DEFAULT_Y_AXIS = 'y_costh';
 
 interface CompareSpecDecodePageClientProps {
@@ -66,8 +65,6 @@ interface CompareSpecDecodePageClientProps {
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   gpuLabel: string;
   precisionLabel: string;
@@ -157,7 +154,6 @@ export default function CompareSpecDecodePageClient({
                   .
                 </p>
               )}
-              {/* MTP engine caveat disclaimer */}
               <div
                 className="mt-3 flex items-start gap-2 rounded-md border-l-2 border-amber-500 bg-amber-500/5 px-3 py-2"
                 data-testid="compare-spec-decode-mtp-caveat"
@@ -292,25 +288,17 @@ function CompareTableSection({
     selectedRunDate,
   );
 
-  // Partition client-side data points by speculative decoding:
-  // Side A = hw keys carrying the method suffix (e.g. _mtp)
-  // Side B = hw keys for the base GPU without any spec-decode suffix
   const { pointsA, pointsB } = useMemo(() => {
     const pA: GPUDataPoint[] = [];
     const pB: GPUDataPoint[] = [];
     const methodSuffix = `_${method}`;
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
       const hwKey = groupKey.split('__')[0];
-      // Must belong to this GPU. Keys are framework-qualified (h200_sglang).
       if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
-      // getHardwareKey appends the spec-decode suffix LAST (h200_sglang_mtp),
-      // so side membership is decided by the key's ending.
       const isSideA = hwKey.endsWith(methodSuffix);
       const isSideB = !isSideA && ![...SPEC_METHODS_ACTIVE].some((m) => hwKey.endsWith(`_${m}`));
       if (!isSideA && !isSideB) continue;
       for (const point of points) {
-        // The slug pins one precision — ignore points from other precisions
-        // the user may enable in the chart controls.
         if (precision !== null && point.precision !== precision) continue;
         (isSideA ? pA : pB).push(point);
       }

@@ -8,13 +8,6 @@ import { parseEmbedOptions } from '@/lib/embed/embed';
 
 export type EmbedSearchParams = Record<string, string | string[] | undefined>;
 
-/**
- * Shared body of `/embed/model/[slug]` and `/zh/embed/model/[slug]`.
- *
- * Resolves the compare-slug (aliases included) to its dashboard model, seeds
- * the featured scenario unless `?scenario=` overrides it, and hands the
- * framework lock from `?framework=` to the dashboard. Unknown slugs 404.
- */
 export default function EmbedModelPage({
   slug,
   searchParams,

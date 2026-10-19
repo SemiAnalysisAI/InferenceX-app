@@ -39,8 +39,6 @@ interface NavLink {
 
 const NAV_LINKS: readonly NavLink[] = [
   { href: '/', label: 'Home', testId: 'nav-link-home', event: 'header_home_clicked' },
-  // AgentX sits directly after Home: it is the flagship benchmark, and the
-  // surface every entry below it ultimately explains.
   {
     href: '/agentx',
     label: 'AgentX',
@@ -70,37 +68,22 @@ const NAV_LINKS: readonly NavLink[] = [
 ] as const;
 
 function isActive(pathname: string, href: string): boolean {
-  // Chinese pages mirror the English tree under /zh; active state is computed
-  // against the English path so both trees highlight the same nav entry.
   const enPathname = isZhPathname(pathname)
     ? pathname === ZH_PREFIX
       ? '/'
       : pathname.slice(ZH_PREFIX.length)
     : pathname;
   if (href === '/') return enPathname === '/';
-  // Dashboard owns every tab path, including the telemetry catalog beneath
-  // `/inference`, which now lives in the footer rather than the primary nav.
   if (href === '/inference') {
     return DASHBOARD_TABS.some((tab) => enPathname.startsWith(tab));
   }
-  // Exact match or a child path under `<href>/...`. The bare `startsWith` would
-  // light up `/compare` when the user is on `/compare-per-dollar/...` since the
-  // latter starts with the literal string `/compare`.
   return enPathname === href || enPathname.startsWith(`${href}/`);
 }
 
-/**
- * Whether the link lands on the page already on screen. Deliberately not
- * `isActive`, which also lights up for every sibling dashboard tab and for
- * child routes — those are real destinations, so treating their clicks as
- * no-ops would strand the user (Dashboard from `/evaluation`, AgentX from
- * `/agentx/<slug>`).
- */
 function isCurrentPage(pathname: string, displayHref: string): boolean {
   return pathname === displayHref;
 }
 
-/** EN ↔ 中文 switcher; maps the current page to its sibling in the other language. */
 function LanguageToggle({
   pathname: routerPathname,
   router,
@@ -108,9 +91,6 @@ function LanguageToggle({
   pathname: string;
   router: ReturnType<typeof useRouter>;
 }) {
-  // The toggle maps the CURRENT address to its sibling, so it must see the
-  // live pathname — per-model dashboard routes rewrite the URL with
-  // replaceClientPathname on model switches, which usePathname ignores.
   const pathname = useClientPathname(routerPathname);
   const isZh = isZhPathname(pathname);
   const target = switchLocalePath(pathname);
@@ -119,9 +99,6 @@ function LanguageToggle({
   return (
     <Link
       href={target + search}
-      // Only /overview rewrites this href per interaction, which would
-      // re-prefetch its force-dynamic sibling on every selector commit.
-      // Everywhere else the href is stable, so let Next prefetch it.
       prefetch={isOverview ? false : undefined}
       data-testid="language-toggle"
       hrefLang={isZh ? 'en' : 'zh-CN'}
@@ -143,8 +120,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isZh = isZhPathname(pathname);
-  // On /zh pages, nav entries with a Chinese sibling navigate within the
-  // Chinese tree and show Chinese labels; the rest keep their English target.
   const navLinks = isZh
     ? NAV_LINKS.map((link) => ({
         ...link,
@@ -158,12 +133,10 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
         displayHref: link.href,
       }));
 
-  // Close menu on route change
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Close menu on click outside or Escape
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -187,7 +160,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     track('header_mobile_menu_toggled');
   }, []);
 
-  // Embeds render one chart inside a third-party iframe; no site chrome.
   if (isEmbedPathname(pathname)) return null;
 
   return (
@@ -197,7 +169,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 sm:gap-6">
-          {/* Brand */}
           <Link
             href={isZh ? '/zh' : '/'}
             data-testid="header-brand"
@@ -216,7 +187,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             </span>
           </Link>
 
-          {/* Desktop nav */}
           <nav className="hidden items-center gap-1 xl:flex">
             {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <Link
@@ -233,8 +203,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 )}
                 onClick={(e) => {
                   track(event);
-                  // Re-entering the current page would refetch the route and
-                  // discard whatever selector state the URL already carries.
                   if (isCurrentPage(pathname, displayHref)) {
                     e.preventDefault();
                     return;
@@ -254,23 +222,18 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             ))}
           </nav>
 
-          {/* Right side. Tighter gaps below `sm` keep five 44px touch targets
-              (search, language, theme, menu) inside a 320px header. */}
           <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
             <SiteSearchButton />
             <LanguageToggle pathname={pathname} router={router} />
-            {/* Below `sm` these move into the mobile menu — they are what push
-                a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
               <MinecraftTogglesLazy />
               <HaloTogglesLazy />
             </span>
             <ModeToggle />
 
-            {/* Mobile hamburger */}
             <div ref={menuRef} className="relative xl:hidden">
               <button
                 type="button"
@@ -280,7 +243,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 aria-expanded={mobileMenuOpen}
                 aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >
-                {/* Three bars that fold into an X while the menu is open. */}
                 <svg
                   width="20"
                   height="20"
@@ -324,10 +286,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 </svg>
               </button>
               {mobileMenuOpen && (
-                /* Phones: dim the page behind the menu so it reads as a layer
-                   and a tap anywhere outside closes it. The header's
-                   backdrop-filter makes it the containing block for fixed
-                   children, so size from its top edge rather than bottom-0. */
                 <button
                   type="button"
                   tabIndex={-1}

@@ -1,7 +1,6 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock next/cache before importing the module under test
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
@@ -31,7 +30,6 @@ const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.CACHE_NAMESPACE;
-  // Default: unstable_cache returns the original function as-is
   mockUnstableCache.mockImplementation((fn: (...args: any[]) => any) => fn as any);
 });
 

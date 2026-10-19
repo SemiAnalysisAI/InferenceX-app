@@ -23,7 +23,6 @@ describe('Power boundary labels', () => {
           <Controls />
         </PathnameContext.Provider>,
       );
-      // Provisioned watts are fixed per hardware; only the measured boundaries are power axes.
       const labels =
         locale === 'en'
           ? ['GPU Level Measured', 'All in Measured']
@@ -45,7 +44,6 @@ describe('Power boundary labels', () => {
       cy.get('[data-testid="measured-power-basis"]').click();
       cy.get('[data-select-option][data-value="gpu-measured"]').click();
       cy.get('[data-testid="selected-metric"]').should('have.text', 'y_measuredAvgPower');
-      // Finish selection assertions before a screenshot can dismiss the open menu.
       cy.get('[data-testid="measured-power-basis"]').click();
       cy.get('[data-select-option]').should('be.visible');
       cy.screenshot(`power-boundary-options-${locale}`, { overwrite: true });

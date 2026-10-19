@@ -12,27 +12,13 @@ import {
   type LegendLayout,
 } from './chart-legend';
 
-/**
- * Shared presentational constants and helpers for the agentic point-detail
- * charts (time-series, stacked-area, distribution, aggregate). These charts
- * are hand-rolled SVG (not the d3-chart library) and share axis padding,
- * tick formatting, and empty/loading states.
- */
-
-/** Axis padding shared by the time-series, stacked-area, and distribution charts. */
 export const CHART_PAD = { top: 12, right: 16, bottom: 56, left: 60 } as const;
 
-/** Sizes passed to charts for the inline (small) vs expanded (dialog) render. */
 export const CHART_SIZES = {
   inline: { width: 720, height: 260 },
   expanded: { width: 1300, height: 520 },
 } as const;
 
-/**
- * Guide-line colors per percentile, shared by the aggregate chart's lines and
- * the distribution chart's vertical guides so the same percentile reads as the
- * same color across the detail page.
- */
 export const PERCENTILE_COLORS = {
   mean: '#ef4444',
   p50: '#3b82f6',
@@ -42,11 +28,9 @@ export const PERCENTILE_COLORS = {
   p99: '#a855f7',
 } as const;
 
-/** Integer tick label: thousands separators only once the value reaches 10000. */
 export const fmtCount = (n: number): string =>
   n >= 10000 ? new Intl.NumberFormat('en-US').format(Math.round(n)) : String(Math.round(n));
 
-/** Seconds → "42s" / "3m 20s" time-axis tick label. */
 export const fmtSeconds = (s: number): string => {
   if (s < 60) return `${Math.round(s)}s`;
   const m = Math.floor(s / 60);
@@ -54,7 +38,6 @@ export const fmtSeconds = (s: number): string => {
   return `${m}m ${rem}s`;
 };
 
-/** "No data" placeholder sized to match the chart it replaces. */
 export function ChartEmpty({ height = 260, message }: { height?: number; message?: string }) {
   const locale = useLocale();
   return (
@@ -64,34 +47,20 @@ export function ChartEmpty({ height = 260, message }: { height?: number; message
   );
 }
 
-/** Loading placeholder for a chart card. */
 export function ChartSkeleton() {
   return <div className="h-[260px] rounded-md bg-muted/30 animate-pulse" />;
 }
 
-/** How a legend entry's color is shown: a stroked line or a filled block. */
 export type LegendSwatch = 'line' | 'dashed-line' | 'area';
 
 export interface ChartLegendEntry {
   label: string;
   color: string;
-  /** Defaults to `'line'`. */
   swatch?: LegendSwatch;
-  /** Stroke width for the line swatches. Defaults to 2. */
   strokeWidth?: number;
-  /** Swatch opacity, to match a translucent area fill. Defaults to 1. */
   opacity?: number;
 }
 
-/**
- * Wrapped legend for the hand-rolled point-detail charts.
- *
- * `layout` comes from `layoutChartLegend()` and must have been computed from
- * the same entry order. `baselineY` is the baseline of the *last* row (charts
- * pass `height - LEGEND_BASELINE_OFFSET`), so a single-row legend lands exactly
- * where it did before wrapping existed and extra rows grow downward into the
- * space the chart added to its bottom padding.
- */
 export function ChartLegend({
   entries,
   layout,
@@ -100,7 +69,6 @@ export function ChartLegend({
 }: {
   entries: readonly ChartLegendEntry[];
   layout: LegendLayout;
-  /** x of the plot area's left edge; item x offsets are relative to it. */
   left: number;
   baselineY: number;
 }) {

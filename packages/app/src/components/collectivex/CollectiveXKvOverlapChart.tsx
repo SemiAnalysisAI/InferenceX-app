@@ -24,7 +24,6 @@ interface CollectiveXKvOverlapChartProps {
   testId?: string;
 }
 
-/** Pseudo-series key for the dotted y = batch ideal-overlap reference. */
 const IDEAL_KEY = '__collectivex-kv-overlap-ideal__';
 
 const STRINGS = {
@@ -99,7 +98,6 @@ export function CollectiveXKvOverlapChart({
     for (const line of Object.values(result)) {
       line.sort((a, b) => a.x - b.x);
     }
-    // Dotted ideal: perfect request overlap is y = batch on both log axes.
     const maxBatch = Math.max(1, ...points.map((point) => point.x));
     if (maxBatch > 1) {
       result[IDEAL_KEY] = [

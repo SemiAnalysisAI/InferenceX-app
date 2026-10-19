@@ -19,9 +19,6 @@ const sql = createAdminSql({ max: 1, onnotice: () => {} });
 
 async function states(ids: string[]): Promise<BackfillState[]> {
   const rows: BackfillState[] = [];
-  // Hash blobs inside Postgres: raw artifacts never leave the database during verification.
-  // The timeline columns mirror the readers: the gzip copy wins when present, and
-  // legacy JSONB is only detoasted for rows without one.
   for (const id of ids) {
     const result = await sql<BackfillState[]>`
       select br.id::text, a.id::text as trace_id,

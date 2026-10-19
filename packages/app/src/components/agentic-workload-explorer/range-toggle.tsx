@@ -7,12 +7,10 @@ export interface RangeOption<T extends string> {
   id: T;
   label: string;
   title?: string;
-  /** Chinese label/title for /zh pages; falls back to the English value. */
   labelZh?: string;
   titleZh?: string;
 }
 
-/** Compact button row for picking a chart's time range. */
 export function RangeToggle<T extends string>({
   value,
   options,

@@ -11,14 +11,6 @@ import {
   listParam,
 } from '@/lib/api/api-documentation-helpers';
 
-/**
- * Docs fragment for GET /api/v1/views/inference.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const X_MODE_ENUM = ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'] as const;

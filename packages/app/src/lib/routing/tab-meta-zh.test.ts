@@ -17,7 +17,6 @@ describe('mirrored dashboard routes', () => {
   });
 
   it.each(mirroredRoutes)('has complete Chinese content for "$key"', ({ key }) => {
-    // Actual Chinese text, not an English placeholder that slipped through.
     expect(TAB_META_ZH[key].title).toMatch(HAN_REGEX);
     expect(TAB_META_ZH[key].description).toMatch(HAN_REGEX);
     expect(TAB_INTRO_ZH[key]).toMatch(HAN_REGEX);

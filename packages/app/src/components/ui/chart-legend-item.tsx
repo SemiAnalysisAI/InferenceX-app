@@ -22,33 +22,20 @@ export interface CommonLegendItemProps {
   hw?: string;
   label: string;
   color: string;
-  /** When present, render a line swatch using this SVG dash pattern instead of a dot. */
   lineDasharray?: string;
   isActive: boolean;
   isHighlighted?: boolean;
   onClick: (name: string) => void;
   onHover?: (id: string) => void;
   onHoverEnd?: () => void;
-  title?: string; // Optional for GPU title or other descriptive text
-  asFragment?: boolean; // If true, don't render the <li> wrapper
+  title?: string;
+  asFragment?: boolean;
   tooltip?: React.JSX.Element | null;
-  isLegendExpanded?: boolean; // Whether the legend is expanded to show full text
-  sidebarMode?: boolean; // Use sidebar-style visual feedback (line-through + faded dot)
+  isLegendExpanded?: boolean;
+  sidebarMode?: boolean;
   onRemove?: (name: string) => void;
   hideAriaLabel?: string;
-  /**
-   * Set false for entries that are labels rather than toggleable series — e.g.
-   * the unofficial-run entries, which are always `isActive` and have nothing to
-   * remove (a run is dismissed from the banner). Such entries render no hide
-   * control and are excluded from the "keep at least one series" active count,
-   * which they would otherwise inflate. Defaults to true.
-   */
   isRemovable?: boolean;
-  /**
-   * When provided, renders a small table icon that opens a per-series points
-   * table (all data points for this hardware/framework series). Only the
-   * inference tab's legend passes this — other tabs get no icon.
-   */
   onShowPoints?: (name: string) => void;
   showPointsAriaLabel?: string;
 }
@@ -75,13 +62,9 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
 }) => {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const id = `checkbox-${hw || name}`; // Unique ID for accessibility
+  const id = `checkbox-${hw || name}`;
   const isLongText = (label ?? '').length > 8;
   const canRemove = isActive && Boolean(onRemove);
-  // Inactive rows get the mirror affordance: hovering swaps the dimmed dot for
-  // a "+", making it explicit that clicking the row brings the series back
-  // (the X on active rows hides it). Clicking anywhere on the row — including
-  // the icon — toggles via the label/checkbox, so the "+" is decorative.
   const canRestore = !isActive;
 
   const content = (
@@ -187,9 +170,6 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
           data-testid={`legend-points-${hw || name}`}
           aria-label={showPointsAriaLabel ?? t.showAllPoints(label)}
           onClick={() => onShowPoints(hw || name)}
-          // Reduced opacity at rest (still visible/tappable on touch), full on
-          // row hover or keyboard focus. ml-auto pins the icon to the row's
-          // right edge so icons align in a column across variable-length labels.
           className="ml-auto shrink-0 p-1 -my-1 rounded-sm text-muted-foreground hover:text-foreground opacity-35 group-hover/row:opacity-100 transition-opacity no-export"
         >
           <Table2 size={13} />

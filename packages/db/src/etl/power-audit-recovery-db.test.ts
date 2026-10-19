@@ -51,7 +51,6 @@ describe('applyAgentxAudits', () => {
                (14, 2, 1, 'agentic_traces', '2026-09-12', null, null, 1, '{}', null),
                (15, 1, 1, 'agentic_traces', '2026-09-12', null, null, 4, '{}', null);`);
     const before = await stored();
-    // Only 12 qualifies: 10 is single-turn, 13 has provenance, 14 is another run's, 15 is unplanned.
     const written = await applyAgentxAudits(sql, {
       workflowRunId: 1,
       writes: [10, 12, 13, 14].map((benchmarkResultId) => ({

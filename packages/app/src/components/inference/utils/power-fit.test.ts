@@ -47,7 +47,6 @@ describe('ordinaryLeastSquares', () => {
       { x: 2, y: 3 },
       { x: 3, y: 7 },
     ]);
-    // Least squares: slope 2.5, intercept -1, residuals (0.5, -1, 0.5) → SSres 1.5, SStot 14.
     expect(fit!.slope).toBeCloseTo(2.5, 12);
     expect(fit!.intercept).toBeCloseTo(-1, 12);
     expect(fit!.rSquared).toBeCloseTo(1 - 1.5 / 14, 12);

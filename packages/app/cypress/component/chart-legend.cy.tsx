@@ -164,7 +164,6 @@ describe('ChartLegend (sidebar variant)', () => {
 
     cy.get('[data-testid="chart-legend"]').should('contain.text', branch);
     cy.get('@legendRender').should((renderSpy) => {
-      // Cypress loses the Sinon spy type when resolving an alias.
       const profilerSpy = renderSpy as unknown as {
         getCalls: () => { args: unknown[] }[];
       };
@@ -376,7 +375,6 @@ describe('ChartLegend (sidebar variant)', () => {
 
   it('clicking a legend item toggles its active state', () => {
     cy.get('.sidebar-legend label').first().click();
-    // After clicking, "Reset filter" should appear since one item is inactive
     cy.contains('Reset filter').should('be.visible');
   });
 
@@ -425,10 +423,6 @@ describe('ChartLegend (sidebar variant)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Per-series points table (inference legend drill-down)
-// ---------------------------------------------------------------------------
-
 function mockPoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -462,7 +456,6 @@ const OVERLAY_POINTS: InferenceData[] = [
   mockPoint({ conc: 8, run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1' }),
 ];
 
-/** Mirrors ScatterGraph's wiring: legend rows with onShowPoints → dialog. */
 function LegendWithPointsTable() {
   const [openSeries, setOpenSeries] = useState<'official' | 'overlay' | null>(null);
 
@@ -526,13 +519,11 @@ describe('ChartLegend points-table icon + dialog', () => {
       'contain.text',
       'DeepSeek V4 Pro · Agentic',
     );
-    // Two rows, conc ascending, linked to the agentic detail pages
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);
     cy.get('a[data-testid="legend-points-row"]')
       .first()
       .should('have.attr', 'href', '/inference/agentic/206860');
     cy.get('a[data-testid="legend-points-row"]').first().should('contain.text', '4');
-    // Offload column present for agentic rows
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'Offload');
   });
 
@@ -542,7 +533,6 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('a[data-testid="legend-points-row"]').should('not.exist');
     cy.get('div[data-testid="legend-points-row"]').should('have.length', 1);
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'metrics only');
-    // Metrics still render
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', '1500.5');
   });
 

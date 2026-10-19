@@ -18,13 +18,10 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       }),
   );
 
-  // One-time cleanup: delete the old IDB cache for users who had it
   useEffect(() => {
     try {
       indexedDB.deleteDatabase('tanstack-query-cache');
-    } catch {
-      // ignore — private browsing or unsupported
-    }
+    } catch {}
   }, []);
 
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;

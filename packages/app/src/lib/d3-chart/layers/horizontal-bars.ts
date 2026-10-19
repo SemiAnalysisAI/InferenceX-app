@@ -13,7 +13,6 @@ export interface HorizontalBarConfig<T> {
   keyFn?: (d: T) => string;
 }
 
-/** Render horizontal bars (y=band, x=linear) using enter/update/exit. */
 export function renderHorizontalBars<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -38,7 +37,6 @@ export function renderHorizontalBars<T>(
     .attr('cursor', 'pointer');
 }
 
-/** Update horizontal bar widths on zoom (X-only rescale). */
 export function updateHorizontalBarsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: ContinuousScale,
@@ -47,7 +45,6 @@ export function updateHorizontalBarsOnZoom<T>(
   group.selectAll<SVGRectElement, T>('.bar').attr('width', (d) => Math.max(0, xScale(getX(d))));
 }
 
-/** Restyle existing bars without repeating their data join or geometry writes. */
 export function updateHorizontalBarsForDisplay<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   config: HorizontalBarConfig<T>,

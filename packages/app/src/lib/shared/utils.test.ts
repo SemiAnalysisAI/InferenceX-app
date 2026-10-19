@@ -39,9 +39,6 @@ vi.mock('@/lib/catalog/constants', async (importOriginal) => {
   };
 });
 
-// ---------------------------------------------------------------------------
-// minimal fixture factory, only fields relevant to utils.ts tests
-// ---------------------------------------------------------------------------
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2024-01-01',
@@ -61,9 +58,6 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   };
 }
 
-// ---------------------------------------------------------------------------
-// minimal AggDataEntry factory
-// ---------------------------------------------------------------------------
 function aggEntry(overrides: Partial<AggDataEntry> = {}): AggDataEntry {
   return {
     hw: 'h100',
@@ -99,9 +93,6 @@ function aggEntry(overrides: Partial<AggDataEntry> = {}): AggDataEntry {
   } as AggDataEntry;
 }
 
-// ===========================================================================
-// formatNumber
-// ===========================================================================
 describe('formatNumber', () => {
   it('returns plain string for numbers below 10000', () => {
     expect(formatNumber(0)).toBe('0');
@@ -116,9 +107,6 @@ describe('formatNumber', () => {
   });
 });
 
-// ===========================================================================
-// updateRepoUrl
-// ===========================================================================
 describe('updateRepoUrl', () => {
   it('replaces the old InferenceMAX repo URL with the new InferenceX URL', () => {
     const oldUrl = 'https://github.com/InferenceMAX/InferenceMAX/pull/42';
@@ -149,10 +137,6 @@ describe('updateRepoUrl', () => {
   });
 });
 
-// ===========================================================================
-// calculateCostsForGpus (produces both cost-per-million and tokens-per-dollar)
-// costh=2.8, costr=0.7 (from mock, but this fn uses userCosts arg)
-// ===========================================================================
 describe('calculateCostsForGpus', () => {
   it('computes purchasing power: tpPerGpu=1000, userCost=$5/hr → 720,000 tok/$', () => {
     const data = [pt({ hwKey: 'h100' as any, tpPerGpu: { y: 1000, roof: false } })];
@@ -205,13 +189,8 @@ describe('calculateCostsForGpus', () => {
   });
 });
 
-// ===========================================================================
-// calculatePowerForGpus
-// mock: getHardwareConfig → { power: 700, ... }
-// ===========================================================================
 describe('calculatePowerForGpus', () => {
   it('computes power correctly: tpPerMw=50, basePower=700, userPower=700 → 50.0', () => {
-    // (50 / 700) * 700 = 50.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 700 });
     expect(result[0].powerUser?.y).toBe(50);
@@ -220,7 +199,6 @@ describe('calculatePowerForGpus', () => {
   });
 
   it('computes power correctly: tpPerMw=50, basePower=700, userPower=350 → 25.0', () => {
-    // (50 / 700) * 350 = 25.0
     const data = [pt({ hwKey: 'h100' as any, tpPerMw: { y: 50, roof: false } })];
     const result = calculatePowerForGpus(data, { h100: 350 });
     expect(result[0].powerUser?.y).toBe(25);
@@ -241,10 +219,6 @@ describe('calculatePowerForGpus', () => {
   });
 });
 
-// ===========================================================================
-// computeOutputCostFields
-// mock: getHardwareConfig → { costh: 2.8, costr: 0.7 }
-// ===========================================================================
 describe('computeOutputCostFields', () => {
   it('skips computation when all output cost fields already exist', () => {
     const existing = {
@@ -269,7 +243,6 @@ describe('computeOutputCostFields', () => {
   });
 
   it('falls back to tpPerGpu * 0.875 when outputTputPerGpu is absent: tpPerGpu=1000', () => {
-    // fallback tput = 1000 * 0.875 = 875
     const item = pt({ tpPerGpu: { y: 1000, roof: false } });
     const result = computeOutputCostFields([item]);
     expect(result[0].costhOutput?.y).toBe(0.889);
@@ -280,12 +253,9 @@ describe('computeOutputCostFields', () => {
   it('does not overwrite an existing costhOutput field (partial override)', () => {
     const item = pt({
       costhOutput: { y: 42, roof: false },
-      // costrOutput is absent — early return won't fire
     });
     const result = computeOutputCostFields([item]);
-    // costhOutput already existed → kept as 42
     expect(result[0].costhOutput?.y).toBe(42);
-    // costrOutput was absent → computed
     expect(result[0].costrOutput?.y).toBe(0.222);
   });
 
@@ -294,12 +264,6 @@ describe('computeOutputCostFields', () => {
   });
 });
 
-// ===========================================================================
-// computeInputCostFields
-// mock: getHardwareConfig → { costh: 2.8, costr: 0.7 }
-// costhi/costri are REQUIRED in InferenceData, so a valid fixture
-// always triggers the early-return. use `undefined as any` to reach compute path.
-// ===========================================================================
 describe('computeInputCostFields', () => {
   it('skips computation when all input cost fields already exist', () => {
     const item = pt({
@@ -325,7 +289,6 @@ describe('computeInputCostFields', () => {
   });
 
   it('falls back to tpPerGpu * 0.125 when inputTputPerGpu is absent: tpPerGpu=1000', () => {
-    // fallback tput = 1000 * 0.125 = 125
     const item = pt({
       costhi: undefined as any,
       costri: undefined as any,
@@ -343,9 +306,7 @@ describe('computeInputCostFields', () => {
       costri: undefined as any,
     });
     const result = computeInputCostFields([item]);
-    // costhi already existed → kept as 77
     expect(result[0].costhi?.y).toBe(77);
-    // costri was absent → computed (fallback: tpPerGpu=1000)
     expect(result[0].costri?.y).toBe(1.556);
   });
 
@@ -354,9 +315,6 @@ describe('computeInputCostFields', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// filterRunsByModel
-// ---------------------------------------------------------------------------
 function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
   return {
     runId: '123',
@@ -478,7 +436,6 @@ describe('filterRunsByModel', () => {
     expect(result!['123'].runUrl).toBe('https://github.com/example');
   });
 
-  // Precision filtering
   it('returns runs without changelogs when no entries match precision', () => {
     const runs = { '123': makeRun([['gptoss-fp4-h200-trt']]) };
     const result = filterRunsByModel(runs, ['gptoss'], ['fp8']);
@@ -535,7 +492,6 @@ describe('filterRunsByModel', () => {
     const runs = {
       '123': makeRun([['dsr1-fp8-mi355x-mori-sglang-mtp']]),
     };
-    // hwKey 'mi355x_mori-sglang_mtp' → config suffix 'mi355x-mori-sglang-mtp'
     const result = filterRunsByModel(runs, ['dsr1'], ['fp8'], ['mi355x_mori-sglang_mtp']);
     expect(result).not.toBeNull();
     expect(result!['123'].changelog!.entries[0].config_keys).toEqual([
@@ -561,9 +517,6 @@ describe('filterRunsByModel', () => {
   });
 });
 
-// ===========================================================================
-// getFrameworkLabel
-// ===========================================================================
 describe('getFrameworkLabel', () => {
   it('maps "trt" to "TRTLLM"', () => {
     expect(getFrameworkLabel('trt')).toBe('TRTLLM');
@@ -626,9 +579,6 @@ describe('getFrameworkLabel', () => {
   });
 });
 
-// ===========================================================================
-// getHardwareLabel
-// ===========================================================================
 describe('getHardwareLabel', () => {
   it('returns uppercased base hardware when no suffixes', () => {
     const entry = aggEntry({ hw: 'h100' });
@@ -702,9 +652,6 @@ describe('getHardwareLabel', () => {
   });
 });
 
-// ===========================================================================
-// getDisplayLabel
-// ===========================================================================
 describe('getDisplayLabel', () => {
   it('combines label and suffix', () => {
     expect(getDisplayLabel({ label: 'H100', suffix: '(vLLM)' })).toBe('H100 (vLLM)');

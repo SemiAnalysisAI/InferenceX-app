@@ -61,14 +61,6 @@ export interface TopologyDiagramHandle {
   openDialog: () => void;
 }
 
-/**
- * Renders a D3-based scale-out topology diagram for a single GPU SKU.
- * Shows cluster topology: Spine → Rail Pod (Leaf + Servers).
- * Leaf switches are inside the rail pod. Server 1 is shown in detail,
- * remaining servers are abstracted. Extra rail pods connect to all spine switches.
- * Clicking the diagram opens an expanded modal view with left/right arrow
- * navigation to cycle between GPU SKUs.
- */
 export const TopologyDiagram = forwardRef<
   TopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
@@ -80,10 +72,8 @@ export const TopologyDiagram = forwardRef<
   const displayedIndexRef = useRef(0);
   displayedIndexRef.current = displayedIndex;
 
-  // Compact view always uses own spec
   const compactConfig = getTopologyConfig(spec);
 
-  // Dialog uses the displayed (navigable) spec
   const displayedSpec = allSpecs[displayedIndex] ?? spec;
   const displayedConfig = getTopologyConfig(displayedSpec);
 
@@ -116,7 +106,6 @@ export const TopologyDiagram = forwardRef<
     },
   }));
 
-  // Keyboard arrow navigation when dialog is open
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -221,15 +210,7 @@ export const TopologyDiagram = forwardRef<
   );
 });
 
-/** Abbreviate NIC model names for compact display.
- * Returns [line1, line2] where line1 is the model name, line2 is the port spec.
- * e.g. "ConnectX-7 2x200GbE" → ["CX-7", "2x200GbE"]
- *      "ConnectX-7 400G" → ["CX-7", "400G"] (InfiniBand uses plain G, not GbE)
- *      "ConnectX-7 400GbE" → ["CX-7", "400GbE"] (Ethernet uses GbE suffix)
- *      "Pollara 400GbE" → ["Pollara", "400GbE"]
- */
 function abbreviateNic(nic: string): [string, string] {
-  // Split on first space that separates model name from port spec
   const parts = nic.replace('ConnectX-', 'CX-').split(/\s+/u);
   if (parts.length >= 2) {
     return [parts[0], parts.slice(1).join(' ')];
@@ -237,15 +218,13 @@ function abbreviateNic(nic: string): [string, string] {
   return [nic, ''];
 }
 
-/** Check if a NIC string indicates dual-port (2x prefix) */
 function isDualPortNic(nic: string): boolean {
   return /\b2x\d+/u.test(nic);
 }
 
-/** Abbreviate switch model names for compact display */
 function abbreviateSwitch(sw: string): string {
   return sw
-    .replace(/^\d+\.?\d*T\s*/u, '') // Remove capacity prefix
+    .replace(/^\d+\.?\d*T\s*/u, '')
     .replace('Arista Tomahawk4 ', 'TH4 ')
     .replace('Arista Tomahawk5 ', 'TH5 ')
     .replace('NVIDIA Quantum-2 ', 'Q-2 ')
@@ -262,21 +241,6 @@ interface TopologyD3Props {
   locale: 'en' | 'zh';
 }
 
-/**
- * D3-rendered SVG topology diagram layout (top to bottom):
- *
- *   [Spine S0] [S1] [S2] [S3]          ← Spine switches (above pods)
- *        │╲    ╱│    │╲    ╱│
- *   ┌─────────── Pod 1 ─────────────┐  ← Rail pod boundary
- *   │  [L0] [L1] [L2] ... [L7]     │  ← Leaf switches (inside pod)
- *   │    │    │    │         │      │
- *   │  ┌Server 1────┐  [2]...[N]   │  ← Server 1 detailed + abstracted
- *   │  │[NIC]...[NIC]│             │
- *   │  │[GPU]...[GPU]│             │
- *   │  └─────────────┘             │
- *   └──────────────────────────────┘
- *     ┌Pod 2┐ ┌Pod 3┐ ...             ← Extra pods (abstracted)
- */
 function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const t = STRINGS[locale];
@@ -299,7 +263,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
     const leafShort = abbreviateSwitch(config.switchLabel);
     const spineShort = abbreviateSwitch(config.spineLabel);
 
-    // === Element dimensions ===
     const gpuBoxW = compact ? 36 : 50;
     const gpuBoxH = compact ? 16 : 22;
     const gpuGap = compact ? 3 : 6;
@@ -316,15 +279,12 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
     const spineBoxH = compact ? 20 : 26;
     const spineGap = compact ? 10 : 14;
 
-    // Abstracted server box
     const absBoxW = compact ? 18 : 30;
     const absBoxGap = compact ? 3 : 6;
 
-    // Abstracted pod box
     const absPodW = compact ? 30 : 50;
     const absPodGap = compact ? 6 : 10;
 
-    // === Server 1 internal layout ===
     const s1Pad = compact ? 4 : 8;
     const gpuRowW = gpuCount * gpuBoxW + (gpuCount - 1) * gpuGap;
     const nicRowW = nicCount * nicBoxW + (nicCount - 1) * nicGap;
@@ -335,7 +295,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
     const s1ContentH = nicBoxH + nicGpuVertGap + gpuBoxH;
     const s1H = s1ContentH + 2 * s1Pad + s1LabelH;
 
-    // === Abstracted servers ===
     const showAllAbstracted = serversPerPod <= 5;
     const abstractedNums = showAllAbstracted
       ? Array.from({ length: serversPerPod - 1 }, (_, i) => i + 2)
@@ -343,16 +302,13 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
     const dotsW = showAllAbstracted ? 0 : compact ? 14 : 22;
     const absAreaW =
       abstractedNums.length * absBoxW + Math.max(0, abstractedNums.length - 1) * absBoxGap + dotsW;
-    const absBoxH2 = s1H; // Match Server 1 height
+    const absBoxH2 = s1H;
 
-    // === Leaf row width ===
     const leafTotalW = railCount * leafBoxW + (railCount - 1) * leafGap;
 
-    // === Server area width ===
     const serverGap = compact ? 6 : 12;
     const serverAreaW = s1W + serverGap + absAreaW;
 
-    // === Pod 1 layout (contains leaf switches + servers) ===
     const podPad = compact ? 6 : 10;
     const podLabelH = compact ? 12 : 16;
     const leafServerGap = compact ? 14 : 22;
@@ -361,51 +317,41 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
     const pod1W = pod1ContentW + 2 * podPad;
     const pod1H = podLabelH + 2 * podPad + pod1InnerH;
 
-    // === Extra pods ===
     const extraPods = podCount - 1;
     const absPodH = pod1H;
     const extraPodsW = extraPods > 0 ? extraPods * absPodW + (extraPods - 1) * absPodGap : 0;
     const allPodsW = pod1W + (extraPods > 0 ? absPodGap + extraPodsW : 0);
 
-    // === Spine row width ===
     const spineTotalW = spineCount * spineBoxW + (spineCount - 1) * spineGap;
 
-    // === Overall dimensions ===
     const contentW = Math.max(allPodsW, spineTotalW);
     const totalW = contentW + (compact ? 16 : 30);
 
-    // === Y positions ===
     const topPad = compact ? 10 : 18;
     const spineY = topPad;
     const spinePodGap = compact ? 24 : 36;
     const podY = spineY + spineBoxH + spinePodGap;
 
-    // Inside Pod 1: leaf switches then server area
     const leafY = podY + podLabelH + podPad;
     const serverAreaY = leafY + leafBoxH + leafServerGap;
 
     const viewBoxH = podY + pod1H + (compact ? 14 : 22);
 
-    // === X positions (centered) ===
     const spineStartX = (totalW - spineTotalW) / 2;
     const allPodsStartX = (totalW - allPodsW) / 2;
     const pod1X = allPodsStartX;
 
-    // Leaf switches centered inside pod
     const leafStartX = pod1X + podPad + (pod1ContentW - leafTotalW) / 2;
 
-    // Server area inside pod
     const serverAreaStartX = pod1X + podPad + (pod1ContentW - serverAreaW) / 2;
     const s1X = serverAreaStartX;
     const s1Y = serverAreaY;
 
-    // GPU/NIC positions within Server 1
     const gpuRowX = s1X + s1Pad + (s1ContentW - gpuRowW) / 2;
     const nicRowX = s1X + s1Pad + (s1ContentW - nicRowW) / 2;
     const nicY = s1Y + s1LabelH + s1Pad;
     const gpuY = nicY + nicBoxH + nicGpuVertGap;
 
-    // === Position arrays ===
     const spinePositions = Array.from({ length: spineCount }, (_, i) => ({
       x: spineStartX + i * (spineBoxW + spineGap),
       cx: spineStartX + i * (spineBoxW + spineGap) + spineBoxW / 2,
@@ -426,7 +372,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       cx: nicRowX + i * (nicBoxW + nicGap) + nicBoxW / 2,
     }));
 
-    // Abstracted server positions
     const absStartX = s1X + s1W + serverGap;
     const absY = s1Y;
     const absServerItems: { x: number; label: string }[] = [];
@@ -446,12 +391,10 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       absServerItems.push({ x: curX, label: `${serversPerPod}` });
     }
 
-    // Extra pod positions
     const extraPodPositions = Array.from({ length: extraPods }, (_, i) => ({
       x: pod1X + pod1W + absPodGap + i * (absPodW + absPodGap),
     }));
 
-    // === Clear and render with D3 ===
     const container = d3.select(containerRef.current);
     container.selectAll('*').remove();
 
@@ -466,7 +409,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       );
 
     if (!isUnofficialHostname(window.location.hostname)) {
-      // Add background logo watermark
       const patternId = `logo-scaleout-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
       svg
         .append('defs')
@@ -490,9 +432,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('fill', `url(#${patternId})`);
     }
 
-    // === Connections (drawn first, behind boxes) ===
-
-    // Leaf → Spine full mesh (crosses pod boundary)
     const leafSpineConns = svg.append('g').attr('class', 'leaf-spine-connections');
     for (const leaf of leafPositions) {
       for (const spine of spinePositions) {
@@ -507,7 +446,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       }
     }
 
-    // Extra pod → all Spine switches (dashed)
     const podSpineConns = svg.append('g').attr('class', 'pod-spine-connections');
     for (const pod of extraPodPositions) {
       for (const spine of spinePositions) {
@@ -523,7 +461,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       }
     }
 
-    // NIC → Leaf connections (Server 1 to leaf switches, both inside pod)
     const nicLeafConns = svg.append('g').attr('class', 'nic-leaf-connections');
     const lineOffset = dualPort ? (compact ? 1.5 : 2.5) : 0;
     nicToLeaf.forEach((leafIdx, nicIdx) => {
@@ -556,7 +493,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       }
     });
 
-    // GPU → NIC connections (Server 1 internal)
     const gpuNicConns = svg.append('g').attr('class', 'gpu-nic-connections');
     for (let i = 0; i < gpuCount; i++) {
       gpuNicConns
@@ -569,7 +505,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .attr('stroke-width', compact ? 0.75 : 1);
     }
 
-    // Abstracted servers → all leaf switches in same pod (dashed)
     const absLeafConns = svg.append('g').attr('class', 'abs-leaf-connections');
     for (const srv of absServerItems) {
       for (const leaf of leafPositions) {
@@ -585,9 +520,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       }
     }
 
-    // === Boxes ===
-
-    // Spine switch boxes
     const spineGroup = svg.append('g').attr('class', 'spine-switches');
     for (let i = 0; i < spineCount; i++) {
       const pos = spinePositions[i];
@@ -609,7 +541,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(`S${i}`);
     }
 
-    // Pod 1 boundary (contains leaf switches + servers)
     svg
       .append('rect')
       .attr('x', pod1X)
@@ -629,7 +560,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       .style('font-weight', '500')
       .text(`${podCount > 1 ? `${t.pod} 1` : t.railPod} (${serversPerPod} ${t.servers})`);
 
-    // Leaf switch boxes (inside pod)
     const leafGroup = svg.append('g').attr('class', 'leaf-switches');
     for (let i = 0; i < railCount; i++) {
       const pos = leafPositions[i];
@@ -651,7 +581,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(`L${i}`);
     }
 
-    // Server 1 boundary
     svg
       .append('rect')
       .attr('x', s1X)
@@ -670,7 +599,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
       .style('font-size', labelFontSize)
       .text(`${t.server} 1`);
 
-    // NIC boxes (inside Server 1)
     const nicGroup = svg.append('g').attr('class', 'nics');
     for (let i = 0; i < nicCount; i++) {
       const pos = nicPositions[i];
@@ -699,7 +627,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(nicLine2);
     }
 
-    // GPU boxes (inside Server 1)
     const gpuGroup = svg.append('g').attr('class', 'gpus');
     for (let i = 0; i < gpuCount; i++) {
       const pos = gpuPositions[i];
@@ -725,7 +652,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(`${t.chip} ${i}`);
     }
 
-    // Abstracted server boxes (inside same pod as Server 1)
     const absGroup = svg.append('g').attr('class', 'abstracted-servers');
     for (const srv of absServerItems) {
       const g = absGroup.append('g');
@@ -746,7 +672,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(srv.label);
     }
 
-    // Dots between abstracted servers
     if (dotsX !== null) {
       svg
         .append('text')
@@ -758,7 +683,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .html('&bull;&bull;&bull;');
     }
 
-    // Additional rail-pods (abstracted, connect to all spines)
     const extraPodGroup = svg.append('g').attr('class', 'extra-pods');
     for (let i = 0; i < extraPods; i++) {
       const pos = extraPodPositions[i];
@@ -783,9 +707,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(`${t.pod} ${i + 2}`);
     }
 
-    // === Labels ===
-
-    // Row labels (expanded view only)
     if (!compact) {
       svg
         .append('text')
@@ -796,7 +717,6 @@ function TopologyD3({ spec, config, compact, locale }: TopologyD3Props) {
         .text(t.spine);
     }
 
-    // Legend labels
     if (compact) {
       svg
         .append('text')

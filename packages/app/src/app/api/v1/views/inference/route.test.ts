@@ -103,7 +103,6 @@ beforeEach(() => {
 
 describe('GET /api/v1/views/inference', () => {
   it('keeps unavailable all-in table rows in official, compared and unofficial scopes and CSV', async () => {
-    // Eight GPUs on one node are not whole four-GPU NVL72 compute trays.
     const untiled = makeRow({
       hardware: 'gb200',
       metrics: {

@@ -1,30 +1,5 @@
 'use client';
 
-/**
- * PowerX "Timeline" display: the per-second GPU power behind each measured
- * average, drawn over the whole benchmark job.
- *
- * ChartDisplay renders this instead of ScatterGraph when the Measured Power
- * Display control is `timeline` (`y_measuredPowerTimeline`). The point set is
- * the same as the Measured Avg Power axis; each point's `power_audit.source`
- * names its `gpu_metrics_*` artifact — or, for disaggregated Slurm / Dynamo
- * rows, its validation file inside a `power_audit_*` bundle — which
- * `/api/gpu-metrics?series=power` returns as one-second per-GPU buckets
- * (`components/gpu-power/power-series.ts`).
- *
- * One trace per config, coloured by hardware (official) or by run (unofficial
- * overlay); in date comparison, official traces take the GPUGraph colour and
- * legend toggle of their (date, hardware) series. The validated measurement
- * window is emphasized; the rest of the
- * job (server start, warmup) is drawn faint. Rated TDP is a dashed reference
- * per hardware; the all-in provisioned line is opt-in because it would halve
- * the vertical resolution of the traces.
- *
- * Pool mode (bundle series carry worker roles) sums each prefill / decode pool
- * instead, against pool-sized TDP references, so a disaggregated deployment
- * reads as two lines on a watts axis. A pinned scatter tooltip can deep-link
- * here focused on one config (`requestPowerTraceFocus`).
- */
 import * as d3 from 'd3';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -93,11 +68,8 @@ import {
   type WindowPhase,
 } from '../utils/powerTimeline';
 
-/** Distinct workflow runs fetched per chart; each is one GitHub artifact sweep. */
 export const POWER_TIMELINE_MAX_RUNS = 4;
-/** Hover targets per trace after LTTB; paths keep every bucket. */
 const HIT_POINTS_PER_TRACE = 200;
-/** Above this many visible traces the `c<conc>` end labels would only overlap. */
 const MAX_LABELED_TRACES = 40;
 const CHART_HEIGHT = 600;
 const MARGIN = { top: 24, right: 84, bottom: 60, left: 64 };
@@ -239,16 +211,12 @@ interface TimelineSample {
   overlayIndex: number | null;
   column: number;
   timeMs: number;
-  /** Data-space x for the active mode: epoch ms (wall) or seconds (elapsed). */
   x: number;
-  /** Mean watts across the GPUs sampled in the bucket; the pool's summed watts in pool mode. */
   y: number;
   min: number;
   max: number;
-  /** GPUs with a sample in the bucket (inside the pool, in pool mode). */
   gpuCount: number;
   phase: WindowPhase;
-  /** The pool this sample sums and its device count, in pool mode. */
   pool?: { role: PowerPoolRole; gpuCount: number };
 }
 
@@ -261,7 +229,6 @@ interface TracePath {
   id: string;
   traceKey: string;
   hwKey: string;
-  /** Date comparison: the official trace's `${date}_${hwKey}` legend series. */
   series?: string;
   overlayIndex: number | null;
   color: string;
@@ -269,7 +236,6 @@ interface TracePath {
   width: number;
   opacity: number;
   points: TracePoint[];
-  /** Worker-role pool the line sums, in pool mode. */
   pool?: PowerPoolRole;
 }
 
@@ -279,15 +245,12 @@ interface ReferenceLine {
   label: string;
   color: string;
   kind: 'tdp' | 'utility';
-  /** Pools the line is sized for, in pool mode (roles sharing one GPU count). */
   pools?: PowerPoolRole[];
 }
 
-/** Vertical distance between stacked reference labels that share a watts value. */
 const REFERENCE_LABEL_ROW = 13;
 
 interface TraceLabel {
-  /** Join key: the trace key, plus the pool role in pool mode. */
   id: string;
   traceKey: string;
   hwKey: string;
@@ -306,14 +269,11 @@ interface DrawModel {
 
 export interface PowerTimelineProps {
   chartId: string;
-  /** Official points of the chart (display-limit clipped points restored). */
   data: InferenceData[];
   overlayData?: OverlayData;
   yLabel: string;
   caption?: React.ReactNode;
-  /** Date comparison: official traces follow the per-date legend series. */
   comparison?: boolean;
-  /** Run numbers shared with the comparison changelog and GPUGraph legend. */
   runNumbering?: Map<string, number>;
 }
 
@@ -348,10 +308,8 @@ function formatElapsed(totalSeconds: number): string {
 
 const formatUtcClock = d3.utcFormat('%H:%M:%S');
 const formatUtcDate = d3.utcFormat('%Y-%m-%d');
-/** Pool sums run to thousands of watts; group the digits. */
 const formatWatts = d3.format(',.0f');
 
-/** Rough advance of one label character at the data-label size. */
 const LABEL_CHAR_WIDTH = 6.5;
 
 function baseHardware(hwKey: string): string {
@@ -366,17 +324,11 @@ function runIdsOf(points: readonly InferenceData[]): Set<string> {
   );
 }
 
-/**
- * The pools a trace draws in pool mode: its worker-role pools, or every GPU as
- * one pool when the collector assigned no roles (a single-node trace then shows
- * its deployment total on the same axis).
- */
 function drawnPools(series: GpuPowerSeries): PowerPool[] {
   const pools = tracePools(series);
   return pools.length > 0 ? pools : [allGpuPool(series)];
 }
 
-/** SVG dash of a pool line: per role from the comparison palette; `all` stays solid. */
 function poolDash(pool: PowerPoolRole): string | null {
   const dash = powerVariantDash({ kind: 'role', id: pool });
   return dash === '' ? null : dash;
@@ -388,7 +340,6 @@ interface TraceRow {
   values: (number | null)[];
 }
 
-/** One polyline's values per line mode: the GPU mean, each GPU, or each pool's sum. */
 function traceRows(series: GpuPowerSeries, lineMode: LineMode): TraceRow[] {
   if (lineMode === 'gpu') {
     return series.gpus.map((gpu, row) => ({ id: `gpu${gpu}`, values: series.power[row] }));
@@ -403,7 +354,6 @@ function traceRows(series: GpuPowerSeries, lineMode: LineMode): TraceRow[] {
   return [{ id: 'mean', values: series.t.map((_, column) => meanPowerAt(series, column)) }];
 }
 
-/** Builds the mean, per-GPU or per-pool polylines plus the window emphasis for one trace. */
 function tracePaths(
   trace: PowerTimelineTrace,
   color: string,
@@ -459,10 +409,6 @@ function tracePaths(
   return paths;
 }
 
-/**
- * Hover targets of one trace: one stream over all its GPUs (mean watts), or in
- * pool mode one stream per pool (summed watts) so the tooltip can name the pool.
- */
 function traceSamples(
   trace: PowerTimelineTrace,
   color: string,
@@ -510,7 +456,6 @@ function sampleRows(
       if (value < min) min = value;
       if (value > max) max = value;
     }
-    // A pool bucket missing a device is a gap, as in `sumPowerAt`, not a dip.
     if (count === 0 || (pool && count < rows.length)) continue;
     const timeMs = bucketTimeMs(series, column);
     samples.push({
@@ -615,7 +560,6 @@ function drawLabels(
     .attr('fill', (label) => label.color)
     .attr('opacity', (label) => labelOpacity(label, highlight))
     .text((label) => label.text);
-  // Sit just past the last sample; flip inside the plot near the right edge.
   const boxes = model.labels.map((label) => {
     const x = xScale(label.x);
     const width = label.text.length * LABEL_CHAR_WIDTH;
@@ -713,24 +657,15 @@ export default function PowerTimeline({
   const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
   const [showUtility, setShowUtility] = useState(initialView.utility);
   const [highlight, setHighlight] = useState<string | null>(null);
-  /** Trace a "View power trace" deep link asked for, once the join has produced it. */
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
-  /** The deep-link request, read once on mount; `undefined` until read, `null` once honoured. */
   const requestedFocusRef = useRef<string | null | undefined>(undefined);
-  // The deep-link request is read once, before planning, so its run is fetched
-  // even when the chart spans more runs than the cap.
   if (requestedFocusRef.current === undefined) {
     requestedFocusRef.current = consumePowerTraceFocus();
   }
-  /** One load across hardware (e.g. GB200 and GB300 at c4); a deep link names its own trace. */
   const [concurrency, setConcurrency] = useState<number | null>(() =>
     requestedFocusRef.current ? null : initialView.concurrency,
   );
 
-  // The chart's point list still carries every precision, quick-filtered rows
-  // and rows without a validated average (ScatterGraph applies those gates at
-  // draw time); only rows that plot on the measured-average axis for the
-  // current selection have a trace to look up.
   const plotsHere = useCallback(
     (point: InferenceData) =>
       point.measuredPowerTimeline !== undefined &&
@@ -751,7 +686,6 @@ export default function PowerTimeline({
         .toSorted((a, b) => a - b),
     [measuredData, overlayPoints],
   );
-  // Filtering before planning keeps the run cap for the runs that hold this load.
   const allPoints = useMemo(
     () =>
       [...measuredData, ...overlayPoints].filter(
@@ -778,10 +712,6 @@ export default function PowerTimeline({
 
   const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
   const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
-  // Same visibility source as ScatterGraph: an overlay session may hold a
-  // local official selection that has not been written back to the filters.
-  // Date comparison instead shows the (date, hardware) series toggled on in
-  // the legend, as GPUGraph does.
   const officialHwTypes = localOfficialOverride ?? activeHwTypes;
   const comparisonSeriesOf = useCallback(
     (point: InferenceData) =>
@@ -796,10 +726,6 @@ export default function PowerTimeline({
     },
     [overlayPointSet, activeOverlayHwTypes, comparisonSeriesOf, activeDates, officialHwTypes],
   );
-  // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
-  // the cap's slots before official runs; runs the legend shows go before runs
-  // it hides entirely, so hiding hardware makes room for the pair compared.
-  // The deep-linked run still goes first.
   const overlayRunIds = useMemo(() => runIdsOf(overlayPoints), [overlayPoints]);
   const shownRunIds = useMemo(() => runIdsOf(allPoints.filter(isShown)), [allPoints, isShown]);
   const fetchedRequests = useMemo(
@@ -811,10 +737,6 @@ export default function PowerTimeline({
     [requests, overlayRunIds, shownRunIds, focusRun],
   );
   const droppedRuns = requests.length - fetchedRequests.length;
-  // React Query structurally shares the combined result, so `resolved` keeps
-  // its identity until a run's data actually changes. That gives the response
-  // map a fixed-shape memo input; a per-query spread would change the deps
-  // array length whenever runs enter or leave the plot, which React rejects.
   const combineQueries = useCallback(
     (results: UseQueryResult<GpuPowerSeriesResponse, Error>[]) => ({
       loadingRuns: results.filter((query) => query.isPending).length,
@@ -847,8 +769,6 @@ export default function PowerTimeline({
   );
   const hasAnyArtifact = requests.length > 0;
 
-  // Honour the deep link once its trace exists; a disaggregated trace opens in
-  // pool mode because its prefill / decode split is what the reader came for.
   useEffect(() => {
     const requested = requestedFocusRef.current;
     if (!requested) return;
@@ -892,9 +812,6 @@ export default function PowerTimeline({
       resolveColor,
     ],
   );
-  // With an overlay loaded the chart reads localOfficialOverride, so a legend
-  // click must write the unified selection the way ScatterGraph does; the
-  // context's toggleHwType would change activeHwTypes with no visible effect.
   const handleToggleHwType = useCallback(
     (key: string) => {
       if (!overlayData) {
@@ -922,13 +839,10 @@ export default function PowerTimeline({
     () => traces.filter((trace) => isShown(trace.point)),
     [traces, isShown],
   );
-  // Focus follows visibility: hiding the focused hardware in the legend lifts
-  // the dimming and the chip instead of dimming everything with nothing lit.
   const focusedTrace = useMemo(
     () => visibleTraces.find((trace) => trace.key === focusKey) ?? null,
     [visibleTraces, focusKey],
   );
-  /** Legend hover wins over the deep-link focus while it lasts. */
   const activeHighlight = highlight ?? focusedTrace?.key ?? null;
   const visibleRunCount = useMemo(
     () => new Set(visibleTraces.map((trace) => trace.runId)).size,
@@ -936,8 +850,6 @@ export default function PowerTimeline({
   );
   const xMode: XMode = xModeChoice ?? (visibleRunCount <= 1 ? 'wall' : 'elapsed');
 
-  // Retain a shared pool choice while data loads; keep its switch available even
-  // if the current selection has no role-tagged trace, so it can be turned off.
   const hasPools = useMemo(
     () => visibleTraces.some((trace) => tracePools(trace.series).length > 0),
     [visibleTraces],
@@ -971,7 +883,6 @@ export default function PowerTimeline({
     (point: InferenceData) => comparisonEntryLabel(String(point.date), runNumbering),
     [runNumbering],
   );
-  /** Hardware, plus the compared date or run of an official trace in date comparison. */
   const seriesLabel = useCallback(
     (point: InferenceData): string =>
       comparisonSeriesOf(point)
@@ -983,14 +894,12 @@ export default function PowerTimeline({
   const model = useMemo<DrawModel>(() => {
     const paths: TracePath[] = [];
     const labels: TraceLabel[] = [];
-    // Two platforms at one load share `c4`; name the hardware so the end labels differ.
     const bases = new Set(visibleTraces.map((trace) => baseHardware(trace.point.hwKey)));
     const hardwarePrefix = (trace: PowerTimelineTrace) => {
       if (bases.size < 2) return '';
       const base = baseHardware(trace.point.hwKey);
       return `${HW_REGISTRY[base]?.label ?? base.toUpperCase()} `;
     };
-    // Several compared dates share `c4` as well; name the date or run too.
     const entries = new Set(
       visibleTraces
         .filter((trace) => comparisonSeriesOf(trace.point))
@@ -1006,7 +915,6 @@ export default function PowerTimeline({
       );
       paths.push(...tracePathSet);
       if (visibleTraces.length > MAX_LABELED_TRACES) continue;
-      // One end label per trace; per pool in pool mode, so the role reads off the line.
       const groups: { pool?: PowerPoolRole; paths: TracePath[] }[] =
         lineMode === 'pool'
           ? drawnPools(trace.series).map((pool) => ({
@@ -1058,10 +966,6 @@ export default function PowerTimeline({
     [visibleTraces, colorForTrace, xMode, lineMode, windowOnly],
   );
 
-  // Rated references: per hardware in mean / per-GPU modes; per (hardware,
-  // pool size) in pool mode, scaled to the pool so the summed line and its
-  // ceiling share the axis. Roles of one hardware that hold the same number
-  // of GPUs share a ceiling and draw as one line (`prefill / decode ×16`).
   const referenceLines = useMemo<ReferenceLine[]>(() => {
     const lines: ReferenceLine[] = [];
     const pushLines = (base: string, color: string, pool?: PoolSizeGroup) => {
@@ -1095,7 +999,6 @@ export default function PowerTimeline({
         });
       }
     };
-    // First trace of a hardware sets the reference colour, as before.
     const perBase = new Map<string, { color: string; pools: PowerPool[] }>();
     for (const trace of visibleTraces) {
       const base = baseHardware(trace.point.hwKey);
@@ -1192,7 +1095,6 @@ export default function PowerTimeline({
           getY: (sample) => sample.y,
           getColor: (sample) => sample.color,
           getRadius: () => 2,
-          // Pool streams of one trace share columns; the role keeps their keys apart.
           keyFn: (sample) =>
             sample.pool
               ? `${sample.trace.key}:${sample.pool.role}:${sample.column}`
@@ -1305,8 +1207,6 @@ export default function PowerTimeline({
                 name: `✕ unofficial-run-${info.id}`,
                 label: `✕ ${branch}`,
                 color: overlayRunColor(index),
-                // The comparison legend groups on the name's first word: one
-                // "Unofficial run" group over every run.
                 title: comparison ? t.unofficialRun : `${t.unofficialRun}: ${branch}`,
                 isHighlighted: true,
                 hw: `overlay-run-${info.id}`,
@@ -1336,8 +1236,6 @@ export default function PowerTimeline({
             .filter((item): item is NonNullable<typeof item> => item !== null)
         : [];
     if (comparison) {
-      // GPUGraph's comparison legend: one row per (date, hardware) series with
-      // a trace candidate, grouped by hardware.
       const seriesWithData = new Set(measuredData.map((point) => `${point.date}_${point.hwKey}`));
       const comparisonItems = comparisonSeries
         .filter(({ id }) => seriesWithData.has(id))
@@ -1395,8 +1293,6 @@ export default function PowerTimeline({
     toggleActiveDate,
   ]);
 
-  // Per-GPU and pools are two views of the same lines, so either switch turns
-  // the other off; both fall back to the mean.
   const chooseLineMode = (next: LineMode) => {
     setLineMode(next);
     track('inference_power_timeline_lines_changed', { lines: next });

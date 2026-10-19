@@ -1,8 +1,3 @@
-/**
- * The OperatorX database: runs as raw bundles (opx_runs + opx_run_docs). Reads rebuild
- * the exact `OperatorXRawBundle` a source returns; writes take one and store it
- * verbatim, with the run-list summary precomputed.
- */
 import type { DbClient } from '../connection.js';
 import type { Sql } from '../etl/db-utils';
 import {
@@ -12,22 +7,15 @@ import {
 } from '../operatorx/bundle';
 import { normalizeBundle } from '../operatorx/normalize';
 
-const DOCS_INSERT_CHUNK = 20; // result documents are a few MB each
+const DOCS_INSERT_CHUNK = 20;
 
-/** A run key is whatever the ingester chose; keep it URL- and log-safe. */
 export const RUN_KEY_RE = /^[\w.-]{1,128}$/u;
 
-/** Every run, newest first, from the precomputed summaries alone. */
 export async function listOperatorXRuns(sql: DbClient): Promise<OperatorXRunRef[]> {
   const rows = await sql`SELECT id, summary FROM opx_runs ORDER BY generated_at DESC, id DESC`;
   return rows.map((r) => ({ ...(r.summary as OperatorXRunRef), revision: String(r.id) }));
 }
 
-/**
- * One run's bundle, or null. Row and documents come back in one query. A shard keeps
- * the attempt that produced it (a partial rerun reuses earlier attempts' shards), and a
- * re-ingest replaces the whole run, so every stored document belongs to it.
- */
 export async function getOperatorXBundle(
   sql: DbClient,
   runKey: string,
@@ -67,15 +55,10 @@ export async function getOperatorXBundle(
   };
 }
 
-/** The run list's entry for a bundle: its metadata plus the planned coverage. */
 export function runSummary(bundle: OperatorXRawBundle): OperatorXRunRef {
   return { ...bundle.run, plan: planFromManifest(bundle.manifest) ?? undefined };
 }
 
-/**
- * Store a bundle under its `run.run_id`, replacing any earlier ingest of that run. The
- * bundle is normalized first, so one that cannot be read is never stored.
- */
 export async function saveOperatorXBundle(
   sql: Sql,
   bundle: OperatorXRawBundle,
@@ -89,8 +72,6 @@ export async function saveOperatorXBundle(
   let docs = 0;
   await sql.begin(async (tx) => {
     await tx`DELETE FROM opx_runs WHERE run_key = ${key}`;
-    // The ::jsonb casts type the parameters as jsonb, so postgres.js serializes the
-    // objects itself; pre-stringifying would double-encode them into jsonb strings.
     const [{ id }] = await tx`
       INSERT INTO opx_runs
         (run_key, run_attempt, generated_at, source_sha, source_branch, conclusion, manifest, summary)

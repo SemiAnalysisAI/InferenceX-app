@@ -29,7 +29,6 @@ async function fetchServerLogChunk(
   return (await response.json()) as ServerLogChunk;
 }
 
-/** Incrementally fetch immutable server-log chunks for one benchmark point. */
 export function useServerLog(
   id: number | null,
   fileName: string | null,

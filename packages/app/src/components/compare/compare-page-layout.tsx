@@ -6,7 +6,6 @@ interface ComparePageLayoutProps {
   children: ReactNode;
 }
 
-/** Focused compare-page shell without the dashboard route navigation. */
 export function ComparePageLayout({ children }: ComparePageLayoutProps) {
   return (
     <UnofficialRunProvider>

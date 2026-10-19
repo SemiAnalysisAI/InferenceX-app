@@ -8,8 +8,6 @@ import {
 import { transformBenchmarkRows } from './benchmark-transform';
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from './supplemental-benchmarks';
 
-// C256-N8 in the supplied 2026-08-22 GPT-OSS throughput.json:
-// chip_count=8, tp=1, ep=8, median_tpot_ms=3.284620495235133.
 const source = SUPPLEMENTAL_BENCHMARK_ROWS.find(
   (row) => row.model === 'gptoss120b' && row.conc === 256,
 )!;
@@ -32,7 +30,6 @@ describe('explicit deployment chip counts', () => {
       selectedYAxisMetric: 'y_tpPerGpu',
       locale,
     };
-    // The overlay consumes the same transform, but has its own tooltip renderer.
     const htmls = [
       generateTooltipContent(config),
       generateGPUGraphTooltipContent(config),
@@ -77,7 +74,6 @@ describe('explicit deployment chip counts', () => {
     { decode: 0, prefill: 0, expected: 8 },
     { decode: 16, prefill: 16, expected: 16 },
   ])('keeps the PP floor for counts $decode / $prefill', ({ decode, prefill, expected }) => {
-    // Stored legacy rows already contain positive TP × EP defaults, without PP.
     const { chartData } = transformBenchmarkRows([
       {
         ...source,

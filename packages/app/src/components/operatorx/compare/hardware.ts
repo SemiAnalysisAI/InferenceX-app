@@ -19,14 +19,12 @@ function spec(key: string): GpuSpec | undefined {
   return label ? GPU_SPECS.find((s) => s.name.startsWith(label)) : undefined;
 }
 
-/** Dense peak TFLOPS at a precision, from the GPU specs table; null when unknown. */
 export function peakTflops(key: string, precision: ComputePrecision): number | null {
   const s = spec(key);
   if (!s || precision === 'other') return null;
   return s[precision] ?? null;
 }
 
-/** Peak memory bandwidth in TB/s, parsed from the GPU specs table. */
 export function peakBandwidthTBs(key: string): number | null {
   const m = spec(key)?.memoryBandwidth.match(/(?<tbs>[\d.]+)\s*TB\/s/u);
   return m ? Number(m.groups?.tbs) : null;

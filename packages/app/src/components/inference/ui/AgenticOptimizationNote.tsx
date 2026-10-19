@@ -15,7 +15,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Agentic-only info-footer note; point tooltips carry the exact optimization method. */
 export function AgenticOptimizationNote() {
   const t = STRINGS[useLocale()];
 

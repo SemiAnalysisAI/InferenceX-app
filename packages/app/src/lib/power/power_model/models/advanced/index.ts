@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Advanced cluster and equipment power modeling. */
 
 export { Cluster } from './cluster';
 export { OSSAllinPowerModel } from './model';

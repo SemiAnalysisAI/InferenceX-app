@@ -1,21 +1,7 @@
-/**
- * The curated CollectiveX support picture: every SKU × library × mode ×
- * expert-parallel degree, independent of which runs are checked. Green means
- * the combination is known to work on the fleet; red means it is known NOT to
- * work, with the investigated reason; gray means the combination is unavailable or awaiting qualification
- * (see the note for the distinction).
- *
- * This mirrors `collectivex/configs/platform_config.json` in the
- * InferenceX repo plus the wall investigations documented in its README and
- * methodology. It is maintained by hand: when a registry row flips or a wall
- * falls upstream, update the cell and its footnote here.
- */
-
 export type CollectiveXKnownStatus = 'works' | 'broken' | 'na';
 
 export interface CollectiveXKnownEp {
   status: CollectiveXKnownStatus;
-  /** Footnote id; required whenever status is not plain `works`. */
   note?: string;
 }
 
@@ -93,9 +79,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's low-latency kernel asserts on AMD CU counts (kNumMaxTopK+1 exceeds the warp-group budget) — an upstream kernel limitation, not an integration gap.",
     zh: 'UCCL 低延迟 Kernel 在 AMD 的 CU 数量下触发断言（kNumMaxTopK+1 超出 warp 组预算），为上游 Kernel 限制而非集成问题。',
   },
-  // B300 throughput EP16 verification confirmed by the maintainer on 2026-10-13.
-  // Qualification source: InferenceX 20c8fba9, collectivex/README.md (2026-10-13).
-  // https://github.com/SemiAnalysisAI/InferenceX/blob/20c8fba9eabd41f7e0b49aada0d1c147a180e7fc/collectivex/README.md
   'nccl-v02-gin': {
     en: 'NCCL EP v0.2 fixes the v0.1 cross-node GIN failure. Throughput EP16 has been revalidated on B200, B300, H100 and H200; GB200/GB300 use MNNVL. Qualification is BF16 only.',
     zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、B300、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
@@ -292,10 +275,6 @@ export const COLLECTIVEX_KNOWN_SUPPORT: Record<'normal' | 'low-latency', KnownMa
   'low-latency': LOW_LATENCY,
 };
 
-/**
- * Footnotes in first-use order for one mode's table, so the rendered numbers
- * read top-to-bottom, left-to-right.
- */
 export function collectiveXKnownFootnoteOrder(mode: 'normal' | 'low-latency'): string[] {
   const seen: string[] = [];
   for (const sku of COLLECTIVEX_KNOWN_SKUS) {

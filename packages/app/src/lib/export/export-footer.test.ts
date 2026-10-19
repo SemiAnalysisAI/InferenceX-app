@@ -61,7 +61,6 @@ describe('getExportFooterText', () => {
   });
 
   it('reads window.location in a browser environment', () => {
-    // jsdom exposes window.location; under the node environment this exercises the fallback.
     const text = getExportFooterText();
     expect(text.startsWith(EXPORT_FOOTER_FALLBACK_HOST) || text.includes('/')).toBe(true);
   });

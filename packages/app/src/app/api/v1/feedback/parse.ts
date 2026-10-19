@@ -1,7 +1,3 @@
-/**
- * Single-pass schema parse for the feedback POST body.
- */
-
 const MAX_FIELD_LEN = 2000;
 const MAX_PAGE_PATH_LEN = 512;
 
@@ -30,8 +26,6 @@ function exceedsCap(value: unknown, max: number): boolean {
 function hasControlChar(s: string): boolean {
   for (let i = 0; i < s.length; i++) {
     const c = s.codePointAt(i);
-    // C0 controls (< 0x20) plus DEL (0x7F) — decimals sidestep the
-    // formatter/linter disagreement over hex casing on this codebase.
     if (c !== undefined && (c < 32 || c === 127)) return true;
   }
   return false;
@@ -41,8 +35,8 @@ function pickPagePath(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   if (value.length === 0 || value.length > MAX_PAGE_PATH_LEN) return null;
   if (!value.startsWith('/')) return null;
-  if (value.startsWith('//')) return null; // protocol-relative URLs
-  if (hasControlChar(value)) return null; // CRLF, etc.
+  if (value.startsWith('//')) return null;
+  if (hasControlChar(value)) return null;
   return value;
 }
 

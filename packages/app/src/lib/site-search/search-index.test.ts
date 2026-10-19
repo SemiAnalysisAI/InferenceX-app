@@ -100,14 +100,12 @@ describe('SiteSearchIndex', () => {
   });
 
   it('finds conceptually related pages that share no literal word', () => {
-    // "energy" never appears; the power/joule concept group bridges it.
     const results = buildIndex().search('energy');
     expect(results.map((r) => r.url)).toContain('/blog/powerx#joules');
   });
 
   it('completes the word still being typed', () => {
     expect(buildIndex().search('methodol')[0].url).toBe('/agentx/methodology');
-    // A finished word with a trailing space is not treated as a prefix.
     expect(buildIndex().search('methodol ')).toEqual([]);
   });
 

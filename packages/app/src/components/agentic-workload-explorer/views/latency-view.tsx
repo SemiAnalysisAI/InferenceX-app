@@ -24,8 +24,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
 
-// -- Types ------------------------------------------------------------------
-
 interface StreamingStats {
   p50: number;
   p95: number;
@@ -92,8 +90,6 @@ interface LatencyData {
   interactivityDistribution: GraphHistogram;
 }
 
-// -- Chart constants --------------------------------------------------------
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -102,8 +98,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// -- i18n -------------------------------------------------------------------
 
 const STRINGS = {
   en: {
@@ -242,8 +236,6 @@ const STRINGS = {
   },
 };
 
-// -- Helpers ----------------------------------------------------------------
-
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
   const fraction = range / 10 ** exponent;
@@ -271,7 +263,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -282,8 +273,6 @@ function truncateModel(model: string, maxLen = 28): string {
   if (model.length <= maxLen) return model;
   return `${model.slice(0, maxLen - 1)}...`;
 }
-
-// -- Section header ---------------------------------------------------------
 
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
@@ -297,8 +286,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// -- Stat card --------------------------------------------------------------
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -310,8 +297,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// -- E2E Latency Distribution Histogram -----------------------------------------
 
 function DistributionHistogram({
   distribution,
@@ -336,7 +321,6 @@ function DistributionHistogram({
   const range = maxVal - minVal || 1;
   const maxCount = Math.max(...bins.map((b) => b.count), 1);
 
-  // Percentile values from server stats
   const p50 = stats.p50;
   const p95 = stats.p95;
   const p99 = stats.p99;
@@ -347,13 +331,11 @@ function DistributionHistogram({
   const barGap = 0.5;
   const barW = Math.max(0.5, PLOT_W / bins.length - barGap);
 
-  // X-axis ticks
   const xTicks = generateTicks(minVal, maxVal, 6);
 
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -364,7 +346,6 @@ function DistributionHistogram({
           strokeWidth={0.5}
         />
 
-        {/* Bars */}
         {bins.map((b, i) => {
           const x = sx(b.min);
           const barH = (b.count / maxCount) * PLOT_H;
@@ -385,7 +366,6 @@ function DistributionHistogram({
           );
         })}
 
-        {/* Percentile lines */}
         {[
           { val: p50, color: '#06b6d4', label: 'p50' },
           { val: p95, color: '#f59e0b', label: 'p95' },
@@ -417,7 +397,6 @@ function DistributionHistogram({
           );
         })}
 
-        {/* X-axis labels */}
         {xTicks.map((tick) => {
           const x = sx(tick);
           if (x < MARGIN.left || x > MARGIN.left + PLOT_W) return null;
@@ -436,7 +415,6 @@ function DistributionHistogram({
         })}
       </svg>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
         {[
           { label: 'p50', color: '#06b6d4', val: p50 },
@@ -454,8 +432,6 @@ function DistributionHistogram({
     </div>
   );
 }
-
-// -- Generic Distribution Histogram (TTFT / TPOT) --------------------------
 
 function GenericDistributionHistogram({
   histogram,
@@ -581,8 +557,6 @@ function GenericDistributionHistogram({
   );
 }
 
-// -- E2E Latency Over Time line chart -------------------------------------------
-
 function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
   const t = STRINGS[useLocale()];
   if (hourly.length === 0) {
@@ -601,11 +575,9 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
   const sx = (i: number) => MARGIN.left + (i / (hourly.length - 1 || 1)) * PLOT_W;
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yTop) * PLOT_H;
 
-  // Build polyline points
   const p50Points = hourly.map((h, i) => `${sx(i)},${sy(h.p50)}`).join(' ');
   const p95Points = hourly.map((h, i) => `${sx(i)},${sy(h.p95)}`).join(' ');
 
-  // X-axis labels: every 6h
   const xLabels: { idx: number; label: string }[] = [];
   for (let i = 0; i < hourly.length; i++) {
     if (i % 6 === 0) {
@@ -624,7 +596,6 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
-        {/* Y-axis grid lines and labels */}
         {yTicks.map((tick) => (
           <g key={`y-${tick}`}>
             {tick > 0 && (
@@ -651,7 +622,6 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
           </g>
         ))}
 
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -662,11 +632,9 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
           strokeWidth={0.5}
         />
 
-        {/* Lines */}
         <polyline points={p50Points} fill="none" stroke="#06b6d4" strokeWidth={1.5} />
         <polyline points={p95Points} fill="none" stroke="#f59e0b" strokeWidth={1.5} />
 
-        {/* Data point dots */}
         {hourly.map((h, i) => (
           <g key={h.hour}>
             <circle cx={sx(i)} cy={sy(h.p50)} r={1.5} fill="#06b6d4">
@@ -682,7 +650,6 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
           </g>
         ))}
 
-        {/* X-axis labels */}
         {xLabels.map(({ idx, label }) => (
           <text
             key={idx}
@@ -697,7 +664,6 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
         ))}
       </svg>
 
-      {/* Legend */}
       <div className="flex gap-x-4 mt-1.5">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
@@ -711,8 +677,6 @@ function HourlyLatencyChart({ hourly }: { hourly: LatencyData['hourly'] }) {
     </div>
   );
 }
-
-// -- E2E Latency by Model horizontal bars ---------------------------------------
 
 function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
   const t = STRINGS[useLocale()];
@@ -742,7 +706,6 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
               {truncateModel(m.model)}
             </span>
             <div className="flex-1 h-5 bg-border/30 rounded-sm overflow-hidden relative">
-              {/* p95 bar (wider, behind) */}
               <div
                 className="absolute inset-y-0 left-0 rounded-sm"
                 style={{
@@ -751,7 +714,6 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
                   opacity: 0.4,
                 }}
               />
-              {/* p50 bar (narrower, in front) */}
               <div
                 className="absolute inset-y-0 left-0 rounded-sm"
                 style={{ width: `${Math.max(p50Pct, 1)}%`, backgroundColor: '#6366f1' }}
@@ -767,7 +729,6 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
         );
       })}
 
-      {/* Legend */}
       <div className="flex gap-x-4 mt-1">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#6366f1' }} />
@@ -785,15 +746,12 @@ function ModelLatencyChart({ byModel }: { byModel: LatencyData['byModel'] }) {
   );
 }
 
-// -- Streaming vs Non-Streaming comparison ----------------------------------
-
 function StreamingComparison({ stats }: { stats: LatencyStats }) {
   const t = STRINGS[useLocale()];
   const { streaming, nonStreaming } = stats;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      {/* Streaming */}
       <div className="rounded-md border border-border bg-surface p-3">
         <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
           {t.streaming}
@@ -821,7 +779,6 @@ function StreamingComparison({ stats }: { stats: LatencyStats }) {
         </div>
       </div>
 
-      {/* Non-Streaming */}
       <div className="rounded-md border border-border bg-surface p-3">
         <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-2">
           {t.nonStreaming}
@@ -852,15 +809,11 @@ function StreamingComparison({ stats }: { stats: LatencyStats }) {
   );
 }
 
-// -- Cache Read vs P99 Latency chart ----------------------------------------
-
 function formatBucketLabel(bucket: number): string {
   if (bucket >= 1_000_000) return `${(bucket / 1_000_000).toFixed(0)}M`;
   if (bucket >= 1_000) return `${(bucket / 1_000).toFixed(0)}k`;
   return String(bucket);
 }
-
-// -- Cache Read x Write Heatmap (p90 latency) --------------------------------
 
 const HEATMAP_COLORS = [
   '#083344',
@@ -939,11 +892,9 @@ function CacheHeatmap({
       const ctx = canvas.getContext('2d')!;
       ctx.scale(scale, scale);
 
-      // Background
       ctx.fillStyle = '#0a0a0a';
       ctx.fillRect(0, 0, canvasW, canvasH);
 
-      // Title
       ctx.fillStyle = '#ededed';
       ctx.font = 'bold 14px monospace';
       ctx.fillText(t.pngTitle, padding, padding + 20);
@@ -951,11 +902,9 @@ function CacheHeatmap({
       ctx.font = '10px monospace';
       ctx.fillText(t.pngDetail(data.length, SNAPSHOT_RANGE_LABEL), padding, padding + 34);
 
-      // SVG
       ctx.drawImage(img, padding, titleHeight + padding, svgW, svgH);
       URL.revokeObjectURL(url);
 
-      // Download
       const a = document.createElement('a');
       a.download = 'cache-heatmap.png';
       a.href = canvas.toDataURL('image/png');
@@ -999,7 +948,6 @@ function CacheHeatmap({
         className="w-full"
         style={{ maxHeight: 400 }}
       >
-        {/* X-axis labels (cacheRead) */}
         {readBuckets.map((rb, i) => (
           <text
             key={`xl-${rb}`}
@@ -1014,7 +962,6 @@ function CacheHeatmap({
           </text>
         ))}
 
-        {/* Y-axis labels (cacheWrite) */}
         {writeBuckets.map((wb, j) => (
           <text
             key={`yl-${wb}`}
@@ -1029,7 +976,6 @@ function CacheHeatmap({
           </text>
         ))}
 
-        {/* Cells */}
         {readBuckets.map((rb, i) =>
           writeBuckets.map((wb, j) => {
             const cell = cellMap.get(`${rb}-${wb}`);
@@ -1071,7 +1017,6 @@ function CacheHeatmap({
           }),
         )}
 
-        {/* X-axis title */}
         <text
           x={LABEL_W + (readBuckets.length * CELL) / 2}
           y={writeBuckets.length * CELL + LABEL_H + 26}
@@ -1083,7 +1028,6 @@ function CacheHeatmap({
           {t.cacheReadAxisTitle}
         </text>
 
-        {/* Y-axis title */}
         <text
           x={10}
           y={LABEL_H + (writeBuckets.length * CELL) / 2}
@@ -1096,7 +1040,6 @@ function CacheHeatmap({
           {t.cacheWriteAxisTitle}
         </text>
 
-        {/* Color legend */}
         {Array.from({ length: 10 }, (_, i) => (
           <rect
             key={`legend-${i}`}
@@ -1127,7 +1070,6 @@ function CacheHeatmap({
         </text>
       </svg>
 
-      {/* Hover detail */}
       {hovered && (
         <div className="mt-2 flex items-center gap-4 text-3xs font-mono text-muted-foreground px-1">
           <span>
@@ -1143,8 +1085,6 @@ function CacheHeatmap({
     </div>
   );
 }
-
-// -- Cache Total x Output → p90 Interactivity heatmap -------------------------
 
 function InteractivityHeatmap({
   data,
@@ -1172,7 +1112,6 @@ function InteractivityHeatmap({
   const outputBuckets = [...new Set(data.map((d) => d.outputBucket))].toSorted((a, b) => a - b);
   const cellMap = new Map(data.map((d) => [`${d.cacheTotalBucket}-${d.outputBucket}`, d]));
 
-  // For interactivity, higher = better, so invert the color scale
   const filtered = hideSmall ? data.filter((d) => d.count >= 5) : data;
   const maxVal = Math.max(...filtered.map((d) => d.p90Interactivity));
   const minVal = Math.min(...filtered.map((d) => d.p90Interactivity));
@@ -1184,7 +1123,6 @@ function InteractivityHeatmap({
   const svgW = LABEL_W + cacheBuckets.length * CELL + 80;
   const svgH = LABEL_H + outputBuckets.length * CELL + 30;
 
-  // Green = high interactivity (good), red = low (bad)
   const INTERACTIVITY_COLORS = [
     '#dc2626',
     '#ea580c',
@@ -1229,7 +1167,6 @@ function InteractivityHeatmap({
         <ExpandTrigger />
       </div>
       <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 400 }}>
-        {/* X-axis labels (cache total) */}
         {cacheBuckets.map((cb, i) => (
           <text
             key={`xl-${cb}`}
@@ -1244,7 +1181,6 @@ function InteractivityHeatmap({
           </text>
         ))}
 
-        {/* Y-axis labels (output tokens) */}
         {outputBuckets.map((ob, j) => (
           <text
             key={`yl-${ob}`}
@@ -1259,7 +1195,6 @@ function InteractivityHeatmap({
           </text>
         ))}
 
-        {/* Cells */}
         {cacheBuckets.map((cb, i) =>
           outputBuckets.map((ob, j) => {
             const cell = cellMap.get(`${cb}-${ob}`);
@@ -1300,7 +1235,6 @@ function InteractivityHeatmap({
           }),
         )}
 
-        {/* X-axis title */}
         <text
           x={LABEL_W + (cacheBuckets.length * CELL) / 2}
           y={outputBuckets.length * CELL + LABEL_H + 26}
@@ -1312,7 +1246,6 @@ function InteractivityHeatmap({
           {t.cacheReadWriteAxis}
         </text>
 
-        {/* Y-axis title */}
         <text
           x={10}
           y={LABEL_H + (outputBuckets.length * CELL) / 2}
@@ -1325,7 +1258,6 @@ function InteractivityHeatmap({
           {t.outputTokensAxis}
         </text>
 
-        {/* Color legend */}
         {Array.from({ length: 10 }, (_, i) => (
           <rect
             key={`legend-${i}`}
@@ -1372,8 +1304,6 @@ function InteractivityHeatmap({
   );
 }
 
-// -- Faceted heatmap by output tokens (small multiples) ----------------------
-
 function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
   const t = STRINGS[useLocale()];
   const [hovered, setHovered] = useState<HeatmapByOutputCell | null>(null);
@@ -1392,14 +1322,12 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
   const readBuckets = [...new Set(data.map((d) => d.readBucket))].toSorted((a, b) => a - b);
   const writeBuckets = [...new Set(data.map((d) => d.writeBucket))].toSorted((a, b) => a - b);
 
-  // Global color scale
   const filtered = hideSmall ? data.filter((d) => d.count >= 5) : data;
   const allP90 = filtered.map((d) => d.p90);
   const globalMin = Math.min(...allP90);
   const globalMax = Math.max(...allP90);
   const globalRange = globalMax - globalMin || 1;
 
-  // Per-facet local scales
   const localScales = new Map<number, { min: number; max: number; range: number }>();
   for (const ob of outputBuckets) {
     const vals = filtered.filter((d) => d.outputBucket === ob).map((d) => d.p90);
@@ -1416,7 +1344,6 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
 
   return (
     <div className="rounded-md border border-border bg-surface p-3">
-      {/* Toggle */}
       <div className="flex items-center justify-end mb-2 gap-2">
         <button
           type="button"
@@ -1474,7 +1401,6 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                 {t.outputLabels[ob] || `${formatBucketLabel(ob)}+ out`}
               </div>
               <svg viewBox={`0 0 ${facetW} ${facetH}`} className="w-full">
-                {/* X labels */}
                 {readBuckets.map((rb, i) => (
                   <text
                     key={`x-${rb}`}
@@ -1488,7 +1414,6 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                     {formatBucketLabel(rb)}
                   </text>
                 ))}
-                {/* Y labels */}
                 {writeBuckets.map((wb, j) => (
                   <text
                     key={`y-${wb}`}
@@ -1502,7 +1427,6 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
                     {formatBucketLabel(wb)}
                   </text>
                 ))}
-                {/* Cells */}
                 {readBuckets.map((rb, i) =>
                   writeBuckets.map((wb, j) => {
                     const cell = cellMap.get(`${rb}-${wb}`);
@@ -1562,7 +1486,6 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
         })}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between mt-2 text-3xs font-mono text-muted-foreground px-1">
         <span>{t.facetFooter(globalScale ? t.sharedScale : t.perFacetScale)}</span>
         {hovered && (
@@ -1602,7 +1525,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H + 20}`} className="w-full" style={{ maxHeight: 260 }}>
-        {/* Y-axis grid + labels */}
         {Array.from({ length: yTicks + 1 }, (_, i) => {
           const val = i * yStep;
           const y = MARGIN.top + PLOT_H - (val / yMax) * PLOT_H;
@@ -1630,7 +1552,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           );
         })}
 
-        {/* Bars: p90 only */}
         {data.map((d, i) => {
           const x = MARGIN.left + gap + i * (barW + gap);
           const p90H = (d.p90 / yMax) * PLOT_H;
@@ -1647,7 +1568,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
                 fillOpacity={0.8}
                 rx={2}
               />
-              {/* X-axis label */}
               <text
                 x={x + barW / 2}
                 y={baseY + 14}
@@ -1658,7 +1578,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
               >
                 {formatBucketLabel(d.bucket)}
               </text>
-              {/* Count label */}
               <text
                 x={x + barW / 2}
                 y={baseY + 26}
@@ -1669,7 +1588,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
               >
                 n={d.count}
               </text>
-              {/* Value on top of bar */}
               <text
                 x={x + barW / 2}
                 y={baseY - p90H - 4}
@@ -1687,7 +1605,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           );
         })}
 
-        {/* X-axis label */}
         <text
           x={MARGIN.left + PLOT_W / 2}
           y={CHART_H + 16}
@@ -1699,7 +1616,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
           {t.cacheReadBarAxisLabel}
         </text>
 
-        {/* Y-axis label */}
         <text
           x={12}
           y={MARGIN.top + PLOT_H / 2}
@@ -1715,8 +1631,6 @@ function CacheReadLatencyChart({ data }: { data: CacheReadBucket[] }) {
     </div>
   );
 }
-
-// -- Main page --------------------------------------------------------------
 
 export default function LatencyPage() {
   return (
@@ -1759,7 +1673,6 @@ function LatencyPageContent() {
           />
         </div>
       )}
-      {/* -- Stats --------------------------------------------------------- */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -1790,7 +1703,6 @@ function LatencyPageContent() {
 
       {data && (
         <>
-          {/* -- Cache Read x Write Heatmap ------------------------------------- */}
           <div>
             <SectionHeader label={t.cacheHeatmapLabel} detail={t.cacheHeatmapDetail} />
             <Expandable title={t.cacheHeatmapLabel} subtitle={t.cacheHeatmapDetail}>
@@ -1798,7 +1710,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Faceted by Output Tokens --------------------------------------- */}
           <div>
             <SectionHeader label={t.facetedLabel} detail={t.facetedDetail} />
             <Expandable title={t.facetedLabel} subtitle={t.facetedDetail}>
@@ -1806,7 +1717,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Cache Read x Write → p90 TTFT ----------------------------------- */}
           <div>
             <SectionHeader label={t.cacheTtftLabel} detail={t.cacheTtftDetail} />
             <Expandable title={t.cacheTtftLabel} subtitle={t.cacheTtftDetail}>
@@ -1814,7 +1724,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Cache Read x Write → p90 Prefill Speed -------------------------- */}
           <div>
             <SectionHeader label={t.cachePrefillLabel} detail={t.cachePrefillDetail} />
             <Expandable title={t.cachePrefillLabel} subtitle={t.cachePrefillDetail}>
@@ -1826,7 +1735,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Cache Total vs Output → p90 Interactivity ----------------------- */}
           <div>
             <SectionHeader
               label={t.interactivityHeatmapLabel}
@@ -1837,7 +1745,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Cache Read vs E2E Latency ----------------------------------------- */}
           <div>
             <SectionHeader label={t.cacheReadLabel} detail={t.cacheReadDetail} />
             <Expandable title={t.cacheReadLabel} subtitle={t.cacheReadDetail} corner>
@@ -1845,7 +1752,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- E2E Latency Distribution Histogram -------------------------------- */}
           <div>
             <SectionHeader
               label={t.e2eDistLabel}
@@ -1860,7 +1766,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- TTFT Distribution ---------------------------------------------- */}
           <div>
             <SectionHeader
               label={t.ttftDistLabel}
@@ -1879,7 +1784,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- TPOT Distribution ---------------------------------------------- */}
           <div>
             <SectionHeader
               label={t.tpotDistLabel}
@@ -1899,7 +1803,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Prefill Speed Distribution ------------------------------------- */}
           <div>
             <SectionHeader
               label={t.prefillDistLabel}
@@ -1919,7 +1822,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- Interactivity Distribution ------------------------------------ */}
           <div>
             <SectionHeader
               label={t.interactDistLabel}
@@ -1946,7 +1848,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- E2E Latency Over Time --------------------------------------------- */}
           <div>
             <SectionHeader label={t.hourlyLabel} detail={t.hourlyDetail} />
             <Expandable title={t.hourlyLabel} subtitle={t.hourlyDetail} corner>
@@ -1954,7 +1855,6 @@ function LatencyPageContent() {
             </Expandable>
           </div>
 
-          {/* -- E2E Latency by Model ---------------------------------------------- */}
           <div>
             <SectionHeader label={t.modelLabel} detail={t.modelDetail(data.byModel.length)} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -1962,7 +1862,6 @@ function LatencyPageContent() {
             </div>
           </div>
 
-          {/* -- Streaming vs Non-Streaming ------------------------------------ */}
           <div>
             <SectionHeader label={t.streamVsNonLabel} />
             <StreamingComparison stats={data.stats} />

@@ -11,13 +11,8 @@ const MinecraftScene = dynamic(() => import('./minecraft-scene'), {
 const INTERACTIVE =
   'button, a, [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="link"], input[type="checkbox"], input[type="radio"], summary';
 
-/**
- * Track whether the user has interacted with the page.
- * Once true, stays true for the session — browsers remember the gesture.
- */
 let userHasInteracted = false;
 
-/** Song start timestamps (in seconds) within the Minecraft OST compilation video. */
 const MINECRAFT_OST_VIDEO_ID = 'bIOiV4d1SVI';
 
 const SONGS = [
@@ -42,19 +37,12 @@ function getInitialMusicStart(): number {
         return Math.floor(parsed.time);
       }
     }
-  } catch {
-    /* ignore parse errors */
-  }
+  } catch {}
 
   const song = SONGS[Math.floor(Math.random() * SONGS.length)];
   return song.start;
 }
 
-/**
- * Renders the floating 3D blocks background, plays the classic Minecraft
- * button click sound on interactive element presses, and streams the
- * Minecraft OST from YouTube — all only when the minecraft theme is enabled.
- */
 export function MinecraftBackground() {
   const [isMinecraft, setIsMinecraft] = useState(false);
 
@@ -85,7 +73,6 @@ export function MinecraftBackground() {
     return () => observer.disconnect();
   }, []);
 
-  // ── Click sound ──
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const bufferRef = useRef<AudioBuffer | null>(null);
@@ -99,7 +86,6 @@ export function MinecraftBackground() {
     return () => window.removeEventListener('minecraft-sound-toggle', check);
   }, []);
 
-  // Preload the click sound into an AudioBuffer for instant playback
   useEffect(() => {
     let cancelled = false;
     if (typeof AudioContext === 'undefined') return;
@@ -122,13 +108,11 @@ export function MinecraftBackground() {
     };
   }, []);
 
-  // Play Minecraft click sound on any interactive element press
   useEffect(() => {
     if (!isMinecraft || !soundEnabled) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target?.closest(INTERACTIVE)) return;
-      // Inventory slots and the game canvas handle their own sounds.
       if (target.closest('[data-mc-silent]')) return;
       const ctx = audioCtxRef.current;
       const buffer = bufferRef.current;
@@ -144,7 +128,6 @@ export function MinecraftBackground() {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [isMinecraft, soundEnabled]);
 
-  // ── Background music (YouTube IFrame API) ──
   const [musicEnabled, setMusicEnabled] = useState(false);
   const playerRef = useRef<YT.Player | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -161,7 +144,6 @@ export function MinecraftBackground() {
 
   const showMusic = isMinecraft && musicEnabled;
 
-  // Load the YT IFrame API script once
   useEffect(() => {
     if (!showMusic) return;
     if (document.querySelector('#yt-iframe-api')) return;
@@ -171,7 +153,6 @@ export function MinecraftBackground() {
     document.head.append(tag);
   }, [showMusic]);
 
-  // Periodically save playback position so music survives page navigations
   useEffect(() => {
     if (!showMusic) return;
     const interval = setInterval(() => {
@@ -182,14 +163,11 @@ export function MinecraftBackground() {
         if (time > 0) {
           sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
         }
-      } catch {
-        /* player may not be ready */
-      }
+      } catch {}
     }, 2000);
     return () => clearInterval(interval);
   }, [showMusic]);
 
-  // Save position on page unload for full-page navigations
   useEffect(() => {
     if (!showMusic) return;
     function save() {
@@ -200,18 +178,12 @@ export function MinecraftBackground() {
         if (time > 0) {
           sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
         }
-      } catch {
-        /* player may not be ready */
-      }
+      } catch {}
     }
     window.addEventListener('beforeunload', save);
     return () => window.removeEventListener('beforeunload', save);
   }, [showMusic]);
 
-  // Create / destroy the player when showMusic toggles.
-  // YT.Player replaces the target element with an iframe, so we create
-  // a disposable inner div inside our stable wrapper to avoid React's
-  // "removeChild" error when the component unmounts.
   useEffect(() => {
     if (!showMusic) {
       playerRef.current?.destroy();
@@ -261,14 +233,8 @@ export function MinecraftBackground() {
               if (disposed) return;
               e.target.setVolume(30);
               e.target.playVideo();
-              // Browsers block autoplay without a prior user gesture.
-              // Keep retrying on every interaction until the player
-              // actually starts (onStateChange fires PLAYING).
               document.addEventListener('pointerdown', nudge, true);
               document.addEventListener('keydown', nudge, true);
-              // If the user already interacted (e.g. clicked the theme
-              // toggle), aggressively retry playVideo on short intervals
-              // so music starts as soon as the browser allows it.
               if (userHasInteracted) {
                 let retries = 0;
                 retry = setInterval(() => {
@@ -282,24 +248,18 @@ export function MinecraftBackground() {
             },
             onStateChange: (e: YT.PlayerEvent & { data: number }) => {
               if (disposed) return;
-              // YT.PlayerState.PLAYING === 1
               if (e.data === 1 && !started) onStarted();
-              // YT.PlayerState.ENDED === 0 — loop the single allowed video
               if (e.data === 0) e.target.playVideo();
             },
           },
         });
-      } catch {
-        // YouTube API failed (blocked by firewall/ad-blocker) — degrade silently
-      }
+      } catch {}
     }
 
-    // YT API might already be loaded
     let installedCallback = false;
     if (typeof YT !== 'undefined' && typeof YT.Player === 'function') {
       createPlayer();
     } else {
-      // Wait for the API to load
       installedCallback = true;
       const prev = window.onYouTubeIframeAPIReady;
       window.onYouTubeIframeAPIReady = () => {
@@ -311,17 +271,14 @@ export function MinecraftBackground() {
     return () => {
       disposed = true;
       clearInterval(retry);
-      // Restore global callback to prevent stale closure chain growth
       if (installedCallback) {
         window.onYouTubeIframeAPIReady = undefined;
       }
-      // Clean up nudge listeners if playback never started
       if (nudgeRef.current) {
         document.removeEventListener('pointerdown', nudgeRef.current, true);
         document.removeEventListener('keydown', nudgeRef.current, true);
         nudgeRef.current = null;
       }
-      // Save position before destroying
       const player = playerRef.current;
       if (player) {
         try {
@@ -329,9 +286,7 @@ export function MinecraftBackground() {
           if (time > 0) {
             sessionStorage.setItem('minecraft-music-pos', JSON.stringify({ time, ts: Date.now() }));
           }
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
       playerRef.current?.destroy();
       playerRef.current = null;

@@ -268,16 +268,11 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
-  // Both inputs are URL-seeded so an article can link the exact figure. Empty
-  // means "use the sequence-aware default", which is why the defaults are not
-  // written into the URL.
   const [minInteractivityInput, setMinInteractivityInput] = useState<string>(
     () => readUrlParams().c_ivmin ?? '',
   );
   const [capsInput, setCapsInput] = useState<string>(() => readUrlParams().c_ttft ?? '');
 
-  // Unofficial-run overlay (`?unofficialrun=…`): each loaded run gets its own
-  // bar per cap, chosen from its own rows only, in the run's palette color.
   const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
     useUnofficialRun();
   const overlayInput = useMemo(
@@ -312,8 +307,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
-  // Agentic rows are read at the selected percentile; fixed sequences at the
-  // median, the same split as the inference chart's interactivity and TTFT axes.
   const statLabel = isAgenticSequence
     ? selectedPercentile.toUpperCase()
     : STAT_LABELS[locale].median;
@@ -330,8 +323,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     [capsInput],
   );
 
-  // One legend governs a chip's official and overlay bars together; overlay-only
-  // hardware is merged in so its bar can be hidden. See docs/tco-calculator.md.
   const legendHwKeys = useMemo(() => {
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
@@ -439,8 +430,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     writeUrlParams({ c_ttft: parsed ? formatFirstTokenCaps(parsed) : '' });
   }, []);
   const handleCapsBlur = useCallback(() => {
-    // Normalize what was typed to the ladder actually in use, so the field and
-    // the chart agree; an unusable entry falls back to the default ladder.
     const parsed = parseFirstTokenCaps(capsInput);
     setCapsInput(parsed ? formatFirstTokenCaps(parsed) : '');
     track('first_token_caps_set', { caps: formatFirstTokenCaps(caps) });
@@ -489,8 +478,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           title: `${t.unofficialRun}: ${series.label}`,
           hw: `overlay-run-${info?.id ?? series.runIndex}`,
           isActive: true,
-          // A label for the run, not a series the legend can hide: per-run
-          // removal lives in the unofficial-run banner.
           isRemovable: false,
           onClick: () => {},
         };

@@ -18,18 +18,12 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
 import { transformUbenchxRun, formatBytes, type UbenchxDerivedRow } from './ubenchx-transform';
 
-/**
- * One color per GPU, using the repo's vendor OKLch hue zones:
- * NVIDIA: hue 120-170, chroma ~0.15; AMD: hue 12-42, chroma ~0.18-0.22.
- */
 const GPU_COLORS: Record<string, string> = {
-  // NVIDIA (green hue zone)
   'B300 SXM': 'oklch(0.62 0.15 128)',
   'GB200 NVL72': 'oklch(0.58 0.15 138)',
   'B200 SXM': 'oklch(0.54 0.15 148)',
   'H200 SXM': 'oklch(0.50 0.15 158)',
   'H100 SXM': 'oklch(0.46 0.15 168)',
-  // AMD (red-orange hue zone)
   MI355X: 'oklch(0.62 0.20 18)',
   MI325X: 'oklch(0.55 0.20 28)',
   MI300X: 'oklch(0.48 0.20 38)',
@@ -137,7 +131,6 @@ function paddedDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.2, max * 1.2];
 }
 
-// Same card and row styling as the /inference scatter tooltips (tooltipUtils.ts).
 const tooltipLine = (label: string, value: string) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
@@ -158,7 +151,6 @@ function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)
   `;
 }
 
-/** Simple inline legend rendered above charts. */
 function GpuLegend({ gpuKeys }: { gpuKeys: readonly string[] }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -214,7 +206,6 @@ function UbenchxChart({
     [allPoints],
   );
 
-  // Log axes get one tick per decade; d3's default log ticks crowd the axis.
   const yTickValues = useMemo(() => {
     if (yScaleType !== 'log') return undefined;
     const [lo, hi] = yDomain;
@@ -326,7 +317,6 @@ export function UbenchxContent() {
 
   const gpuKeys = viewResults.map((r) => r.gpu);
 
-  // Deduplicate source URLs for the footer.
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
 
   return (
@@ -383,7 +373,6 @@ export function UbenchxContent() {
         />
       </section>
 
-      {/* Methodology and metadata */}
       <section className="text-xs text-muted-foreground space-y-1">
         <h3 className="text-sm font-semibold">{t.methodology}</h3>
         <p>{t.methodologyText}</p>

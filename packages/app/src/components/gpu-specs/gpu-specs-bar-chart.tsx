@@ -47,7 +47,6 @@ interface ChartDatum {
   value: number;
 }
 
-/** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
 function positionLabelPairs(
   group: Selection<SVGGElement, unknown, null, undefined>,
   xScale: ScaleLinear<number, number>,
@@ -56,7 +55,6 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, ChartDatum>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, ChartDatum>('.overlay-label');
 
-  // Build a map of max text width per name (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
     const text = select(this).text();
@@ -86,7 +84,6 @@ function positionLabelPairs(
   applyOutlined(overlayLabels);
 }
 
-/** Format a numeric value with commas and up to 2 decimals. */
 function formatValue(value: number): string {
   if (value >= 1000 && Number.isInteger(value)) {
     return value.toLocaleString('en-US');
@@ -188,10 +185,8 @@ export function GpuSpecsBarChart({
       render: (group: Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => {
         const xScale = ctx.xScale as ScaleLinear<number, number>;
         const yScale = ctx.yScale as ScaleBand<string>;
-        // Remove stale labels from previous render (e.g. old .bar-value class)
         group.selectAll('.bar-value').remove();
 
-        // Value labels (top line, bold)
         group
           .selectAll<SVGTextElement, ChartDatum>('.value-label')
           .data(chartData, (d) => d.name)
@@ -205,7 +200,6 @@ export function GpuSpecsBarChart({
           .style('pointer-events', 'none')
           .text((d) => `${formatValue(d.value)} ${unit}`);
 
-        // Subtitle labels (bottom line, muted)
         group
           .selectAll<SVGTextElement, ChartDatum>('.overlay-label')
           .data(chartData, (d) => d.name)
@@ -219,7 +213,6 @@ export function GpuSpecsBarChart({
           .style('pointer-events', 'none')
           .text((d) => (d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD'));
 
-        // Position both labels together using the longer text width
         positionLabelPairs(group, xScale, (d) =>
           d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR,
         );

@@ -1,10 +1,3 @@
-/**
- * The architecture diagram lives on the /model/[slug] deep-dive pages, always
- * expanded (`variant="inline"`). The dashboard renders a link row to those
- * pages where the collapsible drawer used to be — covered by the final
- * describe block.
- */
-
 const MODEL_SITE_URL = 'https://inferencex.semianalysis.com';
 
 function dismissStarModal(win: Window): void {
@@ -20,7 +13,6 @@ function expectNoPageOverflow(): void {
   });
 }
 
-/** Visit a model deep-dive page and wait for the inline diagram to render. */
 function visitModelPage(slug: string) {
   cy.viewport(1280, 800);
   cy.visit(`/model/${slug}`, {
@@ -35,8 +27,6 @@ function visitModelPage(slug: string) {
 describe('Model Architecture Diagram', () => {
   describe('Collapsible Transformer Blocks (MoE model - DeepSeek R1)', () => {
     before(() => {
-      // DeepSeek R1 has a rich architecture diagram (MoE + dense blocks)
-      // that the tests below exercise.
       visitModelPage('deepseek-r1');
     });
 
@@ -49,16 +39,13 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', 'MLA');
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '671B');
 
-      // MoE model (DeepSeek R1) should show both dense and MoE collapsed blocks
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
       cy.get('[data-testid="expand-transformer"]').should('exist');
 
       cy.get('[data-testid="expand-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="collapse-denseTransformer"]').should('exist');
-      // Main transformer should still be collapsed
       cy.get('[data-testid="expand-transformer"]').should('exist');
 
-      // Already expanded from previous test
       cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
     });
@@ -66,12 +53,9 @@ describe('Model Architecture Diagram', () => {
     it('expands MoE transformer block on click', () => {
       cy.get('[data-testid="expand-transformer"]').click({ force: true });
       cy.get('[data-testid="collapse-transformer"]').should('exist');
-      // Dense block should still be collapsed
       cy.get('[data-testid="expand-denseTransformer"]').should('exist');
 
-      // MLA attention should NOT be expandable
       cy.get('[data-testid="expand-attention"]').should('not.exist');
-      // Expert grid should be expandable
       cy.get('[data-testid="expand-experts"]').should('exist');
 
       cy.get('[data-testid="expand-experts"]').click({ force: true });
@@ -88,7 +72,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="collapse-denseTransformer"]').should('exist');
       cy.get('[data-testid="collapse-transformer"]').should('exist');
 
-      // Collapse both for clean state
       cy.get('[data-testid="collapse-denseTransformer"]').click({ force: true });
       cy.get('[data-testid="collapse-transformer"]').click({ force: true });
     });
@@ -108,7 +91,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-attention"]').should('exist');
       cy.get('[data-testid="expand-ffn"]').should('exist');
 
-      // Transformer already expanded from previous test
       cy.get('[data-testid="expand-attention"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
 
@@ -171,10 +153,8 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('shows two separate transformer blocks (no single expand-transformer)', () => {
-      // Two alternating blocks should be visible
       cy.get('[data-testid="expand-altBlock0"]').should('exist');
       cy.get('[data-testid="expand-altBlock1"]').should('exist');
-      // No single "expand-transformer" block (replaced by two alternating blocks)
       cy.get('[data-testid="expand-transformer"]').should('not.exist');
       cy.get('[data-testid="expand-denseTransformer"]').should('not.exist');
 
@@ -184,17 +164,13 @@ describe('Model Architecture Diagram', () => {
     it('first block expands to show Sliding Attention + Sink internals', () => {
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
-      // Expert grid should be expandable within the block
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
-      // Second block should remain collapsed
       cy.get('[data-testid="expand-altBlock1"]').should('exist');
 
       cy.get('[data-testid="expand-altBlock1"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock1"]').should('exist');
-      // Expert grid should be expandable within the block
       cy.get('[data-testid="expand-altExperts1"]').should('exist');
 
-      // Both were expanded in previous tests
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
       cy.get('[data-testid="collapse-altBlock1"]').should('exist');
 
@@ -219,15 +195,12 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('shows a hash-routed MoE prefix block; mHC caption appears once a block is open', () => {
-      // First 3 layers render as a separate hash-routed prefix block
       cy.get('[data-testid="expand-hashBlock"]').should('exist');
-      // mHC caption only appears once a block exposing the mixer nodes is expanded
       cy.get('[data-testid="mhc-note"]').should('not.exist');
       cy.get('[data-testid="expand-hashBlock"]').click({ force: true });
       cy.get('[data-testid="collapse-hashBlock"]').should('exist');
       cy.get('[data-testid="model-architecture-svg"]').contains('Hash Router').should('exist');
       cy.get('[data-testid="mhc-note"]').should('be.visible').and('contain', 'Hyper-Connections');
-      // Restore collapsed state for subsequent tests (shared state: testIsolation off)
       cy.get('[data-testid="collapse-hashBlock"]').click({ force: true });
       cy.get('[data-testid="mhc-note"]').should('not.exist');
     });
@@ -235,17 +208,13 @@ describe('Model Architecture Diagram', () => {
     it('Hybrid attention is expandable and drills down to a Sliding Window block', () => {
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
-      // The union-softmax caption only appears once the attention drill-down is open
       cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
-      // Hybrid attention drills down (unlike gpt-oss sink/full GQA, which does not)
       cy.get('[data-testid="expand-altAttention0"]').should('exist');
       cy.get('[data-testid="expand-altAttention0"]').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
-      // Caption clarifies the two branches feed one softmax (not two attentions)
       cy.get('[data-testid="hybrid-attention-note"]')
         .should('be.visible')
         .and('contain', 'single softmax');
-      // Expert grid still expandable within the block
       cy.get('[data-testid="expand-altExperts0"]').should('exist');
 
       cy.get('[data-testid="expand-altExperts0"]').click({ force: true });
@@ -253,13 +222,9 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('collapsing the parent block hides the union-softmax caption (no orphan caption)', () => {
-      // altBlock0 + altAttention0 are expanded from the previous tests; collapsing
-      // the parent removes the drill-down from the SVG, so the caption must go too
-      // even though altAttention0 stays in the expansion state.
       cy.get('[data-testid="hybrid-attention-note"]').should('be.visible');
       cy.get('[data-testid="collapse-altBlock0"]').click({ force: true });
       cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
-      // Re-expanding the parent restores the remembered drill-down and its caption.
       cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
       cy.get('[data-testid="hybrid-attention-note"]')
         .should('be.visible')
@@ -269,9 +234,6 @@ describe('Model Architecture Diagram', () => {
 
   describe('Hybrid Attention Blocks (MoE model - Kimi K3)', () => {
     before(() => {
-      // The /model page renders the diagram regardless of benchmark
-      // availability, so no fixture patching is needed (unlike the old
-      // dashboard drawer, which required the model to be selectable).
       visitModelPage('kimi-k3');
     });
 
@@ -280,7 +242,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="expand-altBlock1"]').should('exist');
       cy.get('[data-testid="alternating-indicator"]').should('exist');
       cy.get('[data-testid="model-architecture-svg"]').contains('KDA').should('exist');
-      // K3 is a 68:24 split, not the 1:1 interleave the default caption implies.
       cy.get('[data-testid="model-architecture-svg"]')
         .contains('gated MLA every 4th layer')
         .should('exist');
@@ -290,11 +251,6 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('keeps attention static — no CSA/HCA drill-down or union-softmax caption', () => {
-      // K3's hybrid is KDA + gated MLA, not DeepSeek V4's local/compressed CSA-HCA
-      // pair, so `alternatingAttentionExpandable: false` must suppress both the
-      // drill-down and the caption that explains it. DeepSeek V4 keeps both.
-      // Retries re-run this test with the block already expanded, so expand
-      // only when it is still collapsed.
       cy.get('body').then(($body) => {
         if ($body.find('[data-testid="expand-altBlock0"]').length > 0) {
           cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
@@ -303,17 +259,11 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="collapse-altBlock0"]').should('exist');
       cy.get('[data-testid="expand-altAttention0"]').should('not.exist');
       cy.get('[data-testid="hybrid-attention-note"]').should('not.exist');
-      // The MoE expert grid inside the block is still expandable, and its router
-      // line reports K3's own two shared experts rather than an assumed one.
       cy.get('[data-testid="expand-altExperts0"]').should('exist').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]')
         .contains('Top-16 of 896 routed + 2 shared')
         .should('exist');
-      // Same count drives the Experts figure in the specs bar: 16 routed + 2
-      // shared active out of 898, not the assumed "+1".
       cy.get('[data-testid="model-architecture-svg"]').contains('16+2/898').should('exist');
-      // K3's FFN is SiTU-GLU, so the drill-down must not claim SwiGLU/SiLU.
-      // The flow caption renders uppercased, so match case-insensitively.
       cy.get('[data-testid="model-architecture-svg"]')
         .contains(/expert ffn \(situ-glu\)/iu)
         .should('exist');
@@ -324,8 +274,6 @@ describe('Model Architecture Diagram', () => {
     });
 
     it('labels the dense prefix block KDA rather than the model-wide hybrid type', () => {
-      // Layer 1 is the dense-FFN layer and a KDA layer, so "Hybrid Attention"
-      // would misdescribe it next to correctly labelled KDA/MLA blocks.
       cy.get('[data-testid="expand-denseTransformer"]').should('exist').click({ force: true });
       cy.get('[data-testid="model-architecture-svg"]')
         .contains('Kimi Delta Attention (KDA)')
@@ -356,7 +304,6 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', 'Hybrid')
         .and('contain.text', '2.8T')
         .and('have.attr', 'href', '/model/kimi-k3');
-      // Models without a MODEL_ARCHITECTURES entry still get a card (no badges).
       cy.get('[data-testid="model-index-link-glm-5-3"]').should('contain.text', 'GLM-5.3');
     });
 
@@ -435,9 +382,6 @@ describe('Model Architecture Diagram', () => {
           .should('contain.text', '在完整仪表板中查看');
         cy.get('[data-testid="language-toggle"]').should('have.attr', 'href', '/model/deepseek-r1');
 
-        // The click assertions above cover the client transition. Canonical and
-        // hreflang are SSR contracts, so verify them from a fresh document rather
-        // than racing streamed App Router head updates after the soft navigation.
         cy.reload();
         cy.get('[data-testid="model-detail-page"]').should('be.visible');
         cy.get('link[rel="canonical"]').should(
@@ -474,7 +418,6 @@ describe('Model Architecture Diagram', () => {
   describe('Embedded dashboard changelog starts collapsed', () => {
     before(() => {
       cy.viewport(1280, 800);
-      // deepseek-r1 has fixture benchmark data, so the changelog renders.
       cy.visit('/model/deepseek-r1', {
         onBeforeLoad(win) {
           dismissStarModal(win);
@@ -535,9 +478,6 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="model-architecture-link"]')
         .should('have.attr', 'href')
         .and('equal', '/model/deepseek-r1');
-      // The former banner copy and badges now live in the tooltip; Radix
-      // tooltips open on keyboard focus, which is more reliable in Cypress
-      // than synthetic hover.
       cy.get('[data-testid="model-architecture-link"]').focus();
       cy.get('[data-testid="model-architecture-tooltip"]')
         .should('be.visible')
@@ -545,7 +485,6 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', 'MoE')
         .and('contain.text', 'MLA')
         .and('contain.text', '671B');
-      // Dismiss the tooltip so it doesn't cover the link for the next test.
       cy.get('body').type('{esc}');
     });
 

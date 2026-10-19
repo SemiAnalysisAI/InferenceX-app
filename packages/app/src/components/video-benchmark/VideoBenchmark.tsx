@@ -404,7 +404,6 @@ export default function VideoBenchmark({
     }
   }
   useEffect(() => {
-    // A shared preview link must not trigger requests to a URL supplied by its sender.
     if (['127.0.0.1', 'localhost'].includes(location.hostname)) {
       const initial = new URLSearchParams(location.search).get('manifest');
       if (initial) {

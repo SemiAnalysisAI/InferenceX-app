@@ -52,14 +52,12 @@ const STRINGS = {
   },
 } as const;
 
-// Mirror the COLORS palette used by token-flamegraph.tsx so the legend reads
-// consistently across both views. The values are tailwind 500-shade tokens.
-const COLOR_CACHED = '#10b981'; // emerald-500
-const COLOR_UNCACHED = '#0ea5e9'; // sky-500
+const COLOR_CACHED = '#10b981';
+const COLOR_UNCACHED = '#0ea5e9';
 
 const MARGIN = { top: 8, right: 16, bottom: 28, left: 56 } as const;
 const HEIGHT = 320;
-const POINT_HIT_RADIUS = 12; // px hit-test radius for hover/tooltip
+const POINT_HIT_RADIUS = 12;
 
 interface TooltipState {
   point: TokenPoint;
@@ -74,15 +72,12 @@ export function TokensOverTimeChart({
 }: {
   points: TokenPoint[];
   mode: TokenSplitMode;
-  /** Display name of the agent whose requests are being plotted. */
   agentLabel?: string;
 }) {
   const t = STRINGS[useLocale()];
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  // Unique clipPath ID per component instance — two charts on the same page
-  // would otherwise share clipping bounds and collide on the first render.
   const clipId = useId().replaceAll(':', '');
 
   useEffect(() => {
@@ -98,12 +93,8 @@ export function TokensOverTimeChart({
   const innerW = Math.max(1, width - MARGIN.left - MARGIN.right);
   const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
 
-  // Read the active split off each point. Values, max, and tooltip all
-  // adapt as the user toggles between API-reported and hash-block modes.
   const splitOf = (p: TokenPoint) => (mode === 'hash' ? p.hash : p.api);
 
-  // Full data extent — anchors the brush bar's track and the chart's initial
-  // window. Computed once across all points (independent of mode).
   const maxElapsed = useMemo(() => {
     let mE = 0;
     for (const p of points) {
@@ -112,14 +103,8 @@ export function TokensOverTimeChart({
     return mE || 1;
   }, [points]);
 
-  // Aggregate hit rates over every visible point — both api and hash, always.
-  // They sit in the header regardless of the active sub-mode so the user can
-  // compare what the API actually cached against the trie-derived upper bound.
   const hitRates = useMemo(() => computeCacheHitRates(points), [points]);
 
-  // Brush window controls the visible x-range. Y autoscales to the points
-  // inside the window so a deep zoom on a single-turn doesn't waste vertical
-  // headroom on tall off-screen turns.
   const brush = useBrush({ fullStart: 0, fullEnd: maxElapsed });
 
   const visiblePoints = useMemo(
@@ -136,17 +121,10 @@ export function TokensOverTimeChart({
     return mT || 1;
   }, [visiblePoints, mode]);
 
-  // Scales: time → x px, tokens → y px (with y inverted because SVG origin is
-  // top-left). Both derive from the brush window so the chart always shows the
-  // selected sub-range.
   const xSpan = Math.max(1, brush.end - brush.start);
   const xOf = (ms: number) => ((ms - brush.start) / xSpan) * innerW;
   const yOf = (tokens: number) => innerH - (tokens / maxTotal) * innerH;
 
-  // SVG path strings for the two stacked fills + the dark total stroke. We
-  // build paths from EVERY point (not just the brushed subset) and rely on the
-  // SVG clipPath to crop off-screen segments. This keeps the line continuous
-  // across the visible edge instead of stopping abruptly at the brush handle.
   const { totalPath, cachedFill, uncachedFill } = useMemo(() => {
     if (points.length === 0) {
       return { totalPath: '', cachedFill: '', uncachedFill: '' };
@@ -167,21 +145,13 @@ export function TokensOverTimeChart({
       totalCmds.push(`${cmd} ${x} ${yTotal}`);
     });
 
-    // Close fills back to the baseline (y = innerH). The non-null assertions
-    // are safe — we early-returned on `points.length === 0` above.
     const last = points.at(-1)!;
     const first = points.at(0)!;
     const baselineRight = `L ${xOf(last.elapsedMs)} ${innerH}`;
     const baselineLeft = `L ${xOf(first.elapsedMs)} ${innerH} Z`;
 
-    // Cached layer: from baseline up to cached top.
     const cached = `${cachedTopCmds.join(' ')} ${baselineRight} ${baselineLeft}`;
 
-    // Uncached layer: drawn between cached top and total top — a closed
-    // ribbon traced forward along the total then backward along the cached top.
-    // Strip every `M` from the reversed segment: the original cachedTopCmds
-    // starts with `M`, which lands at the end after toReversed() and would
-    // otherwise inject a "move to" mid-path that breaks the polygon.
     const reverseCached = [...cachedTopCmds]
       .toReversed()
       .map((cmd) => cmd.replace(/^M/u, 'L'))
@@ -192,8 +162,6 @@ export function TokensOverTimeChart({
     return { totalPath: total, cachedFill: cached, uncachedFill: uncached };
   }, [points, mode, innerW, innerH, brush.start, brush.end, maxTotal]);
 
-  // 5–7 evenly spaced ticks across the BRUSHED window so labels stay readable
-  // when the user zooms in to a sub-range.
   const xTicks = useMemo(() => {
     const n = 6;
     return Array.from(
@@ -216,8 +184,6 @@ export function TokensOverTimeChart({
       setTooltip(null);
       return;
     }
-    // Find nearest VISIBLE point by x position — points outside the brush
-    // window are clipped, so the tooltip ignores them.
     let nearest: TokenPoint | null = null;
     let nearestDx = Infinity;
     for (const p of visiblePoints) {
@@ -248,8 +214,6 @@ export function TokensOverTimeChart({
 
   return (
     <div className="space-y-4">
-      {/* Header — sticky with the same negative-top trick used on the per-turn
-          flamegraph so it stays flush below the global header on scroll. */}
       <div className="sticky -top-5 z-20 -mx-2 space-y-2 border-b border-border bg-background/95 px-2 pb-2 pt-5 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-3">
           <span className="font-mono text-3xs font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
@@ -279,9 +243,6 @@ export function TokensOverTimeChart({
           </div>
         </div>
 
-        {/* Aggregate hit rates — visible in both API Cache and Hash Blocks
-            sub-modes so the API-reported number can be compared directly to
-            the trie-derived upper bound. */}
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <HitRateTile
             label={t.apiHitRateLabel}
@@ -326,7 +287,6 @@ export function TokensOverTimeChart({
             </clipPath>
           </defs>
           <g transform={`translate(${MARGIN.left} ${MARGIN.top})`}>
-            {/* Y-axis gridlines + labels */}
             {yTicks.map((tick, i) => {
               const y = yOf(tick);
               return (
@@ -352,8 +312,6 @@ export function TokensOverTimeChart({
               );
             })}
 
-            {/* Data layer — clipped to the plot rect so brushed-out segments
-                don't leak past the y-axis or into the x-axis label band. */}
             <g clipPath={`url(#clip-${clipId})`}>
               <path d={cachedFill} fill={COLOR_CACHED} fillOpacity={0.55} />
               <path d={uncachedFill} fill={COLOR_UNCACHED} fillOpacity={0.55} />
@@ -375,7 +333,6 @@ export function TokensOverTimeChart({
               )}
             </g>
 
-            {/* X-axis baseline */}
             <line
               x1={0}
               x2={innerW}
@@ -385,7 +342,6 @@ export function TokensOverTimeChart({
               strokeOpacity={0.2}
             />
 
-            {/* X-axis ticks + labels */}
             {xTicks.map((tick, i) => {
               const x = xOf(tick);
               return (
@@ -412,9 +368,6 @@ export function TokensOverTimeChart({
           </g>
         </svg>
 
-        {/* Brush bar — drag the handles to narrow the visible window, or grab
-            the selection body to pan. Matches the Epoch AI data explorer's
-            range-selector pattern. */}
         <div className="mt-2">
           <BrushBar
             width={width - 32}

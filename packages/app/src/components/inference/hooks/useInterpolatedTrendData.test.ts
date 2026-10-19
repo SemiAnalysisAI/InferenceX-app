@@ -13,8 +13,6 @@ import {
 } from './useInterpolatedTrendData';
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
 
-// ─── Factory ───
-
 function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -226,8 +224,6 @@ describe('rowSupportsTrendMetric', () => {
   });
 });
 
-// ─── Tests ───
-
 describe('interpolateMetricAtInteractivity', () => {
   it('returns null for empty points', () => {
     expect(interpolateMetricAtInteractivity([], 100, 'tpPerGpu')).toBeNull();
@@ -306,8 +302,6 @@ describe('interpolateMetricAtInteractivity', () => {
       }),
     ];
 
-    // The total-throughput frontier drops x=40, while the output-throughput
-    // frontier keeps x=40 and drops x=20. The midpoint must follow the latter.
     expect(interpolateMetricAtInteractivity(points, 50, 'outputTokensPerDollarH')).toBeCloseTo(
       581_250,
       0,
@@ -364,7 +358,7 @@ describe('interpolateMetricAtInteractivity', () => {
   it('filters dominated points via Pareto front', () => {
     const points = [
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),
-      makePoint({ x: 30, tpPerGpu: { y: 300, roof: false } }), // dominated
+      makePoint({ x: 30, tpPerGpu: { y: 300, roof: false } }),
       makePoint({ x: 60, tpPerGpu: { y: 400, roof: false } }),
     ];
     const result = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
@@ -449,9 +443,6 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),
       makePoint({ x: 40, tpPerGpu: { y: 600, roof: false } }),
     ];
-    // jOutput is not set on these points. Returning 0 would render a flat
-    // zero-line that looks like real data (the bug F4 fixed); return null
-    // so the trend chart can show a gap instead.
     const result = interpolateMetricAtInteractivity(points, 30, 'jOutput');
     expect(result).toBeNull();
   });
