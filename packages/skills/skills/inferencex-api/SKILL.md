@@ -24,6 +24,13 @@ formal command directly; it captures the data it needs. Use `inferencex discover
 only to resolve missing selectors, and `describe` or `schema` for offline command
 metadata.
 
+`discover` writes a normalized projection to stdout, not the complete API bodies.
+Redirecting stdout preserves that projection and its source hashes, but not the
+bytes those hashes identify. For coverage or exclusion claims, reuse a retained
+bundle response that contains the needed population, or use the
+[raw capture recipes](references/public-api-examples.md) and calculate from their
+saved bodies. Omit supplemental claims whose source bodies were not retained.
+
 ```bash
 inferencex_cli=.agents/skills/inferencex-api/scripts/inferencex.mjs
 mkdir -p evidence
@@ -103,12 +110,15 @@ the user's selectors and acceptance criteria throughout classification and costi
 4. Read the generated report against the saved responses. Check every factual
    sentence, including limitations and recommendations: its records, field paths
    and calculation must support the wording. Correct unsupported claims in the
-   generator and regenerate, then perform the applicable verification. In the
-   final reply, copy the checked conclusion sentence verbatim—with its scope and
-   conditions—and add artifact links plus the verification outcome. Keep analysis
-   in the report unless the user asks for it in the reply. Additional
-   interpretations need their own supporting evidence. `verify` checks the formal
-   bundle; separately check supplemental reports and the final answer.
+   generator and regenerate, then perform the applicable verification. Save a
+   `handoff.md` containing only the checked conclusion sentence verbatim, artifact
+   links and the verification outcome. If the user explicitly requests inline
+   analysis, include the corresponding checked report text verbatim. Read this
+   handoff once against the report, then copy it as the final reply without
+   another summary, fact inventory or table. Rewriting the handoff can change
+   source attribution, populations or units after they were checked. `verify`
+   checks the formal bundle; supplemental reports and the handoff need this
+   separate review.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct

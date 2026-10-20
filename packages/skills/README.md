@@ -185,12 +185,11 @@ Codex 对应使用 `$inferencex-to-chart` 或 `$inferencex-to-table`，也可从
 汇总在一张图片中，另附详细的 Markdown 表格和可导入电子表格的 CSV。两种版式都会根据来源数量（1 到 40 个）自动调整。
 两种输出共用统计结果与数据范围，保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
 
-输入 `/inferencex-pr-improvements 查看 DeepSeek-R1-0528 在 H200 SGLang FP8、8K/1K、
-35 tok/s/user 下的历史输出吞吐量提升，附来源 PR 和运行链接`，可生成瀑布图、汇总和 CSV。
+输入 `/inferencex-pr-improvements 查看 DeepSeek-R1-0528 在 H200 SGLang FP8、8K/1K、35 tok/s/user 下的历史输出吞吐量提升，附来源 PR 和运行链接`，可生成瀑布图、汇总和 CSV。
 Codex 对应使用 `$inferencex-pr-improvements`。该入口支持公开 API 或已保存的 waterfall 响应，
-在相同交互速度目标下比较基线、历次新高和最佳观测；成本下降基于模型估算。
+在相同交互速度目标下比较基线、历次刷新纪录的结果和最佳观测；成本下降按成本模型估算。
 来源链接用于追溯数据，不代表已单独验证每个 PR 的因果贡献。这些视图产物与正式 CLI 证据包分开；
-查询新数据前会检查线上 API 是否支持 waterfall。
+查询新数据前会检查所连接的部署是否支持 waterfall API。
 
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。

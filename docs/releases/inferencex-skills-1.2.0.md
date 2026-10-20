@@ -14,7 +14,7 @@ raw-view artifacts are not formal CLI verification bundles.
 
 ## 中文说明
 
-新增 `inferencex-pr-improvements`，在固定交互速度目标下展示历史吞吐量提升和模型估算的成本下降。
+新增 `inferencex-pr-improvements`，在固定交互速度目标下展示历史吞吐量提升，以及按成本模型估算的成本下降。
 Codex 和 Claude Code 安装均包含该入口及其渲染脚本。
 
 该入口支持线上 API 查询或已保存的 waterfall 响应，生成瀑布图、CSV 和汇总，
