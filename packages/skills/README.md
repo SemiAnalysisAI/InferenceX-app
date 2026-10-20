@@ -3,22 +3,23 @@
 > InferenceX benchmark data for coding agents and the command line.
 
 Install InferenceX skills for Codex or Claude Code. Query existing public benchmarks,
-create AgentX charts and tables, export source data, and verify saved evidence offline.
+create AgentX charts and tables, explore PR-linked performance improvements,
+export source data, and verify saved evidence offline.
 
 ## Install
 
 Requires Node.js 24 or later. Run from your project directory.
 
-The commands below target 1.1.0. Until it is published, use the supplied candidate
+The commands below target 1.2.0. Until it is published, use the supplied candidate
 archive as described below.
 
 ```sh
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- \
   inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- \
   inferencex-skills install --target claude
 ```
 
@@ -29,10 +30,11 @@ Codex uses `~/.agents/skills/`; Claude Code uses `~/.claude/skills/`. Use
 current directory. `--dir <skills-root>` is an explicit alternative to `--scope`.
 
 Each installation includes `inferencex/` (the general entry), `inferencex-to-chart/`
-and `inferencex-to-table/` (AgentX output shortcuts), and `inferencex-api/`
+and `inferencex-to-table/` (AgentX output shortcuts),
+`inferencex-pr-improvements/` (historical performance gains), and `inferencex-api/`
 (the shared CLI and cookbooks). Existing script paths and the old skill name
 continue to work. Upgrade an existing installation with `install --force` using
-the same target and scope; save local edits first. `status --json` reports all four
+the same target and scope; save local edits first. `status --json` reports all five
 paths, including missing or damaged entries.
 
 <details>
@@ -99,6 +101,18 @@ a CSV for spreadsheets. Both layouts adapt from one source to forty. Each output
 retains the saved source and sample counts.
 You can still ask `/inferencex` for either output, or request a chart and table together.
 
+For historical throughput gains or modeled cost reductions:
+
+> /inferencex-pr-improvements Show DeepSeek-R1-0528 on H200 SGLang FP8,
+> 8K/1K, output throughput at 35 tok/s/user, with source PR and run links.
+
+Codex uses `$inferencex-pr-improvements`. The skill renders a waterfall, summary
+and CSV from the public API or a saved waterfall response. It compares the
+baseline with successive records and the best observation at the same
+interactivity target. Source links establish provenance, not an isolated causal
+effect of each PR. These raw-view outputs are separate from formal CLI evidence
+bundles. Fresh queries check that the deployment supports the waterfall API.
+
 You can also use the CLI directly from the installed skill:
 
 ```sh
@@ -118,6 +132,7 @@ Each export needs a new output directory. Public queries require no API key.
 | PowerX               | Export measured power and energy observations.                        |
 | AgentX               | Export agentic workload summaries and check trace availability.       |
 | AgentX charts/tables | Compare request counts, token lengths and latency by recorded source. |
+| PR improvements      | Show historical gains with associated source PR and run links.        |
 | Result provenance    | Investigate a result's producer, configuration and logs.              |
 | TCO                  | Compare costs using your price assumptions.                           |
 | Framework releases   | Compare matched observations across versions.                         |
@@ -140,18 +155,19 @@ Online requests carry package attribution for aggregate request counts. Set
 <summary>简体中文</summary>
 
 为 Codex 或 Claude Code 安装 InferenceX skills，查询已有的公开基准测试数据，
-生成 AgentX 图表与表格、导出源数据，并离线核验已保存的证据。
+生成 AgentX 图表与表格、查看 PR 关联的性能提升、导出源数据，并离线核验已保存的证据。
 
-需要 Node.js 24 或更高版本。上方命令指定 1.1.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
+需要 Node.js 24 或更高版本。上方命令指定 1.2.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
 安装、状态检查和升级使用同一份产物。没有候选包时，在 `packages/skills` 目录执行 `npm pack` 生成。
 
 默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
 Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。
 `--scope project` 使用当前项目的对应目录；自定义目录可用 `--dir`，不与 `--scope` 混用。
 每处安装均包含 `inferencex/` 通用入口、`inferencex-to-chart/` 与 `inferencex-to-table/`
-两个 AgentX 输出入口，以及 `inferencex-api/` 共用 CLI 与 cookbook。
+两个 AgentX 输出入口、`inferencex-pr-improvements/` 历史性能提升入口，
+以及 `inferencex-api/` 共用 CLI 与 cookbook。
 旧脚本路径与技能名称继续可用。升级时使用相同 target 和 scope 并加上 `--force`，
-先保存本地修改；`status --json` 会分别报告四个目录的状态，入口缺失或损坏时也会报告。
+先保存本地修改；`status --json` 会分别报告五个目录的状态，入口缺失或损坏时也会报告。
 
 安装后，新开一个 Claude Code 会话并输入 `/inferencex 核对这份表格里的 TCO 假设`；
 Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
@@ -168,6 +184,14 @@ Codex 对应使用 `$inferencex-to-chart` 或 `$inferencex-to-table`，也可从
 也可改为输入 token 数、输出 token 数、E2E 或 TTFT 的中位数。表格入口把请求数、占比和四项中位数
 汇总在一张图片中，另附详细的 Markdown 表格和可导入电子表格的 CSV。两种版式都会根据来源数量（1 到 40 个）自动调整。
 两种输出共用统计结果与数据范围，保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
+
+输入 `/inferencex-pr-improvements 查看 DeepSeek-R1-0528 在 H200 SGLang FP8、8K/1K、
+35 tok/s/user 下的历史输出吞吐量提升，附来源 PR 和运行链接`，可生成瀑布图、汇总和 CSV。
+Codex 对应使用 `$inferencex-pr-improvements`。该入口支持公开 API 或已保存的 waterfall 响应，
+在相同交互速度目标下比较基线、历次新高和最佳观测；成本下降基于模型估算。
+来源链接用于追溯数据，不代表已单独验证每个 PR 的因果贡献。这些视图产物与正式 CLI 证据包分开；
+查询新数据前会检查线上 API 是否支持 waterfall。
+
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。

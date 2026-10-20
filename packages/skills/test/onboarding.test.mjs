@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
-const shortcutNames = ['inferencex-to-chart', 'inferencex-to-table'];
+const shortcutNames = ['inferencex-to-chart', 'inferencex-to-table', 'inferencex-pr-improvements'];
 
 function output(result) {
   return JSON.parse(succeeded(result).stdout);
@@ -26,7 +26,7 @@ function withHome(cwd, args, personalRoot) {
   }
 }
 
-test('both hosts install the general entry and output shortcuts sharing one CLI runtime', () => {
+test('both hosts install the general entry and bundled shortcuts with their runtimes', () => {
   for (const target of ['claude', 'codex']) {
     const cwd = suite.project();
     const installed = output(suite.run(['install', '--target', target, '--json'], cwd));
@@ -55,7 +55,12 @@ test('both hosts install the general entry and output shortcuts sharing one CLI 
       assert.ok(links.length > 0);
       for (const [, path] of links)
         assert.ok(readFileSync(resolve(shortcut.skill_path, path)).length);
-      assert.match(instructions, /\.\.\/inferencex-api\/scripts\/inferencex\.mjs/);
+      if (name === 'inferencex-pr-improvements') {
+        const helper = join(shortcut.skill_path, 'scripts/waterfall.mjs');
+        assert.match(succeeded(suite.node([helper, '--help'], { cwd })).stdout, /--input/);
+      } else {
+        assert.match(instructions, /\.\.\/inferencex-api\/scripts\/inferencex\.mjs/);
+      }
     }
     const cli = join(installed.skill_path, 'scripts/inferencex.mjs');
     const described = output(suite.node([cli, 'describe'], { cwd }));
@@ -150,17 +155,24 @@ test('entry integrity failures are observable and a missing entry is repaired wi
   }
 });
 
-test('dry-run previews both output shortcuts without creating files', () => {
+test('dry-run previews all bundled shortcuts without creating files', () => {
   const cwd = suite.project();
   const preview = output(suite.run(['install', '--dry-run', '--json'], cwd));
   assert.equal(preview.ready, false);
   for (const name of shortcutNames) {
     assert.equal(preview.shortcuts[name].outcome, 'would_install');
-    assert.deepEqual(preview.shortcuts[name].write_paths, [
-      '.inferencex-skills.json',
-      'SKILL.md',
-      'integrity.json',
-    ]);
+    assert.deepEqual(
+      preview.shortcuts[name].write_paths,
+      name === 'inferencex-pr-improvements'
+        ? [
+            '.inferencex-skills.json',
+            'SKILL.md',
+            'agents/openai.yaml',
+            'integrity.json',
+            'scripts/waterfall.mjs',
+          ]
+        : ['.inferencex-skills.json', 'SKILL.md', 'integrity.json'],
+    );
   }
   assert.deepEqual(readdirSync(cwd), []);
 });
@@ -214,11 +226,10 @@ syncBuiltinESMExports();
   const recovered = output(suite.run(['install', '--json'], cwd));
   assert.equal(recovered.outcome, 'skipped');
   assert.equal(recovered.entrypoint.installation_state, 'installed');
-  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
-    'inferencex',
-    'inferencex-api',
-    ...shortcutNames,
-  ]);
+  assert.deepEqual(
+    readdirSync(join(cwd, '.claude/skills')),
+    ['inferencex', 'inferencex-api', ...shortcutNames].sort(),
+  );
 });
 
 test('an old runtime with a new entry requires an explicit upgrade before declaring readiness', () => {
