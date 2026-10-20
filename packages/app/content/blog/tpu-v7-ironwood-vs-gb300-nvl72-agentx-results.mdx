@@ -1,0 +1,206 @@
+---
+title: 'TPU v7 vs GB300 NVL72 on AgentX: 1.85x Tokens per Dollar on Qwen3.5 FP8 at 200 tok/s/user, 0.54x vs FP4'
+subtitle: 'AgentX, Qwen3.5-397B, Kimi K3, tokens per $1 TCO on external and internal TPU v7 cost, tokens per MW, tokens per chip, GB300 NVL72 FP4, B200 and B300, end-to-end latency vs p90 interactivity'
+seoDescription: 'TPU v7 vs GB300 NVL72 on AgentX, Qwen3.5 FP8: 0.98x tokens per dollar at 100 tok/s/user and 1.85x at 200 on external TCO, 1.15x and 2.17x on internal TCO.'
+date: '2026-10-19'
+publishDate: '2026-10-19'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - google
+  - tpu
+  - tpuv7
+  - ironwood
+  - gb300
+  - nvl72
+  - qwen
+  - kimi
+  - vllm
+---
+
+A 4-chip TPU v7 (Ironwood) host serving Qwen3.5-397B in FP8 on AgentX delivers **1.85x** the total tokens per $1 TCO of GB300 NVL72 FP8 at 200 tok/s/user on the external owning cost, 2.17x on Google's internal cost and 1.70x the tokens per MW. At 100 tok/s/user the three ratios are 0.98x, 1.15x and 0.90x. GB300 NVL72's FP8 throughput falls 54% from 100 to 200 tok/s/user while TPU v7's falls 14%, and a TPU v7 chip costs 52% as much per hour to own as a GB300 GPU on the external cost (45% on the internal cost). Per chip, TPU v7 serves 0.51x GB300 NVL72's throughput at 100 tok/s/user and 0.97x at 200. Our [TPU externalization article](/blog/tpu-inferencex-full-steam) reported up to 50% better performance per dollar for TPU v7 than B200 and B300 on the 8k/1k workload, with aggregated FP8 serving on all three and external TPU TCO. On AgentX, a different workload, TPU v7 delivers 1.80x the tokens per dollar of B200 Dynamo SGLang, the best B200 or B300 FP8 line per dollar there, at 150 tok/s/user and 2.34x at 200 on the external cost.
+
+Ironwood has no native FP4 compute. Our [LinkedIn post](https://www.linkedin.com/posts/semianalysis_alert-nvidia-has-been-working-overtime-activity-7517993267301625856-mtxG) on NVIDIA's first GB300 FP4 counter-submission said it was "1.64x worse in performance per dollar than TPUv7 for external customers across most of the end-to-end performance curve." The post's chart used end-to-end latency on its x-axis. On the p90 interactivity axis used here, GB300 NVL72 FP4 on Dynamo TensorRT-LLM delivers more tokens per $1 TCO than TPU v7 FP8 at every matched point on both bases: 1.34x to 2.15x from 150 to 400 tok/s/user on the external cost, 1.14x to 1.83x on the internal cost and 1.5x to 2.3x the tokens per MW. On Kimi K3, GB300 NVL72 delivers 1.03x to 1.58x the tokens per dollar of TPU v7 at every matched point on the external cost and 1.1x to 1.7x the tokens per MW. On Google's internal cost TPU v7 delivers more tokens per dollar on Kimi K3 from ~53 to ~149 tok/s/user, by up to 15% at ~100 tok/s/user.
+
+## Summary
+
+| Model        | TPU v7 vs GB300 NVL72     | p90 tok/s/user | TPU / GB300 per $ (external) | TPU / GB300 per $ (internal) | TPU / GB300 per MW | TPU / GB300 per chip |
+| ------------ | ------------------------- | -------------: | ---------------------------: | ---------------------------: | -----------------: | -------------------: |
+| Qwen3.5-397B | FP8 vs FP8 Dynamo SGLang  |            100 |                        0.98x |                        1.15x |              0.90x |                0.51x |
+| Qwen3.5-397B | FP8 vs FP8 Dynamo SGLang  |            200 |                        1.85x |                        2.17x |              1.70x |                0.97x |
+| Qwen3.5-397B | FP8 vs FP4 Dynamo TRT-LLM |            200 |                        0.54x |                        0.64x |              0.50x |                0.29x |
+| Kimi K3      | FP4 vs FP4 Dynamo vLLM    |            100 |                        0.97x |                        1.15x |              0.90x |                0.51x |
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH">
+  Open the AgentX dashboard →
+</DashboardCTA>
+
+## Method
+
+TPU v7 has AgentX results on two models, Qwen3.5-397B and Kimi K3, and the dashboard lists it as TPU7x. The x-axis is p90 interactivity (1 / p90 inter-token latency) in tok/s/user. Matched-interactivity values are interpolated along each system's Pareto frontier with no extrapolation. Throughput counts input tokens, including KV-cache hits, and output tokens. A TPU v7 chip is counted as one chip even though it exposes two devices to the framework, so throughput is per physical chip on both sides.
+
+Tokens per dollar, the dashboard's default metric, counts total tokens (input and output) served per $1 of TCO. The cost is the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) owning cost at large hyperscaler volume: $2.31/GPU/hr for GB300 NVL72, and two figures for TPU v7. The external figure, $1.21/chip/hr, is the owning cost for a buyer other than Google, and renting from Google Cloud on a 3-year commit costs $2.00/chip/hr. The dashboard default is $1.03/chip/hr, Google's own cost to own and run the chip. The tables show both, external first. Only TPU v7's cost differs between the two bases, so GB300 NVL72 and the other GPUs have the same tokens per dollar on both. The charts use the dashboard default, so on the external cost every TPU v7 point sits 15% lower than plotted.
+
+Per-MW figures use the all-in provisioned power per chip from the [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/), 1.207 kW for TPU v7 and 2.12 kW for GB300 NVL72, which are planning figures for deployed systems. A TPU v7 chip is provisioned for 57% of a GB300 GPU's power and costs 52% as much per hour on the external cost and 45% on the internal cost, so per-dollar ratios run 9% above per-MW ratios on the external cost and 28% above on the internal cost.
+
+The [AgentX methodology](/agentx/methodology) and our [Vera Rubin NVL72 results](/blog/vera-rubin-nvl72-vs-gb300-nvl72-agentx-results) describe the workload.
+
+## Specs
+
+| Per chip                             |               TPU v7 (Ironwood) | Blackwell Ultra (GB300 NVL72) |   TPU v7 / BU |
+| ------------------------------------ | ------------------------------: | ----------------------------: | ------------: |
+| HBM capacity                         |                192 GiB (206 GB) |  288 GB HBM3E (278 GB usable) |         0.72x |
+| HBM bandwidth                        |                       7.38 TB/s |                        8 TB/s |         0.92x |
+| Dense FP4                            |                   Not supported |                    15 PFLOP/s |           n/a |
+| Dense FP8                            |                    4.61 PFLOP/s |                     5 PFLOP/s |         0.92x |
+| Dense BF16                           |                    2.31 PFLOP/s |                   2.5 PFLOP/s |         0.92x |
+| Scale-up bandwidth per chip (uni-di) |                  600 GB/s (ICI) |           900 GB/s (NVLink 5) |         0.67x |
+| Scale-up domain                      | 3D torus, up to 9,216 chips/pod |      72 GPUs, switched NVLink |           n/a |
+| TCO, owning (external / internal)    |            $1.21 / $1.03 per hr |                  $2.31 per hr | 0.52x / 0.45x |
+| All-in power per chip (provisioned)  |                        1.207 kW |                       2.12 kW |         0.57x |
+
+TPU v7 values are from Google Cloud's [TPU7x documentation](https://docs.cloud.google.com/tpu/docs/tpu7x), which lists inter-chip interconnect bandwidth as 1,200 GB/s per chip across both directions. Blackwell Ultra values come from the [InferenceX GPU specs](/gpu-specs).
+
+Per chip, TPU v7 has 92% of a Blackwell Ultra GPU's HBM bandwidth and FP8 compute and 72% of its memory capacity. A fully bandwidth-bound decode step would cap TPU v7's per-dollar advantage at 0.92x / 0.52x ≈ 1.8x on the external cost and ~2x on the internal cost. The measured 1.85x, 2.02x and 2.24x per dollar at 200, 300 and 400 tok/s/user on the external cost exceed that, as do 2.17x, 2.37x and 2.63x on the internal cost, because GB300 NVL72's FP8 curve falls away faster than TPU v7's in that band and has a gap in coverage there. Just above 200 tok/s/user, where TPU v7's frontier drops from its 22-agent to its 18-agent point, the ratio dips to ~1.6x on the external cost and ~1.9x on the internal cost.
+
+## Qwen3.5-397B FP8
+
+TPU v7 delivers more tokens per $1 TCO than GB300 NVL72 FP8 from ~103 tok/s/user on the external cost and at every matched point on the internal cost, and less throughput per chip below ~270 tok/s/user. Qwen3.5-397B-A17B has 397B total and 17B active parameters, with three Gated DeltaNet linear-attention layers for every gated full-attention layer ([model card](https://huggingface.co/Qwen/Qwen3.5-397B-A17B); see the [model page](/model/qwen-3-5)). TPU v7 runs vLLM with FP8 and MTP on one 4-chip host, aggregated, with KV-cache offload to host memory from 12 agents up. GB300 NVL72 runs Dynamo SGLang with FP8 and MTP on 4 to 32 GPUs, mostly disaggregated.
+
+The chart below shows total tokens per $1 TCO for both systems on Qwen3.5-397B, with GB300 NVL72's FP4 lines alongside FP8:
+
+<HardwareChart
+  model="Qwen-3.5-397B-A17B"
+  a="tpuv7"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp8,fp4"
+/>
+
+As you can see, GB300 NVL72's FP8 frontier has no measured point between 192 tok/s/user (180 agents) and 450 tok/s/user (44 agents), so its values at 300 and 400 tok/s/user in the table below are interpolated across that gap. A straight line between those two points would put GB300 NVL72 at ~26,700 tok/s/GPU at 300 tok/s/user, which would make TPU v7's lead there 1.81x per dollar on the external cost instead of 2.02x, and 2.12x instead of 2.37x on the internal cost.
+
+| p90 tok/s/user | TPU v7, external (M tokens per $) | TPU v7, internal (M tokens per $) | GB300 NVL72 FP8, both bases (M tokens per $) | Per $ (external) | Per $ (internal) |    Per MW |  Per chip |
+| -------------: | --------------------------------: | --------------------------------: | -------------------------------------------: | ---------------: | ---------------: | --------: | --------: |
+|            100 |                             119.0 |                             139.8 |                                        121.2 |            0.98x |            1.15x |     0.90x |     0.51x |
+|            150 |                             110.9 |                             130.3 |                                         88.6 |            1.25x |            1.47x |     1.15x |     0.66x |
+|        **200** |                         **102.4** |                         **120.3** |                                     **55.5** |        **1.85x** |        **2.17x** | **1.70x** | **0.97x** |
+|            300 |                              75.2 |                              88.3 |                                         37.2 |            2.02x |            2.37x |     1.86x |     1.06x |
+|            400 |                              60.1 |                              70.6 |                                         26.8 |            2.24x |            2.63x |     2.06x |     1.17x |
+
+At 100 tok/s/user TPU v7 delivers 2% fewer tokens per dollar than GB300 NVL72 FP8 on the external owning cost and 15% more on Google's internal cost. Its lead on the internal cost is at least 0.3%, at 81.5 tok/s/user, the low end of its curve. Per MW it trails until ~117 tok/s/user.
+
+At peak throughput GB300 NVL72 FP8 serves 101,367 tok/s/GPU at 68 tok/s/user with a 32-GPU disaggregated config at 1,000 agents, or 158.0M tokens per $ on both bases. TPU v7's peak is 40,363 tok/s/chip at 81 tok/s/user with 32 agents on one host, or 120.1M tokens per $ on the external cost and 141.1M on the internal cost. That is 0.76x GB300 NVL72's peak per dollar on the external cost, 0.89x on the internal cost, 0.40x per chip and 0.70x per MW. At 32 agents the TPU v7 server's prefix-cache hit rate was 88.8% against a theoretical 96.4%, with HBM KV-cache usage at 93%. TPU v7's fastest point reaches 559 tok/s/user, against 581 tok/s/user for GB300 NVL72 FP8, and its p90 time to first token stays between 0.35 s and 0.59 s across the frontier.
+
+On Google's internal cost TPU v7 delivers 2.12x the tokens per dollar of B200 Dynamo SGLang at 150 tok/s/user and 2.75x at 200. Per chip it serves 1.24x B300 SGLang at 150 tok/s/user and 1.62x B300 Dynamo SGLang at 200, the strongest B200 or B300 FP8 lines there.
+
+### Against GB300 NVL72 FP4
+
+The highest-throughput point on GB300 NVL72's FP4 Dynamo TensorRT-LLM line sits above 100 tok/s/user, so the table starts at 150:
+
+| p90 tok/s/user | TPU v7 FP8, external (M tokens per $) | TPU v7 FP8, internal (M tokens per $) | GB300 NVL72 FP4, Dynamo TRT-LLM, both bases (M tokens per $) | GB300 / TPU per $ (external) | GB300 / TPU per $ (internal) | GB300 / TPU per MW |
+| -------------: | ------------------------------------: | ------------------------------------: | -----------------------------------------------------------: | ---------------------------: | ---------------------------: | -----------------: |
+|            150 |                                 110.9 |                                 130.3 |                                                        217.2 |                        1.96x |                        1.67x |              2.13x |
+|        **200** |                             **102.4** |                             **120.3** |                                                    **188.1** |                    **1.84x** |                    **1.56x** |          **2.00x** |
+|            300 |                                  75.2 |                                  88.3 |                                                        137.0 |                        1.82x |                        1.55x |              1.98x |
+|            400 |                                  60.1 |                                  70.6 |                                                         84.3 |                        1.40x |                        1.19x |              1.52x |
+
+Against GB300 NVL72's Dynamo SGLang FP4 line, TPU v7 FP8 delivers more tokens per dollar above ~215 tok/s/user on the external cost and above ~160 on Google's internal cost, and more per MW above ~230.
+
+End-to-end latency includes time to first token. Against p90 end-to-end latency, TPU v7's Qwen3.5 frontier spans 3.4 s to 11.1 s, and each GB300 NVL72 FP4 Dynamo TensorRT-LLM frontier point in that span delivers fewer tokens per $1 TCO on the external cost than a TPU v7 point with lower latency. The TensorRT-LLM line's two highest-throughput points, at 565 and 704 agents, have p90 time to first token of 5.6 s and 8.1 s and p90 end-to-end latency of 11.9 s and 21.6 s. On the p90 interactivity axis they sit at 253 and 119 tok/s/user, inside TPU v7's range.
+
+## Kimi K3
+
+GB300 NVL72 delivers more tokens per chip, per MW and per dollar on the external cost than TPU v7 at every matched point. On Google's internal cost TPU v7 delivers more tokens per dollar in two bands: from ~53 to ~149 tok/s/user, and by up to 4% from ~230 to ~290 tok/s/user, where both curves are sparse. Elsewhere on the internal cost GB300 NVL72 leads by up to 1.34x.
+
+Kimi K3 has 2.8T total and 104B active parameters, with Kimi Delta Attention in 69 of its 93 layers and Gated MLA in the rest ([model card](https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md); see the [model page](/model/kimi-k3)). It ships with MXFP4 weights and MXFP8 activations, which matches the FP4 label on both systems' runs. TPU v7 runs vLLM on 32 chips with one 16-chip prefill worker and one 16-chip decode worker, KV offload to host memory and vLLM's router. GB300 NVL72 runs Dynamo vLLM on 8 to 32 GPUs.
+
+The chart below shows total tokens per $1 TCO for both systems on Kimi K3:
+
+<HardwareChart model="Kimi-K3" a="tpuv7" b="gb300" metric="y_tokensPerDollarH" />
+
+As you can see, TPU v7's best range relative to GB300 NVL72 is 80 to 100 tok/s/user on both bases. There it delivers 2.5% to 5% fewer tokens per dollar than GB300 NVL72 on the external owning cost and 12% to 15% more on Google's internal cost.
+
+| p90 tok/s/user | TPU v7, external (M tokens per $) | TPU v7, internal (M tokens per $) | GB300 NVL72 Dynamo vLLM, both bases (M tokens per $) | Per $ (external) | Per $ (internal) |    Per MW |  Per chip |
+| -------------: | --------------------------------: | --------------------------------: | ---------------------------------------------------: | ---------------: | ---------------: | --------: | --------: |
+|             30 |                             19.49 |                             22.90 |                                                30.25 |            0.64x |            0.76x |     0.59x |     0.34x |
+|             50 |                             19.15 |                             22.49 |                                                23.75 |            0.81x |            0.95x |     0.74x |     0.42x |
+|             80 |                             16.22 |                             19.05 |                                                17.06 |            0.95x |            1.12x |     0.87x |     0.50x |
+|        **100** |                         **13.87** |                         **16.29** |                                            **14.23** |        **0.97x** |        **1.15x** | **0.90x** | **0.51x** |
+|            150 |                              8.15 |                              9.57 |                                                 9.65 |            0.84x |            0.99x |     0.78x |     0.44x |
+|            200 |                              4.65 |                              5.46 |                                                 6.82 |            0.68x |            0.80x |     0.63x |     0.36x |
+
+At peak throughput GB300 NVL72 serves 20,143 tok/s/GPU with an 8-GPU aggregated config at 56 agents, or 31.4M tokens per $ on both bases, against 6,567 tok/s/chip for TPU v7 at 72 agents, or 19.5M tokens per $ on the external cost and 23.0M on the internal cost. That is 0.62x per dollar on the external cost, 0.73x on the internal cost, 0.33x per chip and 0.57x per MW. TPU v7's p90 time to first token is 4.7 s to 6.3 s between 32 and 72 agents. Its 72-agent point runs without MTP, and its other frontier points use MTP.
+
+At 80 to 100 tok/s/user and on the external owning cost, TPU v7 delivers 2.15x to 2.26x the tokens per dollar of B200 and B300 and 0.91x to 1.07x that of the best MI355X line. On Google's internal cost the B200 and B300 ratios are 2.5x to 2.7x, and TPU v7 delivers 1.07x to 1.25x the tokens per dollar of the best MI355X line.
+
+## Some caveats
+
+First, on Qwen3.5 TPU v7 serves from a single aggregated 4-chip host while GB300 NVL72 uses up to 32 disaggregated GPUs. Second, on Kimi K3 and below ~103 tok/s/user on Qwen3.5, the system that delivers more tokens per dollar changes between the external owning cost and Google's internal cost. Third, GB300 NVL72's Qwen3.5 FP8 curve has no measured points between 192 and 450 tok/s/user, and matched values inside that gap are interpolated. Fourth, AgentX does not evaluate model answer quality, so the accuracy difference between FP4 and FP8 is outside these results. Fifth, per-MW numbers use planning figures for all-in power and do not use power measured in these runs. Sixth, the engines differ: TPU v7 runs vLLM on Google's TPU backend, and GB300 NVL72 runs Dynamo SGLang on Qwen3.5 FP8 and FP4, Dynamo TensorRT-LLM on Qwen3.5 FP4 and Dynamo vLLM on Kimi K3. Seventh, the dashboard marks TPU7x results as an official preview that may change as validation and publication continue.
+
+## Configurations
+
+|                      | Qwen3.5-397B                   | Kimi K3                                           |
+| -------------------- | ------------------------------ | ------------------------------------------------- |
+| Serving stack        | vLLM                           | vLLM with vLLM router                             |
+| Precision            | FP8                            | FP4 (MXFP4 weights, MXFP8 activations)            |
+| Speculative decoding | MTP                            | MTP, except the 72-agent point                    |
+| Prefill and decode   | Aggregated, TP8 across 4 chips | Disaggregated, 16-chip prefill and 16-chip decode |
+| KV cache offload     | Host memory, from 12 agents    | Host memory                                       |
+| Chips per config     | 4                              | 32                                                |
+
+## What's next
+
+TPU v7 has no multi-host or disaggregated Qwen3.5 AgentX configs yet, and its single-host curve stops at 32 agents. DeepSeek-V4-Pro, GLM-5.2 and MiniMax-M3 do not have TPU v7 AgentX results yet. TPU 8i, Google's first inference-specific TPU, adds native FP4 support, which Ironwood lacks.
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH">
+  Open the AgentX dashboard →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How does TPU v7 Ironwood compare to GB300 NVL72 on agentic inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "In InferenceX AgentX results on Qwen3.5-397B with FP8 on both systems, TPU v7 delivers 0.98x the total tokens per dollar of GB300 NVL72 at 100 tok/s/user and 1.85x at 200 tok/s/user on the external owning cost, and 1.15x and 2.17x on Google's internal cost. Per chip it serves 0.51x and 0.97x, and per MW 0.90x and 1.70x. On Kimi K3, GB300 NVL72 leads per dollar at every matched point on the external owning cost, with TPU v7 at 0.63x to 0.98x, and 0.62x at peak. On Google's internal cost TPU v7 is at 0.74x to 1.15x, and 0.73x at peak."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does TPU v7 trail GB300 NVL72 per chip on Qwen3.5 but lead per dollar, from ~103 tok/s/user on external cost and at every point on internal cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A TPU v7 chip costs $1.21 per hour to own on the external basis against $2.31 for a GB300 NVL72 GPU, so it leads per dollar once its per-chip throughput passes 0.52x of GB300 NVL72's. That happens at ~103 tok/s/user, because GB300 NVL72's FP8 throughput falls 54% from 100 to 200 tok/s/user while TPU v7's falls 14%. On Google's internal cost of $1.03 per hour the threshold is 0.45x, which TPU v7 passes at every matched point."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does TPU v7 compare with GB300 NVL72 running FP4?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Ironwood has no native FP4 compute. On Qwen3.5 at matched p90 interactivity, GB300 NVL72 FP4 with Dynamo TensorRT-LLM delivers 1.34x to 2.15x the tokens per dollar of TPU v7 FP8 between 150 and 400 tok/s/user on the external owning cost, 1.14x to 1.83x on Google's internal cost, and 1.5x to 2.3x the throughput per MW. Against p90 end-to-end latency, each GB300 NVL72 FP4 Dynamo TensorRT-LLM frontier point between 3.4 s and 11.1 s delivers fewer tokens per dollar on the external cost than a TPU v7 point with lower latency."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does TPU v7 deliver more tokens per dollar than GB300 NVL72?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "At FP8 on Qwen3.5 from ~103 tok/s/user up, yes, on the external owning cost, and at every matched point on Google's internal cost. Between 150 and 450 tok/s/user TPU v7 delivers 1.25x to 2.24x the tokens per dollar of GB300 NVL72 on the external owning cost and 1.47x to 2.63x on Google's internal cost, and more above that on both. On Kimi K3, GB300 NVL72 delivers more at every matched point on the external owning cost, and TPU v7 delivers 2.5% to 15% fewer tokens per dollar from ~53 to ~149 tok/s/user. On Google's internal cost TPU v7 delivers more in that band (12% to 15% more at 80 to 100) and in a narrow band from ~230 to ~290 tok/s/user. Elsewhere GB300 NVL72 delivers more on both bases."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is not covered yet?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TPU v7 has no multi-host or disaggregated Qwen3.5 AgentX configs yet, no AgentX results for DeepSeek-V4-Pro, GLM-5.2 or MiniMax-M3, and the per-MW figures use provisioned all-in power from the SemiAnalysis Datacenter Industry Model."
+      }
+    }
+  ]
+}`}</JsonLd>

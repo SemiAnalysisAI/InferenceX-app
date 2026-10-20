@@ -46,6 +46,7 @@ const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
 const VR_RUBIN_AGENTIC = 'vera-rubin-nvl72-agentic-inference';
+const VR_GB300_AGENTX = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
 const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
 const TILERT = 'ultra-high-interactivity-on-nvidia';
 const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
@@ -64,6 +65,7 @@ const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
 const ENGRAM = 'engrams-embedding-entendre-codesign';
+const TPU_GB300_AGENTX = 'tpu-v7-ironwood-vs-gb300-nvl72-agentx-results';
 
 const entries = [
   {
@@ -2617,7 +2619,7 @@ const entries = [
       value: '$0.181 per million tokens vs $0.222 (B200) and $0.276 (B300)',
     },
     relatedTerms: ['tpu', 'mxu', 'sparsecore', 'ici', 'fp8', 'performance-per-dollar'],
-    articleSlugs: [TPU_IRONWOOD],
+    articleSlugs: [TPU_IRONWOOD, TPU_GB300_AGENTX],
   },
   {
     slug: 'mxu',
@@ -3141,7 +3143,7 @@ const entries = [
       'cost-per-million-tokens',
       'tpuv7-ironwood',
     ],
-    articleSlugs: [TPU_IRONWOOD, VR_RUBIN],
+    articleSlugs: [TPU_IRONWOOD, VR_RUBIN, TPU_GB300_AGENTX, VR_GB300_AGENTX],
   },
   {
     slug: 'tensorcore',
@@ -3825,7 +3827,7 @@ const entries = [
     benchmarkContext:
       'Use the article’s model, engine, precision, workload, and interactivity target when comparing Vera Rubin with GB300 or single-node systems. The published results are a software snapshot; the article’s expectations for later gains are projections rather than measurements.',
     relatedTerms: ['nvl72', 'nvlink', 'extreme-co-design', 'agentx', 'tensorrt-llm'],
-    articleSlugs: [VR_RUBIN_AGENTIC, VR_RUBIN],
+    articleSlugs: [VR_RUBIN_AGENTIC, VR_RUBIN, VR_GB300_AGENTX],
   },
   {
     slug: 'extreme-co-design',

@@ -1,0 +1,252 @@
+---
+title: 'Vera Rubin NVL72 对比 GB300 NVL72 的 AgentX 结果：100 至 120 tok/s/user 下每美元与每 MW 的 token 数达 1.8 至 2.0 倍'
+subtitle: 'AgentX、DeepSeek-V4-Pro、MiniMax-M3、Qwen3.8-Flash-Next、GLM-5.2、每 1 美元 TCO 对应的 token 数、每 MW token 数、GB300 NVL72 的覆盖缺口'
+seoDescription: 'Vera Rubin NVL72 对比 GB300 NVL72 的 AgentX 结果：在四个模型上，100 至 120 tok/s/user 下每美元与每 MW 的 token 数为 1.8 至 2.0 倍，每 GPU 约为 3 倍。'
+date: '2026-10-19'
+publishDate: '2026-10-19'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - nvidia
+  - rubin
+  - gb300
+  - nvl72
+  - deepseek
+  - minimax
+  - qwen
+  - glm
+  - dynamo
+---
+
+在 InferenceX AgentX 上已有 Vera Rubin 结果的全部四个模型（DeepSeek-V4-Pro、MiniMax-M3、Qwen3.8-Flash-Next 和 GLM-5.2）中，Vera Rubin NVL72 在 100 tok/s/user 下**每美元 TCO 对应的总 token 数是 GB300 NVL72 的 1.8 至 2.0 倍**，每 MW 的 token 吞吐量同样是后者的 1.8 至 2.0 倍。GLM-5.2 的 Vera Rubin 曲线从 111.5 tok/s/user 起步，因此改在 120 tok/s/user 比较。按每 GPU 计算，领先幅度为 2.8 至 3.2 倍。每颗 Vera Rubin GPU 的每小时成本是 GB300 GPU 的 1.56 倍，规划功率也是后者的 1.56 倍，因此每美元和每 MW 的领先幅度都小于每 GPU 的领先幅度。
+
+我们的[上一篇 Vera Rubin 文章](/zh/blog/vera-rubin-nvl72-agentic-inference)基于预发布软件，报告了 Vera Rubin NVL72 在 DeepSeek-V4-Pro 上每兆瓦 token 吞吐量最高 7 倍的提升，其中 150 tok/s/user 下约为 GB300 NVL72 SGLang 的 7.2 倍，100 tok/s/user 下为最佳 GB300 NVL72 曲线的 2.09 倍。此后两套系统都有了更新的测试运行。如今 DeepSeek-V4-Pro 上每 MW 的领先幅度在 150 tok/s/user 下为 6.92 倍，并在约 183 tok/s/user 处达到约 8.3 倍的峰值。在 100 tok/s/user 下，领先幅度为 1.90 倍，因为该点 GB300 NVL72 最佳曲线的吞吐量从 28.5M 升至 44.5M tok/s/MW，Vera Rubin 则从 59.4M 升至 84.6M。
+
+在 200 tok/s/user 下，四个模型上每美元的领先幅度都更大：MiniMax-M3、Qwen3.8-Flash-Next 和 GLM-5.2 上为 2.4 至 4.1 倍，DeepSeek-V4-Pro 上为 7.4 倍，而 GB300 NVL72 在该模型 137 tok/s/user 以上的前沿点，服务的 agent 都不超过 4 个。在两套系统都有高吞吐点的三个模型上，峰值吞吐量处的每美元领先幅度为 1.05 至 1.17 倍。仪表板将 Vera Rubin 的结果标注为官方预览。
+
+## 汇总
+
+| 模型               | p90 tok/s/user | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
+| ------------------ | -------------: | ----------------: | ---------------: | ----------------: |
+| DeepSeek-V4-Pro    |            100 |             1.90x |            1.90x |             2.96x |
+| MiniMax-M3         |            100 |             1.93x |            1.94x |             3.02x |
+| Qwen3.8-Flash-Next |            100 |             2.03x |            2.04x |             3.18x |
+| GLM-5.2            |            120 |             1.81x |            1.82x |             2.83x |
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH">
+  查看 AgentX 仪表板 →
+</DashboardCTA>
+
+## 测试方法
+
+[AgentX](/zh/agentx/methodology) 把真实的 Claude Code 会话回放为确定性的 [AIPerf](/zh/glossary/aiperf) 工作负载。AgentX v1.0 共有 393 个公开会话，完整 v1.0 语料中请求的输入 token 中位数为 142,016、输出 token 中位数为 444，每次运行在固定 seed 的 warmup 和前缀 primer 之后进行 1 小时的 profiling。所有图表的横轴都是 p90 交互性，即 1 / p90 token 间延迟，单位为 tok/s/user。纵轴是仪表板的默认指标，即每 1 美元 TCO 对应的总 token 数：总 token 吞吐量（统计输入 token，含 KV cache 命中部分，以及输出 token）除以提供服务的 GPU 的每小时成本。其中约 99% 是输入 token。
+
+每美元数据采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中 hyperscaler 的自持成本：Vera Rubin NVL72 为 $3.61/GPU/hr，GB300 NVL72 为 $2.31/GPU/hr。InferenceX 的[外部和内部 TCO 口径](/zh/glossary/internal-vs-external-tco)只在 TPU v7 上有差别，因此这两套系统在两种口径下的成本相同，本文中的每美元比值在两种口径下都成立。每 MW 数据是用吞吐量除以 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中为每 GPU 规划的全口径功率：Vera Rubin NVL72 为 3.3 kW，GB300 NVL72 为 2.12 kW。这些是已部署机架的规划数值，包含 CPU、网络和散热，并非这些测试运行期间的实测功耗。成本比（1.563）比功率比（1.557）高 0.4%，因此本文中 Vera Rubin 对 GB300 NVL72 的所有每 MW 比值，都比对应的每美元比值高 0.4%。
+
+相同交互性下的数值沿各系统的 Pareto 前沿插值得出，不会外推到曲线实测端点之外。在每个目标交互性上，对比对象都是该点最强的 GB300 NVL72 曲线，无论它来自哪个推理引擎。下文各节以每美元为主要指标，每 MW 和每 GPU 比值作为表格中的列。
+
+## 规格
+
+Vera Rubin NVL72 沿用了 GB300 NVL72 的 72-GPU NVLink 域和 MGX 机架设计。每颗 Rubin GPU 的 HBM 容量同样是 288 GB，并升级到 HBM4 和 NVLink 6。
+
+| 每 GPU                             | Rubin（Vera Rubin NVL72） | Blackwell Ultra（GB300 NVL72） | Rubin / BU |
+| ---------------------------------- | ------------------------: | -----------------------------: | ---------: |
+| HBM 容量                           |               288 GB HBM4 |    288 GB HBM3E（可用 278 GB） |      1.00x |
+| HBM 带宽                           |                 19.2 TB/s |                         8 TB/s |      2.40x |
+| 稠密 NVFP4                         |                35 PFLOP/s |                     15 PFLOP/s |      2.33x |
+| 稠密 FP8                           |              17.5 PFLOP/s |                      5 PFLOP/s |      3.50x |
+| 稠密 BF16                          |                 4 PFLOP/s |                    2.5 PFLOP/s |      1.60x |
+| 每 GPU NVLink 带宽（单向）         |       1.5 TB/s (NVLink 6) |            900 GB/s (NVLink 5) |      1.67x |
+| Scale-up 域规模                    |                        72 |                             72 |      1.00x |
+| TCO（按 hyperscaler 采购规模自持） |              $3.61/GPU/hr |                   $2.31/GPU/hr |      1.56x |
+| 每 GPU 全口径功率（规划值）        |                    3.3 kW |                        2.12 kW |      1.56x |
+
+Rubin 的数值取自 NVIDIA [Vera Rubin NVL72 规格](https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/)中的 Rubin GPU 一列；同一张规格表还列出每颗 GPU 50 PFLOP/s 的 NVFP4 推理算力，脚注注明为稀疏规格。NVIDIA 的 [Rubin](https://www.nvidia.com/en-us/data-center/technologies/rubin/) 页面称，Vera Rubin NVL72 配备新的 Transformer Engine，通过自适应压缩提升 NVFP4 推理性能。NVIDIA 公布的 [NVLink 6 每 GPU 带宽为 3 TB/s](https://www.nvidia.com/en-us/data-center/nvlink/)，这一口径把两个方向合计在内，是同口径下 NVLink 5（1.8 TB/s）的 1.7 倍。Blackwell Ultra 的数值来自 [InferenceX GPU 规格](/zh/gpu-specs)。TCO 和功率采用仪表板所用的数值。
+
+把芯片规格比值除以 1.56 倍的成本比，Rubin 的每美元优势在 HBM 带宽上为 1.54 倍，在稠密 NVFP4 算力上为 1.49 倍，在稠密 FP8 算力上为 2.24 倍。汇总表中实测的每美元领先幅度（1.81 至 2.03 倍）高于 HBM 带宽和 NVFP4 的数值，低于 FP8 的数值。
+
+## DeepSeek-V4-Pro
+
+在 DeepSeek-V4-Pro 上，按每美元计，Vera Rubin NVL72 在 100 tok/s/user 下是 GB300 NVL72 的 1.90 倍，在 125 至 200 tok/s/user 之间为 3.7 至约 8.3 倍。DeepSeek-V4-Pro 总参数 1.6T、激活参数 49B，采用压缩稀疏注意力与高度压缩注意力的混合结构，使 KV cache 在长上下文下依然很小（[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro)；另见[模型页面](/zh/model/deepseek-v4)）。Vera Rubin 运行 Dynamo TensorRT-LLM，使用 FP4 权重和 MTP，并采用 prefill/decode 分离，每个配置 26 至 56 个 GPU。
+
+下图是两套系统在 DeepSeek-V4-Pro 上每 1 美元 TCO 对应的总 token 数：
+
+<HardwareChart
+  model="DeepSeek-V4-Pro"
+  a="vr200"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp4"
+/>
+
+从图中可以看到，在两次运行共同覆盖的每个交互性上，较新的 Vera Rubin Dynamo TRT-LLM 运行都高于上一篇文章所依据的较早 TRT-LLM 运行，峰值也高出 35%。仪表板不会在同一张 AgentX 图表中叠加同一芯片的 vLLM 和 SGLang 曲线，因此这张图默认显示 GB300 NVL72 的 vLLM 和 TensorRT-LLM 曲线。下表在每个目标点都选用该点最强的 GB300 NVL72 曲线，在 150 和 200 tok/s/user 处是 Dynamo SGLang。在图例中选中它即可查看。
+
+| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | 最佳 GB300 NVL72（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
+| -------------: | ---------------------------------: | ---------------------------------: | ----------------: | ---------------: | ----------------: |
+|             90 |                              282.5 |                176.8 (Dynamo vLLM) |             1.60x |            1.60x |             2.50x |
+|        **100** |                          **278.6** |            **147.0 (Dynamo vLLM)** |         **1.90x** |        **1.90x** |         **2.96x** |
+|            125 |                              260.2 |                 70.8 (Dynamo vLLM) |             3.67x |            3.69x |             5.74x |
+|            150 |                              226.1 |               32.8 (Dynamo SGLang) |             6.89x |            6.92x |            10.77x |
+|            200 |                               93.8 |               12.7 (Dynamo SGLang) |             7.37x |            7.40x |            11.51x |
+|            250 |                                7.6 |                  6.7 (Dynamo vLLM) |             1.13x |            1.13x |             1.76x |
+
+在峰值吞吐量处，Vera Rubin NVL72 在 80 tok/s/user 下每美元可提供 284.6M token，GB300 NVL72 Dynamo vLLM 在 56 tok/s/user 下为 244.1M，按每美元计是后者的 1.17 倍（按每 GPU 计为 1.82 倍）。在 250 tok/s/user 下，Vera Rubin 服务约 30 个 agent，GB300 NVL72 只服务 1 个，每美元的领先降至 1.13 倍。超过约 256 tok/s/user 后，GB300 NVL72 Dynamo vLLM 的每美元 token 数高于 Vera Rubin（比值在 260 处为 0.92 倍，在 290 处为 0.65 倍）。Vera Rubin 最快的点达到 310 tok/s/user，GB300 NVL72 最快的点达到 298 tok/s/user。
+
+这一比值在约 183 tok/s/user 处达到峰值，到 200 tok/s/user 又回落到 7.4 倍。超过 137 tok/s/user 后，GB300 NVL72 前沿上每个点服务的 agent 都不超过 4 个，因此从这里到 200 tok/s/user，最强的 GB300 NVL72 数值是在 120 至 128 个 agent 的分离式配置与 4 个 agent 的配置之间插值得出的。
+
+## MiniMax-M3
+
+在 MiniMax-M3 上，按每美元计，Vera Rubin NVL72 在 100 至 300 tok/s/user 之间是 GB300 NVL72 的 1.9 至 3.8 倍；在 100 tok/s/user 下，它是使用 AMD ATOM 引擎的 MI355X 的 1.10 倍。MiniMax-M3 总参数约 428B、激活参数约 23B，采用 MiniMax Sparse Attention（[模型卡](https://huggingface.co/MiniMaxAI/MiniMax-M3)；另见[模型页面](/zh/model/minimax-m3)）。Vera Rubin 运行 Dynamo vLLM，使用 FP4 和 MTP。其吞吐量最高的点来自聚合式的 2-GPU TP2 worker，交互性最高的点则来自一个 10-GPU 的分离式配置。
+
+下图是两套系统在 MiniMax-M3 上每 1 美元 TCO 对应的总 token 数：
+
+<HardwareChart
+  model="MiniMax-M3"
+  a="vr200"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp4"
+/>
+
+从图中可以看到，GB300 NVL72 唯一的 MiniMax-M3 AgentX 曲线来自较早的运行，前沿从 99 tok/s/user 才开始，因此没有可与 Vera Rubin 每美元 136.6M token 的峰值对比的 GB300 NVL72 高吞吐点。在另一端，Vera Rubin 的 10-GPU 分离式配置可达 483 tok/s/user，GB300 NVL72 最快的点为 337 tok/s/user。
+
+| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | GB300 NVL72 Dynamo vLLM（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
+| -------------: | ---------------------------------: | ----------------------------------------: | ----------------: | ---------------: | ----------------: |
+|        **100** |                          **132.3** |                                  **68.4** |         **1.93x** |        **1.94x** |         **3.02x** |
+|            150 |                              114.3 |                                      54.5 |             2.10x |            2.10x |             3.27x |
+|            200 |                               91.0 |                                      38.4 |             2.37x |            2.38x |             3.71x |
+|            300 |                               54.5 |                                      14.4 |             3.78x |            3.80x |             5.91x |
+
+在 Vera Rubin 和 MI355X ATOM 的运行之前，TP2 配置的 B300 TensorRT-LLM 是 MiniMax-M3 在 100 tok/s/user 下表现最好的系统（[背景](/zh/blog/minimax-m3-agentx-b300-trtllm-tp2-vs-the-field)）。它在该点每美元可提供 106.4M token；按每美元计，Vera Rubin 对它的领先在 100 tok/s/user 处为 1.24 倍，在 150 处为 1.76 倍，在 200 处为 2.14 倍。
+
+使用 ATOM 引擎的 MI355X 如今是 MiniMax-M3 在 100 tok/s/user 下每美元表现最好的其他系统，每美元可提供 120.7M token。Vera Rubin 对它的领先在 200 tok/s/user 下扩大到 1.32 倍，并在两条曲线共同覆盖的每个交互性上都保持领先。按每 MW 计，100 tok/s/user 下的领先为 1.67 倍，因为 MI355X 的每 GPU 小时成本相对其规划功率较低。
+
+## Qwen3.8-Flash-Next
+
+在 Qwen3.8-Flash-Next 上，从 100 tok/s/user 起，Vera Rubin NVL72 按每美元计是 GB300 NVL72 的 2.0 至 4.2 倍。Qwen3.8-Flash-Next 是一个 176B 参数的模型（125B 主模型加上 51B 的 n-gram embedding 表），激活参数 6B，采用 Gated DeltaNet 与稀疏注意力的混合架构（[模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8)；另见[模型页面](/zh/model/qwen-3-8-flash-next)）。Vera Rubin 运行 Dynamo SGLang，使用 FP4 和 MTP，每个配置 1 至 6 个 GPU。GB300 NVL72 运行单 GPU 的 SGLang。
+
+下图是两套系统在 Qwen3.8-Flash-Next 上每 1 美元 TCO 对应的总 token 数：
+
+<HardwareChart
+  model="Qwen3.8-Flash-Next"
+  a="vr200"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp4"
+/>
+
+从图中可以看到，Vera Rubin 在 24 至 130 tok/s/user 之间没有实测点，因此它在 50 和 100 tok/s/user 处的数值是跨这一区间插值得出的。它在 100 tok/s/user 以上的第一个实测点位于 130 tok/s/user，每美元可提供 190.9M token，是 GB300 NVL72 在 100 tok/s/user 处数值的 1.85 倍。
+
+| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | GB300 NVL72 SGLang（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
+| -------------: | ---------------------------------: | -----------------------------------: | ----------------: | ---------------: | ----------------: |
+|             50 |                              226.4 |                                182.6 |             1.24x |            1.24x |             1.94x |
+|        **100** |                          **209.6** |                            **103.1** |         **2.03x** |        **2.04x** |         **3.18x** |
+|            150 |                              167.5 |                                 50.4 |             3.32x |            3.33x |             5.19x |
+|            200 |                              109.6 |                                 27.0 |             4.06x |            4.08x |             6.35x |
+
+在峰值吞吐量处，两套系统都是每个推理服务实例使用一个 GPU。Vera Rubin 每 GPU 的吞吐量是 GB300 NVL72 的 1.64 倍，但每 GPU 小时成本是后者的 1.56 倍，因此按每美元计的领先为 1.05 倍（每美元 231.6M 对 220.3M token）。
+
+超过 25 tok/s/user 后，Vera Rubin 前沿上的每个点都是 prefill/decode 分离式配置，而 GB300 NVL72 的结果中没有分离式的 Qwen3.8-Flash-Next 曲线。与 B200 SGLang（100 tok/s/user 下每美元表现最好的其他 Qwen3.8-Flash-Next 系统）相比，Vera Rubin 按每美元计是其 1.75 倍。
+
+## GLM-5.2
+
+在 GLM-5.2 上，按每美元计，Vera Rubin NVL72 在 120 tok/s/user 下是 GB300 NVL72 的 1.81 倍，在 150 至 300 tok/s/user 之间为 2.5 至 3.4 倍。GLM-5.2 的 checkpoint 约含 753B 参数，采用 DeepSeek 式稀疏注意力，每个 token 在 256 个路由专家中激活 8 个（[模型页面](/zh/model/glm-5-3)）。仪表板把 GLM-5.2 和 GLM-5.3 归为一组，两者共享同一个基础模型。Vera Rubin 的运行使用 GLM-5.3 checkpoint，GB300 NVL72 的运行使用 GLM-5.2。Vera Rubin 运行 Dynamo TensorRT-LLM，使用 FP4 和 MTP，采用分离式部署，每个配置 12 至 28 个 GPU。
+
+下图是两套系统在 GLM-5.2 上每 1 美元 TCO 对应的总 token 数：
+
+<HardwareChart model="GLM-5.2" a="vr200" b="gb300" metric="y_tokensPerDollarH" precisions="fp4" />
+
+从图中可以看到，Vera Rubin 在 111 至 262 tok/s/user 之间没有实测点，因此它在 150 和 200 tok/s/user 处的数值是跨这一区间插值得出的。Vera Rubin 在 GLM-5.2 上最快的点达到 459 tok/s/user，GB300 NVL72 为 342 tok/s/user。
+
+| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | 最佳 GB300 NVL72（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
+| -------------: | ---------------------------------: | ---------------------------------: | ----------------: | ---------------: | ----------------: |
+|        **120** |                          **110.2** |           **60.8 (Dynamo SGLang)** |         **1.81x** |        **1.82x** |         **2.83x** |
+|            150 |                               89.0 |               35.2 (Dynamo SGLang) |             2.53x |            2.54x |             3.95x |
+|            200 |                               57.2 |               22.6 (Dynamo SGLang) |             2.53x |            2.54x |             3.95x |
+|            300 |                               23.1 |               6.9 (Dynamo TRT-LLM) |             3.36x |            3.38x |             5.26x |
+
+Vera Rubin 的峰值是 111 tok/s/user 下每美元 116.3M token，GB300 NVL72 Dynamo SGLang 的峰值是 89 tok/s/user 下的 99.2M，按每美元计为 1.17 倍，按每 GPU 计为 1.83 倍。在 300 tok/s/user 下，B200 Dynamo SGLang 是除 Vera Rubin 之外每美元表现最好的系统，每美元可提供 11.8M token，最佳 GB300 NVL72 曲线为 6.9M。Vera Rubin 在该点按每美元计是 B200 的 2.0 倍。
+
+下表在每个目标点都选用该点最强的 GB300 NVL72 曲线：120、150 和 200 tok/s/user 处是 Dynamo SGLang，300 tok/s/user 处是 Dynamo TensorRT-LLM。这两条曲线与 Vera Rubin 一样使用 FP4 和 MTP。Dynamo SGLang 的运行比 Vera Rubin 的运行晚 7 天，使用 SGLang nightly 构建版本。Dynamo TensorRT-LLM 的运行早 1 天，使用 NVIDIA 发布镜像仓库中的 TensorRT-LLM 1.3.0rc28 开发构建版本，而 Vera Rubin 使用内部的 TensorRT-LLM 构建版本。
+
+## 几点说明
+
+第一，推理引擎不同，部分运行时间较早。Vera Rubin 在 DeepSeek-V4-Pro 和 GLM-5.2 上运行 Dynamo TRT-LLM，在 MiniMax-M3 上运行 Dynamo vLLM，在 Qwen3.8-Flash-Next 上运行 Dynamo SGLang。某一点上最强的 GB300 NVL72 曲线可能来自不同的引擎，部分 GB300 曲线使用 draft 模型做投机解码，而 Vera Rubin 使用 MTP。GB300 NVL72 的 MiniMax-M3 结果来自较早的运行。第二，Vera Rubin 软件仍处于早期阶段。所用镜像是内部的 TensorRT-LLM 和 vLLM 构建版本，以及一个 SGLang nightly 版本；Vera Rubin 的 DeepSeek-V4-Pro 曲线在不到四周内于 100 tok/s/user 处变化了 43%。第三，成本和功率均为建模数值。每美元数据使用 TCO 模型中的每 GPU 小时成本，每 MW 数据使用每 GPU 全口径功率的规划数值，二者都不是来自这些运行的账单或遥测数据。如果 Vera Rubin 采用不同的成本或功率数值，本文中 Vera Rubin 的所有每美元或每 MW 比值都会按同一系数缩放。第四，部分比值跨越了覆盖缺口。当某条曲线在较宽的交互性区间内没有实测配置时，区间内的数值都是插值得出的，此处的比值同时反映了硬件差异和这段缺口。这是 DeepSeek-V4-Pro 在 150 至 200 tok/s/user 之间出现 6.9 至约 8.3 倍数字的主要原因。Vera Rubin 自身的曲线在 DeepSeek-V4-Pro（97 至 165 和 230 至 310 tok/s/user）、MiniMax-M3（128 至 244 和 244 至 413 tok/s/user）、Qwen3.8-Flash-Next（24 至 130 和 173 至 271 tok/s/user）和 GLM-5.2（111 至 262 tok/s/user）上也有缺口。
+
+## 配置
+
+各曲线背后的 Vera Rubin NVL72 配置：
+
+|                   | DeepSeek-V4-Pro                        | MiniMax-M3                                     | Qwen3.8-Flash-Next                                | GLM-5.2                               |
+| ----------------- | -------------------------------------- | ---------------------------------------------- | ------------------------------------------------- | ------------------------------------- |
+| 推理服务栈        | Dynamo TensorRT-LLM                    | Dynamo vLLM                                    | Dynamo SGLang                                     | Dynamo TensorRT-LLM                   |
+| 精度              | FP4                                    | FP4                                            | FP4                                               | FP4                                   |
+| 投机解码          | MTP                                    | MTP                                            | MTP                                               | MTP                                   |
+| Prefill 与 decode | 分离式，decode 为 TP4 至 TP32，配合 EP | 峰值处为聚合式 TP2，400+ tok/s/user 时为分离式 | 峰值处为聚合式 TP1，高于 25 tok/s/user 时为分离式 | 分离式，decode 为 TP4 或 TP8，配合 EP |
+| KV cache offload  | 关闭                                   | 开启                                           | 开启                                              | 开启                                  |
+| 每个配置的 GPU 数 | 26 至 56                               | 2 至 10                                        | 1 至 6                                            | 12 至 28                              |
+
+## 下一步
+
+Kimi K3 和 DeepSeek-V4.1-Flash 还没有 Vera Rubin 的 AgentX 结果。Kimi K3 已有 GB300 NVL72、MI355X 和 [TPU v7](/zh/blog/tpu-v7-ironwood-vs-gb300-nvl72-agentx-results) 上的 AgentX 结果。如果有 GB300 NVL72 的 DeepSeek-V4-Pro 配置能在 150 至 200 tok/s/user 下服务超过 4 个 agent，本文中最大的几个比值所依据的 GB300 NVL72 插值数据就会由实测值取代。每 MW 结果使用规划功率，这里的 Vera Rubin 运行也都没有有效的 GPU 功率遥测数据。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH">
+  查看 AgentX 仪表板 →
+</DashboardCTA>
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 agentic 推理上，Vera Rubin NVL72 的成本效率比 GB300 NVL72 高多少？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "根据 InferenceX AgentX 结果，在 100 tok/s/user 下，Vera Rubin NVL72 每美元 TCO 对应的总 token 数在 DeepSeek-V4-Pro 上是 GB300 NVL72 的 1.90 倍，在 MiniMax-M3 上是 1.93 倍，在 Qwen3.8-Flash-Next 上是 2.03 倍；在 GLM-5.2 上，120 tok/s/user 下为 1.81 倍。按每 MW 计为 1.82 至 2.04 倍，按每 GPU 计为 2.83 至 3.18 倍。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "与上一篇 Vera Rubin NVL72 文章相比，这些结果有何变化？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "上一篇文章报告，Vera Rubin NVL72 在 DeepSeek-V4-Pro 上的每兆瓦 token 吞吐量最高提升 7 倍，在 100 tok/s/user 下是最佳 GB300 NVL72 曲线的 2.09 倍。在两套系统更新后的运行中，DeepSeek-V4-Pro 上每 MW 的领先幅度在 100 tok/s/user 下为 1.90 倍，在 150 tok/s/user 下为 6.92 倍，在约 183 tok/s/user 处约为 8.3 倍。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么每美元的领先幅度小于每 GPU 的领先幅度？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "每颗 Vera Rubin NVL72 GPU 的成本为每 GPU 小时 $3.61，GB300 NVL72 为 $2.31；其全口径规划功率为 3.3 kW，后者为 2.12 kW。两个比值都是 1.56 倍，因此按每美元或每兆瓦计算时，每 GPU 的领先幅度会按这个系数缩小。这两项成本在 InferenceX 的外部和内部 TCO 口径下相同，两种口径只在 TPU v7 上有差别。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么 DeepSeek-V4-Pro 上的每美元差距会达到 7 至 8 倍？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "超过 137 tok/s/user 后，GB300 NVL72 前沿上每个点服务的 agent 都不超过 4 个，因此在 150 和 200 tok/s/user 下，最强的 GB300 NVL72 曲线是在 137 tok/s/user 处的 120 个 agent 分离式配置与 241 tok/s/user 处的 4 个 agent 配置之间插值得出的。每美元比值在 150 tok/s/user 处为 6.9 倍，在 200 tok/s/user 处为 7.4 倍，并在约 183 tok/s/user 处达到约 8.3 倍的峰值。这些比值衡量的既有硬件，也有这一覆盖缺口。在 250 tok/s/user 下，每美元领先幅度降至 1.13 倍。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "在峰值吞吐量下，领先幅度有多大？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "按两套系统各自的峰值吞吐量比较，Vera Rubin NVL72 按每美元计在 DeepSeek-V4-Pro 上是 GB300 NVL72 的 1.17 倍，在 Qwen3.8-Flash-Next 上是 1.05 倍，在 GLM-5.2 上是 1.17 倍。在 MiniMax-M3 上，GB300 NVL72 的前沿从 99 tok/s/user 才开始，因此没有可比较的 GB300 NVL72 峰值。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "目前还有哪些内容未覆盖？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kimi K3 和 DeepSeek-V4.1-Flash 还没有 Vera Rubin 的 AgentX 结果；在 DeepSeek-V4-Pro 上，GB300 NVL72 在 137 tok/s/user 以上没有服务超过 4 个 agent 的前沿点；每美元和每 MW 数据分别基于建模的 TCO 和规划的全口径功率，而非实测功率。"
+      }
+    }
+  ]
+}`}</JsonLd>
