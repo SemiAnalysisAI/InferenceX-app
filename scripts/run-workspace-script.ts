@@ -28,6 +28,15 @@ function waitForExit(process: ChildProcess): Promise<number> {
   return promise;
 }
 
+// Comma-separated workspace package names to skip, e.g. when a dedicated workflow
+// already runs that package's suite.
+const excluded = new Set(
+  (process.env.WORKSPACE_SCRIPT_EXCLUDE ?? '')
+    .split(',')
+    .map((name) => name.trim())
+    .filter(Boolean),
+);
+
 const rootPackage = await readManifest(resolve(rootDir, 'package.json'));
 if (!rootPackage.workspaces) {
   throw new Error('Expected package.json workspaces to be an array');
@@ -44,6 +53,10 @@ for (const manifestPath of manifestPaths.toSorted()) {
   const packageDir = dirname(resolve(rootDir, manifestPath));
   const workspacePackage = await readManifest(resolve(rootDir, manifestPath));
   if (!workspacePackage.scripts?.[scriptName]) continue;
+  if (workspacePackage.name && excluded.has(workspacePackage.name)) {
+    console.log(`\n> ${workspacePackage.name} ${scriptName} skipped (WORKSPACE_SCRIPT_EXCLUDE)\n`);
+    continue;
+  }
 
   console.log(`\n> ${workspacePackage.name ?? manifestPath} ${scriptName}\n`);
   const args = ['run', scriptName, ...scriptArgs];
