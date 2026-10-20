@@ -1333,7 +1333,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '20069cd3134a62342679f0aaa882c7860d0dc161519b3506b83faea1a3d5aaa0',
+    sourceSha256: '1dcb0143290f8ad9314c88a4674249ac3b86d6a3cc637e1d148924fbbcd6ca0c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
