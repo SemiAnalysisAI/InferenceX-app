@@ -72,8 +72,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'number',
     description: text(
-      'Target interactivity (tok/s/user) the metric is interpolated at for every snapshot date.',
-      '目标交互速率（tok/s/user）：在每个快照日期上按该值对指标插值。',
+      'Target interactivity (tok/s/user) the metric is interpolated at for every snapshot date. Fixed-sequence rows use median interactivity; agentic-traces rows use P90 interactivity, matching the AgentX charts.',
+      '目标交互速率（tok/s/user）：在每个快照日期上按该值对指标插值。固定序列使用中位数交互速率；agentic-traces 使用 P90 交互速率，与 AgentX 图表一致。',
     ),
     schema: { type: 'number', default: 35, minimum: 1, maximum: 1000 },
     example: '50',
