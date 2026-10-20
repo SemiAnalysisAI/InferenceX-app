@@ -325,11 +325,11 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
               <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
                 <th
                   scope="row"
-                  className="w-[52%] py-2.5 pr-4 text-left font-medium text-muted-foreground"
+                  className="w-[52%] px-4 py-2.5 text-left font-medium text-muted-foreground"
                 >
                   {label}
                 </th>
-                <td className="whitespace-nowrap py-2.5 text-right font-mono">{value}</td>
+                <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">{value}</td>
               </tr>
             ))}
           </tbody>
