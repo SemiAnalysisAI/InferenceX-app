@@ -3,8 +3,8 @@
 import { useSyncExternalStore } from 'react';
 import { isEmbedPathname } from '../embed/embed-route';
 
-export type EasterEggTheme = 'minecraft' | 'csgo' | 'gta' | 'doom' | 'halo';
-const themes: EasterEggTheme[] = ['minecraft', 'csgo', 'gta', 'doom', 'halo'];
+export type EasterEggTheme = 'minecraft' | 'csgo' | 'gta' | 'doom' | 'halo' | 'pokemon';
+const themes: EasterEggTheme[] = ['minecraft', 'csgo', 'gta', 'doom', 'halo', 'pokemon'];
 const listeners = new Set<() => void>();
 let observer: MutationObserver | undefined;
 
