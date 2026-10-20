@@ -69,10 +69,10 @@ export function rowToLightweightPoint(
   );
 
   // AgentX charts, overview and compare read interactivity at P90 (the AgentX
-  // SLA contract); fixed-sequence charts read the median. Trends and the
-  // improvement waterfall must interpolate on the same axis.
+  // SLA contract) from the 1/ITL-derived entry; fixed-sequence charts read the
+  // median. Trends and the improvement waterfall must interpolate on the same axis.
   const interactivity =
-    row.benchmark_type === 'agentic_traces' ? row.metrics.p90_intvty : row.metrics.median_intvty;
+    row.benchmark_type === 'agentic_traces' ? entry.p90_intvty : row.metrics.median_intvty;
 
   const point = {
     x: interactivity ?? 0,

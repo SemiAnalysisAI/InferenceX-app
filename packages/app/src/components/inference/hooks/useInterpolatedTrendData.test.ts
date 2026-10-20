@@ -70,13 +70,14 @@ function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 
 describe('rowToLightweightPoint', () => {
   it('reads AgentX interactivity at P90 and fixed-sequence interactivity at the median', () => {
-    const metrics = { tput_per_gpu: 400, median_intvty: 50, p90_intvty: 20 };
+    // The drifted artifact p90_intvty (99) must lose to 1/p90_itl, as on the AgentX charts.
+    const metrics = { tput_per_gpu: 400, median_intvty: 50, p90_intvty: 99, p90_itl: 0.05 };
     const agentic = rowToLightweightPoint(
       makeBenchmarkRow({ benchmark_type: 'agentic_traces', isl: null, osl: null, metrics }),
       ['tpPerGpu'],
     );
     const fixed = rowToLightweightPoint(makeBenchmarkRow({ metrics }), ['tpPerGpu']);
-    expect(agentic?.x).toBe(20);
+    expect(agentic?.x).toBeCloseTo(20);
     expect(fixed?.x).toBe(50);
   });
 
