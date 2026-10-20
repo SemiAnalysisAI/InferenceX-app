@@ -21,16 +21,12 @@ function runResponse(repo: string): Response {
   });
 }
 
-const notFound = () => new Response(null, { status: 404, statusText: 'Not Found' });
-
 function stubFetch(...responses: Response[]): Mock {
   const fetchMock = vi.fn();
   for (const response of responses) fetchMock.mockResolvedValueOnce(response);
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
-
-const requestedUrls = (fetchMock: Mock) => fetchMock.mock.calls.map(([url]) => url);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -40,7 +36,10 @@ afterEach(() => {
 describe('fetchGithubRun', () => {
   it('searches the primary and then the legacy repository by default', async () => {
     vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
-    const fetchMock = stubFetch(notFound(), runResponse('InferenceMAX/InferenceMAX'));
+    const fetchMock = stubFetch(
+      new Response(null, { status: 404 }),
+      runResponse('InferenceMAX/InferenceMAX'),
+    );
 
     const { fetchGithubRun } = createWorkflowRunServices({} as never, 'test-token');
     const run = await fetchGithubRun(RUN_ID);
@@ -60,7 +59,7 @@ describe('fetchGithubRun', () => {
         { number: 12, htmlUrl: 'https://github.com/InferenceMAX/InferenceMAX/pull/12' },
       ],
     });
-    expect(requestedUrls(fetchMock)).toEqual([
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `https://api.github.com/repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`,
       `https://api.github.com/repos/InferenceMAX/InferenceMAX/actions/runs/${RUN_ID}`,
     ]);
@@ -74,7 +73,11 @@ describe('fetchGithubRun', () => {
 
   it('resolves runs from configured source repositories before the legacy repository', async () => {
     vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
-    const fetchMock = stubFetch(notFound(), notFound(), runResponse('example-org/bench-b'));
+    const fetchMock = stubFetch(
+      new Response(null, { status: 404 }),
+      new Response(null, { status: 404 }),
+      runResponse('example-org/bench-b'),
+    );
 
     const { fetchGithubRun } = createWorkflowRunServices({} as never, 'test-token');
     const run = await fetchGithubRun(RUN_ID);
@@ -83,7 +86,7 @@ describe('fetchGithubRun', () => {
       htmlUrl: `https://github.com/example-org/bench-b/actions/runs/${RUN_ID}`,
       runAttempt: 2,
     });
-    expect(requestedUrls(fetchMock)).toEqual([
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `https://api.github.com/repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`,
       `https://api.github.com/repos/example-org/bench-a/actions/runs/${RUN_ID}`,
       `https://api.github.com/repos/example-org/bench-b/actions/runs/${RUN_ID}`,
@@ -92,13 +95,17 @@ describe('fetchGithubRun', () => {
 
   it('caches a run that no repository has', async () => {
     vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a');
-    const fetchMock = stubFetch(notFound(), notFound(), notFound());
+    const fetchMock = stubFetch(
+      new Response(null, { status: 404 }),
+      new Response(null, { status: 404 }),
+      new Response(null, { status: 404 }),
+    );
 
     const { fetchGithubRun } = createWorkflowRunServices({} as never, 'test-token');
 
     await expect(fetchGithubRun(RUN_ID)).resolves.toBeNull();
     await expect(fetchGithubRun(RUN_ID)).resolves.toBeNull();
-    expect(requestedUrls(fetchMock)).toEqual([
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `https://api.github.com/repos/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`,
       `https://api.github.com/repos/example-org/bench-a/actions/runs/${RUN_ID}`,
       `https://api.github.com/repos/InferenceMAX/InferenceMAX/actions/runs/${RUN_ID}`,
@@ -114,7 +121,7 @@ describe('fetchGithubRun', () => {
     ]);
 
     await expect(fetchGithubRun(RUN_ID)).resolves.toMatchObject({ runAttempt: 2 });
-    expect(requestedUrls(fetchMock)).toEqual([
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `https://api.github.com/repos/example-org/single/actions/runs/${RUN_ID}`,
     ]);
   });

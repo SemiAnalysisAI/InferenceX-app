@@ -798,7 +798,7 @@ describe('CollectiveX availability states', () => {
   });
 });
 
-describe('CollectiveX kv-transfer card', () => {
+describe('CollectiveX source repository links', () => {
   it('links the recorded source repository', () => {
     const sourced = buildDataset({
       meta: {
@@ -828,7 +828,9 @@ describe('CollectiveX kv-transfer card', () => {
       'https://github.com/ExampleOrg/ExampleBench/actions/runs/166',
     );
   });
+});
 
+describe('CollectiveX kv-transfer card', () => {
   it('renders kv cases with bandwidth-bound cells and per-case outcomes', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);

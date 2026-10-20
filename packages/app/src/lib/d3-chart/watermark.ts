@@ -1,7 +1,5 @@
 import type * as d3 from 'd3';
 
-import { DEPLOYMENT_FLAGS } from '@/lib/config/deployment-flags';
-
 import type { ChartMargin } from './types';
 import { CHART_TYPE, px } from './typography';
 
@@ -116,7 +114,6 @@ export function createUnofficialWatermark(
   addLabel(patternWidth, rowHeight + rowHeight / 2);
 
   insertWatermarkRect(svg, innerWidth, innerHeight, margin, patternId);
-  if (!DEPLOYMENT_FLAGS.unofficialWatermarkImage) return;
 
   svg
     .insert('image', ':first-child')

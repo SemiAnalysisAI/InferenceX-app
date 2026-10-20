@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
   getModelAndSequence,
@@ -307,31 +307,6 @@ describe('showsTcoBasisSelector', () => {
   it('hides the selector when the model or scenario is unknown', () => {
     expect(showsTcoBasisSelector(null, Sequence.EightK_OneK)).toBe(false);
     expect(showsTcoBasisSelector(Model.Qwen3_5, undefined)).toBe(false);
-  });
-
-  it('hides the selector while no hardware with an owner cost is shown', () => {
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK, false)).toBe(false);
-    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK, true)).toBe(true);
-  });
-
-  describe('when the deployment shows it always', () => {
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it('shows the selector for every model, scenario, and hardware mix', async () => {
-      vi.stubEnv('NEXT_PUBLIC_TCO_BASIS_SELECTOR', 'always');
-      // The scope is a build-time flag read when the module loads.
-      vi.resetModules();
-      const always = await import('@/lib/catalog/data-mappings');
-
-      for (const model of Object.values(always.Model)) {
-        for (const sequence of Object.values(always.Sequence)) {
-          expect(always.showsTcoBasisSelector(model, sequence, false)).toBe(true);
-        }
-      }
-      expect(always.showsTcoBasisSelector(null, undefined)).toBe(true);
-    });
   });
 });
 

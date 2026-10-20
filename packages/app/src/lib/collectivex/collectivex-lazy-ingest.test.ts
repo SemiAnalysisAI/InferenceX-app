@@ -530,12 +530,11 @@ describe('ensureCollectiveXRun', () => {
   });
 });
 
-const sweepListing = (repository: string) =>
-  `/repos/${repository}/actions/workflows/collectivex-sweep.yml/runs?`;
-
 describe('benchmark source repositories', () => {
   const PRIMARY = 'SemiAnalysisAI/InferenceX';
   const EXTRA = 'ExampleOrg/ExampleBench';
+  const PRIMARY_LISTING = `/repos/${PRIMARY}/actions/workflows/collectivex-sweep.yml/runs?`;
+  const EXTRA_LISTING = `/repos/${EXTRA}/actions/workflows/collectivex-sweep.yml/runs?`;
   const downloads: [string, () => Response][] = [
     ['https://example.test/matrix.zip', () => new Response(matrixZip)],
     ['https://example.test/shards.zip', () => new Response(shardZip)],
@@ -549,8 +548,6 @@ describe('benchmark source repositories', () => {
     });
   }
 
-  const fetchedUrls = (): string[] => mockFetch.mock.calls.map(([url]) => String(url));
-
   beforeEach(() => {
     process.env.INFERENCEX_SOURCE_REPOS = EXTRA;
   });
@@ -560,8 +557,8 @@ describe('benchmark source repositories', () => {
       Promise.resolve({ [ids[0]]: { state: 'live', version: 2, run_attempt: 1 } }),
     );
     routeFetch([
-      [sweepListing(PRIMARY), () => runListing(runObject({ id: 165 }), runObject({ id: 150 }))],
-      [sweepListing(EXTRA), () => runListing(runObject({ id: 170 }), runObject({ id: 160 }))],
+      [PRIMARY_LISTING, () => runListing(runObject({ id: 165 }), runObject({ id: 150 }))],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }), runObject({ id: 160 }))],
     ]);
 
     await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
@@ -571,8 +568,8 @@ describe('benchmark source repositories', () => {
 
   it('reads artifacts from and records the repository that ran the newest sweep', async () => {
     routeFetch([
-      [sweepListing(PRIMARY), () => runListing(runObject({ id: 160 }))],
-      [sweepListing(EXTRA), () => runListing(runObject({ id: 170 }))],
+      [PRIMARY_LISTING, () => runListing(runObject({ id: 160 }))],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }))],
       [`/repos/${EXTRA}/actions/runs/170/artifacts?`, () => Response.json(artifactsBody(170))],
       ...downloads,
     ]);
@@ -584,15 +581,17 @@ describe('benchmark source repositories', () => {
       run_id: '170',
       summary: { source_repository: EXTRA },
     });
-    expect(fetchedUrls().filter((url) => url.includes(`/repos/${PRIMARY}/actions/runs/`))).toEqual(
-      [],
-    );
+    expect(
+      mockFetch.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes(`/repos/${PRIMARY}/actions/runs/`)),
+    ).toEqual([]);
   });
 
   it('keeps discovering the other repositories when one cannot be listed', async () => {
     routeFetch([
-      [sweepListing(PRIMARY), () => new Response(null, { status: 500 })],
-      [sweepListing(EXTRA), () => runListing(runObject({ id: 170 }))],
+      [PRIMARY_LISTING, () => new Response(null, { status: 500 })],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }))],
       [`/repos/${EXTRA}/actions/runs/170/artifacts?`, () => Response.json(artifactsBody(170))],
       ...downloads,
     ]);
@@ -603,12 +602,18 @@ describe('benchmark source repositories', () => {
     expect(mockInsert.mock.calls[0][1].run_id).toBe('170');
   });
 
-  it('does not fail a pass when another repository has no sweep workflow', async () => {
-    routeFetch([[sweepListing(PRIMARY), () => runListing()]]);
+  it('skips another repository without a sweep workflow quietly', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([[PRIMARY_LISTING, () => runListing()]]);
 
     await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
 
-    expect(fetchedUrls().some((url) => url.includes(sweepListing(EXTRA)))).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+
+    expect(
+      mockFetch.mock.calls.map(([url]) => String(url)).some((url) => url.includes(EXTRA_LISTING)),
+    ).toBe(true);
   });
 
   it('fails discovery only when every repository fails', async () => {
@@ -617,7 +622,9 @@ describe('benchmark source repositories', () => {
     const caught = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
 
     expect(collectiveXSweepErrorCode(caught)).toBe('unavailable');
-    expect(fetchedUrls().some((url) => url.includes(sweepListing(EXTRA)))).toBe(true);
+    expect(
+      mockFetch.mock.calls.map(([url]) => String(url)).some((url) => url.includes(EXTRA_LISTING)),
+    ).toBe(true);
   });
 
   it('looks a run up in each repository and records where it was found', async () => {
@@ -629,7 +636,9 @@ describe('benchmark source repositories', () => {
 
     await ensureCollectiveXRun(1, '170');
 
-    expect(fetchedUrls()[0]).toContain(`/repos/${PRIMARY}/actions/runs/170`);
+    expect(mockFetch.mock.calls.map(([url]) => String(url))[0]).toContain(
+      `/repos/${PRIMARY}/actions/runs/170`,
+    );
     expect(mockInsert.mock.calls[0][1]).toMatchObject({
       run_id: '170',
       summary: { source_repository: EXTRA },

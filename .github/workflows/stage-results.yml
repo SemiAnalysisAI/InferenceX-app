@@ -99,7 +99,7 @@ jobs:
             echo "::error::reset-staging-database must be true or false"
             exit 1
           fi
-          if [ "$SOURCE_REPOSITORY" != "$BENCHMARK_REPO" ]; then
+          if [ "${SOURCE_REPOSITORY,,}" != "${BENCHMARK_REPO,,}" ]; then
             echo "::error::Unsupported source repository: $SOURCE_REPOSITORY"
             exit 1
           fi

@@ -312,10 +312,7 @@ export function GlobalFilterProvider({
     if (hasExplicitUrlParam('g_runid')) {
       applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
     }
-    const urlTcoBasis = getUrlParam('g_tco');
-    setTcoBasis(
-      urlTcoBasis === 'external' || urlTcoBasis === 'internal' ? urlTcoBasis : DEFAULT_TCO_BASIS,
-    );
+    setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 

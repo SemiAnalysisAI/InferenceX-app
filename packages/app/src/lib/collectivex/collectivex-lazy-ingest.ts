@@ -218,6 +218,8 @@ async function* repositorySweepRuns(
       `${GITHUB_API_BASE}/repos/${repository}/actions/workflows/${WORKFLOW_FILE}/runs?${parameters}`,
       token,
     );
+    // An extra source repository without the sweep workflow simply has no sweeps.
+    if (response.status === 404 && page === 1 && repository !== GITHUB_REPO_FULL) return;
     if (!response.ok) {
       throw new CollectiveXSweepError(
         'unavailable',

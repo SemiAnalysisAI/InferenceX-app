@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
     error: null as Error | null,
   },
   unofficialAvailable: [] as { model: string; sequence: string; precision: string }[],
-  getUrlParam: vi.fn<(key: string) => string | undefined>(() => undefined),
+  getUrlParam: vi.fn(() => undefined),
   setUrlParams: vi.fn(),
 }));
 
@@ -254,53 +254,5 @@ describe('GlobalFilterProvider context isolation', () => {
     mountProvider();
     act(() => selectModel?.(Model.Muse_Spark_Open));
     expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
-  });
-});
-
-describe('GlobalFilterProvider TCO basis share links', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
-  // The default basis is a build-time flag read at module load, so each case loads the provider.
-  async function tcoBasisFor(urlValue: string | undefined) {
-    vi.resetModules();
-    const { GlobalFilterProvider: Provider, useGlobalFilterSelection: useSelection } =
-      await import('./GlobalFilterContext');
-    mocks.getUrlParam.mockImplementation((key) => (key === 'g_tco' ? urlValue : undefined));
-    let basis: string | undefined;
-    function Probe() {
-      basis = useSelection().tcoBasis;
-      return null;
-    }
-    container = document.createElement('div');
-    root = createRoot(container);
-    act(() =>
-      root?.render(
-        <Provider initialModel={Model.DeepSeek_V4_Pro} initialSequence={Sequence.EightK_OneK}>
-          <Probe />
-        </Provider>,
-      ),
-    );
-    return basis;
-  }
-
-  it.each([
-    ['external', 'external'],
-    ['internal', 'internal'],
-    [undefined, 'internal'],
-    ['owner', 'internal'],
-  ])('reads g_tco=%s as %s under the public default', async (value, expected) => {
-    expect(await tcoBasisFor(value)).toBe(expected);
-  });
-
-  it.each([
-    ['internal', 'internal'],
-    ['external', 'external'],
-    [undefined, 'external'],
-    ['owner', 'external'],
-  ])('reads g_tco=%s as %s when the deployment defaults to External', async (value, expected) => {
-    vi.stubEnv('NEXT_PUBLIC_DEFAULT_TCO_BASIS', 'external');
-    expect(await tcoBasisFor(value)).toBe(expected);
   });
 });

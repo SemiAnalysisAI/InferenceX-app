@@ -1,16 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
-import { DEPLOYMENT_FLAG_NAMES } from './src/lib/config/deployment-flags';
-
 export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['src/test/setup-local-storage.ts'],
-    // test:unit loads the root .env; deployment values there must not change the defaults tests assert.
-    env: Object.fromEntries(
-      [...DEPLOYMENT_FLAG_NAMES, 'INFERENCEX_SOURCE_REPOS'].map((name) => [name, '']),
-    ),
+    // test:unit loads the root .env; extra source repos there must not change the lookups tests assert.
+    env: { INFERENCEX_SOURCE_REPOS: '' },
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',

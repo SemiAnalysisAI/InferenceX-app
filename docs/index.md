@@ -17,7 +17,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [D3 Charts](./d3-charts.md) covers render phases, zoom and tooltip behavior, animation, and Pareto highlights.
 - [Data Pipeline](./data-pipeline.md) covers DB schema and migration rules, ETL design, audited purges and backfills, and agentic and PowerX storage.
 - [Ingesting Runs](./ingesting-runs.md) is the runbook for manually ingesting a GitHub Actions benchmark run.
-- [Deployment Configuration](./deployment-configuration.md) lists the optional environment variables, product flags, and GitHub variables with their defaults.
+- [Deployment Configuration](./deployment-configuration.md) lists the optional environment variables and GitHub variables with their defaults.
 - [GPU Specs](./gpu-specs.md) covers unit conventions, topology invariants, and hardware gotchas.
 - [TCO Calculator](./tco-calculator.md) covers the calculator's interpolation, cost metrics, unofficial-run overlays, and estimator design.
 - [Adding Entities](./adding-entities.md) has the checklists for adding models, GPUs, precisions, sequences, and frameworks.

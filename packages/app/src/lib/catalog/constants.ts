@@ -1,7 +1,5 @@
 import { HW_REGISTRY, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-import { DEPLOYMENT_FLAGS } from '@/lib/config/deployment-flags';
-
 export const TABLEAU_10 = [
   '#4e79a7',
   '#f28e2c',
@@ -24,7 +22,7 @@ export interface GpuSpecs {
 
 export type TcoBasis = 'external' | 'internal';
 
-export const DEFAULT_TCO_BASIS: TcoBasis = DEPLOYMENT_FLAGS.defaultTcoBasis;
+export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
 
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 

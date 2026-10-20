@@ -61,7 +61,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -71,7 +71,6 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-  showsTcoBasisSelector,
 } from '@/lib/catalog/data-mappings';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -376,6 +375,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
   } = useGlobalFilterSelection();
+  const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -892,11 +892,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     );
   }
 
-  const showsTcoBasis = showsTcoBasisSelector(
-    selectedModel,
-    selectedSequence,
-    barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7'),
-  );
+  const showsTcoBasis =
+    scenarioShowsTcoBasis && barResults.some((r) => r.hwKey.split('_')[0] === 'tpuv7');
 
   return (
     <div className="flex flex-col gap-4">

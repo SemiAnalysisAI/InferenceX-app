@@ -6,10 +6,7 @@ import type {
 } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import { text } from '@/lib/api/api-documentation-helpers';
-import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
-
-const OTHER_TCO_BASIS = DEFAULT_TCO_BASIS === 'internal' ? 'external' : 'internal';
 
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
@@ -55,8 +52,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'AgentX 延迟分位数为 p75 或 p90；CollectiveX 支持 p50、p95、p99。',
   ],
   tcoBasis: [
-    `${DEFAULT_TCO_BASIS} (default) or ${OTHER_TCO_BASIS}. Applies the same configured owning/rental cost basis as the UI.`,
-    `${DEFAULT_TCO_BASIS}（默认）或 ${OTHER_TCO_BASIS}，使用与界面相同的自有或租赁成本口径。`,
+    'internal (default) or external. Applies the same configured owning/rental cost basis as the UI.',
+    'internal（默认）或 external，使用与界面相同的自有或租赁成本口径。',
   ],
   unofficialrun: [
     'Up to eight comma-separated public CI run IDs. Surrounding whitespace and duplicates are removed; run indices follow the remaining order. Overlay sources remain separate from official data.',

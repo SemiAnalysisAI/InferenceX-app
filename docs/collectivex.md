@@ -80,7 +80,8 @@ Key invariants:
   are unset.
 - **Source repositories**: sweeps are discovered in `SemiAnalysisAI/InferenceX` and in
   every repository listed in `INFERENCEX_SOURCE_REPOS`, merged newest-first by run id. A
-  repository that cannot be listed is skipped and logged unless every repository fails.
+  repository without the sweep workflow is skipped; one that cannot be listed for another
+  reason is skipped and logged, unless every repository fails.
   Per-run lookups try each repository in order. A run from any other repository records
   it as `source_repository` in its summary, and source, methodology, and run links use
   it; runs without the field link to `SemiAnalysisAI/InferenceX`. The ingest CLI takes

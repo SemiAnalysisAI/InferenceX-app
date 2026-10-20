@@ -1,10 +1,6 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { benchmarkSourceRepos, workflowRunRepos } from './github';
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
+import { benchmarkSourceRepos } from './github';
 
 describe('benchmarkSourceRepos', () => {
   it('searches only the primary repository when no source repositories are configured', () => {
@@ -32,49 +28,11 @@ describe('benchmarkSourceRepos', () => {
     'https://github.com/example-org/bench',
     'example org/bench',
     '/bench',
+    'example-org/..',
+    './bench',
   ])('rejects the malformed entry %j', (entry) => {
     expect(() =>
       benchmarkSourceRepos({ INFERENCEX_SOURCE_REPOS: `example-org/bench,${entry}` }),
     ).toThrow(`Invalid repo slug in INFERENCEX_SOURCE_REPOS: ${entry}`);
-  });
-
-  it('reads process.env by default', () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', undefined);
-    expect(benchmarkSourceRepos()).toEqual(['SemiAnalysisAI/InferenceX']);
-
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench');
-    expect(benchmarkSourceRepos()).toEqual(['SemiAnalysisAI/InferenceX', 'example-org/bench']);
-  });
-});
-
-describe('workflowRunRepos', () => {
-  it('matches the current and legacy repositories by default', () => {
-    expect(workflowRunRepos({})).toEqual([
-      'SemiAnalysisAI/InferenceX',
-      'InferenceMAX/InferenceMAX',
-    ]);
-  });
-
-  it('searches configured source repositories before the legacy repository', () => {
-    expect(workflowRunRepos({ INFERENCEX_SOURCE_REPOS: 'example-org/bench' })).toEqual([
-      'SemiAnalysisAI/InferenceX',
-      'example-org/bench',
-      'InferenceMAX/InferenceMAX',
-    ]);
-  });
-
-  it('lists the legacy repository once even when it is configured as a source', () => {
-    expect(
-      workflowRunRepos({ INFERENCEX_SOURCE_REPOS: 'inferencemax/inferencemax,example-org/bench' }),
-    ).toEqual(['SemiAnalysisAI/InferenceX', 'inferencemax/inferencemax', 'example-org/bench']);
-  });
-
-  it('reads process.env by default', () => {
-    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench');
-    expect(workflowRunRepos()).toEqual([
-      'SemiAnalysisAI/InferenceX',
-      'example-org/bench',
-      'InferenceMAX/InferenceMAX',
-    ]);
   });
 });

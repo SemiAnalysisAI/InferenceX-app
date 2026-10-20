@@ -1609,7 +1609,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '684fb9feafe452b217cc24fe37ff1082780234e9ed987c5fd148ddf41c0920fd',
+    sourceSha256: '5b4cd412a1b543a8f26b5daf72ab252bc6c95edd7ca975262eefc1bbddbed3c7',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and discovery state.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和发现状态。',

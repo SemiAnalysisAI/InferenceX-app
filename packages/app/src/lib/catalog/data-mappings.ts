@@ -1,7 +1,6 @@
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
 
 import type { ExclusionConflictPolicy, ExclusionSpec } from '../benchmarks/exclusion';
-import { DEPLOYMENT_FLAGS } from '../config/deployment-flags';
 
 export enum Model {
   Llama3_3_70B = 'Llama-3.3-70B-Instruct-FP8',
@@ -427,18 +426,11 @@ const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = 
   [Model.Kimi_K3]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
 };
 
-/**
- * `scoped` deployments show the TCO Basis selector only for these scenarios and, when callers pass
- * `ownerCostHardwareShown`, only while hardware with a distinct owner cost is on screen. `always`
- * deployments show it wherever a cost is shown.
- */
 export function showsTcoBasisSelector(
   model: Model | null | undefined,
   sequence: Sequence | null | undefined,
-  ownerCostHardwareShown = true,
 ): boolean {
-  if (DEPLOYMENT_FLAGS.tcoBasisSelector === 'always') return true;
-  if (!model || !sequence || !ownerCostHardwareShown) return false;
+  if (!model || !sequence) return false;
   return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
 }
 

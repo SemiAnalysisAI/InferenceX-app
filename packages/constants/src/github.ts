@@ -3,7 +3,7 @@ export const GITHUB_REPO = 'InferenceX';
 export const GITHUB_REPO_FULL = `${GITHUB_OWNER}/${GITHUB_REPO}`;
 
 /** Pre-rename repository that still owns old workflow runs. */
-const LEGACY_GITHUB_REPO = 'InferenceMAX/InferenceMAX';
+export const LEGACY_GITHUB_REPO = 'InferenceMAX/InferenceMAX';
 
 const REPO_SLUG = /^[\w.-]+\/[\w.-]+$/u;
 
@@ -30,16 +30,11 @@ export function benchmarkSourceRepos(env: Env = process.env): string[] {
     .map((repo) => repo.trim())
     .filter(Boolean);
   for (const repo of configured) {
-    if (!REPO_SLUG.test(repo)) {
+    if (!REPO_SLUG.test(repo) || repo.split('/').some((part) => part === '.' || part === '..')) {
       throw new Error(`Invalid repo slug in INFERENCEX_SOURCE_REPOS: ${repo}`);
     }
   }
   return uniqueRepos([GITHUB_REPO_FULL, ...configured]);
-}
-
-/** Repositories that may own a workflow run: the benchmark sources, then the legacy repository. */
-export function workflowRunRepos(env: Env = process.env): string[] {
-  return uniqueRepos([...benchmarkSourceRepos(env), LEGACY_GITHUB_REPO]);
 }
 
 export const GITHUB_API_BASE = 'https://api.github.com';

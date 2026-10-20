@@ -10,7 +10,7 @@ export interface CollectiveXRunRow {
   generated_at: string;
   source_sha: string;
   source_branch: string | null;
-  /** From the stored summary. Null on runs stored before it was recorded. */
+  /** From the stored summary. Null for runs from SemiAnalysisAI/InferenceX. */
   source_repository: string | null;
   conclusion: string | null;
   matrix: unknown;
@@ -50,7 +50,7 @@ function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
 
 /**
  * The most recent visible live run for a version. Zero-case summaries contain
- * no supported-vendor data and stay hidden. Ordered by run_id — GitHub run ids
+ * no AMD/NVIDIA data and stay hidden. Ordered by run_id — GitHub run ids
  * increase monotonically with creation, matching lazy discovery's newest-first
  * walk (completion time would let a long-failing older run shadow a newer
  * successful one).
@@ -113,7 +113,7 @@ export async function getCollectiveXRun(
 /**
  * Every visible live run summary for a version, newest-first, straight from
  * the precomputed `summary` column — no document loading. Runs whose reader
- * summary contains no supported-vendor cases stay hidden.
+ * summary contains no AMD/NVIDIA cases stay hidden.
  */
 export async function listCollectiveXRuns(
   sql: DbClient,

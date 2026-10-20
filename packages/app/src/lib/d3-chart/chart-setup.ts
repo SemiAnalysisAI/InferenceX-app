@@ -1,7 +1,5 @@
 import * as d3 from 'd3';
 
-import { DEPLOYMENT_FLAGS } from '@/lib/config/deployment-flags';
-
 import type { ChartLayout, ChartSetupConfig } from './types';
 import { CHART_TYPE, px } from './typography';
 import {
@@ -150,8 +148,7 @@ export function setupChartStructure(
   const hasUnofficial = !defs.select(`#${unofficialPatternId}`).empty();
   const hasUnofficialImage = !svg.select('.unofficial-watermark-image').empty();
   const needsSwitch =
-    (watermark === 'unofficial' &&
-      (!hasUnofficial || (DEPLOYMENT_FLAGS.unofficialWatermarkImage && !hasUnofficialImage))) ||
+    (watermark === 'unofficial' && (!hasUnofficial || !hasUnofficialImage)) ||
     (watermark === 'logo' && !hasLogo) ||
     (watermark === 'none' && (hasLogo || hasUnofficial || hasUnofficialImage));
 

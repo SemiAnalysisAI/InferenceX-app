@@ -462,56 +462,6 @@ describe('writeUrlParams + buildShareUrl', () => {
   });
 });
 
-describe('TCO basis share-link default', () => {
-  // The default is a build-time flag read when url-state loads, so each case imports it fresh.
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-  });
-
-  it.each([
-    [undefined, 'internal', 'external'],
-    ['external', 'external', 'internal'],
-  ] as const)(
-    'with NEXT_PUBLIC_DEFAULT_TCO_BASIS=%s omits %s and shares %s',
-    async (flag, omitted, shared) => {
-      vi.stubEnv('NEXT_PUBLIC_DEFAULT_TCO_BASIS', flag);
-      setupWindow('', '/inference');
-      const { PARAM_DEFAULTS, writeUrlParams, buildShareUrl } =
-        await import('@/lib/routing/url-state');
-      expect(PARAM_DEFAULTS.g_tco).toBe(omitted);
-
-      writeUrlParams({ g_tco: shared });
-      await vi.advanceTimersByTimeAsync(200);
-      expect(new URL(buildShareUrl()).searchParams.get('g_tco')).toBe(shared);
-
-      writeUrlParams({ g_tco: omitted });
-      await vi.advanceTimersByTimeAsync(200);
-      expect(buildShareUrl()).not.toContain('g_tco');
-    },
-  );
-
-  it('writes only the non-default basis into a profit-estimator path', async () => {
-    vi.stubEnv('NEXT_PUBLIC_DEFAULT_TCO_BASIS', 'external');
-    const { history } = setupWindow('', '/profit-estimator/deepseek-v4');
-    const { writeUrlParams } = await import('@/lib/routing/url-state');
-
-    writeUrlParams({ g_tco: 'internal' });
-    await vi.advanceTimersByTimeAsync(200);
-    expect(history.replaceState).toHaveBeenLastCalledWith(
-      history.state,
-      '',
-      '/profit-estimator/deepseek-v4/tco-basis/internal',
-    );
-  });
-});
-
 describe('SSR safety', () => {
   beforeEach(() => {
     vi.resetModules();
