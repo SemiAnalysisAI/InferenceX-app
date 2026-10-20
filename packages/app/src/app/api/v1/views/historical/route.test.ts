@@ -26,6 +26,10 @@ vi.mock('@/lib/cache/api-cache', () => ({
 
 import { GET } from './route';
 import { buildImprovementWaterfall } from '@/components/inference/utils/improvement-waterfall';
+import {
+  groupTrendRowsByDate,
+  buildTrendLines,
+} from '@/components/inference/hooks/interpolated-trend-core';
 
 function request(path: string): NextRequest {
   return new NextRequest(new URL(path, 'http://localhost'));
@@ -134,6 +138,79 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('GET /api/v1/views/historical', () => {
+  it('matches dashboard history at P90 and rejects the median-only reachable range', async () => {
+    const rows = curve('2026-03-01', 'h200', 'trt').map((row) => ({
+      ...row,
+      benchmark_type: 'agentic_traces' as const,
+      isl: null,
+      osl: null,
+      metrics: {
+        ...row.metrics,
+        p90_full_response_itl: 1 / row.metrics.median_intvty,
+        p90_itl: 1 / (row.metrics.median_intvty * 5),
+        median_intvty: row.metrics.median_intvty * 2,
+        p90_intvty: 999,
+      },
+    }));
+    mockGetAllBenchmarksForHistory.mockResolvedValue(rows);
+    for (const target of [10, 25, 35, 60, 70]) {
+      const response = await GET(
+        request(
+          `/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=${target}&extendToDate=2026-03-01`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.interactivity).toEqual({
+        statistic: 'p90',
+        field: 'p90_intvty',
+        unit: 'tok/s/user',
+      });
+      const { trendLines } = buildTrendLines(
+        groupTrendRowsByDate(rows, {
+          selectedPrecisions: ['fp8'],
+          selectedYAxisMetric: 'y_tpPerGpu',
+          requestedMetrics: ['tpPerGpu'],
+        }),
+        { targetInteractivity: target, trendMetricKey: 'tpPerGpu', extendToDate: '2026-03-01' },
+      );
+      expect(
+        body.series.map((series: { points: { value: number }[] }) =>
+          series.points.map((point) => point.value),
+        ),
+      ).toEqual([...trendLines.values()].map((points) => points.map((point) => point.value)));
+      if (target === 35) expect(body.series[0].points[0].value).toBeCloseTo(300, 10);
+      if (target === 70) expect(body.series).toEqual([]);
+    }
+    const csv = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=35&extendToDate=2026-03-01&format=csv',
+      ),
+    );
+    expect(await csv.text()).toContain('35,p90,p90_intvty');
+  });
+
+  it('omits AgentX rows missing P90 latency rather than using supplied rate or median', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValue(
+      curve('2026-03-01', 'h200', 'trt').map((row) => ({
+        ...row,
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: { ...row.metrics, p90_intvty: 35 },
+      })),
+    );
+    const response = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&target=35',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.interactivity.statistic).toBe('p90');
+    expect(body.series).toEqual([]);
+  });
+
   it('builds interpolated trend lines at the target interactivity', async () => {
     const res = await GET(
       request(
@@ -154,6 +231,11 @@ describe('GET /api/v1/views/historical', () => {
       precisions: ['fp8'],
     });
     expect(body.metric.key).toBe('tpPerGpu');
+    expect(body.interactivity).toEqual({
+      statistic: 'median',
+      field: 'median_intvty',
+      unit: 'tok/s/user',
+    });
 
     expect(body.series.length).toBe(2);
     const h200 = body.series.find((s: { hwKey: string }) => s.hwKey.startsWith('h200'));

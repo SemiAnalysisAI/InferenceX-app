@@ -29,6 +29,7 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 import {
   buildTrendLines,
   groupTrendRowsByDate,
+  historicalInteractivityAxis,
   trendMetricDependencies,
 } from '@/components/inference/hooks/interpolated-trend-core';
 import {
@@ -129,6 +130,7 @@ export function GET(request: NextRequest) {
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
     const isAgentic = sequence === Sequence.AgenticTraces;
+    const interactivity = historicalInteractivityAxis(isAgentic);
     const islOsl = sequenceToIslOsl(sequence);
     const allRows: BenchmarkRow[] = FIXTURES_MODE
       ? loadFixture<BenchmarkRow[]>('benchmarks').filter((row) => rowToSequence(row) === sequence)
@@ -305,6 +307,9 @@ export function GET(request: NextRequest) {
               runUrls: JSON.stringify(step.sources.map((source) => source.runUrl)),
               prLinks: JSON.stringify(step.prLinks),
               linksAvailable: step.linksAvailable,
+              targetInteractivity: target,
+              interactivityStatistic: interactivity.statistic,
+              interactivityField: interactivity.field,
             })),
           ),
         );
@@ -320,6 +325,9 @@ export function GET(request: NextRequest) {
             date: point.date,
             value: point.value,
             synthetic: point.synthetic ?? false,
+            targetInteractivity: target,
+            interactivityStatistic: interactivity.statistic,
+            interactivityField: interactivity.field,
           })),
         ),
       );
@@ -338,6 +346,7 @@ export function GET(request: NextRequest) {
       },
       target,
       hwKeysWithData,
+      interactivity,
       series: chart === 'waterfall' ? waterfallSeries : series,
       count: series.reduce((total, entry) => total + entry.points.length, 0),
     });

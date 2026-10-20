@@ -12,6 +12,9 @@ import {
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import interactivityCases from '../../../../../skills/test/fixtures/agentic-interactivity.json';
+import { agenticP90Interactivity } from '../../../../../skills/skills/inferencex-api/scripts/agentic-interactivity.mjs';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
 
 function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
@@ -81,6 +84,44 @@ describe('rowToLightweightPoint', () => {
     expect(fixed?.x).toBe(50);
   });
 
+  it.each(interactivityCases)('AgentX P90 parity: $name', (fixture) => {
+    const row = makeBenchmarkRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      metrics: {
+        tput_per_gpu: 400,
+        median_intvty: 70,
+        ...fixture.metrics,
+      } as unknown as BenchmarkRow['metrics'],
+    });
+    const point = rowToLightweightPoint(row, ['tpPerGpu']);
+    expect(point?.x ?? null).toBe(fixture.expected);
+    expect(agenticP90Interactivity(row.metrics)?.value ?? null).toBe(fixture.expected);
+    if (point) expect(point.x).toBe(rowToAggDataEntry(row).p90_intvty);
+  });
+
+  it.each([NaN, Infinity, -Infinity, Number.MIN_VALUE])(
+    'omits invalid AgentX P90 latency %s',
+    (latency) => {
+      expect(
+        rowToLightweightPoint(
+          makeBenchmarkRow({
+            benchmark_type: 'agentic_traces',
+            metrics: { tput_per_gpu: 400, p90_full_response_itl: latency, median_intvty: 70 },
+          }),
+          ['tpPerGpu'],
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it('keeps single-turn median interactivity even when P90 fields disagree', () => {
+    const row = makeBenchmarkRow({
+      metrics: { tput_per_gpu: 400, median_intvty: 70, p90_itl: 0.025, p90_intvty: 999 },
+    });
+    expect(rowToLightweightPoint(row, ['tpPerGpu'])?.x).toBe(70);
+  });
   it('uses the selected TPU cost basis for historical cost and tokens per dollar', () => {
     const row = makeBenchmarkRow({ hardware: 'tpuv7', framework: 'vllm' });
     const metrics = ['costhOutput', 'outputTokensPerDollarH', 'tpPerMw'] as const;

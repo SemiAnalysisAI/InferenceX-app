@@ -72,8 +72,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'number',
     description: text(
-      'Target interactivity (tok/s/user) the metric is interpolated at for every snapshot date. Fixed-sequence rows use median interactivity; agentic-traces rows use P90 interactivity, matching the AgentX charts.',
-      '目标交互速率（tok/s/user）：在每个快照日期上按该值对指标插值。固定序列使用中位数交互速率；agentic-traces 使用 P90 交互速率，与 AgentX 图表一致。',
+      'Target interactivity (tok/s/user) at which the metric is interpolated for every snapshot. AgentX uses P90 slow-tail interactivity: 1 / P90 full-response ITL in seconds, with legacy ITL only when full-response mean/percentile ITL fields are absent. Missing or invalid P90 latency is omitted, never replaced with a median or raw rate percentile. Single-turn workloads retain median interactivity.',
+      '每个快照日期上的指标按该目标交互性（tok/s/user）插值。AgentX 使用 P90 全响应 ITL（秒）的倒数；仅当全响应 ITL 的均值和分位数字段均缺失时才使用旧版 ITL。P90 延迟缺失或无效的数据点不参与计算，不会改用中位数，也不会直接使用 token 速率的 P90。单轮工作负载仍使用中位交互性。',
     ),
     schema: { type: 'number', default: 35, minimum: 1, maximum: 1000 },
     example: '50',
@@ -147,8 +147,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one row per line point, or per waterfall step with JSON-encoded runUrls and prLinks arrays.',
-      '响应编码。csv 为每个趋势点或瀑布图步骤返回一行。瀑布图的 runUrls 和 prLinks 列为 JSON 编码的数组。',
+      'Response encoding. csv returns one row per line point or waterfall step, with targetInteractivity, interactivityStatistic and interactivityField. Waterfall rows include JSON-encoded runUrls and prLinks arrays.',
+      '响应编码。csv 为每个趋势点或瀑布图步骤返回一行，并包含 targetInteractivity、interactivityStatistic 和 interactivityField。瀑布图的 runUrls 和 prLinks 列为 JSON 编码的数组。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -167,6 +167,11 @@ const responseSchema = objectSchema(
       labelZh: stringSchema,
     }),
     target: numberSchema,
+    interactivity: objectSchema({
+      statistic: { type: 'string', enum: ['median', 'p90'] },
+      field: { type: 'string', enum: ['median_intvty', 'p90_intvty'] },
+      unit: { type: 'string', enum: ['tok/s/user'] },
+    }),
     hwKeysWithData: arraySchema(stringSchema),
     series: arraySchema(
       objectSchema(
@@ -215,7 +220,17 @@ const responseSchema = objectSchema(
     ),
     count: integerSchema,
   },
-  ['view', 'apiVersion', 'params', 'metric', 'target', 'hwKeysWithData', 'series', 'count'],
+  [
+    'view',
+    'apiVersion',
+    'params',
+    'metric',
+    'target',
+    'interactivity',
+    'hwKeysWithData',
+    'series',
+    'count',
+  ],
 );
 
 const responseExample = {
@@ -242,6 +257,7 @@ const responseExample = {
     labelZh: '单 GPU 输出吞吐（tok/s/gpu）',
   },
   target: 35,
+  interactivity: { statistic: 'median', field: 'median_intvty', unit: 'tok/s/user' },
   hwKeysWithData: ['h200_trt'],
   series: [
     {
@@ -275,7 +291,7 @@ const responses: readonly ApiResponse[] = [
         mediaType: 'text/csv',
         schema: stringSchema,
         example:
-          'key,hwKey,precision,label,vendor,date,value,synthetic\r\nh200_trt,h200_trt,,H200 (TRTLLM),NVIDIA,2026-07-01,310.4,false',
+          'key,hwKey,precision,label,vendor,date,value,synthetic,targetInteractivity,interactivityStatistic,interactivityField\r\nh200_trt,h200_trt,,H200 (TRTLLM),NVIDIA,2026-07-01,310.4,false,35,median,median_intvty',
       },
     ],
   },
