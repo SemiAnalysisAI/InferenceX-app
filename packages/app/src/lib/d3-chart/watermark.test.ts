@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as d3 from 'd3';
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { createLogoWatermark, createUnofficialWatermark } from './watermark';
 
@@ -234,5 +234,27 @@ describe('createUnofficialWatermark', () => {
     const children = svg.node()!.children;
     expect(children[0].getAttribute('class')).toBe('unofficial-watermark-image');
     expect(children[1].getAttribute('class')).toBe('watermark-rect');
+  });
+
+  describe('when the deployment turns the decorative image off', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('keeps the warning text and backing rect without an image', async () => {
+      vi.stubEnv('NEXT_PUBLIC_UNOFFICIAL_WATERMARK_IMAGE', 'off');
+      // The image switch is a build-time flag read when the module loads.
+      vi.resetModules();
+      const { createUnofficialWatermark: createWithoutImage } = await import('./watermark');
+      const { svg, defs } = makeSvg();
+      svg.append('g').attr('class', 'pre-existing');
+      createWithoutImage(svg, defs, innerWidth, innerHeight, margin, 'test');
+
+      expect(svg.select('image').empty()).toBe(true);
+      expect(defs.selectAll('#unofficial-pattern-test text').size()).toBe(3);
+      const children = svg.node()!.children;
+      expect(children[0].getAttribute('class')).toBe('watermark-rect');
+      expect(children[0].getAttribute('fill')).toBe('url(#unofficial-pattern-test)');
+    });
   });
 });

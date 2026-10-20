@@ -3,7 +3,7 @@ import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
 import { toSequence } from '@/lib/compare/compare-enum-coerce';
 import { sequenceForScenarioSegment } from '@/lib/compare/compare-scenario-route';
 import type { Sequence } from '@/lib/catalog/data-mappings';
-import { APP_THEMES } from '@/lib/themes/themes';
+import { APP_THEMES, DISABLED_THEMES } from '@/lib/themes/themes';
 
 export {
   EMBED_PATH_PREFIX,
@@ -103,7 +103,7 @@ export function embedBootScript(theme: EmbedTheme, skin: EmbedSkin | undefined):
   return (
     `(function(){var h=document.documentElement;h.dataset.inferencexEmbed='';` +
     `var s=${skinJs};if(s){h.dataset.inferencexSkin=s;}` +
-    `h.classList.remove(...${JSON.stringify(APP_THEMES)});h.classList.add(${JSON.stringify(theme)});` +
+    `h.classList.remove(...${JSON.stringify([...APP_THEMES, ...DISABLED_THEMES])});h.classList.add(${JSON.stringify(theme)});` +
     `h.style.colorScheme=${JSON.stringify(theme)};})();`
   );
 }

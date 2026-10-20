@@ -66,6 +66,7 @@ import {
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { DEPLOYMENT_FLAGS } from '@/lib/config/deployment-flags';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { defaultYAxisMetric } from '@/lib/routing/url-state';
 
@@ -427,9 +428,18 @@ export default function ChartControls({
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
   const tcoVisible =
     mounted &&
-    showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
-    showsTcoBasisSelector(selectedModel, selectedSequence);
+    showsTcoBasisSelector(selectedModel, selectedSequence, showTcoBasis);
+  // A toggle shown on every cost metric keeps its xl column while hidden; adding the column once
+  // the metric resolves to a cost metric would resize the Y-axis selector under the cursor.
+  const reservesTcoColumn = showXAxisMode && DEPLOYMENT_FLAGS.tcoBasisSelector === 'always';
+  const tcoColumnClass = reservesTcoColumn
+    ? selectedSequence === Sequence.AgenticTraces
+      ? 'xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_10rem]'
+      : 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]'
+    : tcoVisible && showXAxisMode
+      ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]'
+      : '';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -483,7 +493,7 @@ export default function ChartControls({
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
-              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoColumnClass}`}
             >
               {showXAxisMode && <XAxisModeSelector />}
               <div
@@ -519,6 +529,15 @@ export default function ChartControls({
                 />
               </div>
 
+              {tcoVisible ? (
+                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
+                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
+                </div>
+              ) : (
+                reservesTcoColumn && <div aria-hidden="true" className="hidden xl:block" />
+              )}
+
               {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
                 <MeasuredMetricControls
                   metric={selectedYAxisMetric}
@@ -526,13 +545,6 @@ export default function ChartControls({
                   compare={powerCompare}
                   onCompareChange={setPowerCompare}
                 />
-              )}
-
-              {tcoVisible && (
-                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
-                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
-                </div>
               )}
 
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (

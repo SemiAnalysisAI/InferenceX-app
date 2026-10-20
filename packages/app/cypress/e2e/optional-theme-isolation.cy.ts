@@ -1,11 +1,11 @@
-import { APP_THEMES } from '../../src/lib/themes/themes';
+import { APP_THEMES, DISABLED_THEMES, OPTIONAL_THEMES } from '../../src/lib/themes/themes';
 import { cycleToTheme } from '../support/theme';
 
-const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
+const enabledThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
   /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.mc-boss|\.mc-endgame-guide|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
 const featureAsset = new RegExp(
-  `/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
+  `/decorative/(?:${OPTIONAL_THEMES.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
   'i',
 );
 const featureElements =
@@ -13,7 +13,7 @@ const featureElements =
 const isFeatureAsset = (url: string) => featureAsset.test(decodeURIComponent(url));
 
 function saveMediaOptIns(win: Window, enabled: boolean) {
-  for (const theme of optionalThemes) {
+  for (const theme of OPTIONAL_THEMES) {
     win.localStorage.setItem(`${theme}-music`, String(enabled));
     win.localStorage.setItem(`${theme}-sound`, String(enabled));
   }
@@ -49,32 +49,36 @@ const seo = (doc: Document) => [
 ];
 
 describe('optional themes stay off the default page', () => {
-  for (const route of ['/', '/zh']) {
-    it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
-      const requests: string[] = [];
-      cy.intercept('GET', '**', (request) => {
-        requests.push(request.url);
+  for (const retired of ['kart', ...DISABLED_THEMES]) {
+    for (const route of ['/', '/zh']) {
+      it(`${route} migrates a retired ${retired} preference and keeps the toggle usable`, () => {
+        const requests: string[] = [];
+        cy.intercept('GET', '**', (request) => {
+          requests.push(request.url);
+        });
+        cy.visit(route, {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('theme', retired);
+            saveMediaOptIns(win, false);
+          },
+        });
+        cy.get('html').should('have.class', 'dark').and('not.have.class', retired);
+        cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+        cy.get('[data-testid="theme-toggle"]').focus();
+        cy.get(`[data-testid="theme-option-${retired}"]`).should('not.exist');
+        cy.get('[data-testid="theme-menu"]').should('not.exist');
+        expectNoOptionalResources(requests);
+        cycleToTheme('light');
+        cy.get('html').should('have.class', 'light').and('not.have.class', retired);
+        cy.reload();
+        cy.get('html').should('have.class', 'light').and('not.have.class', retired);
+        cy.then(() => {
+          expect(requests.filter((url) => url.includes(`/decorative/${retired}/`))).to.deep.equal(
+            [],
+          );
+        });
       });
-      cy.visit(route, {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('theme', 'kart');
-          saveMediaOptIns(win, false);
-        },
-      });
-      cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
-      cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
-      cy.get('[data-testid="theme-toggle"]').focus();
-      cy.get('[data-testid="theme-option-kart"]').should('not.exist');
-      cy.get('[data-testid="theme-menu"]').should('not.exist');
-      expectNoOptionalResources(requests);
-      cycleToTheme('light');
-      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
-      cy.reload();
-      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
-      cy.then(() => {
-        expect(requests.filter((url) => url.includes('/decorative/kart/'))).to.deep.equal([]);
-      });
-    });
+    }
   }
 
   for (const [theme, route, width] of [
@@ -122,7 +126,7 @@ describe('optional themes stay off the default page', () => {
     });
   }
 
-  for (const theme of optionalThemes) {
+  for (const theme of OPTIONAL_THEMES) {
     for (const prefix of ['', '/zh']) {
       it(`${prefix || 'English'} embed ignores saved ${theme} before and after hydration`, () => {
         const requests: string[] = [];
@@ -186,7 +190,7 @@ describe('optional themes stay off the default page', () => {
       .and('contain', 'currently');
     cy.document().then((doc) => {
       const baseline = seo(doc);
-      for (const theme of optionalThemes) {
+      for (const theme of enabledThemes) {
         cycleToTheme(theme);
         if (theme === 'minecraft') cy.get('canvas').should('exist');
         else cy.get(`[data-testid="${theme}-theme-banner"]`).should('be.visible');

@@ -1,5 +1,6 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
+import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
@@ -106,7 +107,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
-  g_tco: 'internal',
+  g_tco: DEFAULT_TCO_BASIS,
   i_seq: '',
   i_prec: '',
   i_metric: '',

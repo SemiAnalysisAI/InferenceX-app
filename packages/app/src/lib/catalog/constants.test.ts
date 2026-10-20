@@ -251,6 +251,10 @@ describe('getHardwareConfig', () => {
 });
 
 describe('getGpuSpecs', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('returns specs for a base GPU key', () => {
     const specs = getGpuSpecs('h100');
     expect(specs.tdp).toBe(700);
@@ -312,6 +316,19 @@ describe('getGpuSpecs', () => {
     expect(DEFAULT_TCO_BASIS).toBe('internal');
     expect(getGpuSpecs('tpuv7_vllm')).toEqual(getGpuSpecs('tpuv7_vllm', 'internal'));
     expect(getGpuSpecs('tpuv7_vllm').costh).toBe(1.03);
+  });
+
+  it('defaults to the external basis a deployment configures', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DEFAULT_TCO_BASIS', 'external');
+    // Deployment flags are read once at module load, so reload under the stubbed build env.
+    vi.resetModules();
+    const configured = await import('@/lib/catalog/constants');
+
+    expect(configured.DEFAULT_TCO_BASIS).toBe('external');
+    expect(configured.getGpuSpecs('tpuv7_vllm')).toEqual(
+      configured.getGpuSpecs('tpuv7_vllm', 'external'),
+    );
+    expect(configured.getGpuSpecs('tpuv7_vllm').costh).toBe(1.21);
   });
 
   it('keeps hardware without an owner cost on external rates', () => {

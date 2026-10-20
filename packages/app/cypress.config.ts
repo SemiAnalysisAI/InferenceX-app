@@ -2,6 +2,7 @@ import createBundler from '@bahmutov/cypress-esbuild-preprocessor';
 import { defineConfig } from 'cypress';
 import path from 'path';
 import { setupTimingSplit } from './cypress/plugins/timings';
+import { DEPLOYMENT_FLAG_NAMES } from './src/lib/config/deployment-flags';
 
 export default defineConfig({
   allowCypressEnv: false,
@@ -34,7 +35,15 @@ export default defineConfig({
       on(
         'file:preprocessor',
         createBundler({
-          define: { 'process.env.NODE_ENV': '"test"' },
+          define: {
+            'process.env.NODE_ENV': '"test"',
+            ...Object.fromEntries(
+              DEPLOYMENT_FLAG_NAMES.map((name) => [
+                `process.env.${name}`,
+                JSON.stringify(process.env[name] ?? ''),
+              ]),
+            ),
+          },
           alias: { '@': path.resolve(__dirname, 'src') },
         }),
       );

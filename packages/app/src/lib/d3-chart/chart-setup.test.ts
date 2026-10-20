@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import * as d3 from 'd3';
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 import { setupChartStructure } from './chart-setup';
 import type { ChartSetupConfig } from './types';
@@ -18,6 +18,15 @@ function defaultConfig(overrides?: Partial<ChartSetupConfig>): ChartSetupConfig 
     watermark: 'none',
     ...overrides,
   };
+}
+
+// The image switch is a build-time flag read when the module loads, so the
+// case reloads it; a static import would keep the default.
+async function setupWithoutImage() {
+  vi.stubEnv('NEXT_PUBLIC_UNOFFICIAL_WATERMARK_IMAGE', 'off');
+  vi.resetModules();
+  const module = await import('./chart-setup');
+  return module.setupChartStructure;
 }
 
 describe('setupChartStructure', () => {
@@ -470,6 +479,49 @@ describe('setupChartStructure', () => {
       expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
       expect(svg.select('#logo-pattern-test-chart').empty()).toBe(false);
       expect(svg.select('.unofficial-watermark-image').empty()).toBe(true);
+    });
+  });
+
+  describe('unofficial watermark without the decorative image', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('keeps one warning rect across updates and resizes it in place', async () => {
+      const setup = await setupWithoutImage();
+      const svgEl = makeSvgEl();
+      setup(svgEl, defaultConfig({ watermark: 'unofficial' }));
+      const svg = d3.select(svgEl);
+      const rect = svg.select('.watermark-rect').node();
+      const cfg = defaultConfig({
+        watermark: 'unofficial',
+        containerWidth: 1200,
+        containerHeight: 900,
+      });
+      setup(svgEl, cfg);
+
+      expect(svg.select('image').empty()).toBe(true);
+      expect(svg.selectAll('.watermark-rect').size()).toBe(1);
+      expect(svg.select('.watermark-rect').node()).toBe(rect);
+      expect(Number(svg.select('.watermark-rect').attr('width'))).toBe(
+        cfg.containerWidth - cfg.margin.left - cfg.margin.right,
+      );
+      expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(false);
+    });
+
+    it('still switches the warning off and back to the logo', async () => {
+      const setup = await setupWithoutImage();
+      const svgEl = makeSvgEl();
+      setup(svgEl, defaultConfig({ watermark: 'unofficial' }));
+      setup(svgEl, defaultConfig({ watermark: 'none' }));
+      const svg = d3.select(svgEl);
+      expect(svg.select('.watermark-rect').empty()).toBe(true);
+      expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
+
+      setup(svgEl, defaultConfig({ watermark: 'unofficial' }));
+      setup(svgEl, defaultConfig({ watermark: 'logo' }));
+      expect(svg.select('#unofficial-pattern-test-chart').empty()).toBe(true);
+      expect(svg.select('#logo-pattern-test-chart').empty()).toBe(false);
     });
   });
 

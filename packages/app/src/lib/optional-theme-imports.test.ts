@@ -2,11 +2,10 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { APP_THEMES } from './themes/themes';
+import { OPTIONAL_THEMES } from './themes/themes';
 
 const src = path.resolve(import.meta.dirname, '..');
-const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
-const optionalDirectory = new RegExp(`^components/(?:${optionalThemes.join('|')})/`);
+const optionalDirectory = new RegExp(`^components/(?:${OPTIONAL_THEMES.join('|')})/`);
 const wrappers = new Set([
   'components/minecraft/minecraft-splash.tsx',
   'components/minecraft/minecraft-toggles-lazy.tsx',
@@ -14,7 +13,7 @@ const wrappers = new Set([
 ]);
 const engine = /^(?:three|@react-three\/[^/]+|@dimforge\/rapier[^/]*)(?:\/|$)/;
 const optionalAsset = new RegExp(
-  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
+  `(?:/decorative/(?:${OPTIONAL_THEMES.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
   'i',
 );
 

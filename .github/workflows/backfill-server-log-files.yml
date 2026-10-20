@@ -83,6 +83,7 @@ jobs:
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
       - name: Backfill server-log files
         env:
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ inputs.run-id }}
           FROM_RUN: ${{ inputs.from-run }}
@@ -117,5 +118,7 @@ jobs:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Invalidate production cache
         env:
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:invalidate "$APP_URL"

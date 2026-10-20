@@ -645,8 +645,8 @@ bun packages/db/src/verify-power-publication.ts /path/power-publication.json htt
 ```
 
 For protected previews, follow the bypass handling in
-`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
-The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+`.github/workflows/ingest-results.yml`. The cache scripts and the verifier send
+`CACHE_PROTECTION_BYPASS_SECRET` as the bypass header when it is set. Check remaining receipt gaps
 and API values; ingest success alone does not establish complete coverage. To undo a
 repair, restore the snapshotted rows or original bytes under the same identities.
 Do not delete a shared series to repair one point.

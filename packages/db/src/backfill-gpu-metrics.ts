@@ -49,7 +49,7 @@ import {
   type GpuMetricSeriesCoverageRow,
 } from './queries/gpu-metrics-coverage.js';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
 const PAIR_CONCURRENCY = 4;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 4, onnotice: () => {} });

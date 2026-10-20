@@ -1,4 +1,16 @@
-export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo'];
+import { DEPLOYMENT_FLAGS } from '@/lib/config/deployment-flags';
+
+export const OPTIONAL_THEMES = ['minecraft', 'csgo', 'gta', 'doom', 'halo'] as const;
+export type OptionalTheme = (typeof OPTIONAL_THEMES)[number];
+
+export const DISABLED_THEMES: readonly OptionalTheme[] = OPTIONAL_THEMES.filter((theme) =>
+  DEPLOYMENT_FLAGS.disabledThemes.includes(theme),
+);
+export const ENABLED_OPTIONAL_THEMES: readonly OptionalTheme[] = OPTIONAL_THEMES.filter(
+  (theme) => !DISABLED_THEMES.includes(theme),
+);
+
+export const APP_THEMES: string[] = ['light', 'dark', ...ENABLED_OPTIONAL_THEMES];
 
 export function nextTheme(theme: string | undefined): string {
   return APP_THEMES[(APP_THEMES.indexOf(theme ?? '') + 1) % APP_THEMES.length];

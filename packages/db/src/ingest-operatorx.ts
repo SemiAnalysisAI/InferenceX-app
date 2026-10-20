@@ -8,7 +8,7 @@ import { downloadArtifact, fetchRunMeta, listRunArtifacts } from './lib/github-a
 import type { OperatorXRawBundle } from './operatorx/bundle';
 import { saveOperatorXBundle } from './queries/operatorx';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const SWEEP_WORKFLOW_PATH = '.github/workflows/operatorx-sweep.yml';
 const MANIFEST_FILE = 'operatorx-manifest.json';
 const SHARD_RE = /^operatorx-shard-(?<run>\d+)-(?<attempt>\d+)-(?<shard>.+)$/u;
@@ -125,9 +125,7 @@ async function main(): Promise<void> {
         throw new Error('INGEST_RUN_ID and INGEST_ARTIFACTS_PATH are required without a flag');
       const runId = parseRunId(process.env.INGEST_RUN_ID);
       console.log(`=== run ${runId} ===`);
-      bundles.push(
-        sweepBundle(checkRepo(process.env.INGEST_REPO ?? DEFAULT_REPO), runId, dir, false),
-      );
+      bundles.push(sweepBundle(checkRepo(DEFAULT_REPO), runId, dir, false));
     }
 
     const sql = createAdminSql({

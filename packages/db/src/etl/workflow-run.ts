@@ -1,6 +1,6 @@
 import type postgres from 'postgres';
 
-import { GITHUB_API_BASE, GITHUB_REPOS } from '@semianalysisai/inferencex-constants';
+import { GITHUB_API_BASE, workflowRunRepos } from '@semianalysisai/inferencex-constants';
 
 import { CONCLUSION_OVERRIDES, isRunAttemptPurged } from './run-overrides.js';
 
@@ -28,7 +28,7 @@ export interface GithubRunInfo {
 export function createWorkflowRunServices(
   sql: Sql,
   githubToken?: string,
-  repos: readonly string[] = GITHUB_REPOS,
+  repos: readonly string[] = workflowRunRepos(),
 ) {
   const workflowRunCache = new Map<string, number>();
   const githubRunCache = new Map<number, GithubRunInfo | null>();

@@ -2,17 +2,16 @@
 
 import { useSyncExternalStore } from 'react';
 import { isEmbedPathname } from '../embed/embed-route';
+import { ENABLED_OPTIONAL_THEMES, type OptionalTheme } from './themes';
 
-export type EasterEggTheme = 'minecraft' | 'csgo' | 'gta' | 'doom' | 'halo';
-const themes: EasterEggTheme[] = ['minecraft', 'csgo', 'gta', 'doom', 'halo'];
 const listeners = new Set<() => void>();
 let observer: MutationObserver | undefined;
 
-function snapshot(): EasterEggTheme | null {
+function snapshot(): OptionalTheme | null {
   const root = document.documentElement;
   if (isEmbedPathname(window.location.pathname) || Object.hasOwn(root.dataset, 'inferencexEmbed'))
     return null;
-  return themes.find((theme) => root.classList.contains(theme)) ?? null;
+  return ENABLED_OPTIONAL_THEMES.find((theme) => root.classList.contains(theme)) ?? null;
 }
 
 function subscribe(listener: () => void) {
