@@ -58,7 +58,7 @@ import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
   bulkUpsertAvailability,
-  insertServerLogFiles,
+  insertServerLogFilePaths,
 } from './etl/benchmark-ingest';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
@@ -68,7 +68,11 @@ import {
 import { AsyncSemaphore } from './etl/async-semaphore';
 import { withTransientDbRetry } from './etl/db-retry';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
-import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
+import {
+  discoverServerLogArtifacts,
+  listServerLogFilePaths,
+  serverLogArtifactRoot,
+} from './etl/server-log-artifacts';
 import {
   discoverGpuMetricsArtifacts,
   expectedTelemetryArtifactNames,
@@ -330,9 +334,16 @@ async function main(): Promise<void> {
 
   let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
   const benchmarkFiles = () =>
-    (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
+    (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, {
+      runId: runIdStr,
+      tracker,
+    }));
 
-  const powerSource = { runId, runAttempt: runAttemptNum, headSha: ghInfo?.headSha ?? null };
+  const powerSource = {
+    runId,
+    runAttempt: runAttemptNum,
+    headSha: ghInfo?.headSha ?? null,
+  };
   const requiredPower = verifyRequiredPowerArtifacts(
     artifactsDir,
     powerSource,
@@ -693,16 +704,20 @@ async function main(): Promise<void> {
             if (logArtifact) {
               try {
                 const serverLogStart = Date.now();
-                const logFiles = readServerLogArtifact(logArtifact);
+                const logRoot = serverLogArtifactRoot(
+                  logArtifact.artifactDir,
+                  logArtifact.artifactName,
+                );
+                const logFiles = logRoot ? listServerLogFilePaths(logRoot) : [];
                 const totalBytes = logFiles.reduce(
-                  (bytes, logFile) => bytes + Buffer.byteLength(logFile.logText, 'utf8'),
+                  (bytes, logFile) => bytes + fs.statSync(logFile.path).size,
                   0,
                 );
                 console.log(
                   `    server_logs ${logFiles.length} .log/.out file(s) (${formatBytes(totalBytes)})`,
                 );
                 await withTransientDbRetry(`server_logs for ${configKey}`, () =>
-                  insertServerLogFiles(sql, insertedIds, logFiles),
+                  insertServerLogFilePaths(sql, insertedIds, logFiles),
                 );
                 console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
@@ -777,7 +792,10 @@ async function main(): Promise<void> {
                 console.log(
                   `    trace_replay ${suffix}: checking ${insertedIds.length} benchmark row(s) for existing links`,
                 );
-                const unlinkedIds = await findUnlinkedTraceReplayIds(sql, insertedIds);
+                const unlinkedIds = await withTransientDbRetry(
+                  `trace_replay link check for ${suffix}`,
+                  () => findUnlinkedTraceReplayIds(sql, insertedIds),
+                );
                 console.log(
                   `    trace_replay ${suffix}: found ${unlinkedIds.length} unlinked row(s) (${elapsed(linkStart)})`,
                 );
@@ -907,7 +925,11 @@ async function main(): Promise<void> {
       for (const [hwKey, stats] of Object.entries(data)) {
         if (!GPU_KEYS.has(hwKey)) continue;
         if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-        statsRows.push({ hardware: hwKey, nSuccess: stats.n_success, total: stats.total });
+        statsRows.push({
+          hardware: hwKey,
+          nSuccess: stats.n_success,
+          total: stats.total,
+        });
       }
     }
 
