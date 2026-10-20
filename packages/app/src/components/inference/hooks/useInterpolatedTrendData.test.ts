@@ -69,6 +69,17 @@ function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToLightweightPoint', () => {
+  it('reads AgentX interactivity at P90 and fixed-sequence interactivity at the median', () => {
+    const metrics = { tput_per_gpu: 400, median_intvty: 50, p90_intvty: 20 };
+    const agentic = rowToLightweightPoint(
+      makeBenchmarkRow({ benchmark_type: 'agentic_traces', isl: null, osl: null, metrics }),
+      ['tpPerGpu'],
+    );
+    const fixed = rowToLightweightPoint(makeBenchmarkRow({ metrics }), ['tpPerGpu']);
+    expect(agentic?.x).toBe(20);
+    expect(fixed?.x).toBe(50);
+  });
+
   it('uses the selected TPU cost basis for historical cost and tokens per dollar', () => {
     const row = makeBenchmarkRow({ hardware: 'tpuv7', framework: 'vllm' });
     const metrics = ['costhOutput', 'outputTokensPerDollarH', 'tpPerMw'] as const;
