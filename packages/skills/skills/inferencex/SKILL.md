@@ -28,6 +28,10 @@ For direct AgentX presentation requests, [inferencex-to-chart](../inferencex-to-
 defaults to a chart and [inferencex-to-table](../inferencex-to-table/SKILL.md) defaults
 to tables and CSV. Both use the same shared template and CLI.
 
+For historical throughput gains or modeled cost reductions with source PR/run
+links, use [inferencex-pr-improvements](../inferencex-pr-improvements/SKILL.md).
+It renders the API's baseline-to-best records at fixed interactivity.
+
 If invoked without a task, briefly offer benchmark lookup, token-cost comparison,
 power/AgentX analysis, Pareto frontier/hinterland queries, result provenance,
 release/CollectiveX comparison, dashboard views, charts/tables, or offline
