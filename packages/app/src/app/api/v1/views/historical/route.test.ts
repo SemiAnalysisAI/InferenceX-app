@@ -254,6 +254,7 @@ describe('GET /api/v1/views/historical', () => {
             ...makeRow().metrics,
             median_intvty: median,
             p90_intvty: p90,
+            p90_itl: 1 / p90,
             tput_per_gpu: tput * scale,
             output_tput_per_gpu: tput * scale,
           },
