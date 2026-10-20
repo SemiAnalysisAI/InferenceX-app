@@ -36,7 +36,10 @@ The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs one 
 packed archive on Node 24 and 26 across Linux and macOS. A separate schema-consumer
 step installs the pinned development dependency from `bun.lock` and validates actual
 packed outputs. The suite also runs the Python release-verifier tests. Publication
-remains on Node 24 with one publisher runtime.
+remains on Node 24 with one publisher runtime. Pull requests run the full suite on
+Linux/Node 24 and only the installer, CLI and filesystem tests on the other three
+cells, so they record one platform acceptance; dispatch the workflow manually to run
+the full suite on all four cells and record the release-qualification matrix.
 
 1. Modify the source, choose a new stable version, and update package metadata,
    the unified CLI version, installation examples, and installed-version
