@@ -43,8 +43,13 @@ jobs:
 
       - name: Invalidate cache
         env:
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:invalidate "$APP_URL"
 
       - name: Warm up cache
-        run: bun run admin:cache:warmup https://inferencex.semianalysis.com
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:warmup "$APP_URL"

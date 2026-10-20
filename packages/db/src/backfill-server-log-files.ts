@@ -23,7 +23,7 @@ import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const RETENTION_DAYS = 90;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 2, onnotice: () => {} });
 

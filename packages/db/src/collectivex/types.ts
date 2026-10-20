@@ -203,6 +203,8 @@ export interface CollectiveXRun {
   generated_at: string;
   conclusion: string | null;
   source_sha: string;
+  /** GitHub `owner/repo` that ran the sweep. Runs stored before it was recorded omit it. */
+  source_repository?: string;
   requested_cases: number;
   terminal_cases: number;
   measured_cases: number;
@@ -234,6 +236,8 @@ export interface CollectiveXRunSummary {
   run_attempt: number;
   generated_at: string;
   conclusion: string | null;
+  /** GitHub `owner/repo` that ran the sweep. Runs stored before it was recorded omit it. */
+  source_repository?: string;
   covered_skus: string[];
   requested_cases: number;
   measured_cases: number;

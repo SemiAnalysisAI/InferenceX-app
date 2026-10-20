@@ -3,6 +3,8 @@
 import { ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
+
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -218,7 +220,7 @@ export function CollectiveXRunsTable({
                       </svg>
                     )}
                     <a
-                      href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
+                      href={`https://github.com/${run.source_repository ?? GITHUB_REPO_FULL}/actions/runs/${run.run_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={t.openRun(run.run_id)}

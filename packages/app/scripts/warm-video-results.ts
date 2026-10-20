@@ -1,7 +1,10 @@
 import { env } from 'node:process';
-const productionOrigin = 'https://inferencex.semianalysis.com';
+const origin = new URL(env.INFERENCEX_APP_URL || 'https://inferencex.semianalysis.com').origin;
+const bypassSecret = env.CACHE_PROTECTION_BYPASS_SECRET;
+const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 async function get(path: string) {
-  const response = await fetch(`${productionOrigin}/api/video-runs${path}`, {
+  const response = await fetch(`${origin}/api/video-runs${path}`, {
+    headers,
     signal: AbortSignal.timeout(290000),
   });
   if (!response.ok) throw new Error(`H3 publication failed: HTTP ${response.status}`);

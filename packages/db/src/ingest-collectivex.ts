@@ -2,6 +2,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
+
 import { hasNoSslFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import {
@@ -10,6 +12,7 @@ import {
   listRunArtifacts,
   type RunMeta,
 } from './lib/github-artifacts';
+import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts';
 import { matrixArtifactName, selectShardArtifactNames } from './collectivex/artifact-selection';
 import {
   buildDatasetFromNeutral,
@@ -19,7 +22,7 @@ import {
   type CollectiveXNeutralRunMeta,
 } from './collectivex/reader';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const DEFAULT_REPO = process.env.INGEST_REPO || GITHUB_REPO_FULL;
 const SWEEP_WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
 const DOCS_INSERT_CHUNK = 200;
 
@@ -44,7 +47,7 @@ if (isDownloadMode) {
     process.exit(1);
   }
   runIdStr = parsedId;
-  REPO = args[1] ?? DEFAULT_REPO;
+  REPO = args[1] ?? repositoryFromRunUrl(input) ?? DEFAULT_REPO;
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cx-ingest-'));
   artifactsDir = tempDir;
 } else {
@@ -55,7 +58,7 @@ if (isDownloadMode) {
     process.exit(1);
   }
   runIdStr = runId;
-  REPO = process.env.INGEST_REPO ?? DEFAULT_REPO;
+  REPO = DEFAULT_REPO;
   artifactsDir = artifactsPath;
 }
 
@@ -150,6 +153,7 @@ async function main(): Promise<void> {
     generated_at: generatedAt,
     conclusion: run.conclusion,
     source_sha: run.head_sha,
+    ...(REPO.toLowerCase() === GITHUB_REPO_FULL.toLowerCase() ? {} : { source_repository: REPO }),
   };
   const dataset = buildDatasetFromNeutral(matrix, docs, meta);
   const summary = buildRunSummary(dataset);

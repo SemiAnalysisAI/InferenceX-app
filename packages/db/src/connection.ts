@@ -49,14 +49,24 @@ function resolveSsl(hostname: string | null, input?: string | boolean): Database
   return hostname && LOOPBACK_HOSTS.has(hostname) ? false : 'require';
 }
 
+/**
+ * Alternate names tried, in order, when a connection variable is unset. Each alternate names
+ * the same database (Vercel-managed Neon variables), so lookups never cross database scopes.
+ */
+const DATABASE_URL_FALLBACKS: Readonly<Record<string, readonly string[]>> = {
+  DATABASE_COLLECTIVEX_READONLY_URL: ['COLLECTIVEX_DATABASE_URL'],
+  DATABASE_COLLECTIVEX_WRITE_URL: ['COLLECTIVEX_DATABASE_URL_UNPOOLED'],
+};
+
 export function resolveDatabaseConnection({
   envVar,
   url: urlOverride,
   driver: driverInput,
   ssl: sslInput,
 }: DatabaseConnectionOptions): DatabaseConnectionResolution {
-  const url = urlOverride ?? process.env[envVar];
-  if (!url) throw new Error(`${envVar} is not set`);
+  const envVars = [envVar, ...(DATABASE_URL_FALLBACKS[envVar] ?? [])];
+  const url = urlOverride ?? envVars.map((name) => process.env[name]).find(Boolean);
+  if (!url) throw new Error(`${envVars.join(' or ')} is not set`);
 
   const hostname = getDbHostname(url);
   const driver = resolveDriver(url, hostname, driverInput);

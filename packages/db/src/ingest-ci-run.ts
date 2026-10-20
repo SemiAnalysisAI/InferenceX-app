@@ -101,7 +101,7 @@ import {
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
 const powerPublicationWarnings: string[] = [];
