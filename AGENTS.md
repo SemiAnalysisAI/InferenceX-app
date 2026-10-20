@@ -195,6 +195,10 @@ Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src
 
 Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically.
 
+### Add a hardware results page
+
+Create `packages/app/content/hardware/<slug>.mdx` and its Chinese sibling `packages/app/content/hardware/zh/<slug>.mdx` in the same PR. The hero frontmatter schema is in [Blog](./docs/blog.md#hardware-results-pages). The `/hardware` index, sitemap, llms.txt, llms-full.txt, and OG image pick the page up automatically; the RSS feed stays blog-only.
+
 ### Write or update a whitepaper
 
 Load `.claude/skills/write-inferencex-whitepaper/` first. It holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist for `src/lib/content/whitepapers.ts`.

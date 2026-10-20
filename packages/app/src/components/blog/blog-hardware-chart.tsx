@@ -46,6 +46,7 @@ export function HardwareChart({
               benchmarkQueryScope={`blog-pair:${a}:${b}`}
               initialBenchmarkModel={initialModel}
               initialYAxisMetric={metric}
+              quietEngineResolution
             >
               <InferenceChartDisplay embedded />
             </InferenceProvider>

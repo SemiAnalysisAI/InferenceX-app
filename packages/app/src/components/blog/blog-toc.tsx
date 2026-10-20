@@ -30,6 +30,7 @@ interface BlogTocProps {
   locale?: Locale;
   variant?: 'inline' | 'sidebar' | 'both';
   className?: string;
+  sidebarListClassName?: string;
 }
 
 function handleClick(heading: TocHeading) {
@@ -89,6 +90,7 @@ export function BlogToc({
   locale = 'en',
   variant = 'both',
   className,
+  sidebarListClassName,
 }: BlogTocProps) {
   const t = STRINGS[locale];
   const displayLabel = label ?? t.defaultLabel;
@@ -175,7 +177,10 @@ export function BlogToc({
           </Eyebrow>
           <div
             ref={scrollBoxRef}
-            className="relative max-h-[calc(100vh-30rem)] overflow-y-auto pr-1 [scrollbar-width:thin]"
+            className={cn(
+              'relative max-h-[calc(100vh-30rem)] overflow-y-auto pr-1 [scrollbar-width:thin]',
+              sidebarListClassName,
+            )}
           >
             {list}
           </div>

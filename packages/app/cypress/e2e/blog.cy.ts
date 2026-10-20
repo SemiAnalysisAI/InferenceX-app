@@ -69,6 +69,72 @@ describe('Blog', () => {
     });
   });
 
+  describe('Hardware results pages', () => {
+    const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+
+    for (const locale of ['', '/zh']) {
+      it(`renders the results hero, note, and article on ${locale || '/en'}`, () => {
+        cy.visit(`${locale}/hardware/${slug}`);
+        cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
+        cy.get('[data-testid="hardware-hero"]').within(() => {
+          cy.get('[data-testid="hardware-lede"] strong').should('have.length.greaterThan', 0);
+          cy.get('[data-testid="hardware-highlight"]')
+            .should('have.length.within', 3, 4)
+            .each(($card) => {
+              expect($card.children().first().text().trim()).not.to.equal('');
+            });
+          cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
+          cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
+          cy.get(`a[href="${locale}/hardware"]`).should('be.visible');
+        });
+        cy.get('[data-testid="hardware-note"]').should('be.visible');
+        cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
+        cy.get('[data-testid="blog-related"]').should('not.exist');
+        cy.get('link[rel="canonical"]').should(
+          'have.attr',
+          'href',
+          `https://inferencex.semianalysis.com${locale}/hardware/${slug}`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+          .should('have.attr', 'href')
+          .and('include', `/zh/hardware/${slug}`);
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale ? `/hardware/${slug}` : `/zh/hardware/${slug}`,
+        );
+      });
+    }
+
+    it('stacks the highlight cards below the lede on phones without horizontal overflow', () => {
+      cy.viewport(390, 844);
+      cy.visit(`/hardware/${slug}`);
+      cy.get('[data-testid="hardware-lede"]').then(($lede) => {
+        const ledeBottom = $lede[0].getBoundingClientRect().bottom;
+        cy.get('[data-testid="hardware-highlights"]').should(($highlights) => {
+          expect($highlights[0].getBoundingClientRect().top).to.be.greaterThan(ledeBottom);
+        });
+      });
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.viewport(1280, 720);
+    });
+
+    it('lists the pages on /hardware and links each card to its page', () => {
+      cy.visit('/hardware');
+      cy.get('[data-testid="hardware-card"]').should('have.length.at.least', 2);
+      cy.get(`[data-testid="hardware-card"] a[href="/hardware/${slug}"]`).click();
+      cy.location('pathname').should('eq', `/hardware/${slug}`);
+    });
+
+    it('no longer serves the moved pages under /blog', () => {
+      cy.request({ url: `/blog/${slug}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 404);
+    });
+  });
+
   describe('Inline code styling', () => {
     before(() => {
       cy.visit('/blog/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar');

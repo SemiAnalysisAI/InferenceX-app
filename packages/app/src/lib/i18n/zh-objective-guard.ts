@@ -231,13 +231,16 @@ function englishSubtrees(file: string, source: string): string[] {
   return found;
 }
 
+const ARTICLE_CONTENT = /content\/(?:blog|hardware)\//u;
+const ARTICLE_TRANSLATION = /content\/(?:blog|hardware)\/zh\//u;
+
 function isEnglishSurfaceFile(file: string): boolean {
   const normalized = normalizedFile(file);
   if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(normalized) || normalized.includes('/cypress/')) {
     return false;
   }
-  if (normalized.includes('content/blog/zh/')) return false;
-  if (normalized.includes('content/blog/') && normalized.endsWith('.mdx')) return true;
+  if (ARTICLE_TRANSLATION.test(normalized)) return false;
+  if (ARTICLE_CONTENT.test(normalized) && normalized.endsWith('.mdx')) return true;
   return /\.(?:[cm]?[jt]sx?|json)$/u.test(normalized);
 }
 
@@ -248,7 +251,7 @@ export function compareEnglishSurfaces(
 ): GuardViolation[] {
   if (!isEnglishSurfaceFile(file)) return [];
   const normalized = normalizedFile(file);
-  if (normalized.includes('content/blog/') && normalized.endsWith('.mdx')) {
+  if (ARTICLE_CONTENT.test(normalized) && normalized.endsWith('.mdx')) {
     return baseSource === headSource
       ? []
       : [{ rule: 'english-byte-preservation', file, detail: 'English MDX bytes changed' }];
@@ -290,7 +293,7 @@ function attributeValue(attribute: MdxAttribute): string | null {
   return null;
 }
 
-function normalizeLocalizedLink(target: string): string {
+export function normalizeLocalizedLink(target: string): string {
   if (target.startsWith('#')) return '#<localized-heading>';
 
   const hashIndex = target.indexOf('#');

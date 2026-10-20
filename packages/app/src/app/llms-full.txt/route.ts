@@ -1,4 +1,9 @@
 import { getAllPosts, getPostBySlug } from '@/lib/blog/blog';
+import {
+  getAllHardwarePages,
+  getHardwarePageBySlug,
+  hardwarePagePath,
+} from '@/lib/hardware/hardware';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await
@@ -24,16 +29,44 @@ export async function GET() {
     ].join('\n');
   });
 
+  const hardwareSections = getAllHardwarePages().flatMap((meta) => {
+    const page = getHardwarePageBySlug(meta.slug);
+    if (!page) return [];
+
+    return [
+      [
+        `# ${meta.title}`,
+        '',
+        `> ${meta.seoDescription}`,
+        '',
+        `- **Author**: ${AUTHOR_NAME}`,
+        `- **Date**: ${meta.date}`,
+        `- **URL**: ${SITE_URL}${hardwarePagePath(meta.slug)}`,
+        `- **Tags**: ${meta.tags.join(', ')}`,
+        `- **Reading time**: ${meta.readingTime} min`,
+        '',
+        meta.lede,
+        '',
+        `${meta.highlightsTitle}:`,
+        ...meta.highlights.map((item) => `- ${item.value} ${item.label} ${item.detail}`),
+        '',
+        meta.note,
+        '',
+        page.raw,
+      ].join('\n'),
+    ];
+  });
+
   const body = [
     `# ${SITE_NAME} Articles — Full Content`,
     `> By ${AUTHOR_NAME}`,
     '',
-    `This file contains the full text of all articles from ${SITE_NAME} (${SITE_URL}/blog), covering agentic inference benchmarks including AgentX results, fixed-sequence AI inference, chip performance, and ML infrastructure.`,
+    `This file contains the full text of all articles (${SITE_URL}/blog) and hardware results pages (${SITE_URL}/hardware) from ${SITE_NAME}, covering agentic inference benchmarks including AgentX results, fixed-sequence AI inference, chip performance, and ML infrastructure.`,
     `It is intended for consumption by large language models and AI assistants.`,
     '',
     '---',
     '',
-    ...sections.flatMap((s) => [s, '', '---', '']),
+    ...[...sections, ...hardwareSections].flatMap((s) => [s, '', '---', '']),
   ].join('\n');
 
   return new Response(body, {

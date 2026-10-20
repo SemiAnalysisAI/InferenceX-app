@@ -10,7 +10,7 @@ const MAIN_PATHS = new Set<string>([
   ...DASHBOARD_ROUTES.map((route) => route.path),
 ]);
 const MAIN_PREFIXES = ['/inference/', '/agentx/', '/ubenchx'];
-const ARTICLE_PREFIXES = ['/blog', '/whitepaper'];
+const ARTICLE_PREFIXES = ['/blog', '/whitepaper', '/hardware'];
 
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`);
