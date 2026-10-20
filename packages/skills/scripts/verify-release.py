@@ -27,7 +27,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 PACKAGE = '@semianalysisai/inferencex-skills'
-TASK_ENTRIES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table')
+TASK_ENTRIES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table',
+                'inferencex-pr-improvements')
 REGISTRY = 'https://registry.npmjs.org'
 COLLECTIVEX_POSITIVE_RUN_IDS = ('33378604574', '33412478973')
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
@@ -514,8 +515,13 @@ def check_installed_package(installed, skill_files, entrypoint_files, version):
     check_installed(installed, skill_files, version)
     if version_at_least(version, (1, 1, 0)):
         for name in TASK_ENTRIES:
+            if name == 'inferencex-pr-improvements' and not version_at_least(version, (1, 2, 0)):
+                continue
             files = entrypoint_files.get(name, {})
-            require('SKILL.md' in files and 'integrity.json' in files,
+            required = {'SKILL.md', 'integrity.json'}
+            if name == 'inferencex-pr-improvements':
+                required.update(('scripts/waterfall.mjs', 'agents/openai.yaml'))
+            require(required <= files.keys(),
                     f'Archive is missing the {name} task entry')
             check_installed(installed.with_name(name), files, version)
 

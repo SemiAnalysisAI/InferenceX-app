@@ -8,6 +8,7 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  39112710364, // 2026-10-20 | DeepSeek-V4.1-Flash B300 Dynamo + vLLM AgentX | Reason: Accidentally merged despite containing an EFA patch
   38878624849, // 2026-10-19 | Muse Spark H100 | Reason: 256k corpus used for 1M context length model
   38925660934, // 2026-10-19 | Muse Spark H100 HiCache | Reason: 256k corpus used for 1M context length model
   38819015342, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model

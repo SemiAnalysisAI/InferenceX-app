@@ -1,0 +1,4 @@
+interface:
+  display_name: 'InferenceX PR Improvements'
+  short_description: 'Explore PR-linked inference performance improvements'
+  default_prompt: 'Use $inferencex-pr-improvements to show historical inference performance gains with associated source PRs, benchmark runs, a chart, and CSV.'

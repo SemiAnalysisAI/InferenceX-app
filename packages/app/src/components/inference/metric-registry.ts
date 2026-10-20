@@ -380,28 +380,12 @@ export const METRIC_REGISTRY = {
     titleZh: 'GPU 实测功耗时间线',
     polarity: 'lower',
   },
-  gpuProvisionedWatts: {
-    field: 'gpuProvisionedWatts.y',
-    label: 'GPU Level Provisioned Power per Chip (TDP, W)',
-    labelZh: '每芯片 GPU 额定功耗（TDP，W）',
-    title: 'GPU Level Provisioned Power per Chip (TDP)',
-    titleZh: '每芯片 GPU 额定功耗（TDP）',
-    polarity: 'lower',
-  },
   gpuProvisionedJPerOutputToken: {
     field: 'gpuProvisionedJPerOutputToken.y',
     label: 'GPU Level Provisioned J per Output Token (TDP, J/tok)',
     labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
     title: 'GPU Level Provisioned Joules per Output Token (TDP)',
     titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
-    polarity: 'lower',
-  },
-  utilityProvisionedWatts: {
-    field: 'utilityProvisionedWatts.y',
-    label: 'All in Provisioned Power per Chip (W)',
-    labelZh: '每芯片整体预配功耗（W）',
-    title: 'All in Provisioned Power per Chip',
-    titleZh: '每芯片整体预配功耗',
     polarity: 'lower',
   },
   utilityProvisionedJPerOutputToken: {
@@ -457,6 +441,8 @@ const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
   y_inputTokensPerRmbH: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbN: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbR: 'y_inputTokensPerDollarR',
+  y_gpuProvisionedWatts: 'y_measuredAvgPower',
+  y_utilityProvisionedWatts: 'y_measuredAvgPower',
 };
 
 export function metricCostTier(metricKey: MetricKey): CostTier | undefined {
@@ -628,9 +614,7 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
 }
 
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
-  'y_gpuProvisionedWatts',
   'y_gpuProvisionedJPerOutputToken',
-  'y_utilityProvisionedWatts',
   'y_utilityProvisionedJPerOutputToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',

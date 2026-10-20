@@ -124,6 +124,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   'gpu-specs': ['format', 'metric'],
   historical: [
+    'chart',
     'deployment',
     'end',
     'extendToDate',

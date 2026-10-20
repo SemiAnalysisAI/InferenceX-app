@@ -15,6 +15,7 @@ export type { WorkerPower };
 export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
 
 export interface AggDataEntry {
+  trendSource?: TrendSource;
   rawMetricKeys?: string[];
   id?: number;
   recipe_fingerprint?: string;
@@ -216,9 +217,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   reconstructedPrefillJPerOutputToken?: { y: number; roof: boolean };
   powerVariant?: PowerVariant;
 
-  gpuProvisionedWatts?: { y: number; roof: boolean };
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
-  utilityProvisionedWatts?: { y: number; roof: boolean };
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
   utilityModeledWatts?: { y: number; roof: boolean };
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
@@ -229,9 +228,7 @@ export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 
 export type PowerBasisFieldKey =
-  | 'gpuProvisionedWatts'
   | 'gpuProvisionedJPerOutputToken'
-  | 'utilityProvisionedWatts'
   | 'utilityProvisionedJPerOutputToken'
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken';
@@ -483,11 +480,24 @@ export type UserCostInputs = Record<string, string | undefined>;
 
 export type HardwareConfig = Record<string, HardwareEntry>;
 
+export interface TrendSource {
+  date: string;
+  runId: number;
+  runUrl: string;
+  model: string;
+  precision: string;
+  hwKey: string;
+  benchmarkType: 'single_turn' | 'agentic_traces';
+}
+
 export interface TrendDataPoint {
   date: string;
   value: number;
   x: number;
   synthetic?: boolean;
+  sources?: TrendSource[];
+  /** False when a legacy fallback would make a waterfall comparison ambiguous. */
+  waterfallEligible?: boolean;
 }
 
 export interface TrendLineConfig {

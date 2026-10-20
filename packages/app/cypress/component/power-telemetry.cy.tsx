@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
 
+import GpuMetricsChart from '@/components/gpu-power/GpuPowerChart';
 import { TelemetryDisplayControls } from '@/components/gpu-power/TelemetryDisplayControls';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
@@ -185,6 +186,40 @@ describe('PowerX telemetry interactions', () => {
       'have.been.calledWith',
       'inference_agentic_power_telemetry_retry_clicked',
     );
+  });
+
+  it('draws the all-in provisioned line only when switched on', () => {
+    cy.intercept('GET', endpoint, { body: payload });
+    mountPoint();
+    cy.get(chart).find('svg').should('contain.text', 'B200 TDP: 1000W');
+    cy.get(chart).find('[data-testid="gpu-power-all-in-line"]').should('not.exist');
+    cy.get('[data-testid="power-telemetry-all-in"]').click();
+    cy.get(chart)
+      .find('[data-testid="gpu-power-all-in-line"]')
+      .should('contain.text', 'B200 All-in provisioned: 1710W');
+    cy.get('@capture').should('have.been.calledWith', 'inference_agentic_power_all_in_toggled', {
+      id: ID,
+      enabled: true,
+    });
+    cy.get(chart).screenshot('power-telemetry-all-in-line');
+  });
+
+  it('keeps point tooltips on the samples while the all-in line is drawn', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/inference/agentic/206887">
+        <GpuMetricsChart
+          data={series(1, 'host-a', 500).data}
+          visibleGpus={new Set([0, 1])}
+          metricKey="power"
+          artifactName="gpu_metrics_qwen35_b200"
+          hardware="b200"
+          showAllIn
+        />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
+    cy.get('circle.point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {

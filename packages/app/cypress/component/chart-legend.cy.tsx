@@ -42,6 +42,43 @@ const MOCK_ITEMS: CommonLegendItemProps[] = [
   },
 ];
 
+describe('ChartLegend in an enclosing controls panel', () => {
+  it('shows controls without a second toggle or changing the saved expansion state', () => {
+    const onExpandedChange = cy.stub().as('expandedChange');
+    const onHighContrast = cy.stub().as('highContrastChange');
+    const onReset = cy.stub().as('resetFilter');
+    const onHardware = cy.stub().as('hardwareChange');
+    cy.mount(
+      <ChartLegend
+        legendItems={MOCK_ITEMS.map((item) => ({ ...item, onClick: onHardware }))}
+        variant="sidebar"
+        isLegendExpanded={false}
+        collapsible={false}
+        onExpandedChange={onExpandedChange}
+        switches={[
+          {
+            id: 'embedded-high-contrast',
+            label: 'High Contrast',
+            checked: false,
+            onCheckedChange: onHighContrast,
+          },
+        ]}
+        actions={[{ id: 'embedded-reset', label: 'Reset filter', onClick: onReset }]}
+      />,
+    );
+    cy.get('[data-testid="legend-open-button"], [data-testid="legend-close-button"]').should(
+      'not.exist',
+    );
+    cy.contains('label', 'NVIDIA H100 SXM').should('be.visible').click();
+    cy.get('@hardwareChange').should('have.been.calledWith', 'h100-sxm');
+    cy.get('#embedded-high-contrast').should('be.visible').click();
+    cy.get('@highContrastChange').should('have.been.calledWith', true);
+    cy.get('[data-testid="embedded-reset"]').should('be.visible').click();
+    cy.get('@resetFilter').should('have.been.calledOnce');
+    cy.get('@expandedChange').should('not.have.been.called');
+  });
+});
+
 function ChartLegendWrapper({
   items = MOCK_ITEMS,
   inChart = false,

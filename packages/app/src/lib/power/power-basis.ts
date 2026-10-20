@@ -33,16 +33,10 @@ export const ALL_IN_MEASURED_EMPTY = {
 
 export const POWER_BASIS_FIELDS: Record<
   Exclude<PowerBasis, 'gpu-measured'>,
-  Record<PowerQuantity, PowerBasisFieldKey>
+  Partial<Record<PowerQuantity, PowerBasisFieldKey>>
 > = {
-  'gpu-provisioned': {
-    watts: 'gpuProvisionedWatts',
-    energy: 'gpuProvisionedJPerOutputToken',
-  },
-  'utility-provisioned': {
-    watts: 'utilityProvisionedWatts',
-    energy: 'utilityProvisionedJPerOutputToken',
-  },
+  'gpu-provisioned': { energy: 'gpuProvisionedJPerOutputToken' },
+  'utility-provisioned': { energy: 'utilityProvisionedJPerOutputToken' },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
     energy: 'utilityModeledJPerOutputToken',
@@ -93,9 +87,7 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       : null;
 
   return {
-    gpuProvisionedWatts: tdp,
     gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
-    utilityProvisionedWatts: utility,
     utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
     utilityModeledWatts: modeled,
     utilityModeledJPerOutputToken: modeledEnergy,
