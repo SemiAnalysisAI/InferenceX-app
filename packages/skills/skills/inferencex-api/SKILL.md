@@ -58,6 +58,10 @@ a matching label is insufficient. Missing values remain missing, never zero.
 
 ## Deliver the requested result
 
+Before an AgentX iso-interactivity comparison, history, waterfall, or efficiency-gain
+chart, read [AgentX P90 interactivity](references/agentic-interactivity.md).
+Use its raw-data helper when needed; do not substitute median interactivity.
+
 The inference view defaults to `best=true`, including Qwen3.5 on 8K/1K and
 Agentic. It ranks candidate frameworks per SKU with the dashboard's existing
 shared-range scoring for the selected axes; this is not a universal engine ranking.

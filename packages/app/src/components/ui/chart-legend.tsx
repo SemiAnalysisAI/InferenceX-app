@@ -69,11 +69,13 @@ export interface ChartLegendProps {
   onAdvancedExpandedChange?: (expanded: boolean) => void;
   hideAtomFootnote?: boolean;
   readOnly?: boolean;
+  /** An enclosing panel can own expansion instead of the legend itself. */
+  collapsible?: boolean;
 }
 
 export default function ChartLegend({
   legendItems,
-  isLegendExpanded,
+  isLegendExpanded: expandedProp,
   onExpandedChange,
   switches,
   actions,
@@ -90,7 +92,9 @@ export default function ChartLegend({
   onAdvancedExpandedChange,
   hideAtomFootnote = false,
   readOnly = false,
+  collapsible = true,
 }: ChartLegendProps) {
+  const isLegendExpanded = collapsible ? expandedProp : true;
   const locale = useLocale();
   const t = STRINGS[locale];
   const isSidebar = variant === 'sidebar';
@@ -240,17 +244,19 @@ export default function ChartLegend({
         className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
       >
         <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
-        <button
-          type="button"
-          data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
-          onClick={toggleLegendOpen}
-          aria-expanded={isLegendExpanded}
-          aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
-          title={isLegendExpanded ? t.hideLegend : t.showLegend}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-        >
-          <LegendToggleIcon size={16} aria-hidden="true" />
-        </button>
+        {collapsible && (
+          <button
+            type="button"
+            data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
+            onClick={toggleLegendOpen}
+            aria-expanded={isLegendExpanded}
+            aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+            title={isLegendExpanded ? t.hideLegend : t.showLegend}
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+          >
+            <LegendToggleIcon size={16} aria-hidden="true" />
+          </button>
+        )}
       </div>
     ) : null;
 

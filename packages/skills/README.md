@@ -47,6 +47,13 @@ If you need to build the archive, run `npm pack` in `packages/skills`.
 
 ## Usage
 
+For AgentX interactivity comparisons and historical or efficiency-gain charts, use
+P90 slow-tail interactivity: `1 / P90(full-response ITL in seconds)`. Do not use
+the median or P90 of token rates. The bundled
+[P90 recipe](skills/inferencex-api/references/agentic-interactivity.md) includes
+a tested raw-data helper and instructions for checking deployed API metadata.
+Single-turn median calculations and the formal TCO workflow are unchanged.
+
 Profit-estimator dashboard links encode share state in named route segments,
 for example `/profit-estimator/deepseek-v4/target/24`.
 The per-gigawatt page and `/zh` pages use the same format. These dashboards
