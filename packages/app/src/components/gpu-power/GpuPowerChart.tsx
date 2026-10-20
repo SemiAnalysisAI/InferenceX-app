@@ -1,5 +1,6 @@
 'use client';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
 import { buildTelemetryData, type ParsedPoint } from './chart-data';
@@ -42,6 +43,7 @@ const STRINGS = {
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
     rightAxis: 'right axis',
+    allIn: 'All-in provisioned',
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -56,6 +58,7 @@ const STRINGS = {
     meanChips: '可见芯片均值',
     meanCount: (n: number) => `${n} 个芯片`,
     rightAxis: '右轴',
+    allIn: '整体预配功耗',
   },
 } as const;
 
@@ -77,6 +80,7 @@ interface GpuMetricsChartProps {
   maxPoints?: number;
   display?: TelemetryDisplayState;
   overlay?: TelemetryOverlaySeries | null;
+  showAllIn?: boolean;
 }
 
 function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): ParsedPoint[] {
@@ -97,6 +101,11 @@ function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): Pars
 function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
   const averaged = rollingTimeAverage(points, windowS * 1000);
   return points.map((point, i) => ({ ...point, value: averaged[i]!.value, raw: null }));
+}
+
+export function allInWattsForHardware(hardware: string | undefined): number | null {
+  const power = hardware ? HW_REGISTRY[hardware.toLowerCase()]?.power : undefined;
+  return power && power > 0 ? power * 1000 : null;
 }
 
 export const GPU_COLORS = d3.schemeTableau10;
@@ -194,6 +203,7 @@ const GpuMetricsChart = React.memo(
     maxPoints,
     display = DEFAULT_TELEMETRY_DISPLAY,
     overlay,
+    showAllIn = false,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
@@ -298,6 +308,8 @@ const GpuMetricsChart = React.memo(
       metricKey === 'power'
         ? (tdpForHardware(hardware) ?? detectTdpFromArtifactName(artifactName))
         : null;
+    const allInWatts =
+      metricKey === 'power' && showAllIn && hardware ? allInWattsForHardware(hardware) : null;
 
     const yDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
@@ -310,9 +322,10 @@ const GpuMetricsChart = React.memo(
       );
       const yMin = Math.max(0, ext[0] - padding);
       let yMax = ext[1] + padding;
-      if (tdpInfo && tdpInfo.tdp > yMax) yMax = tdpInfo.tdp * 1.05;
+      const ceiling = Math.max(tdpInfo?.tdp ?? 0, allInWatts ?? 0);
+      if (ceiling > yMax) yMax = ceiling * 1.05;
       return [yMin, yMax] as [number, number];
-    }, [allPoints, tdpInfo]);
+    }, [allPoints, tdpInfo, allInWatts]);
 
     if (allPoints.length === 0) {
       return (
@@ -346,31 +359,60 @@ const GpuMetricsChart = React.memo(
         layers={[
           {
             type: 'custom',
-            key: 'tdp-line',
+            key: 'reference-lines',
             render: (group, ctx) => {
-              group.selectAll('.tdp-line').remove();
-              if (!tdpInfo) return;
+              group.selectAll('.tdp-line, .all-in-line').remove();
               const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-              const tdpY = yScale(tdpInfo.tdp);
-              const tdpGroup = group.append('g').attr('class', 'tdp-line');
-              tdpGroup
-                .append('line')
-                .attr('x1', 0)
-                .attr('x2', ctx.width)
-                .attr('y1', tdpY)
-                .attr('y2', tdpY)
-                .attr('stroke', '#ef4444')
-                .attr('stroke-width', 1.5)
-                .attr('stroke-dasharray', '6,4');
-              tdpGroup
-                .append('text')
-                .attr('x', ctx.width - 4)
-                .attr('y', tdpY - 6)
-                .attr('text-anchor', 'end')
-                .attr('fill', '#ef4444')
-                .attr('font-size', '11px')
-                .attr('font-weight', '600')
-                .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
+              const references: {
+                className: string;
+                watts: number;
+                color: string;
+                dash: string;
+                label: string;
+              }[] = [];
+              if (tdpInfo) {
+                references.push({
+                  className: 'tdp-line',
+                  watts: tdpInfo.tdp,
+                  color: '#ef4444',
+                  dash: '6,4',
+                  label: `${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`,
+                });
+              }
+              if (allInWatts !== null && hardware) {
+                references.push({
+                  className: 'all-in-line',
+                  watts: allInWatts,
+                  color: '#f59e0b',
+                  dash: '2,3',
+                  label: `${tdpInfo?.sku ?? hardware.toUpperCase()} ${t.allIn}: ${Math.round(allInWatts)}W`,
+                });
+              }
+              for (const reference of references) {
+                const lineY = yScale(reference.watts);
+                const lineGroup = group.append('g').attr('class', reference.className);
+                if (reference.className === 'all-in-line') {
+                  lineGroup.attr('data-testid', 'gpu-power-all-in-line');
+                }
+                lineGroup
+                  .append('line')
+                  .attr('x1', 0)
+                  .attr('x2', ctx.width)
+                  .attr('y1', lineY)
+                  .attr('y2', lineY)
+                  .attr('stroke', reference.color)
+                  .attr('stroke-width', 1.5)
+                  .attr('stroke-dasharray', reference.dash);
+                lineGroup
+                  .append('text')
+                  .attr('x', ctx.width - 4)
+                  .attr('y', lineY - 6)
+                  .attr('text-anchor', 'end')
+                  .attr('fill', reference.color)
+                  .attr('font-size', '11px')
+                  .attr('font-weight', '600')
+                  .text(reference.label);
+              }
             },
           },
           {

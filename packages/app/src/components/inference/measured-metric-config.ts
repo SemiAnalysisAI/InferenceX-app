@@ -1,4 +1,4 @@
-import type { PowerBasis } from '@/lib/power/power-basis';
+import { POWER_BASES, type PowerBasis } from '@/lib/power/power-basis';
 import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
@@ -95,17 +95,35 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     'y_measuredWhPerSuccessfulQuery',
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
+  [
+    'y_utilityModeledWatts',
+    {
+      family: 'power',
+      basis: 'utility-modeled',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
   ...(
     [
-      ['gpu-provisioned', 'y_gpuProvisionedWatts', 'y_gpuProvisionedJPerOutputToken'],
-      ['utility-provisioned', 'y_utilityProvisionedWatts', 'y_utilityProvisionedJPerOutputToken'],
-      ['utility-modeled', 'y_utilityModeledWatts', 'y_utilityModeledJPerOutputToken'],
-    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey, MetricConfigKey])[]
-  ).flatMap(([basis, watts, energy]): (readonly [MetricConfigKey, MeasuredMetricConfig])[] => [
-    [watts, { family: 'power', basis, scope: 'all', statistic: 'average', display: 'watts' }],
-    [energy, { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' }],
+      ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken'],
+      ['utility-provisioned', 'y_utilityProvisionedJPerOutputToken'],
+      ['utility-modeled', 'y_utilityModeledJPerOutputToken'],
+    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey])[]
+  ).map(([basis, energy]): readonly [MetricConfigKey, MeasuredMetricConfig] => [
+    energy,
+    { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' },
   ]),
 ];
+
+export function measuredMetricBases(family: MeasuredMetricFamily): PowerBasis[] {
+  return POWER_BASES.filter((basis) =>
+    MEASURED_METRIC_CONFIGS.some(
+      ([, config]) => config.family === family && config.basis === basis,
+    ),
+  );
+}
 
 export function getMeasuredMetricConfig(metric: string): MeasuredMetricConfig | undefined {
   const config = MEASURED_METRIC_CONFIGS.find(([key]) => key === metric)?.[1];
