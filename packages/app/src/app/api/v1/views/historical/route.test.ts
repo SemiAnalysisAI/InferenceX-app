@@ -235,6 +235,49 @@ describe('GET /api/v1/views/historical', () => {
     expect(resBody.params.sequence).toBe('agentic-traces');
   });
 
+  it('interpolates AgentX trends and waterfall steps at P90 interactivity', async () => {
+    // Median and P90 disagree on purpose: at target 35, the P90 axis reads
+    // 300 → 360 (+60) while the median axis would read ~397 → 476.
+    const agenticCurve = (date: string, scale: number) =>
+      [
+        [10, 25, 500],
+        [35, 45, 300],
+        [60, 70, 100],
+      ].map(([p90, median, tput]) =>
+        makeRow({
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          date,
+          conc: Math.round(640 / p90),
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: median,
+            p90_intvty: p90,
+            tput_per_gpu: tput * scale,
+            output_tput_per_gpu: tput * scale,
+          },
+        }),
+      );
+    mockGetAllBenchmarksForHistory.mockResolvedValue([
+      ...agenticCurve('2026-02-01', 1),
+      ...agenticCurve('2026-03-01', 1.2),
+    ]);
+    const res = await GET(
+      request(
+        '/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu&sequence=agentic&target=35&chart=waterfall',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const h200 = body.series.find((series: { hwKey: string }) => series.hwKey.startsWith('h200'));
+    const measured = h200.points.filter((point: { synthetic?: boolean }) => !point.synthetic);
+    expect(measured.map((point: { value: number }) => point.value)).toEqual([300, 360]);
+    const gain = h200.steps.find((step: { kind: string }) => step.kind === 'gain');
+    expect(gain.from).toBeCloseTo(300);
+    expect(gain.delta).toBeCloseTo(60);
+  });
+
   it('rejects unknown metrics and out-of-range targets', async () => {
     const badMetric = await GET(
       request('/api/v1/views/historical?model=DeepSeek-R1-0528&metric=bogus'),
