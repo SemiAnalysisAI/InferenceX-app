@@ -601,6 +601,20 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
 });
 
 describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => {
+  it('labels AgentX operating points as P90 without changing the values', () => {
+    const lines = new Map([['h200_trt', [{ date: '2026-03-01', value: 300, x: 35 }]]]);
+    const result = historicalTrendToCsv(
+      lines,
+      [{ id: 'h200_trt', label: 'H200' }],
+      'Throughput',
+      35,
+      'p90',
+    );
+    expect(result.headers).toContain('P90 Interactivity (tok/s/user)');
+    expect(result.headers).toContain('Target P90 Interactivity (tok/s/user)');
+    expect(result.rows[0][4]).toBe(300);
+    expect(result.rows[0][5]).toBe(35);
+  });
   it('flattens trend lines into rows with GPU labels', () => {
     const trendLines = new Map([
       [

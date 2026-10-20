@@ -111,6 +111,61 @@ const visitHistoricalWithSetup = () => {
 const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
   rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
 
+describe('Historical Trends AgentX P90 operating point', () => {
+  it('labels P90 in English and Chinese while using the P90 rather than median curve', () => {
+    const date = '2025-03-01';
+    cy.fixture('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability', asAgenticRowsOn(rows, date));
+    });
+    cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
+      // Deliberately synthetic regression data: P90 and median must disagree.
+      const agentic = [
+        [10, 500],
+        [35, 300],
+        [60, 100],
+      ].map(([rate, throughput], index) => ({
+        ...rows[0],
+        id: 8800 + index,
+        hardware: 'h200',
+        framework: 'trt',
+        model: 'dsr1',
+        precision: 'fp8',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: [64, 32, 8][index],
+        date,
+        curve_date: date,
+        spec_method: 'none',
+        disagg: false,
+        metrics: {
+          ...rows[0].metrics,
+          median_intvty: rate * 2,
+          p90_intvty: 999,
+          p90_full_response_itl: 1 / rate,
+          tput_per_gpu: throughput,
+          output_tput_per_gpu: throughput,
+        },
+      }));
+      cy.intercept('GET', '**/api/v1/benchmarks?*', agentic).as('p90Benchmarks');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', agentic).as('p90History');
+    });
+    for (const prefix of ['', '/zh']) {
+      cy.visit(
+        `${prefix}/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
+      );
+      cy.wait('@p90Benchmarks');
+      cy.wait('@p90History');
+      cy.get('[data-testid="historical-target-input"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'P90');
+      cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', 'P90');
+      cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
+      cy.get('[data-chart-tooltip]:visible').should('contain.text', '300');
+    }
+  });
+});
+
 describe('Historical Trends — Content & Interactions', () => {
   beforeEach(() => {
     visitHistoricalWithSetup();

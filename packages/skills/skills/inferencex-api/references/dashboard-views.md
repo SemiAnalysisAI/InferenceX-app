@@ -128,6 +128,15 @@ there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 
 ## View selection
 
+For AgentX inference and historical comparisons, read
+[AgentX P90 interactivity](agentic-interactivity.md). Request
+`sequence=agentic-traces&percentile=p90&xmode=interactivity` for the inference view.
+The historical view fixes P90 by workload and does not accept `percentile`.
+Require the historical response's `interactivity.statistic=p90` before labeling
+its values as P90. Its CSV exposes `targetInteractivity`,
+`interactivityStatistic` and `interactivityField`. Single-turn histories keep the
+median; the formal median-only TCO workflow is unchanged.
+
 All paths below are relative to `/api/v1/views/`. The maintained exhaustive
 query-key list is in the app's OpenAPI contract. The following groups explain
 which API selectors belong together.

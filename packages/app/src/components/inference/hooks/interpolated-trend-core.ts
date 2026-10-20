@@ -41,6 +41,15 @@ export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: s
   return supportsTokenMetric(row, tokenMetricTypeForConfigKey(selectedYAxisMetric));
 }
 
+/** Resolved operating-point definition, not a user-selectable percentile. */
+export function historicalInteractivityAxis(isAgentic: boolean) {
+  return {
+    statistic: isAgentic ? ('p90' as const) : ('median' as const),
+    field: isAgentic ? ('p90_intvty' as const) : ('median_intvty' as const),
+    unit: 'tok/s/user' as const,
+  };
+}
+
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
  * This deliberately skips full chart transformation and derives only the
@@ -68,14 +77,15 @@ export function rowToLightweightPoint(
     /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/,
   );
 
-  // AgentX charts, overview and compare read interactivity at P90 (the AgentX
-  // SLA contract) from the 1/ITL-derived entry; fixed-sequence charts read the
-  // median. Trends and the improvement waterfall must interpolate on the same axis.
-  const interactivity =
-    row.benchmark_type === 'agentic_traces' ? entry.p90_intvty : row.metrics.median_intvty;
+  // Reuse the main chart's normalization: AgentX slow-tail interactivity is
+  // 1 / P90 full-response ITL (seconds), with legacy ITL support in the adapter.
+  // Never use raw p90_intvty: older artifacts computed P90(1 / ITL) instead.
+  const isAgentic = row.benchmark_type === 'agentic_traces';
+  const interactivity = isAgentic ? entry.p90_intvty : (row.metrics.median_intvty ?? 0);
+  if (isAgentic && (!Number.isFinite(interactivity) || interactivity <= 0)) return null;
 
   const point = {
-    x: interactivity ?? 0,
+    x: interactivity,
     y: row.metrics.tput_per_gpu ?? 0,
     hw: row.hardware,
     hwKey,

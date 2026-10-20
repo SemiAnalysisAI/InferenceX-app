@@ -1,0 +1,78 @@
+[
+  {
+    "name": "full-response slow tail overrides median, TPOT and raw rate percentile",
+    "metrics": {
+      "p90_full_response_itl": 0.025,
+      "median_intvty": 70,
+      "p90_tpot": 0.001,
+      "p90_intvty": 999
+    },
+    "expected": 40,
+    "source": "p90_full_response_itl"
+  },
+  {
+    "name": "full-response latency takes precedence over legacy latency",
+    "metrics": { "p90_full_response_itl": 0.05, "p90_itl": 0.02 },
+    "expected": 20,
+    "source": "p90_full_response_itl"
+  },
+  {
+    "name": "legacy latency works without full-response fields",
+    "metrics": { "p90_itl": 0.025, "p90_intvty": 999 },
+    "expected": 40,
+    "source": "p90_itl"
+  },
+  {
+    "name": "partial full-response record does not fall back",
+    "metrics": { "median_full_response_itl": 0.01, "p90_itl": 0.025 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "zero full-response P90 does not fall back",
+    "metrics": { "p90_full_response_itl": 0, "p90_itl": 0.025 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "negative full-response P90 does not fall back",
+    "metrics": { "p90_full_response_itl": -0.01, "p90_itl": 0.025 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "null P90 in a partial full-response record stays missing",
+    "metrics": {
+      "median_full_response_itl": 0.01,
+      "p90_full_response_itl": null,
+      "p90_itl": 0.025
+    },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "zero legacy latency stays missing",
+    "metrics": { "p90_itl": 0 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "raw rate and median alone are insufficient",
+    "metrics": { "p90_intvty": 999, "median_intvty": 70 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "TPOT and E2E normalized interactivity are not substitutes",
+    "metrics": { "p90_tpot": 0.025, "p90_e2e_norm_intvty": 80 },
+    "expected": null,
+    "source": null
+  },
+  {
+    "name": "string latency is not a valid measurement",
+    "metrics": { "p90_itl": "0.025" },
+    "expected": null,
+    "source": null
+  },
+  { "name": "empty record stays missing", "metrics": {}, "expected": null, "source": null }
+]
