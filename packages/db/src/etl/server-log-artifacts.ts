@@ -50,17 +50,17 @@ function readBytes(fd: number, position: number, length: number): Buffer {
 /** Drops a UTF-8 sequence cut off by the end of `buffer`. */
 function utf8CompletePrefix(buffer: Buffer): Buffer {
   let lead = buffer.length - 1;
-  while (lead >= 0 && lead > buffer.length - 4 && (buffer[lead]! & 0xC0) === 0x80) lead--;
+  while (lead >= 0 && lead > buffer.length - 4 && buffer[lead]! >> 6 === 0b10) lead--;
   if (lead < 0) return buffer;
   const byte = buffer[lead]!;
-  const width = byte >= 0xF0 ? 4 : byte >= 0xE0 ? 3 : byte >= 0xC0 ? 2 : 1;
+  const width = byte >= 0b11110000 ? 4 : byte >= 0b11100000 ? 3 : byte >= 0b11000000 ? 2 : 1;
   return lead + width > buffer.length ? buffer.subarray(0, lead) : buffer;
 }
 
 /** Drops continuation bytes left at the start of `buffer` by a mid-sequence cut. */
 function utf8CompleteSuffix(buffer: Buffer): Buffer {
   let start = 0;
-  while (start < buffer.length && start < 3 && (buffer[start]! & 0xC0) === 0x80) start++;
+  while (start < buffer.length && start < 3 && buffer[start]! >> 6 === 0b10) start++;
   return buffer.subarray(start);
 }
 
