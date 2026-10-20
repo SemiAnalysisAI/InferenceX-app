@@ -1,6 +1,6 @@
 # InferenceX API skill examples
 
-Use `@semianalysisai/inferencex-skills@1.1.0` to query existing
+Use `@semianalysisai/inferencex-skills@1.2.0` to query existing
 observations; these requests do not run new benchmarks. The skill covers the
 public API, including PowerX and AgentX exports and source-backed investigations. Read the
 [current API contract](https://inferencex.semianalysis.com/api/openapi.json) before
@@ -20,10 +20,10 @@ With Node 24 or later and npm, run the command for your agent from your project:
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- inferencex-skills install --target codex
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- inferencex-skills install --target claude
+npm exec --yes --package @semianalysisai/inferencex-skills@1.2.0 -- inferencex-skills install --target claude
 ```
 
 Start an agent session in that project. Queries need public HTTPS access, with no
