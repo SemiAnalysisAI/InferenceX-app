@@ -707,6 +707,14 @@ describe('isRunAttemptPurged', () => {
     expect(isRunAttemptPurged(34926284366, 1)).toBe(false);
   });
 
+  it('purges every attempt of the accidentally merged EFA-patched run', () => {
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(39112710364, attempt)).toBe(true);
+      expect(isRunAttemptPurged(39112710363, attempt)).toBe(false);
+      expect(isRunAttemptPurged(39112710365, attempt)).toBe(false);
+    }
+  });
+
   it('returns true for runs in PURGED_RUNS regardless of attempt', () => {
     const [first] = PURGED_RUNS;
     if (first === undefined) return;
