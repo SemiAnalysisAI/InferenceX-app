@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   apply:
-    name: Apply production run overrides
+    name: Apply run overrides
     timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
@@ -69,10 +69,15 @@ jobs:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: bun run admin:db:verify
 
-      - name: Invalidate production cache
+      - name: Invalidate cache
         env:
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:invalidate "$APP_URL"
 
-      - name: Warm production cache
-        run: bun run admin:cache:warmup https://inferencex.semianalysis.com
+      - name: Warm cache
+        env:
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:warmup "$APP_URL"

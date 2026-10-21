@@ -45,6 +45,9 @@ on:
       VERCEL_STAGING_BYPASS_SECRET:
         description: Vercel protection automation bypass token
         required: true
+      CACHE_PROTECTION_BYPASS_SECRET:
+        description: Optional Vercel protection bypass token for production and dev site requests
+        required: false
       INFX_MAIN_PAT:
         description: Token used to download InferenceX artifacts
         required: true
@@ -158,7 +161,11 @@ jobs:
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          DEV_SITE_URL: ${{ vars.DEV_SITE_URL ||
+            'https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app' }}
           STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
             'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -169,13 +176,15 @@ jobs:
           case "$REQUESTED_DATABASE_TARGET" in
             production)
               database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
-              cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              cache_invalidate_url="${APP_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
             dev)
               database_write_url="$DATABASE_WRITE_URL_DEV"
-              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              cache_invalidate_url="${DEV_SITE_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
             staging)
               database_write_url="$DATABASE_WRITE_URL_STAGING"
@@ -261,7 +270,7 @@ jobs:
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
             github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
         run: bun run admin:db:prepare:ci
 
@@ -274,7 +283,7 @@ jobs:
           INGEST_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
@@ -291,17 +300,14 @@ jobs:
 
       - name: Invalidate Vercel cache
         run: |
-          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
-          elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
-          else
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
+          headers=()
+          if [ -n "$CACHE_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET")
           fi
+          if [ "$INGEST_DATABASE_TARGET" != "staging" ]; then
+            headers+=(-H "Authorization: Bearer $CACHE_INVALIDATE_SECRET")
+          fi
+          curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" "${headers[@]}"
 
       - name: Verify PowerX source, database and public API
         id: powerx

@@ -18,6 +18,7 @@ concurrency:
 jobs:
   preflight:
     name: Check three-day cadence
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app'
     runs-on: ubuntu-latest
     permissions: {}
     outputs:

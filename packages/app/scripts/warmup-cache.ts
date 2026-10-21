@@ -8,6 +8,8 @@ const SEQUENCES = SEQUENCE_OPTIONS.map((s) => sequenceToIslOsl(s)).filter(
 
 const rawUrl = process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'http://localhost:3000';
 const origin = new URL(rawUrl).origin;
+const bypassSecret = process.env.CACHE_PROTECTION_BYPASS_SECRET;
+const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 
 let total = 0;
 let ok = 0;
@@ -18,7 +20,7 @@ async function hit(path: string): Promise<void> {
   total++;
   try {
     const start = performance.now();
-    const res = await fetch(url);
+    const res = await fetch(url, { headers });
     const ms = Math.round(performance.now() - start);
     if (res.ok) {
       ok++;
@@ -64,7 +66,7 @@ async function warmupCaches() {
 
   let availableDates: string[] = [];
   try {
-    const res = await fetch(`${origin}/api/v1/availability`);
+    const res = await fetch(`${origin}/api/v1/availability`, { headers });
     if (res.ok) {
       const rows = (await res.json()) as { date: string }[];
       const cutoff = new Date();

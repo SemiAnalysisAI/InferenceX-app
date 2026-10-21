@@ -20,6 +20,7 @@ concurrency:
 jobs:
   publish:
     name: 'Publish H3 media'
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -32,4 +33,6 @@ jobs:
       - name: Persist completed H3 artifacts
         env:
           H3_RUN_ID: ${{ inputs.run_id }}
+          INFERENCEX_APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
         run: bun packages/app/scripts/warm-video-results.ts

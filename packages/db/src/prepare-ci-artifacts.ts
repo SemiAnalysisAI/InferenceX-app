@@ -69,6 +69,7 @@ function writeOutputs(values: Record<string, string | number | boolean>): void {
 
 function writeReuseMetadata(
   artifactsPath: string,
+  repo: string,
   sourceRunId: string,
   mergeRunId: string,
   source: GithubRunMetadata,
@@ -82,16 +83,12 @@ function writeReuseMetadata(
       {
         source_run_id: sourceRunId,
         source_run_attempt: source.run_attempt ?? 1,
-        source_run_url:
-          source.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${sourceRunId}`,
+        source_run_url: source.html_url ?? `https://github.com/${repo}/actions/runs/${sourceRunId}`,
         source_pr_number: source.pull_requests?.[0]?.number ?? null,
         source_head_sha: source.head_sha ?? null,
         ingest_run_id: mergeRunId,
         ingest_run_attempt: merge.run_attempt ?? 1,
-        ingest_run_url:
-          merge.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${mergeRunId}`,
+        ingest_run_url: merge.html_url ?? `https://github.com/${repo}/actions/runs/${mergeRunId}`,
       },
       null,
       2,
@@ -108,7 +105,7 @@ function main(): void {
     process.env.MERGE_RUN_ID ?? positional[1] ?? sourceRunId,
     'MERGE_RUN_ID',
   );
-  const repo = process.env.INGEST_REPO ?? DEFAULT_REPO;
+  const repo = process.env.INGEST_REPO || DEFAULT_REPO;
   const artifactsPath = process.env.ARTIFACTS_PATH ?? path.resolve('artifacts');
 
   const sourceMetadata = fetchRunMetadata(repo, sourceRunId);
@@ -170,7 +167,7 @@ function main(): void {
     );
   }
   if (plan.reused) {
-    writeReuseMetadata(artifactsPath, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
+    writeReuseMetadata(artifactsPath, repo, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
   }
 }
 

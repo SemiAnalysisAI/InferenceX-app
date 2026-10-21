@@ -75,7 +75,21 @@ Key invariants:
   persistence, its consistent reads, deletion, and migrations via
   `bun run admin:db:migrate:collectivex`. `COLLECTIVEX_ADMIN_SECRET` is the delete route
   Bearer token (deliberately not `INVALIDATE_SECRET`, since it is remembered in browser
-  localStorage), and `GITHUB_TOKEN` authorizes artifact reads.
+  localStorage), and `GITHUB_TOKEN` authorizes artifact reads. `COLLECTIVEX_DATABASE_URL`
+  and `COLLECTIVEX_DATABASE_URL_UNPOOLED` stand in for the read and write URLs when those
+  are unset.
+- **Source repositories**: sweeps are discovered in `SemiAnalysisAI/InferenceX` and in
+  every repository listed in `INFERENCEX_SOURCE_REPOS`, merged newest-first by run id. A
+  listed repository whose sweep-workflow listing returns 404 is skipped; GitHub also
+  returns 404 for a misspelled repository or one the token cannot see. One that fails to
+  list for another reason is logged, and the pass then counts as failed: the runs list
+  keeps `discovery_complete: false` and both passes use the failure cooldown. Discovery
+  throws when every repository is skipped or fails. Per-run lookups try each repository
+  in order. A run from any other repository records it as `source_repository` in its
+  summary, and source, methodology, and run links use it; runs without the field link to
+  `SemiAnalysisAI/InferenceX`. The ingest CLI takes the repository from its `[repo]`
+  argument, then from a full run URL, then `INGEST_REPO`. `GITHUB_TOKEN` must be able to
+  read Actions runs and artifacts in every listed repository.
 
 ## Known-support matrix
 
