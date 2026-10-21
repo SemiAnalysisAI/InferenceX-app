@@ -128,6 +128,23 @@ there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 
 ## View selection
 
+For AgentX inference and historical comparisons, read
+[AgentX P90 interactivity](agentic-interactivity.md). Request
+`sequence=agentic-traces&percentile=p90&xmode=interactivity` for the inference view.
+The historical view fixes P90 by workload and does not accept `percentile`.
+Require the historical response's `interactivity.statistic=p90` before labeling
+its values as P90. Its CSV exposes `targetInteractivity`,
+`interactivityStatistic` and `interactivityField`. Single-turn histories keep the
+median; the formal median-only TCO workflow is unchanged.
+
+For a chart of historical performance improvements with associated source PRs and
+benchmark runs, use [inferencex-pr-improvements](../../inferencex-pr-improvements/SKILL.md).
+Its helper checks whether the deployment supports `chart=waterfall`, then renders
+the returned baseline, successive records and best observation. A compatible
+saved response also works offline. Source links establish provenance, not an
+isolated causal effect of a PR; the outputs are raw-view artifacts, not formal
+`inferencex verify` bundles.
+
 All paths below are relative to `/api/v1/views/`. The maintained exhaustive
 query-key list is in the app's OpenAPI contract. The following groups explain
 which API selectors belong together.

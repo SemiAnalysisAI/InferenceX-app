@@ -1,11 +1,18 @@
-import fs from 'node:fs';
 import path from 'node:path';
 
 import type postgres from 'postgres';
-import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
+import {
+  readCappedServerLogFile,
+  type ServerLogFile,
+  type ServerLogFilePath,
+} from './server-log-artifacts';
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
-import { capServerLogText, maxServerLogFileBytes } from './server-log-limits';
+import {
+  capServerLogText,
+  maxServerLogFileBytes,
+  type CappedServerLogText,
+} from './server-log-limits';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -125,12 +132,17 @@ export async function bulkIngestBenchmarkRows(
   `;
 
   const newCount = result.filter((r) => r.inserted).length;
-  return { newCount, dupCount: deduped.length - newCount, insertedIds: result.map((r) => r.id) };
+  return {
+    newCount,
+    dupCount: deduped.length - newCount,
+    insertedIds: result.map((r) => r.id),
+  };
 }
 
 interface DeferredServerLogFile {
   fileName: string;
-  readText: () => string;
+  /** Text capped to `maxBytes`; path-backed files never load more than that. */
+  readCapped: (maxBytes: number) => CappedServerLogText;
 }
 
 function primaryDeferredServerLogFile(
@@ -154,24 +166,24 @@ async function insertDeferredServerLogFiles(
   const primary = primaryDeferredServerLogFile(deduped);
   if (!primary) return;
   const additional = deduped.filter((file) => file.fileName !== primary.fileName);
-  const primaryText = primary.readText();
+  const maxBytes = maxServerLogFileBytes();
+  const readStored = (file: DeferredServerLogFile): string => {
+    const capped = file.readCapped(maxBytes);
+    if (capped.truncated) {
+      console.warn(
+        `    [WARN] server_logs ${file.fileName}: truncated ${capped.originalBytes} bytes to ` +
+          `${capped.storedBytes} (limit ${maxBytes}); full file stays in the artifact`,
+      );
+    }
+    return capped.text;
+  };
+  const primaryText = readStored(primary);
   const serverLog =
     primary.fileName.toLowerCase().endsWith('/server.log') ||
     primary.fileName.toLowerCase() === 'server.log'
       ? primaryText
       : null;
   const kvCachePoolTokens = serverLog ? kvCachePoolTokensFromServerLog(serverLog) : null;
-  const maxBytes = maxServerLogFileBytes();
-  const storedText = (fileName: string, text: string): string => {
-    const capped = capServerLogText(text, maxBytes);
-    if (capped.truncated) {
-      console.warn(
-        `    [WARN] server_logs ${fileName}: truncated ${capped.originalBytes} bytes to ` +
-          `${capped.storedBytes} (limit ${maxBytes}); full file stays in the artifact`,
-      );
-    }
-    return capped.text;
-  };
 
   await sql.begin(async (tx) => {
     const rows = await tx<{ id: number; server_log_id: number | null }[]>`
@@ -187,7 +199,7 @@ async function insertDeferredServerLogFiles(
     if (unlinked.length > 0) {
       const [{ id: logId }] = await tx<{ id: number }[]>`
         insert into server_logs (server_log, file_name, files_complete)
-        values (${storedText(primary.fileName, primaryText)}, ${primary.fileName}, true)
+        values (${primaryText}, ${primary.fileName}, true)
         returning id
       `;
       bundleIds.add(Number(logId));
@@ -214,7 +226,7 @@ async function insertDeferredServerLogFiles(
       const storedNames = new Set(stored.map((row) => row.file_name));
       for (const file of additional) {
         if (storedNames.has(file.fileName)) continue;
-        const logText = storedText(file.fileName, file.readText());
+        const logText = readStored(file);
         await tx`
           insert into server_log_files (server_log_id, file_name, log_text)
           values (${logId}, ${file.fileName}, ${logText})
@@ -245,7 +257,10 @@ export async function insertServerLogFiles(
   await insertDeferredServerLogFiles(
     sql,
     benchmarkResultIds,
-    files.map((file) => ({ fileName: file.fileName, readText: () => file.logText })),
+    files.map((file) => ({
+      fileName: file.fileName,
+      readCapped: (maxBytes) => capServerLogText(file.logText, maxBytes),
+    })),
   );
 }
 
@@ -259,7 +274,7 @@ export async function insertServerLogFilePaths(
     benchmarkResultIds,
     files.map((file) => ({
       fileName: file.fileName,
-      readText: () => cleanLogText(fs.readFileSync(file.path, 'utf8')),
+      readCapped: (maxBytes) => readCappedServerLogFile(file.path, maxBytes),
     })),
   );
 }

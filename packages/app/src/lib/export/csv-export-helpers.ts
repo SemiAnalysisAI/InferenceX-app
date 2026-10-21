@@ -321,6 +321,7 @@ export function historicalTrendToCsv(
   lineConfigs: { id: string; label: string; precision?: string }[],
   metricLabel: string,
   targetInteractivity: number,
+  interactivityStatistic: 'median' | 'p90' = 'median',
 ): CsvData {
   const headers = [
     'Chip',
@@ -328,9 +329,9 @@ export function historicalTrendToCsv(
     'Precision',
     'Date',
     metricLabel,
-    'Interactivity (tok/s/user)',
+    `${interactivityStatistic === 'p90' ? 'P90 ' : ''}Interactivity (tok/s/user)`,
     'Synthetic',
-    'Target Interactivity (tok/s/user)',
+    `Target ${interactivityStatistic === 'p90' ? 'P90 ' : ''}Interactivity (tok/s/user)`,
   ];
 
   const configById = new Map(lineConfigs.map((c) => [c.id, c]));

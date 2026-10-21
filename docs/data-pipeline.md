@@ -355,8 +355,11 @@ Each stored file is capped at 128 MiB of UTF-8 text (override with
 `SERVER_LOG_MAX_FILE_BYTES`). PostgreSQL rejects any value over 1 GB and drops the connection,
 and verbose multinode decode workers can exceed that. An oversized file keeps its first and last
 halves, cut at line boundaries, around a marker recording the original size; the complete file
-remains in the GitHub artifact and GCS backup. KV-cache metadata is still derived from the full
-`server.log` before capping. Server-log and trace-replay writes retry up to three times with
+remains in the GitHub artifact and GCS backup. Artifact files are read from disk only up to those
+kept bytes, so a multi-GiB frontend log neither exhausts memory nor stalls the event loop long
+enough for the pooler to drop the connection. KV-cache metadata is derived from the stored
+`server.log`, whose kept head holds the engine startup lines that report KV-cache size.
+Server-log writes, trace-replay link checks and trace-replay writes retry up to three times with
 backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
 because both writers are transactional and re-check existing links.
 

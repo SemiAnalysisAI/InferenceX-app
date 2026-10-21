@@ -21,7 +21,7 @@ import { readBoundedRegular } from '../skills/inferencex-api/scripts/local-files
 
 const SKILL_NAME = 'inferencex-api';
 const ENTRYPOINT_NAME = 'inferencex';
-const SHORTCUT_NAMES = ['inferencex-to-chart', 'inferencex-to-table'];
+const SHORTCUT_NAMES = ['inferencex-to-chart', 'inferencex-to-table', 'inferencex-pr-improvements'];
 const INSTALL_METADATA = '.inferencex-skills.json';
 const TARGET_DIRS = {
   claude: '.claude/skills',
@@ -58,7 +58,7 @@ It never changes files or uses the network.
 Interrupted owned installs recover on the next install; status and dry-run remain read-only.
 Recovery covers process crashes, without an fsync or power-loss durability guarantee.
 --version reports the executing installer, not an installed skill.
-Bundled entries: inferencex, inferencex-to-chart, inferencex-to-table
+Bundled entries: inferencex, inferencex-to-chart, inferencex-to-table, inferencex-pr-improvements
 Shared implementation and legacy entry: inferencex-api
 `;
 
@@ -330,6 +330,11 @@ async function main(args, signal) {
           target === 'claude'
             ? 'For AgentX outputs: /inferencex-to-chart <your task> or /inferencex-to-table <your task>.'
             : 'For AgentX outputs: $inferencex-to-chart <your task> or $inferencex-to-table <your task>.',
+        );
+        console.log(
+          target === 'claude'
+            ? 'For PR-linked improvement history: /inferencex-pr-improvements <your task>.'
+            : 'For PR-linked improvement history: $inferencex-pr-improvements <your task>.',
         );
         console.log(
           'Example: Compare the InferenceX TCO assumptions in my spreadsheet with the matching public observations.',
