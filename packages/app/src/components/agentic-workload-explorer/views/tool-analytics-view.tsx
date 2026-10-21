@@ -15,6 +15,7 @@ import {
 } from '@/components/agentic-workload-explorer/tool-os-error-rates';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import { explorerHref } from '@/lib/agentic-workload-explorer/paths';
 import { getToolColor } from '@/lib/agentic-workload-explorer/tool-colors';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
@@ -2423,7 +2424,9 @@ function ToolAnalyticsPageContent() {
     if (value === 'all') params.delete('harness');
     else params.set('harness', value);
     const qs = params.toString();
-    router.replace(`/tool-analytics${qs ? `?${qs}` : ''}`, { scroll: false });
+    router.replace(explorerHref(`/tool-analytics${qs ? `?${qs}` : ''}`, locale), {
+      scroll: false,
+    });
   }
 
   return (
