@@ -1151,6 +1151,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/benchmarks/benchmark-api-view.ts',
+    sourceSha256: '82197a032d055fdc572f95d9fc680649342223c4ed57f01f0739846ac8de3aeb',
+    reviewArea: {
+      en: 'Calculator metric projection, including recorded prompt/generation totals for the agentic P/D token mix.',
+      zh: '计算器指标投影，包括用于智能体 P/D 输入输出 token 比例的 prompt/generation 总量。',
+    },
+  },
+  {
     source: 'src/app/api/gpu-metrics/artifact-selection.ts',
     sourceSha256: 'ab1efa13ee06e467a73b3a89946a8e58968c9f3dee1eea533b33fe4770aff08e',
     reviewArea: {

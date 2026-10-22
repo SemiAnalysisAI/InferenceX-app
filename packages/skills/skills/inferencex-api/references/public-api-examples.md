@@ -271,6 +271,9 @@ The history operation accepts `model`, `isl`, and `osl`. It has no documented GP
 date-range or `powerValid` filter. This recipe filters the received array locally
 by the exact `hardware` key and inclusive **original observation `date`**, not an
 as-of cutoff or `curve_date`. Omit `view=calculator` to retain all stored metrics.
+The compact calculator view preserves recorded `total_prompt_tokens` and
+`total_generation_tokens` for an agentic P/D token mix. Missing totals stay
+missing; do not infer the fleet-wide mix from rates per prefill/decode GPU.
 Edit `scope` to match the user's request; discover raw hardware keys from the API.
 
 ```bash

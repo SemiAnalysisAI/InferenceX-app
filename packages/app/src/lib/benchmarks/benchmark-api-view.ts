@@ -4,6 +4,8 @@ const CALCULATOR_METRIC_KEYS = new Set([
   'tput_per_gpu',
   'input_tput_per_gpu',
   'output_tput_per_gpu',
+  'total_prompt_tokens',
+  'total_generation_tokens',
   'prefill_pp',
   'decode_pp',
   // Cached-input billing in the Fleet Lifecycle section reads these. Only

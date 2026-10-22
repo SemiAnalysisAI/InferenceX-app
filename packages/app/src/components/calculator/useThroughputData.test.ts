@@ -7,6 +7,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 
 import type { GPUDataPoint } from './types';
 import {
@@ -1396,6 +1397,44 @@ describe('buildGpuGroups', () => {
       // tokens instead of inventing an 80% input mix.
       expect(Object.values(grouped)[0][0].inputTokenShare).toBeUndefined();
     });
+
+    it.each([true, false])(
+      'preserves the agentic P/D token mix through the calculator projection (totals=%s)',
+      (hasTotals) => {
+        const row = makeRow({
+          disagg: true,
+          is_multinode: true,
+          prefill_tp: 4,
+          prefill_ep: 1,
+          decode_tp: 16,
+          decode_ep: 1,
+          num_prefill_gpu: 4,
+          num_decode_gpu: 16,
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          metrics: {
+            p90_itl: 1 / 50,
+            tput_per_gpu: 300,
+            input_tput_per_gpu: 750,
+            output_tput_per_gpu: 187.5,
+            ...(hasTotals ? { total_prompt_tokens: 1000, total_generation_tokens: 1000 } : {}),
+          },
+        });
+        const options = {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          classify: singlePrecisionClassify,
+        };
+        const raw = Object.values(buildGpuGroups([row], options).grouped)[0][0];
+        const compact = Object.values(
+          buildGpuGroups(toCalculatorBenchmarkRows([row], 'agentic-traces'), options).grouped,
+        )[0][0];
+        expect(compact.inputTokenShare).toBe(raw.inputTokenShare);
+        if (hasTotals) expect(compact.inputTokenShare).toBeCloseTo(0.5, 9);
+        else expect(compact.inputTokenShare).toBeUndefined();
+      },
+    );
   });
 
   it('applies Internal TPUv7 owner cost to every calculator token basis', () => {
