@@ -1,9 +1,9 @@
 # Deployment Configuration
 
 Operational values (benchmark source repositories, target sites, Deployment Protection
-bypass) are read from the environment, GitHub repository variables, or secrets. Only
-`STAGING_SITE_URL` has a default. A required value that is unset fails the script or
-workflow step that needs it, with an error naming the variable.
+bypass) are read from the environment, GitHub repository variables, or secrets. There
+are no defaults: a required value that is unset fails the script or workflow step that
+needs it, with an error naming the variable.
 
 Site identity stays fixed in code: the canonical `SITE_URL`, the API reference base
 URL, About and FAQ repository links, and the H3 video repository.
@@ -35,13 +35,13 @@ their links use it.
 
 ## GitHub Actions
 
-| Name                             | Kind     | Required                                  | Effect                                                                                                                                                                                                                      |
-| -------------------------------- | -------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_URL`                        | variable | yes, by every workflow that uses it       | Site targeted by cache invalidation and warmup, OperatorX invalidation, H3 media warmup, and PowerX verification on the `production` ingest target.                                                                         |
-| `BENCHMARK_REPO`                 | variable | yes, by every workflow that uses it       | Repository whose benchmark artifacts the ingest workflows download and that dispatches `stage-results`. When it is not `SemiAnalysisAI/InferenceX`, also list it in `INFERENCEX_SOURCE_REPOS` for the app's GitHub lookups. |
-| `DEV_SITE_URL`                   | variable | `dev` ingest target only                  | Site invalidated by the `dev` ingest target.                                                                                                                                                                                |
-| `STAGING_SITE_URL`               | variable | optional, defaults to the staging preview | Site invalidated by the `staging` ingest target.                                                                                                                                                                            |
-| `CACHE_PROTECTION_BYPASS_SECRET` | secret   | optional                                  | Deployment Protection bypass sent with production and dev site requests and by the cache scripts.                                                                                                                           |
+| Name                             | Kind     | Required                            | Effect                                                                                                                                                                                                                      |
+| -------------------------------- | -------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_URL`                        | variable | yes, by every workflow that uses it | Site targeted by cache invalidation and warmup, OperatorX invalidation, H3 media warmup, and PowerX verification on the `production` ingest target.                                                                         |
+| `BENCHMARK_REPO`                 | variable | yes, by every workflow that uses it | Repository whose benchmark artifacts the ingest workflows download and that dispatches `stage-results`. When it is not `SemiAnalysisAI/InferenceX`, also list it in `INFERENCEX_SOURCE_REPOS` for the app's GitHub lookups. |
+| `DEV_SITE_URL`                   | variable | `dev` ingest target only            | Site invalidated by the `dev` ingest target.                                                                                                                                                                                |
+| `STAGING_SITE_URL`               | variable | `staging` ingest target only        | Site invalidated by the `staging` ingest target.                                                                                                                                                                            |
+| `CACHE_PROTECTION_BYPASS_SECRET` | secret   | optional                            | Deployment Protection bypass sent with production and dev site requests and by the cache scripts.                                                                                                                           |
 
 `INFX_MAIN_PAT` must be able to read Actions artifacts in `BENCHMARK_REPO`, and `PAT`
 must be able to send repository dispatch events to it.

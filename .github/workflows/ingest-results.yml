@@ -165,8 +165,7 @@ jobs:
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
           APP_URL: ${{ vars.APP_URL }}
           DEV_SITE_URL: ${{ vars.DEV_SITE_URL }}
-          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
-            'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
@@ -188,6 +187,7 @@ jobs:
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
             staging)
+              : "${STAGING_SITE_URL:?STAGING_SITE_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_STAGING"
               cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
