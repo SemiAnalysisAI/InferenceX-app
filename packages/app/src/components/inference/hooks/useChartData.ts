@@ -16,6 +16,7 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
+  countsInputTokens,
   isAllInMeasuredConfigKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
@@ -53,7 +54,11 @@ import {
   benchmarkCurveDate,
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
-import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import {
+  mergeRunScopedRows,
+  transformBenchmarkRows,
+  type TokenBasis,
+} from '@/lib/benchmarks/benchmark-transform';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
@@ -75,6 +80,26 @@ export {
   type RooflineDirection,
   type XAxisMode,
 } from './chart-data-core';
+
+/**
+ * Qualify the token noun of a metric label for the uncached basis, e.g.
+ * "Total Tokens per $1 TCO" -> "Total Tokens (Uncached Input) per $1 TCO" and
+ * "Cost per Million Total Tokens ($/M tok)" -> "… Total Tokens (Uncached Input) ($/M tok)".
+ */
+export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): string | undefined {
+  if (typeof text !== 'string') return undefined;
+  const unit = /\s*[(（][^()（）]*[)）]$/u.exec(text);
+  const head = unit ? text.slice(0, unit.index) : text;
+  const tail = unit ? unit[0] : '';
+  if (locale === 'zh') {
+    return `${head}${head.includes('输入') ? '（未缓存）' : '（未缓存输入）'}${tail}`;
+  }
+  const qualifier = /input/iu.test(head) ? ' (Uncached)' : ' (Uncached Input)';
+  const per = head.indexOf(' per ');
+  return per > 0 && /token/iu.test(head.slice(0, per))
+    ? `${head.slice(0, per)}${qualifier}${head.slice(per)}${tail}`
+    : `${head}${qualifier}${tail}`;
+}
 
 export function useChartData(
   selectedModel: Model,
@@ -109,6 +134,7 @@ export function useChartData(
   allowDefaultRunPreference = false,
   powerCompare: PowerCompare = 'none',
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
+  tokenBasis: TokenBasis = 'total',
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -240,8 +266,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
-  }, [rows, selectedPercentile, tcoBasis]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis);
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis]);
 
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',
@@ -397,14 +423,36 @@ export function useChartData(
                   y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
+        const tokenBasisLabels: Partial<ChartDefinition> =
+          tokenBasis === 'uncached' && countsInputTokens(selectedYAxisMetric)
+            ? Object.fromEntries(
+                (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
+                  [
+                    `${selectedYAxisMetric}_${field}`,
+                    withUncachedQualifier(
+                      chartDef[`${selectedYAxisMetric}_${field}` as keyof ChartDefinition],
+                      'en',
+                    ),
+                  ],
+                  [
+                    `${selectedYAxisMetric}_${field}Zh`,
+                    withUncachedQualifier(
+                      chartDef[`${selectedYAxisMetric}_${field}Zh` as keyof ChartDefinition],
+                      'zh',
+                    ),
+                  ],
+                ]),
+              )
+            : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
+        const dynamicYLabel = { ...chartDef, ...revenueLabels, ...tokenBasisLabels }[yLabelKey];
 
         return {
           chartDefinition: {
             ...chartDef,
             ...rooflineOverrides,
             ...revenueLabels,
+            ...tokenBasisLabels,
             heading: chartHeading,
             x_scale_field: xAxisField,
             x_label: xAxisLabel,
@@ -424,6 +472,7 @@ export function useChartData(
       fixedSequenceStatistic,
       selectedSequence,
       tokenRevenuePriceSource,
+      tokenBasis,
     ],
   );
 

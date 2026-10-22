@@ -1225,7 +1225,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/resolveXAxisField.ts',
-    sourceSha256: '946b9fa6db0409d722f9f384b032ef56dc734b88c64beeeda0c798c03a9b7c1f',
+    sourceSha256: '6ab8cf1353312d0f6ba3dae0aa2f5e0665b40a0b916322c23c57d976c5167839',
     reviewArea: {
       en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
       zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
@@ -1265,7 +1265,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: 'a2968b195179c6da79ea09d9f8c22614ca939bf746e0dc1f5f82c3a526449ced',
+    sourceSha256: '83f89238d115f3bd10306a83de8be6759c9207890f803888f231b676f2e0ae44',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',

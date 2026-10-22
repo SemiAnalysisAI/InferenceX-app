@@ -2,17 +2,14 @@ import {
   DB_MODEL_TO_DISPLAY,
   FRAMEWORK_ALIASES,
   GPU_KEYS,
+  GPU_RUNNER_ALIASES,
 } from '@semianalysisai/inferencex-constants';
 
 export { GPU_KEYS };
 
-const HW_ALIASES: Record<string, string> = {
-  vrnvl72: 'vr200',
-};
-
 export function hwToGpuKey(hw: string): string | null {
   const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
-  const base = HW_ALIASES[raw] ?? raw;
+  const base = GPU_RUNNER_ALIASES[raw] ?? raw;
   return GPU_KEYS.has(base) ? base : null;
 }
 
