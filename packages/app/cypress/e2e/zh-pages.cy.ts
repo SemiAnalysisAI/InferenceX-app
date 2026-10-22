@@ -48,6 +48,9 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="footer-link-articles"]')
         .should('contain.text', '文章')
         .and('have.attr', 'href', '/zh/blog');
+      cy.get('[data-testid="footer-link-hardware"]')
+        .should('have.text', '硬件结果')
+        .and('have.attr', 'href', '/zh/hardware');
       cy.get('[data-testid="footer-link-land-acknowledgement"]').should(
         'have.attr',
         'href',

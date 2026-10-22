@@ -177,6 +177,9 @@ describe('objective Chinese guard', () => {
 
     it.each([
       ['content/blog/post.mdx', '# Exact\n', '# Changed\n', 1],
+      ['content/blog/zh/post.mdx', '# 旧\n', '# 新\n', 0],
+      ['packages/app/content/hardware/results.mdx', '# Exact\n', '# Changed\n', 1],
+      ['packages/app/content/hardware/zh/results.mdx', '# 旧\n', '# 新\n', 0],
       ['src/copy.test.ts', base, 'anything', 0],
       ['src/plumbing.ts', 'export const x = 1;', 'export const x = 2;', 0],
       [

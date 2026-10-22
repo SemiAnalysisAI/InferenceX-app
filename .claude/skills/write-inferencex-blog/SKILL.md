@@ -131,6 +131,22 @@ Use the **same `<Figure>` block twice**: once here as the hero (so the chart anc
 
 **Architectural diagrams (rack layouts, topology diagrams) go between the architectural prose and the DashboardCTA, not buried lower down.** If the post discusses a rack-scale system, scale-up domain, NVLink island, prefill/decode pool topology, or anything where a picture is worth a paragraph, drop it in immediately after the prose that motivates it. Example from `gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt.mdx`: the lede mentions "all 72 GPUs over NVLink 5" → next paragraph explains the 8-GPU NVLink island vs 72-GPU rack → next thing the reader sees is the GB200 NVL72 rack diagram showing the 18 compute trays / 9 NVSwitch5 trays. The visual grounds the technical claim before the data tables appear. Use the same `<Figure>` block format as the hero chart, with `srcLight`/`srcDark` even if dark is a placeholder copy of light.
 
+### Live charts
+
+Hardware-comparison posts can embed the live dashboard chart instead of a screenshot, scoped to two chips:
+
+```mdx
+<HardwareChart
+  model="DeepSeek-V4-Pro"
+  a="vr200"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp4"
+/>
+```
+
+`model` is the dashboard display name, `a`/`b` are registry base keys from `packages/constants/src/gpu-keys.ts`, `metric` is a y-axis metric key, `precisions` is a comma-separated list, and `sequence` defaults to `agentic-traces`. The chart follows the dashboard's engine guard, so it never overlays vLLM and SGLang lines for the same chip; if a table quotes a line the chart hides by default, say so next to the chart.
+
 ### Model / architecture paragraph
 
 One paragraph naming the model, vendor, release date (use it to compute "N weeks after release" if it sharpens the cadence framing), total/active parameters, expert count + top-K routing, attention mechanism (MLA, NSA/DSA, GQA, etc.), and context window. **Always WebSearch to verify these numbers** — don't carry over from a prior generation. Cite a source URL inline if the number is non-obvious.

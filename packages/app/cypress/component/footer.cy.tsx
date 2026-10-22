@@ -60,6 +60,9 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-articles"]')
       .should('contain.text', 'Articles')
       .and('have.attr', 'href', '/blog');
+    cy.get('[data-testid="footer-link-hardware"]')
+      .should('contain.text', 'Hardware Results')
+      .and('have.attr', 'href', '/hardware');
   });
 
   for (const width of [390, 768, 1280]) {

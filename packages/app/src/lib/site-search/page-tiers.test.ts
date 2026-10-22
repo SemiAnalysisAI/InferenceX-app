@@ -19,6 +19,11 @@ describe('pageTier', () => {
     expect(pageTier('/blog')).toBe(PAGE_TIER.article);
     expect(pageTier('/blog/powerx#joules')).toBe(PAGE_TIER.article);
     expect(pageTier('/whitepaper/agentx')).toBe(PAGE_TIER.article);
+    expect(pageTier('/hardware')).toBe(PAGE_TIER.article);
+    expect(pageTier('/zh/hardware/vera-rubin-nvl72-vs-gb300-nvl72-agentx-results')).toBe(
+      PAGE_TIER.article,
+    );
+    expect(pageTier('/hardware-specs')).toBe(PAGE_TIER.reference);
     expect(pageTier('/blogroll')).toBe(PAGE_TIER.reference);
   });
 });

@@ -238,6 +238,7 @@ export function InferenceProvider({
   autoSelectAllGpus = false,
   lockedFrameworks,
   minimalChrome = false,
+  quietEngineResolution = false,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -250,6 +251,7 @@ export function InferenceProvider({
   autoSelectAllGpus?: boolean;
   lockedFrameworks?: readonly string[];
   minimalChrome?: boolean;
+  quietEngineResolution?: boolean;
 }) {
   const locale = useLocale();
   const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
@@ -1916,7 +1918,11 @@ export function InferenceProvider({
         </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
-        detail={comparisonGuardLifted ? null : engineConflict}
+        detail={
+          comparisonGuardLifted || (quietEngineResolution && engineConflict?.kind === 'resolved')
+            ? null
+            : engineConflict
+        }
         onDismiss={dismissEngineConflict}
         onCompare={
           consentSupported

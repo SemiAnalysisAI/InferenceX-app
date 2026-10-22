@@ -17,6 +17,10 @@
   word-break: break-all;
 }
 
+.blog-prose.hardware-prose a {
+  word-break: normal;
+}
+
 .blog-prose .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

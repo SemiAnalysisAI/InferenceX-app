@@ -33,6 +33,7 @@ const STRINGS = {
     telemetry: 'Telemetry',
     comparisons: 'Comparisons',
     articles: 'Articles',
+    hardwareResults: 'Hardware Results',
     whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
     historicalTrends: 'Historical Trends',
@@ -72,6 +73,7 @@ const STRINGS = {
     telemetry: '遥测数据',
     comparisons: '性能对比',
     articles: '技术文章',
+    hardwareResults: '硬件结果',
     whitepapers: '白皮书',
     historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
@@ -265,6 +267,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.articles}
+                </Link>
+                <Link
+                  data-testid="footer-link-hardware"
+                  href={`${prefix}/hardware`}
+                  onClick={() => track('footer_hardware_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.hardwareResults}
                 </Link>
                 <Link
                   data-testid="footer-link-whitepapers"

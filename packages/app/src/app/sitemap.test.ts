@@ -4,7 +4,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
-import { zhPath } from '@/lib/i18n/i18n';
+import { languageAlternates, zhPath } from '@/lib/i18n/i18n';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 import {
   defaultRouteModel,
@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
   fixturesMode: false,
   getDb: vi.fn(() => ({})),
   listDatasets: vi.fn(() => Promise.resolve([{ slug: 'agentx-fixture' }])),
+  hardwarePages: {
+    en: [
+      { slug: 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results', date: '2026-10-19' },
+      { slug: 'tpu-v7-ironwood-vs-gb300-nvl72-agentx-results', date: '2026-10-18' },
+    ],
+    zh: [{ slug: 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results', date: '2026-10-19' }],
+  },
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -30,6 +37,9 @@ vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
 }));
 vi.mock('@/lib/agentx/agentx-optimizations', () => ({ AGENTX_OPTIMIZATION_SLUGS: [] }));
 vi.mock('@/lib/blog/blog', () => ({ getAllPosts: () => [] }));
+vi.mock('@/lib/hardware/hardware', () => ({
+  getAllHardwarePages: (locale: 'en' | 'zh' = 'en') => mocks.hardwarePages[locale],
+}));
 vi.mock('@/lib/compare/compare-availability', () => ({
   getAllComparableCompareSlugs: () => Promise.resolve([]),
 }));
@@ -173,6 +183,30 @@ describe('sitemap locale parity', () => {
       expect(en?.lastModified).toBe(`${paper.publishedDate}T00:00:00.000Z`);
       expect(en?.alternates?.languages).toEqual(zh?.alternates?.languages);
     }
+  });
+
+  it('emits the hardware index in both locales and pairs only translated hardware pages', async () => {
+    const entries = await sitemap();
+    const byUrl = new Map(entries.map((entry) => [entry.url, entry]));
+    expect(byUrl.get(`${SITE_URL}/hardware`)?.alternates?.languages).toEqual(
+      languageAlternates('/hardware'),
+    );
+    expect(byUrl.has(`${SITE_URL}/zh/hardware`)).toBe(true);
+
+    const paired = '/hardware/vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+    for (const url of [`${SITE_URL}${paired}`, `${SITE_URL}${zhPath(paired)}`]) {
+      expect(byUrl.get(url)?.alternates?.languages).toEqual(languageAlternates(paired));
+      expect(byUrl.get(url)?.lastModified).toBe('2026-10-19T00:00:00.000Z');
+    }
+
+    const englishOnly = '/hardware/tpu-v7-ironwood-vs-gb300-nvl72-agentx-results';
+    expect(byUrl.get(`${SITE_URL}${englishOnly}`)).toEqual({
+      url: `${SITE_URL}${englishOnly}`,
+      lastModified: '2026-10-18T00:00:00.000Z',
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    });
+    expect(byUrl.has(`${SITE_URL}${zhPath(englishOnly)}`)).toBe(false);
   });
 
   it('does not require a database connection in fixture mode', async () => {
