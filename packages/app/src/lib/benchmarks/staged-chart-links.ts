@@ -9,10 +9,8 @@ export interface StagedChartLink {
   url: string;
 }
 
-export const STAGING_CHART_ORIGIN =
-  'https://inferencemax-app-git-staging-semianalysisai.vercel.app';
-
 export function buildStagedChartLinks(
+  origin: string,
   runId: string,
   scopes: readonly StagedChartScope[],
 ): StagedChartLink[] {
@@ -43,7 +41,7 @@ export function buildStagedChartLinks(
       i_xmode: 'interactivity',
       i_metric: 'y_tpPerGpu',
     });
-    const url = `${STAGING_CHART_ORIGIN}/inference?${params}`;
+    const url = `${origin.replace(/\/+$/u, '')}/inference?${params}`;
     links.set(url, {
       label: `${model} · ${sequence} · ${scope.precision.toUpperCase()} · ${hardware} · ${scope.date}`,
       url,

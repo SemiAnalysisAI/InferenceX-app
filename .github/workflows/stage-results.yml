@@ -302,6 +302,7 @@ jobs:
         env:
           DATABASE_READONLY_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           RUN_ID: ${{ needs.validate.outputs.run-id }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
         run: bun run --cwd packages/app scripts/staged-chart-links.ts
 
   report:

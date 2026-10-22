@@ -9,6 +9,7 @@ import {
   fetchGithubWorkflowRun,
   getRunDate,
   normalizeGithubRunInfo,
+  resetGithubRunRepositories,
   type GithubArtifact,
   type GithubWorkflowRun,
 } from './github-artifacts';
@@ -18,6 +19,7 @@ vi.stubGlobal('fetch', mockFetch);
 
 afterEach(() => {
   mockFetch.mockReset();
+  resetGithubRunRepositories();
   vi.useRealTimers();
   vi.unstubAllEnvs();
 });
@@ -116,6 +118,23 @@ describe('fetchGithubWorkflowRun', () => {
       [`${GITHUB_API_BASE}/repos/example-org/bench-a/actions/runs/456`, authHeaders],
       [`${GITHUB_API_BASE}/repos/example-org/bench-b/actions/runs/456`, authHeaders],
     ]);
+  });
+
+  it('asks the known owner first for artifacts after the run lookup found it', async () => {
+    vi.stubEnv('INFERENCEX_SOURCE_REPOS', 'example-org/bench-a,example-org/bench-b');
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(workflowRun({ id: 456 })))
+      .mockResolvedValueOnce(Response.json({ artifacts: [] }));
+
+    await fetchGithubWorkflowRun('456', 'token-123');
+    await fetchGithubRunArtifacts('456', 'token-123');
+
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(mockFetch.mock.calls[3][0]).toBe(
+      `${GITHUB_API_BASE}/repos/example-org/bench-b/actions/runs/456/artifacts?per_page=100&page=1`,
+    );
   });
 
   it('stops at the first repository that has the run', async () => {

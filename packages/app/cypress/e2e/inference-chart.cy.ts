@@ -890,7 +890,7 @@ describe('Staged Pareto deep links', () => {
     });
     cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
     cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
-    const [link] = buildStagedChartLinks(runId, [stagedRows[0]!]);
+    const [link] = buildStagedChartLinks('http://localhost:3000', runId, [stagedRows[0]!]);
     const url = new URL(link!.url);
     cy.visit(`${url.pathname}${url.search}`, {
       onBeforeLoad(win) {
