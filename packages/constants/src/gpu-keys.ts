@@ -146,6 +146,15 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
 
 export const GPU_KEYS = new Set(Object.keys(HW_REGISTRY));
 
+/**
+ * Runner names that differ from their canonical GPU key. Benchmark artifacts and
+ * changelog config keys carry the runner name (`vrnvl72`); stored rows, chart
+ * points and the legend use the GPU key (`vr200`).
+ */
+export const GPU_RUNNER_ALIASES: Record<string, string> = {
+  vrnvl72: 'vr200',
+};
+
 export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([k, v]) => [k, v.vendor]),
 );

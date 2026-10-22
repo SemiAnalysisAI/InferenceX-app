@@ -1,6 +1,7 @@
 import {
   FRAMEWORK_ALIASES,
   FW_REGISTRY,
+  GPU_RUNNER_ALIASES,
   resolveFrameworkAlias,
   resolveFrameworkPartLabel,
 } from '@semianalysisai/inferencex-constants';
@@ -23,7 +24,7 @@ export function changelogConfigToHwKey(
   benchmarkType?: 'single_turn' | 'agentic_traces',
 ): string | null {
   const parts = configKey.toLowerCase().split('-');
-  const gpu = parts[2];
+  const gpu = GPU_RUNNER_ALIASES[parts[2]] ?? parts[2];
   const remainder = parts.slice(3).join('-');
   if (!gpu || !remainder) return null;
 
