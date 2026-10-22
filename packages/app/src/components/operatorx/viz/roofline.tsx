@@ -7,6 +7,7 @@ import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/c
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -17,6 +18,17 @@ import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
+
+const STRINGS = {
+  en: {
+    ascendBasis:
+      'Ascend 950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
+  },
+  zh: {
+    ascendBasis:
+      'Ascend 950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
+  },
+};
 
 interface Point {
   hw: string;
@@ -33,6 +45,7 @@ const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
 function Roofline({ model }: { model: ComparisonModel }) {
+  const strings = STRINGS[useLocale()];
   const { view } = model;
   const counts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
@@ -120,6 +133,9 @@ function Roofline({ model }: { model: ComparisonModel }) {
           </Label>
         </div>
       </div>
+      {model.hardware.includes('ascend950pr') && (
+        <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
+      )}
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-roofline"

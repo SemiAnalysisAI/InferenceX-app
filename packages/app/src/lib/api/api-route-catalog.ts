@@ -551,8 +551,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
-      zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
+      en: 'OperatorX page backend; its cross-hardware comparison includes optional hardware reference values, sources and assumptions for normalization; its shape follows the page.',
+      zh: 'OperatorX 页面后端；跨硬件对比包含可选的归一化参考值、来源和假设，结构随页面变化。',
     },
     sourceSha256: 'e7ade13f67a40e408371dece3fd676c547fcd2022d474ec5ca112e8cdb47131c',
   },
@@ -1150,6 +1150,23 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: '../db/src/operatorx/compare.ts',
+    sourceSha256: '439fe9579b3c31e388b75aaa64da20aaf219b9631c8099e932911986f7099b9b',
+    reviewArea: {
+      en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
+      zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/hardware.ts',
+    sourceSha256: '06f76317048a83cd40e364b1b94d1438d8b77c9d2e79534922e2bd5d09b57348',
+    reviewArea: {
+      en: 'OperatorX Ascend reference values, provenance and assumed bandwidth shared with UI normalization.',
+      zh: 'OperatorX Ascend 参考值、来源及假定带宽，与 UI 归一化共用。',
+    },
+  },
+
   {
     source: 'src/app/api/gpu-metrics/artifact-selection.ts',
     sourceSha256: 'e92ccb4d5f3706ae063b23652cb9898616820c16589745057eac43dceb96771c',

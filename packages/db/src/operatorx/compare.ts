@@ -1,4 +1,5 @@
 import { opLabels, usefulBytes, usefulFlops } from './describe';
+import { OPERATORX_HARDWARE_REFERENCES, type OperatorXHardwareReference } from './hardware';
 import {
   type OperatorXDataset,
   type OperatorXSource,
@@ -13,6 +14,8 @@ export interface ComparisonHardware {
   id: string;
   runner: string;
   runs: { runId: string; generatedAt: string }[];
+  /** Optional normalization basis for hardware absent from the general GPU catalog. */
+  reference?: OperatorXHardwareReference;
 }
 
 export type ComputePrecision = 'fp4' | 'fp8' | 'bf16' | 'other';
@@ -275,7 +278,12 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   const kernels: string[] = [];
   const kernelIndex = new Map<string, number>();
   const measurements: Record<string, ComparisonColumns> = {};
-  const hardware = comparison.hardware.filter((h) => rows.some((r) => r.hardware === h.id));
+  const hardware = comparison.hardware
+    .filter((h) => rows.some((r) => r.hardware === h.id))
+    .map((h) => {
+      const reference = OPERATORX_HARDWARE_REFERENCES[h.id];
+      return reference ? { ...h, reference } : h;
+    });
   for (const h of hardware) {
     const empty = () => Array.from({ length: cases.length }, () => null);
     measurements[h.id] = {

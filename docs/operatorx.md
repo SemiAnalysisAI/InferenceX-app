@@ -21,6 +21,40 @@ TFLOPS is computed on read as useful FLOPs (`usefulFlops()` in
 `latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
 Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
 
+## Ascend 950PR normalization
+
+The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
+Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section 5):
+378 dense BF16 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s. The compute value
+is Cube-only (Huawei Ascend 950 white paper, table 3-1), excluding the Vector
+contribution in the 425 TFLOPS combined figure. Exact memory/ECC configuration
+remains unresolved; the chart states this qualification. Other precision ceilings
+remain null. The normalized roofline divides arithmetic intensity by 236.25
+FLOP/byte and throughput by 378 TFLOPS; raw measurements are unchanged.
+
+`GET /api/v1/operatorx/compare?op=gemm` includes an optional `hardware[].reference`
+object with `label`, nullable `peakTflops.{bf16,fp8,fp4}`, `memoryBandwidthTBs`,
+`memoryBandwidthAssumed`, `source`, and `qualification`. UI helpers and the
+page-owned API use the same reference. This endpoint remains a `page-bff`, outside
+the published OpenAPI contract. Unknown hardware gets no reference. Ascend uses a
+cool crimson in light/dark charts, distinct from AMD's warm reds; color is a
+presentation-only control with no numerical API effect.
+
+### 中文说明
+
+`ascend950pr` 的参考值仅用于 OperatorX，依据 `Ascend-ubench.md` 的硬件配置说明和第 5 节，
+以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 稠密计算峰值为 378 TFLOPS，
+HBM 带宽**假定为** 1.6 TB/s。计算峰值取自华为 Ascend 950 白皮书表 3-1 中的 Cube 项，
+不包含 425 TFLOPS 合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
+其他精度的峰值保留为 null。归一化时，算术强度除以 236.25 FLOP/byte，吞吐量除以
+378 TFLOPS；实测数据不变。
+
+`GET /api/v1/operatorx/compare?op=gemm` 的响应在 `hardware[].reference` 中提供可选的参考值对象：
+`label`、允许为 null 的 `peakTflops.{bf16,fp8,fp4}`、`memoryBandwidthTBs`、
+`memoryBandwidthAssumed`、`source` 和 `qualification`。UI 与页面专属 API 共用参考值。
+该接口仍属于 `page-bff`，不纳入公开 OpenAPI 契约；未知硬件不返回参考值。
+Ascend 在浅色和深色图表中使用偏冷的深红色，与 AMD 的暖红色区分；颜色仅影响展示，不改变 API 数值。
+
 ## Persistence and deployment
 
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
