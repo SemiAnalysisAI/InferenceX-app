@@ -424,6 +424,7 @@ export default function ChartControls({
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
   const tokenBasisVisible =
     mounted &&
+    featureGateUnlocked &&
     tcoSource === 'inference' &&
     selectedSequence === Sequence.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);
