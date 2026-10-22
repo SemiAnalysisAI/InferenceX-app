@@ -18,6 +18,7 @@ import { BlogBackLink } from './blog-back-link';
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
 import { BlogPostCard } from './blog-post-card';
 import { BlogPostNav } from './blog-post-nav';
+import { BLOG_PROSE_CLASS } from './blog-prose';
 import { BlogShareRow } from './blog-share-row';
 import { BlogSidebarCta } from './blog-sidebar-cta';
 import { BlogToc } from './blog-toc';
@@ -25,22 +26,6 @@ import { HashScroll } from './hash-scroll';
 import { ReadingProgressBar } from './reading-progress-bar';
 
 const CTA_PATH = '/agentx';
-
-const PROSE_CLASS = [
-  'prose prose-neutral dark:prose-invert blog-prose max-w-none',
-  'prose-p:max-w-[72ch] prose-ul:max-w-[72ch] prose-ol:max-w-[72ch] prose-blockquote:max-w-[72ch] prose-headings:max-w-[72ch]',
-  'prose-p:text-base prose-p:leading-7 prose-li:leading-7',
-  'prose-headings:scroll-mt-24 prose-headings:text-balance prose-headings:tracking-tight',
-  'prose-h2:mt-14 prose-h2:mb-5 prose-h2:text-2xl prose-h2:font-semibold',
-  'prose-h3:mt-10 prose-h3:mb-3 prose-h3:text-xl prose-h3:font-semibold',
-  'prose-a:text-brand prose-a:decoration-brand/40 prose-a:underline-offset-2 hover:prose-a:decoration-brand',
-  'prose-strong:text-foreground',
-  'prose-blockquote:border-primary/50 prose-blockquote:font-normal prose-blockquote:text-muted-foreground',
-  'prose-figcaption:mt-0 prose-figcaption:text-sm prose-figcaption:text-muted-foreground',
-  'prose-img:rounded-xl prose-img:border prose-img:border-border/40',
-  'prose-pre:rounded-xl prose-pre:border prose-pre:border-border/50 prose-pre:bg-card',
-  'prose-table:text-sm prose-th:text-muted-foreground prose-th:font-medium prose-hr:border-border/40',
-].join(' ');
 
 export interface BlogPostContentProps {
   locale: Locale;
@@ -147,7 +132,7 @@ export function BlogPostContent({
                   className="lg:hidden"
                 />
               )}
-              <article data-blog-article className={PROSE_CLASS}>
+              <article data-blog-article className={BLOG_PROSE_CLASS}>
                 {content}
                 <p className="mt-12 max-w-[72ch] border-t border-border/40 pt-6 text-xs leading-5 text-muted-foreground">
                   {t.copyright}

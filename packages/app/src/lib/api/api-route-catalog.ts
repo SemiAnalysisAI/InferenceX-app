@@ -551,8 +551,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
-      zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
+      en: 'OperatorX page backend; its cross-hardware comparison includes hardware reference values and workload-resolved chart defaults; its shape follows the page.',
+      zh: 'OperatorX 页面后端；跨硬件对比包含归一化参考值及按工作负载确定的图表默认值，结构随页面变化。',
     },
     sourceSha256: 'e7ade13f67a40e408371dece3fd676c547fcd2022d474ec5ca112e8cdb47131c',
   },
@@ -1150,6 +1150,31 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: '../db/src/operatorx/visualization.ts',
+    sourceSha256: '2b05d3af345fe795b4262e4408f587f2d3f125de0461b3c6c4ce6f3124409635',
+    reviewArea: {
+      en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
+      zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/compare.ts',
+    sourceSha256: '51090373089cffb319be3c7a26f1da6f1533592c1bb053c8fd50a90f983aa21c',
+    reviewArea: {
+      en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
+      zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/hardware.ts',
+    sourceSha256: 'acc8180f8e64c04c7a62072379e8262434764d5438796f2590704734d691aa1e',
+    reviewArea: {
+      en: 'OperatorX Ascend reference values, provenance and assumed bandwidth shared with UI normalization.',
+      zh: 'OperatorX Ascend 参考值、来源及假定带宽，与 UI 归一化共用。',
+    },
+  },
+
   {
     source: 'src/app/api/gpu-metrics/artifact-selection.ts',
     sourceSha256: 'e92ccb4d5f3706ae063b23652cb9898616820c16589745057eac43dceb96771c',

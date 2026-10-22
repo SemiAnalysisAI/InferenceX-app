@@ -214,7 +214,23 @@ inspection are presentation-only and introduce no extra selectors.
 
 OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
-the page and are not part of this skill's read-only view API.
+the page and are not part of this skill's read-only view API. The page-owned
+`/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
+optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
+`peakTflops.bf16=378`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
+plus `source` and `qualification`. FP8/FP4 peaks remain null. Normalized X is
+arithmetic intensity divided by 236.25 FLOP/byte; Y is achieved TFLOPS divided
+by 378. The bandwidth is an assumption, not an independently verified memory/ECC
+configuration. Apply these references to the returned measurements; do not substitute
+the older matmul sweep for the ingested F.linear results. Missing measurements stay
+missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.
+The response also returns workload-resolved `defaults`: `metricVsSizeSlice` prefers
+an existing ranked slice with successful positive finite 950PR latency at two or
+more distinct positive sizes, falling back to the existing largest slice.
+`rooflinePrecision` prefers BF16 with FLOP/byte counts, otherwise the most common
+supported precision (null when none); `rooflineNormalized` is true. Missing/error/
+unsupported rows do not qualify the preferred slice. Explicit UI selections override
+these initial defaults; hardware visibility and measured values are unchanged.
 
 The explorer's session-list version filter uses the same parser as its other
 pages: absent, `all`, invalid, or out-of-range versions mean no version filter.

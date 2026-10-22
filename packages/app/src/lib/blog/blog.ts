@@ -4,7 +4,7 @@ import path from 'node:path';
 import matter from 'gray-matter';
 
 import { AUTHOR_NAME, OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { localePath, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 
 export interface BlogFrontmatter {
   title: string;
@@ -195,13 +195,26 @@ export function blogOgImageUrl(slug: string, locale: BlogLocale = 'en'): string 
   return `${SITE_URL}${blogPathPrefix(locale)}/${slug}/opengraph-image`;
 }
 
-export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: BlogLocale = 'en') {
-  const url = `${SITE_URL}${blogPathPrefix(locale)}/${meta.slug}`;
+export interface ArticleJsonLdInput {
+  type: 'Article' | 'BlogPosting';
+  path: string;
+  title: string;
+  description: string;
+  date: string;
+  modifiedDate?: string;
+  image: string;
+  locale: BlogLocale;
+  raw: string;
+  readingTime: number;
+}
+
+export function buildArticleJsonLd(input: ArticleJsonLdInput) {
+  const url = `${SITE_URL}${input.path}`;
   return {
     '@context': 'https://schema.org',
-    '@type': 'BlogPosting',
-    headline: meta.title,
-    image: blogOgImageUrl(meta.slug, locale),
+    '@type': input.type,
+    headline: input.title,
+    image: input.image,
     author: { '@type': 'Person', name: AUTHOR_NAME },
     publisher: {
       '@type': 'Organization',
@@ -211,39 +224,66 @@ export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: 
         url: OG_IMAGE,
       },
     },
-    datePublished: `${meta.date}T00:00:00Z`,
-    ...(meta.modifiedDate && { dateModified: `${meta.modifiedDate}T00:00:00Z` }),
-    description: blogDescription(meta),
+    datePublished: `${input.date}T00:00:00Z`,
+    ...(input.modifiedDate && { dateModified: `${input.modifiedDate}T00:00:00Z` }),
+    description: input.description,
     url,
     mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    inLanguage: locale === 'zh' ? ZH_LANG_TAG : 'en-US',
-    wordCount: getWordCount(raw),
-    timeRequired: `PT${meta.readingTime}M`,
+    inLanguage: input.locale === 'zh' ? ZH_LANG_TAG : 'en-US',
+    wordCount: getWordCount(input.raw),
+    timeRequired: `PT${input.readingTime}M`,
+  };
+}
+
+export function buildBlogPostingJsonLd(meta: BlogPostMeta, raw: string, locale: BlogLocale = 'en') {
+  return buildArticleJsonLd({
+    type: 'BlogPosting',
+    path: `${blogPathPrefix(locale)}/${meta.slug}`,
+    title: meta.title,
+    description: blogDescription(meta),
+    date: meta.date,
+    modifiedDate: meta.modifiedDate,
+    image: blogOgImageUrl(meta.slug, locale),
+    locale,
+    raw,
+    readingTime: meta.readingTime,
+  });
+}
+
+export interface BreadcrumbSection {
+  name: string;
+  path: string;
+}
+
+export function buildSectionBreadcrumbJsonLd(
+  locale: BlogLocale,
+  section: BreadcrumbSection,
+  slug: string,
+  title: string,
+) {
+  const sectionPath = localePath(section.path, locale);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: locale === 'zh' ? '首页' : 'Home',
+        item: locale === 'zh' ? `${SITE_URL}/zh` : SITE_URL,
+      },
+      { '@type': 'ListItem', position: 2, name: section.name, item: `${SITE_URL}${sectionPath}` },
+      { '@type': 'ListItem', position: 3, name: title, item: `${SITE_URL}${sectionPath}/${slug}` },
+    ],
   };
 }
 
 export function buildBlogBreadcrumbJsonLd(slug: string, title: string) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
-      { '@type': 'ListItem', position: 2, name: 'Blog', item: `${SITE_URL}/blog` },
-      { '@type': 'ListItem', position: 3, name: title, item: `${SITE_URL}/blog/${slug}` },
-    ],
-  };
+  return buildSectionBreadcrumbJsonLd('en', { name: 'Blog', path: '/blog' }, slug, title);
 }
 
 export function buildBlogBreadcrumbJsonLdZh(slug: string, title: string) {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: '首页', item: `${SITE_URL}/zh` },
-      { '@type': 'ListItem', position: 2, name: '博客', item: `${SITE_URL}/zh/blog` },
-      { '@type': 'ListItem', position: 3, name: title, item: `${SITE_URL}/zh/blog/${slug}` },
-    ],
-  };
+  return buildSectionBreadcrumbJsonLd('zh', { name: '博客', path: '/blog' }, slug, title);
 }
 
 export function getTopTags(posts: readonly Pick<BlogPostMeta, 'tags'>[], limit: number): string[] {

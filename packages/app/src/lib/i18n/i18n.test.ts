@@ -179,6 +179,16 @@ describe('switchLocalePath', () => {
     expect(switchLocalePath('/zh/model/deepseek-r1')).toBe('/model/deepseek-r1');
   });
 
+  it('switches hardware results pages within the language trees', () => {
+    const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+    expect(hasZhSibling('/hardware')).toBe(true);
+    expect(hasZhSibling(`/hardware/${slug}`)).toBe(true);
+    expect(hasZhSibling('/hardware-results')).toBe(false);
+    expect(switchLocalePath('/hardware')).toBe('/zh/hardware');
+    expect(switchLocalePath(`/hardware/${slug}`)).toBe(`/zh/hardware/${slug}`);
+    expect(switchLocalePath(`/zh/hardware/${slug}`)).toBe(`/hardware/${slug}`);
+  });
+
   it('falls back to the other homepage for unmirrored paths', () => {
     expect(switchLocalePath('/some-unknown-route')).toBe('/zh');
     expect(switchLocalePath('/zh/unknown-page')).toBe('/');

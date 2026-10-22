@@ -5,6 +5,7 @@ import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllPosts } from '@/lib/blog/blog';
+import { getAllHardwarePages } from '@/lib/hardware/hardware';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare/compare-slug';
@@ -61,6 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getAvailableRunEntries(),
   ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
+  const zhHardwarePages = new Set(getAllHardwarePages('zh').map((page) => page.slug));
 
   return [
     ...DASHBOARD_ROUTES.filter((route) => route.indexable).flatMap((route) =>
@@ -206,6 +208,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       };
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
+    }),
+    ...localizedPair('/hardware', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
+    ...getAllHardwarePages().flatMap((page) => {
+      const enPath = `/hardware/${page.slug}`;
+      const entry = {
+        lastModified: new Date(`${page.date}T00:00:00Z`).toISOString(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      };
+      if (!zhHardwarePages.has(page.slug)) return [{ ...entry, url: `${BASE_URL}${enPath}` }];
+      return localizedPair(enPath, entry);
     }),
     ...localizedPair('/whitepaper', {
       lastModified: now,
