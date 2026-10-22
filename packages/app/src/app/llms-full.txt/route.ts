@@ -47,11 +47,6 @@ export async function GET() {
         '',
         meta.lede,
         '',
-        `${meta.highlightsTitle}:`,
-        ...meta.highlights.map((item) => `- ${item.value} ${item.label} ${item.detail}`),
-        '',
-        meta.note,
-        '',
         page.raw,
       ].join('\n'),
     ];

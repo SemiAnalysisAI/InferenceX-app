@@ -8,7 +8,6 @@ import { slugify } from '../blog/blog';
 import { hasZhSibling, zhPath } from '../i18n/i18n';
 import { compareBlogPair, normalizeLocalizedLink } from '../i18n/zh-objective-guard';
 import { hardwareFrontmatterErrors } from './hardware';
-import { noteParts } from './hardware-markup';
 
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..', '..');
 const CONTENT_DIR = path.join(APP_DIR, 'content', 'hardware');
@@ -32,9 +31,7 @@ interface HeroFields {
   date?: unknown;
   publishDate?: unknown;
   tags?: unknown;
-  highlights?: { value?: unknown }[];
   links?: { href?: unknown }[];
-  note?: unknown;
 }
 
 const hero = (raw: string) => matter(raw).data as HeroFields;
@@ -47,8 +44,7 @@ function localImageRefs(raw: string): string[] {
 }
 
 function heroHrefs(fields: HeroFields): string[] {
-  const note = typeof fields.note === 'string' ? noteParts(fields.note).link?.href : undefined;
-  return [...(fields.links ?? []).map((link) => String(link.href)), ...(note ? [note] : [])];
+  return (fields.links ?? []).map((link) => String(link.href));
 }
 
 const countMathFences = (raw: string) => (raw.match(/^\$\$\s*$/gmu) ?? []).length;
@@ -93,11 +89,8 @@ describe.each(enFiles)('%s', (file) => {
     expect(zhHero.tags).toEqual(enHero.tags);
   });
 
-  it('keeps hero highlight values and link targets identical across locales', () => {
+  it('keeps link targets identical across locales', () => {
     const [enHero, zhHero] = [hero(en), hero(zh)];
-    expect(zhHero.highlights?.map((item) => item.value)).toEqual(
-      enHero.highlights?.map((item) => item.value),
-    );
     expect(heroHrefs(zhHero).map(normalizeLocalizedLink)).toEqual(
       heroHrefs(enHero).map(normalizeLocalizedLink),
     );

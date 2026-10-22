@@ -27,12 +27,6 @@ import {
   zhAlternates,
 } from '@/lib/i18n/i18n';
 
-export interface HardwareHighlight {
-  value: string;
-  label: string;
-  detail: string;
-}
-
 export interface HardwareFrontmatter {
   title: string;
   seoDescription: string;
@@ -40,10 +34,7 @@ export interface HardwareFrontmatter {
   publishDate: string;
   tags: string[];
   lede: string;
-  highlightsTitle: string;
-  highlights: HardwareHighlight[];
   links: HardwareLink[];
-  note: string;
 }
 
 export interface HardwarePageMeta extends HardwareFrontmatter {
@@ -67,19 +58,13 @@ const FRONTMATTER_FIELDS: readonly string[] = [
   'publishDate',
   'tags',
   'lede',
-  'highlightsTitle',
-  'highlights',
   'links',
-  'note',
 ];
-const TEXT_FIELDS = ['title', 'seoDescription', 'lede', 'highlightsTitle', 'note'] as const;
+const TEXT_FIELDS = ['title', 'seoDescription', 'lede'] as const;
 const DATE_FIELDS = ['date', 'publishDate'] as const;
-const HIGHLIGHT_FIELDS: readonly string[] = ['value', 'label', 'detail'];
 const LINK_FIELDS: readonly string[] = ['label', 'href'];
-const MIN_HIGHLIGHTS = 3;
-const MAX_HIGHLIGHTS = 4;
+const MAX_LINKS = 2;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
-const MARKDOWN_LINKS = new RegExp(MARKDOWN_LINK.source, 'gu');
 
 type Fields = Record<string, unknown>;
 
@@ -122,7 +107,7 @@ export function hardwareFrontmatterErrors(data: unknown): string[] {
     if (!isIsoDate(data[field])) errors.push(`${field} must be a quoted 'YYYY-MM-DD' date`);
   }
 
-  const { tags, lede, highlights, links, note } = data;
+  const { tags, lede, links } = data;
   if (!Array.isArray(tags) || tags.length === 0 || !tags.every(isText)) {
     errors.push('tags must be a non-empty list of strings');
   }
@@ -130,26 +115,14 @@ export function hardwareFrontmatterErrors(data: unknown): string[] {
   if (typeof lede === 'string') {
     if (lede.split('**').length % 2 === 0) errors.push('lede must close every ** bold marker');
     if (MARKDOWN_LINK.test(lede) || lede.includes('`')) {
-      errors.push('lede supports **bold** only; move links and code into the body or the note');
+      errors.push('lede supports **bold** only; move links and code into the body');
     }
   }
 
-  if (
-    !Array.isArray(highlights) ||
-    highlights.length < MIN_HIGHLIGHTS ||
-    highlights.length > MAX_HIGHLIGHTS
-  ) {
-    errors.push(`highlights must list ${MIN_HIGHLIGHTS} to ${MAX_HIGHLIGHTS} items`);
+  if (!Array.isArray(links) || links.length === 0 || links.length > MAX_LINKS) {
+    errors.push(`links must list 1 to ${MAX_LINKS} items; the first one is the primary button`);
   }
-  if (Array.isArray(highlights)) {
-    highlights.forEach((item, index) => {
-      errors.push(...fieldErrors(item, `highlights[${index}]`, HIGHLIGHT_FIELDS));
-    });
-  }
-
-  if (!Array.isArray(links) || links.length === 0) {
-    errors.push('links must list at least one button; the first one is the primary button');
-  } else {
+  if (Array.isArray(links)) {
     links.forEach((item, index) => {
       const where = `links[${index}]`;
       errors.push(...fieldErrors(item, where, LINK_FIELDS));
@@ -157,18 +130,6 @@ export function hardwareFrontmatterErrors(data: unknown): string[] {
         errors.push(`${where}.href must be a root-relative path or an https URL`);
       }
     });
-  }
-
-  if (typeof note === 'string') {
-    const noteLinks = [...note.matchAll(MARKDOWN_LINKS)];
-    if (noteLinks.length > 1) errors.push('note may contain at most one [label](href) link');
-    const href = noteLinks[0]?.groups?.href;
-    if (href && !isSupportedHref(href)) {
-      errors.push('note link must point to a root-relative path or an https URL');
-    }
-    if (note.includes('**') || note.includes('`')) {
-      errors.push('note is plain text apart from one [label](href) link');
-    }
   }
 
   return errors;

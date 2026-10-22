@@ -19,13 +19,6 @@ const { VR, TPU, META, PAGES } = vi.hoisted(() => {
     publishDate: '2026-10-19',
     tags: ['agentx', 'rubin'],
     lede: 'Vera Rubin NVL72 serves **1.8x to 2.0x as many tokens per dollar** as GB300 NVL72.',
-    highlightsTitle: 'Largest lead in tokens per $1 TCO vs GB300 NVL72',
-    highlights: [
-      { value: '~8.3x', label: 'DeepSeek-V4-Pro', detail: 'at ~183 tok/s/user' },
-      { value: '~10.2x', label: 'MiniMax-M3', detail: 'at ~337 tok/s/user' },
-      { value: '~4.2x', label: 'Qwen3.8-Flash-Next', detail: 'at ~176 tok/s/user' },
-      { value: '~3.9x', label: 'GLM-5.2', detail: 'at ~322 tok/s/user' },
-    ],
     links: [
       {
         label: 'Open the AgentX dashboard',
@@ -33,16 +26,10 @@ const { VR, TPU, META, PAGES } = vi.hoisted(() => {
       },
       { label: 'Read the methodology', href: '/agentx/methodology' },
     ],
-    note: 'Charts load live dashboard data. See the [methodology](/agentx/methodology).',
   };
   const pages: HardwarePageMeta[] = [
     meta,
-    {
-      ...meta,
-      slug: tpu,
-      title: 'TPU v7 vs GB300 NVL72 on AgentX',
-      highlights: meta.highlights.slice(0, 3),
-    },
+    { ...meta, slug: tpu, title: 'TPU v7 vs GB300 NVL72 on AgentX' },
   ];
   return { VR: vr, TPU: tpu, META: meta, PAGES: pages };
 });
@@ -75,14 +62,16 @@ function renderPage(locale: 'en' | 'zh', headings: TocHeading[] = HEADINGS) {
 }
 
 describe('HardwarePageContent', () => {
-  it('renders the hero, highlight cards, buttons, and note above the article', () => {
+  it('renders an unboxed header with meta line, title, lede, and links above the article', () => {
     const html = renderPage('en');
 
     expect(html).toContain('data-testid="hardware-page"');
-    expect(html.indexOf('data-testid="hardware-hero"')).toBeLessThan(
-      html.indexOf('data-testid="hardware-note"'),
+    expect(html.indexOf('href="/hardware"')).toBeLessThan(html.indexOf('<h1'));
+    expect(html.indexOf('<h1')).toBeLessThan(html.indexOf('data-testid="hardware-lede"'));
+    expect(html.indexOf('data-testid="hardware-lede"')).toBeLessThan(
+      html.indexOf('data-testid="hardware-hero-links"'),
     );
-    expect(html.indexOf('data-testid="hardware-note"')).toBeLessThan(
+    expect(html.indexOf('data-testid="hardware-hero-links"')).toBeLessThan(
       html.indexOf('data-testid="hardware-article"'),
     );
     expect(html.match(/<h1\b/gu)).toHaveLength(1);
@@ -90,13 +79,8 @@ describe('HardwarePageContent', () => {
       '<strong class="font-semibold text-foreground">1.8x to 2.0x as many tokens per dollar</strong>',
     );
     expect(html).not.toContain('**');
-    expect(html).toContain('Largest lead in tokens per $1 TCO vs GB300 NVL72');
-    expect(count(html, 'data-testid="hardware-highlight"')).toBe(4);
-    for (const highlight of META.highlights) {
-      expect(html).toContain(highlight.value);
-      expect(html).toContain(highlight.label);
-      expect(html).toContain(highlight.detail);
-    }
+    expect(html).not.toContain('role="note"');
+    expect(html).not.toContain('rounded-2xl');
     expect(html).toContain('October 19, 2026');
     expect(html).toContain('9 min read');
     expect(html).toContain('href="/hardware"');
@@ -105,7 +89,7 @@ describe('HardwarePageContent', () => {
     expect(html).not.toMatch(HAN);
   });
 
-  it('styles the first link as the primary button and opens absolute URLs in a new tab', () => {
+  it('renders the first link as the primary button and the second as a text link', () => {
     const html = renderPage('en');
     const links = [...html.matchAll(/<a [^>]*data-testid="hardware-hero-link"[^>]*>/gu)].map(
       ([tag]) => tag,
@@ -118,15 +102,10 @@ describe('HardwarePageContent', () => {
     );
     expect(links[0]).toContain('target="_blank"');
     expect(links[1]).not.toContain('bg-brand');
+    expect(links[1]).not.toContain('data-slot="button"');
+    expect(links[1]).toContain('text-brand');
     expect(links[1]).toContain('href="/agentx/methodology"');
     expect(links[1]).not.toContain('target=');
-  });
-
-  it('renders the note link as a real anchor', () => {
-    const html = renderPage('en');
-    expect(html).toMatch(
-      /role="note"[^>]*>.*Charts load live dashboard data\. See the <a [^>]*href="\/agentx\/methodology"[^>]*>methodology<\/a>\./su,
-    );
   });
 
   it('keeps the table of contents and drops the blog share, CTA, navigation, and related widgets', () => {
@@ -157,14 +136,13 @@ describe('HardwarePageContent', () => {
     expect(html.match(new RegExp(`<a [^>]*href="/hardware/${VR}"[^>]*>`, 'u'))?.[0]).toContain(
       'hrefLang="en"',
     );
-    expect(html).toContain('aria-label="说明"');
     expect(html).not.toContain('min read');
     expect(html).not.toContain('Hardware Results');
   });
 });
 
 describe('HardwareIndexContent', () => {
-  it('renders one card per page with its highlights and a link to the page', () => {
+  it('renders one card per page with its date, title, lede, and a link to the page', () => {
     const html = renderToStaticMarkup(<HardwareIndexContent locale="en" />);
 
     expect(html).toContain('data-testid="hardware-index-page"');
@@ -173,7 +151,8 @@ describe('HardwareIndexContent', () => {
     expect(count(html, 'data-testid="hardware-card"')).toBe(2);
     expect(html).toContain(`href="/hardware/${VR}"`);
     expect(html).toContain(`href="/hardware/${TPU}"`);
-    expect(html).toContain('~10.2x');
+    expect(html).toContain('October 19, 2026');
+    expect(html).toContain('1.8x to 2.0x as many tokens per dollar');
     expect(html).toContain('Read the results');
     expect(html).toContain('"@type":"CollectionPage"');
     expect(html).not.toMatch(HAN);

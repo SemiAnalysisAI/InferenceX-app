@@ -40,7 +40,7 @@ Posts without `publishDate` are hidden in production — this field is required 
 
 ## Hardware Results Pages
 
-Head-to-head hardware results live in `packages/app/content/hardware/<slug>.mdx` with a required Chinese sibling in `content/hardware/zh/`, and render at `/hardware/<slug>` and `/zh/hardware/<slug>` (index: `/hardware`). `src/lib/hardware/hardware.ts` reads them and reuses the blog helpers (`compileBlogMdx`, slugify, reading time, JSON-LD builders), so `HardwareChart`, `Figure`, tables, `DashboardCTA`, and `JsonLd` work unchanged in the body. The page renders a hero from frontmatter, so the MDX body starts at the first section heading:
+Head-to-head hardware results live in `packages/app/content/hardware/<slug>.mdx` with a required Chinese sibling in `content/hardware/zh/`, and render at `/hardware/<slug>` and `/zh/hardware/<slug>` (index: `/hardware`). `src/lib/hardware/hardware.ts` reads them and reuses the blog helpers (`compileBlogMdx`, slugify, reading time, JSON-LD builders), so `HardwareChart`, `Figure`, tables, `DashboardCTA`, and `JsonLd` work unchanged in the body. The page renders its header (meta line, title, lede, links) from frontmatter, so the MDX body starts at the first section heading:
 
 ```yaml
 title: string
@@ -48,16 +48,13 @@ seoDescription: string
 date: YYYY-MM-DD # quoted
 publishDate: YYYY-MM-DD # quoted; same scheduled-publishing rule as posts
 tags: string[]
-lede: string # hero paragraph; **bold** is the only markup
-highlightsTitle: string
-highlights: # 3 or 4 cards
-  - { value: '~8.3x', label: DeepSeek-V4-Pro, detail: at ~183 tok/s/user }
-links: # hero buttons; the first is primary; root-relative path or https URL
-  - { label: Open the AgentX dashboard, href: 'https://inferencex.semianalysis.com/inference' }
-note: string # plain text with at most one [label](href) link
+lede: string # header paragraph; **bold** is the only markup
+links: # 1 or 2; root-relative path or https URL
+  - { label: Open the AgentX dashboard, href: 'https://inferencex.semianalysis.com/inference' } # primary button
+  - { label: Read the methodology, href: /agentx/methodology } # text link beside it
 ```
 
-Unknown fields are rejected and an invalid file fails the build with a list of problems. Chinese files keep `date`, `publishDate`, `tags`, highlight values, and link targets identical, and point internal links at `/zh` routes. `hardware-content.test.ts` enforces this.
+Unknown fields are rejected and an invalid file fails the build with a list of problems. Chinese files keep `date`, `publishDate`, `tags`, and link targets identical, and point internal links at `/zh` routes. `hardware-content.test.ts` enforces this.
 
 ## Math (KaTeX)
 

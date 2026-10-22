@@ -38,12 +38,6 @@ const VALID = {
   publishDate: '2026-10-19',
   tags: ['agentx', 'rubin'],
   lede: 'Vera Rubin NVL72 serves **1.8x to 2.0x as many tokens per dollar** as GB300 NVL72.',
-  highlightsTitle: 'Largest lead in tokens per $1 TCO vs GB300 NVL72',
-  highlights: [
-    { value: '~8.3x', label: 'DeepSeek-V4-Pro', detail: 'at ~183 tok/s/user' },
-    { value: '~10.2x', label: 'MiniMax-M3', detail: 'at ~337 tok/s/user' },
-    { value: '~4.2x', label: 'Qwen3.8-Flash-Next', detail: 'at ~176 tok/s/user' },
-  ],
   links: [
     {
       label: 'Open the AgentX dashboard',
@@ -51,7 +45,6 @@ const VALID = {
     },
     { label: 'Read the methodology', href: '/agentx/methodology' },
   ],
-  note: 'Charts load live dashboard data. See the [methodology](/agentx/methodology).',
 };
 
 function withChanges(changes: Record<string, unknown>): Record<string, unknown> {
@@ -87,11 +80,7 @@ afterEach(() => {
 describe('hardwareFrontmatterErrors', () => {
   it('accepts the documented schema', () => {
     expect(hardwareFrontmatterErrors(VALID)).toEqual([]);
-    expect(
-      hardwareFrontmatterErrors(
-        withChanges({ highlights: [...VALID.highlights, VALID.highlights[0]] }),
-      ),
-    ).toEqual([]);
+    expect(hardwareFrontmatterErrors(withChanges({ links: VALID.links.slice(0, 1) }))).toEqual([]);
   });
 
   it('rejects non-mapping frontmatter', () => {
@@ -99,15 +88,16 @@ describe('hardwareFrontmatterErrors', () => {
     expect(hardwareFrontmatterErrors(['title'])).toEqual(['frontmatter must be a YAML mapping']);
   });
 
-  it('reports missing text fields and leftover blog fields', () => {
+  it('reports missing text fields and leftover blog or highlight fields', () => {
     expect(
       hardwareFrontmatterErrors(
-        withChanges({ title: undefined, subtitle: 'Blog subtitle', note: ' ' }),
+        withChanges({ title: undefined, lede: ' ', subtitle: 'Blog subtitle', highlights: [] }),
       ),
     ).toEqual([
       'frontmatter has unknown field "subtitle"',
+      'frontmatter has unknown field "highlights"',
       'title must be a non-empty string',
-      'note must be a non-empty string',
+      'lede must be a non-empty string',
     ]);
   });
 
@@ -136,78 +126,46 @@ describe('hardwareFrontmatterErrors', () => {
     [
       'a markdown link',
       'Serves 1.8x, see [the method](/agentx/methodology).',
-      'lede supports **bold** only; move links and code into the body or the note',
+      'lede supports **bold** only; move links and code into the body',
     ],
     [
       'inline code',
       'Runs `--tp 8` on **Vera Rubin**.',
-      'lede supports **bold** only; move links and code into the body or the note',
+      'lede supports **bold** only; move links and code into the body',
     ],
   ])('rejects a lede with %s', (_case, lede, error) => {
     expect(hardwareFrontmatterErrors(withChanges({ lede }))).toEqual([error]);
   });
 
-  it('requires three or four complete highlight cards', () => {
+  it('requires one or two links with safe destinations', () => {
+    expect(hardwareFrontmatterErrors(withChanges({ links: [] }))).toEqual([
+      'links must list 1 to 2 items; the first one is the primary button',
+    ]);
     expect(
-      hardwareFrontmatterErrors(withChanges({ highlights: VALID.highlights.slice(0, 2) })),
-    ).toEqual(['highlights must list 3 to 4 items']);
-    expect(
-      hardwareFrontmatterErrors(
-        withChanges({ highlights: [...VALID.highlights, ...VALID.highlights.slice(0, 2)] }),
-      ),
-    ).toEqual(['highlights must list 3 to 4 items']);
+      hardwareFrontmatterErrors(withChanges({ links: [...VALID.links, VALID.links[0]] })),
+    ).toEqual(['links must list 1 to 2 items; the first one is the primary button']);
     expect(
       hardwareFrontmatterErrors(
         withChanges({
-          highlights: [
-            { ...VALID.highlights[0], unit: 'x' },
-            { value: '~10.2x', label: 'MiniMax-M3' },
-            '~4.2x Qwen3.8-Flash-Next',
-          ],
+          links: [{ label: 'Email', href: 'mailto:team@semianalysis.com' }, { href: '/agentx' }],
         }),
       ),
     ).toEqual([
-      'highlights[0] has unknown field "unit"',
-      'highlights[1].detail must be a non-empty string',
-      'highlights[2] must be a mapping with value, label, detail',
-    ]);
-    expect(hardwareFrontmatterErrors(withChanges({ highlights: undefined }))).toEqual([
-      'highlights must list 3 to 4 items',
-    ]);
-  });
-
-  it('requires at least one button with a safe destination', () => {
-    expect(hardwareFrontmatterErrors(withChanges({ links: [] }))).toEqual([
-      'links must list at least one button; the first one is the primary button',
+      'links[0].href must be a root-relative path or an https URL',
+      'links[1].label must be a non-empty string',
     ]);
     expect(
       hardwareFrontmatterErrors(
         withChanges({
           links: [
-            { label: 'Email', href: 'mailto:team@semianalysis.com' },
             { label: 'Protocol-relative', href: '//example.com/agentx' },
             { label: 'Plain HTTP', href: 'http://inferencex.semianalysis.com' },
-            { href: '/agentx' },
           ],
         }),
       ),
     ).toEqual([
       'links[0].href must be a root-relative path or an https URL',
       'links[1].href must be a root-relative path or an https URL',
-      'links[2].href must be a root-relative path or an https URL',
-      'links[3].label must be a non-empty string',
-    ]);
-  });
-
-  it('keeps the note to plain text with at most one safe link', () => {
-    expect(
-      hardwareFrontmatterErrors(withChanges({ note: 'See [one](/agentx) and [two](/blog).' })),
-    ).toEqual(['note may contain at most one [label](href) link']);
-    expect(
-      hardwareFrontmatterErrors(withChanges({ note: 'See [docs](ftp://example.com).' })),
-    ).toEqual(['note link must point to a root-relative path or an https URL']);
-    expect(hardwareFrontmatterErrors(withChanges({ note: 'Charts are **live**.' }))).toEqual([
-      'note is plain text apart from one [label](href) link',
     ]);
   });
 });
@@ -221,7 +179,7 @@ describe('parseHardwareFrontmatter', () => {
     expect(() =>
       parseHardwareFrontmatter(withChanges({ title: '', links: [] }), 'content/hardware/x.mdx'),
     ).toThrow(
-      'Invalid hardware page frontmatter in content/hardware/x.mdx:\n- title must be a non-empty string\n- links must list at least one button; the first one is the primary button',
+      'Invalid hardware page frontmatter in content/hardware/x.mdx:\n- title must be a non-empty string\n- links must list 1 to 2 items; the first one is the primary button',
     );
   });
 });

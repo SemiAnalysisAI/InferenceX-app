@@ -64,26 +64,6 @@ export function HardwareIndexContent({ locale }: { locale: Locale }) {
                 <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">
                   <HardwareLede lede={page.lede} />
                 </p>
-                <div className="flex flex-col gap-3 border-t border-border/40 pt-4">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {page.highlightsTitle}
-                  </p>
-                  <ul className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-                    {page.highlights.map((highlight) => (
-                      <li
-                        key={`${highlight.label}-${highlight.detail}`}
-                        className="flex min-w-0 flex-col"
-                      >
-                        <span className="text-xl font-bold tracking-tight text-brand tabular-nums">
-                          {highlight.value}
-                        </span>
-                        <span className="text-xs leading-snug text-foreground">
-                          {highlight.label}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
                 <span className="mt-auto inline-flex items-center gap-1 text-sm font-medium text-brand">
                   {t.readResults}
                   <ArrowRight aria-hidden="true" className="size-4" />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isExternalHref, isSupportedHref, ledeSegments, noteParts } from './hardware-markup';
+import { isExternalHref, isSupportedHref, ledeSegments } from './hardware-markup';
 
 describe('ledeSegments', () => {
   it('marks text between ** markers as strong and keeps source offsets as stable keys', () => {
@@ -21,26 +21,6 @@ describe('ledeSegments', () => {
       { text: ' on DeepSeek-V4-Pro', strong: false, start: 9 },
     ]);
     expect(ledeSegments('Plain lede.')).toEqual([{ text: 'Plain lede.', strong: false, start: 0 }]);
-  });
-});
-
-describe('noteParts', () => {
-  it('splits the note around its single markdown link', () => {
-    expect(
-      noteParts('Charts load live data; see the [AgentX methodology](/agentx/methodology).'),
-    ).toEqual({
-      before: 'Charts load live data; see the ',
-      link: { label: 'AgentX methodology', href: '/agentx/methodology' },
-      after: '.',
-    });
-  });
-
-  it('returns the whole note as text when it has no link', () => {
-    expect(noteParts('Charts load live dashboard data.')).toEqual({
-      before: 'Charts load live dashboard data.',
-      link: null,
-      after: '',
-    });
   });
 });
 

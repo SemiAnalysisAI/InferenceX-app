@@ -9,12 +9,6 @@ export interface LedeSegment {
   start: number;
 }
 
-export interface NoteParts {
-  before: string;
-  link: HardwareLink | null;
-  after: string;
-}
-
 export const MARKDOWN_LINK = /\[(?<label>[^\]\n]+)\]\((?<href>[^)\s]+)\)/u;
 
 export function ledeSegments(lede: string): LedeSegment[] {
@@ -25,16 +19,6 @@ export function ledeSegments(lede: string): LedeSegment[] {
     start += text.length + 2;
   });
   return segments;
-}
-
-export function noteParts(note: string): NoteParts {
-  const match = MARKDOWN_LINK.exec(note);
-  if (!match?.groups) return { before: note, link: null, after: '' };
-  return {
-    before: note.slice(0, match.index),
-    link: { label: match.groups.label, href: match.groups.href },
-    after: note.slice(match.index + match[0].length),
-  };
 }
 
 export function isExternalHref(href: string): boolean {

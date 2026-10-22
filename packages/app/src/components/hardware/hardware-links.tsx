@@ -2,6 +2,7 @@
 
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
@@ -15,69 +16,47 @@ export function HardwareHeroLinks({
   links: readonly HardwareLink[];
 }) {
   return (
-    <div
-      className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap"
-      data-testid="hardware-hero-links"
-    >
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3" data-testid="hardware-hero-links">
       {links.map((link, position) => {
         const primary = position === 0;
         const external = isExternalHref(link.href);
         const Icon = external ? ArrowUpRight : ArrowRight;
-        const onClick = () =>
-          track('hardware_hero_link_clicked', { slug, href: link.href, position });
+        const anchorProps = {
+          className: primary
+            ? undefined
+            : 'inline-flex items-center gap-1 text-sm font-medium text-brand underline-offset-4 hover:underline',
+          'data-testid': 'hardware-hero-link',
+          onClick: () => track('hardware_hero_link_clicked', { slug, href: link.href, position }),
+        };
         const label = (
           <>
             {link.label}
-            <Icon aria-hidden="true" />
+            <Icon aria-hidden="true" className="size-4" />
           </>
         );
-        return (
+        const anchor = external ? (
+          <a href={link.href} target="_blank" rel="noopener noreferrer" {...anchorProps}>
+            {label}
+          </a>
+        ) : (
+          <Link href={link.href} {...anchorProps}>
+            {label}
+          </Link>
+        );
+        return primary ? (
           <Button
-            key={`${link.href}-${link.label}`}
+            key={link.href}
             asChild
             size="lg"
-            variant={primary ? 'default' : 'outline'}
-            className={primary ? 'bg-brand text-primary-foreground hover:bg-brand/90' : undefined}
+            className="bg-brand text-primary-foreground hover:bg-brand/90"
           >
-            {external ? (
-              <a
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="hardware-hero-link"
-                onClick={onClick}
-              >
-                {label}
-              </a>
-            ) : (
-              <Link href={link.href} data-testid="hardware-hero-link" onClick={onClick}>
-                {label}
-              </Link>
-            )}
+            {anchor}
           </Button>
+        ) : (
+          <Fragment key={link.href}>{anchor}</Fragment>
         );
       })}
     </div>
-  );
-}
-
-export function HardwareNoteLink({ slug, link }: { slug: string; link: HardwareLink }) {
-  const className = 'font-medium text-brand underline-offset-2 hover:underline';
-  const onClick = () => track('hardware_note_link_clicked', { slug, href: link.href });
-  return isExternalHref(link.href) ? (
-    <a
-      href={link.href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className}
-      onClick={onClick}
-    >
-      {link.label}
-    </a>
-  ) : (
-    <Link href={link.href} className={className} onClick={onClick}>
-      {link.label}
-    </Link>
   );
 }
 

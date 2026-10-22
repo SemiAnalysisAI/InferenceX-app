@@ -197,7 +197,7 @@ Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chines
 
 ### Add a hardware results page
 
-Create `packages/app/content/hardware/<slug>.mdx` and its Chinese sibling `packages/app/content/hardware/zh/<slug>.mdx` in the same PR. The hero frontmatter schema is in [Blog](./docs/blog.md#hardware-results-pages). The `/hardware` index, sitemap, llms.txt, llms-full.txt, and OG image pick the page up automatically; the RSS feed stays blog-only.
+Create `packages/app/content/hardware/<slug>.mdx` and its Chinese sibling `packages/app/content/hardware/zh/<slug>.mdx` in the same PR. The frontmatter schema is in [Blog](./docs/blog.md#hardware-results-pages). The `/hardware` index, sitemap, llms.txt, llms-full.txt, and OG image pick the page up automatically; the RSS feed stays blog-only.
 
 ### Write or update a whitepaper
 

@@ -3,27 +3,12 @@ title: 'Vera Rubin NVL72 vs GB300 NVL72: AgentX Results'
 seoDescription: 'Vera Rubin NVL72 vs GB300 NVL72 on AgentX: 1.8x to 2.0x tokens per dollar and per MW at 100 to 120 tok/s/user on four models, up to ~10.2x on MiniMax-M3.'
 date: '2026-10-19'
 publishDate: '2026-10-19'
-lede: 'On InferenceX AgentX, Vera Rubin NVL72 serves up to **~8.3x** the total tokens per $1 TCO of GB300 NVL72 on DeepSeek-V4-Pro, **~10.2x** on MiniMax-M3, **~4.2x** on Qwen3.8-Flash-Next and **~3.9x** on GLM-5.2. At 100 tok/s/user (120 on GLM-5.2), the lead is 1.8x to 2.0x per dollar and per MW. Each Vera Rubin GPU has 1.56x the hourly cost and provisioned power of a GB300 GPU.'
-highlightsTitle: 'Largest lead in tokens per $1 TCO vs GB300 NVL72'
-highlights:
-  - value: '~8.3x'
-    label: 'DeepSeek-V4-Pro'
-    detail: 'at ~183 tok/s/user'
-  - value: '~10.2x'
-    label: 'MiniMax-M3'
-    detail: 'at ~337 tok/s/user'
-  - value: '~4.2x'
-    label: 'Qwen3.8-Flash-Next'
-    detail: 'at ~176 tok/s/user'
-  - value: '~3.9x'
-    label: 'GLM-5.2'
-    detail: 'at ~322 tok/s/user'
+lede: 'On InferenceX AgentX at 100 tok/s/user (120 on GLM-5.2), Vera Rubin NVL72 leads GB300 NVL72 by **1.8x to 2.0x** in total tokens per $1 TCO and in token throughput per MW on all four models with Vera Rubin results. The per-dollar ratio for each model peaks where every GB300 NVL72 config serves 4 agents or fewer, up to ~10.2x on MiniMax-M3.'
 links:
   - label: 'Open the AgentX dashboard'
     href: 'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
   - label: 'Read the methodology'
     href: '/agentx/methodology'
-note: 'Charts load live dashboard data and can include newer runs than the tables and numbers in the text.'
 tags:
   - agentx
   - agentic
@@ -42,20 +27,22 @@ tags:
 
 ## Summary
 
-| Model              | p90 tok/s/user | VR / GB300 per $ | VR / GB300 per MW | VR / GB300 per GPU |
-| ------------------ | -------------: | ---------------: | ----------------: | -----------------: |
-| DeepSeek-V4-Pro    |            100 |            1.90x |             1.90x |              2.96x |
-| MiniMax-M3         |            100 |            1.93x |             1.94x |              3.02x |
-| Qwen3.8-Flash-Next |            100 |            2.03x |             2.04x |              3.18x |
-| GLM-5.2            |            120 |            1.81x |             1.82x |              2.83x |
+| Model              | tok/s/user | VR / GB300 per $ | Largest VR / GB300 per $ (tok/s/user) |
+| ------------------ | ---------: | ---------------: | ------------------------------------: |
+| DeepSeek-V4-Pro    |        100 |            1.90x |                          ~8.3x (~183) |
+| MiniMax-M3         |        100 |            1.93x |                         ~10.2x (~337) |
+| Qwen3.8-Flash-Next |        100 |            2.03x |                          ~4.2x (~176) |
+| GLM-5.2            |        120 |            1.81x |                          ~3.9x (~322) |
 
 ## Method
 
 [AgentX](/agentx/methodology) replays real Claude Code sessions as deterministic [AIPerf](/glossary/aiperf) workloads. AgentX v1.0 has 393 published sessions, the median request in the full v1.0 corpus has 142,016 input tokens and 444 output tokens, and each run is profiled for 1 hour after a seeded warmup and prefix primers. The x-axis of every chart is p90 interactivity, 1 / p90 inter-token latency, in tok/s/user. The y-axis is the dashboard's default metric, total tokens per $1 TCO: total token throughput, which counts input tokens (including KV-cache hits) and output tokens, divided by the hourly cost of the GPUs serving it. Input is ~99% of that total.
 
-Per-dollar figures use the hyperscaler owning cost from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/): $3.61/GPU/hr for Vera Rubin NVL72 and $2.31/GPU/hr for GB300 NVL72. InferenceX's [external and internal TCO bases](/glossary/internal-vs-external-tco) differ only for TPU v7, so both systems cost the same on either basis and every per-dollar ratio in this article holds on both. Per-MW figures divide throughput by the all-in power provisioned per GPU in the [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/): 3.3 kW for Vera Rubin NVL72 and 2.12 kW for GB300 NVL72. These are planning figures for a deployed rack, including CPUs, networking and cooling. They are not measured draw during these runs. The cost ratio (1.563) is 0.4% above the power ratio (1.557), so every per-MW ratio between Vera Rubin and GB300 NVL72 in this article is 0.4% higher than the per-dollar ratio.
+Per-dollar figures use the hyperscaler owning cost from the [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/): $3.61/GPU/hr for Vera Rubin NVL72 and $2.31/GPU/hr for GB300 NVL72. InferenceX's [external and internal TCO bases](/glossary/internal-vs-external-tco) differ only for TPU v7, so both systems cost the same on either basis and every per-dollar ratio in this article holds on both. Per-MW figures divide throughput by the all-in power provisioned per GPU in the [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/): 3.3 kW for Vera Rubin NVL72 and 2.12 kW for GB300 NVL72. These are planning figures for a deployed rack, including CPUs, networking and cooling. They are not measured draw during these runs.
 
-Matched-interactivity values are interpolated along each system's Pareto frontier, with no extrapolation past a curve's measured ends. GLM-5.2 is compared at 120 tok/s/user because its Vera Rubin curve starts at 111.5 tok/s/user. At each target the comparison uses the strongest GB300 NVL72 line at that point, whichever engine that is. Per dollar is the primary metric in the sections below, with per MW and per GPU as table columns.
+Matched-interactivity values are interpolated along each system's Pareto frontier, with no extrapolation past a curve's measured ends. GLM-5.2 is compared at 120 tok/s/user because its Vera Rubin curve starts at 111.5 tok/s/user. At each target the comparison uses the strongest GB300 NVL72 line at that point, whichever engine that is. Per dollar is the primary metric in the sections below and the only ratio in the results tables, since each per-MW ratio of Vera Rubin to GB300 NVL72 is within 0.4% of the matching per-dollar ratio.
+
+Charts load live dashboard data and can include newer runs than the tables and numbers in the text.
 
 ## Specs
 
@@ -81,7 +68,7 @@ Divided by the 1.56x cost ratio, the silicon ratios give Rubin 1.54x per dollar 
 
 Our [previous Vera Rubin article](/blog/vera-rubin-nvl72-agentic-inference) reported up to 7x better token throughput per megawatt for Vera Rubin NVL72 on DeepSeek-V4-Pro with pre-release software, including ~7.2x over GB300 NVL72 SGLang at 150 tok/s/user and 2.09x over the best GB300 NVL72 line at 100 tok/s/user. Both systems have newer runs since. The per-MW lead is now 6.92x at 150 tok/s/user. At 100 tok/s/user it fell from 2.09x to 1.90x, because GB300 NVL72's best line there rose from 28.5M to 44.5M tok/s/MW and Vera Rubin's from 59.4M to 84.6M.
 
-On DeepSeek-V4-Pro the largest lead over GB300 NVL72 is ~8.3x at ~183 tok/s/user, per dollar and per MW. Above 137 tok/s/user every GB300 NVL72 frontier point serves 4 agents or fewer. At ~183 tok/s/user the strongest GB300 NVL72 line is Dynamo SGLang, whose value is interpolated between a 120-agent disaggregated config at 137 tok/s/user and a 4-agent config at 241 tok/s/user.
+On DeepSeek-V4-Pro the largest ratio to GB300 NVL72 is ~8.3x at ~183 tok/s/user, per dollar and per MW. Above 137 tok/s/user every GB300 NVL72 frontier point serves 4 agents or fewer. At ~183 tok/s/user the strongest GB300 NVL72 line is Dynamo SGLang, whose value is interpolated between a 120-agent disaggregated config at 137 tok/s/user and a 4-agent config at 241 tok/s/user.
 
 DeepSeek-V4-Pro has 1.6T total and 49B active parameters, with a hybrid of compressed sparse attention and heavily compressed attention that keeps its KV cache small at long context ([model card](https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro); see the [model page](/model/deepseek-v4)). Vera Rubin runs Dynamo TensorRT-LLM with FP4 weights and MTP, with prefill/decode disaggregation on 26 to 56 GPUs per configuration.
 
@@ -97,20 +84,22 @@ The chart below shows total tokens per $1 TCO for both systems on DeepSeek-V4-Pr
 
 As you can see, the newer Vera Rubin Dynamo TRT-LLM run sits above the earlier TRT-LLM run behind the previous article at every interactivity both runs cover, and its peak is 35% higher. The chart opens on GB300 NVL72's vLLM and TensorRT-LLM lines because the dashboard does not overlay vLLM and SGLang lines for the same chip on one AgentX chart. The table uses the strongest GB300 NVL72 line at each target, which is Dynamo SGLang at 150 and 200 tok/s/user. Select it in the legend to see it.
 
-| p90 tok/s/user | Vera Rubin NVL72 (M tokens per $) | Best GB300 NVL72 (M tokens per $) | VR / GB300 per $ | VR / GB300 per MW | VR / GB300 per GPU |
-| -------------: | --------------------------------: | --------------------------------: | ---------------: | ----------------: | -----------------: |
-|             90 |                             282.5 |               176.8 (Dynamo vLLM) |            1.60x |             1.60x |              2.50x |
-|        **100** |                         **278.6** |           **147.0 (Dynamo vLLM)** |        **1.90x** |         **1.90x** |          **2.96x** |
-|            125 |                             260.2 |                70.8 (Dynamo vLLM) |            3.67x |             3.69x |              5.74x |
-|            150 |                             226.1 |              32.8 (Dynamo SGLang) |            6.89x |             6.92x |             10.77x |
-|            200 |                              93.8 |              12.7 (Dynamo SGLang) |            7.37x |             7.40x |             11.51x |
-|            250 |                               7.6 |                 6.7 (Dynamo vLLM) |            1.13x |             1.13x |              1.76x |
+Values are M tokens per $1 TCO, and the ratio is Vera Rubin / GB300.
+
+| tok/s/user | Vera Rubin |                   GB300 |     Ratio |
+| ---------: | ---------: | ----------------------: | --------: |
+|         90 |      282.5 |     176.8 (Dynamo vLLM) |     1.60x |
+|    **100** |  **278.6** | **147.0 (Dynamo vLLM)** | **1.90x** |
+|        125 |      260.2 |      70.8 (Dynamo vLLM) |     3.67x |
+|        150 |      226.1 |    32.8 (Dynamo SGLang) |     6.89x |
+|        200 |       93.8 |    12.7 (Dynamo SGLang) |     7.37x |
+|        250 |        7.6 |       6.7 (Dynamo vLLM) |     1.13x |
 
 At peak throughput Vera Rubin NVL72 serves 284.6M tokens per $ at 80 tok/s/user against 244.1M for GB300 NVL72 Dynamo vLLM at 56 tok/s/user, a 1.17x lead per dollar (1.82x per GPU). At 250 tok/s/user Vera Rubin is serving ~30 agents and GB300 NVL72 one, and the lead falls to 1.13x per dollar. Above ~256 tok/s/user GB300 NVL72 Dynamo vLLM serves more tokens per dollar than Vera Rubin (0.92x at 260 and 0.65x at 290). The fastest Vera Rubin point reaches 310 tok/s/user and the fastest GB300 NVL72 point reaches 298 tok/s/user.
 
 ## MiniMax-M3
 
-On MiniMax-M3 the largest per-dollar lead over GB300 NVL72 is ~10.2x at ~337 tok/s/user, the fastest GB300 NVL72 point, a disaggregated Dynamo vLLM config serving 1 agent. The next-fastest GB300 NVL72 point, at 271 tok/s/user, serves 24 agents, and Vera Rubin's value at ~337 tok/s/user is interpolated between its measured points at 244 and 413 tok/s/user.
+On MiniMax-M3 the largest per-dollar ratio to GB300 NVL72 is ~10.2x at ~337 tok/s/user, the fastest GB300 NVL72 point, a disaggregated Dynamo vLLM config serving 1 agent. The next-fastest GB300 NVL72 point, at 271 tok/s/user, serves 24 agents, and Vera Rubin's value at ~337 tok/s/user is interpolated between its measured points at 244 and 413 tok/s/user.
 
 MiniMax-M3 has ~428B total and ~23B active parameters with MiniMax Sparse Attention ([model card](https://huggingface.co/MiniMaxAI/MiniMax-M3); see the [model page](/model/minimax-m3)). Vera Rubin runs Dynamo vLLM with FP4 and MTP. Its highest-throughput points come from aggregated 2-GPU TP2 workers, and its highest-interactivity points from a 10-GPU disaggregated config.
 
@@ -126,12 +115,14 @@ The chart below shows total tokens per $1 TCO for both systems on MiniMax-M3:
 
 As you can see, GB300 NVL72's only MiniMax-M3 AgentX line, from an older run, starts at 99 tok/s/user, so there is no GB300 NVL72 high-throughput point to compare against Vera Rubin's 136.6M tokens per $ peak. At the other end, Vera Rubin reaches 483 tok/s/user with its 10-GPU disaggregated config.
 
-| p90 tok/s/user | Vera Rubin NVL72 (M tokens per $) | GB300 NVL72 Dynamo vLLM (M tokens per $) | VR / GB300 per $ | VR / GB300 per MW | VR / GB300 per GPU |
-| -------------: | --------------------------------: | ---------------------------------------: | ---------------: | ----------------: | -----------------: |
-|        **100** |                         **132.3** |                                 **68.4** |        **1.93x** |         **1.94x** |          **3.02x** |
-|            150 |                             114.3 |                                     54.5 |            2.10x |             2.10x |              3.27x |
-|            200 |                              91.0 |                                     38.4 |            2.37x |             2.38x |              3.71x |
-|            300 |                              54.5 |                                     14.4 |            3.78x |             3.80x |              5.91x |
+Values are M tokens per $1 TCO, GB300 runs Dynamo vLLM in every row, and the ratio is Vera Rubin / GB300.
+
+| tok/s/user | Vera Rubin |    GB300 |     Ratio |
+| ---------: | ---------: | -------: | --------: |
+|    **100** |  **132.3** | **68.4** | **1.93x** |
+|        150 |      114.3 |     54.5 |     2.10x |
+|        200 |       91.0 |     38.4 |     2.37x |
+|        300 |       54.5 |     14.4 |     3.78x |
 
 B300 TensorRT-LLM at TP2 was the leading MiniMax-M3 system at 100 tok/s/user before the Vera Rubin and MI355X ATOM runs ([background](/blog/minimax-m3-agentx-b300-trtllm-tp2-vs-the-field)). It serves 106.4M tokens per $ there, and Vera Rubin's lead over it is 1.24x per dollar at 100, 1.76x at 150 and 2.14x at 200 tok/s/user.
 
@@ -139,7 +130,7 @@ MI355X on AMD's ATOM engine is now the strongest other MiniMax-M3 system per dol
 
 ## Qwen3.8-Flash-Next
 
-On Qwen3.8-Flash-Next the largest per-dollar lead over GB300 NVL72 is ~4.2x at ~176 tok/s/user. There the GB300 NVL72 SGLang value is interpolated between configs serving 4 agents at 160 tok/s/user and 2 agents at 203 tok/s/user, and the Vera Rubin value between its measured points at 173 and 271 tok/s/user.
+On Qwen3.8-Flash-Next the largest per-dollar ratio to GB300 NVL72 is ~4.2x at ~176 tok/s/user. There the GB300 NVL72 SGLang value is interpolated between configs serving 4 agents at 160 tok/s/user and 2 agents at 203 tok/s/user, and the Vera Rubin value between its measured points at 173 and 271 tok/s/user.
 
 Qwen3.8-Flash-Next is a 176B-parameter model (a 125B main model plus a 51B n-gram embedding table) with 6B active parameters and a Gated DeltaNet and sparse-attention hybrid ([model card](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8); see the [model page](/model/qwen-3-8-flash-next)). Vera Rubin runs Dynamo SGLang with FP4 and MTP on 1 to 6 GPUs per config. GB300 NVL72 runs single-GPU SGLang.
 
@@ -155,12 +146,14 @@ The chart below shows total tokens per $1 TCO for both systems on Qwen3.8-Flash-
 
 As you can see, Vera Rubin has no measured point between 24 and 130 tok/s/user, so its values at 50 and 100 tok/s/user are interpolated across that span. Its first measured point above 100, at 130 tok/s/user, serves 190.9M tokens per $, which is 1.85x GB300 NVL72's value at 100.
 
-| p90 tok/s/user | Vera Rubin NVL72 (M tokens per $) | GB300 NVL72 SGLang (M tokens per $) | VR / GB300 per $ | VR / GB300 per MW | VR / GB300 per GPU |
-| -------------: | --------------------------------: | ----------------------------------: | ---------------: | ----------------: | -----------------: |
-|             50 |                             226.4 |                               182.6 |            1.24x |             1.24x |              1.94x |
-|        **100** |                         **209.6** |                           **103.1** |        **2.03x** |         **2.04x** |          **3.18x** |
-|            150 |                             167.5 |                                50.4 |            3.32x |             3.33x |              5.19x |
-|            200 |                             109.6 |                                27.0 |            4.06x |             4.08x |              6.35x |
+Values are M tokens per $1 TCO, GB300 runs SGLang in every row, and the ratio is Vera Rubin / GB300.
+
+| tok/s/user | Vera Rubin |     GB300 |     Ratio |
+| ---------: | ---------: | --------: | --------: |
+|         50 |      226.4 |     182.6 |     1.24x |
+|    **100** |  **209.6** | **103.1** | **2.03x** |
+|        150 |      167.5 |      50.4 |     3.32x |
+|        200 |      109.6 |      27.0 |     4.06x |
 
 At peak throughput both systems run one GPU per server. Vera Rubin delivers 1.64x the throughput per GPU but costs 1.56x as much per GPU-hour, so its lead per dollar is 1.05x (231.6M vs 220.3M tokens per $).
 
@@ -168,7 +161,7 @@ Above 25 tok/s/user every Vera Rubin frontier point is a disaggregated prefill/d
 
 ## GLM-5.2
 
-On GLM-5.2 the largest per-dollar lead over GB300 NVL72 is ~3.9x at ~322 tok/s/user. Every GB300 NVL72 point above 246 tok/s/user serves 1 agent, and the strongest GB300 NVL72 value at ~322 tok/s/user is interpolated between two such Dynamo SGLang configs, at 283 tok/s/user and at 342 tok/s/user, the fastest GB300 NVL72 point.
+On GLM-5.2 the largest per-dollar ratio to GB300 NVL72 is ~3.9x at ~322 tok/s/user. Every GB300 NVL72 point above 246 tok/s/user serves 1 agent, and the strongest GB300 NVL72 value at ~322 tok/s/user is interpolated between two such Dynamo SGLang configs, at 283 tok/s/user and at 342 tok/s/user, the fastest GB300 NVL72 point.
 
 GLM-5.2 has ~753B parameters in its checkpoint, with DeepSeek-style sparse attention and 8 of 256 routed experts active per token ([model page](/model/glm-5-3)). The dashboard groups GLM-5.2 and GLM-5.3, which share a base model. The Vera Rubin run uses the GLM-5.3 checkpoint and the GB300 NVL72 runs use GLM-5.2. Vera Rubin runs Dynamo TensorRT-LLM with FP4 and MTP, disaggregated on 12 to 28 GPUs per config.
 
@@ -178,12 +171,14 @@ The chart below shows total tokens per $1 TCO for both systems on GLM-5.2:
 
 As you can see, Vera Rubin has no measured point between 111 and 262 tok/s/user, so its values at 150 and 200 tok/s/user are interpolated across that span. Vera Rubin's fastest GLM-5.2 point reaches 459 tok/s/user.
 
-| p90 tok/s/user | Vera Rubin NVL72 (M tokens per $) | Best GB300 NVL72 (M tokens per $) | VR / GB300 per $ | VR / GB300 per MW | VR / GB300 per GPU |
-| -------------: | --------------------------------: | --------------------------------: | ---------------: | ----------------: | -----------------: |
-|        **120** |                         **110.2** |          **60.8 (Dynamo SGLang)** |        **1.81x** |         **1.82x** |          **2.83x** |
-|            150 |                              89.0 |              35.2 (Dynamo SGLang) |            2.53x |             2.54x |              3.95x |
-|            200 |                              57.2 |              22.6 (Dynamo SGLang) |            2.53x |             2.54x |              3.95x |
-|            300 |                              23.1 |              6.9 (Dynamo TRT-LLM) |            3.36x |             3.38x |              5.26x |
+Values are M tokens per $1 TCO, and the ratio is Vera Rubin / GB300.
+
+| tok/s/user | Vera Rubin |                    GB300 |     Ratio |
+| ---------: | ---------: | -----------------------: | --------: |
+|    **120** |  **110.2** | **60.8 (Dynamo SGLang)** | **1.81x** |
+|        150 |       89.0 |     35.2 (Dynamo SGLang) |     2.53x |
+|        200 |       57.2 |     22.6 (Dynamo SGLang) |     2.53x |
+|        300 |       23.1 |     6.9 (Dynamo TRT-LLM) |     3.36x |
 
 Vera Rubin's peak is 116.3M tokens per $ at 111 tok/s/user against 99.2M for GB300 NVL72 Dynamo SGLang at 89 tok/s/user, 1.17x per dollar and 1.83x per GPU. At 300 tok/s/user, B200 Dynamo SGLang is the strongest system per dollar other than Vera Rubin, at 11.8M tokens per $ against 6.9M for the best GB300 NVL72 line. Vera Rubin's per-dollar lead over B200 there is 2.0x.
 

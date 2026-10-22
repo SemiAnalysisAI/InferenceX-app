@@ -9,7 +9,7 @@ import type { HardwarePageMeta } from '@/lib/hardware/hardware';
 import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 
-import { HardwareHero, HardwareNote } from './hardware-hero';
+import { HardwareHero } from './hardware-hero';
 
 const HARDWARE_PROSE_CLASS = cn(
   BLOG_PROSE_CLASS,
@@ -35,13 +35,12 @@ export function HardwarePageContent({ locale, meta, headings, content }: Hardwar
   return (
     <main className="relative" data-testid="hardware-page">
       <HashScroll />
-      <div className="container mx-auto flex flex-col gap-4 px-4 pb-16 pt-4 lg:px-8 lg:pt-6">
+      <div className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8">
         <HardwareHero meta={meta} locale={locale} />
-        <HardwareNote note={meta.note} slug={meta.slug} locale={locale} />
 
         <div
           className={cn(
-            'mt-2 grid gap-8 lg:mt-4',
+            'grid gap-8',
             hasToc && 'lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-12 xl:gap-16',
           )}
         >

@@ -11,7 +11,6 @@ export const HARDWARE_COPY = {
     indexDescription: `Head-to-head ${SITE_NAME} AgentX results for new accelerator systems, comparing tokens per dollar of TCO, per megawatt and per chip at matched interactivity.`,
     indexEmpty: 'Coming soon.',
     readResults: 'Read the results',
-    noteLabel: 'Note',
   },
   zh: {
     indexEyebrow: 'InferenceX 研究',
@@ -21,6 +20,5 @@ export const HARDWARE_COPY = {
     indexDescription: `${SITE_NAME} 发布的新一代加速器系统 AgentX 对比结果，在相同交互性下比较每美元 TCO、每 MW 与每颗芯片的 token 数。`,
     indexEmpty: '即将上线。',
     readResults: '查看结果',
-    noteLabel: '说明',
   },
 } satisfies Record<Locale, unknown>;

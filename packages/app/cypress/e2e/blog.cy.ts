@@ -73,21 +73,15 @@ describe('Blog', () => {
     const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
 
     for (const locale of ['', '/zh']) {
-      it(`renders the results hero, note, and article on ${locale || '/en'}`, () => {
+      it(`renders the results header and article on ${locale || '/en'}`, () => {
         cy.visit(`${locale}/hardware/${slug}`);
         cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
         cy.get('[data-testid="hardware-hero"]').within(() => {
-          cy.get('[data-testid="hardware-lede"] strong').should('have.length.greaterThan', 0);
-          cy.get('[data-testid="hardware-highlight"]')
-            .should('have.length.within', 3, 4)
-            .each(($card) => {
-              expect($card.children().first().text().trim()).not.to.equal('');
-            });
+          cy.get('[data-testid="hardware-lede"]').should('be.visible');
           cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
           cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
           cy.get(`a[href="${locale}/hardware"]`).should('be.visible');
         });
-        cy.get('[data-testid="hardware-note"]').should('be.visible');
         cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
         cy.get('[data-testid="blog-related"]').should('not.exist');
         cy.get('link[rel="canonical"]').should(
@@ -106,13 +100,13 @@ describe('Blog', () => {
       });
     }
 
-    it('stacks the highlight cards below the lede on phones without horizontal overflow', () => {
+    it('places the header links below the lede on phones without horizontal overflow', () => {
       cy.viewport(390, 844);
       cy.visit(`/hardware/${slug}`);
       cy.get('[data-testid="hardware-lede"]').then(($lede) => {
         const ledeBottom = $lede[0].getBoundingClientRect().bottom;
-        cy.get('[data-testid="hardware-highlights"]').should(($highlights) => {
-          expect($highlights[0].getBoundingClientRect().top).to.be.greaterThan(ledeBottom);
+        cy.get('[data-testid="hardware-hero-links"]').should(($links) => {
+          expect($links[0].getBoundingClientRect().top).to.be.greaterThan(ledeBottom);
         });
       });
       cy.document().then((doc) => {

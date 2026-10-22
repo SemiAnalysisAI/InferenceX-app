@@ -3,27 +3,12 @@ title: 'Vera Rubin NVL72 对比 GB300 NVL72 的 AgentX 结果'
 seoDescription: 'Vera Rubin NVL72 对比 GB300 NVL72 的 AgentX 结果：在四个模型上，100 至 120 tok/s/user 下每美元与每 MW 的 token 数为 1.8 至 2.0 倍，在 MiniMax-M3 上最高约为 10.2 倍。'
 date: '2026-10-19'
 publishDate: '2026-10-19'
-lede: '在 InferenceX AgentX 上，Vera Rubin NVL72 每 1 美元 TCO 对应的总 token 数最高分别可达 GB300 NVL72 的**约 8.3 倍**（DeepSeek-V4-Pro）、**约 10.2 倍**（MiniMax-M3）、**约 4.2 倍**（Qwen3.8-Flash-Next）和**约 3.9 倍**（GLM-5.2）。在 100 tok/s/user 下（GLM-5.2 为 120），每美元和每 MW 的领先幅度均为 1.8 至 2.0 倍。每颗 Vera Rubin GPU 的每小时成本和规划功率都是 GB300 GPU 的 1.56 倍。'
-highlightsTitle: '每 1 美元 TCO 对应 token 数相对 GB300 NVL72 的最大领先幅度'
-highlights:
-  - value: '~8.3x'
-    label: 'DeepSeek-V4-Pro'
-    detail: '约 183 tok/s/user 处'
-  - value: '~10.2x'
-    label: 'MiniMax-M3'
-    detail: '约 337 tok/s/user 处'
-  - value: '~4.2x'
-    label: 'Qwen3.8-Flash-Next'
-    detail: '约 176 tok/s/user 处'
-  - value: '~3.9x'
-    label: 'GLM-5.2'
-    detail: '约 322 tok/s/user 处'
+lede: '在 InferenceX AgentX 上，以 100 tok/s/user（GLM-5.2 为 120）比较，Vera Rubin NVL72 在已有 Vera Rubin 结果的全部四个模型上，每 1 美元 TCO 对应的总 token 数和每 MW 的 token 吞吐量都是 GB300 NVL72 的**1.8 至 2.0 倍**。各模型的每美元比值都在 GB300 NVL72 每个配置只服务不超过 4 个 agent 的区间达到峰值，最高为 MiniMax-M3 上的约 10.2 倍。'
 links:
   - label: '查看 AgentX 仪表板'
     href: 'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_metric=y_tokensPerDollarH'
   - label: '阅读测试方法'
     href: '/zh/agentx/methodology'
-note: '图表实时加载仪表板数据，可能包含比文中表格和数字更新的测试运行。'
 tags:
   - agentx
   - agentic
@@ -42,20 +27,22 @@ tags:
 
 ## 汇总
 
-| 模型               | p90 tok/s/user | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
-| ------------------ | -------------: | ----------------: | ---------------: | ----------------: |
-| DeepSeek-V4-Pro    |            100 |             1.90x |            1.90x |             2.96x |
-| MiniMax-M3         |            100 |             1.93x |            1.94x |             3.02x |
-| Qwen3.8-Flash-Next |            100 |             2.03x |            2.04x |             3.18x |
-| GLM-5.2            |            120 |             1.81x |            1.82x |             2.83x |
+| 模型               | tok/s/user | VR / GB300 每美元 | 最大 VR / GB300 每美元比值（tok/s/user） |
+| ------------------ | ---------: | ----------------: | ---------------------------------------: |
+| DeepSeek-V4-Pro    |        100 |             1.90x |                        约 8.3x（约 183） |
+| MiniMax-M3         |        100 |             1.93x |                       约 10.2x（约 337） |
+| Qwen3.8-Flash-Next |        100 |             2.03x |                        约 4.2x（约 176） |
+| GLM-5.2            |        120 |             1.81x |                        约 3.9x（约 322） |
 
 ## 测试方法
 
 [AgentX](/zh/agentx/methodology) 把真实的 Claude Code 会话回放为确定性的 [AIPerf](/zh/glossary/aiperf) 工作负载。AgentX v1.0 共有 393 个公开会话，完整 v1.0 语料中请求的输入 token 中位数为 142,016、输出 token 中位数为 444，每次运行在固定 seed 的 warmup 和前缀 primer 之后进行 1 小时的 profiling。所有图表的横轴都是 p90 交互性，即 1 / p90 token 间延迟，单位为 tok/s/user。纵轴是仪表板的默认指标，即每 1 美元 TCO 对应的总 token 数：总 token 吞吐量（统计输入 token，含 KV cache 命中部分，以及输出 token）除以提供服务的 GPU 的每小时成本。其中约 99% 是输入 token。
 
-每美元数据采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中 hyperscaler 的自持成本：Vera Rubin NVL72 为 $3.61/GPU/hr，GB300 NVL72 为 $2.31/GPU/hr。InferenceX 的[外部和内部 TCO 口径](/zh/glossary/internal-vs-external-tco)只在 TPU v7 上有差别，因此这两套系统在两种口径下的成本相同，本文中的每美元比值在两种口径下都成立。每 MW 数据是用吞吐量除以 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中为每 GPU 规划的全口径功率：Vera Rubin NVL72 为 3.3 kW，GB300 NVL72 为 2.12 kW。这些是已部署机架的规划数值，包含 CPU、网络和散热，并非这些测试运行期间的实测功耗。成本比（1.563）比功率比（1.557）高 0.4%，因此本文中 Vera Rubin 对 GB300 NVL72 的所有每 MW 比值，都比对应的每美元比值高 0.4%。
+每美元数据采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中 hyperscaler 的自持成本：Vera Rubin NVL72 为 $3.61/GPU/hr，GB300 NVL72 为 $2.31/GPU/hr。InferenceX 的[外部和内部 TCO 口径](/zh/glossary/internal-vs-external-tco)只在 TPU v7 上有差别，因此这两套系统在两种口径下的成本相同，本文中的每美元比值在两种口径下都成立。每 MW 数据是用吞吐量除以 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中为每 GPU 规划的全口径功率：Vera Rubin NVL72 为 3.3 kW，GB300 NVL72 为 2.12 kW。这些是已部署机架的规划数值，包含 CPU、网络和散热，并非这些测试运行期间的实测功耗。
 
-相同交互性下的数值沿各系统的 Pareto 前沿插值得出，不会外推到曲线实测端点之外。GLM-5.2 的 Vera Rubin 曲线从 111.5 tok/s/user 起步，因此改在 120 tok/s/user 比较。在每个目标交互性上，对比对象都是该点最强的 GB300 NVL72 曲线，无论它来自哪个推理引擎。下文各节以每美元为主要指标，每 MW 和每 GPU 比值作为表格中的列。
+相同交互性下的数值沿各系统的 Pareto 前沿插值得出，不会外推到曲线实测端点之外。GLM-5.2 的 Vera Rubin 曲线从 111.5 tok/s/user 起步，因此改在 120 tok/s/user 比较。在每个目标交互性上，对比对象都是该点最强的 GB300 NVL72 曲线，无论它来自哪个推理引擎。下文各节以每美元为主要指标，结果表格也只列每美元比值，因为 Vera Rubin 对 GB300 NVL72 的每 MW 比值与对应的每美元比值相差都在 0.4% 以内。
+
+图表实时加载仪表板数据，可能包含比文中表格和数字更新的测试运行。
 
 ## 规格
 
@@ -81,7 +68,7 @@ Rubin 的数值取自 NVIDIA [Vera Rubin NVL72 规格](https://www.nvidia.com/en
 
 我们的[上一篇 Vera Rubin 文章](/zh/blog/vera-rubin-nvl72-agentic-inference)基于预发布软件，报告了 Vera Rubin NVL72 在 DeepSeek-V4-Pro 上每兆瓦 token 吞吐量最高 7 倍的提升，其中 150 tok/s/user 下约为 GB300 NVL72 SGLang 的 7.2 倍，100 tok/s/user 下为最佳 GB300 NVL72 曲线的 2.09 倍。此后两套系统都有了更新的测试运行。如今每 MW 的领先幅度在 150 tok/s/user 下为 6.92 倍。在 100 tok/s/user 下，领先幅度从 2.09 倍降至 1.90 倍，因为该点 GB300 NVL72 最佳曲线的吞吐量从 28.5M 升至 44.5M tok/s/MW，Vera Rubin 则从 59.4M 升至 84.6M。
 
-在 DeepSeek-V4-Pro 上，相对 GB300 NVL72 的最大领先幅度按每美元和每 MW 计均约为 8.3 倍，出现在约 183 tok/s/user 处。超过 137 tok/s/user 后，GB300 NVL72 前沿上每个点服务的 agent 都不超过 4 个。在约 183 tok/s/user 处，最强的 GB300 NVL72 曲线是 Dynamo SGLang，其数值是在 137 tok/s/user 处的 120 个 agent 分离式配置与 241 tok/s/user 处的 4 个 agent 配置之间插值得出的。
+在 DeepSeek-V4-Pro 上，对 GB300 NVL72 的最大比值按每美元和每 MW 计均约为 8.3 倍，出现在约 183 tok/s/user 处。超过 137 tok/s/user 后，GB300 NVL72 前沿上每个点服务的 agent 都不超过 4 个。在约 183 tok/s/user 处，最强的 GB300 NVL72 曲线是 Dynamo SGLang，其数值是在 137 tok/s/user 处的 120 个 agent 分离式配置与 241 tok/s/user 处的 4 个 agent 配置之间插值得出的。
 
 DeepSeek-V4-Pro 总参数 1.6T、激活参数 49B，采用压缩稀疏注意力与高度压缩注意力的混合结构，使 KV cache 在长上下文下依然很小（[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro)；另见[模型页面](/zh/model/deepseek-v4)）。Vera Rubin 运行 Dynamo TensorRT-LLM，使用 FP4 权重和 MTP，并采用 prefill/decode 分离，每个配置 26 至 56 个 GPU。
 
@@ -97,20 +84,22 @@ DeepSeek-V4-Pro 总参数 1.6T、激活参数 49B，采用压缩稀疏注意力�
 
 从图中可以看到，在两次运行共同覆盖的每个交互性上，较新的 Vera Rubin Dynamo TRT-LLM 运行都高于上一篇文章所依据的较早 TRT-LLM 运行，峰值也高出 35%。仪表板不会在同一张 AgentX 图表中叠加同一芯片的 vLLM 和 SGLang 曲线，因此这张图默认显示 GB300 NVL72 的 vLLM 和 TensorRT-LLM 曲线。下表在每个目标点都选用该点最强的 GB300 NVL72 曲线，在 150 和 200 tok/s/user 处是 Dynamo SGLang。在图例中选中它即可查看。
 
-| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | 最佳 GB300 NVL72（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
-| -------------: | ---------------------------------: | ---------------------------------: | ----------------: | ---------------: | ----------------: |
-|             90 |                              282.5 |                176.8 (Dynamo vLLM) |             1.60x |            1.60x |             2.50x |
-|        **100** |                          **278.6** |            **147.0 (Dynamo vLLM)** |         **1.90x** |        **1.90x** |         **2.96x** |
-|            125 |                              260.2 |                 70.8 (Dynamo vLLM) |             3.67x |            3.69x |             5.74x |
-|            150 |                              226.1 |               32.8 (Dynamo SGLang) |             6.89x |            6.92x |            10.77x |
-|            200 |                               93.8 |               12.7 (Dynamo SGLang) |             7.37x |            7.40x |            11.51x |
-|            250 |                                7.6 |                  6.7 (Dynamo vLLM) |             1.13x |            1.13x |             1.76x |
+数值为每 1 美元 TCO 的 M token 数，比值为 Vera Rubin / GB300。
+
+| tok/s/user | Vera Rubin |                   GB300 |      比值 |
+| ---------: | ---------: | ----------------------: | --------: |
+|         90 |      282.5 |     176.8 (Dynamo vLLM) |     1.60x |
+|    **100** |  **278.6** | **147.0 (Dynamo vLLM)** | **1.90x** |
+|        125 |      260.2 |      70.8 (Dynamo vLLM) |     3.67x |
+|        150 |      226.1 |    32.8 (Dynamo SGLang) |     6.89x |
+|        200 |       93.8 |    12.7 (Dynamo SGLang) |     7.37x |
+|        250 |        7.6 |       6.7 (Dynamo vLLM) |     1.13x |
 
 在峰值吞吐量处，Vera Rubin NVL72 在 80 tok/s/user 下每美元可提供 284.6M token，GB300 NVL72 Dynamo vLLM 在 56 tok/s/user 下为 244.1M，按每美元计是后者的 1.17 倍（按每 GPU 计为 1.82 倍）。在 250 tok/s/user 下，Vera Rubin 服务约 30 个 agent，GB300 NVL72 只服务 1 个，每美元的领先降至 1.13 倍。超过约 256 tok/s/user 后，GB300 NVL72 Dynamo vLLM 的每美元 token 数高于 Vera Rubin（比值在 260 处为 0.92 倍，在 290 处为 0.65 倍）。Vera Rubin 最快的点达到 310 tok/s/user，GB300 NVL72 最快的点达到 298 tok/s/user。
 
 ## MiniMax-M3
 
-在 MiniMax-M3 上，相对 GB300 NVL72 的每美元最大领先幅度约为 10.2 倍，出现在约 337 tok/s/user 处，即 GB300 NVL72 最快的点，这是一个只服务 1 个 agent 的 Dynamo vLLM 分离式配置。GB300 NVL72 次快的点位于 271 tok/s/user，服务 24 个 agent；Vera Rubin 在约 337 tok/s/user 处的数值是在其 244 和 413 tok/s/user 两个实测点之间插值得出的。
+在 MiniMax-M3 上，对 GB300 NVL72 的每美元最大比值约为 10.2 倍，出现在约 337 tok/s/user 处，即 GB300 NVL72 最快的点，这是一个只服务 1 个 agent 的 Dynamo vLLM 分离式配置。GB300 NVL72 次快的点位于 271 tok/s/user，服务 24 个 agent；Vera Rubin 在约 337 tok/s/user 处的数值是在其 244 和 413 tok/s/user 两个实测点之间插值得出的。
 
 MiniMax-M3 总参数约 428B、激活参数约 23B，采用 MiniMax Sparse Attention（[模型卡](https://huggingface.co/MiniMaxAI/MiniMax-M3)；另见[模型页面](/zh/model/minimax-m3)）。Vera Rubin 运行 Dynamo vLLM，使用 FP4 和 MTP。其吞吐量最高的点来自聚合式的 2-GPU TP2 worker，交互性最高的点则来自一个 10-GPU 的分离式配置。
 
@@ -126,12 +115,14 @@ MiniMax-M3 总参数约 428B、激活参数约 23B，采用 MiniMax Sparse Atten
 
 从图中可以看到，GB300 NVL72 唯一的 MiniMax-M3 AgentX 曲线来自较早的运行，前沿从 99 tok/s/user 才开始，因此没有可与 Vera Rubin 每美元 136.6M token 的峰值对比的 GB300 NVL72 高吞吐点。在另一端，Vera Rubin 的 10-GPU 分离式配置可达 483 tok/s/user。
 
-| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | GB300 NVL72 Dynamo vLLM（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
-| -------------: | ---------------------------------: | ----------------------------------------: | ----------------: | ---------------: | ----------------: |
-|        **100** |                          **132.3** |                                  **68.4** |         **1.93x** |        **1.94x** |         **3.02x** |
-|            150 |                              114.3 |                                      54.5 |             2.10x |            2.10x |             3.27x |
-|            200 |                               91.0 |                                      38.4 |             2.37x |            2.38x |             3.71x |
-|            300 |                               54.5 |                                      14.4 |             3.78x |            3.80x |             5.91x |
+数值为每 1 美元 TCO 的 M token 数，GB300 各行均运行 Dynamo vLLM，比值为 Vera Rubin / GB300。
+
+| tok/s/user | Vera Rubin |    GB300 |      比值 |
+| ---------: | ---------: | -------: | --------: |
+|    **100** |  **132.3** | **68.4** | **1.93x** |
+|        150 |      114.3 |     54.5 |     2.10x |
+|        200 |       91.0 |     38.4 |     2.37x |
+|        300 |       54.5 |     14.4 |     3.78x |
 
 在 Vera Rubin 和 MI355X ATOM 的运行之前，TP2 配置的 B300 TensorRT-LLM 是 MiniMax-M3 在 100 tok/s/user 下表现最好的系统（[背景](/zh/blog/minimax-m3-agentx-b300-trtllm-tp2-vs-the-field)）。它在该点每美元可提供 106.4M token；按每美元计，Vera Rubin 对它的领先在 100 tok/s/user 处为 1.24 倍，在 150 处为 1.76 倍，在 200 处为 2.14 倍。
 
@@ -139,7 +130,7 @@ MiniMax-M3 总参数约 428B、激活参数约 23B，采用 MiniMax Sparse Atten
 
 ## Qwen3.8-Flash-Next
 
-在 Qwen3.8-Flash-Next 上，相对 GB300 NVL72 的每美元最大领先幅度约为 4.2 倍，出现在约 176 tok/s/user 处。该点 GB300 NVL72 SGLang 的数值是在 160 tok/s/user 处服务 4 个 agent 与 203 tok/s/user 处服务 2 个 agent 的两个配置之间插值得出的，Vera Rubin 的数值则是在其 173 和 271 tok/s/user 两个实测点之间插值得出的。
+在 Qwen3.8-Flash-Next 上，对 GB300 NVL72 的每美元最大比值约为 4.2 倍，出现在约 176 tok/s/user 处。该点 GB300 NVL72 SGLang 的数值是在 160 tok/s/user 处服务 4 个 agent 与 203 tok/s/user 处服务 2 个 agent 的两个配置之间插值得出的，Vera Rubin 的数值则是在其 173 和 271 tok/s/user 两个实测点之间插值得出的。
 
 Qwen3.8-Flash-Next 是一个 176B 参数的模型（125B 主模型加上 51B 的 n-gram embedding 表），激活参数 6B，采用 Gated DeltaNet 与稀疏注意力的混合架构（[模型卡](https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8)；另见[模型页面](/zh/model/qwen-3-8-flash-next)）。Vera Rubin 运行 Dynamo SGLang，使用 FP4 和 MTP，每个配置 1 至 6 个 GPU。GB300 NVL72 运行单 GPU 的 SGLang。
 
@@ -155,12 +146,14 @@ Qwen3.8-Flash-Next 是一个 176B 参数的模型（125B 主模型加上 51B 的
 
 从图中可以看到，Vera Rubin 在 24 至 130 tok/s/user 之间没有实测点，因此它在 50 和 100 tok/s/user 处的数值是跨这一区间插值得出的。它在 100 tok/s/user 以上的第一个实测点位于 130 tok/s/user，每美元可提供 190.9M token，是 GB300 NVL72 在 100 tok/s/user 处数值的 1.85 倍。
 
-| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | GB300 NVL72 SGLang（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
-| -------------: | ---------------------------------: | -----------------------------------: | ----------------: | ---------------: | ----------------: |
-|             50 |                              226.4 |                                182.6 |             1.24x |            1.24x |             1.94x |
-|        **100** |                          **209.6** |                            **103.1** |         **2.03x** |        **2.04x** |         **3.18x** |
-|            150 |                              167.5 |                                 50.4 |             3.32x |            3.33x |             5.19x |
-|            200 |                              109.6 |                                 27.0 |             4.06x |            4.08x |             6.35x |
+数值为每 1 美元 TCO 的 M token 数，GB300 各行均运行 SGLang，比值为 Vera Rubin / GB300。
+
+| tok/s/user | Vera Rubin |     GB300 |      比值 |
+| ---------: | ---------: | --------: | --------: |
+|         50 |      226.4 |     182.6 |     1.24x |
+|    **100** |  **209.6** | **103.1** | **2.03x** |
+|        150 |      167.5 |      50.4 |     3.32x |
+|        200 |      109.6 |      27.0 |     4.06x |
 
 在峰值吞吐量处，两套系统都是每个推理服务实例使用一个 GPU。Vera Rubin 每 GPU 的吞吐量是 GB300 NVL72 的 1.64 倍，但每 GPU 小时成本是后者的 1.56 倍，因此按每美元计的领先为 1.05 倍（每美元 231.6M 对 220.3M token）。
 
@@ -168,7 +161,7 @@ Qwen3.8-Flash-Next 是一个 176B 参数的模型（125B 主模型加上 51B 的
 
 ## GLM-5.2
 
-在 GLM-5.2 上，相对 GB300 NVL72 的每美元最大领先幅度约为 3.9 倍，出现在约 322 tok/s/user 处。GB300 NVL72 在 246 tok/s/user 以上的每个点都只服务 1 个 agent；在约 322 tok/s/user 处，最强的 GB300 NVL72 数值是在两个这样的 Dynamo SGLang 配置之间插值得出的，二者分别位于 283 tok/s/user 和 342 tok/s/user，后者是 GB300 NVL72 最快的点。
+在 GLM-5.2 上，对 GB300 NVL72 的每美元最大比值约为 3.9 倍，出现在约 322 tok/s/user 处。GB300 NVL72 在 246 tok/s/user 以上的每个点都只服务 1 个 agent；在约 322 tok/s/user 处，最强的 GB300 NVL72 数值是在两个这样的 Dynamo SGLang 配置之间插值得出的，二者分别位于 283 tok/s/user 和 342 tok/s/user，后者是 GB300 NVL72 最快的点。
 
 GLM-5.2 的 checkpoint 约含 753B 参数，采用 DeepSeek 式稀疏注意力，每个 token 在 256 个路由专家中激活 8 个（[模型页面](/zh/model/glm-5-3)）。仪表板把 GLM-5.2 和 GLM-5.3 归为一组，两者共享同一个基础模型。Vera Rubin 的运行使用 GLM-5.3 checkpoint，GB300 NVL72 的运行使用 GLM-5.2。Vera Rubin 运行 Dynamo TensorRT-LLM，使用 FP4 和 MTP，采用分离式部署，每个配置 12 至 28 个 GPU。
 
@@ -178,12 +171,14 @@ GLM-5.2 的 checkpoint 约含 753B 参数，采用 DeepSeek 式稀疏注意力�
 
 从图中可以看到，Vera Rubin 在 111 至 262 tok/s/user 之间没有实测点，因此它在 150 和 200 tok/s/user 处的数值是跨这一区间插值得出的。Vera Rubin 在 GLM-5.2 上最快的点达到 459 tok/s/user。
 
-| p90 tok/s/user | Vera Rubin NVL72（每美元 M token） | 最佳 GB300 NVL72（每美元 M token） | VR / GB300 每美元 | VR / GB300 每 MW | VR / GB300 每 GPU |
-| -------------: | ---------------------------------: | ---------------------------------: | ----------------: | ---------------: | ----------------: |
-|        **120** |                          **110.2** |           **60.8 (Dynamo SGLang)** |         **1.81x** |        **1.82x** |         **2.83x** |
-|            150 |                               89.0 |               35.2 (Dynamo SGLang) |             2.53x |            2.54x |             3.95x |
-|            200 |                               57.2 |               22.6 (Dynamo SGLang) |             2.53x |            2.54x |             3.95x |
-|            300 |                               23.1 |               6.9 (Dynamo TRT-LLM) |             3.36x |            3.38x |             5.26x |
+数值为每 1 美元 TCO 的 M token 数，比值为 Vera Rubin / GB300。
+
+| tok/s/user | Vera Rubin |                    GB300 |      比值 |
+| ---------: | ---------: | -----------------------: | --------: |
+|    **120** |  **110.2** | **60.8 (Dynamo SGLang)** | **1.81x** |
+|        150 |       89.0 |     35.2 (Dynamo SGLang) |     2.53x |
+|        200 |       57.2 |     22.6 (Dynamo SGLang) |     2.53x |
+|        300 |       23.1 |     6.9 (Dynamo TRT-LLM) |     3.36x |
 
 Vera Rubin 的峰值是 111 tok/s/user 下每美元 116.3M token，GB300 NVL72 Dynamo SGLang 的峰值是 89 tok/s/user 下的 99.2M，按每美元计为 1.17 倍，按每 GPU 计为 1.83 倍。在 300 tok/s/user 下，B200 Dynamo SGLang 是除 Vera Rubin 之外每美元表现最好的系统，每美元可提供 11.8M token，最佳 GB300 NVL72 曲线为 6.9M。Vera Rubin 在该点按每美元计是 B200 的 2.0 倍。
 
