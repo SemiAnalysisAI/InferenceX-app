@@ -225,7 +225,3 @@ Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit e
 3. **Audit security**: `bun audit` checks the installed packages recorded in `bun.lock`. For each finding, update the affected dependency with `bun update` or `bun update --latest`, then rerun the audit. Do not suppress an advisory without a documented reason.
 4. **Fix lint/format**: `bun run lint:fix && bun run fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `unicorn/no-negated-condition`), so fix those manually. For mechanical bulk changes, delegate to a subagent and verify with `bun run typecheck`.
 5. **Final check**: `bun run lint && bun run fmt && bun run typecheck && bun run security` all pass.
-
-## Claude AI Agents
-
-`.github/workflows/claude.yml` defines the `@claude` router, its `implement` and `review` jobs, the explicit overrides (`@claude review`, `chrome`, `frontend`, `general`/`lite`), and the models. The job prompts live in `.github/claude/`.

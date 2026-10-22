@@ -9,11 +9,13 @@ import {
   cleanLogText,
   listServerLogFilePaths,
   primaryServerLogFile,
+  readCappedServerLogFile,
   readServerLogArtifact,
   readServerLogFiles,
   serverLogArtifactRoot,
   serverLogArtifactSuffix,
 } from './server-log-artifacts.js';
+import { capServerLogText } from './server-log-limits.js';
 
 const roots: string[] = [];
 
@@ -96,9 +98,12 @@ describe('server-log artifact discovery', () => {
 
     expect(serverLogArtifactRoot(artifactDir, 'server_logs_config-a')).toBe(artifactDir);
     expect(fs.existsSync(path.join(artifactDir, 'srt-single-node-logs'))).toBe(false);
-    expect(readServerLogArtifact({ artifactName: 'server_logs_config-a', artifactDir })).toEqual([
-      { fileName: 'results/server.log', logText: 'server\n' },
-    ]);
+    expect(
+      readServerLogArtifact({
+        artifactName: 'server_logs_config-a',
+        artifactDir,
+      }),
+    ).toEqual([{ fileName: 'results/server.log', logText: 'server\n' }]);
   });
 
   it('roots multinode artifacts at their extracted archive', () => {
@@ -108,12 +113,39 @@ describe('server-log artifact discovery', () => {
     });
 
     expect(
-      readServerLogArtifact({ artifactName: 'multinode_server_logs_config-b', artifactDir }),
+      readServerLogArtifact({
+        artifactName: 'multinode_server_logs_config-b',
+        artifactDir,
+      }),
     ).toEqual([{ fileName: 'host-1_decode_w0.out', logText: 'decode\n' }]);
     expect(serverLogArtifactRoot(tempRoot(), 'multinode_server_logs_config-c')).toBeNull();
   });
 
   it('removes PostgreSQL-incompatible null bytes', () => {
     expect(cleanLogText('a\u0000b')).toBe('ab');
+  });
+});
+
+describe('readCappedServerLogFile', () => {
+  it('reads oversized files as only head and tail, matching in-memory truncation', () => {
+    const maxBytes = 64 * 1024;
+    // Multi-byte characters land on the head/tail cut points at various offsets.
+    const text = Array.from({ length: 6000 }, (_, i) => `line ${i} héllo ✓ 𝄞\n`).join('');
+    const file = path.join(tempRoot(), 'frontend_0.out');
+    fs.writeFileSync(file, text);
+
+    const capped = readCappedServerLogFile(file, maxBytes);
+    expect(capped).toEqual(capServerLogText(text, maxBytes));
+    expect(capped.truncated).toBe(true);
+    expect(capped.text).not.toContain('\uFFFD');
+  });
+
+  it('returns files within the limit whole, without null bytes', () => {
+    const file = path.join(tempRoot(), 'server.log');
+    fs.writeFileSync(file, 'a\u0000b\n');
+    expect(readCappedServerLogFile(file, 64 * 1024)).toMatchObject({
+      text: 'ab\n',
+      truncated: false,
+    });
   });
 });
