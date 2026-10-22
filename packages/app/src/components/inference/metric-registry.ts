@@ -563,6 +563,15 @@ export function countsInputTokens(metricConfigKey: string): boolean {
   return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
 }
 
+/**
+ * Input-token metrics (input throughput, cost, energy) get a TTFT x-axis option.
+ * Decided from the registry title so display qualifiers can't change the answer.
+ */
+export function isInputMetric(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && metricOptionTitle(key, 'en').toLowerCase().includes('input');
+}
+
 /** The token basis a metric is charted on: only input-token metrics follow the toggle. */
 export function tokenBasisForMetric(metricConfigKey: string, tokenBasis: TokenBasis): TokenBasis {
   return countsInputTokens(metricConfigKey) ? tokenBasis : 'total';

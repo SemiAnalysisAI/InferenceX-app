@@ -81,11 +81,24 @@ export {
   type XAxisMode,
 } from './chart-data-core';
 
-/** Insert a token-basis qualifier ahead of a trailing unit, e.g. "… (tok/s/chip)". */
-function withTokenBasisSuffix(text: unknown, suffix: string): string | undefined {
+/**
+ * Qualify the token noun of a metric label for the uncached basis, e.g.
+ * "Total Tokens per $1 TCO" -> "Total Tokens (Uncached Input) per $1 TCO" and
+ * "Cost per Million Total Tokens ($/M tok)" -> "… Total Tokens (Uncached Input) ($/M tok)".
+ */
+export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): string | undefined {
   if (typeof text !== 'string') return undefined;
   const unit = /\s*[(（][^()（）]*[)）]$/u.exec(text);
-  return unit ? `${text.slice(0, unit.index)}${suffix}${unit[0]}` : `${text}${suffix}`;
+  const head = unit ? text.slice(0, unit.index) : text;
+  const tail = unit ? unit[0] : '';
+  if (locale === 'zh') {
+    return `${head}${head.includes('输入') ? '（未缓存）' : '（未缓存输入）'}${tail}`;
+  }
+  const qualifier = /input/iu.test(head) ? ' (Uncached)' : ' (Uncached Input)';
+  const per = head.indexOf(' per ');
+  return per > 0 && /token/iu.test(head.slice(0, per))
+    ? `${head.slice(0, per)}${qualifier}${head.slice(per)}${tail}`
+    : `${head}${qualifier}${tail}`;
 }
 
 export function useChartData(
@@ -416,16 +429,16 @@ export function useChartData(
                 (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
                   [
                     `${selectedYAxisMetric}_${field}`,
-                    withTokenBasisSuffix(
+                    withUncachedQualifier(
                       chartDef[`${selectedYAxisMetric}_${field}` as keyof ChartDefinition],
-                      ' · Uncached',
+                      'en',
                     ),
                   ],
                   [
                     `${selectedYAxisMetric}_${field}Zh`,
-                    withTokenBasisSuffix(
+                    withUncachedQualifier(
                       chartDef[`${selectedYAxisMetric}_${field}Zh` as keyof ChartDefinition],
-                      ' · 未缓存',
+                      'zh',
                     ),
                   ],
                 ]),

@@ -8,6 +8,7 @@ import type {
   InferenceData,
   YAxisMetricKey,
 } from '@/components/inference/types';
+import { isInputMetric as isInputMetricKey } from '@/components/inference/metric-registry';
 import { agenticSpecDecodingKeySuffix } from '@/components/inference/utils/point-identity';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
@@ -97,9 +98,7 @@ function resolveXAxisField(
   selectedYAxisMetric: string,
   selectedXAxisMetric: string | null,
 ): string {
-  const metricTitle =
-    (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
-  const isInputMetric = metricTitle.toLowerCase().includes('input');
+  const isInputMetric = isInputMetricKey(selectedYAxisMetric);
   const isTtftOverride = selectedXAxisMetric === 'p90_ttft';
 
   if (selectedXAxisMetric && chartDef.chartType === 'interactivity' && isInputMetric) {

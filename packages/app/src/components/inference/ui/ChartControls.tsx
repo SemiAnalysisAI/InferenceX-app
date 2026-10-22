@@ -49,6 +49,7 @@ import {
   type CostTier,
   type MetricKey,
   countsInputTokens,
+  isInputMetric,
 } from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
@@ -404,13 +405,7 @@ export default function ChartControls({
     });
   };
 
-  const isInputMetric = (() => {
-    const chartDef = graphs[0]?.chartDefinition;
-    if (!chartDef) return false;
-    const titleKey = `${selectedYAxisMetric}_title` as keyof typeof chartDef;
-    const title = (chartDef[titleKey] as string) || '';
-    return title.toLowerCase().includes('input');
-  })();
+  const selectedIsInputMetric = isInputMetric(selectedYAxisMetric);
 
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
@@ -611,7 +606,7 @@ export default function ChartControls({
 
               {!showXAxisMode &&
                 graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric &&
+                selectedIsInputMetric &&
                 selectedSequence !== Sequence.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
@@ -638,7 +633,7 @@ export default function ChartControls({
                 )}
 
               {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric && (
+                selectedIsInputMetric && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
                       htmlFor="scale-type-select"
