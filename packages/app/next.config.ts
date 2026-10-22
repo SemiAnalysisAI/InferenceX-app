@@ -5,11 +5,6 @@ import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-mod
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
 const nextConfig: NextConfig = {
-  // Allow a second, isolated dev server (e.g. a dump-mode instance on another
-  // port) to run from the same project dir by pointing it at a separate build
-  // dir via NEXT_DIST_DIR. Defaults to '.next' so the primary server and all
-  // CI/prod builds are unaffected. Next.js's single-dev-server lock lives under
-  // distDir, so distinct dirs let the two coexist.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
@@ -28,29 +23,12 @@ const nextConfig: NextConfig = {
         destination: '/zh/agentx/:path*',
         permanent: true,
       },
-      // PowerX moved into the inference dashboard.
       { source: '/gpu-metrics', destination: '/inference', permanent: true },
       { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
     ]);
   },
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
-    // NOTE: route transitions (src/app/motion.css "Route transitions" block)
-    // need no config here. Next 15–16.2 gated React's <ViewTransition> behind
-    // `experimental.viewTransition`; the React build vendored by Next 16.3
-    // exports it as stable `React.ViewTransition`, and 16.3 removed the flag
-    // from the config schema (setting it now fails validation).
-    // components/motion/route-transition.tsx feature-detects the export, so
-    // navigation correctness never depends on it.
-    // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
-    // "Render-blocking requests" insight and rejected: it embeds the full CSS
-    // text in every route's RSC payload (~46 KiB gz, duplicated 2×), so every
-    // client-side tab navigation re-downloads CSS that is otherwise a
-    // one-time immutable fetch. Net regression for this SPA-heavy dashboard.
-    // Persist Turbopack's compiler cache under .next/cache in GitHub Actions
-    // so the workflow cache step makes warm builds fast. Gated on
-    // GITHUB_ACTIONS (not CI, which Vercel also sets) to keep the
-    // experimental flag out of production builds.
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {

@@ -5,6 +5,7 @@ import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllPosts } from '@/lib/blog/blog';
+import { getAllHardwarePages } from '@/lib/hardware/hardware';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare/compare-slug';
@@ -36,10 +37,6 @@ import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 
-/**
- * Emit an English page and its Chinese sibling as a pair, both carrying the
- * full hreflang set so crawlers link the two versions.
- */
 function localizedPair(
   enPath: string,
   entry: Omit<SitemapEntry, 'url' | 'alternates'>,
@@ -57,8 +54,6 @@ function localizedPair(
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
-  // Only emit (model, pair) URLs that have benchmark data on both sides —
-  // avoids polluting the sitemap with empty pages that hurt crawl budget.
   const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries] = await Promise.all([
     getAllComparableCompareSlugs(),
     getAllComparablePrecisionSlugs(),
@@ -67,6 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getAvailableRunEntries(),
   ]);
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
+  const zhHardwarePages = new Set(getAllHardwarePages('zh').map((page) => page.slug));
 
   return [
     ...DASHBOARD_ROUTES.filter((route) => route.indexable).flatMap((route) =>
@@ -76,9 +72,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: route.canonicalPath === '/' ? 1 : 0.9,
       }),
     ),
-    // Per-model tab routes (/calculator/<slug>, /historical/<slug>). The
-    // default model's pages canonicalize to the bare tab paths (already
-    // emitted above), so they stay out of the sitemap.
     ...MODEL_ROUTE_TABS.flatMap((tab) =>
       modelRoutesForTab(tab)
         .filter((route) => route.model !== defaultRouteModel(tab))
@@ -102,9 +95,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'yearly',
       priority: 0.4,
     }),
-    // Per-model inference pages — the indexable path form of
-    // `/inference?g_model=…`. Deprecated models keep their pages (historical
-    // data stays reachable) at a lower priority than actively benchmarked ones.
     ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
       localizedPair(`/inference/${entry.slug}`, {
         lastModified: now,
@@ -112,8 +102,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: ACTIVE_INFERENCE_MODEL_SLUGS.includes(entry) ? 0.8 : 0.5,
       }),
     ),
-    // The catalog index is indexable; the per-point detail pages it links to
-    // stay noindex, so only this page enters the sitemap.
     ...localizedPair('/inference/agentic', {
       lastModified: now,
       changeFrequency: 'daily',
@@ -196,8 +184,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    // Live GPU rankings per model (fastest / cheapest). The registry is
-    // static; page bodies render from live benchmark data on request.
     ...localizedPair('/rankings', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
     ...getAllRankingPageEntries().flatMap((entry) =>
       localizedPair(`/rankings/${entry.slug}`, {
@@ -206,8 +192,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    // Model-on-hardware pages, availability-filtered so only pairings with
-    // benchmark rows enter the sitemap (same crawl-budget rule as /compare).
     ...localizedPair('/run', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
     ...runEntries.flatMap((entry) =>
       localizedPair(`/run/${entry.slug}`, {
@@ -222,13 +206,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: 'monthly' as const,
         priority: 0.7,
       };
-      // Posts without a Chinese translation stay English-only in the sitemap.
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
-    // Whitepaper landing pages. Every paper ships both locales from the same
-    // registry entry, and the Figure 1 PNG is listed so image crawlers find it
-    // next to the canonical URL (the Chinese page reuses the English asset).
+    ...localizedPair('/hardware', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
+    ...getAllHardwarePages().flatMap((page) => {
+      const enPath = `/hardware/${page.slug}`;
+      const entry = {
+        lastModified: new Date(`${page.date}T00:00:00Z`).toISOString(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      };
+      if (!zhHardwarePages.has(page.slug)) return [{ ...entry, url: `${BASE_URL}${enPath}` }];
+      return localizedPair(enPath, entry);
+    }),
     ...localizedPair('/whitepaper', {
       lastModified: now,
       changeFrequency: 'monthly',
@@ -242,7 +233,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
     ...localizedPair('/model', {
       lastModified: now,
       changeFrequency: 'weekly' as const,
@@ -262,9 +252,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    // Every indexed per-dollar landing page has a stable data graphic so image
-    // crawlers discover the PNG alongside the canonical comparison URL. The
-    // Chinese sibling references the same English-hosted PNG.
     ...compareSlugs.flatMap(({ modelSlug, a, b }) => {
       const enPath = `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
       return localizedPair(enPath, {
@@ -274,7 +261,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       });
     }),
-    // Precision comparison pages — each slug page has a hero PNG chart.
     ...precisionSlugs.flatMap(({ modelSlug, gpu, precA, precB }) => {
       const enPath = `/compare-precision/${canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB)}`;
       return localizedPair(enPath, {
@@ -284,7 +270,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       });
     }),
-    // Speculative decoding comparison pages — each slug page has a hero PNG chart.
     ...specDecodeSlugs.flatMap(({ modelSlug, gpu, precision, method }) => {
       const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method)}`;
       return localizedPair(enPath, {

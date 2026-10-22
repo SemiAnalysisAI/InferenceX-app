@@ -5,6 +5,15 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+## TCO basis
+
+Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
+read-only views. Qwen3.5 and Kimi K3 expose the corresponding dashboard toggle
+on 8K/1K and Agentic Traces; inference charts show it for cost metrics when
+TPUv7 data is visible. The API accepts the pricing basis independently of
+control visibility. It changes configured ownership costs, not measured
+throughput; explicit custom costs remain user-controlled.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at
@@ -44,6 +53,15 @@ share links and explicit presets still apply their selections. View API requests
 are stateless: omit `best` for the default ranking, or send `best=false` explicitly
 for each model to retain all selected series. Do not infer a destination model's
 default from a manual engine selection made on another model.
+
+Best per SKU ranks only points in the selected precisions. For example,
+`precisions=fp8&best=true` selects the best FP8 configuration per SKU; a faster
+FP4 configuration cannot displace it. The dashboard applies the same scope to
+both official and unofficial-overlay selections.
+
+Qwen3.5 defaults to `xmode=e2e` and excludes MI300X, MI325X, H100, and H200
+when `gpus` is omitted. An explicit `xmode` or `gpus` overrides its model default;
+use `gpus=` to include all hardware.
 
 Example URLs (check deployed availability before use):
 
@@ -109,6 +127,23 @@ a staging link to production and assume that its unpublished run is available
 there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 
 ## View selection
+
+For AgentX inference and historical comparisons, read
+[AgentX P90 interactivity](agentic-interactivity.md). Request
+`sequence=agentic-traces&percentile=p90&xmode=interactivity` for the inference view.
+The historical view fixes P90 by workload and does not accept `percentile`.
+Require the historical response's `interactivity.statistic=p90` before labeling
+its values as P90. Its CSV exposes `targetInteractivity`,
+`interactivityStatistic` and `interactivityField`. Single-turn histories keep the
+median; the formal median-only TCO workflow is unchanged.
+
+For a chart of historical performance improvements with associated source PRs and
+benchmark runs, use [inferencex-pr-improvements](../../inferencex-pr-improvements/SKILL.md).
+Its helper checks whether the deployment supports `chart=waterfall`, then renders
+the returned baseline, successive records and best observation. A compatible
+saved response also works offline. Source links establish provenance, not an
+isolated causal effect of a PR; the outputs are raw-view artifacts, not formal
+`inferencex verify` bundles.
 
 All paths below are relative to `/api/v1/views/`. The maintained exhaustive
 query-key list is in the app's OpenAPI contract. The following groups explain
@@ -217,7 +252,11 @@ boundary, not evidence that those points are more energy efficient.
 The dashboard names its four boundaries GPU Level Measured, GPU Level Provisioned
 (TDP), All in Provisioned, and All in Measured. All in Measured combines measured
 GPU power with modeled unmeasured components and PUE; do not describe it as measured
-wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis`
+wall power. GPU Level Provisioned (TDP) and All in Provisioned publish only J per
+output token. Their watts are per-hardware constants (rated TDP, and the registry's
+all-in utility power with PUE already included), drawn only as power-timeline reference
+lines: `metric=y_gpuProvisionedWatts` and `metric=y_utilityProvisionedWatts` return 400.
+Other metric IDs and API selector values are unchanged. Profit `powerBasis`
 still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
 Expanding assumptions or unavailable-estimate details does not change returned data.
 
@@ -351,6 +390,11 @@ America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution
 returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
 Keep using `mori-sglang` for API selectors and raw CSV output throughout.
 This display-only exception changes no API data or OpenAPI contract.
+
+`MoRI vLLM` is the display label for `vllm-disagg` in charts and read-only
+views. Keep using `vllm-disagg` as the raw framework key and
+`mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
+stored data or API selectors.
 
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test

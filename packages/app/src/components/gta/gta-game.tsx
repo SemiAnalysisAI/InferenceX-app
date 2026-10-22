@@ -182,7 +182,6 @@ export function GtaGame({
   assetBase,
 }: {
   locale?: 'en' | 'zh';
-  /** Override for the asset root (defaults to /decorative/gta/). */
   assetBase?: string;
 }) {
   const t = COPY[locale],
@@ -349,7 +348,6 @@ export function GtaGame({
       if (debug.advanceTime === advance) delete debug.advanceTime;
       if (debug.gta_state === get) delete debug.gta_state;
     };
-    // The renderer owns one lifetime, independent of HUD state updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
   useEffect(

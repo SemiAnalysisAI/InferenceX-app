@@ -372,9 +372,7 @@ export function GpuSpecsContent() {
     [t],
   );
 
-  // Refs for each scale-out topology diagram, keyed by GPU name
   const diagramRefs = useRef<Record<string, TopologyDiagramHandle | null>>({});
-  // Refs for each scale-up topology diagram, keyed by GPU name
   const scaleUpDiagramRefs = useRef<Record<string, ScaleUpTopologyDiagramHandle | null>>({});
 
   const handleTopologyClick = (gpuName: string) => {

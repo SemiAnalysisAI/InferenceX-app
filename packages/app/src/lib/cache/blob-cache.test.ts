@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock @vercel/blob
 vi.mock('@vercel/blob', () => ({
   del: vi.fn(),
   head: vi.fn(),
@@ -16,7 +15,6 @@ const mockHead = vi.mocked(head);
 const mockList = vi.mocked(list);
 const mockPut = vi.mocked(put);
 
-// Save original env
 const originalEnv = { ...process.env };
 
 beforeEach(() => {
@@ -24,7 +22,6 @@ beforeEach(() => {
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token-123';
   process.env.BLOB_CACHE_PREFIX = 'test-cache';
 
-  // Default: global fetch returns valid JSON
   vi.stubGlobal('fetch', vi.fn());
 });
 

@@ -3,8 +3,6 @@ import { ImageResponse } from 'next/og';
 import type { SsrInterpolatedRow } from '@/lib/compare/compare-ssr';
 import { getCjkFonts } from '@/lib/seo/og-assets';
 
-// Render natively at high DPI. Scaling the CSS output would bitmap-upsample
-// Satori's text and SVG paths instead of rasterizing them at the target size.
 export const R = 2;
 export const SIZE = { width: 1200 * R, height: 675 * R };
 export const CHART_FRAME = { left: 0, top: 18 * R, width: 746 * R, height: 382 * R };
@@ -150,7 +148,6 @@ export function renderSeriesPath(points: Point[], stroke: string, dashed: boolea
   );
 }
 
-/** Shared Satori shell for all indexed compare PNG routes. */
 export async function renderComparePngChart({
   curveRows,
   plottedRows,

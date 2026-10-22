@@ -48,18 +48,11 @@ const STRINGS = {
 interface Props {
   value: TelemetryDisplayState;
   onChange: (next: TelemetryDisplayState) => void;
-  /** Analytics event prefix, e.g. `gpu_metrics` → `gpu_metrics_display_mode_changed`. */
   analyticsPrefix: string;
-  /** Prefix for control ids so two charts on one page do not collide. */
   idPrefix: string;
   className?: string;
 }
 
-/**
- * Display-mode controls shared by the PowerX explorer and the per-point PowerX
- * tab: raw samples vs. a time-window rolling average, and per-chip lines vs.
- * the mean across the visible chips.
- */
 export function TelemetryDisplayControls({
   value,
   onChange,

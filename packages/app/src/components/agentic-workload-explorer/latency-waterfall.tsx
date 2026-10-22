@@ -7,9 +7,9 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
 const COLORS = {
-  prefill: '#0ea5e9', // sky-500
-  decode: '#8b5cf6', // violet-500
-  undecomposed: '#6b7280', // gray-500
+  prefill: '#0ea5e9',
+  decode: '#8b5cf6',
+  undecomposed: '#6b7280',
 } as const;
 
 const STRINGS = {
@@ -231,7 +231,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
 
   return (
     <div className="space-y-4">
-      {/* Section header */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
           <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
@@ -240,7 +239,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
           <div className="flex-1 h-px bg-border" />
         </div>
 
-        {/* Legend + group controls */}
         <div className="flex items-center gap-4">
           {legendItems(t).map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
@@ -269,7 +267,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
         </div>
       </div>
 
-      {/* Chart container */}
       <div
         ref={containerRef}
         className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
@@ -306,7 +303,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                 onMouseMove={(e) => handleMouseMove(e, row)}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Indented border line for child rows */}
                 {row.indent === 1 && (
                   <line
                     x1={8}
@@ -319,7 +315,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                   />
                 )}
 
-                {/* Row label */}
                 <text
                   x={labelX + 4}
                   y={y + ROW_HEIGHT / 2}
@@ -334,7 +329,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                   {row.label}
                 </text>
 
-                {/* Background track */}
                 <rect
                   x={barX}
                   y={y + 2}
@@ -345,7 +339,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                   style={{ color: 'var(--color-border)', opacity: 0.3 }}
                 />
 
-                {/* Latency segments — hidden for group header rows (summed bar is misleading) */}
                 {!row.isGroup &&
                   segments.map((seg, si) =>
                     seg.w > 0 ? (
@@ -369,7 +362,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
                     ) : null,
                   )}
 
-                {/* Duration label */}
                 <text
                   x={barX + barWidth + 8}
                   y={y + ROW_HEIGHT / 2}
@@ -391,7 +383,6 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
           })}
         </svg>
 
-        {/* Tooltip */}
         {tooltip && (
           <div
             className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-3 py-2 space-y-1"

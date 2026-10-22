@@ -7,7 +7,6 @@ import { APP_THEMES } from './themes/themes';
 const src = path.resolve(import.meta.dirname, '..');
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const optionalDirectory = new RegExp(`^components/(?:${optionalThemes.join('|')})/`);
-// These wrappers contain only activation gates and dynamic imports.
 const wrappers = new Set([
   'components/minecraft/minecraft-splash.tsx',
   'components/minecraft/minecraft-toggles-lazy.tsx',
@@ -19,7 +18,6 @@ const optionalAsset = new RegExp(
   'i',
 );
 
-/** Static runtime imports, including re-exports. Dynamic imports stay behind their gate. */
 function imports(text: string): string[] {
   const file = ts.createSourceFile(
     'module.tsx',
@@ -116,7 +114,6 @@ describe('optional theme import boundary', () => {
       const dependencies = file.endsWith('.css')
         ? [...text.matchAll(/@import\s+['"](?<url>[^'"]+)['"]/g)].map((match) => match.groups!.url)
         : imports(text);
-      // Palette variables and hiding rules may remain shared; asset/font loads may not.
       if (file.endsWith('.css')) {
         for (const match of text.matchAll(/(?:url\([^)]*\)|@font-face\s*\{[^}]*\})/g))
           if (optionalAsset.test(match[0])) violations.push(`${chain.join(' → ')}: ${match[0]}`);

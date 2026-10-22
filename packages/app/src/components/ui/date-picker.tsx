@@ -72,22 +72,10 @@ export interface DatePickerProps {
   placeholder?: string;
   availableDates?: string[];
   isCheckingAvailableDates?: boolean;
-  /**
-   * Whether the newest run on the selected date is currently selected. When
-   * false, the external "Latest" button stays enabled even on the latest date
-   * so it can jump to the newest run. Defaults to true.
-   */
   isLatestRunSelected?: boolean;
-  /**
-   * Called by the external "Latest" button when the latest date is already
-   * selected but an older run is active, so the caller can select the newest run.
-   */
   onGoToLatestRun?: () => void;
 }
 
-/**
- * Single date picker component that allows selecting a date via a modal calendar.
- */
 export function DatePicker({
   date,
   onChange,
@@ -107,7 +95,6 @@ export function DatePicker({
   const [isApplying, _setIsApplying] = useState(false);
   const [error, setError] = useState('');
 
-  // Get display text for the input
   const getDisplayText = () => {
     if (!date) {
       return resolvedPlaceholder;
@@ -115,7 +102,6 @@ export function DatePicker({
     return formatDisplayDate(date, locale);
   };
 
-  // Handle date selection in calendar
   const handleDateClick = (dateObj: Date) => {
     const dateStr = formatCalendarDate(dateObj);
     const isSelected = tempDate === dateStr;
@@ -131,7 +117,6 @@ export function DatePicker({
     });
   };
 
-  // Apply selection
   const handleApply = () => {
     if (!tempDate) {
       setError(t.selectDateError);
@@ -148,7 +133,6 @@ export function DatePicker({
     setOpen(false);
   };
 
-  // Cancel selection
   const handleCancel = () => {
     setTempDate(date);
     setOpen(false);
@@ -156,7 +140,6 @@ export function DatePicker({
 
   const getLatestDate = () => getLatestSelectableDate(availableDates, maxDate);
 
-  // Check if the selected date is already the latest
   const isLatestDateSelected = () => {
     if (!tempDate) {
       return false;
@@ -165,23 +148,18 @@ export function DatePicker({
     return tempDate === getLatestDate();
   };
 
-  // Check if the current date prop is already the latest (for external button)
   const isCurrentDateLatest = () => {
     if (!date) {
       return false;
     }
     const latestDate = getLatestDate();
-    // date prop is already in YYYY-MM-DD format
     return date === latestDate;
   };
 
-  // Go to latest date (for calendar dialog)
   const handleGoToLatest = () => {
     setTempDate(getLatestDate());
   };
 
-  // Go to latest date directly (for external button). When the latest date is
-  // already selected, fall through to the latest run instead.
   const handleGoToLatestExternal = () => {
     if (isCurrentDateLatest()) {
       if (!isLatestRunSelected && onGoToLatestRun) {
@@ -197,7 +175,6 @@ export function DatePicker({
 
   const isLatestDisabled = isCurrentDateLatest() && isLatestRunSelected;
 
-  // Get current date index in available dates
   const getCurrentDateIndex = () => {
     if (!date || !availableDates || availableDates.length === 0) {
       return -1;
@@ -205,19 +182,16 @@ export function DatePicker({
     return availableDates.indexOf(date);
   };
 
-  // Check if we can go to previous date
   const canGoPrevious = () => {
     const index = getCurrentDateIndex();
     return index > 0;
   };
 
-  // Check if we can go to next date
   const canGoNext = () => {
     const index = getCurrentDateIndex();
     return index >= 0 && index < (availableDates?.length ?? 0) - 1;
   };
 
-  // Go to previous available date
   const handleGoPrevious = () => {
     const index = getCurrentDateIndex();
     if (index > 0 && availableDates) {
@@ -226,7 +200,6 @@ export function DatePicker({
     }
   };
 
-  // Go to next available date
   const handleGoNext = () => {
     const index = getCurrentDateIndex();
     if (availableDates && index >= 0 && index < availableDates.length - 1) {
@@ -235,7 +208,6 @@ export function DatePicker({
     }
   };
 
-  // Reset when opening
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'date_picker_opened' : 'date_picker_closed');
     setError('');

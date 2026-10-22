@@ -334,9 +334,7 @@ export default function ServingResults({
       mediaPath = safePath(
         `${current.runPath.slice(0, current.runPath.lastIndexOf('/') + 1)}${safePath(path)}`,
       );
-  } catch {
-    // Invalid manifest paths never become media URLs.
-  }
+  } catch {}
   const mediaUrl = urls.get(mediaPath);
   const chooseCell = (id: string) => {
     setSelected(id);

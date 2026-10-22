@@ -20,17 +20,11 @@ const MAX_ROWS = 5_000;
 
 const roundMetric = (v: unknown) => (typeof v === 'number' ? Math.round(v * 10000) / 10000 : v);
 
-/**
- * Defense-in-depth query filter. The readonly DB role enforces permissions,
- * but we also reject obviously bad queries before they hit the wire.
- */
 const BLOCKED_PATTERN =
   /\b(?:INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXEC|SET|RESET|PREPARE|EXECUTE|DO)\b/iu;
 
-/** Max execution time for query_sql calls (ms). */
 const QUERY_TIMEOUT_MS = 5_000;
 
-// ── Enum arrays for JSON Schema constraints ──────────────────────────────
 const HW_ENUM = [...GPU_KEYS].toSorted() as [string, ...string[]];
 const MODEL_ENUM = Object.keys(DB_MODEL_TO_DISPLAY).toSorted() as [string, ...string[]];
 const FW_ENUM = [...FRAMEWORK_KEYS].toSorted() as [string, ...string[]];
@@ -42,18 +36,11 @@ const modelMapping = Object.entries(DB_MODEL_TO_DISPLAY)
   .map(([k, v]) => `${k}=${v}`)
   .join(', ');
 
-/**
- * Server instructions — compact (<2KB) so Claude Code doesn't truncate.
- * Contains only what agents need to pick the right tool on the first call.
- */
 const SERVER_INSTRUCTIONS = `InferenceX: ML inference benchmark database. Query GPU performance across hardware and frameworks.
 Models: ${modelMapping}.
 Key tool: get_latest_benchmarks filters by hardware, model, framework, precision, spec_method, disagg, num_gpu, isl, osl, and conc. It returns config details (including num_prefill_gpu and num_decode_gpu) plus selected metric keys. Pass metrics=["all"] for the complete metrics JSONB object. Common keys include median_ttft, p99_ttft, median_tpot, p99_tpot, tput_per_gpu, output_tput_per_gpu, median_itl, and median_e2el.
 For aggregations or custom queries use query_sql against the latest_benchmarks view joined to configs.`;
 
-/**
- * Full overview returned by get_overview tool — no length constraint.
- */
 const DOMAIN_OVERVIEW = `InferenceX benchmark database. It contains ML inference performance data across GPU hardware and serving frameworks.
 
 ## Tables
@@ -115,8 +102,6 @@ export function createServer(): McpServer {
     { instructions: SERVER_INSTRUCTIONS },
   );
 
-  // ── Domain overview ──────────────────────────────────────────────────
-
   server.registerTool(
     'get_overview',
     {
@@ -130,8 +115,6 @@ export function createServer(): McpServer {
         content: [{ type: 'text' as const, text: DOMAIN_OVERVIEW }],
       }),
   );
-
-  // ── High-level query tools ───────────────────────────────────────────
 
   server.registerTool(
     'list_hardware',
@@ -269,7 +252,6 @@ export function createServer(): McpServer {
       limit,
     }) => {
       const rowLimit = Math.min(limit ?? 200, MAX_ROWS);
-      // Allowlisted sort keys to prevent SQL injection via JSONB key
       const SORT_KEYS = new Set([
         'median_ttft',
         'p99_ttft',
@@ -309,7 +291,6 @@ export function createServer(): McpServer {
         LIMIT ${rowLimit}
       `) as Record<string, unknown>[];
 
-      // Default metrics to extract when no specific metrics requested.
       const DEFAULT_METRICS = [
         'median_tpot',
         'median_ttft',
@@ -327,7 +308,6 @@ export function createServer(): McpServer {
           ? requestedMetrics
           : DEFAULT_METRICS;
 
-      // Build filter set for stripping redundant fields
       const appliedFilters: Record<string, unknown> = {};
       if (hardware) appliedFilters.hardware = hardware;
       if (model) appliedFilters.model = model;
@@ -375,8 +355,6 @@ export function createServer(): McpServer {
       };
     },
   );
-
-  // ── Raw SQL escape hatch ─────────────────────────────────────────────
 
   server.registerTool(
     'query_sql',

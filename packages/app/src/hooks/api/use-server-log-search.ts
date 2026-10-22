@@ -26,7 +26,6 @@ async function fetchServerLogSearch(
   return (await response.json()) as ServerLogSearchResponse;
 }
 
-/** Search complete stored log files; the browser does not need to load them first. */
 export function useServerLogSearch(id: number, query: string, enabled = false) {
   return useQuery({
     queryKey: ['server-log-search', id, query] as const,

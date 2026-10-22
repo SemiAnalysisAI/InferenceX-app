@@ -11,7 +11,6 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-/** Normalize legacy strings and current `{ name, version? }` component metadata. */
 function componentMetadata(raw: unknown): { name?: string; version?: string } {
   const legacyName = nonEmptyString(raw);
   if (legacyName) return { name: legacyName };
@@ -23,7 +22,6 @@ function componentMetadata(raw: unknown): { name?: string; version?: string } {
   };
 }
 
-/** Extract runtime components into the flat metrics representation consumed by the app. */
 export function extractRuntimeMetadata(row: Record<string, unknown>): RuntimeMetadata {
   const metadata: RuntimeMetadata = {};
   const kvOffloading = nonEmptyString(row.kv_offloading);

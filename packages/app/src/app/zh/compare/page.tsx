@@ -95,7 +95,6 @@ export default function CompareIndexPageZh() {
     <>
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="zh" />
-      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
       <Suspense fallback={<CompareRouteSkeleton />}>
         <CompareCatalogZh />
       </Suspense>
@@ -169,10 +168,6 @@ async function CompareCatalogZh() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                {/* `displayName` 按约定即 Model 枚举值（见 compare-slug.ts 中的
-                    CompareModelSlug），因此共享的 ModelLogo 可从 MODEL_CONFIG
-                    解析各区块的品牌标识（DeepSeek、MiniMax、Kimi 等）；没有
-                    配置 logo 的模型则不渲染任何内容。 */}
                 <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
                   <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
                   {model.label}

@@ -1,27 +1,3 @@
-/**
- * Ingest OperatorX runs into the OperatorX database.
- *
- * Stores each run's RAW documents (the manifest and every shard's operatorx results
- * JSON); the normalizer in src/operatorx/normalize.ts is the single transform point and
- * runs at API-read time. It also runs once here, so a run that cannot be read is never
- * stored. Re-ingesting a run replaces it.
- *
- * Sweep runs are accepted from any branch of the source repo; only the workflow
- * identity is checked.
- *
- * Three modes:
- *   --download <run-url-or-id> [repo]  Download a sweep run's artifacts from GitHub
- *   --bundle <file.json> [...]         Store raw bundles (`OperatorXRawBundle`) as they are
- *   (no flag)                          Read pre-downloaded artifacts from INGEST_ARTIFACTS_PATH
- *
- * Environment variables:
- *   DATABASE_OPERATORX_WRITE_URL — Postgres connection string (direct, non-pooled)
- *   GITHUB_TOKEN                 — GitHub token for run metadata + artifact download
- *   INGEST_RUN_ID                — (env mode) Workflow run ID
- *   INGEST_ARTIFACTS_PATH        — (env mode) Local path to pre-downloaded artifacts
- *   INGEST_REPO                  — (env mode) Source repo slug (owner/name)
- */
-
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -37,7 +13,6 @@ const SWEEP_WORKFLOW_PATH = '.github/workflows/operatorx-sweep.yml';
 const MANIFEST_FILE = 'operatorx-manifest.json';
 const SHARD_RE = /^operatorx-shard-(?<run>\d+)-(?<attempt>\d+)-(?<shard>.+)$/u;
 
-/** Every results JSON under an artifact's results/, except counter dumps. */
 function readResultDocs(dir: string): unknown[] {
   const root = path.join(dir, 'results');
   if (!fs.existsSync(root)) return [];
@@ -56,7 +31,6 @@ function readResultDocs(dir: string): unknown[] {
   return docs;
 }
 
-/** The newest artifact name per shard, from attempts up to `attempt`. */
 function selectShards(names: string[], runId: string, attempt: number) {
   const shards = new Map<string, { name: string; attempt: number }>();
   for (const name of names) {
@@ -69,7 +43,6 @@ function selectShards(names: string[], runId: string, attempt: number) {
   return shards;
 }
 
-/** A sweep run's bundle from its artifacts in `dir`, downloading them first if asked. */
 export function sweepBundle(repo: string, runId: string, dir: string, download: boolean) {
   const run = fetchRunMeta(repo, runId);
   if (run.path !== SWEEP_WORKFLOW_PATH)
@@ -128,7 +101,6 @@ function parseRunId(input: string | undefined): string {
 }
 
 function checkRepo(repo: string): string {
-  // reaches shell-interpolated `gh api` calls
   if (!/^[\w.-]+\/[\w.-]+$/u.test(repo)) throw new Error(`Invalid repo slug: ${repo}`);
   return repo;
 }

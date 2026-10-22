@@ -5,8 +5,6 @@ import {
   PROFIT_HISTORY_DATE,
 } from '../support/profit-fixtures';
 
-// Invalid MI355X knots dominate the valid curve in the performance frontier.
-// Power selection must recover the remaining curve before interpolation.
 function rowsFor(date = PROFIT_DATE) {
   const rows = profitBenchmarkRows('kimik3', date).map((row) => ({
     ...row,

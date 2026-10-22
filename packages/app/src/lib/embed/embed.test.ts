@@ -37,8 +37,6 @@ describe('parseEmbedOptions', () => {
   });
 
   it('locks to the requested framework families and drops unknown ones', () => {
-    // The lock is what keeps a vLLM-hosted embed from ever plotting another
-    // engine, so unknown keys must not silently widen it.
     expect(parseEmbedOptions({ framework: 'vllm' }).frameworks).toEqual(['vllm']);
     expect(parseEmbedOptions({ framework: 'VLLM, sglang' }).frameworks).toEqual(['vllm', 'sglang']);
     expect(parseEmbedOptions({ framework: 'vllm,vllm,nope' }).frameworks).toEqual(['vllm']);
@@ -66,12 +64,10 @@ describe('parseEmbedOptions', () => {
       theme: 'dark',
       skin: 'vllm',
     });
-    // Unknown skin prefix: keep the base theme, drop the skin.
     expect(parseEmbedOptions({ theme: 'sglang-light' })).toMatchObject({
       theme: 'light',
       skin: undefined,
     });
-    // Standalone skin= is also accepted; theme= prefix wins when both are set.
     expect(parseEmbedOptions({ skin: 'vllm' })).toMatchObject({ theme: 'dark', skin: 'vllm' });
     expect(parseEmbedOptions({ skin: 'nope', theme: 'light' }).skin).toBeUndefined();
   });

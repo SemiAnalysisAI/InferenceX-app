@@ -6,8 +6,6 @@ import * as d3 from 'd3';
 
 import { useChartZoom, type UseChartZoomResult } from './useChartZoom';
 
-// Lightweight renderHook — TLR isn't installed, so we mount a 1-component root
-// and capture the latest hook return value in a ref-style object.
 function renderHook<T>(hook: () => T): { result: { current: T }; unmount: () => void; root: Root } {
   const result = { current: undefined as unknown as T };
   function TestComponent() {
@@ -64,9 +62,6 @@ describe('setupZoom transform replay', () => {
 
     hook.current.setupZoom(svgSelection, 800, 600, { onZoom });
 
-    // Drawing just happened at base scales; replaying identity would force the
-    // chart's zoom handler through a full axes + grid + layers pass for
-    // pixel-identical output.
     expect(onZoom).not.toHaveBeenCalled();
     cleanup();
   });
@@ -76,14 +71,11 @@ describe('setupZoom transform replay', () => {
     const firstOnZoom = vi.fn();
     const zoom = hook.current.setupZoom(svgSelection, 800, 600, { onZoom: firstOnZoom });
 
-    // User zooms in: 2x around an offset.
     const userTransform = d3.zoomIdentity.translate(-100, -50).scale(2);
     svgSelection.call(zoom.transform as any, userTransform);
     expect(firstOnZoom).toHaveBeenCalledTimes(1);
     expect(hook.current.zoomTransformRef.current.k).toBe(2);
 
-    // Chart rebuilds (data change) and re-runs setupZoom: the stored zoom must
-    // be replayed exactly once so the freshly drawn DOM matches the zoom state.
     const secondOnZoom = vi.fn();
     hook.current.setupZoom(svgSelection, 800, 600, { onZoom: secondOnZoom });
 
@@ -110,11 +102,9 @@ describe('setupZoom transform replay', () => {
     const { svgEl, svgSelection, hook, cleanup } = setup();
     const onZoom = vi.fn();
 
-    // Stored ref says identity but someone left a stale transform on the node.
     (svgEl as unknown as { __zoom: d3.ZoomTransform }).__zoom = d3.zoomIdentity.scale(3);
     hook.current.setupZoom(svgSelection, 800, 600, { onZoom });
 
-    // The replay normalizes the node back to the stored (identity) transform.
     expect(onZoom).toHaveBeenCalledTimes(1);
     expect(d3.zoomTransform(svgEl).k).toBe(1);
     cleanup();
@@ -126,8 +116,6 @@ describe('setupZoom transform replay', () => {
 
     hook.current.setupZoom(svgSelection, 800, 600, { onZoom });
 
-    // Charts that declare a default zoom level still get their initial
-    // transform applied — only the no-op identity replay is skipped.
     expect(onZoom).toHaveBeenCalledTimes(1);
     expect(onZoom.mock.calls[0][0].transform.k).toBe(1.5);
     cleanup();

@@ -32,7 +32,6 @@ interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
   tooltipRef: React.RefObject<HTMLDivElement | null>;
   dimensions: { width: number; height: number };
-  /** Owned by D3Chart so the imperative handle can read current scales. */
   scalesRef: React.MutableRefObject<{ xScale: BuiltScale; yScale: BuiltScale } | null>;
   setupZoom: (
     svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
@@ -41,7 +40,6 @@ interface RendererDeps {
     options?: any,
   ) => d3.ZoomBehavior<SVGSVGElement, unknown>;
   zoomTransformRef: React.MutableRefObject<d3.ZoomTransform>;
-  // Tooltip handlers
   isPinned: () => boolean;
   pinTooltip: (data: any, isOverlay?: boolean) => void;
   dismissTooltip: (clearPinnedPoint?: boolean) => void;
@@ -81,7 +79,6 @@ function resolveTickValues(
   return typeof tickValues === 'function' ? tickValues(scale) : tickValues;
 }
 
-/** Map per-axis `grid` flags onto the grid renderer's visibility options. */
 function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility {
   return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
 }
@@ -92,7 +89,6 @@ export interface ZoomFrameBatcher {
   cancel: () => void;
 }
 
-/** Coalesces expensive zoom work and always runs the latest submitted closure. */
 export function createZoomFrameBatcher(
   requestFrame: (callback: FrameRequestCallback) => number,
   cancelFrame: (id: number) => void,
@@ -131,7 +127,6 @@ export interface TransitionGeometry {
   paths: Map<SVGPathElement, string>;
 }
 
-/** Final z-order after every render: rooflines < points < line labels. */
 const RAISE_ORDER = ['.dot-group', '.point', '.line-label'] as const;
 const LINE_LABEL_RAISE = ['.line-label'] as const;
 const TRANSITION_POINT_SELECTOR = '.dot-group';
@@ -231,10 +226,6 @@ function customLayerDisplayPlanIdentity<T>(layers: LayerConfig<T>[]): string {
     .join('|');
 }
 
-/**
- * Coordinates structure, stable-identity data joins, metric updates, display
- * invalidation, tooltip wiring, and zoom work for D3Chart.
- */
 export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps): void {
   const {
     chartId,
@@ -272,8 +263,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     attachHandlers,
   } = deps;
 
-  // scalesRef is owned by D3Chart so the imperative handle can read it; the renderer
-  // writes the freshly-built scales into it on every render below.
   const layoutRef = useRef<ChartLayout | null>(null);
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
@@ -311,8 +300,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const dataPhaseLayers = dataIdentity ? null : layers;
   const dataPhaseTooltip = dataIdentity ? null : tooltipConfig;
 
-  // Phase 1: SVG structure. Metric changes may refresh labels here, but never
-  // touch joined marks.
   useLayoutEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
     if (!hasRenderableData) {
@@ -351,8 +338,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     hasRenderableData,
   ]);
 
-  // Phase 2: full data join. With a supplied identity this runs only when the
-  // point set changes, not when coordinates or display state change.
   useLayoutEffect(() => {
     if (
       !svgRef.current ||
@@ -364,7 +349,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       return;
     }
 
-    // Animate when data or scale domains changed (but not on resize/theme changes)
     const dataChanged = data !== prevDataRef.current;
     const scalesChanged =
       xScaleConfig !== prevScalesRef.current.xScaleConfig ||
@@ -376,10 +360,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     {
       if (!svgRef.current || !tooltipRef.current) return;
 
-      // Preserve zoom transform before structure rebuild
       zoomTransformRef.current = d3.zoomTransform(svgRef.current);
 
-      // ── Save old positions for animated transitions ──
       const existingGroup = d3.select(svgRef.current).select<SVGGElement>('.zoom-group');
       const previousGeometry =
         transitionDuration && (dataChanged || scalesChanged) && !existingGroup.empty()
@@ -392,7 +374,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       const renderGroup = clipContent ? zoomGroup : g;
       const tooltip = d3.select(tooltipRef.current);
 
-      // ── Build scales (skip for radial-only charts) ──
       const xScale = hasScales
         ? buildScale(xScaleConfig, [0, width])
         : buildScale({ type: 'linear', domain: [0, 1] }, [0, width]);
@@ -401,7 +382,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         : buildScale({ type: 'linear', domain: [0, 1] }, [height, 0]);
       scalesRef.current = { xScale, yScale };
 
-      // ── Grid + Axes (skip when no scale configs) ──
       if (hasScales) {
         const xTickValues = resolveTickValues(xAxisConfig?.tickValues, xScale as AnyScale);
         const yTickValues = resolveTickValues(yAxisConfig?.tickValues, yScale as AnyScale);
@@ -425,7 +405,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           yTickValues,
         });
 
-        // Custom axis formatting callbacks
         if (xAxisConfig?.customize) {
           xAxisConfig.customize(layout.xAxisGroup);
         }
@@ -434,7 +413,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         }
       }
 
-      // ── Render context ──
       const ctx: RenderContext = {
         layout,
         tooltipElement: tooltipRef.current,
@@ -448,7 +426,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       };
       renderContextRef.current = ctx;
 
-      // ── Render layers ──
       const layerSelections: (d3.Selection<any, any, any, any> | null)[] = [];
       for (const layer of layers) {
         const sel = renderLayer(layer, renderGroup, xScale, yScale, layout, ctx);
@@ -457,20 +434,10 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
       lastDisplayIdentityRef.current = displayIdentity;
 
-      // Ensure points render above lines/rooflines on re-renders
-      // (D3 enter appends new elements at the end, so new lines can end up after existing dots)
-      //
-      // Line labels (built in the rooflines layer, which renders before the dots
-      // so paths sit behind points) must sit above the points too. Raise them
-      // after the dot raise so the final z-order is rooflines < points <
-      // line-labels on every render. `.raise()` only reorders DOM, so per-label
-      // de-overlap placement is untouched. No-op for charts without line labels.
       raiseInOrder(renderGroup, RAISE_ORDER);
 
-      // ── Tooltip ──
       if (tooltipConfig) {
         if (tooltipConfig.proximityHover && tooltipConfig.getDataX) {
-          // Proximity hover: overlay rect + bisect to nearest point
           const rulers = createRulers(
             renderGroup,
             tooltipConfig.rulerType,
@@ -484,7 +451,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
 
-          // Remove any previous overlay to avoid duplicates
           renderGroup.selectAll('.proximity-overlay').remove();
 
           renderGroup
@@ -496,11 +462,9 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             .attr('pointer-events', 'all')
             .on('mousemove', (event: MouseEvent) => {
               if (isPinned()) return;
-              // Let taps reach the pinning click handler (see touch-input.ts).
               if (isTouchCompatMouseEvent(event)) return;
               const [mx] = d3.pointer(event);
 
-              // Get current (possibly zoomed) x scale
               let currentXScale = xScale;
               if (svgRef.current && zoomConfig?.axes !== 'y') {
                 const t = d3.zoomTransform(svgRef.current);
@@ -517,7 +481,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               const d = sortedData[idx];
               if (!d) return;
 
-              // Show tooltip content
               tooltip
                 .style('opacity', 1)
                 .style('display', 'block')
@@ -525,14 +488,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 .html(tooltipConfig.content(d, false));
               invalidateTooltipGeometry(tooltip.node());
 
-              // Position tooltip near mouse
               const geometry = getTooltipContainerGeometry(containerEl);
               const cmx = event.clientX - geometry.bounds.left;
               const cmy = event.clientY - geometry.bounds.top;
               const pos = computeTooltipPosition(cmx, cmy, tooltip, containerEl, 10, geometry);
               tooltip.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
 
-              // Position rulers
               rulerGroup.style('display', 'block');
               if (verticalRuler && tooltipConfig.getRulerX) {
                 const rx = tooltipConfig.getRulerX(d, currentXScale as any);
@@ -619,7 +580,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         }
       }
 
-      // ── Zoom ──
       if (zoomConfig?.enabled) {
         const zoomAxes = zoomConfig.axes ?? 'both';
 
@@ -746,11 +706,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           },
         );
 
-        // setupZoom only replays the stored transform (re-emitting a zoom
-        // event over the freshly drawn base-scale DOM) when it is non-identity.
-        // The identity replay used to dismiss a pinned tooltip as a side
-        // effect of that emit — keep that behavior when the replay is skipped,
-        // since the chart under the tooltip was just rebuilt.
         const restored = zoomTransformRef.current;
         if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned()) {
           dismissTooltip(true);
@@ -758,10 +713,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           renderGroup.select('.ruler-group').style('display', 'none');
         }
       }
-      // A restored non-identity transform emits synchronously above, but its
-      // expensive path work is normally rAF-batched. Flush that replay before
-      // capturing transition targets or a running transition can overwrite
-      // zoomed paths with their base-scale `d` values.
       zoomFrameBatcherRef.current?.flush();
 
       animateTransitionGeometry(renderGroup, previousGeometry, transitionDuration);
@@ -774,7 +725,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     return () => {
       zoomFrameBatcherRef.current?.cancel();
     };
-    // We intentionally list specific deps rather than the entire props object.
   }, [
     dataJoinIdentity,
     dimensions.width,
@@ -793,8 +743,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     hideTooltipElements,
   ]);
 
-  // Phase 3: coordinate and scale updates. Bound scatter data is mutated by
-  // stable key, so metric-only changes skip enter/update/exit joins.
   useLayoutEffect(() => {
     if (
       !dataIdentity ||
@@ -975,8 +923,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     dismissTooltip,
   ]);
 
-  // Phase 4: display-only invalidation. Charts can restyle existing marks
-  // without rebuilding structure, joins, scales, or paths.
   useLayoutEffect(() => {
     const ctx = renderContextRef.current;
     if (!ctx) return;

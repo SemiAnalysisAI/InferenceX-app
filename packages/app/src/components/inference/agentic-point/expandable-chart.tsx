@@ -7,11 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-/**
- * Wraps a chart in a card with a header + expand button. Click the button to
- * open the chart in a large dialog. The `render` prop receives `expanded:true`
- * inside the dialog so charts can pick larger width/height.
- */
 export function ExpandableChart({
   title,
   render,

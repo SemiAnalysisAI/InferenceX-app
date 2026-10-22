@@ -132,7 +132,6 @@ describe('profitTargetUrlValue', () => {
   });
 
   it("compares against the selected model's default, not a global one", () => {
-    // 35 is DeepSeek V4 Pro's default but an explicit choice on Kimi K3 (default 45).
     expect(profitTargetUrlValue(Model.DeepSeek_V4_Pro, 35)).toBe('');
     expect(profitTargetUrlValue(Model.Kimi_K3, 35)).toBe('35');
   });

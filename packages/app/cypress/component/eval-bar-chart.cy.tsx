@@ -67,7 +67,6 @@ describe('EvalBarChartD3', () => {
       },
       unofficial: {},
     });
-    // Skeleton elements are rendered (Skeleton component uses data-slot="skeleton")
     cy.get('[data-slot="skeleton"]').should('have.length.greaterThan', 0);
   });
 
@@ -141,10 +140,8 @@ describe('EvalBarChartD3', () => {
       },
     );
 
-    // SVG should be rendered inside the chart container
     cy.get('#evaluation-chart svg').should('exist');
 
-    // Points (circles) should render for the mean scores
     cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
   });
 
@@ -184,8 +181,6 @@ describe('EvalBarChartD3', () => {
 
   for (const includeOfficial of [false, true]) {
     it(`renders interactive unofficial markers with a portaled tooltip (${includeOfficial ? 'with' : 'without'} official rows)`, () => {
-      // Evaluation-only run that originally displayed its error bar and legend
-      // entry, but no marker because the tooltip is no longer an SVG sibling.
       const run = {
         id: 33769499103,
         name: 'Run Sweep - Validate vLLM P/D cache-source metrics on GB300',
@@ -260,10 +255,7 @@ describe('EvalBarChartD3', () => {
       cy.get('#evaluation-chart .unofficial-error-bar').should('have.length', 1);
       cy.get('#evaluation-chart .point').should('have.length', officialRows.length);
 
-      // The group's bounds include its score label; target the visible marker.
       cy.get(`${marker} .unofficial-eval-x`).trigger('mouseenter').trigger('mousemove');
-      // Hover tooltips ignore pointer events, so Cypress's fixed-position
-      // hit test sees the chart underneath. Check their rendered state directly.
       cy.get(tooltip)
         .should('have.css', 'display', 'block')
         .and('have.css', 'opacity', '1')

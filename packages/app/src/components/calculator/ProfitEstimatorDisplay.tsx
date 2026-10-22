@@ -117,19 +117,12 @@ import type { CostProvider } from './types';
 import { useProfitHistory } from './useProfitHistory';
 import { useThroughputData } from './useThroughputData';
 
-/**
- * Where the $/M tok sale price comes from: the OpenRouter catalog, the lab's
- * published list price (offered only for models that have one in
- * `profitModelDefaults`), or a typed triple.
- */
 type PriceSource = 'openrouter' | 'list' | 'custom';
 
-/** Source a model opens on: its list price when it has one, else OpenRouter. */
 function defaultPriceSource(model: Model): PriceSource {
   return profitModelDefaults(model).listPricing ? 'list' : 'openrouter';
 }
 
-/** The two published TCO tiers plus a per-chip $/GPU/hr the reader types. */
 type ProfitCostProvider = CostProvider | 'custom';
 
 const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
@@ -138,8 +131,6 @@ const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   custom: 'custom',
 };
 
-// The published tiers use the same option labels as the /inference y-axis
-// selector (Owning at Large Hyperscaler Volume, Rent - 3 Year Commit).
 const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
   ...(['costh', 'costr'] as const).map((value) => ({
     value,
@@ -155,34 +146,23 @@ function costProviderOptionLabel(provider: ProfitCostProvider, locale: 'en' | 'z
   return locale === 'zh' ? option.labelZh : option.label;
 }
 
-/** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
 const CUSTOM_COST_SEED: CostProvider = 'costh';
 
-// Each basis opens on a different published tier. Per chip-hour is the view
-// an operator renting capacity reads, so it opens on Rent - 3 Year Commit;
-// per GW-year models a fleet owner, so it stays on Owning at Large
-// Hyperscaler Volume.
 const DEFAULT_COST_PROVIDER: Record<ProfitBasis, CostProvider> = {
   'chip-hour': 'costr',
   'gw-year': 'costh',
 };
 
-/** Base GPU (`h200`, `gb300`) of a legend key like `gb300_dynamo-sglang`. */
 function baseGpuOf(hwKey: string): string {
   return hwKey.split('_')[0] ?? hwKey;
 }
 
-/**
- * A typed custom cost. Empty or non-numeric → undefined, so the SKU drops out
- * with the `no-cost` reason instead of being priced at zero.
- */
 export function parseCustomCostInput(raw: string | undefined): number | undefined {
   if (raw === undefined || raw.trim() === '') return undefined;
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-/** Options in selector order; the list-price entry is filtered out per model when absent. */
 function priceSourceOptions(
   listVendor: string | null,
 ): { value: PriceSource; label: string; labelZh: string }[] {
@@ -440,7 +420,6 @@ const STRINGS = {
   },
 } as const;
 
-/** A plain note under the chart that folds behind its title, like the metric notes on /inference. */
 function InfoFold({
   title,
   toggleLabel,
@@ -452,7 +431,6 @@ function InfoFold({
   children: React.ReactNode;
   testId: string;
 }) {
-  // Collapsed by default; the formula is reference material, not the result.
   const [open, setOpen] = useState(false);
   return (
     <div className="py-1 text-xs" data-testid={testId}>
@@ -479,12 +457,10 @@ function InfoFold({
   );
 }
 
-/** Number inputs step on mouse wheel while focused; drop focus so a scroll over the box only scrolls the page. */
 function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
-/** Dashboard tab each basis is served from; drives the model allow-list and the URL rewrite. */
 export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
@@ -495,7 +471,6 @@ export default function ProfitEstimatorDisplay({
   basis,
 }: {
   urlSeed?: CalculatorUrlSeed;
-  /** `/profit-estimator` is per chip-hour; `/profit-estimator-per-gigawatt` scales to a GW-year. */
   basis: ProfitBasis;
 }) {
   return (
@@ -511,7 +486,6 @@ export default function ProfitEstimatorDisplay({
   );
 }
 
-/** A percentage field: the raw string the user is typing plus the clamped number in use. */
 function usePercentField(defaultValue: number, eventName: string) {
   const [raw, setRaw] = useState(String(defaultValue));
   const [value, setValue] = useState(defaultValue);
@@ -541,7 +515,6 @@ function ProfitEstimatorInner({
   initialTarget,
   basis,
 }: {
-  /** Shared `c_ivtarget`, parsed on the server so the first paint matches the link. */
   initialTarget?: number;
   basis: ProfitBasis;
 }) {
@@ -551,14 +524,9 @@ function ProfitEstimatorInner({
   const { setUrlParam, getUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
     useLockedTierDialog('profit_cost_provider');
 
-  // Precision is not a control here: `effectivePrecisions` stays in auto mode,
-  // which resolves to the densest measured precision per model, so the bars
-  // always reflect the best-covered run set.
   const {
     tcoBasis,
     selectedModel,
@@ -570,11 +538,6 @@ function ProfitEstimatorInner({
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
-  // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list intersected with models that have an agentic-traces
-  // run, so the selector never offers a model that would draw an empty chart. If the
-  // intersection is still loading or empty, the allow-list alone is offered so
-  // the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(() => {
     const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
@@ -606,14 +569,10 @@ function ProfitEstimatorInner({
   const [customInputPrice, setCustomInputPrice] = useState('1');
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
-  // The server seed belongs to this navigation; the URL store can outlive a model.
   const [targetValue, setTargetValue] = useState<number>(
     () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
-  // Only a target that differs from the model's default is written, so default
-  // views keep unchanged share links. A model switch re-seeds the default below,
-  // which clears the param.
   useEffect(() => {
     setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
   }, [selectedModel, targetValue, setUrlParam]);
@@ -635,15 +594,6 @@ function ProfitEstimatorInner({
     profitModelDefaults(selectedModel).labCutPct,
     'profit_lab_cut_set',
   );
-  // Each model has its own operating point, price source, and license fee
-  // (Kimi K3: 45 tok/s/user on the Moonshot list price at 30%; GLM 5.2/5.3: 100 tok/s/user
-  // on the Z.ai list price at 20%; MiniMax M3: 83 tok/s/user on the MiniMax
-  // list price at 20%; DeepSeek V4 Pro: 35 tok/s/user on the DeepSeek list
-  // price at 0%, MIT-licensed; DeepSeek V4.1 Flash: 125 tok/s/user on the
-  // DeepSeek Flash list price at 0%, MIT-licensed), so a model switch re-seeds
-  // all three. The ref keeps
-  // this to actual switches: re-renders with the same model leave the
-  // reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
   const resetLabCut = labCut.reset;
   useEffect(() => {
@@ -656,8 +606,6 @@ function ProfitEstimatorInner({
     resetLabCut(defaults.labCutPct);
   }, [selectedModel, resetLabCut]);
   const listPricing = profitModelDefaults(selectedModel).listPricing;
-  // A model without a list price cannot stay on 'list' (e.g. the route seeded
-  // one model and the allow-list swapped it); fall back to the catalog.
   const effectivePriceSource: PriceSource =
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
   const selectedPercentile = Percentile.P90;
@@ -684,13 +632,6 @@ function ProfitEstimatorInner({
     basis === 'gw-year' && powerBasis !== 'provisioned',
   );
 
-  // ── Compare history ───────────────────────────────────────────────────────
-  // The `/inference` panel, pinned to this page's workload: up to four chip
-  // configs, a date range, and the Config Changelog from which individual
-  // dates or runs are pinned onto the chart. The selection lives in the same
-  // `i_gpus`, `i_dstart`, `i_dend`, and `i_dates` URL params, so a comparison
-  // built on `/inference` pastes straight into the estimator. Hydrated after
-  // mount so the first client render matches the server one.
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
   const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -718,11 +659,6 @@ function ProfitEstimatorInner({
       profitHistoryChipOptions(availabilityRows, dbModelKeys, selectedPrecisions, selectedModel),
     [availabilityRows, dbModelKeys, selectedPrecisions, selectedModel],
   );
-  // A chip the new model (or precision) has no agentic rows for leaves the
-  // selection, the way `/inference` prunes its comparison on a model switch.
-  // When that empties the selection the range and pins go with it, exactly as
-  // clearing the chips by hand does, so the next chip starts a fresh comparison
-  // instead of inheriting the previous model's dates.
   useEffect(() => {
     if (!availabilityRows || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
     const offered = new Set(historyChipOptions.map((o) => o.value));
@@ -742,8 +678,6 @@ function ProfitEstimatorInner({
       profitHistoryAvailableDates(availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs),
     [availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
-  // A range whose endpoints the selected chips no longer have data for is
-  // dropped together with the pinned dates, as `InferenceContext` does.
   useEffect(() => {
     if (!historyHydrated || !availabilityRows || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
@@ -777,8 +711,6 @@ function ProfitEstimatorInner({
     },
     [setUrlParam],
   );
-  // Changelog pins. Functional updaters so "Add all" and quick successive
-  // clicks never overwrite each other (the `/inference` fix for the same race).
   const handleHistoryAddDate = useCallback((entry: string) => {
     setSelectedDates((prev) => (prev.includes(entry) ? prev : [...prev, entry]));
   }, []);
@@ -798,17 +730,12 @@ function ProfitEstimatorInner({
     [setUrlParam],
   );
 
-  // Config Changelog for the selected chips: one workflow-info query per
-  // available date (bounded to the range once one is set), the same feed
-  // `/inference` renders under its chart.
   const historyChangelogs = useComparisonChangelogs(
     selectedGPUs,
     selectedDateRange,
     historyAvailableDates,
     'agentic_traces',
   );
-  // Same-day runs are numbered from the changelog's run enumeration so a bar
-  // labelled "#2" is the run the changelog calls "#2" (as `ChartDisplay` does).
   const historyRunScope = useMemo(
     () => ({
       modelDbKeys: dbModelKeys,
@@ -818,10 +745,6 @@ function ProfitEstimatorInner({
     }),
     [dbModelKeys, selectedGPUs, selectedPrecisions],
   );
-  // Per chip, the run its current bar already shows (the main query is an
-  // as-of-date fetch, so chips can sit on different runs). Pinning that run
-  // from the changelog must not draw a second bar of the same data, the case
-  // `/inference` covers by handing `buildComparisonDates` its `selectedRunId`.
   const historyCurrentRunIds = useMemo(
     () =>
       profitHistoryCurrentRunIds(historyChangelogs.changelogs, selectedRunDate, historyRunScope),
@@ -849,10 +772,6 @@ function ProfitEstimatorInner({
     }
     return numbering;
   }, [historyChangelogs.changelogs, historyRunScope]);
-  // A pinned plain date that turns out to have several runs expands into one
-  // entry per run once the changelog knows them, so the bars match the
-  // changelog's per-run blocks instead of a single merged "latest" bar
-  // (`ChartDisplay` does the same). Idempotent once expanded.
   useEffect(() => {
     const runConfigsByDate = new Map(
       historyChangelogs.changelogs.map((c) => [c.date, c.runConfigs] as const),
@@ -881,13 +800,8 @@ function ProfitEstimatorInner({
     (entry: string) => profitHistoryEntryLabel(entry, historyRunNumbering),
     [historyRunNumbering],
   );
-  // A comparison date still in flight holds the chart, as on `/inference`, so
-  // the bars never show today's chips with the history half missing.
   const loading = throughputLoading || history.loading;
 
-  // Per-base-GPU $/GPU/hr typed by the reader; seeded from the hyperscaler
-  // tier the first time each chip appears so the custom view starts from the
-  // published owning rate on either basis.
   const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
   const customCostBases = useMemo(
     () =>
@@ -920,8 +834,6 @@ function ProfitEstimatorInner({
   const interpolationCostProvider: CostProvider =
     costProvider === 'custom' ? CUSTOM_COST_SEED : costProvider;
 
-  // Entering the custom tier copies the published $/GPU/hr the caption was
-  // showing, so the badges keep their numbers and the reader edits from there.
   const enterCustomCosts = useCallback(() => {
     if (costProvider === 'custom') return;
     const seedFrom = costProvider;
@@ -943,8 +855,6 @@ function ProfitEstimatorInner({
     },
     [interceptLockedTier, enterCustomCosts],
   );
-  // Typing into a caption badge is the custom-cost entry: the first
-  // keystroke on a published tier moves the chart onto Custom $/GPU/hr.
   const handleCustomCostChange = useCallback(
     (base: string, raw: string) => {
       if (costProvider !== 'custom') {
@@ -998,13 +908,6 @@ function ProfitEstimatorInner({
     [utilization.value, labCut.value, basis, powerBasis],
   );
 
-  // Price every SKU first, then build the legend from the ones that produced a
-  // bar. A config the target falls outside of (or that cannot be priced) is
-  // named in the caption instead of being offered as a legend chip.
-  //
-  // With a history comparison active, only the compared chips are drawn, as on
-  // `/inference`: today's bar for each, then one per comparison date priced
-  // from that date's run with the same target, prices, and TCO tier.
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
     const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
@@ -1073,9 +976,6 @@ function ProfitEstimatorInner({
     historyEntryLabel,
   ]);
 
-  // `availableHwKeys` describes today's run; with a comparison active a chip
-  // that only priced on an earlier date still owns bars, so it stays in the
-  // legend (appended in registry order) rather than being dropped with them.
   const legendHwKeys = useMemo(
     () => profitHistoryLegendKeys(availableHwKeys, fullEstimate.rows, historyActive),
     [fullEstimate.rows, availableHwKeys, historyActive],
@@ -1092,9 +992,6 @@ function ProfitEstimatorInner({
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
 
-  // Bar colour: the chip's vendor colour, faded toward the page background for
-  // older comparison dates (oldest lightest, today solid), the lightness ramp
-  // the `/inference` comparison uses to tell one config's dates apart.
   const historyRanks = useMemo(
     () => profitHistoryDateRanks(fullEstimate.rows),
     [fullEstimate.rows],
@@ -1197,16 +1094,12 @@ function ProfitEstimatorInner({
 
   const pricingNotice = useMemo(() => {
     if (effectivePriceSource !== 'openrouter') return null;
-    // A model with no OpenRouter listing never starts the query, and TanStack v5
-    // leaves a disabled query `isPending`, so check the id before the fetch state.
     if (openRouterModelId === null) return t.pricingUnavailable(null);
     if (openRouterQuery.isLoading) return t.pricingLoading;
     if (!openRouterQuery.data) return t.pricingUnavailable(openRouterModelId);
     return null;
   }, [effectivePriceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
-  // The caption prints the selector's own option copy (also in the PNG export
-  // twin), so the trigger reads the same before and after hydration.
   const costTier = costProviderOptionLabel(costProvider, locale);
   const priceSourceLabel =
     pricing?.source === 'openrouter'
@@ -1219,9 +1112,6 @@ function ProfitEstimatorInner({
           ? '自定义'
           : 'custom';
 
-  // Only the SKUs the legend currently shows; hiding a bar drops its badge.
-  // On the custom tier a chip whose price is blank has no bar and no legend
-  // entry, but its badge stays so the reader can type the price back in.
   const tcoBadges = useMemo(() => {
     const bases = new Set<string>();
     for (const key of legendHwKeys) {
@@ -1242,17 +1132,11 @@ function ProfitEstimatorInner({
       .map((base) => ({
         base,
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
-        // Custom shows the text as typed (an empty field stays empty
-        // instead of snapping to 0); published tiers show the model rate.
         value:
           costProvider === 'custom' ? (customCosts[base] ?? '') : String(costPerGpuHourFor(base)),
       }));
   }, [legendHwKeys, visibleHwKeys, availableHwKeys, costPerGpuHourFor, costProvider, customCosts]);
 
-  // The cost provider is chosen in the caption's Cost Tier line, where the
-  // tier used to print as plain text. Unlocked tiers first, then Custom
-  // $/GPU/hr, then the locked rent tiers so the free-form option is never
-  // buried below rows that only open the TCO model dialog.
   const costProviderControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-cost-selector">
       <SearchableSelect
@@ -1292,9 +1176,6 @@ function ProfitEstimatorInner({
     </span>
   );
 
-  // Utilization and the model license fee are typed straight into the caption,
-  // next to the Cost Tier selector, so the assumptions line is where every
-  // pricing assumption gets changed.
   const utilizationControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-utilization-control">
       <CaptionPercentInput
@@ -1336,9 +1217,6 @@ function ProfitEstimatorInner({
     </span>
   );
 
-  // Compared chips with no bar on a comparison date (or on the current date,
-  // when the chip only priced earlier), named in the caption so a missing bar
-  // reads as "no run that day", not as a zero.
   const historyMissing = useMemo(() => {
     if (!historyActive) return [];
     return profitHistoryMissing(
@@ -1346,8 +1224,6 @@ function ProfitEstimatorInner({
       history.comparisonDates,
       selectedGPUs,
       (hwKey) => {
-        // `hardwareConfig` covers today's rows only; a chip that priced
-        // earlier alone still has a registry entry to label it by.
         const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
         return config ? getDisplayLabel(config) : hwKey;
       },
@@ -1366,11 +1242,8 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
-    // Right padding keeps the title and price lines clear of the export
-    // button, which sits in the figure corner.
     return (
       <div className="mb-2 pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
@@ -1493,9 +1366,7 @@ function ProfitEstimatorInner({
       : `InferenceX_profit_estimator_${selectedModel}`;
 
   const handleExportCsv = useCallback(() => {
-    // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
-    // Measured + modeled rows name their basis and pinned power-model revision per row.
     const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
     const basisColumns = (row: ProfitEstimatorRow) => {
       const source = row.powerSource;
@@ -1513,7 +1384,6 @@ function ProfitEstimatorInner({
       usd(row.profit),
       row.revenue > 0 ? (row.profit / row.revenue).toFixed(4) : '',
       row.revenuePerGpuHour.toFixed(4),
-      // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
       ...(includeBasis ? basisColumns(row) : []),
     ]);
@@ -1700,9 +1570,6 @@ function ProfitEstimatorInner({
                         onChange={(values) => {
                           const next = values[0];
                           if (!next) return;
-                          // Seed the custom fields from the price in force (list or
-                          // live catalog) so switching over starts from a real price
-                          // instead of $1/M.
                           if (next === 'custom' && pricing) {
                             setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
                             setCustomCachedPrice(
@@ -1725,7 +1592,6 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {/* Expand pricing to a full row rather than squeezing three price inputs. */}
                   {effectivePriceSource === 'custom' && (
                     <div
                       data-testid="profit-custom-prices"

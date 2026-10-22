@@ -1,14 +1,3 @@
-/**
- * Storage codec for `agentic_trace_replay.request_timeline_gz`: gzip of the
- * JSON text of one versioned {@link RequestTimeline} document.
- *
- * Encoding streams the JSON into gzip in batches of requests, so neither an
- * ingest worker nor the legacy-JSONB conversion backfill holds the complete
- * serialized document (about 200 million characters for a 460,000-request
- * run) next to the request objects it was built from. Readers that need only a
- * few fields of each request scan the document instead of parsing all of it.
- */
-
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createGunzip, createGzip, gunzipSync } from 'node:zlib';
@@ -20,19 +9,10 @@ import type { Token } from 'stream-json/parser.js';
 import type { RequestRecord, RequestTimeline } from './compute-request-timeline';
 import { gunzipJsonWithinLimit } from './gzip-json-stream';
 
-/** JSON characters accumulated before each write into the gzip stream. */
 const JSON_BATCH_CHARS = 1024 * 1024;
 
-/**
- * Largest decompressed timeline a scan decodes in one piece. Scans run in
- * request-serving functions, where a parsed request costs about as much heap
- * as its JSON text on top of the text and the gunzip buffer. This ceiling is
- * therefore lower than the 128 MiB one ingest uses for server metrics, and
- * larger timelines are tokenized as a stream.
- */
 export const REQUEST_TIMELINE_IN_MEMORY_JSON_BYTES = 16 * 1024 * 1024;
 
-/** Emit complete values only, without start/chunk/end tokens around them. */
 const PACKED_TOKENS = {
   packKeys: true,
   packStrings: true,
@@ -44,22 +24,15 @@ const PACKED_TOKENS = {
 
 export interface GzippedRequestTimeline {
   gz: Buffer;
-  /** Number of request records written into the document's `requests` array. */
   requestCount: number;
 }
 
-/** The fields of one request that a scan passes on. */
 export type ScannedRequest = Partial<Record<keyof RequestRecord, unknown>>;
 
-/** A timeline's top-level scalars. */
 export type RequestTimelineHeader = Partial<
   Record<Exclude<keyof RequestTimeline, 'requests'>, unknown>
 >;
 
-/**
- * Yield `{...header, "requests": [...]}` as JSON text. When `requests` is the
- * timeline's last key, the concatenated text equals `JSON.stringify(timeline)`.
- */
 async function* timelineJsonText(
   header: object,
   requests: Iterable<object> | AsyncIterable<object>,
@@ -79,11 +52,6 @@ async function* timelineJsonText(
   yield `${text}]}`;
 }
 
-/**
- * Gzip a timeline document whose requests may arrive incrementally, such as
- * index-range slices of a legacy JSONB array. A failing request source rejects
- * the returned promise.
- */
 export async function gzipRequestTimelineParts(
   header: object,
   requests: Iterable<object> | AsyncIterable<object>,
@@ -100,14 +68,12 @@ export async function gzipRequestTimelineParts(
   return { gz: Buffer.concat(chunks), requestCount: counter.requests };
 }
 
-/** `gzip(JSON.stringify(timeline))` for the `request_timeline_gz` column. */
 export async function gzipRequestTimeline(timeline: RequestTimeline): Promise<Buffer> {
   const { requests, ...header } = timeline;
   const { gz } = await gzipRequestTimelineParts(header, requests);
   return gz;
 }
 
-/** Parse timeline JSON text. Throws unless it is an object with a `requests` array. */
 export function parseRequestTimelineJson(json: string): RequestTimeline {
   const parsed: unknown = JSON.parse(json);
   if (
@@ -118,13 +84,10 @@ export function parseRequestTimelineJson(json: string): RequestTimeline {
   ) {
     throw new Error('request timeline has no requests array');
   }
-  // The request records themselves are not re-validated on every read: the
-  // gzip writers above and the legacy JSONB writers all serialized this type.
   const timeline = parsed as RequestTimeline;
   return timeline;
 }
 
-/** Decode a stored `request_timeline_gz` value. Throws on corrupt input. */
 export function gunzipRequestTimeline(gz: Uint8Array): RequestTimeline {
   return parseRequestTimelineJson(gunzipSync(gz).toString('utf8'));
 }
@@ -133,10 +96,6 @@ function notAnObjectError(): Error {
   return new Error('request timeline holds a request that is not an object');
 }
 
-/**
- * Consume parser tokens of one timeline document, holding at most one request
- * at a time and only its selected fields.
- */
 async function scanTimelineTokens(
   tokens: AsyncIterable<unknown>,
   fields: ReadonlySet<string>,
@@ -207,12 +166,6 @@ async function scanTimelineTokens(
   return header;
 }
 
-/**
- * Tokenize timeline JSON text, such as bounded chunks of a legacy JSONB
- * timeline, and pass the `fields` of each request to `onRequest`. Never holds
- * the document or more than one request. Returns the top-level scalars, and
- * throws on malformed JSON, a missing `requests` array, or a non-object request.
- */
 export function scanRequestTimelineText(
   text: AsyncIterable<string | Uint8Array>,
   fields: ReadonlySet<string>,
@@ -221,12 +174,6 @@ export function scanRequestTimelineText(
   return scanTimelineTokens(chain([Readable.from(text), parser(PACKED_TOKENS)]), fields, onRequest);
 }
 
-/**
- * Decode a stored `request_timeline_gz` value and pass each request to
- * `onRequest`. Timelines up to `maxInMemoryBytes` of JSON are parsed in one
- * piece. Larger ones are gunzipped and tokenized as a stream, and their
- * requests carry only `fields`. Throws on corrupt gzip or JSON.
- */
 export async function scanRequestTimelineGz(
   gz: Buffer,
   fields: ReadonlySet<string>,
@@ -244,7 +191,6 @@ export async function scanRequestTimelineGz(
 
   const { requests, ...header } = parseRequestTimelineJson(json);
   for (const request of requests) {
-    // Parsed data: confirm each element is an object, as the token scan does.
     const value: unknown = request;
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       throw notAnObjectError();

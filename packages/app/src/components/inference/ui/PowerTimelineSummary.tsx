@@ -68,11 +68,6 @@ const validatedWatts = (point: InferenceData, role: PowerPoolRole) =>
       : point.measuredAvgPower
   )?.y ?? null;
 
-/**
- * Per-trace provenance behind the Timeline curves: which run and telemetry file
- * each trace came from, the validated window length, and per pool its GPU
- * count, the row's validated average, the drawn peak and the rated pool TDP.
- */
 export default function PowerTimelineSummary({
   traces,
   responses,

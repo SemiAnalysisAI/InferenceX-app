@@ -164,8 +164,6 @@ export function CollectiveXSupportMatrices() {
                               className="border-l border-border/60 px-2 py-1.5 text-center"
                             >
                               {pairNa ? (
-                                // The whole pairing does not exist; one muted
-                                // dash reads better than two identical chips.
                                 <span
                                   data-testid="collectivex-known-na"
                                   title={noteTextOf(kase.ep8.note) ?? undefined}

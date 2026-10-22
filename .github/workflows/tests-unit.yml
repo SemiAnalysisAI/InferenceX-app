@@ -65,6 +65,9 @@ jobs:
         run: bun run typecheck
       - name: Unit tests
         run: bun run test:unit
+        env:
+          # Tests (Skills) runs the packed skills suite; it reads no app source.
+          WORKSPACE_SCRIPT_EXCLUDE: '@semianalysisai/inferencex-skills'
 
   zh-copy-only:
     name: Chinese-only English-byte guard

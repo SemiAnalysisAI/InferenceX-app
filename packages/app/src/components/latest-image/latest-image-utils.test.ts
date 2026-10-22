@@ -40,8 +40,6 @@ describe('daysSince', () => {
   });
 
   it('floors to whole days regardless of intraday hour offset', () => {
-    // The submitted-day anchor is 00:00Z; an early-morning "today" still
-    // belongs to the same UTC day, so 23:59 vs 00:01 must round identically.
     const today = new Date('2026-05-28T00:01:00Z');
     expect(daysSince('2026-05-27', today)).toBe(1);
     const lateToday = new Date('2026-05-28T23:59:00Z');
@@ -80,7 +78,6 @@ describe('ageColorStyle', () => {
     const maxDay = ageColorStyle(AGE_MAX_RED_DAYS);
     expect(oneDay?.color).toMatch(/^oklch\(/u);
     expect(maxDay?.color).toMatch(/^oklch\(/u);
-    // Lightness L drops as days grow; AGE_MAX_RED_DAYS sits at L≈0.50, 1d at L≈0.77.
     expect(lightnessOf(maxDay!.color as string)).toBeLessThan(lightnessOf(oneDay!.color as string));
   });
 
@@ -133,8 +130,6 @@ describe('isOutdated', () => {
   });
 
   it('is false when actualLatest is null and tag is not in UNSTABLE_PATTERNS', () => {
-    // No release data → can't classify as outdated. Avoid red-flagging a row
-    // we have no ground truth for.
     expect(isOutdated('vllm/vllm-openai:v0.21.0', null)).toBe(false);
   });
 });
@@ -192,7 +187,6 @@ describe('getCurrentImageNodeTypeTooltip', () => {
   });
 });
 
-/** Fixed-sequence or agentic row shape the catalog helpers read. */
 function imageRow(
   model: string,
   scenario: 'agentic' | '1k/1k' | '1k/8k' | '8k/1k' | { isl: number; osl: number },
@@ -239,7 +233,6 @@ describe('isActiveImageRow', () => {
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(true);
-    // Maintenance is not deprecation: DeepSeek R1 stays listed on 8K/1K.
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 

@@ -1,39 +1,4 @@
 import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
-// /profit-estimator: one stacked bar per SKU, US$ per all-in GW per year.
-// Behaviours worth locking down:
-//  - defaults are Kimi K3, 45 tok/s/user, the Moonshot list price
-//    ($3.00 / $0.30 cached / $15.00), 60% utilization, 30% model license fee;
-//  - GLM 5.2/5.3 has its own defaults, 100 tok/s/user, the Z.ai list price
-//    ($1.40 / $0.26 cached / $4.40), and a 20% license fee; a model switch
-//    re-seeds all three;
-//  - MiniMax M3 opens on 83 tok/s/user, the MiniMax list price, and a 20% license fee
-//    ($0.30 / $0.06 cached / $1.20);
-//  - DeepSeek V4 Pro opens on 35 tok/s/user, the DeepSeek peak list price
-//    ($1.32 / $0.044 cached / $3.96), and a 0% license fee (MIT weights);
-//  - DeepSeek V4.1 Flash opens on 125 tok/s/user, the DeepSeek Flash peak list
-//    price ($0.30 / $0.006 cached / $1.20), and a 0% license fee (MIT weights);
-//  - utilization scales revenue only, so the revenue label moves and the
-//    TCO segment does not;
-//  - the SKU legend is the filter for which bars are drawn;
-//  - a loss is drawn below the zero line as a hatched segment, not as a new colour;
-//  - the OpenRouter catalog is one click away from the list price and a
-//    custom triple (input, cached input, output) can replace either;
-//  - the workload is pinned to agentic traces, so there is no scenario or
-//    precision selector, the model selector offers Kimi K3, GLM 5.2/5.3,
-//    MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash only, and the target
-//    interactivity is a typed number, not a slider;
-//  - the cost tier, utilization and license fee are edited in the caption line
-//    under the title; custom $/GPU/hr is typed into the TCO badges there;
-//  - the per-GW page opens on Owning at Large Hyperscaler Volume while the
-//    per chip-hour page opens on Rent - 3 Year Commit;
-//  - the heading reads like /inference, the subtitle carries the assumptions, and
-//    the formula folds away under the chart;
-//  - /profit-estimator/<model> is the per-model route; switching models
-//    rewrites the address bar in place;
-//  - the compare-history panel mirrors /inference: up to four chip configs and
-//    a date range, kept in `i_gpus`/`i_dstart`/`i_dend`; with a range set the
-//    chart draws only the compared chips, today's bar plus one per range
-//    endpoint priced from that date's run, labelled with the date.
 
 import {
   interceptProfitData,
@@ -46,10 +11,6 @@ import {
   PROFIT_RUNS,
 } from '../support/profit-fixtures';
 
-// Kimi K3 is the page default; the DeepSeek row proves the page prices the
-// routed model, not the first catalog entry. Every row sits below its lab's
-// list price, as the real aggregates do, so the spec can tell the two sources
-// apart.
 const OPENROUTER_MODELS = {
   data: [
     {
@@ -91,11 +52,9 @@ function unlockPowerGate(win: Cypress.AUTWindow): void {
 }
 
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
-/** The plot SVG itself, not the icon SVGs inside the export button. */
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
-// Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
     it(`keeps available estimates without a per-configuration warning list (${locale})`, () => {
@@ -169,7 +128,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       );
       const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
       cy.get('#profit-target').should('have.value', '125');
-      // GB300 fills one NVL72 tray and prices with modeled Grace sockets.
       chart().find('text.revenue-label').should('have.length', 4);
       chart()
         .should('contain', 'GB300')
@@ -344,7 +302,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         win.HTMLAnchorElement.prototype.click = () => {};
       },
     });
-    // Four SKUs get pairs, GB200 included; GB300 has no Grace power and keeps one bar.
     chart().find('text.revenue-label').should('have.length', 9);
     chart().should('contain', 'GB200').and('contain', 'All in Measured');
     cy.get('[data-testid="export-button"]').first().click();
@@ -432,7 +389,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       cy.get('[data-chart-tooltip="profit-estimator-chart"]')
         .should('be.visible')
         .and('contain', 'MI355X');
-      // Clear the pinned tooltip for screenshots; the SVG center is outside the scroll viewport.
       chartSvg().trigger('click', { force: true, scrollBehavior: false });
       cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
       cy.document().should((doc) => {
@@ -507,7 +463,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .then((original) => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
-        // These existing fixtures intentionally have throughput but no validated power.
         cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
         cy.contains('No SKU can be priced for the current selection.').should('be.visible');
         cy.get('#profit-target').should('have.value', '45');
@@ -521,8 +476,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       });
   });
 });
-// The formula fold is collapsed by default; open it (if it is not already) before
-// reading the text. Tests share one page, so a previous test may have opened it.
 const openFormulaNotes = () =>
   cy.get('[data-testid="profit-formula-notes"] button').then(($btn) => {
     if ($btn.attr('aria-expanded') === 'false') cy.wrap($btn).click();
@@ -548,8 +501,6 @@ describe('Profit Estimator per GW', () => {
 
   it('opens with the documented defaults and a priced chart', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
-    // Utilization and the license fee are typed into the caption, next to the
-    // Cost Tier selector; the pricing panel no longer has fields for them.
     cy.get('[data-testid="result-context-utilization"] input#profit-utilization').should(
       'have.value',
       '60',
@@ -561,9 +512,6 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-pricing-panel"] #profit-utilization').should('not.exist');
     cy.get('[data-testid="profit-pricing-panel"] #profit-lab-cut').should('not.exist');
     bars().should('have.length.greaterThan', 0);
-    // Cost tiers carry the same names as the /inference y-axis selector. The
-    // GW-year basis models a fleet owner, so it opens on the owning tier. The
-    // selector sits in the caption's Cost Tier line, not in the pricing panel.
     cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
     cy.get('[data-testid="result-context-cost-tier"] button#profit-cost')
       .should('contain.text', 'Owning at Large Hyperscaler Volume')
@@ -575,8 +523,6 @@ describe('Profit Estimator per GW', () => {
         'Rent - 3 Year Commit',
         'Custom $/GPU/hr',
       ]);
-      // Custom $/GPU/hr sits directly after the published tiers, ahead of the
-      // locked rent tiers that only open the TCO model dialog.
       const customIdx = labels.indexOf('Custom $/GPU/hr');
       expect(customIdx).to.equal(labels.indexOf('Rent - 3 Year Commit') + 1);
       const lockedIdx = [...$opts].flatMap((el, i) =>
@@ -586,10 +532,7 @@ describe('Profit Estimator per GW', () => {
       expect(Math.min(...lockedIdx)).to.be.greaterThan(customIdx);
     });
     cy.get('body').type('{esc}');
-    // Escape restores focus asynchronously; wait before opening another menu
-    // so the cost selector cannot steal focus and close the model dropdown.
     cy.get('button#profit-cost').should('have.attr', 'aria-expanded', 'false').and('be.focused');
-    // Segments are labelled in place; there is no separate key under the title.
     cy.get('[data-testid="profit-segment-key"]').should('not.exist');
     chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
@@ -625,7 +568,6 @@ describe('Profit Estimator per GW', () => {
       .and('contain.text', 'DeepSeek V4 Pro')
       .and('contain.text', 'DeepSeek V4.1 Flash');
     cy.get('body').type('{esc}');
-    // Kimi K3 opens on the Moonshot list price; the catalog and custom stay one click away.
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
       .should('have.length', 3)
@@ -634,12 +576,8 @@ describe('Profit Estimator per GW', () => {
       .and('contain.text', 'Custom $/M tok');
     cy.get('body').type('{esc}');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
-    // The badges are the custom-cost entry, so each one carries an input.
     cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
-    // Each x label carries its vendor mark; the H200 curve stops short of 45
-    // tok/s/user, so it is absent from the chart rather than extrapolated.
     chart().find('.tick image.vendor-mark').should('not.exist');
-    // Desktop width: upright two-line labels, SKU name then framework.
     chart().find('.tick text tspan').should('have.length', 8);
     chart().find('.tick text').first().should('not.have.attr', 'transform');
     chart().find('.tick text').first().should('contain.text', 'GB300 NVL72');
@@ -658,8 +596,6 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="export-button"]').should('exist');
     cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
-    // Both profit tabs sit between Inference Performance and Accuracy Evals;
-    // the TCO calculator and fleet lifecycle left the nav for the footer.
     cy.get('[data-testid^="tab-trigger-"]').then(($tabs) => {
       const keys = [...$tabs].map((el) => (el as HTMLElement).dataset.testid);
       expect(keys.slice(0, 4)).to.deep.equal([
@@ -716,14 +652,8 @@ describe('Profit Estimator per GW', () => {
       .first()
       .invoke('text')
       .should((text) => {
-        // Bars re-sort by P&L, but the fixture SKUs keep their profit order at
-        // 30% utilization, so the first bar is the same chip and its revenue
-        // label halves along with every other bar's.
         expect(parseCompactUsd(text)).to.be.closeTo(revenueAt60 / 2, revenueAt60 * 0.02);
       });
-    // Y domain rescales, so compare TCO in data terms via the tooltip-free
-    // path: heights change with the axis, but the segment must still be there
-    // and the pixel height must not have been halved along with revenue.
     chart()
       .find('rect.bar-tco')
       .first()
@@ -759,7 +689,6 @@ describe('Profit Estimator per GW', () => {
       .its('length')
       .then((allBars) => {
         cy.get('[data-testid="profit-legend"] li').should('have.length.greaterThan', 1);
-        // One badge per base chip drawn: GB300, B300, B200, MI355X.
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
         cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
         cy.get('[data-testid="profit-legend"] li').first().click();
@@ -768,8 +697,6 @@ describe('Profit Estimator per GW', () => {
           .find('rect.bar-tco')
           .should('have.length.lessThan', 4)
           .and('have.length.greaterThan', 0);
-        // Clicking a legend item isolates it; the subtitle keeps only that
-        // SKU's TCO badge.
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 1);
         cy.get('[data-testid="profit-tco-badges"]')
           .should('contain.text', 'GB300: 2.31')
@@ -782,7 +709,6 @@ describe('Profit Estimator per GW', () => {
   });
 
   it('lets the OpenRouter catalog or a custom price pair replace the list price', () => {
-    // The catalog reads the Kimi row, which sits below Moonshot's list price.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'OpenRouter').click();
     cy.get('[data-testid="profit-selling-prices"]')
@@ -792,7 +718,6 @@ describe('Profit Estimator per GW', () => {
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
 
-    // Custom seeds from the price in force, here the catalog.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'Custom $/M tok').click();
     cy.get('[data-testid="profit-custom-prices"]').should('exist');
@@ -814,21 +739,16 @@ describe('Profit Estimator per GW', () => {
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-custom"]').click();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
-    // There is no separate custom-cost form; the caption badges are the inputs.
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
-    // A user-entered $/GPU/hr has no external source to cite.
     cy.get('[data-testid="profit-tco-source"]').should('not.exist');
     chart()
       .find('rect.bar-tco')
       .its('length')
       .then((tcoBarsBefore) => {
-        // Inputs start from the owning tier the caption was showing, so
-        // nothing is dropped yet.
         cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
         cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('9').blur();
         cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 9');
-        // An empty custom cost drops that chip instead of pricing it at zero.
         cy.get('[data-testid="profit-custom-cost-gb300"]').clear().blur();
         chart().find('rect.bar-tco').should('have.length.lessThan', tcoBarsBefore);
         cy.get('[data-testid="profit-custom-cost-gb300"]').type('1.5').blur();
@@ -846,16 +766,12 @@ describe('Profit Estimator per GW', () => {
   });
 
   it('switches to custom $/GPU/hr when a caption badge is edited', () => {
-    // This case verifies the published default; the preceding case edits the
-    // same badge on the shared page, so start with a fresh estimator instance.
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
     );
     cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'MI355X: 1.5');
-    // Typing into a badge on a published tier moves the chart onto the
-    // custom tier; the other chips keep the price they were showing.
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     cy.get('[data-testid="profit-tco-badges"]')
@@ -871,7 +787,6 @@ describe('Profit Estimator per GW', () => {
     interceptProfitData();
     cy.intercept('GET', 'https://openrouter.ai/api/v1/models', { data: [] }).as('openrouter-empty');
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
-    // The list price does not depend on the catalog, so the page opens priced.
     chart().should('exist');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
     cy.get('button#profit-price-source').click();
@@ -889,9 +804,6 @@ const chipTrigger = () =>
   cy.get('[data-testid="profit-history-gpu-multiselect"] [role="combobox"]');
 const axisLabels = () => chartSvg().find('.x-axis text');
 const changelog = () => cy.get('[data-testid="profit-history-changelog"]');
-// The chip options need the availability rows and the auto-resolved
-// precision, both of which land with the first priced chart, so every panel
-// interaction waits for a bar before opening the MultiSelect.
 const waitForChart = () => {
   chart().should('exist');
   bars().should('have.length.greaterThan', 0);
@@ -915,20 +827,13 @@ describe('Profit Estimator per GW — compare history', () => {
       .then((allBars) => {
         chipTrigger().should('contain.text', 'Select Chip Config');
         chipTrigger().click({ force: true });
-        // Every agentic SKU at the effective precisions. The lone fp8 curve
-        // (H200) keeps both precisions in play (the sparse-precision rule), so
-        // it is offered as a chip even though its curve stops short of the
-        // target on the chart, as on `/inference`. Single-turn rows are never
-        // offered.
         cy.get('[role="option"]').should('have.length', 5).and('contain.text', 'GB300');
         cy.get('[role="option"]').should('contain.text', 'H200');
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-history-date-range"]').should('be.visible');
-        // A chip alone changes nothing: the chart waits for a range.
         bars().should('have.length', allBars);
         chipTrigger().should('contain.text', 'GB300');
-        // Clearing the chips also clears the range control.
         chipTrigger().click({ force: true });
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
@@ -940,26 +845,19 @@ describe('Profit Estimator per GW — compare history', () => {
   it('prices the chosen chips on the range endpoints next to today', () => {
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     waitForChart();
-    // The MultiSelect closes after each pick, so the second chip reopens it.
     pickChip('GB300');
     pickChip('B200');
     cy.contains('button', 'Select date range').click();
     cy.contains('button', 'Max Range').click();
     cy.contains('button', 'Apply').click();
 
-    // The picker shows the applied range (the address bar is deliberately
-    // left clean after load, see url-state.ts, so the UI is what is asserted).
     cy.contains('button', 'Jul 15, 2026').should('be.visible');
-    // Two chips × (today + the earlier endpoint) = four stacked bars; the
-    // range's end date is today's run, so it is not fetched again.
     chart().find('rect.bar-tco').should('have.length', 4);
     cy.get('[data-testid="profit-legend"] li').should('have.length', 2);
     cy.get('[data-testid="profit-history-note"]')
       .should('contain.text', 'Compare history')
       .and('contain.text', PROFIT_HISTORY_DATE);
     axisLabels().should('contain.text', PROFIT_HISTORY_DATE);
-    // The earlier run carries 80% of the throughput, so each chip's history
-    // bar is shorter than its current one and sits immediately to its left.
     revenueLabels().then(($labels) => {
       const revenues = [...$labels].map((el) => parseCompactUsd(el.textContent ?? ''));
       expect(revenues).to.have.length(4);
@@ -994,8 +892,6 @@ describe('Profit Estimator per GW — compare history', () => {
     waitForChart();
     changelog().should('not.exist');
     pickChip('GB300');
-    // One block per fixture date, expanded by default as on /inference, with
-    // the run's notes and its Git Commit / Workflow Run links.
     changelog()
       .contains('button', 'Config Changelog (3 dates with changes)')
       .should('have.attr', 'aria-expanded', 'true');
@@ -1005,11 +901,7 @@ describe('Profit Estimator per GW — compare history', () => {
       .and('contain.text', 'Git Commit')
       .and('contain.text', 'Workflow Run')
       .and('contain.text', 'Add all to chart');
-    // Nothing is on the chart yet, so every date offers "Add to chart".
     changelog().find('span:contains("On chart")').should('have.length', 0);
-    // Pin the earlier date: the chart shows GB300 today plus GB300 on that
-    // date, the range picker stays empty, and the row flips to "Remove from
-    // chart".
     changelog()
       .contains('span', PROFIT_HISTORY_DATE)
       .parent()
@@ -1033,8 +925,6 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     waitForChart();
     pickChip('GB300');
-    // The twice-run date renders one block per run, numbered in start order,
-    // each with its own notes.
     changelog()
       .should('contain.text', `${PROFIT_RUN_DATE} #1`)
       .and('contain.text', `${PROFIT_RUN_DATE} #2`)
@@ -1052,9 +942,6 @@ describe('Profit Estimator per GW — compare history', () => {
       .should('exist');
     chart().find('rect.bar-tco').should('have.length', 2);
     axisLabels().should('contain.text', `${PROFIT_RUN_DATE} #1`);
-    // "Add all" pins run #2 and the earlier date as well; today's run date is
-    // already the main bar, so it adds nothing. Bars run oldest → newest and,
-    // at 80% / 85% / 92% / 100% of today's throughput, rise left to right.
     changelog().contains('button', 'Add all to chart').click();
     changelog().find('button:contains("Add to chart")').should('have.length', 0);
     chart().find('rect.bar-tco').should('have.length', 4);
@@ -1074,12 +961,10 @@ describe('Profit Estimator per GW — compare history', () => {
       { onBeforeLoad: suppressNudges },
     );
     chart().should('exist');
-    // Range start + pinned run #2 + today.
     chart().find('rect.bar-tco').should('have.length', 3);
     axisLabels()
       .should('contain.text', PROFIT_HISTORY_DATE)
       .and('contain.text', `${PROFIT_RUN_DATE} #2`);
-    // Range endpoints cannot be removed individually; the pinned run can.
     changelog().find('span:contains("On chart")').should('have.length', 2);
     changelog().find('button:contains("On chart")').should('have.length', 0);
     changelog().find('button:contains("Remove from chart")').should('have.length', 1);
@@ -1104,16 +989,12 @@ describe('Profit Estimator per GW — chart height follows the viewport', () => 
   beforeEach(stubOpenRouter);
 
   it('shrinks on a laptop-height viewport and grows back on a tall one', () => {
-    // 720px tall (the Cypress default): 720 - 260 reserved = 460px chart, so the
-    // card title and the x labels share one screen.
     cy.viewport(1280, 720);
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     chartSvg().should('have.attr', 'height', '460');
-    // Plenty of room: the chart takes its full 720px.
     cy.viewport(1440, 1200);
     chartSvg().should('have.attr', 'height', '720');
-    // Very short viewports stop at the minimum where in-bar labels collide.
     cy.viewport(1280, 600);
     chartSvg().should('have.attr', 'height', '440');
   });
@@ -1125,7 +1006,6 @@ describe('Profit Estimator per GW — per-model route', () => {
     cy.visit('/profit-estimator-per-gigawatt/kimi-k3', { onBeforeLoad: suppressNudges });
     chart().should('exist');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
-    // A canonical slug is left alone; only aliases and model switches rewrite.
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
 
     cy.request({ url: '/profit-estimator-per-gigawatt/Kimi-K3', followRedirect: false }).then(
@@ -1208,12 +1088,10 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://docs.z.ai/guides/overview/pricing')
       .and('contain.text', 'Z.ai');
-    // The wide curve covers 100 tok/s/user; the H200 curve stops short of it.
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     chart().should('not.contain.text', 'H200');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
 
-    // The catalog stays one click away and reads the GLM row, not Kimi's.
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
       .should('have.length', 3)
@@ -1227,7 +1105,6 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
 
-    // Custom seeds from the price in force, here the list price.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'Z.ai list price').click();
     cy.get('button#profit-price-source').click();
@@ -1252,8 +1129,6 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    // The in-page switch rewrites to the slugged path; only a fresh visit to the
-    // slug canonicalizes the default model back to the bare path.
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'Kimi K3')
@@ -1310,12 +1185,10 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://platform.minimax.io/docs/guides/pricing-paygo')
       .and('contain.text', 'MiniMax');
-    // The wide curve covers 83 tok/s/user; the H200 curve stops short of it.
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     chart().should('not.contain.text', 'H200');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
 
-    // The catalog stays one click away and reads the MiniMax row, not Kimi's.
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
       .should('have.length', 3)
@@ -1329,7 +1202,6 @@ describe('Profit Estimator — MiniMax M3', () => {
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
 
-    // Custom seeds from the price in force, here the list price.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'MiniMax list price').click();
     cy.get('button#profit-price-source').click();
@@ -1359,8 +1231,6 @@ describe('Profit Estimator — MiniMax M3', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    // Leaving a per-model path always rewrites to the target model's slug,
-    // as the GLM → Kimi switch above asserts.
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
@@ -1403,7 +1273,6 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '24');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 24 tok/s/user');
 
-    // Back on the model's default operating point, the link carries no target.
     cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
@@ -1434,13 +1303,10 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
       .and('contain.text', 'DeepSeek');
-    // 35 tok/s/user sits inside every fixture curve, the short H200 one included,
-    // so all five SKUs are priced.
     chart().find('image.bar-vendor-mark').should('have.length', 5);
     chart().should('contain.text', 'H200');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
 
-    // The catalog stays one click away and reads the DeepSeek row, not Kimi's.
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
       .should('have.length', 3)
@@ -1454,7 +1320,6 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
 
-    // Custom seeds from the price in force, here the list price.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'DeepSeek list price').click();
     cy.get('button#profit-price-source').click();
@@ -1484,8 +1349,6 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
 
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'Kimi K3').click();
-    // Leaving a per-model path rewrites to the target model's slug; only a
-    // fresh visit canonicalizes the default model to the bare path.
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/kimi-k3');
     cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
@@ -1530,13 +1393,10 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.get('[data-testid="profit-list-price-source"]')
       .should('have.attr', 'href', 'https://api-docs.deepseek.com/quick_start/pricing/')
       .and('contain.text', 'DeepSeek');
-    // 125 tok/s/user sits inside the wide curve (top 130) but past the H200
-    // curve's 38 tok/s/user top, so H200 lists as not priced.
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     chart().should('not.contain.text', 'H200');
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
 
-    // The catalog stays one click away and reads the Flash row, not V4 Pro's.
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
       .should('have.length', 3)
@@ -1550,7 +1410,6 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
 
-    // Custom seeds from the price in force, here the list price.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'DeepSeek list price').click();
     cy.get('button#profit-price-source').click();
@@ -1566,8 +1425,6 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.get('[data-testid="profit-target-input"]').should('have.value', '35');
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '0');
 
-    // Both DeepSeek models share a vendor label, so the switch must land on the
-    // Flash triple, not keep V4 Pro's.
     cy.get('[data-testid="profit-model-selector"]').click();
     cy.contains('[role="option"]', 'DeepSeek V4.1 Flash').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/deepseek-v41-flash');
@@ -1627,8 +1484,6 @@ describe('Profit Estimator per GW — Chinese mirror', () => {
 describe('Profit Estimator (per chip-hour)', () => {
   before(() => {
     stubOpenRouter();
-    // Tall enough for the 720px chart, so the thin compute-expense segment
-    // still has room for its name.
     cy.viewport(1280, 1000);
     cy.visit('/profit-estimator', { onBeforeLoad: suppressNudges });
     chart().should('exist');
@@ -1648,8 +1503,6 @@ describe('Profit Estimator (per chip-hour)', () => {
       'contain.text',
       'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity (Beta)',
     );
-    // The chip-hour basis reads like a renter's P&L, so it opens on the
-    // 3-year-commit rental tier rather than the owning tier the GW-year page uses.
     cy.get('button#profit-cost').should('contain.text', 'Rent - 3 Year Commit');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
@@ -1661,20 +1514,14 @@ describe('Profit Estimator (per chip-hour)', () => {
     );
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', 'TCO $/chip/hr');
-    // Revenue labels are dollars and cents, not billions.
     revenueLabels().should('have.length', 4);
     revenueLabels()
       .first()
       .invoke('text')
       .should('match', /^\$\d+\.\d{2}/u)
       .and('not.match', /[BMk]/u);
-    // At Moonshot's list price the rental TCO is a few percent of revenue, so
-    // the thin Compute Expense segment is drawn but drops its name by design;
-    // the license-fee segment is tall enough to keep its label.
     chart().find('rect.bar-tco').should('have.length', 4);
     chart().should('contain.text', 'Model License Fee');
-    // The catalog price is a fraction of the list price, so the Compute
-    // Expense segment grows tall enough to carry its name.
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'OpenRouter').click();
     chart().should('contain.text', 'Compute Expense').and('contain.text', 'Model License Fee');
@@ -1750,7 +1597,6 @@ describe('Profit Estimator — responsive control panels', () => {
           cy.get('legend').should('have.text', 'Pricing Config');
           cy.get('#profit-price-source').click();
         });
-        // Utilization and the license fee live in the caption with the Cost Tier.
         cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(
           'have.value',
           '60',
@@ -1763,7 +1609,6 @@ describe('Profit Estimator — responsive control panels', () => {
         cy.get('[data-testid="profit-pricing-panel"] [data-testid="profit-custom-prices"]')
           .find('input')
           .should('have.length', 3);
-        // Custom $/GPU/hr is typed into the caption badges, not the panel.
         cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
         cy.get('[data-testid="profit-caption"] [data-testid="profit-tco-badge"] input').should(
           'have.length.greaterThan',
@@ -1856,8 +1701,6 @@ describe('VR publication economics', () => {
             const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
             expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
             expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
-            // At the exact 40 tok/s/user knot: 18,000 tok/s/chip, 70% input,
-            // the selected cache rate, DeepSeek list prices, 60% revenue utilization.
             const revenuePerHour =
               (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
                 3600) /
@@ -1900,7 +1743,6 @@ it('keeps the latest VR snapshot in the profit estimator, matching the private p
     );
     const vr = rows.find((row) => row.hwKey.startsWith('vr200'));
     expect(vr).not.to.equal(undefined);
-    // September 10 is 75% of the original throughput with a 90% cache-hit rate.
     const revenue =
       (((12_600 * 0.75 * (0.1 * 1.32 + 0.9 * 0.044) + 5_400 * 0.75 * 3.96) * 3600) / 1_000_000) *
       0.6;

@@ -26,8 +26,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
-// Custom $/chip/hr moved into the chart caption's TCO badges
-// (`InferenceTcoBadges`), so only the power panel remains.
 type GpuValuePanelKind = 'powers';
 
 const STRINGS = {
@@ -71,7 +69,6 @@ const PANEL_CONFIG: Record<
       '输入每个芯片的自定义全电源配置兆瓦 token 吞吐量（tok/s/MW）。这些值用于计算自定义功耗指标。',
     sectionTestId: 'custom-powers-section',
     calculateTestId: 'custom-powers-calculate',
-    // Preserve legacy input IDs so existing Cypress selectors keep passing.
     inputIdPrefix: 'cost-input',
     resetEvent: 'inference_custom_powers_reset',
     calculatedEvent: 'inference_custom_powers_calculated',

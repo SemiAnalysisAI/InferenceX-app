@@ -9,7 +9,6 @@ import {
   mergeProfileStatsUpgrade,
 } from './compute-aggregate-stats.js';
 
-/** Build a minimal `profile_export.jsonl` from a few synthetic requests. */
 function makeProfileBlob(
   requests: { isl: number; osl: number; rl?: number; ttft?: number; cancelled?: boolean }[],
 ) {
@@ -32,7 +31,6 @@ function makeProfileBlob(
   return gzipSync(Buffer.from(lines.join('\n')));
 }
 
-/** Build a tiny server_metrics_json blob with KV util + prefix cache series. */
 function makeServerBlob() {
   const json = JSON.stringify({
     metrics: {
@@ -88,14 +86,11 @@ describe('computeAggregateStats', () => {
     expect(stats.sequenceLengths.isl?.n).toBe(3);
     expect(stats.sequenceLengths.osl?.n).toBe(3);
 
-    // Server-side metrics still null when there's no server blob.
     expect(stats.kvCacheUtil).toBeNull();
     expect(stats.prefixCacheHitRate).toBeNull();
 
-    // Per-request E2EL/OSL ratios (s/tok): 1/50=0.02, 2/75≈0.02667, 3/100=0.03.
     expect(stats.e2elPerOsl?.n).toBe(3);
     expect(stats.e2elPerOsl?.p50).toBeCloseTo(2 / 75, 6);
-    // p90 of 3 values (linear interpolation): pos=1.8 → 0.02667 + 0.8×(0.03-0.02667)
     expect(stats.e2elPerOsl?.p90).toBeCloseTo(2 / 75 + 0.8 * (0.03 - 2 / 75), 6);
   });
 
@@ -141,20 +136,17 @@ describe('computeAggregateStats', () => {
     expect(stats.prefixCacheHitRate?.n).toBe(1);
     expect(stats.prefixCacheHitRate?.mean).toBeCloseTo(0.8, 6);
 
-    // Profile-derived metrics absent.
     expect(stats.isl).toBeNull();
     expect(stats.osl).toBeNull();
     expect(stats.e2elPerOsl).toBeNull();
   });
 
   it('tolerates a malformed profile blob by leaving its metrics null', async () => {
-    // A random non-gzip buffer triggers a gunzip error — code path swallows it.
     const garbage = Buffer.from('not-gzip-data');
     const stats = await computeAggregateStats({ profileBlob: garbage, serverBlob: null });
     expect(stats.isl).toBeNull();
     expect(stats.osl).toBeNull();
     expect(stats.e2elPerOsl).toBeNull();
-    // Version still set so the row is considered "computed".
     expect(stats.version).toBe(STATS_VERSION);
   });
 });
@@ -179,9 +171,6 @@ describe('mergeProfileStatsUpgrade', () => {
   });
 
   it('drops the retired derived fields when upgrading a pre-v6 bundle', async () => {
-    // Bundles written before v6 carry normalizedSessionTimeS /
-    // p90PrefillTpsPerUser / normalizedE2e400 — the upgrade must not
-    // resurrect them into the new bundle.
     const legacy = {
       version: STATS_VERSION - 1,
       isl: null,

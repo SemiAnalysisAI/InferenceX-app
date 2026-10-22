@@ -16,9 +16,6 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
-  // Provisioned / modelled boundary gauges: same upper-envelope curve as measured watts.
-  'y_gpuProvisionedWatts',
-  'y_utilityProvisionedWatts',
   'y_utilityModeledWatts',
 ]);
 
@@ -26,19 +23,12 @@ export function isPowerCurveMetric(metric: string): boolean {
   return POWER_CURVE_METRICS.has(metric);
 }
 
-/**
- * Whether a drawn series is a provisioned or modelled gauge rather than
- * telemetry: a boundary axis, or a boundary comparison clone of one. Gauges
- * keep envelope ties (see `upperPowerEnvelope`); measured series, the measured
- * boundary clone and role clones stay on the strict envelope.
- */
 export function isPowerGaugeSeries(metric: string, sample: InferenceData | undefined): boolean {
   const variant = sample?.powerVariant;
   if (variant) return variant.kind === 'basis' && variant.id !== 'gpu-measured';
   return isPowerBasisConfigKey(metric);
 }
 
-/** No declared direction means there is no Pareto frontier to draw or filter by. */
 export function chartFrontier(
   points: InferenceData[],
   direction: ParetoDirection | undefined,
@@ -50,12 +40,6 @@ export function chartFrontier(
   );
 }
 
-/**
- * Higher-power outer boundary across tested configurations, not an efficiency
- * frontier. It starts from the X end the chart's frontier `direction` favors.
- * Unique X vertices avoid concurrency backtracking during smoothing.
- * Callers scope the samples by hardware, precision, date and overlay run.
- */
 export function upperPowerEnvelope(
   points: readonly InferenceData[],
   direction: ParetoDirection,
@@ -65,12 +49,6 @@ export function upperPowerEnvelope(
   const sorted = points
     .filter((point) => isFrontierEligible(point) && Number.isFinite(point.y) && point.y > 0)
     .sort((a, b) => (maximizeX ? b.x - a.x : a.x - b.x) || b.y - a.y);
-  // Measured telemetry keeps the strict envelope: a tie at the running maximum
-  // is a repeat marker that Optimal Only collapses. A provisioned or modelled
-  // gauge (`keepTies`) is flat by construction, so its ties stay on the
-  // boundary and the series draws across its tested x-range instead of one
-  // marker. Repeated X keeps only its first vertex so the smoothing never
-  // backtracks.
   let maxY = -Infinity;
   let lastX = Number.NaN;
   const envelope = sorted.filter((point) => {

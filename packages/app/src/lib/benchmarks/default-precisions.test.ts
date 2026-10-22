@@ -16,7 +16,7 @@ describe('countCurvesByPrecision', () => {
     const counts = countCurvesByPrecision([
       row('fp8', 'b200'),
       row('fp8', 'b300'),
-      row('fp8', 'b200'), // dup curve, not counted again
+      row('fp8', 'b200'),
       row('fp4', 'mi355x', 'atom'),
     ]);
     expect(counts).toEqual({ fp8: 2, fp4: 1 });
@@ -55,12 +55,10 @@ describe('countCurvesByPrecision', () => {
 
 describe('pickDefaultPrecisions', () => {
   it('picks the single densest precision only when every precision clears the threshold', () => {
-    // dsr1 shape: both dense.
     expect(pickDefaultPrecisions({ fp4: 23, fp8: 38 })).toEqual(['fp8']);
   });
 
   it('shows both when one precision is below the threshold (MiniMax M3 shape)', () => {
-    // fp4 barren (1 curve) next to a dense fp8 → surface both, not just fp8.
     expect(pickDefaultPrecisions({ fp4: 1, fp8: 14 })).toEqual(['fp4', 'fp8']);
   });
 
@@ -73,13 +71,11 @@ describe('pickDefaultPrecisions', () => {
   });
 
   it('breaks non-fp4 ties by canonical enum order', () => {
-    // fp8 precedes bf16 in PRECISION_OPTIONS.
     expect(pickDefaultPrecisions({ bf16: 6, fp8: 6 })).toEqual(['fp8']);
   });
 
   it('surfaces all precisions (sorted) when any is below threshold', () => {
     expect(pickDefaultPrecisions({ fp8: 3, fp4: 2 })).toEqual(['fp4', 'fp8']);
-    // llama70b shape: fp4 sparse (3), fp8 dense (8) → both.
     expect(pickDefaultPrecisions({ fp4: 3, fp8: 8 })).toEqual(['fp4', 'fp8']);
     expect(MIN_SOLE_DEFAULT_CURVES).toBe(4);
   });
@@ -165,8 +161,6 @@ describe('resolveEffectivePrecisions', () => {
   });
 
   it('includes a loaded unofficial run precision so the overlay is visible by default', () => {
-    // Both official precisions dense → base is the sole densest (fp8); the user
-    // opened an fp4 unofficial run, so fp4 must be merged in.
     expect(
       resolveEffectivePrecisions({
         selectedPrecisions: ['fp4'],

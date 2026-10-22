@@ -47,7 +47,6 @@ describe('chip page registry integrity', () => {
   it('covers 9 chips and 12 versus pages (44 localized URLs with the index)', () => {
     expect(getAllChipPages()).toHaveLength(9);
     expect(getAllChipVsPages()).toHaveLength(12);
-    // index + chips + versus, each in en and zh
     expect(2 * (1 + getAllChipRouteSlugs().length)).toBe(44);
   });
 
@@ -83,7 +82,6 @@ describe('chip page registry integrity', () => {
         expect(CHIP_VS_HIGHLIGHT_LABELS_ZH[row.key]).toBeDefined();
         expect(row.aValue.length).toBeGreaterThan(0);
         expect(row.bValue.length).toBeGreaterThan(0);
-        // Only fp4 may omit the ratio (when one side lacks FP4 support).
         if (row.key !== 'fp4') {
           expect(row.ratio, `${page.slug} ${row.key} ratio`).toBeDefined();
         }
@@ -125,7 +123,6 @@ describe('Chinese chip page parity', () => {
       expect(zh.summary).toMatch(/[\u4E00-\u9FFF]/u);
       expect(zh.summary).toContain(entry.label);
       expect(zh.keywords.length).toBeGreaterThanOrEqual(5);
-      // zh-copy rule: the standalone English noun "Chip" must not appear.
       for (const text of [zh.summary, ...zh.overview, zh.benchmarkContext]) {
         expect(text).not.toMatch(/(?<![A-Za-z])[Cc]hips?(?![A-Za-z])/u);
       }

@@ -1,22 +1,3 @@
-/**
- * Comparison series for the gated measured-power charts (`i_pcompare`).
- *
- * The selected metric stays the chart's base series. A comparison adds sibling
- * series drawn from the SAME points — one per other power boundary
- * (`boundaries`, PowerX Figures 2/3) or per worker role (`roles`, Figures 6/7)
- * — so ScatterGraph can draw them with the hardware's colour and a per-variant
- * dash through its ordinary series pipeline (frontier, Optimal Only, tooltip,
- * table, CSV, `?unofficialrun=` overlay). A variant point is a clone of its
- * base point with `y` remapped and `powerVariant` set; base points are left
- * untouched so a chart without comparison is byte-identical to before.
- *
- * Boundary variants exist where the metric is one of the quantities every
- * boundary publishes (`POWER_BASIS_FIELDS`: whole-deployment average W per
- * chip, J per output token, J per total token). Role variants exist on
- * average W per chip and J per output token, the only axes every worker pool
- * shares. Everywhere else the comparison yields no series and the control
- * says so.
- */
 import type { Locale } from '@/lib/i18n/i18n';
 import {
   POWER_BASES,
@@ -41,7 +22,6 @@ export function parsePowerCompare(value: string | null | undefined): PowerCompar
   return value === 'boundaries' || value === 'roles' ? value : 'none';
 }
 
-/** Point fields a comparison series can plot; each is a `{ y, roof }` pair. */
 export type PowerSeriesField = keyof Pick<
   InferenceData,
   | PowerBasisField
@@ -63,9 +43,6 @@ const ROLE_WATT_FIELDS: Record<PowerRole, PowerSeriesField> = {
   prefill: 'measuredPrefillAvgPower',
   decode: 'measuredDecodeAvgPower',
 };
-// Energy per output token per role. The prefill pool's own figure is per input
-// token; `reconstructedPrefillJPerOutputToken` carries it onto the output-token
-// axis (utils/role-energy.ts).
 const ROLE_ENERGY_FIELDS: Record<PowerRole, PowerSeriesField> = {
   all: 'measuredJPerOutputToken',
   prefill: 'reconstructedPrefillJPerOutputToken',
@@ -78,7 +55,6 @@ const ROLE_LABELS: Record<PowerRole, { en: string; zh: string }> = {
   decode: { en: 'Decode GPUs', zh: '解码 GPU' },
 };
 
-/** SVG dash per variant; the base series and `all` stay solid. */
 const VARIANT_DASH: Record<string, string> = {
   'gpu-measured': '',
   'gpu-provisioned': '8 4',
@@ -89,19 +65,15 @@ const VARIANT_DASH: Record<string, string> = {
   decode: '2 3',
 };
 
-/** The quantity `metric` plots at its own boundary, or null when it is no `POWER_BASIS_FIELDS` cell. */
 function boundaryQuantity(metric: string, basis: PowerBasis): PowerQuantity | null {
   return (
-    POWER_QUANTITIES.find((quantity) => metric === `y_${POWER_BASIS_FIELDS[basis][quantity]}`) ??
-    null
+    POWER_QUANTITIES.find((quantity) => {
+      const field = POWER_BASIS_FIELDS[basis][quantity];
+      return field !== undefined && metric === `y_${field}`;
+    }) ?? null
   );
 }
 
-/**
- * The base series' own identity under a comparison — the boundary or role the
- * selected metric already plots — or null when the metric admits no comparison
- * of that kind.
- */
 export function powerCompareBase(metric: string, mode: PowerCompare): PowerVariant | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config || mode === 'none') return null;
@@ -114,14 +86,11 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
       ? { kind: 'role', id: config.scope }
       : null;
   }
-  // Role energy compares J per output token; a prefill J per input token axis
-  // has no decode counterpart.
   return config.denominator === 'output' && config.unit === 'joules' && config.scope !== 'prefill'
     ? { kind: 'role', id: config.scope }
     : null;
 }
 
-/** The sibling series a comparison adds to the selected metric (never the base itself). */
 export function powerCompareVariants(metric: string, mode: PowerCompare): PowerCompareSeries[] {
   const base = powerCompareBase(metric, mode);
   const config = getMeasuredMetricConfig(metric);
@@ -129,10 +98,11 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
   if (base.kind === 'basis') {
     const quantity = boundaryQuantity(metric, base.id);
     if (!quantity) return [];
-    return POWER_BASES.filter((basis) => basis !== base.id).map((basis) => ({
-      variant: { kind: 'basis', id: basis },
-      field: POWER_BASIS_FIELDS[basis][quantity],
-    }));
+    return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
+      if (basis === base.id) return [];
+      const field = POWER_BASIS_FIELDS[basis][quantity];
+      return field ? [{ variant: { kind: 'basis', id: basis }, field }] : [];
+    });
   }
   const fields = config.family === 'power' ? ROLE_WATT_FIELDS : ROLE_ENERGY_FIELDS;
   return ROLES.filter((role) => role !== base.id).map((role) => ({
@@ -141,17 +111,10 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
   }));
 }
 
-/** Whether choosing `mode` on `metric` draws anything. `none` is always available. */
 export function powerCompareAvailable(metric: string, mode: PowerCompare): boolean {
   return mode === 'none' || powerCompareVariants(metric, mode).length > 0;
 }
 
-/**
- * Appends one clone per comparison series to `points` (already remapped onto
- * the selected metric). A point lacking a variant's field contributes nothing
- * to that series — never a 0 — so the availability rules of each boundary and
- * role carry through unchanged.
- */
 export function expandPowerCompareSeries(
   points: readonly InferenceData[],
   metric: string,
@@ -170,7 +133,6 @@ export function expandPowerCompareSeries(
   return result;
 }
 
-/** Comparison mode implied by the variants present in a rendered point set. */
 export function inferPowerCompare(points: readonly InferenceData[]): PowerCompare {
   for (const point of points) {
     if (point.powerVariant?.kind === 'basis') return 'boundaries';
@@ -179,7 +141,6 @@ export function inferPowerCompare(points: readonly InferenceData[]): PowerCompar
   return 'none';
 }
 
-/** Distinct variants in draw order: the base first, then siblings in canonical order. */
 export function powerVariantsInData(
   points: readonly InferenceData[],
   metric: string,
@@ -209,7 +170,6 @@ export function powerVariantLabel(variant: PowerVariant, locale: Locale): string
     : ROLE_LABELS[variant.id][locale];
 }
 
-/** Short boundary names for in-chart line labels; the legend keeps the full names. */
 const BASIS_SHORT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
   'gpu-measured': { en: 'Measured', zh: '实测' },
   'gpu-provisioned': { en: 'TDP', zh: 'TDP' },
@@ -217,14 +177,12 @@ const BASIS_SHORT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
   'utility-modeled': { en: 'PUE modeled', zh: 'PUE 建模' },
 };
 
-/** Suffix text a line label carries for one comparison series. */
 export function powerVariantShortLabel(variant: PowerVariant, locale: Locale): string {
   return variant.kind === 'basis'
     ? BASIS_SHORT_LABELS[variant.id][locale]
     : ROLE_LABELS[variant.id][locale];
 }
 
-/** `700 W`, `1.37 kW`, `19.2 kW`: kilowatts from 1000 W, at most two decimals, zeros trimmed. */
 export function formatWatts(watts: number): string {
   if (Math.abs(watts) >= 1000) {
     return `${(watts / 1000).toFixed(2).replace(/\.?0+$/u, '')} kW`;
@@ -232,12 +190,6 @@ export function formatWatts(watts: number): string {
   return `${Math.round(watts)} W`;
 }
 
-/**
- * The value a series holds at every point, or null when it varies. A
- * provisioned boundary (TDP, all-in) is one number per hardware, so its line
- * label can state it instead of sending the reader to the axis. Non-finite
- * values are ignored; an empty series is null.
- */
 export function flatSeriesValue(values: readonly number[], relTolerance = 0.005): number | null {
   const finite = values.filter((value) => Number.isFinite(value));
   if (finite.length === 0) return null;
@@ -247,16 +199,13 @@ export function flatSeriesValue(values: readonly number[], relTolerance = 0.005)
 }
 
 export interface PowerLineLabelOptions {
-  /** The selected metric's own series keeps the plain hardware label. */
   isBase: boolean;
   locale: Locale;
-  /** Shared watts of a flat series (`flatSeriesValue`), appended after the name. */
   flatWatts?: number | null;
 }
 
 const LINE_LABEL_SUFFIX_SEPARATOR = ' · ';
 
-/** Suffix appended to a comparison sibling's line label; '' for the base series. */
 export function powerLineLabelSuffix(
   variant: PowerVariant | null | undefined,
   opts: PowerLineLabelOptions,
@@ -271,10 +220,6 @@ export function powerLineLabelSuffix(
 
 const LINE_LABEL_SERIES_DELIMITER = '::';
 
-/**
- * Line-label series id: the hardware key for the base series (existing pinned
- * anchors and hover hooks key on it) and `<hw>::<variant>` for a sibling.
- */
 export function lineLabelSeriesId(
   hw: string,
   variant: PowerVariant | null | undefined,
@@ -283,22 +228,16 @@ export function lineLabelSeriesId(
   return isBase || !variant ? hw : `${hw}${LINE_LABEL_SERIES_DELIMITER}${variant.id}`;
 }
 
-/** Inverse of `lineLabelSeriesId`: the hardware key behind a line-label series id. */
 export function lineLabelHardwareKey(seriesId: string): string {
   const index = seriesId.indexOf(LINE_LABEL_SERIES_DELIMITER);
   return index === -1 ? seriesId : seriesId.slice(0, index);
 }
 
-/** Whether `metric` plots watts per chip, so a flat boundary's label can state its value. */
 export function metricPlotsWatts(metric: string): boolean {
   const config = getMeasuredMetricConfig(metric);
   return config?.family === 'power' && config.display === 'watts';
 }
 
-/**
- * Series label for a table or CSV row: the point's variant, or the base
- * series' identity when the chart is comparing and this is a base point.
- */
 export function powerSeriesLabel(
   point: Pick<InferenceData, 'powerVariant'>,
   metric: string,

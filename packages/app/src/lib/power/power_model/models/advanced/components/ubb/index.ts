@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** UBB/HGX board families, with each implementation in its own module. */
 
 export { AMD8WayUBB } from './amd_8way_ubb';
 export { B200HGXBoard } from './b200_hgx';

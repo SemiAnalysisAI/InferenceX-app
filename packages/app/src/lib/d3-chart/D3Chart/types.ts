@@ -13,22 +13,13 @@ import type { BarLabelConfig } from '../layers/bar-labels';
 import type { ScatterPointConfig } from '../layers/scatter-points';
 import type { RadarConfig } from '../layers/radar';
 
-// ---------------------------------------------------------------------------
-// Scale configs
-// ---------------------------------------------------------------------------
-
 export type ScaleConfig =
   | { type: 'band'; domain: string[]; padding?: number }
   | { type: 'linear'; domain: [number, number]; nice?: boolean }
   | { type: 'log'; domain: [number, number]; nice?: boolean }
   | { type: 'time'; domain: [Date, Date]; nice?: boolean };
 
-// ---------------------------------------------------------------------------
-// Layer configs
-// ---------------------------------------------------------------------------
-
 interface LayerBase {
-  /** Optional key for stable identity across re-renders. */
   key?: string;
 }
 
@@ -91,19 +82,13 @@ export interface RadarLayerConfig<T> extends LayerBase {
 
 export interface CustomLayerConfig extends LayerBase {
   type: 'custom';
-  /**
-   * Custom render function. Return a D3 selection if this layer should be
-   * targetable by tooltip `attachToLayer`.
-   */
   render:
     | ((
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
         ctx: RenderContext,
       ) => d3.Selection<any, any, any, any> | void)
     | null;
-  /** Scale-neutral state for this layer; changes automatically invalidate phase 4. */
   displayIdentity?: string;
-  /** Cheap decoration update run when this layer's display identity changes. */
   onDisplayUpdate?:
     | ((zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>, ctx: RenderContext) => void)
     | null;
@@ -124,29 +109,14 @@ export type LayerConfig<T = any> =
   | RadarLayerConfig<T>
   | CustomLayerConfig;
 
-// ---------------------------------------------------------------------------
-// Axis configs
-// ---------------------------------------------------------------------------
-
 export interface AxisConfig {
   label?: string;
   tickFormat?: (d: d3.AxisDomain) => string;
   tickCount?: number;
-  /** Explicit ticks or a domain-aware generator, useful for geometric and sparse log axes. */
   tickValues?: (number | Date)[] | ((scale: AnyScale) => (number | Date)[]);
-  /**
-   * Draw grid lines at this axis's ticks. Defaults to true. Set to false to
-   * drop the lines running perpendicular to the axis (e.g. `xAxis.grid: false`
-   * removes vertical grid lines while keeping the horizontal ones).
-   */
   grid?: boolean;
-  /** Post-render callback for custom axis label formatting (e.g., multi-line tspan). */
   customize?: (axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Zoom config
-// ---------------------------------------------------------------------------
 
 export interface ZoomConfig {
   enabled: boolean;
@@ -154,27 +124,17 @@ export interface ZoomConfig {
   scaleExtent?: [number, number];
   resetEventName?: string;
   defaultZoomK?: number;
-  /** Custom constrain function for zoom transform. */
   constrain?: (
     transform: d3.ZoomTransform,
     extent: [[number, number], [number, number]],
     translateExtent: [[number, number], [number, number]],
   ) => d3.ZoomTransform;
-  /** Custom X rescale (e.g., left-anchored zoom). When set, overrides default rescaleX. */
   rescaleX?: (xScale: ContinuousScale, transform: d3.ZoomTransform) => ContinuousScale;
-  /** Custom Y rescale (e.g., top-anchored zoom). When set, overrides default rescaleY. */
   rescaleY?: (yScale: ContinuousScale, transform: d3.ZoomTransform) => ContinuousScale;
-  /** Custom transform storage (e.g., Y-only storage). */
   customTransformStorage?: (transform: d3.ZoomTransform) => d3.ZoomTransform;
-  /** Called after zoom reset animation completes. */
   onReset?: () => void;
-  /** Called on each zoom event, AFTER default axis/grid/layer updates. */
   onZoom?: (event: d3.D3ZoomEvent<SVGSVGElement, unknown>, ctx: ZoomContext) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Tooltip config
-// ---------------------------------------------------------------------------
 
 export interface TooltipConfig<T = any> {
   rulerType: 'vertical' | 'horizontal' | 'crosshair' | 'none';
@@ -193,34 +153,20 @@ export interface TooltipConfig<T = any> {
   onHoverStart?: (sel: d3.Selection<any, T, any, any>, d: T) => void;
   onHoverEnd?: (sel: d3.Selection<any, T, any, any>, d: T) => void;
   onPointClick?: (d: T) => void;
-  /** Which layer index to attach tooltip handlers to. Defaults to first renderable layer. */
   attachToLayer?: number;
-  /**
-   * When true, show ruler/tooltip on mousemove anywhere in the chart area,
-   * snapping to the nearest data point by x-position (bisect).
-   * Requires `getDataX` to extract the x-value from each data point.
-   */
   proximityHover?: boolean;
-  /** Extract the numeric x-value from a data point for bisect. Required when `proximityHover` is true. */
   getDataX?: (d: T) => number;
 }
 
-// ---------------------------------------------------------------------------
-// Render / Zoom context passed to custom layers
-// ---------------------------------------------------------------------------
-
 export interface RenderContext {
   layout: ChartLayout;
-  /** Portaled tooltip node owned by the chart wrapper. */
   tooltipElement: HTMLDivElement;
   xScale: AnyScale | d3.ScaleTime<number, number>;
   yScale: AnyScale | d3.ScaleTime<number, number>;
-  /** Scales currently rendered after applying the active zoom transform. */
   renderedXScale?: AnyScale | d3.ScaleTime<number, number>;
   renderedYScale?: AnyScale | d3.ScaleTime<number, number>;
   width: number;
   height: number;
-  /** Transition duration in ms for animated scale/domain changes. */
   transitionDuration?: number;
 }
 
@@ -230,13 +176,8 @@ export interface ZoomContext extends RenderContext {
   transform: d3.ZoomTransform;
 }
 
-// ---------------------------------------------------------------------------
-// Imperative handle (exposed via ref)
-// ---------------------------------------------------------------------------
-
 export interface D3ChartHandle {
   dismissTooltip: (clearPinnedPoint?: boolean) => void;
-  /** Immediately hide tooltip + rulers without waiting for React re-render. */
   hideTooltip: () => void;
   getPinnedPoint: () => unknown;
   getPinnedPointIsOverlay: () => boolean;
@@ -244,20 +185,9 @@ export interface D3ChartHandle {
   pinTooltip: (point: unknown, isOverlay?: boolean) => void;
   getSvgElement: () => SVGSVGElement | null;
   getTooltipElement: () => HTMLDivElement | null;
-  /** Current x/y scales (post-render). Null before the first render. */
   getScales: () => { xScale: BuiltScale; yScale: BuiltScale } | null;
-  /**
-   * Re-apply `.dot-group` transforms from currently-bound datum `x`/`y` values using
-   * current scales (zoom-aware). Use to drive imperative position updates outside the
-   * normal React render path (e.g. replay animation frames). No-op when scales are
-   * unavailable or when neither scale is continuous.
-   */
   refreshDataPositions: () => void;
 }
-
-// ---------------------------------------------------------------------------
-// Main component props
-// ---------------------------------------------------------------------------
 
 export interface D3ChartProps<T = any> {
   chartId: string;
@@ -268,16 +198,9 @@ export interface D3ChartProps<T = any> {
   testId?: string;
   grabCursor?: boolean;
   instructions?: string;
-  /** When false, chart structure uses the root `g` group instead of clip-pathed zoomGroup. */
   clipContent?: boolean;
-  /**
-   * Stable identity for the set of rendered points. When supplied, coordinate
-   * changes update bound data in place instead of repeating the full join.
-   */
   dataIdentity?: string;
-  /** Coordinate/scale invalidation key for in-place metric updates. */
   metricIdentity?: string;
-  /** Display-only invalidation key for built-in layers and `onDisplayUpdate`. */
   displayIdentity?: string;
 
   xScale?: ScaleConfig;
@@ -294,11 +217,8 @@ export interface D3ChartProps<T = any> {
   legendElement?: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Keep the SVG mounted so D3 retains its layout when scrolling toggles. */
   scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 
-  /** Called after all layers render. Useful for one-off DOM manipulations. */
   onRender?: (ctx: RenderContext) => void;
-  /** Runs only for display invalidation, after structure/data/metric phases. */
   onDisplayUpdate?: (ctx: RenderContext) => void;
 }

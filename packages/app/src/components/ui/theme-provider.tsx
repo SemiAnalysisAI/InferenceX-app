@@ -11,7 +11,6 @@ function RetiredThemeMigration() {
   const { theme, setTheme } = useTheme();
 
   React.useEffect(() => {
-    // next-themes only removes registered classes; kart is no longer registered.
     document.documentElement.classList.remove('kart');
     if (theme === 'kart') setTheme('dark');
   }, [theme, setTheme]);

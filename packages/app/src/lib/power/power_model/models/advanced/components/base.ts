@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Reusable component interfaces and explicit equipment quantities. */
 
 import {
   type Details,
@@ -25,7 +24,6 @@ export abstract class GenericComponent extends FrozenModel {
     this.provenance = provenance;
   }
 
-  /** Return electrical watts for one component in its configured state. */
   abstract estimate_w(): number;
 
   protected _details(): Details {
@@ -50,7 +48,6 @@ export interface FixedPowerComponentFields extends GenericComponentFields {
   power_w: number;
 }
 
-/** An explicitly supplied power input, also usable for additional component types. */
 export class FixedPowerComponent extends GenericComponent {
   static override readonly typeName: string = 'FixedPowerComponent';
   readonly power_w: number;

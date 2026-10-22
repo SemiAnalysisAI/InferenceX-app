@@ -9,9 +9,6 @@ import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
 import { processOverlayChartDataWithClipping } from '@/components/inference/utils';
 
-// Qwen3.5 B200 c1, run 34175132645: actual rounded telemetry, eight GPUs
-// (same fixture as modeled-system-power.test.ts) plus token rates and a J per
-// total token consistent with them (9 total tokens per output token).
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: 441192,
@@ -58,7 +55,6 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** Full official-path derivation for one row with real HW_REGISTRY specs. */
 function derive(source: BenchmarkRow) {
   const entry = rowToAggDataEntry(source);
   const hwKey = getHardwareKey(entry);
@@ -72,7 +68,6 @@ describe('power boundaries through the derived-field builder', () => {
   ] as const)(
     'retains AgentX %s multinode estimates across chart and public view',
     (hardware, tp, pp, replicas, gpus, watts, totalWatts) => {
-      // Topologies from Kimi K3 rows 441678 / 441866; aggregate role counts share devices.
       const source = row({
         hardware,
         model: 'kimik3',
@@ -137,12 +132,11 @@ describe('power boundaries through the derived-field builder', () => {
   it.each(['single_turn', 'agentic_traces'] as const)(
     'keeps %s GPU boundaries when an NVL72 row is not whole compute trays',
     (benchmark_type) => {
-      // Eight GPUs on one node cannot be one four-GPU NVL72 tray.
       const { entry, fields } = derive(row({ hardware: 'gb200', benchmark_type }));
       expect(entry.modeledSystemPower).toMatchObject({ status: 'unsupported', reason: 'topology' });
       expect(fields.measuredAvgPower).toBeDefined();
-      expect(fields.gpuProvisionedWatts).toBeDefined();
-      expect(fields.utilityProvisionedWatts).toBeDefined();
+      expect(fields.gpuProvisionedJPerOutputToken).toBeDefined();
+      expect(fields.utilityProvisionedJPerOutputToken).toBeDefined();
       expect(fields.utilityModeledWatts).toBeUndefined();
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
     },
@@ -198,9 +192,6 @@ describe('power boundaries through the derived-field builder', () => {
   });
 });
 
-// 8P + 8D fixed-sequence disaggregation: the producer divides total tokens by
-// all 16 GPUs but output tokens by the 8 decode GPUs, so the deployment serves
-// 270 × 16 = 4320 total and 60 × 8 = 480 output tok/s (again 9 : 1).
 function disaggRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return row({
     disagg: true,
@@ -240,14 +231,13 @@ describe('J per total token at every power boundary', () => {
       expect(fields[perTotal]?.y, perTotal).toBeGreaterThan(0);
       expect(fields[perOutput]!.y / fields[perTotal]!.y, perTotal).toBeCloseTo(tokenMix, 9);
     }
-    // All in Provisioned divides by total tokens over every allocated GPU,
-    // exactly as the ungated jTotal does.
     expect(fields.utilityProvisionedJPerTotalToken?.y).toBeCloseTo(fields.jTotal!.y, 9);
   });
 
   it('withholds provisioned J per total token where output energy is withheld', () => {
     const { fields } = derive(disaggRow({ benchmark_type: 'agentic_traces' }));
-    expect(fields.gpuProvisionedWatts).toBeDefined();
+    expect(fields.jTotal).toBeDefined();
+    expect(fields.gpuProvisionedJPerOutputToken).toBeUndefined();
     expect(fields.gpuProvisionedJPerTotalToken).toBeUndefined();
     expect(fields.utilityProvisionedJPerTotalToken).toBeUndefined();
   });

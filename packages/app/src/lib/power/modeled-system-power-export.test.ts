@@ -12,7 +12,6 @@ import { estimateChassisPower } from '@/lib/power/system-power-model';
 const h200 = (gpuWatts: number) =>
   estimateChassisPower('h200', gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
 
-// Original H200 c1, run 31672765610, artifact 9171086754; schema marker was absent.
 function input(): ComparisonInput {
   return {
     cohort: 'original-qwen',
@@ -97,7 +96,6 @@ describe('offline modeled PowerX comparisons', () => {
       output_tokens: 9303,
       integration_seconds: 64.67805051803589,
     });
-    // python -m power_model --gpu-level-power-per-gpu=229.002875 --system=h200: IT 3810.904 W.
     expect(result.rows[0].estimated_energy.it_j_per_output_token).toBeCloseTo(
       26.494877309376715,
       9,
@@ -251,12 +249,9 @@ describe('offline modeled PowerX comparisons', () => {
     expect(gb300Flat.cpu_basis).toBe('measured');
     expect(x86Flat.cpu_basis).toBeNull();
     expect(x86Flat.measured_total_grace_j).toBeUndefined();
-    // The x86 row and its cell are byte-identical to an export without the NVL72 row.
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);
     expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
-    // Without cpu_power_valid the row reports no Grace-side inputs, and the rack
-    // model's Grace profile stands in for the sockets.
     delete gb300.benchmark.metrics.cpu_power_valid;
     const modeledCpu = buildComparison(source).rows[1];
     expect(modeledCpu.modeled).toMatchObject({

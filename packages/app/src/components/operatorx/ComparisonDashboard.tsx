@@ -27,10 +27,8 @@ import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
-/** Baseline select value for "no baseline". */
 const NO_BASELINE = 'none';
 
-/** Visible cards with their width: a half card left alone in its row takes the whole row. */
 function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
   const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
   let run: typeof out = [];
@@ -90,7 +88,6 @@ function VizCard({
   );
 }
 
-/** Cross-hardware comparison of one op: workload, metric and GPU controls over the visualizations. */
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
@@ -117,7 +114,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     () => (picked ? available.filter((h) => picked.includes(h)) : available),
     [picked, available],
   );
-  // No baseline until one is picked.
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
   const model = useMemo(() => {
     if (!view) return null;
@@ -153,7 +149,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>
     );
-  // While another workload loads, the previous one stays on screen, dimmed.
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;

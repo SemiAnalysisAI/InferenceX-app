@@ -80,9 +80,6 @@ const REQUEST_CARD_STRINGS = {
   },
 } as const;
 
-// Unofficial-run overlays cannot open this persisted point-detail route: they
-// have no benchmark_results id or stored request timeline. These charts are
-// therefore intentionally limited to DB-backed agentic points.
 export function RequestMetricOverTime({
   title,
   metric,
@@ -197,7 +194,6 @@ export function SequenceMetricCard({
   timelineLoading,
 }: {
   metric: 'isl' | 'osl';
-  /** Phase-scoped timeline — distribution values + in-flight are both derived from it. */
   timeline: RequestChartData | null | undefined;
   timelineLoading: boolean;
 }) {
@@ -211,8 +207,6 @@ export function SequenceMetricCard({
     { value: 'inflight', label: t.inflight },
   ];
   const testPrefix = `${metric}-metric`;
-  // Per-request ISL/OSL for the selected phase (request_timeline carries both,
-  // so the distribution honours the warmup/profiling toggle for free).
   const values = useMemo(
     () =>
       timeline

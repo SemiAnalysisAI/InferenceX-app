@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Shared state selection and accounting for switches with always-powered optics. */
 
 import {
   type OperatingState,
@@ -20,7 +19,6 @@ export interface OpticalScaleOutSwitchFields {
   provenance?: Provenance;
 }
 
-/** The class-level constants of a concrete switch (Python ClassVars). */
 export interface OpticalSwitchSpec {
   name: string;
   bandwidth_tbps: number;

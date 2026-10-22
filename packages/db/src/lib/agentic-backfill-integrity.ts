@@ -4,9 +4,7 @@ export interface BackfillState {
   benchmark_hash: string;
   profile_hash: string | null;
   server_hash: string | null;
-  /** Container read for the timeline: gzip when present, else legacy JSONB. */
   timeline_format: 'gzip' | 'jsonb' | null;
-  /** md5 of the stored gzip bytes or of the legacy JSONB text. */
   timeline_hash: string | null;
   chart_version: number | null;
   stats_version: number | null;
@@ -35,9 +33,6 @@ export function verifyBackfillState(
     throw new Error(`point ${before.id}: timeline version ${after.timeline_version}`);
   }
   if (before.timeline_version === versions.timeline) {
-    // Converting legacy JSONB to gzip rewrites the container, so the stored
-    // bytes differ by design. Across containers the document must keep its
-    // version and request count. Within one container the bytes must match.
     const unchanged =
       before.timeline_format === after.timeline_format
         ? before.timeline_hash === after.timeline_hash

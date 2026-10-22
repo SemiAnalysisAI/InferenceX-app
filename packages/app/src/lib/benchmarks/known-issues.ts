@@ -1,29 +1,13 @@
-/**
- * Known upstream issues affecting specific benchmark configurations.
- *
- * Entries are matched against the series visible on an inference chart.
- * Matches render an on-chart warning box (which is captured by PNG export)
- * and are stamped into the CSV export header.
- */
-
 import { Model } from '@/lib/catalog/data-mappings';
 
 export interface KnownConfigIssue {
-  /** Availability hardware key the issue applies to ({hardware}_{framework}[_mtp]) */
   hwKey: string;
-  /** Model the issue applies to */
   model: Model;
-  /** Precisions the issue applies to; omit to match every precision */
   precisions?: string[];
-  /** GitHub Actions run IDs (the numeric `/runs/<id>` segment) the issue applies to; omit to match every run */
   affectedRuns?: string[];
-  /** Short description shown in the warning box, e.g. "Accuracy issues" */
   summary: string;
-  /** Human-readable filing date, e.g. "Apr 21, 2026" */
   filed: string;
-  /** Upstream issue URL */
   url: string;
-  /** Short issue reference, e.g. "NVIDIA/srt-slurm#51" */
   issueRef: string;
 }
 
@@ -50,25 +34,16 @@ export const KNOWN_CONFIG_ISSUES: KnownConfigIssue[] = [
   },
 ];
 
-/** Minimal point shape needed for matching. */
 export interface MatchablePoint {
   hwKey: string | number;
   precision: string;
-  /** Run URL of the GitHub Actions run that produced this point, if known. */
   run_url?: string;
 }
 
-/** Numeric GitHub Actions run id from a run URL (ignores any `/attempts/<n>` suffix), or null. */
 export function runIdFromRunUrl(runUrl: string | null | undefined): string | null {
   return runUrl?.match(/\/runs\/(?<runId>\d+)/u)?.groups?.runId ?? null;
 }
 
-/**
- * Whether a chart point falls under a known issue (hwKey + precision + run scope).
- * Shared by matchKnownConfigIssues and the on-chart warning-arrow point filters so
- * both agree on which points an issue covers. Run-scoped issues never match a point
- * whose run id is unknown.
- */
 export function pointMatchesIssue(issue: KnownConfigIssue, p: MatchablePoint): boolean {
   if (String(p.hwKey) !== issue.hwKey) return false;
   if (issue.precisions && !issue.precisions.includes(p.precision)) return false;
@@ -79,11 +54,6 @@ export function pointMatchesIssue(issue: KnownConfigIssue, p: MatchablePoint): b
   return true;
 }
 
-/**
- * Return the known issues whose (model, hwKey, precision, run) matches at least
- * one visible chart point. Order follows KNOWN_CONFIG_ISSUES; each issue appears
- * at most once.
- */
 export function matchKnownConfigIssues(
   model: string,
   points: MatchablePoint[],
@@ -93,7 +63,6 @@ export function matchKnownConfigIssues(
   );
 }
 
-/** Format a known issue as a CSV header comment line. */
 export function knownIssueCsvNote(issue: KnownConfigIssue, configLabel: string): string {
   return `WARNING: ${configLabel} — ${issue.summary.toLowerCase()} reported, filed since ${issue.filed} (${issue.issueRef}): ${issue.url}`;
 }

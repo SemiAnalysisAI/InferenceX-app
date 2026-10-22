@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Rack NVLink switch ASIC, separate from external scale-out gear. */
 
 import { type Details, Provenance } from '../../../base';
 import { FixedPowerComponent } from './base';

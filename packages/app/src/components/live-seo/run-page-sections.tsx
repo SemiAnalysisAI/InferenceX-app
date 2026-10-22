@@ -1,10 +1,3 @@
-/**
- * Shared server-rendered body for `/run/<pair>` and `/zh/run/<pair>`.
- * One markup tree, two string bundles — the EN and ZH routes cannot drift.
- * All numbers come pre-derived from `getRunPageData`, which reads through the
- * same cached benchmark query the dashboard renders.
- */
-
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtGpuHour, fmtMs, fmtThroughput } from '@/components/live-seo/format';
@@ -272,12 +265,6 @@ export function RunDetailContent({
   );
 }
 
-/**
- * Formatted best-of-config TTFT and TPOT for the quick answers. Returned as
- * separate values because each is minimized independently across configs:
- * the two bests can come from different runs, so composing them as a single
- * measured pair would misstate the data.
- */
 export function latencyQuote(data: RunPageData): { ttft: string; tpot: string } | null {
   if (data.bestMedianTtft === null || data.bestMedianTpot === null) return null;
   return { ttft: fmtMs(data.bestMedianTtft), tpot: fmtMs(data.bestMedianTpot) };

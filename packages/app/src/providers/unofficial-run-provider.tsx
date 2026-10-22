@@ -115,7 +115,6 @@ export function useUnofficialRun() {
   }
   return context;
 }
-/** Registers derived chart availability; the provider reducer owns reconciliation. */
 export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): void {
   const { reconcileOverlayScope } = useUnofficialRun();
   useEffect(() => {
@@ -136,10 +135,6 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
 
   const result: UnofficialChartData = {};
   for (const [key, rows] of groups) {
-    // Overlay points are always priced on the external basis here;
-    // `processOverlayChartDataWithClipping` reprices them to the selected
-    // basis at render time, so seeding them with the app default would
-    // double-apply the internal/external ratio.
     const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
@@ -184,7 +179,6 @@ export function parseAvailableModelsAndSequences(
   return result;
 }
 
-/** Canonicalize the first unofficial-run URL value without changing server validation policy. */
 export function parseUnofficialRunIds(search: string): string[] {
   const params = new URLSearchParams(search);
   for (const [key, value] of params) {
@@ -540,7 +534,6 @@ export function UnofficialRunProvider({
   );
 }
 
-/** Allows dashboard navigation to own banner placement while the provider owns its state. */
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
   const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
   return (

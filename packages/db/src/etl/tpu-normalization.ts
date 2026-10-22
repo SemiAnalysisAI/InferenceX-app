@@ -1,23 +1,13 @@
-/** A positive physical-chip count, without truncating malformed producer values. */
 export function physicalChipCount(value: unknown): number | undefined {
   if (typeof value !== 'number' && typeof value !== 'string') return undefined;
   const n = typeof value === 'string' && /^[1-9]\d*$/u.test(value) ? Number(value) : value;
   return typeof n === 'number' && Number.isSafeInteger(n) && n > 0 ? n : undefined;
 }
 
-/** Preserve zero for an explicitly absent prefill/decode role. */
 export function roleChipCount(value: unknown): number | undefined {
   return value === 0 || value === '0' ? 0 : physicalChipCount(value);
 }
 
-/**
- * The August 3 manual Qwen sweep predates num_gpus/DP in the artifact contract.
- * Its producer (00b9a76) divides by TP/2 but omits DP: TP8/DP1 is correct,
- * TP1/DP8 is eight times too large. Both configurations use four physical chips.
- * Scope this repair to the verified run and recipe, before config identity is
- * computed. Modern artifacts with explicit counts are already normalized.
- * Both DB ingestion and unofficial overlays call the same mappers.
- */
 export function normalizeLegacyTpuRow(
   row: Record<string, any>,
   runId?: string | number | null,
@@ -50,8 +40,6 @@ export function normalizeLegacyTpuRow(
     num_gpus: 4,
     dp,
     disagg: false,
-    // The eval aggregator emitted one worker in each phase for the same
-    // aggregate server; these are not two disaggregated worker pools.
     ...('prefill_tp' in row ? { prefill_num_workers: 0, decode_num_workers: 0 } : {}),
   };
   for (const key of ['tput_per_gpu', 'input_tput_per_gpu', 'output_tput_per_gpu']) {
@@ -60,7 +48,6 @@ export function normalizeLegacyTpuRow(
   return normalized;
 }
 
-/** GitHub run IDs are globally unique; URLs remain the stored provenance. */
 export function artifactRunId(runUrl: string | null | undefined): string | undefined {
   return runUrl?.match(
     /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<runId>\d+)(?:\/|$)/u,

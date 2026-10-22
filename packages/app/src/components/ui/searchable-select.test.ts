@@ -56,9 +56,6 @@ function openMenu() {
   act(() => trigger.click());
 }
 
-// React 18 controlled inputs ignore direct `.value` assignment because the
-// internal value tracker thinks nothing changed. Use the native HTMLInputElement
-// setter so React picks up the change and fires onChange in jsdom.
 function setSearchValue(value: string) {
   const input = document.body.querySelector('input[type="text"]') as HTMLInputElement;
   const nativeSetter = Object.getOwnPropertyDescriptor(
@@ -300,7 +297,6 @@ describe('SearchableSelect', () => {
     ) as HTMLDivElement;
     act(() => target.click());
     expect(handle).toHaveBeenCalledExactlyOnceWith('y_inputTputPerGpu');
-    // Menu closed → no select-item visible
     expect(document.body.querySelectorAll('[data-slot="select-item"]')).toHaveLength(0);
   });
 

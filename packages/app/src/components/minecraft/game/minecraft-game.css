@@ -1,5 +1,3 @@
-/* Playable Minecraft. Loaded with the game chunk only. */
-
 .mc-dialog {
   width: min(1600px, 98vw) !important;
   max-width: none !important;
@@ -71,7 +69,6 @@
   cursor: none;
 }
 
-/* Reset the theme's global button and input bevels inside the game. */
 .minecraft .mc-game button,
 .minecraft .mc-game input {
   border: 0 !important;
@@ -83,7 +80,6 @@
   background-color: transparent !important;
 }
 
-/* ── Menus ── */
 .mc-title-screen,
 .mc-menu {
   position: absolute;
@@ -287,7 +283,6 @@
   background: #80ff80;
 }
 
-/* ── HUD ── */
 .mc-hud {
   position: absolute;
   inset: 0;
@@ -421,7 +416,6 @@ img.mc-hud-icon {
   margin-left: auto;
 }
 
-/* ── Items ── */
 .mc-item {
   position: relative;
   display: block;
@@ -444,7 +438,6 @@ img.mc-hud-icon {
   display: block;
 }
 
-/* ── Container screens ── */
 .mc-screen-backdrop {
   position: absolute;
   inset: 0;
@@ -519,7 +512,6 @@ img.mc-hud-icon {
   pointer-events: none;
 }
 
-/* ── Overlays ── */
 .mc-pause,
 .mc-death {
   position: absolute;
@@ -555,7 +547,6 @@ img.mc-hud-icon {
   background: #00000060 !important;
 }
 
-/* ── Touch controls ── */
 .mc-touch {
   position: absolute;
   inset: 0;
@@ -653,7 +644,6 @@ img.mc-hud-icon {
   background: transparent !important;
 }
 
-/* ── Title panorama ── */
 .mc-panorama {
   position: absolute;
   inset: 0;
@@ -663,7 +653,6 @@ img.mc-hud-icon {
   pointer-events: none;
 }
 .mc-panorama-view {
-  /* Half-height over tan(42.5deg): an 85 degree vertical field of view like the vanilla title screen. */
   --mc-pano: calc(50cqh / 0.9163);
   position: absolute;
   inset: 0;

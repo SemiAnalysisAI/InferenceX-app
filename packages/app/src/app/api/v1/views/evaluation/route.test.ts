@@ -69,10 +69,8 @@ function evalRow(overrides: Partial<EvalRow> = {}): EvalRow {
 }
 
 const ROWS: EvalRow[] = [
-  // Two same-config/same-date retries — aggregated into one bar (n=2).
   evalRow({ id: 1, config_id: 1, metrics: { em_strict: 0.8, em_strict_se: 0.01 } }),
   evalRow({ id: 2, config_id: 1, metrics: { em_strict: 0.9, em_strict_se: 0.01 } }),
-  // Second benchmark, later date, different config.
   evalRow({
     id: 3,
     config_id: 2,
@@ -162,7 +160,6 @@ describe('GET /api/v1/views/evaluation', () => {
       framework: 'trtllm',
       date: '2026-03-05',
     });
-    // Half the min/max error-band width — float noise, so compare approximately.
     expect(body.rows[0].stderr).toBeCloseTo(0.02, 10);
   });
 
@@ -244,7 +241,6 @@ describe('GET /api/v1/views/evaluation', () => {
     expect(lines[0]).toBe('source,hwKey,label,score,stderr,n,precision,framework,date');
     expect(lines).toHaveLength(2);
     expect(lines[1]).toContain('h200_sglang');
-    // Multi-line config labels are flattened for CSV rows.
     expect(lines[1]).not.toContain('\n');
   });
 

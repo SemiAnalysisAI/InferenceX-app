@@ -1,10 +1,5 @@
 import { TILE, type IconName, type TileName } from './mc-atlas';
 
-/**
- * Block registry. Numeric ids are stored in chunk arrays, so never renumber an
- * existing block (saved worlds reference them). Face order everywhere is
- * +X (east), -X (west), +Y (top), -Y (bottom), +Z (south), -Z (north).
- */
 export type ToolKind = 'pickaxe' | 'axe' | 'shovel' | 'hoe' | 'sword' | 'shears';
 export type SoundGroup =
   | 'grass'
@@ -26,7 +21,6 @@ export type RenderKind =
   | 'door'
   | 'ladder';
 
-/** Axis-aligned box in 1/16 block units: x0 y0 z0 x1 y1 z1. */
 export type Box = readonly [number, number, number, number, number, number];
 
 export interface BlockDef {
@@ -34,36 +28,26 @@ export interface BlockDef {
   key: string;
   en: string;
   zh: string;
-  /** Six face tiles: +X -X +Y -Y +Z -Z. */
   tiles: readonly number[];
   render: RenderKind;
-  /** Collides with entities. */
   solid: boolean;
-  /** Fully occludes neighbours and blocks light. */
   opaque: boolean;
-  /** Rendered in the alpha-blended pass (water, ice). */
   translucent?: boolean;
   hardness: number;
   tool?: ToolKind;
-  /** Minimum harvest tier (1 wood, 2 stone, 3 iron, 4 diamond). */
   tier?: number;
   sound: SoundGroup;
   light?: number;
-  /** Extra light attenuation for non-opaque blocks (leaves, water). */
   filter?: number;
   gravity?: boolean;
   replaceable?: boolean;
-  /** Needs a solid block below to exist. */
   needsSupport?: boolean;
-  /** Breaks instantly by hand regardless of hardness. */
   instant?: boolean;
   icon: IconName;
-  /** Default dropped item key; '' drops nothing. */
   drop?: string;
   boxes?: readonly Box[];
   flammable?: boolean;
   climbable?: boolean;
-  /** Blocks with a facing in meta bits 0-1. */
   facing?: boolean;
 }
 
@@ -76,7 +60,6 @@ const column = (side: TileName, top: TileName, bottom: TileName = top) => [
   TILE[side],
   TILE[side],
 ];
-/** Front on +Z for meta facing 0; the mesher rotates by facing. */
 const fronted = (front: TileName, side: TileName, top: TileName, bottom: TileName = top) => [
   TILE[side],
   TILE[side],
@@ -1503,7 +1486,6 @@ const DEFS: [number, Def][] = [
 
 export const BLOCKS: BlockDef[] = [];
 export const BLOCK_BY_KEY: Record<string, BlockDef> = {};
-// Append-only IDs: old saves keep their existing block meanings.
 for (const [id, key, en, zh, tile, hardness] of [
   [85, 'netherrack', 'Netherrack', '下界岩', 'netherrack', 0.4],
   [86, 'nether_bricks', 'Nether Bricks', '下界砖块', 'nether_bricks', 2],
@@ -1540,7 +1522,6 @@ for (const [id, def] of DEFS) {
   BLOCK_BY_KEY[block.key] = block;
 }
 
-/** Block id by key, throwing on typos so tests catch them. */
 export function blockId(key: string): number {
   const b = BLOCK_BY_KEY[key];
   if (!b) throw new Error(`Unknown block ${key}`);
@@ -1623,13 +1604,11 @@ export const B = {
 
 export const isLiquid = (id: number) => id === B.water || id === B.lava;
 
-/** Light emitted by a block, taking furnace lit state (meta bit 2) into account. */
 export function emission(id: number, meta: number): number {
   if (id === B.furnace) return meta & 4 ? 13 : 0;
   return BLOCKS[id]?.light ?? 0;
 }
 
-/** Collision boxes in block-local 0..1 units, or null when the block has no collision. */
 export function collisionBoxes(id: number, meta: number): readonly Box[] | null {
   const b = BLOCKS[id];
   if (!b || !b.solid) return null;
@@ -1638,10 +1617,6 @@ export function collisionBoxes(id: number, meta: number): readonly Box[] | null 
 }
 const FULL: readonly Box[] = [[0, 0, 0, 16, 16, 16]];
 
-/**
- * Door meta: bits 0-1 facing (0 +Z, 1 -X, 2 -Z, 3 +X: the side the door is
- * hinged against when closed), bit 2 open, bit 3 upper half.
- */
 export function doorBox(meta: number): Box {
   const facing = (meta & 3) as 0 | 1 | 2 | 3;
   const open = (meta & 4) !== 0;
@@ -1662,7 +1637,6 @@ export function doorBox(meta: number): Box {
   }
 }
 
-/** Ladder meta 0-3 uses the same facing convention: the wall it is attached to. */
 export function ladderBox(meta: number): Box {
   switch (meta & 3) {
     case 0: {

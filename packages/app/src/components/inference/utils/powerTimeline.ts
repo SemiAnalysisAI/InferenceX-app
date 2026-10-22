@@ -1,18 +1,3 @@
-/**
- * Joins chart points to the per-second GPU telemetry behind their measured
- * average power (the PowerX "Timeline" display).
- *
- * Every validated row records its window in `power_audit`, whose `source` is
- * `power_validation_<name>.json`. Two collectors publish the telemetry:
- * - single-node runners upload one `gpu_metrics_<name>` CSV artifact per
- *   config, so the source names the artifact exactly;
- * - Slurm / Dynamo runners upload one `power_audit_<RESULT_FILENAME>` bundle per
- *   sweep whose `LOGS/power/samples.csv` covers every concurrency; the API cuts
- *   it into one series per `power_validation_*.json` it contains and labels
- *   each with that `source`, so the same file name joins it to the row.
- * Nothing is matched by hardware or concurrency; points whose telemetry is
- * missing (expired artifact, another collector) are reported, not guessed.
- */
 import {
   bucketTimeMs,
   sumPowerAt,
@@ -30,35 +15,27 @@ interface AuditedPoint {
   power_audit?: { source?: string } | null;
 }
 
-/** The `<name>` of a point's `power_validation_<name>.json` audit source. */
 export function telemetryNameForPoint(point: AuditedPoint): string | null {
   const source = point.power_audit?.source;
   if (!source) return null;
   return SOURCE_PATTERN.exec(source)?.groups?.name ?? null;
 }
 
-/** `gpu_metrics_<RESULT_FILENAME>` for a point, from its power-audit source. */
 export function telemetryArtifactForPoint(point: AuditedPoint): string | null {
   const name = telemetryNameForPoint(point);
   return name ? `${ARTIFACT_PREFIX}${name}` : null;
 }
 
-/**
- * Stable identity of a point's trace: run id plus audit name. Unique within a
- * chart because the audit name carries the config and the concurrency.
- */
 export function traceKeyForPoint(point: AuditedPoint & { run_url?: string }): string | null {
   const runId = runIdFromUrl(point.run_url);
   const name = telemetryNameForPoint(point);
   return runId && name ? `${runId}:${name}` : null;
 }
 
-/** Workflow run id from a GitHub Actions run URL. */
 export function runIdFromUrl(url: string | null | undefined): string | null {
   return url?.match(/\/runs\/(?<runId>\d+)/u)?.groups?.runId ?? null;
 }
 
-/** Attempt number from a `/runs/<id>/attempts/<n>` URL; null when the URL names none. */
 export function runAttemptFromUrl(url: string | null | undefined): number | null {
   const attempt = url?.match(/\/runs\/\d+\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
   return attempt ? Number(attempt) : null;
@@ -78,17 +55,10 @@ export function longestCommonPrefix(values: readonly string[]): string {
 
 export interface PowerTimelineRequest {
   runId: string;
-  /** RESULT_FILENAME prefix shared by every wanted artifact of the run. */
   prefix: string;
-  /** Sorted, unique validation basenames expected by the displayed points. */
   sources: string[];
 }
 
-/**
- * One request per workflow run, narrowed to the common RESULT_FILENAME prefix
- * of the points' artifacts so a sweep of other models is not downloaded.
- * Points without a run URL or an audit source plan nothing.
- */
 export function planPowerTimelineRequests(
   points: readonly InferenceData[],
 ): PowerTimelineRequest[] {
@@ -112,17 +82,11 @@ export function planPowerTimelineRequests(
     });
 }
 
-/** Run id half of a trace key (`traceKeyForPoint`). */
 export function traceKeyRunId(key: string | null | undefined): string | null {
   const runId = key?.split(':')[0];
   return runId || null;
 }
 
-/**
- * Moves the request for `runId` to the front so it survives the per-chart run
- * cap; the order of the other requests is kept. Returns the same array when
- * nothing needs moving.
- */
 export function prioritizeRun(
   requests: PowerTimelineRequest[],
   runId: string | null,
@@ -132,13 +96,6 @@ export function prioritizeRun(
   return [requests[index], ...requests.slice(0, index), ...requests.slice(index + 1)];
 }
 
-/**
- * Moves every request whose run is in `runIds` ahead of the others, keeping
- * the relative order inside both groups. Unofficial-run overlays are loaded
- * on purpose, so their telemetry must survive the per-chart run cap before
- * official rows compete for the remaining slots. Returns the same array when
- * nothing needs moving.
- */
 export function prioritizeRuns(
   requests: PowerTimelineRequest[],
   runIds: ReadonlySet<string>,
@@ -152,12 +109,10 @@ export function prioritizeRuns(
 }
 
 export interface PowerTimelineTrace {
-  /** `traceKeyForPoint(point)`. */
   key: string;
   point: InferenceData;
   runId: string;
   series: GpuPowerSeries;
-  /** Validated measurement window (UTC ms) from `power_audit`, when recorded. */
   windowStartMs: number | null;
   windowEndMs: number | null;
 }
@@ -165,7 +120,6 @@ export interface PowerTimelineTrace {
 export type PowerTimelineAxis = 'wall' | 'elapsed' | 'serving';
 export type PowerTimelineLines = 'mean' | 'gpu' | 'pool';
 
-/** URL input is optional: an omitted axis retains the existing per-run default. */
 export function parsePowerTimelineParams(params: {
   i_ptaxis?: string;
   i_ptlines?: string;
@@ -199,7 +153,6 @@ export function hasPowerTimelineWindow(trace: PowerTimelineTrace): boolean {
   );
 }
 
-/** Filter and position retained buckets only; never infer a missing serving origin. */
 export function powerTimelineSampleX(
   trace: PowerTimelineTrace,
   column: number,
@@ -214,17 +167,6 @@ export function powerTimelineSampleX(
   return (timeMs - origin) / 1000;
 }
 
-/**
- * Why a validated point has no trace:
- * - `no-source`: the row predates `power_audit.source` (older schema), so no
- *   artifact can be named;
- * - `no-run`: no workflow run URL to look in;
- * - `run-not-fetched`: its run is not among the loaded responses (over the
- *   per-chart run limit, still loading, or the request failed);
- * - `not-in-run`: the run was loaded but holds neither a matching
- *   `gpu_metrics_*` artifact nor a power-audit bundle with the point's
- *   validation file (expired, over the download cap, or another collector).
- */
 export type MissingTraceReason = 'no-source' | 'no-run' | 'run-not-fetched' | 'not-in-run';
 
 export interface MissingTrace {
@@ -234,11 +176,9 @@ export interface MissingTrace {
 
 export interface PowerTimelineJoin {
   traces: PowerTimelineTrace[];
-  /** Points with a validated average but no telemetry trace, with the reason. */
   missing: MissingTrace[];
 }
 
-/** Attaches fetched series to points; order follows `points`. */
 export function joinPowerTimeline(
   points: readonly InferenceData[],
   responses: ReadonlyMap<string, GpuPowerSeriesResponse>,
@@ -261,8 +201,6 @@ export function joinPowerTimeline(
       missing.push({ point, reason: 'run-not-fetched' });
       continue;
     }
-    // A bundle-cut series names the point's validation file; a per-config
-    // CSV artifact names the config itself.
     const source = `power_validation_${name}.json`;
     const artifact = `${ARTIFACT_PREFIX}${name}`;
     const series =
@@ -289,7 +227,6 @@ function unixSecondsToMs(seconds: number | undefined): number | null {
   return typeof seconds === 'number' && Number.isFinite(seconds) ? seconds * 1000 : null;
 }
 
-/** Sample position relative to the validated window. */
 export type WindowPhase = 'before' | 'window' | 'after' | 'unknown';
 
 export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPhase {
@@ -299,7 +236,6 @@ export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPh
   return 'window';
 }
 
-/** Short config label: `TP8 · c64`, plus `PD` for disaggregated points. */
 export function traceConfigLabel(point: InferenceData): string {
   const parts: string[] = [];
   if (point.disagg) parts.push('PD');
@@ -312,17 +248,11 @@ export type PowerPoolRole = GpuPowerRole | 'all';
 
 export interface PowerPool {
   role: PowerPoolRole;
-  /** Row indices into `series.power`, in series order. */
   rows: number[];
 }
 
 const POOL_ORDER: readonly PowerPoolRole[] = ['all', 'prefill', 'decode'];
 
-/**
- * The GPU pools of a series by worker role, in `prefill`, `decode` order —
- * only the roles that have at least one device. A series whose collector
- * assigns no roles yields no pools; callers fall back to `allGpuPool`.
- */
 export function tracePools(series: Pick<GpuPowerSeries, 'devices' | 'power'>): PowerPool[] {
   const rows = new Map<PowerPoolRole, number[]>();
   series.devices?.forEach((device, row) => {
@@ -341,11 +271,6 @@ export interface PoolSizeGroup {
   roles: PowerPoolRole[];
 }
 
-/**
- * Pools that hold the same number of GPUs share one rated ceiling, so their
- * reference draws once, labelled `prefill / decode ×16`, instead of two labels
- * printed over each other. Sizes ascending, roles in pool order, deduplicated.
- */
 export function groupPoolsBySize(
   pools: readonly Pick<PowerPool, 'role' | 'rows'>[],
 ): PoolSizeGroup[] {
@@ -362,11 +287,6 @@ export function groupPoolsBySize(
     }));
 }
 
-/**
- * Label row for each reference line: lines at the same watts (different
- * hardware with an equal pool ceiling) stack their labels upward, slot 0 on
- * the line and slot n `n` rows above, instead of overprinting. Input order.
- */
 export function referenceLabelSlots(lines: readonly { watts: number }[]): number[] {
   const used = new Map<number, number>();
   return lines.map((line) => {
@@ -376,12 +296,6 @@ export function referenceLabelSlots(lines: readonly { watts: number }[]): number
   });
 }
 
-/**
- * Rows for end-of-line trace labels in pixel space: a label whose box overlaps
- * one already placed (both ranges intersect) moves one `rowHeight` below it,
- * top anchors first, so pools ending at the same watts do not overprint.
- * Returns each label's y in input order.
- */
 export function stackTraceLabels(
   labels: readonly { left: number; right: number; y: number }[],
   rowHeight: number,
@@ -392,7 +306,6 @@ export function stackTraceLabels(
   for (const index of order) {
     const { left, right } = labels[index];
     let y = ys[index];
-    // Each move strictly lowers the label, so this ends within `placed.length` passes.
     let moved = true;
     while (moved) {
       moved = false;
@@ -409,7 +322,6 @@ export function stackTraceLabels(
   return ys;
 }
 
-/** Every GPU of the series as one pool. */
 export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
   return { role: 'all', rows: series.power.map((_, row) => row) };
 }
@@ -417,24 +329,15 @@ export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
 export interface TracePoolSummary {
   role: PowerPoolRole;
   gpuCount: number;
-  /** Highest drawn one-second pool sum inside the window; null when none was complete. */
   peakWatts: number | null;
 }
 
 export interface TraceWindowSummary {
-  /** Recorded validated serving-window length, or null when bounds are missing. */
   windowSeconds: number | null;
   bucketSeconds: number;
   pools: TracePoolSummary[];
 }
 
-/**
- * What a Timeline reader needs next to the curves: the validated window's
- * length and, per pool, its GPU count and the peak of the drawn pool line
- * inside the window. A bucket missing a pool device is a gap in the line, so
- * it is skipped. Averages are not recomputed: the benchmark row's validated
- * figures stay the only means.
- */
 export function summarizeTraceWindow(
   trace: PowerTimelineTrace,
   pools: readonly PowerPool[],
@@ -461,20 +364,12 @@ export function summarizeTraceWindow(
   };
 }
 
-// ── Deep link from a pinned scatter tooltip ─────────────────────────────────
-//
-// "View power trace" on a pinned tooltip switches the metric to the Timeline
-// display; the timeline mounts afterwards and reads the requested trace here
-// so it can emphasise that config. The one-shot gesture takes precedence over
-// restored URL focus; the mounted timeline then persists it with its view state.
-
 let pendingFocus: string | null = null;
 
 export function requestPowerTraceFocus(key: string): void {
   pendingFocus = key;
 }
 
-/** The pending focus request, cleared on read. */
 export function consumePowerTraceFocus(): string | null {
   const key = pendingFocus;
   pendingFocus = null;

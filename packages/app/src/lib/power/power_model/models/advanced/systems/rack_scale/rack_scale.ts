@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Compose fixed NVL72 tray counts and account for rack electrical stages once. */
 
 import {
   DEFAULT_OPERATING_STATE,

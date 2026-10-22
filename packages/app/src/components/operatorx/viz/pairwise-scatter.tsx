@@ -19,7 +19,6 @@ interface Pair {
   y: number;
 }
 
-/** Number of cases both GPUs measured. */
 function shared(model: ComparisonModel, a: string | undefined, b: string): number {
   return a
     ? model.view.cases.filter((_, i) => model.value(a, i) !== null && model.value(b, i) !== null)

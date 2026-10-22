@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Cluster aggregation over actual system quantities and allocated network gear. */
 
 import {
   DEFAULT_OPERATING_STATE,

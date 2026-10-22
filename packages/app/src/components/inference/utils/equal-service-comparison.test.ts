@@ -104,7 +104,6 @@ describe('equal-service comparison', () => {
       [1, 8, a[0].run_url],
       [2, 1, a[1].run_url],
     ]);
-    // Interpolating the endpoint percentages instead would incorrectly give 62.5%.
     expect(result.metrics.meanWattsPerGpu.changePercent).not.toBe(62.5);
   });
 
@@ -166,7 +165,6 @@ describe('equal-service comparison', () => {
   });
 
   it('keys a stitched append-only curve by its snapshot; rows without one keep their own run', () => {
-    // B200 TP4: run 35905882425 appended c1–c4 onto run 35843506474's c8–c128.
     const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-20' };
     const stitched = [
       point({
@@ -239,7 +237,6 @@ describe('equal-service comparison', () => {
         measuredDecodeAvgPower: metric(500),
         ...overrides,
       });
-    // The chart and the views API both store the derived value on `x` only.
     const rows = [
       role({ id: 1, x: 31.2 }),
       role({ id: 2, x: 24.8, conc: 16 }),

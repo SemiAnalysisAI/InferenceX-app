@@ -93,8 +93,6 @@ const STRINGS = {
   },
 };
 
-// ── Section header component ─────────────────────────────────────
-
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -105,8 +103,6 @@ function SectionHeader({ label }: { label: string }) {
     </div>
   );
 }
-
-// ── Status badge ─────────────────────────────────────────────────
 
 function StatusBadge({ code }: { code: number | null }) {
   if (code === null) return <span className="text-muted-foreground">--</span>;
@@ -123,8 +119,6 @@ function StatusBadge({ code }: { code: number | null }) {
     </span>
   );
 }
-
-// ── Status Code Breakdown ────────────────────────────────────────
 
 function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
   const t = STRINGS[useLocale()];
@@ -147,7 +141,6 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      {/* Left: horizontal bars */}
       <div className="space-y-2">
         {data.map((d) => {
           const is5xx = d.statusCode >= 500;
@@ -172,7 +165,6 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
         })}
       </div>
 
-      {/* Right: summary stats */}
       <div className="space-y-3 pl-4 border-l border-border">
         <div>
           <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground mb-1">
@@ -200,8 +192,6 @@ function StatusCodeBreakdown({ data }: { data: ErrorData['statusCodes'] }) {
     </div>
   );
 }
-
-// ── Main Page ────────────────────────────────────────────────────
 
 export default function ErrorsPage() {
   return (
@@ -325,7 +315,6 @@ function ErrorsPageContent() {
         </div>
       )}
 
-      {/* ── Stats ── */}
       <section>
         <SectionHeader label={t.errorSummary} />
         {initialLoading ? (
@@ -385,7 +374,6 @@ function ErrorsPageContent() {
         )}
       </section>
 
-      {/* ── Error Reach vs Retry Concentration ── */}
       <section>
         <SectionHeader label={t.errorReach} />
         {initialLoading ? (
@@ -395,7 +383,6 @@ function ErrorsPageContent() {
         )}
       </section>
 
-      {/* ── Hourly Incident Signals ── */}
       <section>
         <SectionHeader label={t.hourlyIncident} />
         {initialLoading ? (
@@ -409,7 +396,6 @@ function ErrorsPageContent() {
         )}
       </section>
 
-      {/* ── Status Code Breakdown ── */}
       <section>
         <SectionHeader label={t.statusBreakdown} />
         {initialLoading ? (
@@ -423,7 +409,6 @@ function ErrorsPageContent() {
         )}
       </section>
 
-      {/* ── Model Impact Matrix ── */}
       <section>
         <SectionHeader label={t.modelImpact} />
         {initialLoading ? (
@@ -437,7 +422,6 @@ function ErrorsPageContent() {
         )}
       </section>
 
-      {/* ── Recent Errors ── */}
       <section>
         <SectionHeader label={t.recentErrors} />
         {initialLoading ? (

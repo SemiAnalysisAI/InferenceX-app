@@ -196,7 +196,6 @@ interface SubmissionsTableProps {
 }
 
 function getModelDisplayName(dbModel: string): string {
-  // MODEL_PREFIX_MAPPING maps prefix → display model name
   const displayModel = MODEL_PREFIX_MAPPING[dbModel];
   if (displayModel) return getModelLabel(displayModel);
   return dbModel;

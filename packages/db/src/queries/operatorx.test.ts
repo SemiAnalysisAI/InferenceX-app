@@ -64,7 +64,6 @@ function bind(value: unknown): string | number | boolean | null {
     : (value as string | number | boolean | null);
 }
 
-/** Let postgres.js-style tagged queries run against an isolated in-memory Postgres. */
 function sqlFor(db: PGlite): Sql & DbClient {
   const makeTag = (client: Pick<PGlite, 'query'>): Sql => {
     const tag = async (strings: TemplateStringsArray, ...values: unknown[]) => {

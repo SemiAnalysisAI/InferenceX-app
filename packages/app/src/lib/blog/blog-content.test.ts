@@ -4,16 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 import { compareBlogPair } from '../i18n/zh-objective-guard';
 
-/**
- * Integrity checks over the real MDX in `content/blog/`. These are cheap file reads,
- * not a rendering test — they catch the mistakes that only surface at build time or,
- * worse, silently ship: a post without its mandatory `/zh` translation, a `<Figure>`
- * pointing at an image nobody committed, and en/zh drifting apart in structure.
- */
-
-// Resolved from this file so the suite works whether vitest runs from the repo root
-// or from packages/app. `import.meta.dirname` rather than `new URL(...).pathname`:
-// the latter keeps percent-encoding and yields a leading-slash `/C:/…` on Windows.
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..', '..');
 const CONTENT_DIR = path.join(APP_DIR, 'content', 'blog');
 const ZH_DIR = path.join(CONTENT_DIR, 'zh');
@@ -30,7 +20,6 @@ const zhFiles = fs
 
 const read = (file: string) => fs.readFileSync(file, 'utf8');
 
-/** Frontmatter values we require to be byte-identical between a post and its translation. */
 function frontmatterField(raw: string, field: string): string | null {
   const fm = raw.split('---')[1] ?? '';
   const match = new RegExp(`^${field}:\\s*(?<value>.*)$`, 'mu').exec(fm);
@@ -46,7 +35,6 @@ function tagList(raw: string): string[] {
   );
 }
 
-/** Local `<Figure src="/images/...">` and markdown `![alt](/images/...)` references. */
 function localImageRefs(raw: string): string[] {
   return [
     ...raw.matchAll(/src="(?<path>\/[^"]+)"/gu),

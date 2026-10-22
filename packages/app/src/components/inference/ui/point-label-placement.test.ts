@@ -13,10 +13,6 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const PLOT = { width: 400, height: 300 };
 const CLIP_ID = 'clip-test-chart';
 
-/**
- * A chart skeleton shaped like `setupChartStructure` builds it: a clipPath
- * in <defs> sized to the plot and a `.zoom-group` that references it.
- */
 function renderChart(clip = true) {
   const svg = document.createElementNS(SVG_NS, 'svg');
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -43,13 +39,10 @@ function renderChart(clip = true) {
 interface PointSpec {
   x: number;
   y: number;
-  /** Label lines; each becomes a tspan. */
   lines?: string[];
-  /** Stubbed text width so the test controls the collision box. */
   width?: number;
 }
 
-/** Add a `.dot-group` with a `.point-label`, mirroring `renderScatterPoints`. */
 function addPoint(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   { x, y, lines = ['TP8'], width = 30 }: PointSpec,
@@ -66,7 +59,6 @@ function addPoint(
     .attr('x', 0)
     .attr('dy', (_line, index) => (index === 0 ? '-0.8em' : '1.1em'))
     .text((line) => line);
-  // jsdom has no layout engine; give the label a deterministic box.
   Object.defineProperty(text.node()!, 'getBBox', {
     value: () => new DOMRect(-width / 2, -20, width, 12),
   });
@@ -105,9 +97,6 @@ describe('point labels stay inside the plot bounding box', () => {
   });
 
   it('flips a label below its point when the default slot would cross the top edge', () => {
-    // The regression: a Pareto-frontier point pinned at the very top of the
-    // y-range put its label above itself, where the clip path sliced the
-    // text in half.
     const { zoomGroup } = renderChart();
     const label = addPoint(zoomGroup, { x: 200, y: 6, lines: ['5xDEP8+1xDEP16'], width: 90 });
 
@@ -119,16 +108,11 @@ describe('point labels stay inside the plot bounding box', () => {
 
   it('flips a label above its point when the below slot would cross the bottom edge', () => {
     const { zoomGroup } = renderChart();
-    // A neighbour whose own label occupies this label's default (above)
-    // slot, so the ladder has to move on to the next candidate.
     const blocker = addPoint(zoomGroup, { x: 200, y: 296 });
     const label = addPoint(zoomGroup, { x: 202, y: 292 });
 
     avoidPointLabelCollisions(zoomGroup);
 
-    // The first-placed label keeps "above"; the second cannot use "above"
-    // (collision) or "below" (its box would end at y=311, past the 300px
-    // plot), so it takes the "further above" slot instead of spilling out.
     expect(firstDy(blocker)).toBe(-8);
     expect(firstDy(label)).toBe(-22);
     expect(label.style('opacity')).toBe('1');
@@ -140,8 +124,6 @@ describe('point labels stay inside the plot bounding box', () => {
 
     placePointLabels(zoomGroup);
 
-    // Box right = 395 + 20 + 2 padding = 417 → shift left by 17 so every
-    // tspan (text-anchor: middle) is re-centred inside the plot.
     expect(tspanXs(label)).toEqual([-17, -17]);
     expect(label.style('opacity')).toBe('1');
   });
@@ -157,7 +139,6 @@ describe('point labels stay inside the plot bounding box', () => {
 
   it('hides a label that cannot fit inside the plot at any slot', () => {
     const { zoomGroup } = renderChart();
-    // Wider than the whole plot: no horizontal shift can rescue it.
     const label = addPoint(zoomGroup, { x: 200, y: 150, width: 500 });
 
     placePointLabels(zoomGroup);
@@ -207,7 +188,6 @@ describe('point labels stay inside the plot bounding box', () => {
     keepPointLabelsInPlot(zoomGroup);
     expect(tspanXs(label)).toEqual([-17]);
 
-    // Zoom moves the point back to the middle: the shift must not linger.
     group.attr('transform', 'translate(200,150)');
     keepPointLabelsInPlot(zoomGroup);
     expect(tspanXs(label)).toEqual([0]);
@@ -229,7 +209,6 @@ describe('point labels stay inside the plot bounding box', () => {
 
     placePointLabels(zoomGroup, { bounds: { left: 0, top: 140, right: 400, bottom: 300 } });
 
-    // Above (top = 150 - 8 - 9 - 2 = 131) breaches the tightened top edge.
     expect(firstDy(label)).toBe(14);
   });
 
@@ -245,12 +224,10 @@ describe('point labels stay inside the plot bounding box', () => {
   });
 
   it('writes nothing on a repeat pass when the layout is unchanged', () => {
-    // MutationObserver consumers (session replay, the coach mark) pay for every
-    // record, so a pass that moves no label must not rewrite any attribute.
     const { zoomGroup } = renderChart();
-    addPoint(zoomGroup, { x: 200, y: 150 }); // default slot
-    addPoint(zoomGroup, { x: 395, y: 150, width: 40 }); // shifted inward
-    addPoint(zoomGroup, { x: 200, y: -40 }); // placement-hidden
+    addPoint(zoomGroup, { x: 200, y: 150 });
+    addPoint(zoomGroup, { x: 395, y: 150, width: 40 });
+    addPoint(zoomGroup, { x: 200, y: -40 });
     avoidPointLabelCollisions(zoomGroup);
 
     const observer = new MutationObserver(() => undefined);

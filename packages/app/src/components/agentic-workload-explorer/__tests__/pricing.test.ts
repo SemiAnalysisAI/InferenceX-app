@@ -40,9 +40,7 @@ describe('estimateCost', () => {
       outputTokens: 1_000_000,
       timestampMs: Date.parse('2026-09-25T00:00:00Z'),
     };
-    // Opus 5.5: $4 in + $20 out (no long-context surcharge on Anthropic models).
     expect(estimateCost({ ...oneMillionEach, model: 'claude-opus-5-5' })).toBeCloseTo(24);
-    // GPT-6 Sol / Luna over 272k input: 2x input, 1.5x output.
     expect(estimateCost({ ...oneMillionEach, model: 'gpt-6-sol' })).toBeCloseTo(4 + 15);
     expect(estimateCost({ ...oneMillionEach, model: 'gpt-6-luna' })).toBeCloseTo(0.2 + 0.75);
     for (const model of ['claude-opus-5-5', 'gpt-6-sol', 'gpt-6-luna']) {
@@ -60,7 +58,7 @@ describe('estimateCost', () => {
       model: 'claude-opus-4-6',
       inputTokens: 1_000_000,
     });
-    expect(cost).toBe(5); // $5 per 1M input tokens
+    expect(cost).toBe(5);
   });
 
   it('calculates opus output cost correctly', () => {
@@ -69,7 +67,7 @@ describe('estimateCost', () => {
       model: 'claude-opus-4-6',
       outputTokens: 1_000_000,
     });
-    expect(cost).toBe(25); // $25 per 1M output tokens
+    expect(cost).toBe(25);
   });
 
   it('calculates opus cache read cost', () => {
@@ -78,7 +76,7 @@ describe('estimateCost', () => {
       model: 'claude-opus-4-6',
       cacheReadInputTokens: 1_000_000,
     });
-    expect(cost).toBe(0.5); // $0.50 per 1M cache read tokens
+    expect(cost).toBe(0.5);
   });
 
   it('calculates opus cache creation cost', () => {
@@ -87,7 +85,7 @@ describe('estimateCost', () => {
       model: 'claude-opus-4-6',
       cacheWriteTokens: 1_000_000,
     });
-    expect(cost).toBe(6.25); // $6.25 per 1M cache creation tokens
+    expect(cost).toBe(6.25);
   });
 
   it('applies 2x fast mode pricing to an Opus 5 alias', () => {
@@ -177,7 +175,7 @@ describe('estimateCost', () => {
       inputTokens: 1_000_000,
       isFastMode: true,
     })!;
-    expect(fastCost).toBe(standardCost); // no multiplier
+    expect(fastCost).toBe(standardCost);
   });
 
   it('calculates sonnet pricing correctly', () => {
@@ -187,7 +185,7 @@ describe('estimateCost', () => {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
     });
-    expect(cost).toBe(3 + 15); // $3 input + $15 output
+    expect(cost).toBe(3 + 15);
   });
 
   it('calculates haiku pricing correctly', () => {
@@ -197,7 +195,7 @@ describe('estimateCost', () => {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
     });
-    expect(cost).toBe(1 + 5); // $1 input + $5 output
+    expect(cost).toBe(1 + 5);
   });
 
   it('calculates opus 4.1 pricing correctly (legacy tier)', () => {
@@ -207,7 +205,7 @@ describe('estimateCost', () => {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
     });
-    expect(cost).toBe(15 + 75); // $15 input + $75 output
+    expect(cost).toBe(15 + 75);
   });
 
   it('calculates haiku 3.5 pricing correctly', () => {
@@ -217,7 +215,7 @@ describe('estimateCost', () => {
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
     });
-    expect(cost).toBe(0.8 + 4); // $0.80 input + $4 output
+    expect(cost).toBe(0.8 + 4);
   });
 
   it('calculates mixed token types', () => {
@@ -229,7 +227,6 @@ describe('estimateCost', () => {
       cacheWriteTokens: 200_000,
       isFastMode: false,
     });
-    // 0.1M * $5 + 0.05M * $25 + 0.5M * $0.5 + 0.2M * $6.25
     expect(cost).toBeCloseTo(0.5 + 1.25 + 0.25 + 1.25, 6);
   });
 
@@ -413,8 +410,8 @@ describe('computeCostBreakdown', () => {
         output_tokens: 1_000_000,
       },
     ]);
-    expect(result.input).toBe(5); // $5 per 1M input
-    expect(result.output).toBe(25); // $25 per 1M output
+    expect(result.input).toBe(5);
+    expect(result.output).toBe(25);
     expect(result.cacheRead).toBe(0);
     expect(result.cacheWrite).toBe(0);
   });
@@ -478,7 +475,6 @@ describe('computeCostBreakdown', () => {
         input_tokens: 1_000_000,
       },
     ]);
-    // Opus $5 + Sonnet $3 = $8
     expect(result.input).toBe(8);
   });
 
@@ -490,8 +486,8 @@ describe('computeCostBreakdown', () => {
         cache_write_tokens: 1_000_000,
       },
     ]);
-    expect(result.cacheRead).toBe(0.5); // $0.50 per 1M cache read
-    expect(result.cacheWrite).toBe(6.25); // $6.25 per 1M cache create
+    expect(result.cacheRead).toBe(0.5);
+    expect(result.cacheWrite).toBe(6.25);
   });
 });
 

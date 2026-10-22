@@ -86,7 +86,6 @@ describe('computeRequestTimeline', () => {
   });
 
   it('shifts ns timestamps to be relative to the earliest credit_issued', async () => {
-    // Two requests with absolute ns starting at 1_000_000_000.
     const tl = await computeRequestTimeline(
       makeBlob([
         { cid: 'a', ti: 0, credit: 1_000_000_000, start: 1_001_000_000, end: 1_010_000_000 },
@@ -340,7 +339,6 @@ describe('computeRequestTimeline', () => {
   });
 
   it('skips records missing both credit_issued_ns and request_start_ns', async () => {
-    // Build a record with only request_end_ns — the helper rejects it.
     const broken = gzipSync(
       Buffer.from(
         JSON.stringify({

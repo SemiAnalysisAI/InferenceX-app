@@ -7,7 +7,6 @@ import { LANDING_META_ZH } from '@/lib/routing/tab-meta-zh';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {
-  // Absolute, so the root layout's `| InferenceX by SemiAnalysis` template is not appended.
   title: { absolute: `${LANDING_META_ZH.title} | ${LANDING_META.brand}` },
   description: LANDING_META_ZH.description,
   alternates: zhAlternates('/'),

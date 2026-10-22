@@ -1,9 +1,5 @@
 # Testing
 
-The [October 2026 E2E audit](testing/e2e-usefulness-audit-2026-10.md) records
-per-test usefulness rankings, the 25% runtime-case reduction, and the
-validated browser-specific timing refresh procedure.
-
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
@@ -58,7 +54,15 @@ current spec and rejects removed entries.
 
 CI uploads raw per-shard, per-test observations and validates the complete
 20-shard matrix before publishing `cypress-timing-baselines`. Refresh all
-three baselines with the [documented artifact procedure](testing/e2e-usefulness-audit-2026-10.md#timing-evidence-and-sharding).
+three baselines from a successful full run:
+
+```sh
+gh run download RUN_ID --pattern 'cypress-timings-*' --dir /tmp/cypress-observations
+bun packages/app/scripts/refresh-cypress-timings.ts /tmp/cypress-observations
+```
+
+Use a fresh destination directory, review the generated diff and balance
+report, and commit the baselines on a branch.
 Do not invent timings or treat the plugin's merged output as a fresh full
 measurement. Spec durations are Cypress's reported execution durations, not
 whole-job wall time; checkout, dependency installation, and application build
@@ -69,12 +73,6 @@ time are not included.
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 
 ## Quality Standards
-
-See the [October 2026 test suite audit](./test-suite-audit.md) for concrete examples
-of redundant coverage, disconnected test-only implementations, and the meaningful
-regression checks retained when pruning the suite.
-The [exact-text follow-up](./test-copy-audit.md) distinguishes incidental copy
-snapshots from assertions that protect units, data identity, and real behavior.
 
 1. **No tautological tests** — every test must verify a real transformation
 2. **Cover edge cases** — empty input, null, boundary values, error paths

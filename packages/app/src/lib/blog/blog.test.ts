@@ -117,10 +117,6 @@ vi.mock('node:fs', async (importOriginal) => {
 
 const isZhPath = (p: string) => p.includes('/zh/');
 
-/**
- * Mock the content tree with English posts and a zh/ translations subdir.
- * Directory existence checks return true; file checks consult the maps.
- */
 function mockLocalizedFiles(en: Record<string, string>, zh: Record<string, string>) {
   const lookup = (p: string) => {
     const files = isZhPath(p) ? zh : en;
@@ -187,19 +183,15 @@ describe('getReadingTime', () => {
 
   it('calculates reading time for longer content', () => {
     const words = Array.from({ length: 500 }, () => 'word').join(' ');
-    // 500 words / 265 wpm = 1.89 → ceil = 2
     expect(getReadingTime(words)).toBe(2);
   });
 
   it('counts CJK prose by characters, not whitespace-separated words', () => {
-    // 800 Han chars with no spaces: 800 / 400 cpm = 2 minutes. The old
-    // word-split logic would have counted this as a single "word" → 1 minute.
     const cjk = '推'.repeat(800);
     expect(getReadingTime(cjk)).toBe(2);
   });
 
   it('combines CJK characters and Latin words in mixed content', () => {
-    // 400 Han chars (1 min at 400 cpm) + 265 Latin words (1 min at 265 wpm)
     const mixed = `${'理'.repeat(400)} ${Array.from({ length: 265 }, () => 'word').join(' ')}`;
     expect(getReadingTime(mixed)).toBe(2);
   });
@@ -214,17 +206,16 @@ describe('smartTruncate', () => {
   });
 
   it('cuts at a word boundary (never mid-word) and appends an ellipsis', () => {
-    const text = Array.from({ length: 60 }, () => 'word').join(' '); // 60×"word " → 299 chars
+    const text = Array.from({ length: 60 }, () => 'word').join(' ');
     const out = smartTruncate(text, 155);
     expect(out.length).toBeLessThanOrEqual(155);
     expect(out.endsWith('…')).toBe(true);
     const body = out.slice(0, -1);
-    // Every retained token is a complete "word" — no "wor"/"rd" fragments.
     expect(body.split(' ').every((t) => t === 'word')).toBe(true);
   });
 
   it('strips trailing punctuation before the ellipsis', () => {
-    const text = `${'alpha, '.repeat(40)}beta`; // lands the cut right after a comma
+    const text = `${'alpha, '.repeat(40)}beta`;
     const out = smartTruncate(text, 50);
     const body = out.slice(0, -1);
     expect(out.endsWith('…')).toBe(true);
@@ -406,7 +397,6 @@ describe('getAllPosts — publishDate filtering', () => {
     });
 
     const posts = getAllPosts();
-    // only past-publish has a valid publishDate <= now
     expect(posts).toHaveLength(1);
     expect(posts[0].slug).toBe('past-publish');
   });
@@ -432,8 +422,6 @@ describe('getAllPosts — zh locale', () => {
 
   it('inherits publishDate gating from the English post in production', () => {
     vi.stubEnv('NODE_ENV', 'production');
-    // English original is unpublished (no publishDate) — the zh translation
-    // must not leak even though its file exists.
     mockLocalizedFiles(
       { 'no-publish.mdx': FAKE_MDX_NO_PUBLISH },
       { 'no-publish.mdx': FAKE_MDX_ZH },
@@ -488,7 +476,6 @@ describe('getAdjacentPosts — zh locale', () => {
         'middle-post.mdx': FAKE_MDX_MIDDLE,
         'older-post.mdx': FAKE_MDX_OLDER,
       },
-      // middle-post has no translation: zh prev/next must skip over it.
       { 'test-post.mdx': FAKE_MDX_ZH, 'older-post.mdx': FAKE_MDX_ZH },
     );
 
@@ -550,7 +537,6 @@ describe('getAdjacentPosts', () => {
 
   it('returns prev (older) and next (newer) for a middle post', () => {
     mockThreePosts();
-    // sorted newest-first: test-post (Jan 15), middle-post (Jan 1), older-post (Dec 1)
     const { prev, next } = getAdjacentPosts('middle-post');
     expect(next!.slug).toBe('test-post');
     expect(prev!.slug).toBe('older-post');
@@ -617,10 +603,6 @@ describe('extractHeadings', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Structured data (JSON-LD) builders — pure, no fs access.
-// ---------------------------------------------------------------------------
-
 const SAMPLE_META: BlogPostMeta = {
   title: 'GB200 vs MI355X Inference Benchmark',
   subtitle: 'Head-to-head throughput and latency.',
@@ -660,21 +642,15 @@ describe('buildBlogPostingJsonLd', () => {
     expect(jsonLd['@type']).toBe('BlogPosting');
     expect(jsonLd.headline).toBe(SAMPLE_META.title);
 
-    // image — absolute OG image URL for the post.
     expect(jsonLd.image).toBe(`${SITE_URL}/blog/gb200-vs-mi355x/opengraph-image`);
 
-    // inLanguage — English tag on the English page.
     expect(jsonLd.inLanguage).toBe('en-US');
 
-    // mainEntityOfPage — WebPage pointing at the canonical post URL.
     expect(jsonLd.mainEntityOfPage).toEqual({
       '@type': 'WebPage',
       '@id': `${SITE_URL}/blog/gb200-vs-mi355x`,
     });
 
-    // publisher.logo — ImageObject with an absolute URL. Dimensions are
-    // intentionally omitted (optional in schema.org) because the asset's real
-    // size conflicts with the root layout's OG declaration; see blog.ts.
     expect(jsonLd.publisher['@type']).toBe('Organization');
     expect(jsonLd.publisher.logo).toEqual({
       '@type': 'ImageObject',
@@ -683,11 +659,8 @@ describe('buildBlogPostingJsonLd', () => {
     expect(jsonLd.publisher.logo.width).toBeUndefined();
     expect(String(jsonLd.publisher.logo.url)).toMatch(/^https:\/\//u);
 
-    // Existing required fields are preserved.
     expect(jsonLd.author).toEqual({ '@type': 'Person', name: 'SemiAnalysis' });
     expect(jsonLd.datePublished).toBe('2026-03-01T00:00:00Z');
-    // Description routes through blogDescription (same helper as the meta/OG
-    // tags) so structured data and SERP snippet never diverge.
     expect(jsonLd.description).toBe(blogDescription(SAMPLE_META));
     expect(jsonLd.url).toBe(`${SITE_URL}/blog/gb200-vs-mi355x`);
     expect(jsonLd.wordCount).toBe(5);
@@ -796,7 +769,6 @@ const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
 });
 
 describe('article index helpers', () => {
-  // Newest first, matching getAllPosts ordering.
   const posts = [
     mk('newest', '2026-05-01', ['nvidia', 'b200', 'agentx']),
     mk('mid', '2026-04-01', ['amd', 'mi355x', 'agentx']),
@@ -836,7 +808,6 @@ describe('article index helpers', () => {
   });
 });
 
-/** Mock `public/images/post/` with the given file names; null means the folder is missing. */
 function mockPost(mdx: string | null, files: string[] | null = null) {
   vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
     const target = String(p);

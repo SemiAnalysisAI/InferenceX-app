@@ -1,13 +1,3 @@
-/**
- * Ingest supplemental data from packages/db/data/.
- * Looks for:
- *   - supplemental-evals.json  (extra eval results, currently used for gsm8k evals baseline data)
- *   - supplemental-bmk.json    (extra benchmark results)
- *
- * Usage:
- *   bun run --cwd packages/db db:ingest:supplemental
- */
-
 import fs from 'fs';
 import path from 'path';
 
@@ -208,7 +198,6 @@ async function ingestSupplementalBmk(
 
   const { getOrCreateConfig } = configCache;
 
-  // Group by date for separate workflow runs
   const byDate = new Map<string, SupplementalBmk[]>();
   for (const entry of data) {
     if (!byDate.has(entry.date)) byDate.set(entry.date, []);
@@ -273,12 +262,8 @@ async function ingestSupplementalBmk(
         numDecodeGpu: entry.tp * entry.ep,
       });
 
-      // Supplemental metrics bypass mapBenchmarkRow, so apply the power
-      // publication contract here too: fail-closed verdict normalization,
-      // then strip withheld measurements when power_valid=0.
       normalizePowerContractMetrics(entry.metrics, entry.metrics);
       scrubWithheldPowerMetrics(entry.metrics);
-      // Supplemental data bypasses mapBenchmarkRow's numeric-only metric boundary.
       const powerInvalidReasons = extractPowerInvalidReasons(
         entry.power_invalid_reasons ?? entry.metrics.power_invalid_reasons,
       );
@@ -305,10 +290,6 @@ async function ingestSupplementalBmk(
     totalNew += newCount;
     totalDup += dupCount;
 
-    // Upsert availability — only reached if bulkIngestBenchmarkRows succeeded above.
-    // Entries that failed model/hw resolution were skipped via `continue` in the loop,
-    // and getOrCreateConfig failures propagate (no try/catch), so `entries` that made it
-    // to `rows` are exactly the valid ones.
     const availRows: {
       model: string;
       isl: number | null;

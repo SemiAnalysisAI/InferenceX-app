@@ -48,8 +48,6 @@ export function GtaThemeBanner() {
           />
         </picture>
         <div className="gta-banner-shade" aria-hidden="true" />
-        {/* Real text so assistive tech reads "Grand Theft InferenceX"; the
-            spaces collapse visually because the lines are flex items. */}
         <p className="gta-wordmark">
           <span>Grand</span> <span>Theft</span> <span className="gta-wordmark-big">InferenceX</span>
         </p>
@@ -84,10 +82,6 @@ export function GtaThemeBanner() {
   );
 }
 
-/**
- * Follow the root class, like the CS:GO and Minecraft decorations, because
- * this mounts outside ThemeProvider. Artwork loads only while GTA is active.
- */
 export function GtaDecorations() {
   const [active, setActive] = useState(false);
 

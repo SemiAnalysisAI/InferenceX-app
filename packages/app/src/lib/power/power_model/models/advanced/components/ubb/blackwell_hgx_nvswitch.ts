@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** The user-specified Blackwell HGX NVSwitch baseline. */
 
 import { type Details, type Provenance, ValidationError } from '../../../../base';
 import { BLACKWELL_NVSWITCH_BASELINE } from '../../profiles';

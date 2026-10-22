@@ -29,8 +29,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     stats: 'Stats',
@@ -97,8 +95,6 @@ const STRINGS = {
   },
 } as const;
 
-// ── Chart constants ──────────────────────────────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -109,8 +105,6 @@ const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
 
 const COST_PER_SEARCH = 0.01;
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
@@ -139,7 +133,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -171,8 +164,6 @@ function shortenModel(model: string): string {
   return model.replace(/^claude-/u, '').replace(/-\d{8}$/u, '');
 }
 
-// ── Section header ───────────────────────────────────────────────
-
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -185,8 +176,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// ── Stat card ────────────────────────────────────────────────────
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -198,8 +187,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// ── Searches Over Time (SVG bar chart) ──────────────────────────
 
 function SearchesOverTimeChart({
   data,
@@ -254,7 +241,6 @@ function SearchesOverTimeChart({
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -281,7 +267,6 @@ function SearchesOverTimeChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -292,7 +277,6 @@ function SearchesOverTimeChart({
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {data.map((d, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const barH = (d.searchCount / yMax) * PLOT_H;
@@ -331,8 +315,6 @@ function SearchesOverTimeChart({
   );
 }
 
-// ── Searches by Model (horizontal bars) ─────────────────────────
-
 function SearchesByModelChart({
   byModel,
   locale,
@@ -341,7 +323,6 @@ function SearchesByModelChart({
   locale: Locale;
 }) {
   const t = STRINGS[locale];
-  // Merge dated and undated ids of the same model under its short name.
   const merged = new Map<string, WebSearchModelEntry>();
   for (const m of byModel) {
     const model = shortenModel(m.model);
@@ -409,8 +390,6 @@ function SearchesByModelChart({
   );
 }
 
-// ── Search Cost Over Time (SVG area chart) ──────────────────────
-
 function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; locale: Locale }) {
   const t = STRINGS[locale];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -431,7 +410,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
   const sx = (i: number) => MARGIN.left + (i / Math.max(data.length - 1, 1)) * PLOT_W;
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
-  // Build path for line and area
   const linePoints = data.map((_, i) => `${sx(i)},${sy(costs[i])}`).join(' ');
   const areaPath = [
     `M ${sx(0)},${MARGIN.top + PLOT_H}`,
@@ -465,7 +443,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -492,7 +469,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -503,10 +479,8 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
             strokeWidth={0.5}
           />
 
-          {/* Area fill */}
           <path d={areaPath} fill="#10b981" opacity={0.15} />
 
-          {/* Line */}
           <polyline
             points={linePoints}
             fill="none"
@@ -516,7 +490,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
             strokeLinecap="round"
           />
 
-          {/* Dots */}
           {data.map((_, i) => (
             <circle key={i} cx={sx(i)} cy={sy(costs[i])} r={2} fill="#10b981">
               <title>
@@ -525,7 +498,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
             </circle>
           ))}
 
-          {/* X-axis labels */}
           {data.map((d, i) => {
             if (i % labelInterval !== 0 && i !== data.length - 1) return null;
             return (
@@ -550,8 +522,6 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
     </Expandable>
   );
 }
-
-// ── Top Sessions Table ──────────────────────────────────────────
 
 function WebSearchTopSessionsTable({
   sessions,
@@ -625,8 +595,6 @@ function WebSearchTopSessionsTable({
   );
 }
 
-// ── Main page ────────────────────────────────────────────────────
-
 export default function WebSearchPage() {
   return (
     <Suspense>
@@ -656,7 +624,6 @@ function WebSearchPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* ── Stats ───────────────────────────────────────────────── */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -698,7 +665,6 @@ function WebSearchPageContent() {
 
       {data && (
         <>
-          {/* ── Searches Over Time ─────────────────────────────────── */}
           <div>
             <SectionHeader
               label={t.searchesOverTime}
@@ -720,19 +686,16 @@ function WebSearchPageContent() {
             />
           </div>
 
-          {/* ── Searches by Model ──────────────────────────────────── */}
           <div>
             <SectionHeader label={t.searchesByModel} detail={t.models(data.byModel.length)} />
             <SearchesByModelChart byModel={data.byModel} locale={locale} />
           </div>
 
-          {/* ── Search Cost Over Time ──────────────────────────────── */}
           <div>
             <SectionHeader label={t.searchCostOverTime} detail={`$${COST_PER_SEARCH}/search`} />
             <SearchCostChart daily={data.daily} locale={locale} />
           </div>
 
-          {/* ── Top Sessions ───────────────────────────────────────── */}
           <div>
             <SectionHeader label={t.topSessions} detail={t.sessions(data.topSessions.length)} />
             <WebSearchTopSessionsTable sessions={data.topSessions} locale={locale} />

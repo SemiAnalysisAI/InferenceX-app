@@ -1,15 +1,3 @@
-/**
- * Server-side helpers shared between the `/compare` and `/compare-per-dollar`
- * SSR routes. Extracted from `app/compare/[slug]/page.tsx` (PR #351, PR #382)
- * when the second route was added so the two pages share:
- *
- *   - a single `getCachedBenchmarks` blob slot keyed by dbKeys (one cache
- *     entry per model bucket regardless of which route triggered the fetch),
- *   - the same fixtures / live-database ladder,
- *   - the same summary, GPUDataPoint construction, interpolation pipeline,
- *     and JSON-LD shape — with a `variant` knob that swaps the headline
- *     framing between the latency+throughput view and the per-dollar view.
- */
 import {
   AUTHOR_NAME,
   AUTHOR_URL,
@@ -38,10 +26,6 @@ import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
 
 export { getCachedBenchmarks };
 
-// ---------------------------------------------------------------------------
-// URL-param validators (shared by both routes' overrides)
-// ---------------------------------------------------------------------------
-
 export const KNOWN_MODELS = new Set([
   'Muse-Spark-Open',
   'Llama-3.3-70B-Instruct-FP8',
@@ -64,13 +48,6 @@ export const KNOWN_MODELS = new Set([
 export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
-/**
- * Three-sentence framing shown above the narrative when a compare page is
- * rendering the agentic workload. The agentic scenario is a different kind of
- * measurement from a fixed-sequence run, and a reader who arrived from a GPU
- * query ("b200 vs b300") has no reason to know that yet — so say it once,
- * here, and hand off to /agentx for the rest.
- */
 export interface AgenticScenarioIntro {
   paragraph: string;
   linkLabel: string;
@@ -89,10 +66,6 @@ export function pickString(value: string | string[] | undefined): string | undef
   if (Array.isArray(value)) return value[0];
   return undefined;
 }
-
-// ---------------------------------------------------------------------------
-// Pair summary (JSON-LD additionalProperty)
-// ---------------------------------------------------------------------------
 
 export interface PairSummary {
   hardware: string;
@@ -125,11 +98,6 @@ export function summarize(rows: BenchmarkRow[], hw: string): PairSummary {
   };
 }
 
-// ---------------------------------------------------------------------------
-// GPUDataPoint construction + interpolation pipeline
-// ---------------------------------------------------------------------------
-
-/** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
 const computeGpuCost = (costPerHour: number, tps: number) =>
   costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
 
@@ -267,8 +235,6 @@ function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number }
   return { min, max };
 }
 
-/** Pre-compute interpolated table data for the GPU pair at 3 interactivity
- *  targets (25th, 50th, 75th percentile) within the overlapping range. */
 export function computeCompareTableData(
   rows: BenchmarkRow[],
   a: string,
@@ -335,14 +301,6 @@ export function computeCompareTableData(
   return { defaultTargets, ssrRows, interactivityRange };
 }
 
-/** Sample the same interpolated cost curve used for the comparison table for
- * server-rendered image assets. More samples make the static PNG read like the
- * interactive roofline without requiring browser-based chart capture.
- *
- * `includeTargets` are merged into the even sampling grid so callers can
- * guarantee the curve has exact samples at specific targets (e.g. the plotted
- * comparison dots), making it safe to partition the curve into solid /
- * dashed segments without interpolation gaps at the boundary. */
 export function computeCompareImageRows(
   rows: BenchmarkRow[],
   a: string,
@@ -381,10 +339,6 @@ export function computeCompareImageRows(
         : null,
   }));
 }
-
-// ---------------------------------------------------------------------------
-// JSON-LD graph
-// ---------------------------------------------------------------------------
 
 export function jsonLdEntryFor(key: string, summary: PairSummary, position: number) {
   const meta = HW_REGISTRY[key];
@@ -433,29 +387,17 @@ export function jsonLdEntryFor(key: string, summary: PairSummary, position: numb
   };
 }
 
-/** Variant determines the ItemList/Dataset headline framing in JSON-LD.
- *  `'full'` is the /compare page's latency+throughput+cost framing.
- *  `'per-dollar'` is the /compare-per-dollar page's cost-efficiency framing. */
 export type CompareJsonLdVariant = 'full' | 'per-dollar';
 
-// ---------------------------------------------------------------------------
-// Plain-English table narrative
-// ---------------------------------------------------------------------------
-
-/** Format cost as $X.XX or $X.X depending on magnitude. */
 export function fmtCost(v: number): string {
   if (v >= 10) return `$${v.toFixed(1)}`;
   return `$${v.toFixed(2)}`;
 }
 
-/** Round a ratio (always ≥ 1) into a percentage delta, e.g. 1.3 → "30%". */
 export function fmtPctDelta(ratio: number): string {
   return `${Math.round((ratio - 1) * 100)}%`;
 }
 
-/** Deterministic 32-bit-ish string hash. Used to pick a template variant
- *  per (page, row) without `Math.random()` so SSR + hydration agree and the
- *  same URL renders the same prose every request. */
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
@@ -464,9 +406,6 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
-/** Bucket the target into low / middle / high segment of the benchmarked
- *  range. Used by templates that say things like "Near the low end" or
- *  "At the upper edge" so the same prose array doesn't all read identically. */
 export function bandFor(
   target: number,
   range: { min: number; max: number },
@@ -501,7 +440,7 @@ export interface FullBoth {
   bLabel: string;
   cheaper: string;
   faster: string;
-  costRatio: number | null; // null when tied or zero-guarded
+  costRatio: number | null;
   tputRatio: number | null;
   costTied: boolean;
   tputTied: boolean;
@@ -519,10 +458,6 @@ export const BAND_PHRASE: Record<'low' | 'middle' | 'high', string> = {
   middle: 'around the middle',
   high: 'toward the upper edge',
 };
-
-// ---------------------------------------------------------------------------
-// /compare-per-dollar variant — both GPUs, no tie, non-zero costs
-// ---------------------------------------------------------------------------
 
 const PER_DOLLAR_BOTH_TEMPLATES: ((i: PerDollarBoth) => string)[] = [
   (i) =>
@@ -577,10 +512,6 @@ const PER_DOLLAR_SINGLE_TEMPLATES: ((args: {
     `Only ${i.presentLabel} has cost data at ${i.target} tok/s/user on ${i.modelLabel} — ${fmtCost(i.presentCost)} per million tokens. ${i.missingLabel} is unmeasured at this target.`,
 ];
 
-// ---------------------------------------------------------------------------
-// /compare 'full' variant — both GPUs, mentions cost AND throughput
-// ---------------------------------------------------------------------------
-
 function fullSummary(i: FullBoth): string {
   const costPart = i.costTied
     ? 'cost per token is essentially tied'
@@ -629,36 +560,11 @@ const FULL_SINGLE_TEMPLATES: ((args: {
     `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
-/** Pick template `rowIndex` in the rotation starting from a per-page hash
- *  offset. Within a single page, paragraphs 0/1/2 always pick three
- *  *consecutive* templates from the pool (never repeating each other), while
- *  the page-level seed picks where in the rotation to start — so different
- *  pages get different starting templates. Avoids the birthday-problem
- *  collisions that pickTemplate alone produces when sampling N times from a
- *  pool of size M near N. */
 export function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {
   const start = hashStr(pageSeed) % arr.length;
   return arr[(start + rowIndex) % arr.length];
 }
 
-/** Per-route prose summary of the interpolated table — one paragraph per
- *  default interactivity target. Server-rendered into the page HTML so
- *  crawlers and screen-readers get a plain-English read of every operating
- *  point. Returns an empty array when there's no data (caller falls back to
- *  the empty-state UI).
- *
- *  Template selection is deterministic: the same (model, GPU pair, row index,
- *  variant) seed always picks the same template, so SSR and any subsequent
- *  render agree on prose. Different pages pick different templates from the
- *  pool, so the catalog reads with variety instead of repeating the same
- *  sentence shape on every URL.
- *
- *  The returned prose anchors to the SSR'd default model / sequence /
- *  precision — i.e. the slug's canonical operating point. The chart and
- *  interpolated table beneath the narrative re-render on client-side filter
- *  changes; the narrative does not. The caller adds a "(default selection)"
- *  caveat after the last paragraph so a reader who fiddles with the chart
- *  controls sees that the narrative is fixed to the slug's defaults. */
 export function compareTableNarrative(
   variant: CompareJsonLdVariant,
   modelLabel: string,
@@ -670,10 +576,6 @@ export function compareTableNarrative(
   if (ssrRows.length === 0) return [];
 
   const range = `${interactivityRange.min}–${interactivityRange.max} tok/s/user`;
-  // Page-level seed: stable across renders, varies by (route variant, model,
-  // GPU pair). Template selection rotates by rowIndex from this seed so the
-  // 3 paragraphs on a single page never duplicate templates with each other,
-  // and different pages pick different starting points in the rotation.
   const pageSeed = `${variant}|${modelLabel}|${aLabel}|${bLabel}`;
   const paragraphs: string[] = [];
 
@@ -741,7 +643,6 @@ export function compareTableNarrative(
       continue;
     }
 
-    // 'full' variant
     if (a && b) {
       const costOk = a.cost > 0 && b.cost > 0;
       const tputOk = a.value > 0 && b.value > 0;
@@ -790,49 +691,30 @@ export function compareTableNarrative(
   return paragraphs;
 }
 
-// ---------------------------------------------------------------------------
-// SEO meta description — stat-led, ≤155 chars, per (model, GPU pair)
-// ---------------------------------------------------------------------------
-
-/** The single interpolated head-to-head stat surfaced in the meta description.
- *  `tputPct` / `costPct` are 0 when that dimension is within ~1% (a tie). */
 export interface CompareStat {
   aLabel: string;
   bLabel: string;
   gpuLabel: string;
   faster: string;
   slower: string;
-  /** Throughput-per-GPU advantage of `faster` over `slower`, as a whole
-   *  percent (0 when the two are within 1%). */
   tputPct: number;
   cheaper: string;
   pricier: string;
-  /** Cost-per-token advantage of `cheaper` over `pricier`, as a whole percent
-   *  (0 when the two are within 1%). */
   costPct: number;
 }
 
-/** Does a row carry a real, comparable data point for both GPUs? */
 function statRowUsable(row: SsrInterpolatedRow): boolean {
   return Boolean(
     row.a && row.b && row.a.value > 0 && row.b.value > 0 && row.a.cost > 0 && row.b.cost > 0,
   );
 }
 
-/** Pick the representative interpolated row for the meta description — the
- *  default (middle) interactivity target if it has data for both GPUs, else
- *  the first target that does. Returns null when no target has a comparable
- *  pair (sparse-data pairs fall back to boilerplate). */
 function pickCompareStatRow(rows: SsrInterpolatedRow[]): SsrInterpolatedRow | null {
   const mid = rows[Math.floor(rows.length / 2)];
   if (mid && statRowUsable(mid)) return mid;
   return rows.find(statRowUsable) ?? null;
 }
 
-/** Language-agnostic head-to-head stat for the meta description, computed at
- *  the default interactivity target. Shared by the English `compareMetaDescription`
- *  and its Chinese port so both surface the same numbers. Returns null when the
- *  pair has no comparable interpolated data. */
 export function computeCompareStat(
   a: string,
   b: string,
@@ -867,23 +749,12 @@ export function computeCompareStat(
   };
 }
 
-/** Length cap for meta descriptions — Google truncates SERP snippets past
- *  ~155–160 chars, so every branch below must stay at or under this. */
 export const META_DESCRIPTION_MAX = 155;
 
-/** First candidate that fits within `max`, or undefined if none do. */
 function firstUnder(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
 
-/** Stat-led, ≤155-char meta description for a `/compare/<slug>` page. Leads
- *  with the differentiating throughput / cost delta at the default interactivity
- *  target (the actual reason a searcher clicks) instead of the boilerplate that
- *  was identical across ~360 pages. Falls back to a compact, still-≤155-char
- *  boilerplate sentence when the pair has thin / degenerate data.
- *
- *  A trailing brand clause is dropped down a ladder (full → short → none) so a
- *  long GPU-pair / model name never pushes the description over the cap. */
 export function compareMetaDescription(
   model: CompareModelSlug,
   a: string,
@@ -893,7 +764,6 @@ export function compareMetaDescription(
   const modelName = compareModelSeoName(model);
   const gpuLabel = compareDisplayLabel(a, b);
 
-  // Boilerplate fallback ladder — progressively shorter so one always fits.
   const fallback =
     firstUnder(
       [
@@ -921,7 +791,7 @@ export function compareMetaDescription(
   if (tputClause && costClause) core = `${tputClause}; ${costClause}.`;
   else if (tputClause) core = `${tputClause}.`;
   else if (costClause) core = `${costClause} on ${modelName}.`;
-  else return fallback; // both dimensions within 1% — nothing differentiating to lead with
+  else return fallback;
 
   return (
     firstUnder(
@@ -935,13 +805,6 @@ export function compareMetaDescription(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Master-index helpers (shared by /compare and /compare-per-dollar)
-// ---------------------------------------------------------------------------
-
-/** "A", "A and B", or "A, B, and C" — Oxford-comma serial join. Used by the
- *  master index ledes on both /compare and /compare-per-dollar so the
- *  enumeration stays consistent if a model is added or removed. */
 export function formatModelList(models: CompareModelSlug[]): string {
   const labels = models.map((m) => m.label);
   if (labels.length === 0) return 'no models';
@@ -958,18 +821,11 @@ export interface VendorBucketEntry {
 }
 
 export interface VendorBuckets {
-  /** Cross-vendor pairs (NVIDIA × AMD). */
   cross: VendorBucketEntry[];
-  /** Both sides NVIDIA. */
   nvidia: VendorBucketEntry[];
-  /** Both sides AMD. */
   amd: VendorBucketEntry[];
 }
 
-/** Split (a, b) GPU pairs into vendor buckets for the index grid. The caller
- *  wraps these entries with its own group headings / descriptions / route
- *  prefix — keeps the sorting + bucketing + slug-building in one place so the
- *  two index pages can't drift on those mechanics. */
 export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair[]): VendorBuckets {
   const nvidia: VendorBucketEntry[] = [];
   const amd: VendorBucketEntry[] = [];
@@ -992,9 +848,6 @@ export function bucketComparePairsByVendor(modelSlug: string, pairs: ComparePair
   return { cross, nvidia, amd };
 }
 
-/** Breadcrumb trail for a compare slug page. Emitted alongside the main
- *  Dataset/ItemList JSON-LD so Google can render the Home → Compare → A vs B
- *  trail in search results. Variant chooses /compare vs /compare-per-dollar. */
 export function buildBreadcrumbJsonLd(
   variant: CompareJsonLdVariant,
   pairLabel: string,
@@ -1014,8 +867,6 @@ export function buildBreadcrumbJsonLd(
   };
 }
 
-/** Pick the oldest and newest benchmark dates among rows whose hardware matches
- *  the compared pair — used to populate Dataset.datePublished / dateModified. */
 export function dateRangeForPair(
   rows: BenchmarkRow[],
   a: string,
@@ -1042,12 +893,8 @@ export function buildJsonLd(
   summaryB: PairSummary,
   ssrRows: SsrInterpolatedRow[],
   imageUrl?: string,
-  /** ISO date of oldest benchmark row contributing to this dataset. */
   datePublished?: string,
-  /** ISO date of newest benchmark row — drives Google Dataset Search freshness. */
   dateModified?: string,
-  /** Display model name accepted by /api/v1/benchmarks?model=…, used to wire the
-   *  Dataset's `distribution: DataDownload` to a real machine-readable export. */
   modelApiKey?: string,
 ) {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();

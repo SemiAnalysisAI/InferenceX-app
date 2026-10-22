@@ -1,7 +1,3 @@
-/**
- * Server-side OperatorX reads: the active source plus normalization and in-process
- * caching. API routes call only this module.
- */
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
   buildComparison,
@@ -23,26 +19,18 @@ import {
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
 
-/*
- * Responses are cached at the CDN until an ingest purges them. What the server keeps in
- * memory is keyed by stored revision instead of by time, so the request after a purge
- * reads the new data: the run list is read fresh (one small query), and a run's bundle or
- * an op's comparison is reused only while the revisions it was built from are current.
- */
 const MAX_DATASETS = 32;
 const COMPARISON_READ_BATCH = 4;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
 let runsInFlight: Promise<OperatorXRunRef[]> | null = null;
-/** Normalized bundles by `runId:revision`, least recently used first. */
 const datasets = new Map<string, Promise<Normalized>>();
 
 export function sourceName(): string {
   return getOperatorXSource().name;
 }
 
-/** The stored runs; concurrent callers share one read. */
 export function listRuns(): Promise<OperatorXRunRef[]> {
   if (!runsInFlight) {
     runsInFlight = getOperatorXSource().listRuns();
@@ -63,7 +51,7 @@ async function normalized(runId: string): Promise<Normalized> {
   const key = `${runId}:${revisionOf(run)}`;
   const hit = datasets.get(key);
   if (hit) {
-    datasets.delete(key); // refresh LRU position
+    datasets.delete(key);
     datasets.set(key, hit);
     return hit;
   }
@@ -91,9 +79,7 @@ export async function getResultDetail(
 
 const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
 
-/** Each op's comparison and the `runId:revision` list it was built from. */
 const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
-/** Comparisons built while some run could not be read: served, but never cached. */
 const partial = new WeakSet<Comparison>();
 
 export function isPartialComparison(comparison: Comparison): boolean {
@@ -108,12 +94,6 @@ function comparisonRuns(op: ComparisonOp, listed: OperatorXRunRef[]): OperatorXR
   });
 }
 
-/**
- * Keep the newest actual result for each hardware/case/backend. A missing row only
- * stands until an older run supplies a result; errors and unsupported results are
- * real outcomes and remain newest-wins. Read a few bundles at a time and retain only
- * selected rows, not every historical profile.
- */
 async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Comparison> {
   const selected = new Map<
     string,
@@ -160,10 +140,6 @@ async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Com
   return comparison;
 }
 
-/**
- * An op's comparison, rebuilt when a run it reads is added, replaced or removed. A
- * partial one (some run failed to read) is not kept, so the next request tries again.
- */
 export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   const runs = comparisonRuns(op, await listRuns());
   const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
@@ -178,12 +154,6 @@ export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   return value;
 }
 
-/**
- * Read timelines from their original stored runs. A newer comparison can replace a
- * row without removing the older result that a client's open detail still names.
- * Read current bundles rather than the run-ID cache: a re-ingest replaces the stored
- * revision while keeping the run ID and result indices.
- */
 export async function getTimelines(
   op: ComparisonOp,
   refs: string[],
@@ -221,7 +191,6 @@ export function errorStatus(error: unknown): number {
   return error instanceof OperatorXSourceError ? error.status : 503;
 }
 
-/** Our own source errors say what failed; anything else stays generic. */
 export function errorMessage(error: unknown, fallback: string): string {
   return error instanceof OperatorXSourceError ? `${fallback}: ${error.message}` : fallback;
 }

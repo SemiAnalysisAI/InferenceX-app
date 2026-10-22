@@ -7,9 +7,6 @@ const KEY = 'chunk_reload';
 const reload = vi.fn();
 let originalLocation: Location;
 
-// JSDOM exposes `Location.reload` as non-configurable. In this isolated test
-// environment, replace Location with a prototype-preserving copy that stubs only reload.
-
 function chunkErr(): Error {
   const e = new Error('Loading chunk 123 failed');
   e.name = 'ChunkLoadError';
@@ -78,7 +75,6 @@ describe('installChunkLoadRecovery', () => {
   it('installs each error listener only once', async () => {
     const addEventListener = vi.spyOn(window, 'addEventListener');
     vi.resetModules();
-    // Import after resetting module state so the listener spy captures initial installation.
     const { installChunkLoadRecovery: install } = await import('./chunk-load-recovery');
 
     install();

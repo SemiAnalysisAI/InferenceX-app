@@ -21,11 +21,6 @@ const STRINGS = {
   },
 };
 
-/**
- * Chrome shared by every explorer page, rendered inside the dashboard shell
- * (below the InferenceX tab nav): title, snapshot stamp, the global
- * trace-version filter and the explorer's own section navigation.
- */
 export function ExplorerShell({ children }: { children: ReactNode }) {
   const strings = STRINGS[useLocale()];
   return (
@@ -40,7 +35,6 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
             <SnapshotStamp />
           </div>
         </div>
-        {/* `useSearchParams` in the selector needs a Suspense boundary. */}
         <Suspense fallback={null}>
           <TraceVersionSelector />
         </Suspense>

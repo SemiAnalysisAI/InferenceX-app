@@ -16,7 +16,6 @@ interface CatalogLinkCardProps {
   event: 'run_index_entry_clicked' | 'ranking_index_entry_clicked' | 'chip_index_entry_clicked';
 }
 
-/** A scan-friendly, keyboard-visible link used by public catalog indexes. */
 export function CatalogLinkCard({
   href,
   title,

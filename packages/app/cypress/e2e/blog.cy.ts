@@ -34,13 +34,6 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    // Card thumbnails are the only load-blocking subresources the listing adds
-    // on top of the shared chrome, and the featured card plus the first grid
-    // row are eager. Serve every optimizer request from a fixture so the visit
-    // never waits on image resizing or a remote thumbnail host; the optimizer
-    // itself is covered by the cy.request check below. Visiting per test
-    // instead of once in before-all lets Cypress retries cover a lost Firefox
-    // load event, which otherwise fails the hook and skips the whole suite.
     beforeEach(() => {
       cy.intercept(
         { method: 'GET', pathname: '/_next/image' },
@@ -50,8 +43,6 @@ describe('Blog', () => {
     });
 
     it('serves local card thumbnails through the image optimizer', () => {
-      // The browser never fetches these (stubbed above), so check the real
-      // optimizer response directly for the first local thumbnail on the page.
       cy.get('[data-testid="blog-post-grid"] img[src^="/_next/image?url=%2Fimages%2F"]')
         .first()
         .invoke('attr', 'src')
@@ -74,9 +65,67 @@ describe('Blog', () => {
     });
 
     it('renders the post title as the one and only h1', () => {
-      // The title is the page's single <h1> (primary-keyword top heading);
-      // MDX body sections map to <h2>, so there must be exactly one h1.
       cy.get('h1').should('have.length', 1).and('contain.text', 'InferenceMAX');
+    });
+  });
+
+  describe('Hardware results pages', () => {
+    const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+
+    for (const locale of ['', '/zh']) {
+      it(`renders the results header and article on ${locale || '/en'}`, () => {
+        cy.visit(`${locale}/hardware/${slug}`);
+        cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
+        cy.get('[data-testid="hardware-hero"]').within(() => {
+          cy.get('[data-testid="hardware-lede"]').should('be.visible');
+          cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
+          cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
+          cy.get(`a[href="${locale}/hardware"]`).should('be.visible');
+        });
+        cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
+        cy.get('[data-testid="blog-related"]').should('not.exist');
+        cy.get('link[rel="canonical"]').should(
+          'have.attr',
+          'href',
+          `https://inferencex.semianalysis.com${locale}/hardware/${slug}`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+          .should('have.attr', 'href')
+          .and('include', `/zh/hardware/${slug}`);
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale ? `/hardware/${slug}` : `/zh/hardware/${slug}`,
+        );
+      });
+    }
+
+    it('places the header links below the lede on phones without horizontal overflow', () => {
+      cy.viewport(390, 844);
+      cy.visit(`/hardware/${slug}`);
+      cy.get('[data-testid="hardware-lede"]').then(($lede) => {
+        const ledeBottom = $lede[0].getBoundingClientRect().bottom;
+        cy.get('[data-testid="hardware-hero-links"]').should(($links) => {
+          expect($links[0].getBoundingClientRect().top).to.be.greaterThan(ledeBottom);
+        });
+      });
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.viewport(1280, 720);
+    });
+
+    it('lists the pages on /hardware and links each card to its page', () => {
+      cy.visit('/hardware');
+      cy.get('[data-testid="hardware-card"]').should('have.length.at.least', 2);
+      cy.get(`[data-testid="hardware-card"] a[href="/hardware/${slug}"]`).click();
+      cy.location('pathname').should('eq', `/hardware/${slug}`);
+    });
+
+    it('no longer serves the moved pages under /blog', () => {
+      cy.request({ url: `/blog/${slug}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 404);
     });
   });
 
@@ -107,16 +156,12 @@ describe('Blog', () => {
     });
 
     it('leaves single-dollar prices as literal text, not math', () => {
-      // `singleDollarTextMath: false` — otherwise "$3 ... $15" would be swallowed
-      // into an inline formula and the prices would disappear from the prose.
       cy.get('article.prose').should('contain.text', '$3 per million tokens input');
       cy.get('article.prose').should('contain.text', '$15 per million tokens output');
     });
 
     it('renders every figure the post references', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
-      // Only the first figure is eager; the rest are `loading="lazy"` and stay at
-      // naturalWidth 0 until scrolled to, so decode is only asserted on that one.
       cy.get('article.prose figure img')
         .first()
         .should(($img) => {
@@ -129,8 +174,6 @@ describe('Blog', () => {
         );
       });
 
-      // Complements the eager-only decode check above: the srcs exist on the server
-      // even though lazy images have not fetched them yet.
       cy.get('article.prose figure img').then(($imgs) => {
         const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
         for (const src of srcs) {

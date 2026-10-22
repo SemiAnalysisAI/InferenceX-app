@@ -47,8 +47,6 @@ export const TPUV7_PREVIEW_STRINGS = {
   },
 } as const;
 
-// TPUv7 data is currently the supplemental Qwen3.5 8k/1k snapshot only, so a
-// hardware-scoped match covers exactly that curve, mirroring Jalapeño.
 export const OFFICIAL_PREVIEW_SERIES = [
   {
     id: 'jalapeno-official-preview',

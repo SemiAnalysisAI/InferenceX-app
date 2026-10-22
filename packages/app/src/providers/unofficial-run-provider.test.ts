@@ -12,11 +12,6 @@ import {
   type OverlaySelectionState,
 } from './unofficial-run-provider';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Minimal BenchmarkRow stub — only fields used by buildChartData key logic. */
 function stubRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: 1,
@@ -74,10 +69,6 @@ function rawPowerArtifact(overrides: Record<string, unknown> = {}): Record<strin
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// parseAvailableModelsAndSequences
-// ---------------------------------------------------------------------------
 
 describe('parseAvailableModelsAndSequences', () => {
   it('returns empty array for null input', () => {
@@ -164,7 +155,6 @@ describe('parseAvailableModelsAndSequences', () => {
   });
 
   it('deduplicates identical model/sequence combinations', () => {
-    // Simulate data where the same key appears twice (e.g. via spread merge)
     const entry = { e2e: { data: [], gpus: {} }, interactivity: { data: [], gpus: {} } };
     const chartData = Object.fromEntries([
       ['Kimi-K2.5_1k/1k', entry],
@@ -174,10 +164,6 @@ describe('parseAvailableModelsAndSequences', () => {
     expect(result).toHaveLength(1);
   });
 });
-
-// ---------------------------------------------------------------------------
-// buildChartData — key construction
-// ---------------------------------------------------------------------------
 
 describe('buildChartData', () => {
   it('maps DB model key to display name in chart data keys', () => {
@@ -199,9 +185,6 @@ describe('buildChartData', () => {
   });
 
   it('prices TPUv7 overlay points on the external basis for later repricing', () => {
-    // processOverlayChartDataWithClipping reprices from external at render
-    // time, so the source overlay data must not already carry the internal
-    // owner cost even though internal is the app default.
     const rows = [
       stubRow({
         model: 'qwen3.5-397b',
@@ -264,9 +247,7 @@ describe('buildChartData', () => {
     ];
     const result = buildChartData(rows);
     const group = result['DeepSeek-R1-0528_1k/1k'];
-    // e2e chart x-axis is median_e2el
     expect(group.e2e.data[0].x).toBe(5);
-    // interactivity chart x-axis is median_intvty
     expect(group.interactivity.data[0].x).toBe(150);
   });
 
@@ -281,7 +262,6 @@ describe('buildChartData', () => {
     delete raw.num_prefill_gpu;
     delete raw.num_decode_gpu;
     const rows = normalizeArtifactRows([raw], '2026-08-12');
-    // Reproduce the ingest default that used to bypass the chart's PP fallback.
     expect(rows[0].num_decode_gpu).toBe(4);
     expect(rows[0].num_prefill_gpu).toBe(4);
     const group = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'];
@@ -294,8 +274,6 @@ describe('buildChartData', () => {
   });
 
   it('preserves all data points for disagg configs with different parallelism but same tp', () => {
-    // Two configs: same hwKey/precision/tp/conc but different decode_ep/dp_attention.
-    // Both must survive buildChartData; D3 dedup is a rendering concern, not a data one.
     const rows = [
       stubRow({
         disagg: true,
@@ -322,7 +300,6 @@ describe('buildChartData', () => {
     const group = result['DeepSeek-R1-0528_1k/1k'];
     expect(group.interactivity.data).toHaveLength(2);
     expect(group.e2e.data).toHaveLength(2);
-    // Verify the two points have different x/y values (different perf numbers)
     const [a, b] = group.interactivity.data;
     expect(a.x).not.toBe(b.x);
   });

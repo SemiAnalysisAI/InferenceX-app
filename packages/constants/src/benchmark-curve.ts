@@ -1,4 +1,3 @@
-/** Canonical replacement scope. Keep in sync with SQL benchmark_curve_scope. */
 export interface BenchmarkCurveInput {
   model?: string;
   hardware: string;
@@ -12,7 +11,6 @@ export interface BenchmarkCurveInput {
   offload_mode?: string | null;
 }
 
-/** AgentX submits one curve across topology, decoding, and offload choices. */
 export function benchmarkCurveScope(row: BenchmarkCurveInput): string {
   const agentic = row.benchmark_type === 'agentic_traces';
   return JSON.stringify([

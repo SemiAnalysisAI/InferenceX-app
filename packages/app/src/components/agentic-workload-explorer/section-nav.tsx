@@ -16,12 +16,10 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 export interface ExplorerNavLink {
-  /** Explorer-relative path, e.g. `/sessions`. */
   path: string;
   label: { en: string; zh: string };
 }
 
-/** Primary sections, shown inline; the rest live in the "More" menu. */
 export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/', label: { en: 'Overview', zh: '概览' } },
   { path: '/sessions', label: { en: 'Sessions', zh: '会话' } },
@@ -54,14 +52,12 @@ const STRINGS = {
   zh: { more: '更多', navLabel: 'Agentic Workload Explorer 分区', select: '分区' },
 };
 
-/** Whether `relativePath` (explorer-relative) is inside the section at `sectionPath`. */
 export function isActiveSection(relativePath: string | null, sectionPath: string): boolean {
   if (relativePath === null) return false;
   if (sectionPath === '/') return relativePath === '/';
   return relativePath === sectionPath || relativePath.startsWith(`${sectionPath}/`);
 }
 
-/** Number keys 1-9 jump to the first nine sections and 0 to the tenth. */
 function useSectionHotkeys(locale: Locale, query: string) {
   const router = useRouter();
 
@@ -166,11 +162,6 @@ function SectionNavWithVersion() {
   return <SectionNavInner query={versionQuery(searchParams.get('version'))} />;
 }
 
-/**
- * Explorer section tabs (desktop) and a section picker (mobile). Links keep
- * the current `?version=` selection; `useSearchParams` needs a Suspense
- * boundary, so the static render falls back to links without it.
- */
 export function SectionNav() {
   return (
     <Suspense fallback={<SectionNavInner query="" />}>

@@ -56,8 +56,6 @@ const STRINGS = {
   },
 } as const;
 
-// ── Helpers ──────────────────────────────────────────────────────
-
 function aggregate(
   stats: PlatformStat[],
   key: keyof PlatformStat,
@@ -75,8 +73,6 @@ function aggregate(
 
 const TREND_COLORS = ['#6366f1', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-// ── Section header ───────────────────────────────────────────────
-
 function SectionHeader({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -87,8 +83,6 @@ function SectionHeader({ label }: { label: string }) {
     </div>
   );
 }
-
-// ── Stat card ────────────────────────────────────────────────────
 
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
@@ -101,8 +95,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// ── Horizontal bar chart ─────────────────────────────────────────
 
 function HorizontalBars({
   data,
@@ -149,8 +141,6 @@ function HorizontalBars({
   );
 }
 
-// ── Platform Trends (SVG stacked bar chart) ──────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -184,7 +174,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -225,7 +214,6 @@ function PlatformTrendsChart({
       dayData[os] = (dayData[os] || 0) + Number(entry.sessionCount);
     }
 
-    // Days arrive as Date strings ("Wed Aug 26 2026 …"), so sort by time.
     const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
 
     let max = 0;
@@ -264,7 +252,6 @@ function PlatformTrendsChart({
   return (
     <>
       <div className="flex items-center justify-between mb-2">
-        {/* Legend */}
         <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground">
           {allOsList.map((os) => (
             <span key={os} className="flex items-center gap-1">
@@ -291,7 +278,6 @@ function PlatformTrendsChart({
       </div>
 
       <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {/* Y-axis grid lines + labels */}
         {yTicks.map((tick) => (
           <g key={`y-${tick}`}>
             {tick > 0 && (
@@ -321,7 +307,6 @@ function PlatformTrendsChart({
           </g>
         ))}
 
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -332,7 +317,6 @@ function PlatformTrendsChart({
           strokeWidth={0.5}
         />
 
-        {/* Stacked bars */}
         {days.map(({ day, data }, i) => {
           let yOffset = 0;
           const rects: React.ReactNode[] = [];
@@ -360,7 +344,6 @@ function PlatformTrendsChart({
           return <g key={day}>{rects}</g>;
         })}
 
-        {/* X-axis labels */}
         {days.map(({ day }, i) => {
           if (i % labelInterval !== 0 && i !== days.length - 1) return null;
           const d = new Date(day);
@@ -382,7 +365,6 @@ function PlatformTrendsChart({
           );
         })}
 
-        {/* Axis label */}
         <text
           x={MARGIN.left + PLOT_W / 2}
           y={CHART_H - 2}
@@ -399,8 +381,6 @@ function PlatformTrendsChart({
     </>
   );
 }
-
-// ── Main page ────────────────────────────────────────────────────
 
 export default function PlatformPage() {
   const t = STRINGS[useLocale()];
@@ -430,19 +410,16 @@ function PlatformPageContent() {
     key: String(traceVersionParam),
   });
 
-  // ── Aggregated distributions ──────────────────────────────────
   const osDist = useMemo(() => (data ? aggregate(data.stats, 'os') : []), [data]);
   const cliDist = useMemo(() => (data ? aggregate(data.stats, 'cliVersion') : []), [data]);
   const nodeDist = useMemo(() => (data ? aggregate(data.stats, 'nodeVersion') : []), [data]);
   const archDist = useMemo(() => (data ? aggregate(data.stats, 'arch') : []), [data]);
 
-  // ── Stats ─────────────────────────────────────────────────────
   const uniqueOs = useMemo(() => osDist.filter((d) => d.label !== 'unknown').length, [osDist]);
   const uniqueCli = useMemo(() => cliDist.filter((d) => d.label !== 'unknown').length, [cliDist]);
   const mostCommonOs = useMemo(() => (osDist.length > 0 ? osDist[0].label : '--'), [osDist]);
   const totalSessions = useMemo(() => osDist.reduce((sum, d) => sum + d.count, 0), [osDist]);
 
-  // ── Trend chart data ──────────────────────────────────────────
   const { allOsList, osColorMap } = useMemo(() => {
     if (!data) return { allOsList: [], osColorMap: {} };
     const osSet = new Set<string>();
@@ -459,7 +436,6 @@ function PlatformPageContent() {
 
   return (
     <div className="space-y-5">
-      {/* ── Stats ── */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -487,7 +463,6 @@ function PlatformPageContent() {
 
       {data && (
         <>
-          {/* ── OS Distribution ── */}
           <div>
             <SectionHeader label={t.osDist} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -495,7 +470,6 @@ function PlatformPageContent() {
             </div>
           </div>
 
-          {/* ── CLI Version Distribution ── */}
           <div>
             <SectionHeader label={t.cliVersionDist} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -503,7 +477,6 @@ function PlatformPageContent() {
             </div>
           </div>
 
-          {/* ── Node.js Version Distribution ── */}
           <div>
             <SectionHeader label={t.nodeVersionDist} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -511,7 +484,6 @@ function PlatformPageContent() {
             </div>
           </div>
 
-          {/* ── Architecture Distribution ── */}
           <div>
             <SectionHeader label={t.archDist} />
             <div className="rounded-md border border-border bg-surface p-3">
@@ -519,7 +491,6 @@ function PlatformPageContent() {
             </div>
           </div>
 
-          {/* ── Platform Trends ── */}
           <div>
             <SectionHeader label={t.platformTrends} />
             <div className="rounded-md border border-border bg-surface p-3">

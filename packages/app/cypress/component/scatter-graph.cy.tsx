@@ -127,7 +127,6 @@ describe('ScatterGraph', () => {
         expect(curve.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
       });
     });
-    // New labels must inherit the fade even when Pareto membership is unchanged.
     cy.get('#scatter-line-labels').click();
     cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
       $labels.each((_, label) => {
@@ -141,7 +140,6 @@ describe('ScatterGraph', () => {
         expect(label.style.filter).to.equal('opacity(0.2)');
       });
     });
-    // Turning the switch off restores official and unofficial marks.
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(
       ($marks) => {
@@ -656,9 +654,7 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // The scatter layer renders point groups with class 'dot-group'
     cy.get('#test-scatter-points svg .dot-group').should('exist');
-    // Each point gets a <g> with a visible shape inside
     cy.get('#test-scatter-points svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
@@ -975,13 +971,11 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Both the official roofline and the overlay (unofficial) roofline render.
     cy.get('#test-scatter-overlay-labels svg .roofline-path').should('have.length.greaterThan', 0);
     cy.get('#test-scatter-overlay-labels svg .overlay-roofline-path').should(
       'have.length.greaterThan',
       0,
     );
-    // Both an official-keyed and an overlay-keyed line label should render.
     cy.get('#test-scatter-overlay-labels svg .line-label').should('have.length.greaterThan', 0);
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key^="overlay-"]')
@@ -989,16 +983,12 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The pill names the hardware behind the ✕ marker, parsed like an official
-    // pill; the long branch that crashed the production page stays in the legend.
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
-      .should('have.text', '✕ B200 (TRTLLM)')
+      .should('have.text', 'B200 (TRTLLM)')
       .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
     ).should('have.text', 'B200');
-    // b200_trt is active only in the overlay legend (official rows: h100), so
-    // the overlay pill must stay visible after the filter-sync effect.
     cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
       .should('have.attr', 'data-visible', '1')
       .and('have.css', 'opacity', '1');
@@ -1065,7 +1055,6 @@ describe('ScatterGraph', () => {
           activeOverlayHwTypes: new Set(['h100_vllm']),
           allOverlayHwTypes: new Set(['h100_vllm']),
           runIndexByUrl: { [runUrl]: 0, 'precision-order': 0 },
-          // No run metadata: exercise the hardware-label fallback path.
           unofficialRunInfos: [],
         },
       },
@@ -1163,7 +1152,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('have.text', '✕ B200 (TRTLLM)');
+      .should('have.text', 'B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
@@ -1250,12 +1239,7 @@ describe('ScatterGraph', () => {
       '#test-scatter-ingested-singleton-label svg .line-label[data-hw-key="b200_tilert_mtp"] .ll-engine',
     )
       .should('have.text', ' (TileRT, MTP)')
-      // Muted next to the series-coloured GPU name.
-      .and(($engine) => {
-        const gpu = $engine.siblings('.ll-gpu')[0] as unknown as SVGTSpanElement;
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal('');
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal(gpu.style.fill);
-      });
+      .and('have.attr', 'fill', '#d1d5db');
 
     expandLegendAdvanced();
     cy.get('#scatter-line-labels').click();
@@ -1277,8 +1261,6 @@ describe('ScatterGraph', () => {
       createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 16, y: 200, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100_vllm_mtp', x: 32, y: 150, precision: Precision.FP4 }),
     ];
-    // Overlay roofline with no run metadata, so its line label falls back to the
-    // hw label — exercising the overlay path's model-aware suffix resolution.
     const runUrl = 'https://github.com/x/y/actions/runs/999';
     const overlayData = {
       data: [
@@ -1333,18 +1315,15 @@ describe('ScatterGraph', () => {
           activeOverlayHwTypes: new Set(['b200_vllm_mtp']),
           allOverlayHwTypes: new Set(['b200_vllm_mtp']),
           runIndexByUrl: { [runUrl]: 0, '999': 0 },
-          // Intentionally empty so the overlay label falls back to the hw label.
           unofficialRunInfos: [],
         },
       },
     );
 
-    // Official roofline label reads "EAGLE", not the generic "MTP".
     cy.get('#test-scatter-m3-eagle svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .find('text')
       .should('contain.text', 'EAGLE');
-    // Overlay roofline (no run metadata → hw-label fallback) also reads "EAGLE".
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"]')
       .find('text')
       .should('contain.text', 'EAGLE');
@@ -1353,13 +1332,7 @@ describe('ScatterGraph', () => {
       .and('have.attr', 'font-weight', '700');
     cy.get('#test-scatter-m3-eagle svg .line-label[data-line-key^="overlay-"] .ll-engine')
       .should('contain.text', 'EAGLE')
-      // Muted next to the series-coloured GPU name.
-      .and(($engine) => {
-        const gpu = $engine.siblings('.ll-gpu')[0] as unknown as SVGTSpanElement;
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal('');
-        expect(($engine[0] as unknown as SVGTSpanElement).style.fill).to.not.equal(gpu.style.fill);
-      });
-    // No label should show the generic MTP token for M3.
+      .and('have.attr', 'fill', '#d1d5db');
     cy.get('#test-scatter-m3-eagle svg .line-label text').should('not.contain.text', 'MTP');
   });
 
@@ -1442,18 +1415,12 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Preview mode is diagnostic, so cross-engine official and unofficial
-    // results remain visible together instead of choosing one engine family.
     cy.get('#test-scatter-agentx-engine-guard svg .overlay-roofline-path').should('exist');
     cy.get(
       '#test-scatter-agentx-engine-guard svg .roofline-path[data-hw-key="b200_sglang"]',
     ).should('have.css', 'opacity', '1');
-    // The exclusion resolver must be bypassed rather than resolving in favor of
-    // either the official or overlay engine family.
     cy.get('@setUnifiedOverlaySelection').should('not.have.been.called');
 
-    // An additional official engine can also be selected while the preview is
-    // loaded; the production-only conflict toggle must not be consulted.
     cy.get('label[for="checkbox-h100_vllm"]').click();
     cy.get('@blockedComparisonToggle').should('not.have.been.called');
     cy.get('@setUnifiedOverlaySelection').should((setSelection) => {
@@ -1606,7 +1573,6 @@ describe('ScatterGraph', () => {
       },
     );
 
-    // Same engine family: no exclusion applies, both series render.
     cy.get('#test-scatter-agentx-same-family svg .overlay-roofline-path').should('exist');
     cy.get('#test-scatter-agentx-same-family svg .roofline-path').should(
       'have.css',
@@ -1690,8 +1656,6 @@ describe('ScatterGraph', () => {
 
   it('clears perf rulers when the y-axis or x-axis metric changes', () => {
     const chartId = 'test-scatter-perf-ruler-axis-reset';
-    // Distinct `conc` per point keeps the D3 join keys unique, as they are
-    // for real runs; the metric-change update matches marks by that key.
     const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
       [8, 16, 32].map((x, index) =>
         createMockInferenceData({
@@ -1757,8 +1721,6 @@ describe('ScatterGraph', () => {
 
     mountWithProviders(<AxisMetricHarness />, { unofficial: {} });
 
-    // Ruler mode exposes one widened hit stroke per visible roofline; clicking
-    // two of them completes a measurement.
     const placeRuler = () => {
       cy.get(`#${chartId} svg .perf-ruler-hit`).should('have.length', 2);
       cy.get(`#${chartId} svg .perf-ruler-hit`).eq(0).click({ force: true });
@@ -1766,11 +1728,6 @@ describe('ScatterGraph', () => {
       cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
     };
 
-    // Clearing the rulers also drops the "clear rulers" legend entry, which
-    // narrows the sidebar and rebuilds the chart while the metric-change
-    // tween is still running. Both three-point curves must still be drawn
-    // as real curves afterwards (a stale tween used to collapse them onto a
-    // single coordinate).
     const expectCurvesIntact = () => {
       cy.get(`#${chartId} svg .roofline-path`)
         .should('have.length', 2)
@@ -1784,16 +1741,12 @@ describe('ScatterGraph', () => {
     cy.get('#scatter-perf-ruler').click({ force: true });
     placeRuler();
 
-    // Switching the y-axis metric redraws the curves in new units: the ruler
-    // must not survive. Ruler mode itself stays on so the user can measure
-    // again without re-enabling it.
     cy.get('[data-testid="change-y-metric"]').click();
     cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
     cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
     expectCurvesIntact();
     placeRuler();
 
-    // Same for the x-axis metric (the resolved `x_scale_field`).
     cy.get('[data-testid="change-x-metric"]').click();
     cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
     cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
@@ -2170,8 +2123,6 @@ describe('ChartDisplay engine comparison guard', () => {
   });
 
   it('renders the table columns without the median interactivity or TTFT columns', () => {
-    // Mirror the real interactivity chart: x IS interactivity, which is what
-    // made the separate median column a duplicate.
     const chartDefinition = createMockChartDefinition({
       chartType: 'interactivity',
       x: 'median_intvty',
@@ -2211,14 +2162,8 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-results-table"] thead th').then(($headers) => {
       const headers = [...$headers].map((th) => (th.textContent ?? '').trim());
-      // Interactivity is already the x-axis column on the interactivity chart,
-      // so the median column duplicated it. Assert both that the column is gone
-      // and that exactly one interactivity column remains, so a rename cannot
-      // quietly reintroduce the duplicate.
       expect(headers).to.not.include('Median Interactivity (tok/s)');
       expect(headers.filter((h) => h.toLowerCase().includes('interactivity'))).to.have.length(1);
-      // Median TTFT was dropped too; unlike interactivity it is not duplicated
-      // by the x-axis column, so nothing else in the table should carry it.
       expect(headers).to.not.include('Median TTFT (ms)');
       expect(headers.filter((h) => h.toLowerCase().includes('ttft'))).to.have.length(0);
     });
@@ -2563,8 +2508,6 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
 
     cy.get('[data-testid="change-overlay-scope"]').click();
-    // The new overlay scope can arrive before the official query. Its empty
-    // graph must not be persisted as an intentional empty official selection.
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 2);
     cy.get('[data-testid="load-official-scope"]').click();
     cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 4);
@@ -2580,8 +2523,6 @@ describe('ChartDisplay engine comparison guard', () => {
   });
 });
 
-// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, while the
-// upper power boundary shows measured power across operating configurations.
 describe('Power envelopes', () => {
   const powerMetrics = [
     ['y_measuredAvgPower', 'Watts'],
@@ -2733,7 +2674,7 @@ describe('Power envelopes', () => {
       [100, 400],
       [70, 600],
       [40, 800],
-      [60, 100], // An off-boundary measurement must select its curve, not its raw y.
+      [60, 100],
     ];
     const official = samples.map(([x, y], index) =>
       createMockInferenceData({ hwKey: 'h100', x, y, conc: index + 1 }),
@@ -2816,7 +2757,6 @@ describe('Power envelopes', () => {
           svg.querySelector<SVGPathElement>('.roofline-path')!,
           svg.querySelector<SVGPathElement>('.overlay-roofline-path')!,
         ];
-        // Sample native SVG geometry independently of the ruler's interpolation helper.
         for (const [index, path] of paths.entries()) {
           const length = path.getTotalLength();
           const distance = Math.min(
@@ -3000,8 +2940,6 @@ describe('Power envelopes', () => {
       .and('have.text', 'TP2');
   });
 
-  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
-  // flips the corner toward higher x.
   it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
     mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
     cy.get('#power-sweep .dot-group')
@@ -3063,8 +3001,6 @@ describe('Power envelopes', () => {
     it(`smooths ${metric} across configurations and preserves overlay runs through zoom`, () => {
       const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
       const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
-      // The H100 Qwen3.5 8k/1k measurements that produced loops when joined
-      // in concurrency order. EP1 and EP8 contribute to the same upper boundary.
       const rows = [
         [16, 62.737, 399.728, 8],
         [32, 55.742, 448.775, 8],

@@ -4,6 +4,7 @@ import { getHardwareConfig } from '@/lib/catalog/constants';
 import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
+  getOverlayLineLabel,
   getPointHardwareConfig,
   inferenceFrameworkLabelOverride,
 } from './inference-labels';
@@ -281,5 +282,17 @@ describe('run-specific MoRI UMBP labels', () => {
     );
     expect(getPointHardwareConfig({ hwKey, ...points[1] }, config).suffix).toBe('(MoRI SGLang)');
     expect(getInferenceHardwareConfig(hwKey, undefined, []).suffix).toBe('(MoRI SGLang)');
+  });
+});
+
+describe('getOverlayLineLabel', () => {
+  const run = { id: 42, branch: 'feat/faster-decode' };
+
+  it('omits the ✕ marker so in-plot pills do not read as data points', () => {
+    expect(getOverlayLineLabel('B300 FP4 (SGLang)', run, false)).toBe('B300 FP4 (SGLang)');
+  });
+
+  it('appends the run tag only when runs share hardware', () => {
+    expect(getOverlayLineLabel('B300 FP4', run, true)).toBe('B300 FP4 · feat/faster-decode');
   });
 });

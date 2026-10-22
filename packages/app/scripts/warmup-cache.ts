@@ -1,14 +1,6 @@
 import { MODEL_OPTIONS, SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-/**
- * Warm up API caches by querying all endpoints the frontend uses.
- *
- * Usage:
- *   bun run admin:cache:warmup [url]           (default: http://localhost:3000)
- *   bun run admin:cache:warmup https://inferencex.semianalysis.com
- */
-
 const MODELS = MODEL_OPTIONS;
 const SEQUENCES = SEQUENCE_OPTIONS.map((s) => sequenceToIslOsl(s)).filter(
   (s): s is { isl: number; osl: number } => s !== null,
@@ -45,7 +37,6 @@ async function warmupCaches() {
   const start = performance.now();
   console.log(`Warming up: ${origin}\n`);
 
-  // --- Singleton endpoints (no params) ---
   console.log('Singleton endpoints:');
   await Promise.all([
     hit('/api/v1/availability'),
@@ -53,13 +44,11 @@ async function warmupCaches() {
     hit('/api/v1/evaluations'),
   ]);
 
-  // --- Benchmarks (latest) per model ---
   console.log('\nBenchmarks (latest) per model:');
   for (const model of MODELS) {
     await hit(`/api/v1/benchmarks?model=${encodeURIComponent(model)}`);
   }
 
-  // --- Benchmark history per model × sequence ---
   console.log('\nBenchmark history per model × sequence:');
   const historyPaths: string[] = [];
   for (const model of MODELS) {
@@ -69,12 +58,10 @@ async function warmupCaches() {
       );
     }
   }
-  // Run in batches of 4 to avoid hammering the server
   for (let i = 0; i < historyPaths.length; i += 4) {
     await Promise.all(historyPaths.slice(i, i + 4).map((p) => hit(p)));
   }
 
-  // --- Discover all available dates from the availability endpoint ---
   let availableDates: string[] = [];
   try {
     const res = await fetch(`${origin}/api/v1/availability`);
@@ -88,11 +75,8 @@ async function warmupCaches() {
         .toSorted()
         .toReversed();
     }
-  } catch {
-    // fall through — dates will be empty, skip date-specific sections
-  }
+  } catch {}
 
-  // --- Benchmarks per model × date (exact) ---
   if (availableDates.length > 0) {
     console.log('\nBenchmarks per model × date (exact):');
     const datePaths: string[] = [];
@@ -108,7 +92,6 @@ async function warmupCaches() {
     }
   }
 
-  // --- Workflow info for all available dates ---
   if (availableDates.length > 0) {
     console.log(`\nWorkflow info (${availableDates.length} dates from availability):`);
     for (const date of availableDates) {

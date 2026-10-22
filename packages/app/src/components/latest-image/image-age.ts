@@ -52,7 +52,6 @@ function configurationKey(row: ImageAgeObservation): string {
   ]);
 }
 
-/** Nearest-rank p90: one vote per displayed configuration, not per benchmark point. */
 export function imageAgeSummary(rows: readonly ImageAgeObservation[], asOf: string): ImageAgePoint {
   const dates = new Map<string, string>();
   for (const row of rows) {
@@ -69,7 +68,6 @@ export function imageAgeSummary(rows: readonly ImageAgeObservation[], asOf: stri
   };
 }
 
-/** Carry observations forward only; never backfill a configuration before its first submission. */
 export function imageAgeHistory(
   observations: readonly ImageAgeObservation[],
   asOf: string,

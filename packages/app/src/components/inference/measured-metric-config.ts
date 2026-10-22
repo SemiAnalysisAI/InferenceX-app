@@ -9,20 +9,11 @@ import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
 type MeasuredScope = 'all' | 'prefill' | 'decode';
-/**
- * How whole-deployment average power is shown: per-chip watts, percent of
- * TDP, or the per-second telemetry trace behind the average (`timeline`, which
- * ChartDisplay renders with `PowerTimeline` instead of the scatter chart).
- */
 export type MeasuredPowerDisplay = 'watts' | 'tdp' | 'timeline';
 
 export type MeasuredMetricConfig =
   | {
       family: 'power';
-      /**
-       * Power boundary the key plots. Derived boundaries publish only the
-       * `POWER_BASIS_FIELDS` quantities; `gpu-measured` publishes every variant.
-       */
       basis: PowerBasis;
       scope: MeasuredScope;
       statistic: 'average' | 'p75' | 'p90';
@@ -53,14 +44,12 @@ export const MEASURED_METRIC_DEFAULTS = {
 
 const measured = { basis: 'gpu-measured' } as const;
 
-/** Control settings that plot each `POWER_QUANTITIES` entry for the whole deployment. */
 const POWER_QUANTITY_CONFIGS = {
   watts: { family: 'power', scope: 'all', statistic: 'average', display: 'watts' },
   joulesPerOutputToken: { family: 'energy', scope: 'all', denominator: 'output', unit: 'joules' },
   joulesPerTotalToken: { family: 'energy', scope: 'all', denominator: 'total', unit: 'joules' },
 } as const satisfies Record<PowerQuantity, MeasuredMetricConfigChange>;
 
-// Presentation settings resolve to existing metrics; they do not own chart state.
 const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetricConfig])[] = [
   [
     'y_measuredAvgPower',
@@ -119,12 +108,20 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
   ...POWER_BASES.filter((basis) => basis !== 'gpu-measured').flatMap((basis) =>
-    POWER_QUANTITIES.map((quantity): readonly [MetricConfigKey, MeasuredMetricConfig] => [
-      `y_${POWER_BASIS_FIELDS[basis][quantity]}`,
-      { ...POWER_QUANTITY_CONFIGS[quantity], basis },
-    ]),
+    POWER_QUANTITIES.flatMap((quantity): (readonly [MetricConfigKey, MeasuredMetricConfig])[] => {
+      const field = POWER_BASIS_FIELDS[basis][quantity];
+      return field ? [[`y_${field}`, { ...POWER_QUANTITY_CONFIGS[quantity], basis }]] : [];
+    }),
   ),
 ];
+
+export function measuredMetricBases(family: MeasuredMetricFamily): PowerBasis[] {
+  return POWER_BASES.filter((basis) =>
+    MEASURED_METRIC_CONFIGS.some(
+      ([, config]) => config.family === family && config.basis === basis,
+    ),
+  );
+}
 
 export function getMeasuredMetricConfig(metric: string): MeasuredMetricConfig | undefined {
   const config = MEASURED_METRIC_CONFIGS.find(([key]) => key === metric)?.[1];
@@ -143,13 +140,8 @@ export function changeMeasuredMetricConfig(
     current?.family === family
       ? current
       : getMeasuredMetricConfig(MEASURED_METRIC_DEFAULTS[family])!;
-  // A family switch keeps the boundary: the metric key is what carries it.
   const basis = change.basis ?? (current ?? config).basis;
   if (basis !== 'gpu-measured') {
-    // A derived boundary keeps any requested combination it publishes, so Per
-    // moves between output and total tokens on it. Choosing the boundary
-    // otherwise snaps to its first combination; any other change returns to
-    // GPU-measured telemetry, so every control change lands on a real key.
     const unchanged: MeasuredMetricConfigChange = config;
     const onBasis = MEASURED_METRIC_CONFIGS.filter(
       ([, candidate]) => candidate.family === family && candidate.basis === basis,
@@ -179,7 +171,6 @@ export function changeMeasuredMetricConfig(
   }
 
   const denominator = change.denominator ?? config.denominator;
-  // Input/output normalization does not imply a prefill/decode attribution.
   if (
     (scope === 'prefill' && denominator !== 'input') ||
     (scope === 'decode' && denominator !== 'output')

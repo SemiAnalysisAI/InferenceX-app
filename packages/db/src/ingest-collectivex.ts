@@ -1,37 +1,3 @@
-/**
- * Ingest a CollectiveX sweep run's artifacts into the CollectiveX database.
- *
- * Stores the RAW matrix + case-attempt documents (the sweep JSON contract is
- * expected to change; the shared reader in src/collectivex/reader.ts is the
- * single transform point and runs at API-read time). The reader IS executed
- * once here — to validate the bundle assembles and to precompute the
- * `summary` column that backs the dashboard's run picker.
- *
- * Sweep runs are accepted from ANY branch of the source repo (they are
- * launched via `gh api` on feature branches); only the workflow identity is
- * checked, never head_branch.
- *
- * The dashboard ingests runs lazily on read; this CLI exists to pre-warm runs
- * before their GitHub artifacts expire, backfill older runs into the picker,
- * and force-refresh a run. Re-ingesting a run the dashboard deleted clears
- * its tombstone (deliberate operator override).
- *
- * Two modes:
- *   --download <run-url-or-id> [repo]  Download artifacts from GitHub then ingest
- *   (no flag)                          Read pre-downloaded artifacts from INGEST_ARTIFACTS_PATH
- *
- * Usage:
- *   bun run admin:db:ingest:collectivex https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123
- *   bun run admin:db:ingest:collectivex 123
- *
- * Environment variables:
- *   DATABASE_COLLECTIVEX_WRITE_URL — Postgres connection string (direct, non-pooled)
- *   GITHUB_TOKEN                   — GitHub PAT for run metadata + artifact download
- *   INGEST_RUN_ID                  — (env mode) Workflow run ID
- *   INGEST_ARTIFACTS_PATH          — (env mode) Local path to pre-downloaded artifacts
- *   INGEST_REPO                    — (env mode) Source repo slug (owner/name)
- */
-
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -57,8 +23,6 @@ const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const SWEEP_WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
 const DOCS_INSERT_CHUNK = 200;
 
-// ── Argument / env parsing ──────────────────────────────────────────────────
-
 const isDownloadMode = process.argv[2] === '--download';
 
 let artifactsDir: string;
@@ -67,8 +31,6 @@ let REPO: string;
 let tempDir: string | null = null;
 
 if (isDownloadMode) {
-  // Positional args only: drop the '--' injected by pnpm arg passthrough and
-  // option flags like --no-ssl (read from argv by their own helpers).
   const args = process.argv.slice(3).filter((a) => !a.startsWith('--'));
   const input = args[0];
   if (!input) {
@@ -97,9 +59,6 @@ if (isDownloadMode) {
   artifactsDir = artifactsPath;
 }
 
-// Both reach shell-interpolated `gh api` calls — reject metachars. --download
-// parses its run id out of a URL or a digits-only argument, but the env-var path
-// takes INGEST_RUN_ID verbatim, so validate here where both modes converge.
 if (!/^[\w.-]+\/[\w.-]+$/u.test(REPO)) {
   console.error(`Invalid repo slug: ${REPO}`);
   process.exit(1);
@@ -109,9 +68,6 @@ if (!/^\d+$/u.test(runIdStr)) {
   process.exit(1);
 }
 
-// ── Artifact reading ────────────────────────────────────────────────────────
-
-/** Parse every `*.json` file in an artifact directory. */
 function readDocsDir(dir: string): unknown[] {
   const docs: unknown[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -130,13 +86,10 @@ function runGeneratedAt(run: RunMeta): string {
   return run.updated_at || run.run_started_at || run.created_at || '';
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
   console.log(`=== db:ingest:collectivex — run ${runIdStr} (${REPO}) ===`);
 
   const run = fetchRunMeta(REPO, runIdStr);
-  // Identity check only — never the branch: sweeps run on feature branches.
   if (run.path !== SWEEP_WORKFLOW_PATH) {
     throw new Error(`run ${runIdStr} is not a CollectiveX sweep (workflow: ${run.path})`);
   }
@@ -150,7 +103,6 @@ async function main(): Promise<void> {
 
   if (isDownloadMode) {
     const artifacts = listRunArtifacts(REPO, runIdStr);
-    // Keep the newest per name — retried uploads can duplicate a name.
     const byName = new Map<string, (typeof artifacts)[number]>();
     for (const artifact of artifacts) {
       const existing = byName.get(artifact.name);
@@ -192,7 +144,6 @@ async function main(): Promise<void> {
   console.log(`  matrix version: ${version}  shard artifacts: ${shardDirs.length}`);
   const docs = shardDirs.flatMap((dir) => readDocsDir(path.join(artifactsDir, dir)));
 
-  // Assemble once: validates the bundle and precomputes the picker summary.
   const meta: CollectiveXNeutralRunMeta = {
     run_id: runIdStr,
     run_attempt: run.run_attempt,
@@ -214,11 +165,7 @@ async function main(): Promise<void> {
   });
   try {
     await sql.begin(async (tx) => {
-      // Re-ingest = refresh: replace the run and its documents wholesale.
       await tx`DELETE FROM cx_runs WHERE run_id = ${runIdStr}`;
-      // The ::jsonb casts type the parameters as jsonb, so postgres.js
-      // serializes the raw objects itself — pre-stringifying here would
-      // double-encode them into jsonb strings.
       await tx`
         INSERT INTO cx_runs
           (run_id, run_attempt, version, generated_at, source_sha, source_branch, conclusion, matrix, summary)

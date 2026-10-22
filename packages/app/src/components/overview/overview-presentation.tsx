@@ -26,21 +26,14 @@ import {
 } from './overview-navigation';
 import type { OverviewLocale, OverviewStrings } from './overview-strings';
 
-/**
- * Width the matrix is laid out at while presenting, before `zoom` magnifies it.
- * Fixing it keeps the column proportions identical to the on-page matrix, so a
- * projected slide reads the same as the page the audience visits afterwards.
- */
 const PRESENTATION_LAYOUT_WIDTH = 1200;
 
-/** Room left around the matrix so it never runs into the bezel. */
 const PRESENTATION_FILL = { width: 0.96, height: 0.94 };
 
 const PRESENTATION_ZOOM_RANGE = { min: 0.3, max: 3 };
 
 interface OverviewPresentationState {
   presenting: boolean;
-  /** False until mounted, and on browsers that refuse the Fullscreen API. */
   supported: boolean;
   toggle: () => void;
 }
@@ -62,21 +55,10 @@ export function useOverviewPresentation(): OverviewPresentationState {
   return usePresentationContext();
 }
 
-/**
- * For leaves that only need to adapt if a presentation happens to be running.
- * Unlike the controls, they are reusable outside the overview page, where "not
- * presenting" is the honest answer rather than a wiring mistake.
- */
 export function useIsPresenting(): boolean {
   return useContext(OverviewPresentationContext)?.presenting ?? false;
 }
 
-/**
- * Owns the fullscreen state for the whole page, not just the surface: the page
- * body has to know it is presenting so it can drop the chrome that lives
- * outside the surface from the DOM rather than leaving it for the browser to
- * merely stop painting.
- */
 export function OverviewPresentationProvider({
   locale,
   children,
@@ -85,8 +67,6 @@ export function OverviewPresentationProvider({
   children: ReactNode;
 }) {
   const data = useOverviewData();
-  // Same reason the matrix reads it here: the reference follows the URL, so a
-  // payload still cached from another reference must not rewrite it.
   const referenceHardware = useOverviewReference();
   const { push, replaceClientState } = useOverviewNavigation();
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -142,9 +122,6 @@ export function OverviewPresentationProvider({
         notifyClientSearchChange(href);
       }
     };
-    // Capture runs before the navigation provider reads the new location, so
-    // a Back/Forward entry that predates presentation cannot make its client
-    // state disagree with the still-active browser fullscreen surface.
     window.addEventListener('popstate', preserveIntentWhileFullscreen, true);
     return () => window.removeEventListener('popstate', preserveIntentWhileFullscreen, true);
   }, []);
@@ -168,8 +145,6 @@ export function OverviewPresentationProvider({
     }
   }, [setPresentationIntent]);
 
-  // Magnify rather than restyle: one `zoom` scales type, padding and rules
-  // together, so the projected matrix cannot drift from the page's own layout.
   const fit = useCallback(() => {
     const surface = surfaceRef.current;
     const scaler = scalerRef.current;
@@ -188,9 +163,6 @@ export function OverviewPresentationProvider({
     );
   }, [presenting]);
 
-  // `data` is the dependency that matters beyond resizing: changing the view or
-  // the SLO mid presentation changes the row count, and the matrix has to be
-  // refitted.
   useEffect(() => {
     fit();
     window.addEventListener('resize', fit);
@@ -201,8 +173,6 @@ export function OverviewPresentationProvider({
     if (!presenting) return undefined;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      // Key repeat would oscillate between the two views and spam fetches;
-      // one page per physical press.
       if (event.repeat) return;
       const eventTarget = event.target;
       if (
@@ -213,13 +183,9 @@ export function OverviewPresentationProvider({
       ) {
         return;
       }
-      // Two views, so either arrow means "the other one" — the audience reads
-      // it as paging through slides.
       const target: OverviewComparisonMode =
         data.comparisonMode === 'hardware' ? OVERVIEW_DEFAULT_HISTORY_WINDOW : 'hardware';
       event.preventDefault();
-      // Only `compare` is merged out of this href, so both row scopes stay on
-      // the URL as they are and there is nothing to pass for them here.
       push(
         overviewHref(
           locale,
@@ -245,15 +211,6 @@ export function OverviewPresentationProvider({
   );
 }
 
-/**
- * The element handed to the Fullscreen API. Everything outside it stops
- * rendering while it is fullscreen, which is what strips the page down to the
- * matrix.
- *
- * Switching views or SLO while presenting is safe: `OverviewNavigationProvider`
- * swaps the data client-side without a route change, so this element is never
- * unmounted and the browser keeps it fullscreen.
- */
 export function OverviewPresentationSurface({ children }: { children: ReactNode }) {
   const { presenting, surfaceRef, scalerRef } = usePresentationContext();
   return (
@@ -267,8 +224,6 @@ export function OverviewPresentationSurface({ children }: { children: ReactNode 
           : undefined
       }
     >
-      {/* The toolbar needs more air from the matrix once it is the only chrome
-          on a projector than it does as one strip among many on the page. */}
       <div
         ref={scalerRef}
         className={`flex flex-col ${presenting ? 'gap-6' : 'gap-4'}`}

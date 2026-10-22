@@ -30,7 +30,6 @@ function point(overrides: Partial<InferenceData> = {}): InferenceData {
     ...overrides,
   };
 }
-// PowerX Figure 6 values (B200 / MI355X, TP4, three-dispatch means).
 const b200 = (conc: number, joules: number, watts: number, speed: number, id: number) =>
   point({
     id,

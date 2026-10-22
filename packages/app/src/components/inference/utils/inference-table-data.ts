@@ -1,8 +1,12 @@
-import type { AggDataEntry, InferenceData, YAxisMetricKey } from '@/components/inference/types';
+import type {
+  AggDataEntry,
+  InferenceData,
+  PowerBasisFieldKey,
+  YAxisMetricKey,
+} from '@/components/inference/types';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import type { Locale } from '@/lib/i18n/i18n';
 import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
-import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
 /** Table candidates keep GPU measurements even when the all-in model cannot run. */
 export function allInMeasuredTableData(
@@ -27,9 +31,9 @@ export function inferenceTableYValue(point: InferenceData, yPath?: string): numb
 
 type UnavailableReason = SystemPowerUnsupportedReason | 'energy' | 'model-unavailable';
 
-const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set([
-  POWER_BASIS_FIELDS['utility-modeled'].joulesPerOutputToken,
-  POWER_BASIS_FIELDS['utility-modeled'].joulesPerTotalToken,
+const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set<PowerBasisFieldKey>([
+  'utilityModeledJPerOutputToken',
+  'utilityModeledJPerTotalToken',
 ]);
 
 export function allInMeasuredUnavailableReason(

@@ -25,7 +25,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { AiChartBarPoint, AiChartSpec } from './types';
 import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';
 
-/** Sanitize tooltip HTML that may contain LLM-generated strings. */
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['div', 'span', 'strong', 'br'],
@@ -67,10 +66,6 @@ const STRINGS = {
     },
   },
 } as const;
-
-// ---------------------------------------------------------------------------
-// Bar Chart (horizontal)
-// ---------------------------------------------------------------------------
 
 function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
   const locale = useLocale();
@@ -154,10 +149,6 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Scatter Chart
-// ---------------------------------------------------------------------------
 
 function ScatterChart({
   data,
@@ -250,10 +241,6 @@ function ScatterChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Line Chart
-// ---------------------------------------------------------------------------
 
 interface LinePoint {
   hwKey: string;
@@ -382,10 +369,6 @@ function LineChart({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Radar Chart
-// ---------------------------------------------------------------------------
-
 function RadarChart({
   data,
   axes,
@@ -439,7 +422,6 @@ function RadarChart({
     [axes, numberLocale],
   );
 
-  // Radar ignores scales/axes — it draws its own grid. Provide dummy scales.
   const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
 
   return (
@@ -457,10 +439,6 @@ function RadarChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Inline Legend
-// ---------------------------------------------------------------------------
 
 function InlineLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
@@ -487,10 +465,6 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
     };
   });
 }
-
-// ---------------------------------------------------------------------------
-// Main Result Component
-// ---------------------------------------------------------------------------
 
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   const locale = useLocale();

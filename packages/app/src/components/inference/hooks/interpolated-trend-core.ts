@@ -41,6 +41,15 @@ export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: s
   return supportsTokenMetric(row, tokenMetricTypeForConfigKey(selectedYAxisMetric));
 }
 
+/** Resolved operating-point definition, not a user-selectable percentile. */
+export function historicalInteractivityAxis(isAgentic: boolean) {
+  return {
+    statistic: isAgentic ? ('p90' as const) : ('median' as const),
+    field: isAgentic ? ('p90_intvty' as const) : ('median_intvty' as const),
+    unit: 'tok/s/user' as const,
+  };
+}
+
 /**
  * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
  * This deliberately skips full chart transformation and derives only the
@@ -62,9 +71,21 @@ export function rowToLightweightPoint(
       ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
       : entry;
   if (!isKnownGpu(hwKey)) return null;
+  // workflow_run_id is a database ID, not a GitHub Actions ID. Preserve the
+  // actual producer URL (including repository and attempt), never the snapshot ID.
+  const runMatch = row.run_url?.match(
+    /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/,
+  );
+
+  // Reuse the main chart's normalization: AgentX slow-tail interactivity is
+  // 1 / P90 full-response ITL (seconds), with legacy ITL support in the adapter.
+  // Never use raw p90_intvty: older artifacts computed P90(1 / ITL) instead.
+  const isAgentic = row.benchmark_type === 'agentic_traces';
+  const interactivity = isAgentic ? entry.p90_intvty : (row.metrics.median_intvty ?? 0);
+  if (isAgentic && (!Number.isFinite(interactivity) || interactivity <= 0)) return null;
 
   const point = {
-    x: row.metrics.median_intvty ?? 0,
+    x: interactivity,
     y: row.metrics.tput_per_gpu ?? 0,
     hw: row.hardware,
     hwKey,
@@ -74,6 +95,17 @@ export function rowToLightweightPoint(
     dp: entry.dp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
+    trendSource: runMatch
+      ? {
+          date: row.date,
+          runId: Number(runMatch.groups!.id),
+          runUrl: row.run_url!,
+          model: row.model,
+          precision: row.precision,
+          hwKey,
+          benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : 'single_turn',
+        }
+      : undefined,
     tput_per_gpu: entry.tput_per_gpu,
     input_tput_per_gpu: entry.input_tput_per_gpu,
     output_tput_per_gpu: entry.output_tput_per_gpu,
@@ -415,11 +447,34 @@ export function buildTrendLines(
         tokenRevenuePricing,
       );
       if (interpolated === null) continue;
+      // Preserve the source curve's provenance, including reused points from older runs.
+      const frontierKey = PROPORTIONAL_TO_THROUGHPUT[trendMetricKey] ?? 'tpPerGpu';
+      const frontier = paretoFrontUpperLeft(
+        points,
+        (point) => point.x,
+        (point) => extractMetric(point, frontierKey)!,
+      );
+      const sources = [
+        ...new Map(
+          frontier
+            .flatMap((point) => (point.trendSource ? [point.trendSource] : []))
+            .map((source) => [`${source.date}:${source.runId}:${source.hwKey}`, source]),
+        ).values(),
+      ];
       if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
       resultMap.get(groupKey)!.set(date, {
         date,
         value: interpolated,
         x: targetInteractivity,
+        sources,
+        waterfallEligible:
+          !trendMetricKey.toLowerCase().includes('output') ||
+          frontier.every(
+            (point) =>
+              typeof point.output_tput_per_gpu === 'number' &&
+              Number.isFinite(point.output_tput_per_gpu) &&
+              point.output_tput_per_gpu > 0,
+          ),
       });
     }
   }

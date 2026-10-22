@@ -22,7 +22,6 @@ export interface ComparePageDerivedData {
   interactivityRange: { min: number; max: number };
   oldest?: string;
   newest?: string;
-  /** Full-shape rows limited to the fixed GPU pair for scoped chart hydration. */
   initialPairBenchmarkRows: BenchmarkRow[];
 }
 
@@ -78,12 +77,6 @@ function buildComparePageDerivedData(
   };
 }
 
-/**
- * Assemble the compact server-owned comparison payload from one cached,
- * pair-filtered row set. Selector transforms stay pure and cheap per request;
- * caching them separately would either nest unstable_cache calls or duplicate
- * the full pair payload in every sequence/precision entry.
- */
 export async function getComparePageDerivedData(
   dbModelKeys: readonly string[],
   a: string,

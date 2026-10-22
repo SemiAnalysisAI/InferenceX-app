@@ -23,8 +23,6 @@ export const metadata: Metadata = {
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-// The catalog reads the same live benchmark tables the dashboard does, so a
-// build-time snapshot would go stale the moment a new run lands.
 export const dynamic = 'force-dynamic';
 
 const jsonLd = {

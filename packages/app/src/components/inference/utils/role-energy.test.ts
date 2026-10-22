@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { reconstructedRoleEnergy } from './role-energy';
 
-// A disaggregated 8K/1K run: the deployment's energy over the window divided
-// by 8× more input than output tokens, so J/out ÷ J/in = 7.9 = the served ratio.
 const entry = {
   disagg: true,
   power_valid: 1,

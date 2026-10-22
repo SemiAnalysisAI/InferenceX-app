@@ -10,28 +10,12 @@ import {
 
 import { enAlternates, type Locale, ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
 
-/**
- * Whitepaper registry.
- *
- * Every whitepaper the site publishes is one typed entry here. The `/whitepaper`
- * index and the `/whitepaper/[slug]` landing pages (plus their `/zh` siblings)
- * render exclusively from this module, so the English and Chinese copies of a
- * paper always ship together and stay in lockstep with the PDF they summarize.
- *
- * Binary assets (the PDF, cover render, hardware render, and figure PNGs) live under
- * `packages/app/public/whitepaper/<slug>/` and are referenced by public path.
- */
-
 export type WhitepaperKpiIcon = 'dollar' | 'trending' | 'percent';
 
 export interface WhitepaperKpi {
-  /** Headline number, e.g. `$32.6B`. */
   value: string;
-  /** What the number is, e.g. `Revenue per GW-year`. */
   label: string;
-  /** Operating condition the number holds under. */
   caption: string;
-  /** Lucide glyph drawn in the tile corner. */
   icon: WhitepaperKpiIcon;
 }
 
@@ -40,9 +24,7 @@ export interface WhitepaperComparisonItem {
   label: string;
 }
 
-/** One-line secondary scenario shown under the KPI tiles. */
 export interface WhitepaperComparison {
-  /** Scenario name, e.g. `Rented at $3.00/GPU/hr (August 2026 3-year pricing)`. */
   lead: string;
   items: readonly WhitepaperComparisonItem[];
 }
@@ -57,28 +39,22 @@ export interface WhitepaperSource {
   href: string;
 }
 
-/** Locale copy for one figure card; assets live on `WhitepaperFigure`. */
 export interface WhitepaperFigureCopy {
-  /** Cost tier shown in the chart header, mirrors the estimator's `Cost Tier` value. */
   costTier: string;
   caption: string;
   alt: string;
 }
 
-/** Theme-switched plot PNGs plus the badge text of the estimator header they reproduce. */
 export interface WhitepaperFigure {
   id: string;
   srcLight: string;
   srcDark: string;
   width: number;
   height: number;
-  /** Estimator `TCO $/chip/hr` badge text, e.g. `MI355X: 1.5`. */
   tcoBadge: string;
 }
 
-/** Locale-independent values of the estimator chart header the figure cards reproduce. */
 export interface WhitepaperChartMeta {
-  /** Public path of the model mark drawn before the chart title. */
   modelLogoPath: string;
   utilization: string;
   licenseFee: string;
@@ -94,27 +70,19 @@ export interface WhitepaperChartMeta {
 }
 
 export interface WhitepaperCopy {
-  /** Eyebrow kicker above the title, e.g. `Whitepaper · Executive Summary`. */
   typeLabel: string;
   title: string;
   subtitle: string;
-  /** Meta description for search and social cards. */
   description: string;
-  /** Lead paragraph shared by the landing page and the PDF. */
   abstract: string;
   keyFindings: readonly string[];
-  /** Three headline tiles under the hero. */
   kpis: readonly WhitepaperKpi[];
   comparison: WhitepaperComparison;
-  /** Formula chain, one step per entry. */
   methodSteps: readonly string[];
   assumptions: readonly WhitepaperAssumption[];
   sources: readonly WhitepaperSource[];
-  /** Author byline. Always the InferenceX team; never an individual. */
   authors: string;
-  /** Estimator chart title shared by every figure card. */
   figureTitle: string;
-  /** Same order as `Whitepaper.figures`. */
   figures: readonly WhitepaperFigureCopy[];
   coverAlt: string;
   chipAlt: string;
@@ -122,19 +90,13 @@ export interface WhitepaperCopy {
 
 export interface Whitepaper {
   slug: string;
-  /** ISO date (YYYY-MM-DD) the paper was published. */
   publishedDate: string;
-  /** ISO date (YYYY-MM-DD) of the benchmark snapshot the numbers come from. */
   dataDate: string;
   pageCount: number;
   tags: readonly string[];
-  /** Public path of the downloadable PDF under `public/`. */
   pdfPath: string;
-  /** PDF cover render; also the sitemap and JSON-LD image. */
   coverImagePath: string;
-  /** Alias of `coverImagePath` kept for the sitemap and JSON-LD builders. */
   heroImagePath: string;
-  /** Transparent hardware render layered over the hero band. */
   chipImagePath: string;
   chipImageWidth: number;
   chipImageHeight: number;
@@ -451,7 +413,6 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
   },
 ];
 
-/** Newest first. */
 export function getAllWhitepapers(): readonly Whitepaper[] {
   return [...WHITEPAPERS].sort((a, b) => b.publishedDate.localeCompare(a.publishedDate));
 }
@@ -481,7 +442,6 @@ export function formatWhitepaperDate(isoDate: string, locale: Locale): string {
   });
 }
 
-/** Page chrome strings shared by the index and detail pages. */
 export const WHITEPAPER_COPY = {
   en: {
     indexTitle: 'Whitepapers',
@@ -590,8 +550,6 @@ export function whitepaperDetailMetadata(slug: string, locale: Locale): Metadata
   const enPath = `/whitepaper/${paper.slug}`;
   const url = `${SITE_URL}${whitepaperDetailPath(paper.slug, locale)}`;
   return {
-    // `absolute` keeps a short " | InferenceX" suffix instead of the long root
-    // template so the headline survives SERP truncation (same as blog posts).
     title: { absolute: `${copy.title} | ${SITE_NAME}` },
     description: copy.description,
     keywords: [...paper.tags],
@@ -619,7 +577,6 @@ export function whitepaperDetailMetadata(slug: string, locale: Locale): Metadata
   };
 }
 
-/** schema.org Report describing one whitepaper, with the PDF as an encoding. */
 export function buildWhitepaperJsonLd(paper: Whitepaper, locale: Locale): object {
   const copy = whitepaperCopy(paper, locale);
   const url = `${SITE_URL}${whitepaperDetailPath(paper.slug, locale)}`;

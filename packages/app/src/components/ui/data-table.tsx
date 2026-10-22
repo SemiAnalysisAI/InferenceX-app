@@ -25,19 +25,12 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 
 export interface DataTableColumn<T> {
-  /** Column header text. */
   header: string;
-  /** Right-align the column (default: false = left-aligned). */
   align?: 'left' | 'right' | 'center';
-  /** Extract and format the cell value from a row. */
   cell: (row: T, index: number) => React.ReactNode;
-  /** Extract a sortable/searchable value from a row. Omit to disable sorting and search for this column. */
   sortValue?: (row: T) => number | string;
-  /** Additional className for header and body cells. */
   className?: string;
-  /** Opt-in visibility preset membership; columns without this remain in All data only. */
   importance?: 'key' | 'secondary';
-  /** Pin this explicit configuration identifier while the table scrolls horizontally. */
   pinned?: boolean;
 }
 
@@ -49,21 +42,11 @@ interface SortState {
 }
 
 interface DataTableProps<T> {
-  /** Row data to display. */
   data: T[];
-  /** Column definitions. */
   columns: DataTableColumn<T>[];
-  /** Unique test id for the table wrapper. */
   testId?: string;
-  /** Analytics event prefix for pagination events. */
   analyticsPrefix?: string;
-  /** Show watermark (default: true). */
   watermark?: boolean;
-  /**
-   * Show the search box (default: true). Turn it off for a table whose rows are
-   * few and already named elsewhere — one line per chip, say — where a search
-   * field is a control the reader has no use for.
-   */
   searchable?: boolean;
 }
 
@@ -172,7 +155,6 @@ export function DataTable<T>({
     setPage(0);
   };
 
-  // Search: match against all columns with sortValue
   const filtered = useMemo(() => {
     if (!searchable || !search.trim()) return data;
     const q = search.trim().toLowerCase();
@@ -211,7 +193,6 @@ export function DataTable<T>({
 
   return (
     <div data-testid={testId} className="mt-3 w-full min-w-0 max-w-full">
-      {/* Search */}
       {searchable && (
         <div className="relative mb-3 w-full max-w-sm sm:max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
@@ -361,7 +342,6 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {/* Pagination controls */}
       <div className="mt-3 flex flex-col gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           <span data-testid="data-table-pagination-summary">

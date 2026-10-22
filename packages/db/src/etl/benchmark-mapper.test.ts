@@ -13,7 +13,6 @@ import {
 } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 
-/** Minimal valid v1 benchmark row. */
 function makeV1Row(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -33,7 +32,6 @@ function makeV1Row(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid agentic row: scenario_type triggers the agentic path; `users` → conc. */
 function makeAgenticRow(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsv4',
@@ -47,7 +45,6 @@ function makeAgenticRow(overrides: Record<string, any> = {}): Record<string, any
   };
 }
 
-/** Minimal valid v2 benchmark row (disaggregated prefill/decode parallelism). */
 function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -91,8 +88,6 @@ function dirtyPowerPayload(): Record<string, any> {
     peak_temp_c: 79.2,
     avg_util_pct: 88.5,
     avg_mem_used_mb: 71234.5,
-    // NVL72 CPU-side measurements share the GPU window but follow their own
-    // cpu_power_valid verdict; tests that want them kept must supply it.
     avg_cpu_socket_power_w: 250.5,
     avg_total_cpu_power_w: 1002,
     total_cpu_energy_j: 601200,
@@ -169,7 +164,6 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics.tput_per_gpu).toBe(1234.5);
       expect(result!.metrics.median_ttft).toBe(50.2);
       expect(result!.metrics.mean_tpot).toBe(12.3);
-      // Non-metric keys should not be in metrics
       expect(result!.metrics).not.toHaveProperty('hw');
       expect(result!.metrics).not.toHaveProperty('model');
       expect(result!.metrics).not.toHaveProperty('framework');
@@ -329,8 +323,8 @@ describe('mapBenchmarkRow', () => {
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(row, tracker);
 
-      expect(result!.config.numPrefillGpu).toBe(8); // 4 * 2
-      expect(result!.config.numDecodeGpu).toBe(16); // 2 TP * 4 EP * 2 workers
+      expect(result!.config.numPrefillGpu).toBe(8);
+      expect(result!.config.numDecodeGpu).toBe(16);
     });
   });
 
@@ -358,8 +352,6 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics.median_ttft).toBe(50.2);
     });
 
-    // Producer contract: cpu_power_valid is independent of power_valid. Each leg
-    // withholds only its own keys; worker telemetry belongs to the GPU leg.
     it.each([
       { power_valid: 1, cpu_power_valid: 1, gpuKept: true, cpuKept: true },
       { power_valid: 1, cpu_power_valid: 0, gpuKept: true, cpuKept: false },
@@ -391,7 +383,6 @@ describe('mapBenchmarkRow', () => {
     );
 
     it('withholds CPU-side keys that arrive without a cpu_power_valid verdict or with a malformed one', () => {
-      // No legacy rows predate cpu_power_valid, so absence is out of contract and fails closed.
       const tracker = createSkipTracker();
       const dirty = dirtyPowerPayload();
       const absent = mapBenchmarkRow(
@@ -461,8 +452,6 @@ describe('mapBenchmarkRow', () => {
     );
 
     it('converges a dirty pv=0 artifact to exactly what a clean producer would ship', () => {
-      // Upserts replace metrics and workers wholesale, so re-ingest must
-      // converge to the same row as a producer-clean artifact.
       const tracker = createSkipTracker();
       const dirtyResult = mapBenchmarkRow(
         makeV2Row({ power_valid: 0, power_metric_schema_version: 2, ...dirtyPowerPayload() }),
@@ -890,7 +879,6 @@ describe('mapBenchmarkRow', () => {
       expect(result!.workers![1].role).toBe('decode');
       expect(result!.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
       expect(result!.workers![1].num_gpus).toBe(16);
-      // Optional telemetry fields stay absent when the source omits them.
       expect(result!.workers![1].avg_temp_c).toBeUndefined();
     });
 
@@ -903,14 +891,10 @@ describe('mapBenchmarkRow', () => {
         tracker,
       );
 
-      // workers is an array — parseNum yields undefined, but the explicit
-      // NON_METRIC_KEYS entry is what guarantees it never leaks into metrics.
       expect(result!.metrics).not.toHaveProperty('workers');
     });
 
     it('captures the NVL72 CPU-side keys without an unknown-key warning', async () => {
-      // The warning fires once per process per key, so a fresh module instance is
-      // the only way to observe whether these keys are known.
       vi.resetModules();
       const fresh = await import('./benchmark-mapper');
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -944,11 +928,6 @@ describe('mapBenchmarkRow', () => {
     });
 
     it('captures new cluster-wide temp / util / mem scalars into metrics', () => {
-      // These are flat scalars on the agg row (sibling of avg_power_w), so
-      // the auto-capture path must store them under their raw keys without
-      // emitting a "[WARN] auto-captured unexpected metric" warning. The
-      // warning suppression is verified indirectly: METRIC_KEYS now contains
-      // these keys, so a clean test run never produces a warning.
       const tracker = createSkipTracker();
       const result = mapBenchmarkRow(
         makeV1Row({
@@ -1101,11 +1080,8 @@ describe('extractWorkers', () => {
   it('keeps well-formed entries and drops malformed ones', () => {
     const result = extractWorkers([
       { role: 'prefill', worker_idx: 0, num_gpus: 4, avg_power_w: 500 },
-      // missing role
       { worker_idx: 1, num_gpus: 4, avg_power_w: 500 },
-      // missing avg_power_w
       { role: 'decode', worker_idx: 0, num_gpus: 4 },
-      // ok
       { role: 'frontend', worker_idx: 0, num_gpus: 0, avg_power_w: 0 },
     ]);
 
@@ -1441,7 +1417,7 @@ describe('mapBenchmarkRow — agentic interactivity normalization', () => {
     const result = mapBenchmarkRow(
       makeAgenticRow({
         p90_itl: 0.0893,
-        p90_intvty: 23.91, // fast-tail contamination — must be overwritten
+        p90_intvty: 23.91,
         p75_itl: 0.0692,
         p75_intvty: 19,
       }),
@@ -1465,13 +1441,10 @@ describe('mapBenchmarkRow — agentic interactivity normalization', () => {
   });
 
   it('DELETES a stale artifact *_intvty when the matching *_itl is absent', () => {
-    // Artifact ships intvty (possibly the drifted p(1/ITL) definition) but no itl
-    // for that percentile. Passing it through would mix harness semantics into a
-    // column meant to be 1/p(ITL) everywhere — so the key must be removed, not kept.
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(makeAgenticRow({ p90_intvty: 42, p95_itl: 0.2 }), tracker);
-    expect(result!.metrics).not.toHaveProperty('p90_intvty'); // stale → deleted
-    expect(result!.metrics.p95_intvty).toBeCloseTo(5, 6); // derived from itl
+    expect(result!.metrics).not.toHaveProperty('p90_intvty');
+    expect(result!.metrics.p95_intvty).toBeCloseTo(5, 6);
   });
 
   it('DELETES a stale artifact *_intvty when the matching *_itl is zero/invalid', () => {
@@ -1481,11 +1454,6 @@ describe('mapBenchmarkRow — agentic interactivity normalization', () => {
   });
 });
 
-/**
- * Minimal v3 agentic row (2026-07-02+): nested request_metrics/server_metrics,
- * p50 percentiles, pre-inverted intvty, kv_offloading descriptors. Mirrors the
- * real artifact from GH run 28553943579 (trimmed).
- */
 function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsv4',
@@ -1553,7 +1521,6 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
           p95: 0.22255,
           std: 0.08327,
         },
-        // already slow-tail inverted upstream (pXX_intvty = 1/pXX_itl)
         intvty: {
           mean: 13.2482,
           p50: 27.19411,
@@ -1647,7 +1614,6 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     [{ pp: null }, 16],
     [{ request_metrics: undefined }, 4],
   ])('counts physical GPUs for the AgentX producer shape %j', (overrides, expected) => {
-    // Qwen3.8 H200 run 33038487711 uses TP4/EP4 on four GPUs, not sixteen.
     const result = mapBenchmarkRow(
       makeV3AgenticRow({
         infmax_model_prefix: 'qwen3.8next',
@@ -1680,24 +1646,20 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.osl).toBeNull();
 
     const m = result!.metrics;
-    // latency distributions, p50 stored under the canonical median_* name
     expect(m.median_ttft).toBeCloseTo(1.49712, 6);
     expect(m.p90_ttft).toBeCloseTo(56.22194, 6);
     expect(m.std_e2el).toBeCloseTo(149.59205, 6);
     expect(m.p95_itl).toBeCloseTo(0.22255, 6);
     expect(m.mean_tpot).toBeCloseTo(0.07548, 6);
-    // qps + token distributions
     expect(m.median_qps).toBe(0);
     expect(m.p90_input_tokens).toBeCloseTo(404935.9, 3);
     expect(m.median_output_tokens_actual).toBeCloseTo(290.5, 3);
     expect(m.p95_output_tokens_expected).toBeCloseTo(5312.9, 3);
-    // throughput scalars under the v2 flat names
     expect(m.tput_per_gpu).toBeCloseTo(9043.47223, 3);
     expect(m.output_tput_per_gpu).toBeCloseTo(48.43723, 3);
     expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);
     expect(m.total_tput_tps).toBeCloseTo(36173.88892, 3);
     expect(m.duration_seconds).toBeCloseTo(7222.04352, 3);
-    // cache / kv / totals
     expect(m.theoretical_cache_hit_rate).toBeCloseTo(0.97509, 6);
     expect(m.server_gpu_cache_hit_rate).toBeCloseTo(0.78539, 6);
     expect(m.server_external_cache_hit_rate).toBe(0);
@@ -1705,7 +1667,6 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.total_prompt_tokens).toBe(261750519);
     expect(m.total_generation_tokens).toBe(1422696);
     expect(m.total_requests_completed).toBe(1648);
-    // nested containers must not leak into metrics
     expect(m).not.toHaveProperty('request_metrics');
     expect(m).not.toHaveProperty('server_metrics');
   });
@@ -1713,13 +1674,10 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
   it('re-derives *_intvty from *_itl (matching the pre-inverted artifact values)', () => {
     const tracker = createSkipTracker();
     const m = mapBenchmarkRow(makeV3AgenticRow(), tracker)!.metrics;
-    // The artifact already ships slow-tail intvty; the derive invariant keeps
-    // one definition and must agree with it (up to the artifact's rounding).
     expect(m.median_intvty).toBeCloseTo(1 / 0.03677, 6);
     expect(m.p90_intvty).toBeCloseTo(1 / 0.16652, 6);
     expect(m.median_intvty).toBeCloseTo(27.19411, 2);
     expect(m.p90_intvty).toBeCloseTo(6.00526, 2);
-    // std is never inverted — passes through from the artifact
     expect(m.std_intvty).toBeCloseTo(24.77636, 6);
   });
 

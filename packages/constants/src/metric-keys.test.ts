@@ -28,7 +28,6 @@ describe('CPU_SIDE_POWER_METRIC_KEYS', () => {
     for (const key of CPU_SIDE_POWER_METRIC_KEYS) {
       expect(MEASURED_POWER_METRIC_KEYS.has(key)).toBe(true);
     }
-    // The verdict itself is a discriminator, not a measurement.
     expect(CPU_SIDE_POWER_METRIC_KEYS.has('cpu_power_valid')).toBe(false);
   });
 });
@@ -62,7 +61,6 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'peak_temp_c',
         'avg_util_pct',
         'avg_mem_used_mb',
-        // NVL72 Grace-side and compute-module measurements (same window as GPU energy).
         'avg_cpu_socket_power_w',
         'avg_total_cpu_power_w',
         'total_cpu_energy_j',
@@ -78,7 +76,6 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
-    // These fields describe or explain withholding; they are not measurements.
     for (const key of [
       'power_valid',
       'power_metric_schema_version',
@@ -103,8 +100,6 @@ describe('POWER_METRIC_KEYS', () => {
   });
 
   it('contains exactly the contract discriminators plus the measured keys', () => {
-    // The public API documentation types every one of these keys on
-    // BenchmarkRow.metrics, so membership changes are contract changes.
     expect(new Set(POWER_METRIC_KEYS)).toEqual(
       new Set([
         'power_valid',

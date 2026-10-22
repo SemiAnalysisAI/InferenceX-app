@@ -170,7 +170,6 @@ describe('insertServerLogFiles', () => {
     fs.writeFileSync(routerPath, 'router');
     try {
       const { sql, calls } = fakeTransactionSql(7, ['stored.log']);
-      // stored.log has no file on disk, so reading it would throw.
       await insertServerLogFilePaths(
         sql,
         [42],

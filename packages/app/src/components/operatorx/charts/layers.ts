@@ -5,10 +5,6 @@ import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart';
 type Linear = d3.ScaleContinuousNumeric<number, number>;
 type Band = d3.ScaleBand<string>;
 
-/**
- * Horizontal bars on a band y-axis that grow from `origin` on a continuous x-axis.
- * With `sub`, each band splits into one thinner bar per `subDomain` entry.
- */
 export function originBarsLayer<T>(opts: {
   key: string;
   data: T[];
@@ -71,7 +67,6 @@ export interface BoxDatum {
   p95: number;
 }
 
-/** Box plots on a band x-axis: box p25–p75, median bar, whiskers p5–p95. */
 export function boxLayer(opts: { key: string; data: BoxDatum[] }): CustomLayerConfig {
   return {
     type: 'custom',

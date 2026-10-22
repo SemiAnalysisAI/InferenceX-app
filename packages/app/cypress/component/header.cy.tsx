@@ -7,8 +7,6 @@ import { ThemeProvider } from '@/components/ui/theme-provider';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { createMockRouter } from '../support/mock-router';
 
-// Mounted outside the Next app shell; next-style-loader inserts the global
-// stylesheet before this anchor, so it must exist before the import below.
 const cssAnchor = document.createElement('noscript');
 cssAnchor.id = '__next_css__DO_NOT_USE__';
 document.head.append(cssAnchor);
@@ -18,9 +16,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
 
-/** Minimum touch target, per WCAG 2.5.8 and the `size-11` / `min-h-11` utilities. */
 const MIN_TOUCH_PX = 44;
-/** Tolerance for sub-pixel layout rounding. */
 const EPSILON = 0.5;
 
 function rectOf(selector: string) {
@@ -50,15 +46,12 @@ describe('Header', () => {
   }
 
   beforeEach(() => {
-    // ThemeProvider reads persisted state; isolate each header story.
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
   });
 
   it('keeps the sticky header opaque enough that content cannot show through', () => {
-    // Regression: `bg-background/60 backdrop-blur-[2px]` let page text bleed
-    // through the sticky header while scrolling on mobile.
     cy.get('[data-testid="header"]').should(($el) => {
       const tokens = $el[0].className.split(/\s+/u);
       expect(tokens).to.include('bg-background/95');
@@ -67,8 +60,6 @@ describe('Header', () => {
       expect(tokens).to.not.include('bg-background/60');
       expect(tokens).to.not.include('backdrop-blur-[2px]');
     });
-    // With the stylesheet applied the header must actually blur what scrolls
-    // beneath it (backdrop-blur-md), not just carry the class names.
     cy.get('[data-testid="header"]').should(($el) => {
       const { backdropFilter } = getComputedStyle($el[0]);
       expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
@@ -76,10 +67,6 @@ describe('Header', () => {
   });
 
   it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
-    // The old 250ms retry re-read the address bar, which a stale
-    // mid-transition restore could revert; the retry then stacked a duplicate
-    // history entry and visibly restarted the transition (landing "Full
-    // dashboard" regression). A single push is the contract now.
     cy.clock();
     cy.get('[data-testid="nav-link-overview"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledOnceWith', '/overview');
@@ -108,8 +95,6 @@ describe('Header', () => {
   });
 
   it('still navigates to Dashboard from a sibling dashboard tab', () => {
-    // `/evaluation` lights up the Dashboard tab but is a different page, so the
-    // no-op guard must not fire — otherwise the link is dead on nine routes.
     mountHeader('/evaluation');
     cy.get('[data-testid="nav-link-dashboard"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
@@ -158,7 +143,6 @@ describe('Header', () => {
   it('orders the nav with Home first and AgentX second', () => {
     const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
-      // Strip the NEW badge so the comparison is against the label alone.
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
       expect(labels).to.deep.equal(expected);
     });
@@ -166,7 +150,6 @@ describe('Header', () => {
 
   it('keeps footer destinations out of the primary nav', () => {
     cy.get('[data-testid="nav-link-supporters"]').should('not.exist');
-    // Telemetry moved to the footer; Articles took its place in the nav.
     cy.get('[data-testid="nav-link-telemetry"]').should('not.exist');
   });
 

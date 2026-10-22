@@ -23,12 +23,6 @@ import { renderDiagram } from './model-architecture-diagram-renderer';
 interface ModelArchitectureDiagramProps {
   model: Model;
   className?: string;
-  /**
-   * `drawer` (default) renders the collapsible bar used inside dashboard
-   * cards. `inline` renders the diagram always-expanded with no toggle —
-   * used by the `/model/[slug]` pages where the architecture is the content,
-   * not an aside.
-   */
   variant?: 'drawer' | 'inline';
 }
 
@@ -103,8 +97,6 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     const container = containerRef.current;
     if (!isExpanded || !svg || !container) return;
 
-    // Match the renderer's effective width so ResizeObserver notifications that
-    // cannot change the SVG (including its initial callback) stay no-ops.
     const width = Math.min(container.clientWidth || 600, 640);
     const isDark = isDarkTheme(resolvedTheme);
     const previous = lastRenderRef.current;
@@ -151,13 +143,6 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     >
       <div ref={containerRef} className="px-4 pb-4">
         <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
-        {/* The drill-down only renders while its parent block is expanded, so gate
-              the caption on the parent too — collapsing the parent leaves the child
-              id in expandedBlocks (state is restored on re-expand), and the caption
-              must not outlive the drawing it explains. */}
-        {/* Mirrors `altAttnExpandable` in renderDiagram: the caption describes the
-              CSA/HCA local-vs-compressed drill-down, so hybrids that opt out of that
-              drill-down must not show it either. */}
         {arch.attentionType === 'Hybrid' &&
           arch.alternatingAttentionExpandable !== false &&
           [0, 1].some(

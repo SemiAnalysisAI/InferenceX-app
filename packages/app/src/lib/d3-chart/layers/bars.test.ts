@@ -4,8 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { asMock, createMockGroup } from './test-helpers';
 import { renderBars, updateBarsOnZoom, type BarConfig } from './bars';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 interface TestDatum {
   label: string;
   value: number;
@@ -33,8 +31,6 @@ function makeScales() {
   const yScale = d3.scaleLinear().domain([0, 100]).range([200, 0]);
   return { xScale, yScale };
 }
-
-// ── renderBars ───────────────────────────────────────────────────────
 
 describe('renderBars', () => {
   it('creates one rect per data item', () => {
@@ -173,7 +169,6 @@ describe('renderBars', () => {
     const data = [{ label: 'A', value: 0, color: '#000' }];
     const result = asMock(renderBars(group as any, data, xScale, yScale, height, makeConfig()));
 
-    // yScale(0) = 200 (bottom), so height = 200 - 200 = 0
     expect(result.elements[0].attrs['height']).toBe(0);
   });
 
@@ -188,8 +183,6 @@ describe('renderBars', () => {
   });
 });
 
-// ── updateBarsOnZoom ─────────────────────────────────────────────────
-
 describe('updateBarsOnZoom', () => {
   it('updates y and height on existing bars', () => {
     const group = createMockGroup();
@@ -197,7 +190,6 @@ describe('updateBarsOnZoom', () => {
     const height = 200;
     renderBars(group as any, SAMPLE_DATA, xScale, yScale, height, makeConfig());
 
-    // Simulate zoom by creating a new yScale with different domain
     const newYScale = d3.scaleLinear().domain([0, 200]).range([200, 0]);
     updateBarsOnZoom(group as any, newYScale, height, (d: TestDatum) => d.value);
 
@@ -212,7 +204,6 @@ describe('updateBarsOnZoom', () => {
   it('does nothing on empty group', () => {
     const group = createMockGroup();
     const yScale = d3.scaleLinear().domain([0, 100]).range([200, 0]);
-    // Should not throw
     updateBarsOnZoom(group as any, yScale, 200, (d: TestDatum) => d.value);
   });
 });

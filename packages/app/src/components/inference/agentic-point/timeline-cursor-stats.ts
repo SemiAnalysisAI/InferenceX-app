@@ -1,10 +1,3 @@
-/**
- * Pure math behind the cursor stats popover: count how many requests are
- * running / waiting / completed at a given instant, in O(log n) per query via
- * binary search over pre-sorted timestamp columns.
- */
-
-/** Pre-sorted (ascending) timestamp columns for one filtered request set. */
 export interface SortedRequestTimes {
   credits: number[];
   starts: number[];
@@ -18,7 +11,6 @@ export interface CursorStats {
   inflight: number;
 }
 
-/** Number of values in a sorted ascending array that are <= target. */
 export function countLeq(sorted: number[], target: number): number {
   let lo = 0;
   let hi = sorted.length;
@@ -30,7 +22,6 @@ export function countLeq(sorted: number[], target: number): number {
   return lo;
 }
 
-/** Number of values in a sorted ascending array that are < target. */
 export function countLt(sorted: number[], target: number): number {
   let lo = 0;
   let hi = sorted.length;
@@ -42,12 +33,6 @@ export function countLt(sorted: number[], target: number): number {
   return lo;
 }
 
-/**
- * Request counts at time t (ns offset on the same axis as the sorted columns):
- *   running   = #(start <= t) - #(end < t)
- *   waiting   = #(credit <= t) - #(start <= t)
- *   completed = #(end <= t)
- */
 export function cursorStatsAt(times: SortedRequestTimes, t: number): CursorStats {
   const startsLeq = countLeq(times.starts, t);
   const running = Math.max(0, startsLeq - countLt(times.ends, t));

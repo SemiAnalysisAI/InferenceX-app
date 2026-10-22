@@ -12,11 +12,6 @@ import {
   type MockInferenceContextValues,
 } from '../support/mock-data';
 
-/**
- * Measured Energy sits behind the ↑↑↓↓ feature gate while power telemetry is
- * WIP. Unlock it and remount so the gated group is listed; the gate hook reads
- * localStorage on mount.
- */
 function mountWithPowerGroupsUnlocked() {
   cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
   mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
@@ -81,13 +76,11 @@ describe('Inference ChartControls', () => {
 
   it('Y-axis metric selector shows grouped options', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    // Should contain at least the "Throughput" group
     cy.contains('Throughput').should('exist');
   });
 
   it('calls setSelectedYAxisMetric when a Y-axis option is chosen', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    // "Throughput per GPU" is the label for y_tpPerGpu — pick a different one
     cy.contains('[data-slot="select-item"]', 'Output Token Throughput per Chip').click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnce');
   });
@@ -118,7 +111,6 @@ describe('Inference ChartControls', () => {
   });
 
   it('does not render the Cost Tier selector; it lives in the chart caption', () => {
-    // Default mock: selectedYAxisMetric = y_tpPerGpu
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="cost-tier-selector"]').should('not.exist');
   });
@@ -127,7 +119,6 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
       const labels = [...$items].map((item) => item.textContent?.trim() ?? '');
-      // The custom tier is one more Cost Tier option, not a second axis entry.
       expect(labels.filter((label) => label.startsWith('Total Tokens per $1 TCO'))).to.deep.equal([
         'Total Tokens per $1 TCO',
       ]);
@@ -154,7 +145,6 @@ describe('Inference ChartControls', () => {
   });
 
   it('hides the GPU comparison section when no GPUs are selected', () => {
-    // Default mock: selectedGPUs = [] — GPU date range pickers should not render
     cy.contains('Comparison Date Range').should('not.exist');
     cy.contains('Intermediary Dates').should('not.exist');
   });
@@ -302,7 +292,6 @@ describe('Inference ChartControls', () => {
       </PathnameContext.Provider>,
       { inference: {}, unofficial: {} },
     );
-    // The count is derived from actual non-default settings, not merely present controls.
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('contain.text', '更多图表设置')
       .and('contain.text', '项已更改');
@@ -357,14 +346,11 @@ describe('Inference ChartControls grouped measured metrics', () => {
       cy.get(`input[aria-label="${searchLabel}"]`).type(group);
       cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
         const values = [...$options].map((option) => option.dataset.value);
-        // Thirteen measured axes plus the Timeline display of measured power.
         expect(values).to.have.length(14);
         expect(new Set(values).size).to.equal(14);
         expect(values).to.include('y_measuredPowerTimeline');
       });
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
-      // 'All in Measured Power per Chip' also contains the family name; only
-      // the family option may display exactly that name.
       cy.get('[data-select-option]').should(($options) => {
         const exact = [...$options].filter((option) => option.textContent?.trim() === power);
         expect(exact).to.have.length(1);
@@ -573,10 +559,26 @@ describe('Inference ChartControls cost metrics', () => {
         selectedModel: Model.Qwen3_5,
         selectedSequence: Sequence.EightK_OneK,
       },
-      // The TCO Basis selector is scoped to Qwen3.5 on 8K/1K and AgentX.
       globalFilters: { selectedModel: Model.Qwen3_5, effectiveSequence: Sequence.EightK_OneK },
     });
   });
+
+  for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
+    it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
+      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+        unofficial: {},
+        inference: {
+          selectedYAxisMetric: 'y_costh',
+          selectedModel: Model.Kimi_K3,
+          selectedSequence: sequence,
+        },
+        globalFilters: { selectedModel: Model.Kimi_K3, effectiveSequence: sequence },
+      });
+      cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
+      cy.get('[data-testid="tco-basis-external"]').click();
+      cy.get('@setTcoBasis_global').should('have.been.calledOnceWithExactly', 'external');
+    });
+  }
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
@@ -665,7 +667,6 @@ describe('Inference ChartControls cost metrics', () => {
   });
 
   it('selects tokens per dollar through the Y-axis metric control on the active tier', () => {
-    // y_costh is selected, so other tiered metrics open on the hyperscaler tier.
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', /^Total Tokens per \$1 TCO$/u).click();
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_tokensPerDollarH');
