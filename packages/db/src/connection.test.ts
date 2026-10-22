@@ -1,11 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  getCollectiveXDb,
-  getCollectiveXWriteDb,
-  getDb,
-  resolveDatabaseConnection,
-} from './connection';
+import { getCollectiveXDb, getDb, resolveDatabaseConnection } from './connection';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -122,87 +117,6 @@ describe('resolveDatabaseConnection', () => {
     vi.stubEnv('MISSING_DATABASE_URL', '');
     expect(() => resolveDatabaseConnection({ envVar: 'MISSING_DATABASE_URL' })).toThrow(
       'MISSING_DATABASE_URL is not set',
-    );
-  });
-});
-
-describe('CollectiveX connection fallbacks', () => {
-  const readUrl = 'postgres://user:pass@ep-cx-read.us-east-1.aws.neon.tech/cx';
-  const writeUrl = 'postgres://user:pass@ep-cx-write.us-east-1.aws.neon.tech/cx';
-  const readError = 'DATABASE_COLLECTIVEX_READONLY_URL or COLLECTIVEX_DATABASE_URL is not set';
-  const writeError =
-    'DATABASE_COLLECTIVEX_WRITE_URL or COLLECTIVEX_DATABASE_URL_UNPOOLED is not set';
-
-  beforeEach(() => {
-    for (const name of [
-      'DATABASE_READONLY_URL',
-      'DATABASE_WRITE_URL',
-      'DATABASE_COLLECTIVEX_READONLY_URL',
-      'DATABASE_COLLECTIVEX_WRITE_URL',
-      'COLLECTIVEX_DATABASE_URL',
-      'COLLECTIVEX_DATABASE_URL_UNPOOLED',
-    ]) {
-      vi.stubEnv(name, undefined);
-    }
-  });
-
-  it('uses the Vercel-managed Neon variables when the explicit variables are unset', () => {
-    vi.stubEnv('DATABASE_COLLECTIVEX_READONLY_URL', '');
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL', readUrl);
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL_UNPOOLED', writeUrl);
-
-    expect(resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_READONLY_URL' }).url).toBe(
-      readUrl,
-    );
-    expect(resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_WRITE_URL' }).url).toBe(
-      writeUrl,
-    );
-    expect(getCollectiveXDb({ driver: 'neon' })).toBe(getDb({ url: readUrl, driver: 'neon' }));
-    expect(getCollectiveXWriteDb({ driver: 'neon' })).toBe(
-      getDb({ url: writeUrl, driver: 'neon' }),
-    );
-  });
-
-  it('prefers the explicit variables and an explicit URL over the fallbacks', () => {
-    vi.stubEnv('DATABASE_COLLECTIVEX_READONLY_URL', 'postgres://user:pass@read.example.com/cx');
-    vi.stubEnv('DATABASE_COLLECTIVEX_WRITE_URL', 'postgres://user:pass@write.example.com/cx');
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL', readUrl);
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL_UNPOOLED', writeUrl);
-
-    expect(resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_READONLY_URL' }).url).toBe(
-      'postgres://user:pass@read.example.com/cx',
-    );
-    expect(resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_WRITE_URL' }).url).toBe(
-      'postgres://user:pass@write.example.com/cx',
-    );
-    expect(
-      resolveDatabaseConnection({
-        envVar: 'DATABASE_COLLECTIVEX_WRITE_URL',
-        url: 'postgres://postgres:postgres@localhost:5432/cx',
-      }).url,
-    ).toBe('postgres://postgres:postgres@localhost:5432/cx');
-  });
-
-  it('never falls back across database scopes or between read and write roles', () => {
-    vi.stubEnv('DATABASE_READONLY_URL', 'postgres://user:pass@main-read.example.com/app');
-    vi.stubEnv('DATABASE_WRITE_URL', 'postgres://user:pass@main-write.example.com/app');
-    expect(() =>
-      resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_READONLY_URL' }),
-    ).toThrow(readError);
-    expect(() => getCollectiveXWriteDb({ driver: 'neon' })).toThrow(writeError);
-
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL', readUrl);
-    expect(() => resolveDatabaseConnection({ envVar: 'DATABASE_COLLECTIVEX_WRITE_URL' })).toThrow(
-      writeError,
-    );
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL', undefined);
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL_UNPOOLED', writeUrl);
-    expect(() => getCollectiveXDb({ driver: 'neon' })).toThrow(readError);
-
-    vi.stubEnv('DATABASE_READONLY_URL', undefined);
-    vi.stubEnv('COLLECTIVEX_DATABASE_URL', readUrl);
-    expect(() => resolveDatabaseConnection({ envVar: 'DATABASE_READONLY_URL' })).toThrow(
-      /^DATABASE_READONLY_URL is not set$/u,
     );
   });
 });

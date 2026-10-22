@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { hasNoSslFlag } from './cli-utils.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
@@ -49,7 +49,6 @@ import {
   type GpuMetricSeriesCoverageRow,
 } from './queries/gpu-metrics-coverage.js';
 
-const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
 const PAIR_CONCURRENCY = 4;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 4, onnotice: () => {} });
@@ -356,7 +355,7 @@ async function main(): Promise<void> {
     let failedRuns = 0;
     for (const run of runs) {
       try {
-        const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+        const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
         const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
         if (artifacts === null) {
           goneRuns++;
@@ -408,7 +407,7 @@ async function main(): Promise<void> {
 
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
-    const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
     const runStart = Date.now();
     const manifest = flags.receipt === null ? null : readReceipt(flags.receipt, run);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));

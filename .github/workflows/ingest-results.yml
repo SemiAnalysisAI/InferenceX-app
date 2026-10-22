@@ -163,9 +163,8 @@ jobs:
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
-          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
-          DEV_SITE_URL: ${{ vars.DEV_SITE_URL ||
-            'https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app' }}
+          APP_URL: ${{ vars.APP_URL }}
+          DEV_SITE_URL: ${{ vars.DEV_SITE_URL }}
           STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
             'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -175,12 +174,14 @@ jobs:
         run: |
           case "$REQUESTED_DATABASE_TARGET" in
             production)
+              : "${APP_URL:?APP_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
               cache_invalidate_url="${APP_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
             dev)
+              : "${DEV_SITE_URL:?DEV_SITE_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_DEV"
               cache_invalidate_url="${DEV_SITE_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
@@ -270,9 +271,11 @@ jobs:
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
             github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
-        run: bun run admin:db:prepare:ci
+        run: |
+          : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run admin:db:prepare:ci
 
       - name: Run migrations
         run: bun run admin:db:migrate --yes
@@ -283,12 +286,14 @@ jobs:
           INGEST_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
           DATABASE_WRITE_RECEIPT: ${{ github.workspace }}/database-writes.json
-        run: bun run admin:db:ingest:ci
+        run: |
+          : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run admin:db:ingest:ci
 
       - name: Apply run overrides
         env:

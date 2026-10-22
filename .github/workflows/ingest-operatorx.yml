@@ -26,10 +26,11 @@ jobs:
       # A repository_dispatch may arrive before the source sweep completes.
       - name: Wait for the sweep run to complete
         env:
-          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           for _ in $(seq 60); do
             status=$(gh api "repos/$BENCHMARK_REPO/actions/runs/$RUN_ID" --jq .status)
             [ "$status" = completed ] && exit 0
@@ -66,18 +67,21 @@ jobs:
 
       - name: Ingest run
         env:
-          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           DATABASE_OPERATORX_WRITE_URL: ${{ secrets.DATABASE_OPERATORX_WRITE_URL }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
-        run: bun run --cwd packages/db src/ingest-operatorx.ts --download "$RUN_ID" "$BENCHMARK_REPO"
+        run: |
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run --cwd packages/db src/ingest-operatorx.ts --download "$RUN_ID" "$BENCHMARK_REPO"
 
       - name: Invalidate OperatorX cache
         env:
-          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          APP_URL: ${{ vars.APP_URL }}
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
         run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
           headers=(-H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET")
           if [ -n "$CACHE_PROTECTION_BYPASS_SECRET" ]; then
             headers+=(-H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET")

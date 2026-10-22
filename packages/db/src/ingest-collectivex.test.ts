@@ -74,15 +74,17 @@ describe('download-mode repository selection', () => {
     await vi.waitFor(() => expect(mocks.fetchRunMeta).toHaveBeenCalledWith(expected, RUN_ID));
   });
 
-  it('falls back to the primary repository', async () => {
+  it('exits when no argument, run URL, or INGEST_REPO names the repository', async () => {
     vi.stubEnv('INGEST_REPO', '');
-    mocks.fetchRunMeta.mockReturnValue(otherWorkflow);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit');
+    });
 
-    await runCli(['--download', RUN_ID]);
+    await expect(runCli(['--download', RUN_ID])).rejects.toThrow('process.exit');
 
-    await vi.waitFor(() =>
-      expect(mocks.fetchRunMeta).toHaveBeenCalledWith('SemiAnalysisAI/InferenceX', RUN_ID),
-    );
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith('INGEST_REPO is not set');
+    expect(mocks.fetchRunMeta).not.toHaveBeenCalled();
   });
 });
 

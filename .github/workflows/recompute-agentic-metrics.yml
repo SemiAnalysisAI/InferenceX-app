@@ -260,7 +260,9 @@ jobs:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Invalidate cache after all shards pass
         env:
-          APP_URL: ${{ vars.APP_URL || 'https://inferencex.semianalysis.com' }}
+          APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
-        run: bun run admin:cache:invalidate "$APP_URL"
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          bun run admin:cache:invalidate "$APP_URL"

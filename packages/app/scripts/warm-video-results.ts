@@ -1,5 +1,6 @@
 import { env } from 'node:process';
-const origin = new URL(env.INFERENCEX_APP_URL || 'https://inferencex.semianalysis.com').origin;
+if (!env.INFERENCEX_APP_URL) throw new Error('INFERENCEX_APP_URL is not set');
+const origin = new URL(env.INFERENCEX_APP_URL).origin;
 const bypassSecret = env.CACHE_PROTECTION_BYPASS_SECRET;
 const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 async function get(path: string) {

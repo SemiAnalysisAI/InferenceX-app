@@ -12,7 +12,7 @@ import path from 'path';
 
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
-import { hasNoSslFlag } from './cli-utils';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils';
 import {
   assertRequestedRunAttempt,
   dedupeArtifactsByLogicalName,
@@ -101,7 +101,6 @@ import {
   hasEvalsOnlyFlag,
 } from './etl/changelog-ingest';
 
-const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
 const powerPublicationWarnings: string[] = [];
@@ -160,7 +159,7 @@ if (isDownloadMode) {
   REPO =
     args[1] ??
     input.match(/^https:\/\/github\.com\/(?<repo>[^/]+\/[^/]+)\/actions\/runs\/\d+/u)?.[1] ??
-    DEFAULT_REPO;
+    requireIngestRepo();
 
   runAttemptNum = fetchRunAttempt(REPO, runIdStr);
   assertRequestedRunAttempt(input, runAttemptNum);

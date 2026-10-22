@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { hasNoSslFlag } from './cli-utils.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
@@ -23,7 +23,6 @@ import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
-const DEFAULT_REPO = process.env.INGEST_REPO || 'SemiAnalysisAI/InferenceX';
 const RETENTION_DAYS = 90;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 2, onnotice: () => {} });
 
@@ -173,7 +172,7 @@ async function main(): Promise<void> {
   let githubRuns = 0;
   for (const [runIndex, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `server-log-backfill-${runId}-`));
     try {
       let source: Exclude<ArtifactSource, 'auto'> | null = null;

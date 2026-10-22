@@ -4,7 +4,7 @@ import path from 'path';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
-import { hasNoSslFlag } from './cli-utils';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import {
   downloadArtifact,
@@ -22,7 +22,6 @@ import {
   type CollectiveXNeutralRunMeta,
 } from './collectivex/reader';
 
-const DEFAULT_REPO = process.env.INGEST_REPO || GITHUB_REPO_FULL;
 const SWEEP_WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
 const DOCS_INSERT_CHUNK = 200;
 
@@ -47,7 +46,7 @@ if (isDownloadMode) {
     process.exit(1);
   }
   runIdStr = parsedId;
-  REPO = args[1] ?? repositoryFromRunUrl(input) ?? DEFAULT_REPO;
+  REPO = args[1] ?? repositoryFromRunUrl(input) ?? requireIngestRepo();
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cx-ingest-'));
   artifactsDir = tempDir;
 } else {
@@ -58,7 +57,7 @@ if (isDownloadMode) {
     process.exit(1);
   }
   runIdStr = runId;
-  REPO = DEFAULT_REPO;
+  REPO = requireIngestRepo();
   artifactsDir = artifactsPath;
 }
 

@@ -67,10 +67,10 @@ jobs:
           REQUESTED_BY: ${{ github.event.client_payload.requested-by || inputs.requested-by }}
           COMMENT_ID: ${{ github.event.client_payload.comment-id || inputs.comment-id }}
           RESET_STAGING_DATABASE: ${{ inputs.reset-staging-database || false }}
-          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
-          SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository ||
-            vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || vars.BENCHMARK_REPO }}
         run: |
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::run-id must be numeric"
             exit 1
@@ -121,11 +121,14 @@ jobs:
           PR_NUMBER: ${{ steps.request.outputs.pr-number }}
           REQUESTED_BY: ${{ steps.request.outputs.requested-by }}
           COMMENT_ID: ${{ steps.request.outputs.comment-id }}
-          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PAT }}
           script: |
+            if (!process.env.BENCHMARK_REPO) {
+              throw new Error('BENCHMARK_REPO repository variable is not set');
+            }
             const [owner, repo] = process.env.BENCHMARK_REPO.split('/');
             await github.rest.repos.createDispatchEvent({
               owner,
@@ -318,10 +321,13 @@ jobs:
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
           CHART_LINKS: ${{ needs['refresh-chart-series'].outputs.chart-links }}
           STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' && needs['refresh-chart-series'].result == 'success' }}
-          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
         with:
           github-token: ${{ secrets.PAT }}
           script: |
+            if (!process.env.BENCHMARK_REPO) {
+              throw new Error('BENCHMARK_REPO repository variable is not set');
+            }
             const [owner, repo] = process.env.BENCHMARK_REPO.split('/');
             await github.rest.repos.createDispatchEvent({
               owner,

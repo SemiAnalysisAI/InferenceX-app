@@ -31,6 +31,7 @@ describe('required-power preparation', () => {
         vi.stubEnv('SOURCE_RUN_ID', runId);
         vi.stubEnv('MERGE_RUN_ID', mergeRunId);
         vi.stubEnv('ARTIFACTS_PATH', dir);
+        vi.stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
         vi.stubEnv('INGEST_REQUIRE_POWER', 'true');
         vi.stubEnv('GITHUB_OUTPUT', '');
         mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: attempt }));
@@ -73,8 +74,33 @@ describe('reuse metadata', () => {
     vi.clearAllMocks();
   });
 
+  it('exits when INGEST_REPO is unset', async () => {
+    const originalExitCode = process.exitCode;
+    try {
+      vi.stubEnv('SOURCE_RUN_ID', '35855544139');
+      vi.stubEnv('MERGE_RUN_ID', '99999999999');
+      vi.stubEnv('INGEST_REPO', '');
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit');
+      });
+      process.exitCode = 0;
+
+      await import('./prepare-ci-artifacts');
+
+      expect(exit).toHaveBeenCalledWith(1);
+      expect(error).toHaveBeenCalledWith('INGEST_REPO is not set');
+      expect(process.exitCode).toBe(1);
+      expect(mocks.metadata).not.toHaveBeenCalled();
+      expect(mocks.artifacts).not.toHaveBeenCalled();
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+  });
+
   it.each([
-    { ingestRepo: undefined, repo: 'SemiAnalysisAI/InferenceX' },
+    { ingestRepo: 'SemiAnalysisAI/InferenceX', repo: 'SemiAnalysisAI/InferenceX' },
     { ingestRepo: 'example-org/bench', repo: 'example-org/bench' },
   ])('links runs without an html_url to $repo', async ({ ingestRepo, repo }) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-reuse-'));
