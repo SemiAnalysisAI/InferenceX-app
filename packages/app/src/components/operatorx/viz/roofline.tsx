@@ -1,6 +1,7 @@
 'use client';
 
 import { curveLinear } from 'd3';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -22,11 +23,11 @@ const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const STRINGS = {
   en: {
     ascendBasis:
-      'Ascend 950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
+      '950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
   },
   zh: {
     ascendBasis:
-      'Ascend 950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
+      '950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
   },
 };
 
@@ -54,12 +55,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
     return m;
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
+  const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [normalized, setNormalized] = useState(true);
-  const precision =
-    picked && precisions.includes(picked)
-      ? picked
-      : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
+  const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {

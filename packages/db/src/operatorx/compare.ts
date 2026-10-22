@@ -1,4 +1,5 @@
 import { opLabels, usefulBytes, usefulFlops } from './describe';
+import { comparisonDefaults, type ComparisonDefaults } from './visualization';
 import { OPERATORX_HARDWARE_REFERENCES, type OperatorXHardwareReference } from './hardware';
 import {
   type OperatorXDataset,
@@ -219,6 +220,7 @@ export interface ComparisonColumns {
 }
 
 export interface ComparisonView {
+  defaults: ComparisonDefaults;
   op: ComparisonOp;
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
@@ -314,6 +316,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     }
   }
   return {
+    defaults: comparisonDefaults({ op: comparison.op, cases, measurements }),
     op: comparison.op,
     hardware,
     workloads: comparison.workloads,

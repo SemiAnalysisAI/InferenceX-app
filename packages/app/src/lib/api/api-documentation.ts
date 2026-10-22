@@ -787,8 +787,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 // OperatorX remains a page-bff, recorded in api-route-catalog.ts rather than
-// published OpenAPI. Its optional hardware[].reference normalization basis and
-// bandwidth assumptions are documented in the bilingual section in docs/operatorx.md.
+// published OpenAPI. Its hardware[].reference normalization basis, bandwidth
+// assumptions and workload-resolved chart defaults are documented in docs/operatorx.md.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,

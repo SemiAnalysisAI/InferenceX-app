@@ -223,7 +223,14 @@ arithmetic intensity divided by 236.25 FLOP/byte; Y is achieved TFLOPS divided
 by 378. The bandwidth is an assumption, not an independently verified memory/ECC
 configuration. Apply these references to the returned measurements; do not substitute
 the older matmul sweep for the ingested F.linear results. Missing measurements stay
-missing. The Ascend crimson color is presentation-only.
+missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.
+The response also returns workload-resolved `defaults`: `metricVsSizeSlice` prefers
+an existing ranked slice with successful positive finite 950PR latency at two or
+more distinct positive sizes, falling back to the existing largest slice.
+`rooflinePrecision` prefers BF16 with FLOP/byte counts, otherwise the most common
+supported precision (null when none); `rooflineNormalized` is true. Missing/error/
+unsupported rows do not qualify the preferred slice. Explicit UI selections override
+these initial defaults; hardware visibility and measured values are unchanged.
 
 The explorer's session-list version filter uses the same parser as its other
 pages: absent, `all`, invalid, or out-of-range versions mean no version filter.

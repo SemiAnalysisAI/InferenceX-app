@@ -62,6 +62,12 @@ describe('Ascend OperatorX reference', () => {
     expect(reference.source).toContain('Ascend-ubench.md');
     expect(reference.qualification).toContain('memory/ECC');
     expect(hardwareLabel('ascend950pr')).toBe(reference.label);
+    expect(reference.label).toBe('950PR');
+    expect(view.defaults).toEqual({
+      metricVsSizeSlice: null,
+      rooflinePrecision: 'bf16',
+      rooflineNormalized: true,
+    });
     expect(peakTflops('ascend950pr', 'bf16')).toBe(reference.peakTflops.bf16);
     expect(peakBandwidthTBs('ascend950pr')).toBe(reference.memoryBandwidthTBs);
     expect(reference.peakTflops.bf16! / reference.memoryBandwidthTBs).toBe(236.25);

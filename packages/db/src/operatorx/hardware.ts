@@ -10,7 +10,7 @@ export interface OperatorXHardwareReference {
 
 export const OPERATORX_HARDWARE_REFERENCES: Record<string, OperatorXHardwareReference> = {
   ascend950pr: {
-    label: 'Ascend 950PR',
+    label: '950PR',
     peakTflops: { bf16: 378, fp8: null, fp4: null },
     memoryBandwidthTBs: 1.6,
     memoryBandwidthAssumed: true,
