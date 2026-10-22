@@ -33,9 +33,6 @@ on:
       DATABASE_WRITE_URL:
         description: Production database write connection for direct ingests
         required: false
-      DATABASE_DEV_WRITE_URL:
-        description: Development database write connection for direct ingests
-        required: false
       DATABASE_STAGING_WRITE_URL:
         description: Neon staging branch write connection
         required: true
@@ -46,7 +43,7 @@ on:
         description: Vercel protection automation bypass token
         required: true
       VERCEL_PROTECTION_BYPASS_SECRET:
-        description: Optional Vercel protection bypass token for production and dev site requests
+        description: Optional Vercel protection bypass token for production site requests
         required: false
       INFX_MAIN_PAT:
         description: Token used to download InferenceX artifacts
@@ -87,7 +84,6 @@ on:
         type: choice
         options:
           - production
-          - dev
           - staging
           - neon-branch
       neon-branch:
@@ -158,14 +154,12 @@ jobs:
       - name: Select ingest target
         env:
           DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
-          DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
           APP_URL: ${{ vars.APP_URL }}
-          DEV_SITE_URL: ${{ vars.DEV_SITE_URL }}
-          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
@@ -179,17 +173,10 @@ jobs:
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
-            dev)
-              : "${DEV_SITE_URL:?DEV_SITE_URL repository variable is not set}"
-              database_write_url="$DATABASE_WRITE_URL_DEV"
-              cache_invalidate_url="${DEV_SITE_URL%/}/api/v1/invalidate"
-              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
-              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
-              ;;
             staging)
-              : "${STAGING_SITE_URL:?STAGING_SITE_URL repository variable is not set}"
+              : "${STAGING_APP_URL:?STAGING_APP_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_STAGING"
-              cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
+              cache_invalidate_url="${STAGING_APP_URL%/}/api/v1/invalidate"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
             neon-branch)
