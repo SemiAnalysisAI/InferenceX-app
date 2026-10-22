@@ -639,28 +639,28 @@ describe('supportsPointTokenMetric', () => {
 describe('withUncachedQualifier', () => {
   it('qualifies the token noun ahead of "per" and keeps the unit last', () => {
     expect(withUncachedQualifier('Total Tokens per $1 TCO (tok/$)', 'en')).toBe(
-      'Total Tokens (Uncached Input) per $1 TCO (tok/$)',
+      'Total Tokens (Horace He Y-Metric) per $1 TCO (tok/$)',
     );
     expect(withUncachedQualifier('Token Throughput per Chip', 'en')).toBe(
-      'Token Throughput (Uncached Input) per Chip',
+      'Token Throughput (Horace He Y-Metric) per Chip',
     );
   });
 
-  it('appends after a trailing token noun and shortens it for input-only metrics', () => {
+  it('appends after a trailing token noun, including input-only metrics', () => {
     expect(withUncachedQualifier('Cost per Million Total Tokens ($)', 'en')).toBe(
-      'Cost per Million Total Tokens (Uncached Input) ($)',
+      'Cost per Million Total Tokens (Horace He Y-Metric) ($)',
     );
     expect(withUncachedQualifier('Input Token Throughput per Chip', 'en')).toBe(
-      'Input Token Throughput (Uncached) per Chip',
+      'Input Token Throughput (Horace He Y-Metric) per Chip',
     );
   });
 
   it('qualifies Chinese labels before the full-width unit', () => {
     expect(withUncachedQualifier('每芯片 token 吞吐量（tok/s/chip）', 'zh')).toBe(
-      '每芯片 token 吞吐量（未缓存输入）（tok/s/chip）',
+      '每芯片 token 吞吐量（Horace He Y 轴指标）（tok/s/chip）',
     );
     expect(withUncachedQualifier('每芯片输入 token 吞吐量', 'zh')).toBe(
-      '每芯片输入 token 吞吐量（未缓存）',
+      '每芯片输入 token 吞吐量（Horace He Y 轴指标）',
     );
   });
 });

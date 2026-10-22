@@ -9,12 +9,12 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    label: 'Uncached input',
-    help: "Counts only each turn's new input plus output, excluding the prompt prefix that earlier turns of the same conversation already sent. The excluded share is the trace's theoretical (infinite-cache) cacheable prefix, not the server's observed cache hits, so it doesn't depend on how well a system caches. This is an approximation, not an exact per-request count: the theoretical hit rate is measured in KV blocks and applied to the run's measured input throughput.",
+    label: 'Horace He Y-Metric',
+    help: "Uncached-input basis. Counts only each turn's new input plus output, excluding the prompt prefix that earlier turns of the same conversation already sent. The excluded share is the trace's theoretical (infinite-cache) cacheable prefix, not the server's observed cache hits, so it doesn't depend on how well a system caches. This is an approximation, not an exact per-request count: the theoretical hit rate is measured in KV blocks and applied to the run's measured input throughput.",
   },
   zh: {
-    label: '未缓存输入',
-    help: '仅计入每轮新增的输入与输出，不计同一对话此前各轮已发送过的 prompt prefix。扣除的比例取自 trace 的理论（无限 cache）可缓存 prefix，而非服务端实测的 cache 命中，因此与系统的 cache 表现无关。该值为近似值，并非逐请求精确统计：理论命中率按 KV block 计算，再应用于本次运行实测的输入吞吐量。',
+    label: 'Horace He Y 轴指标',
+    help: '未缓存输入口径。仅计入每轮新增的输入与输出，不计同一对话此前各轮已发送过的 prompt prefix。扣除的比例取自 trace 的理论（无限 cache）可缓存 prefix，而非服务端实测的 cache 命中，因此与系统的 cache 表现无关。该值为近似值，并非逐请求精确统计：理论命中率按 KV block 计算，再应用于本次运行实测的输入吞吐量。',
   },
 } as const;
 

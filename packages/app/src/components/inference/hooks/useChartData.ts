@@ -82,9 +82,8 @@ export {
 } from './chart-data-core';
 
 /**
- * Qualify the token noun of a metric label for the uncached basis, e.g.
- * "Total Tokens per $1 TCO" -> "Total Tokens (Uncached Input) per $1 TCO" and
- * "Cost per Million Total Tokens ($/M tok)" -> "… Total Tokens (Uncached Input) ($/M tok)".
+ * Qualify the token noun of a metric label for the uncached basis (the Horace He Y-Metric), e.g.
+ * "Total Tokens per $1 TCO" -> "Total Tokens (Horace He Y-Metric) per $1 TCO".
  */
 export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): string | undefined {
   if (typeof text !== 'string') return undefined;
@@ -92,9 +91,9 @@ export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): strin
   const head = unit ? text.slice(0, unit.index) : text;
   const tail = unit ? unit[0] : '';
   if (locale === 'zh') {
-    return `${head}${head.includes('输入') ? '（未缓存）' : '（未缓存输入）'}${tail}`;
+    return `${head}（Horace He Y 轴指标）${tail}`;
   }
-  const qualifier = /input/iu.test(head) ? ' (Uncached)' : ' (Uncached Input)';
+  const qualifier = ' (Horace He Y-Metric)';
   const per = head.indexOf(' per ');
   return per > 0 && /token/iu.test(head.slice(0, per))
     ? `${head.slice(0, per)}${qualifier}${head.slice(per)}${tail}`
