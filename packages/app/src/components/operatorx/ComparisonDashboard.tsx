@@ -17,11 +17,10 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, sortHardware } from './compare/hardware';
+import { hardwareLabel, operatorXColors, sortHardware } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
@@ -107,7 +106,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const workload = view?.workloads.find((w) => w.id === view.workload);
   const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
   const colors = useMemo(
-    () => generateVendorColors(view?.hardware.map((h) => h.id) ?? [], theme),
+    () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
   );
   const hardware = useMemo(

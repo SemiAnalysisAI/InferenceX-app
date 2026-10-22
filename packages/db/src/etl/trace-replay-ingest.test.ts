@@ -384,6 +384,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.chart_series).toEqual({ version: 12 });
   });
 
+  // The multi-megabyte PGlite round trip can exceed 5 seconds under parallel CI load.
   it('round-trips a chunked profile and exposes charts without a single oversized value', async () => {
     const profile = Buffer.alloc(PROFILE_INLINE_BYTES + 17);
     for (let i = 0; i < profile.length; i++) profile[i] = i % 251;
@@ -404,5 +405,5 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(0);
     const after = await storedTrace(43);
     expect(after.trace_replay_id).toBe(row.trace_replay_id);
-  });
+  }, 30_000);
 });

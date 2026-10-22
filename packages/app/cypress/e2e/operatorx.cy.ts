@@ -75,3 +75,37 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
   cy.location('search').should('contain', 'op=moe');
   cy.contains('No results yet').should('be.visible');
 });
+
+it('defaults to a measured 950PR shape and normalized BF16, while honoring precision and scale changes', () => {
+  const ascend = normalizeBundle(run('103', 'ascend950pr-external', [64, 128]));
+  const fp8 = normalizeBundle(run('104', 'h200-dgxc', [64, 128]));
+  fp8.results = [64, 128, 256].map((m, i) => ({
+    ...fp8.results[0],
+    index: i,
+    args: { ...fp8.results[0].args, m, a: { dtype: 'e4m3' }, b: { dtype: 'e4m3' } },
+    precision: 'e4m3 × e4m3 → bf16',
+  }));
+  const view = comparisonView(
+    buildComparison('gemm', [
+      { runner: 'h200-dgxc', dataset: fp8 },
+      { runner: 'ascend950pr-external', dataset: ascend },
+    ]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
+  cy.visit('/operatorx');
+  cy.wait('@ascend');
+  cy.get('#operatorx-hardware').should('contain.text', '950PR');
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"] [aria-label="Shape"]').should(
+    'contain.text',
+    'bf16',
+  );
+  cy.get('[data-testid="operatorx-viz-roofline"]').within(() => {
+    cy.contains('[role="tab"]', 'bf16').should('have.attr', 'aria-selected', 'true');
+    cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+    cy.contains('[role="tab"]', 'fp8').click().should('have.attr', 'aria-selected', 'true');
+    cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+    cy.contains('[role="tab"]', 'bf16').click().should('have.attr', 'aria-selected', 'true');
+    cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+  });
+});

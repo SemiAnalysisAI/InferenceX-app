@@ -1,24 +1,12 @@
-import type {
-  ComparisonCase,
-  ComparisonOp,
-  ComparisonView,
-} from '@semianalysisai/inferencex-db/operatorx/compare';
+import type { ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { escapeHtml } from '@/lib/shared/utils';
 
-export function sliceKey(op: ComparisonOp, c: ComparisonCase): string {
-  if (op === 'gemm') return `N=${c.dims.n} K=${c.dims.k} · ${c.precision}`;
-  return `${c.shape.replace(/^T=\d+ /u, '')} · ${c.precision}`;
-}
-
-export function slices(op: ComparisonOp, cases: ComparisonCase[]): Map<string, number[]> {
-  const out = new Map<string, number[]>();
-  cases.forEach((c, i) => {
-    const k = sliceKey(op, c);
-    out.set(k, [...(out.get(k) ?? []), i]);
-  });
-  return out;
-}
+export {
+  sliceKey,
+  slices,
+  rankedSlices,
+} from '@semianalysisai/inferencex-db/operatorx/visualization';
 
 export const SIZE_BUCKETS: { label: string; max: number }[] = [
   { label: '1', max: 1 },
@@ -32,12 +20,6 @@ export const SIZE_BUCKETS: { label: string; max: number }[] = [
 export function sizeBucket(x: number | null): string | null {
   if (x === null) return null;
   return SIZE_BUCKETS.find((b) => x <= b.max)?.label ?? null;
-}
-
-export function rankedSlices(op: ComparisonOp, cases: ComparisonCase[]): [string, number[]][] {
-  return [...slices(op, cases)].sort(
-    (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
-  );
 }
 
 export function caseOrigin(view: ComparisonView, i: number): { label: string; value: string }[] {
