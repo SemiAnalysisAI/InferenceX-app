@@ -26,11 +26,13 @@ jobs:
       # A repository_dispatch may arrive before the source sweep completes.
       - name: Wait for the sweep run to complete
         env:
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           for _ in $(seq 60); do
-            status=$(gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/$RUN_ID" --jq .status)
+            status=$(gh api "repos/$BENCHMARK_REPO/actions/runs/$RUN_ID" --jq .status)
             [ "$status" = completed ] && exit 0
             sleep 20
           done
@@ -65,17 +67,26 @@ jobs:
 
       - name: Ingest run
         env:
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           DATABASE_OPERATORX_WRITE_URL: ${{ secrets.DATABASE_OPERATORX_WRITE_URL }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
-        run: bun run --cwd packages/db src/ingest-operatorx.ts --download "$RUN_ID" SemiAnalysisAI/InferenceX
+        run: |
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run --cwd packages/db src/ingest-operatorx.ts --download "$RUN_ID" "$BENCHMARK_REPO"
 
       - name: Invalidate OperatorX cache
         env:
+          APP_URL: ${{ vars.APP_URL }}
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
-          curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate?scope=operatorx" \
-            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET"
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          headers=(-H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
 
       - name: Notify Slack on failure
         if: failure()

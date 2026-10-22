@@ -123,6 +123,11 @@ describe('CollectiveX neutral run view', () => {
         'href',
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
       );
+    cy.get(`[data-testid="collectivex-run-row-${runId}"] a[href*="/actions/runs/"]`).should(
+      'have.attr',
+      'href',
+      `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`,
+    );
 
     installRuns();
     installRun();
@@ -790,6 +795,38 @@ describe('CollectiveX availability states', () => {
     cy.wait('@run');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
     cy.then(() => expect(availabilityRequests).to.eq(0));
+  });
+});
+
+describe('CollectiveX source repository links', () => {
+  it('links the recorded source repository', () => {
+    const sourced = buildDataset({
+      meta: {
+        run_id: '166',
+        generated_at: '2026-08-11T12:20:00Z',
+        source_sha: SOURCE_SHA,
+        source_repository: 'ExampleOrg/ExampleBench',
+      },
+    });
+    installRuns([sourced]);
+    installRun(sourced);
+    openCollectiveX();
+
+    cy.get('[data-testid="collectivex-source-link"]').should(
+      'have.attr',
+      'href',
+      `https://github.com/ExampleOrg/ExampleBench/tree/${SOURCE_SHA}/experimental/CollectiveX`,
+    );
+    cy.get('[data-testid="collectivex-methodology-link"]').should(
+      'have.attr',
+      'href',
+      `https://github.com/ExampleOrg/ExampleBench/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
+    );
+    cy.get('[data-testid="collectivex-run-row-166"] a[href*="/actions/runs/"]').should(
+      'have.attr',
+      'href',
+      'https://github.com/ExampleOrg/ExampleBench/actions/runs/166',
+    );
   });
 });
 

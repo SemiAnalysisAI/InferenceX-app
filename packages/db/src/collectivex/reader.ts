@@ -106,6 +106,7 @@ export interface CollectiveXNeutralRunMeta {
   generated_at: string;
   conclusion: string | null;
   source_sha: string;
+  source_repository?: string;
 }
 
 function toSupportedVendor(raw: string): CollectiveXVendor | null {
@@ -495,6 +496,7 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
     run_attempt: run.run_attempt,
     generated_at: run.generated_at,
     conclusion: run.conclusion,
+    source_repository: run.source_repository,
     covered_skus: run.covered_skus,
     requested_cases: run.requested_cases,
     measured_cases: run.measured_cases,

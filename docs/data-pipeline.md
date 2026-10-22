@@ -237,9 +237,9 @@ Ranks remain inside each worker's source; native-only endpoints retain their fal
 The all-endpoints view summarizes workers, while selecting a worker exposes its ranks.
 
 For runs ingested before a server-metric adapter was available, dispatch
-`Recompute Agentic Metrics` on `master` with the benchmark run ID. It force-rebuilds
-chart series and aggregate statistics from stored blobs for that run in production,
-then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
+`Recompute Agentic Metrics` on the default branch (`master`) with the benchmark run ID.
+It force-rebuilds chart series and aggregate statistics from stored blobs for that run
+in the `DATABASE_WRITE_URL` database, then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
 
 ### Logical Engines vs Raw Series
 
@@ -280,8 +280,8 @@ aggregate recomputation; no benchmark rerun or raw-artifact replacement is neede
 
 The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
-connection endpoint before writing; production recomputation still requires
-`master`. Preview environments use branch-scoped database and cache settings.
+connection endpoint before writing; writing `DATABASE_WRITE_URL` still requires the
+default branch. Preview environments use branch-scoped database and cache settings.
 After a child-database repair, refresh its isolated `CACHE_NAMESPACE` and
 `BLOB_CACHE_PREFIX` and redeploy that preview to retire cached payloads.
 
@@ -648,8 +648,8 @@ bun packages/db/src/verify-power-publication.ts /path/power-publication.json htt
 ```
 
 For protected previews, follow the bypass handling in
-`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
-The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+`.github/workflows/ingest-results.yml`. The cache scripts and the verifier send
+`VERCEL_PROTECTION_BYPASS_SECRET` as the bypass header when it is set. Check remaining receipt gaps
 and API values; ingest success alone does not establish complete coverage. To undo a
 repair, restore the snapshotted rows or original bytes under the same identities.
 Do not delete a shared series to repair one point.

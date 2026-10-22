@@ -2,13 +2,12 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { hasNoSslFlag } from './cli-utils';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import { downloadArtifact, fetchRunMeta, listRunArtifacts } from './lib/github-artifacts';
 import type { OperatorXRawBundle } from './operatorx/bundle';
 import { saveOperatorXBundle } from './queries/operatorx';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const SWEEP_WORKFLOW_PATH = '.github/workflows/operatorx-sweep.yml';
 const MANIFEST_FILE = 'operatorx-manifest.json';
 const SHARD_RE = /^operatorx-shard-(?<run>\d+)-(?<attempt>\d+)-(?<shard>.+)$/u;
@@ -118,16 +117,14 @@ async function main(): Promise<void> {
       const runId = parseRunId(args[0]);
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opx-ingest-'));
       console.log(`=== run ${runId} ===`);
-      bundles.push(sweepBundle(checkRepo(args[1] ?? DEFAULT_REPO), runId, tempDir, true));
+      bundles.push(sweepBundle(checkRepo(args[1] ?? requireIngestRepo()), runId, tempDir, true));
     } else {
       const dir = process.env.INGEST_ARTIFACTS_PATH;
       if (!process.env.INGEST_RUN_ID || !dir)
         throw new Error('INGEST_RUN_ID and INGEST_ARTIFACTS_PATH are required without a flag');
       const runId = parseRunId(process.env.INGEST_RUN_ID);
       console.log(`=== run ${runId} ===`);
-      bundles.push(
-        sweepBundle(checkRepo(process.env.INGEST_REPO ?? DEFAULT_REPO), runId, dir, false),
-      );
+      bundles.push(sweepBundle(checkRepo(requireIngestRepo()), runId, dir, false));
     }
 
     const sql = createAdminSql({

@@ -21,11 +21,13 @@ const scope = (overrides: Partial<StagedChartScope> = {}): StagedChartScope => (
   ...overrides,
 });
 
+const ORIGIN = 'https://staging.example.test';
+
 describe('staged Pareto line links', () => {
   it('selects the actual workload, precision and exact run line even when it is the main run', () => {
-    const [link] = buildStagedChartLinks('38295633957', [scope()]);
+    const [link] = buildStagedChartLinks(ORIGIN, '38295633957', [scope()]);
     const url = new URL(link!.url);
-    expect(url.origin).toBe('https://inferencemax-app-git-staging-semianalysisai.vercel.app');
+    expect(url.origin).toBe(ORIGIN);
     expect(url.pathname).toBe('/inference');
     const p = url.searchParams;
     expect(p.get('g_model')).toBe('Qwen-3.5-397B-A17B');
@@ -48,7 +50,7 @@ describe('staged Pareto line links', () => {
   });
 
   it('keeps separate workloads, precisions and fixed-sequence spec lines but combines agentic point variants', () => {
-    const links = buildStagedChartLinks('123', [
+    const links = buildStagedChartLinks(ORIGIN, '123', [
       scope(),
       scope({ spec_method: 'mtp' }),
       scope({ disagg: false }),
@@ -67,7 +69,7 @@ describe('staged Pareto line links', () => {
   });
 
   it('normalizes model/framework aliases with the same chart identity helpers', () => {
-    const links = buildStagedChartLinks('123', [
+    const links = buildStagedChartLinks(ORIGIN, '123', [
       scope({ model: 'kimik2.6', framework: 'atom-disagg' }),
       scope({ model: 'kimik2.5', framework: 'mooncake-atom' }),
     ]);
@@ -78,12 +80,14 @@ describe('staged Pareto line links', () => {
   });
 
   it('rejects unchartable scopes rather than linking to unrelated defaults', () => {
-    expect(() => buildStagedChartLinks('123', [scope({ model: 'unknown' })])).toThrow(
+    expect(() => buildStagedChartLinks(ORIGIN, '123', [scope({ model: 'unknown' })])).toThrow(
       'Unsupported',
     );
     expect(() =>
-      buildStagedChartLinks('123', [scope({ benchmark_type: 'single_turn', isl: 3, osl: 4 })]),
+      buildStagedChartLinks(ORIGIN, '123', [
+        scope({ benchmark_type: 'single_turn', isl: 3, osl: 4 }),
+      ]),
     ).toThrow('Unsupported');
-    expect(() => buildStagedChartLinks('invalid', [scope()])).toThrow('run ID');
+    expect(() => buildStagedChartLinks(ORIGIN, 'invalid', [scope()])).toThrow('run ID');
   });
 });

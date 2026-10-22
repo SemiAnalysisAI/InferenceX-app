@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 
-import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import { benchmarkSourceRepos, GITHUB_API_BASE } from '@semianalysisai/inferencex-constants';
 
 const GITHUB_HEADERS = {
   Accept: 'application/vnd.github.v3+json',
@@ -60,20 +60,63 @@ function appendPaginationParams(url: string, page: number): string {
   return `${url}${separator}per_page=100&page=${page}`;
 }
 
-export function fetchGithubWorkflowRun(runId: string, token: string): Promise<Response> {
-  return fetch(`${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}`, {
-    headers: {
-      ...GITHUB_HEADERS,
-      Authorization: `Bearer ${token}`,
-    },
-  });
+// A run id belongs to one repository for good, so remembering the owner for the life of
+// the process skips repeat 404s in other source repositories. No run or artifact data is
+// cached. Bounded so a long-lived instance cannot grow it without limit.
+const RUN_REPOSITORY_LIMIT = 1000;
+const runRepositories = new Map<string, string>();
+
+function rememberRunRepository(runId: string, repo: string): void {
+  runRepositories.delete(runId);
+  runRepositories.set(runId, repo);
+  if (runRepositories.size > RUN_REPOSITORY_LIMIT) {
+    runRepositories.delete(runRepositories.keys().next().value!);
+  }
 }
 
-export async function fetchGithubRunArtifacts(
+/** Source repositories in lookup order, starting with the run's known owner. */
+function sourceReposForRun(runId: string): string[] {
+  const repos = benchmarkSourceRepos();
+  const known = runRepositories.get(runId);
+  return known && repos.includes(known)
+    ? [known, ...repos.filter((repo) => repo !== known)]
+    : repos;
+}
+
+export function resetGithubRunRepositories(): void {
+  runRepositories.clear();
+}
+
+/**
+ * Fetches a workflow run from the first source repository that has it. Otherwise returns the
+ * first failure other than 404 (a 404 only means another repository owns the run), else the
+ * last 404.
+ */
+export async function fetchGithubWorkflowRun(runId: string, token: string): Promise<Response> {
+  let failure: Response | undefined;
+  for (const repo of sourceReposForRun(runId)) {
+    const response = await fetch(`${GITHUB_API_BASE}/repos/${repo}/actions/runs/${runId}`, {
+      headers: {
+        ...GITHUB_HEADERS,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.ok) {
+      rememberRunRepository(runId, repo);
+      return response;
+    }
+    if (!failure || failure.status === 404) failure = response;
+  }
+  return failure!;
+}
+
+/** Pages one repository's artifact listing; null when its first page fails (no such run). */
+async function fetchRepoRunArtifacts(
+  repo: string,
   runId: string,
   token: string,
-): Promise<GithubArtifact[]> {
-  const url = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts`;
+): Promise<GithubArtifact[] | null> {
+  const url = `${GITHUB_API_BASE}/repos/${repo}/actions/runs/${runId}/artifacts`;
   const artifacts: GithubArtifact[] = [];
   let page = 1;
 
@@ -85,7 +128,7 @@ export async function fetchGithubRunArtifacts(
       },
     });
     if (!response.ok) {
-      break;
+      return page === 1 ? null : artifacts;
     }
 
     const data = (await response.json()) as { artifacts?: GithubArtifact[] };
@@ -102,6 +145,21 @@ export async function fetchGithubRunArtifacts(
   }
 
   return artifacts;
+}
+
+/** Lists a run's artifacts from the first source repository whose listing succeeds. */
+export async function fetchGithubRunArtifacts(
+  runId: string,
+  token: string,
+): Promise<GithubArtifact[]> {
+  for (const repo of sourceReposForRun(runId)) {
+    const artifacts = await fetchRepoRunArtifacts(repo, runId, token);
+    if (artifacts) {
+      rememberRunRepository(runId, repo);
+      return artifacts;
+    }
+  }
+  return [];
 }
 
 export function downloadGithubArtifact(url: string, token: string): Promise<Response> {

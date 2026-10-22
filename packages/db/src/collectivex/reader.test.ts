@@ -197,6 +197,16 @@ describe('CollectiveX artifact assembly', () => {
     });
   });
 
+  it('carries the recorded source repository into the run and its summary', () => {
+    const dataset = buildDataset({ meta: { source_repository: 'ExampleOrg/ExampleBench' } });
+    expect(dataset.run.source_repository).toBe('ExampleOrg/ExampleBench');
+    expect(buildRunSummary(dataset).source_repository).toBe('ExampleOrg/ExampleBench');
+
+    const legacy = buildDataset();
+    expect(JSON.stringify(legacy.run)).not.toContain('source_repository');
+    expect(JSON.stringify(buildRunSummary(legacy))).not.toContain('source_repository');
+  });
+
   it('derives a per-GPU payload bandwidth from total_logical_bytes', () => {
     const dispatch = makeCollectiveXSeries().points[0].components.dispatch;
     expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(

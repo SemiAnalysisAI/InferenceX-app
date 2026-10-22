@@ -21,8 +21,7 @@ const { mockParseCsvData, zipArchives } = vi.hoisted(() => ({
 
 vi.mock('@semianalysisai/inferencex-constants', () => ({
   GITHUB_API_BASE: 'https://api.github.com',
-  GITHUB_OWNER: 'TestOwner',
-  GITHUB_REPO: 'TestRepo',
+  benchmarkSourceRepos: () => ['TestOwner/TestRepo'],
 }));
 
 vi.mock('@/components/gpu-power/types', () => ({

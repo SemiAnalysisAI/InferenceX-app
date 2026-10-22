@@ -1591,7 +1591,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: 'a4478f8c939f20a31c2e862348e03ad24990a43f90550fc567df8f19aea69799',
+    sourceSha256: '006f87eb54bca94142d6c8f1aa57679ce96330286b30654e0c4bd37600cd0d00',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -1634,7 +1634,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '3eaf48a67933cfbda9068bc6367b16120fe46c28428dc1740763d6957a8365a0',
+    sourceSha256: '5b4cd412a1b543a8f26b5daf72ab252bc6c95edd7ca975262eefc1bbddbed3c7',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and discovery state.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和发现状态。',

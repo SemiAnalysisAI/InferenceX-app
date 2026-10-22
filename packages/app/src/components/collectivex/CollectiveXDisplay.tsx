@@ -3,6 +3,8 @@
 import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
+
 import { Button } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
@@ -682,6 +684,7 @@ export default function CollectiveXDisplay() {
     );
   }
   const singleDataset = datasets.length === 1 ? datasets[0] : null;
+  const sourceRepository = singleDataset?.run.source_repository ?? GITHUB_REPO_FULL;
   const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
   const requestedCases = datasets.reduce((sum, dataset) => sum + dataset.run.requested_cases, 0);
   const terminalCases = datasets.reduce((sum, dataset) => sum + dataset.run.terminal_cases, 0);
@@ -729,7 +732,7 @@ export default function CollectiveXDisplay() {
               <>
                 <a
                   data-testid="collectivex-source-link"
-                  href={`https://github.com/SemiAnalysisAI/InferenceX/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
+                  href={`https://github.com/${sourceRepository}/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -743,7 +746,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/SemiAnalysisAI/InferenceX/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
