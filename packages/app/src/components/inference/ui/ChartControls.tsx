@@ -48,6 +48,8 @@ import {
   type CostMetricFamilyId,
   type CostTier,
   type MetricKey,
+  countsInputTokens,
+  isInputMetric,
 } from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
@@ -65,6 +67,7 @@ import {
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
+import { TokenBasisToggle } from './TokenBasisToggle';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { defaultYAxisMetric } from '@/lib/routing/url-state';
@@ -402,13 +405,7 @@ export default function ChartControls({
     });
   };
 
-  const isInputMetric = (() => {
-    const chartDef = graphs[0]?.chartDefinition;
-    if (!chartDef) return false;
-    const titleKey = `${selectedYAxisMetric}_title` as keyof typeof chartDef;
-    const title = (chartDef[titleKey] as string) || '';
-    return title.toLowerCase().includes('input');
-  })();
+  const selectedIsInputMetric = isInputMetric(selectedYAxisMetric);
 
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
@@ -425,6 +422,11 @@ export default function ChartControls({
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tokenBasisVisible =
+    mounted &&
+    tcoSource === 'inference' &&
+    selectedSequence === Sequence.AgenticTraces &&
+    countsInputTokens(selectedYAxisMetric);
   const tcoVisible =
     mounted &&
     showTcoBasis &&
@@ -489,11 +491,14 @@ export default function ChartControls({
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
               >
-                <LabelWithTooltip
-                  htmlFor="y-axis-select"
-                  label={t.yAxisMetric}
-                  tooltip={t.yAxisMetricTooltip}
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <LabelWithTooltip
+                    htmlFor="y-axis-select"
+                    label={t.yAxisMetric}
+                    tooltip={t.yAxisMetricTooltip}
+                  />
+                  {tokenBasisVisible && <TokenBasisToggle />}
+                </div>
                 <SearchableSelect
                   triggerId="y-axis-select"
                   triggerTestId="yaxis-metric-selector"
@@ -601,7 +606,7 @@ export default function ChartControls({
 
               {!showXAxisMode &&
                 graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric &&
+                selectedIsInputMetric &&
                 selectedSequence !== Sequence.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
@@ -628,7 +633,7 @@ export default function ChartControls({
                 )}
 
               {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric && (
+                selectedIsInputMetric && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
                       htmlFor="scale-type-select"

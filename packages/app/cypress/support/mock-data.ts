@@ -212,6 +212,8 @@ export function createMockInferenceContextValues(
     selectedPercentile: 'p90',
     fixedSequenceStatistic: 'median',
     setFixedSequenceStatistic: namedStub('setFixedSequenceStatistic'),
+    tokenBasis: 'total',
+    setTokenBasis: namedStub('setTokenBasis'),
     selectedXAxisMetric: null,
     setSelectedXAxisMetric: namedStub('setSelectedXAxisMetric'),
     selectedE2eXAxisMetric: null,

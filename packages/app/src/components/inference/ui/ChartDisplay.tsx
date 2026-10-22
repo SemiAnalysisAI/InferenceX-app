@@ -8,6 +8,7 @@ import chartDefinitions, {
   costTierLabel,
   costTierOptionLabel,
   metricCostTier,
+  tokenBasisForMetric,
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -297,6 +298,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     tokenRevenuePricing,
     showLineLabels,
     powerCompare,
+    tokenBasis,
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
@@ -410,8 +412,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return { e2e: null, interactivity: null };
     }
 
-    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e');
-    const interactivityRaw = getOverlayData(selectedModel, selectedSequence, 'interactivity');
+    const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
+    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e', overlayTokenBasis);
+    const interactivityRaw = getOverlayData(
+      selectedModel,
+      selectedSequence,
+      'interactivity',
+      overlayTokenBasis,
+    );
 
     const getRunForRow = (row: InferenceData) => {
       const url = row.run_url ?? null;
@@ -519,6 +527,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMode,
     tokenRevenuePricing,
     tcoBasis,
+    tokenBasis,
     compareGpuPair,
   ]);
 

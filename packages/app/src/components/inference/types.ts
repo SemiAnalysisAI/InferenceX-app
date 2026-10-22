@@ -9,6 +9,7 @@ import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
 import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 
 export type { WorkerPower };
 
@@ -391,6 +392,7 @@ export interface InferenceDisplayContextType {
   openRouterPricingError: string | null;
   selectedPercentile: string;
   fixedSequenceStatistic: FixedSequenceStatistic;
+  tokenBasis: TokenBasis;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
   selectedXAxisMode: XAxisMode;
@@ -433,6 +435,7 @@ export interface InferenceActionsContextType {
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
+  setTokenBasis: (basis: TokenBasis) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (mode: XAxisMode) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;

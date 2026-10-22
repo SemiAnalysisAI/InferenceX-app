@@ -46,7 +46,10 @@ import type {
   PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
-import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
+import {
+  resolveMetricConfigKey,
+  tokenBasisForMetric,
+} from '@/components/inference/metric-registry';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
@@ -101,6 +104,7 @@ import {
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
 } from '@/lib/benchmarks/exclusion';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/shared/utils';
 import {
   isAgenticOnlyXAxisMode,
@@ -466,6 +470,11 @@ export function InferenceProvider({
     setFixedSequenceStatistic(getUrlParam('i_mstat') === 'mean' ? 'mean' : 'median');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const [tokenBasis, setTokenBasis] = useState<TokenBasis>('total');
+  useEffect(() => {
+    setTokenBasis(getUrlParam('i_tokens') === 'uncached' ? 'uncached' : 'total');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
@@ -707,6 +716,7 @@ export function InferenceProvider({
       selectedRunDateRev === 0,
     powerCompare,
     fixedSequenceStatistic,
+    tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
   );
 
   const dbModelKeys = useMemo<string[]>(
@@ -1546,6 +1556,7 @@ export function InferenceProvider({
           : selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_mstat: fixedSequenceStatistic,
+      i_tokens: tokenBasis,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
       i_dstart: selectedDateRange.startDate,
@@ -1589,6 +1600,7 @@ export function InferenceProvider({
       selectedXAxisMode,
       requestedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       scaleType,
       selectedGPUs,
       selectedDates,
@@ -1813,6 +1825,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       defaultXAxisMode,
       scaleType,
       powerCompare,
@@ -1840,6 +1853,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       defaultXAxisMode,
       scaleType,
       powerCompare,
@@ -1873,6 +1887,7 @@ export function InferenceProvider({
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
     setTokenRevenuePriceSource,
     setFixedSequenceStatistic,
+    setTokenBasis,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,

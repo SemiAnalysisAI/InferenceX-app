@@ -1,4 +1,5 @@
 import type { ChartDefinition } from './types';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
@@ -531,6 +532,49 @@ export function metricAxisCeiling(metricConfigKey: string): number | undefined {
 
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
+}
+
+/** Metrics that count input tokens, so the uncached token basis rescales them. */
+const INPUT_TOKEN_METRICS: ReadonlySet<MetricKey> = new Set<MetricKey>([
+  'tpPerGpu',
+  'inputTputPerGpu',
+  'tpPerMw',
+  'inputTputPerMw',
+  'powerUser',
+  'costh',
+  'costr',
+  'costhi',
+  'costri',
+  'costUser',
+  'tokensPerDollarH',
+  'tokensPerDollarR',
+  'inputTokensPerDollarH',
+  'inputTokensPerDollarR',
+  'tokensPerDollarUser',
+  'jTotal',
+  'jInput',
+  'measuredJPerTotalToken',
+  'measuredJPerInputToken',
+  'measuredPrefillJPerInputToken',
+]);
+
+export function countsInputTokens(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
+}
+
+/**
+ * Input-token metrics (input throughput, cost, energy) get a TTFT x-axis option.
+ * Decided from the registry title so display qualifiers can't change the answer.
+ */
+export function isInputMetric(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && metricOptionTitle(key, 'en').toLowerCase().includes('input');
+}
+
+/** The token basis a metric is charted on: only input-token metrics follow the toggle. */
+export function tokenBasisForMetric(metricConfigKey: string, tokenBasis: TokenBasis): TokenBasis {
+  return countsInputTokens(metricConfigKey) ? tokenBasis : 'total';
 }
 
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {
