@@ -418,14 +418,14 @@ export function useChartData(
                     `${selectedYAxisMetric}_${field}`,
                     withTokenBasisSuffix(
                       chartDef[`${selectedYAxisMetric}_${field}` as keyof ChartDefinition],
-                      ' · Uncached Input',
+                      ' · Uncached',
                     ),
                   ],
                   [
                     `${selectedYAxisMetric}_${field}Zh`,
                     withTokenBasisSuffix(
                       chartDef[`${selectedYAxisMetric}_${field}Zh` as keyof ChartDefinition],
-                      ' · 未缓存输入',
+                      ' · 未缓存',
                     ),
                   ],
                 ]),
