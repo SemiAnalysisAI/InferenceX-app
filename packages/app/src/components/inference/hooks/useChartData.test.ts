@@ -637,30 +637,36 @@ describe('supportsPointTokenMetric', () => {
 });
 
 describe('withUncachedQualifier', () => {
-  it('qualifies the token noun ahead of "per" and keeps the unit last', () => {
+  it('renames total and unqualified token nouns to uncached suffix + output tokens', () => {
     expect(withUncachedQualifier('Total Tokens per $1 TCO (tok/$)', 'en')).toBe(
-      'Total Tokens (Uncached Input) per $1 TCO (tok/$)',
+      'Uncached Suffix + Output Tokens per $1 TCO (tok/$)',
     );
     expect(withUncachedQualifier('Token Throughput per Chip', 'en')).toBe(
-      'Token Throughput (Uncached Input) per Chip',
+      'Uncached Suffix + Output Token Throughput per Chip',
     );
-  });
-
-  it('appends after a trailing token noun and shortens it for input-only metrics', () => {
     expect(withUncachedQualifier('Cost per Million Total Tokens ($)', 'en')).toBe(
-      'Cost per Million Total Tokens (Uncached Input) ($)',
+      'Cost per Million Uncached Suffix + Output Tokens ($)',
     );
-    expect(withUncachedQualifier('Input Token Throughput per Chip', 'en')).toBe(
-      'Input Token Throughput (Uncached) per Chip',
+    expect(withUncachedQualifier('Measured Joules per Token (incl. prompt)', 'en')).toBe(
+      'Measured Joules per Uncached Suffix + Output Token',
     );
   });
 
-  it('qualifies Chinese labels before the full-width unit', () => {
+  it('renames input-only token nouns to uncached suffix input tokens', () => {
+    expect(withUncachedQualifier('Input Token Throughput per Chip', 'en')).toBe(
+      'Uncached Suffix Input Token Throughput per Chip',
+    );
+  });
+
+  it('renames Chinese labels', () => {
+    expect(withUncachedQualifier('每 1 美元 TCO 对应的总 token 数（tok/$）', 'zh')).toBe(
+      '每 1 美元 TCO 对应的未缓存 suffix + 输出 token 数（tok/$）',
+    );
     expect(withUncachedQualifier('每芯片 token 吞吐量（tok/s/chip）', 'zh')).toBe(
-      '每芯片 token 吞吐量（未缓存输入）（tok/s/chip）',
+      '每芯片 未缓存 suffix + 输出 token 吞吐量（tok/s/chip）',
     );
     expect(withUncachedQualifier('每芯片输入 token 吞吐量', 'zh')).toBe(
-      '每芯片输入 token 吞吐量（未缓存）',
+      '每芯片未缓存 suffix 输入 token 吞吐量',
     );
   });
 });

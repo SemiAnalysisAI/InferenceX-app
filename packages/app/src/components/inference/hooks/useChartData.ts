@@ -82,23 +82,23 @@ export {
 } from './chart-data-core';
 
 /**
- * Qualify the token noun of a metric label for the uncached basis, e.g.
- * "Total Tokens per $1 TCO" -> "Total Tokens (Uncached Input) per $1 TCO" and
- * "Cost per Million Total Tokens ($/M tok)" -> "… Total Tokens (Uncached Input) ($/M tok)".
+ * Rename the token noun of a metric label for the uncached basis (the Horace He Metric), e.g.
+ * "Total Tokens per $1 TCO" -> "Uncached Suffix + Output Tokens per $1 TCO" and
+ * "Input Token Throughput per Chip" -> "Uncached Suffix Input Token Throughput per Chip".
  */
 export function withUncachedQualifier(text: unknown, locale: 'en' | 'zh'): string | undefined {
   if (typeof text !== 'string') return undefined;
-  const unit = /\s*[(（][^()（）]*[)）]$/u.exec(text);
-  const head = unit ? text.slice(0, unit.index) : text;
-  const tail = unit ? unit[0] : '';
   if (locale === 'zh') {
-    return `${head}${head.includes('输入') ? '（未缓存）' : '（未缓存输入）'}${tail}`;
+    const zh = text.replace('（含提示词）', '');
+    if (zh.includes('总 token')) return zh.replace('总 token', '未缓存 suffix + 输出 token');
+    if (zh.includes('输入 token')) return zh.replace('输入 token', '未缓存 suffix 输入 token');
+    return zh.replace('token', '未缓存 suffix + 输出 token');
   }
-  const qualifier = /input/iu.test(head) ? ' (Uncached)' : ' (Uncached Input)';
-  const per = head.indexOf(' per ');
-  return per > 0 && /token/iu.test(head.slice(0, per))
-    ? `${head.slice(0, per)}${qualifier}${head.slice(per)}${tail}`
-    : `${head}${qualifier}${tail}`;
+  const en = text.replace(' (incl. prompt)', '');
+  if (/\bTotal Token/u.test(en))
+    return en.replace(/\bTotal Token/u, 'Uncached Suffix + Output Token');
+  if (/\bInput Token/u.test(en)) return en.replace(/\bInput Token/u, 'Uncached Suffix Input Token');
+  return en.replace(/\bToken/u, 'Uncached Suffix + Output Token');
 }
 
 export function useChartData(

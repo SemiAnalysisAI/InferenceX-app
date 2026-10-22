@@ -470,11 +470,13 @@ export function InferenceProvider({
     setFixedSequenceStatistic(getUrlParam('i_mstat') === 'mean' ? 'mean' : 'median');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [tokenBasis, setTokenBasis] = useState<TokenBasis>('total');
+  const [requestedTokenBasis, setTokenBasis] = useState<TokenBasis>('total');
   useEffect(() => {
     setTokenBasis(getUrlParam('i_tokens') === 'uncached' ? 'uncached' : 'total');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The Horace He Metric is hidden behind the feature gate; locked viewers always see the total basis.
+  const tokenBasis: TokenBasis = featureGateUnlocked ? requestedTokenBasis : 'total';
 
   const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
