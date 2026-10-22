@@ -65,6 +65,35 @@ function throughputPerChip(tokenType: TokenType): MetricExplanation {
   };
 }
 
+function newInputSuffixThroughput(includeOutput: boolean): MetricExplanation {
+  const countedEn = includeOutput
+    ? 'the new input suffix of each turn plus output tokens'
+    : 'the new input suffix of each turn';
+  const countedZh = includeOutput ? '每轮新输入 suffix 与输出 token' : '每轮新输入 suffix';
+  return {
+    description: {
+      en:
+        `Throughput per chip counting only ${countedEn}: ` +
+        'input tokens that no earlier turn of the trace already sent. The prefix share comes from the ' +
+        "trace's theoretical infinite-cache hit rate, not the server's observed cache hits, so it " +
+        'does not reward or penalize cache implementations and stays comparable across systems. ' +
+        'Only Agentic trace points carry the rate.',
+      zh:
+        `每芯片吞吐量，仅计入${countedZh}：` +
+        '即 trace 中此前各轮尚未发送过的输入 token。prefix 占比取自 trace 的理论无限 cache 命中率，' +
+        '而非服务端实测命中，因此不会奖励或惩罚 cache 实现，跨系统可直接比较。仅 Agentic trace 数据点有该命中率。',
+    },
+    formula: {
+      en: includeOutput
+        ? 'tok/s/chip = total tok/s/chip − input tok/s/chip × theoretical cache hit rate'
+        : 'tok/s/chip = input tok/s/chip × (1 − theoretical cache hit rate)',
+      zh: includeOutput
+        ? 'tok/s/chip = 总 tok/s/chip − 输入 tok/s/chip × 理论 cache 命中率'
+        : 'tok/s/chip = 输入 tok/s/chip × (1 − 理论 cache 命中率)',
+    },
+  };
+}
+
 function throughputPerMw(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -268,6 +297,8 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
   outputTputPerGpu: throughputPerChip('output'),
+  newInputSuffixOutputTputPerGpu: newInputSuffixThroughput(true),
+  newInputSuffixTputPerGpu: newInputSuffixThroughput(false),
   tokenRevenuePerGpuHour: tokenRevenuePerGpuHour(),
   tpPerMw: throughputPerMw('total'),
   inputTputPerMw: throughputPerMw('input'),

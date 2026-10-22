@@ -573,6 +573,60 @@ describe('createChartDataPoint', () => {
     expect(point.inputTputPerGpu).toEqual({ y: 300, roof: false });
   });
 
+  it('computes new-input-suffix throughput fields when the rate is valid', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 600,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // input suffix = 300 x (1 - 0.8); suffix + output = 900 - 300 x 0.8
+    expect(point.newInputSuffixTputPerGpu?.y).toBeCloseTo(60);
+    expect(point.newInputSuffixOutputTputPerGpu?.y).toBeCloseTo(660);
+  });
+
+  it('omits new-input-suffix throughput fields when the rate is missing', () => {
+    const e = entry({ tput_per_gpu: 900, input_tput_per_gpu: 300 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('omits new-input-suffix throughput fields when input throughput is missing', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 0,
+      theoretical_cache_hit_rate: 0.8,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('omits new-input-suffix throughput fields when the rate is out of range', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 1.2,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu).toBeUndefined();
+    expect(point.newInputSuffixOutputTputPerGpu).toBeUndefined();
+  });
+
+  it('reports zero input suffix and output-only suffix+output at a full theoretical hit rate', () => {
+    const e = entry({
+      tput_per_gpu: 900,
+      output_tput_per_gpu: 600,
+      input_tput_per_gpu: 300,
+      theoretical_cache_hit_rate: 1,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.newInputSuffixTputPerGpu?.y).toBe(0);
+    expect(point.newInputSuffixOutputTputPerGpu?.y).toBeCloseTo(600);
+  });
+
   it('computes tpPerMw from throughput and hardware power', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');

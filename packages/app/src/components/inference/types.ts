@@ -179,6 +179,10 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   tokensPerDollarH?: { y: number; roof: boolean };
   tokensPerDollarR?: { y: number; roof: boolean };
+  // New-input-suffix throughput (total / input minus the infinite-cache
+  // theoretical prefix share). Agentic-trace points only.
+  newInputSuffixOutputTputPerGpu?: { y: number; roof: boolean };
+  newInputSuffixTputPerGpu?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
