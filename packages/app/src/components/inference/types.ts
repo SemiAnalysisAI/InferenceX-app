@@ -9,6 +9,7 @@ import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
 import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 
 export type { WorkerPower };
 
@@ -179,10 +180,6 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   tokensPerDollarH?: { y: number; roof: boolean };
   tokensPerDollarR?: { y: number; roof: boolean };
-  // New-input-suffix throughput (total / input minus the infinite-cache
-  // theoretical prefix share). Agentic-trace points only.
-  newInputSuffixOutputTputPerGpu?: { y: number; roof: boolean };
-  newInputSuffixTputPerGpu?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
@@ -395,6 +392,7 @@ export interface InferenceDisplayContextType {
   openRouterPricingError: string | null;
   selectedPercentile: string;
   fixedSequenceStatistic: FixedSequenceStatistic;
+  tokenBasis: TokenBasis;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
   selectedXAxisMode: XAxisMode;
@@ -437,6 +435,7 @@ export interface InferenceActionsContextType {
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
+  setTokenBasis: (basis: TokenBasis) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (mode: XAxisMode) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;

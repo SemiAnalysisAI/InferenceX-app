@@ -100,32 +100,6 @@ export const METRIC_REGISTRY = {
     costTier: 'rental',
     polarity: 'higher',
   },
-  // New-input-suffix throughput pair: total / input throughput minus the
-  // infinite-cache theoretical prefix share (trace-derived, agentic only).
-  // Deliberately based on the theoretical rate rather than server-observed
-  // cache hits so systems with good cache storage aren't penalized — like
-  // MFU vs HFU, actual (uncached + output) throughput is always at least the
-  // theoretical (uncachable suffix + output) throughput.
-  newInputSuffixOutputTputPerGpu: {
-    field: 'newInputSuffixOutputTputPerGpu.y',
-    label: 'New Input Suffix + Output Token Throughput per Chip (tok/s/chip)',
-    labelZh: '每芯片新输入 suffix + 输出 token 吞吐量（tok/s/chip）',
-    title: 'New Input Suffix + Output Token Throughput per Chip',
-    titleZh: '每芯片新输入 suffix + 输出 token 吞吐量',
-    polarity: 'higher',
-  },
-  newInputSuffixTputPerGpu: {
-    field: 'newInputSuffixTputPerGpu.y',
-    label: 'New Input Suffix Token Throughput per Chip (tok/s/chip)',
-    labelZh: '每芯片新输入 suffix token 吞吐量（tok/s/chip）',
-    title: 'New Input Suffix Token Throughput per Chip',
-    titleZh: '每芯片新输入 suffix token 吞吐量',
-    polarity: 'higher',
-    x: 'p90_ttft',
-    xLabel: 'P90 Time To First Token (s)',
-    xLabelZh: 'P90 首 token 延迟 (s)',
-    heading: 'vs. P90 Time To First Token',
-  },
   tpPerMw: {
     field: 'tpPerMw.y',
     label: 'Token Throughput per All in Utility MW (tok/s/MW)',
@@ -559,6 +533,35 @@ export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
 }
 
+/** Metrics that count input tokens, so the uncached token basis rescales them. */
+const INPUT_TOKEN_METRICS: ReadonlySet<MetricKey> = new Set<MetricKey>([
+  'tpPerGpu',
+  'inputTputPerGpu',
+  'tpPerMw',
+  'inputTputPerMw',
+  'powerUser',
+  'costh',
+  'costr',
+  'costhi',
+  'costri',
+  'costUser',
+  'tokensPerDollarH',
+  'tokensPerDollarR',
+  'inputTokensPerDollarH',
+  'inputTokensPerDollarR',
+  'tokensPerDollarUser',
+  'jTotal',
+  'jInput',
+  'measuredJPerTotalToken',
+  'measuredJPerInputToken',
+  'measuredPrefillJPerInputToken',
+]);
+
+export function countsInputTokens(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
+}
+
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {
   return isMetricKey(metricKey) && !('source' in METRIC_REGISTRY[metricKey]);
 }
@@ -666,8 +669,6 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
       'y_tpPerGpu',
       'y_inputTputPerGpu',
       'y_outputTputPerGpu',
-      'y_newInputSuffixOutputTputPerGpu',
-      'y_newInputSuffixTputPerGpu',
       'y_tpPerMw',
       'y_inputTputPerMw',
       'y_outputTputPerMw',

@@ -6,6 +6,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
 import {
+  applyUncachedTokenBasis,
   mergeRunScopedRows,
   rowToAggDataEntry,
   transformBenchmarkRows,
@@ -870,7 +871,92 @@ describe('rowToAggDataEntry — agentic measured power', () => {
   });
 });
 
+describe('applyUncachedTokenBasis', () => {
+  const agenticEntry = (metrics: Record<string, number>) => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        benchmark_type: 'agentic_traces',
+        metrics: {
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 600,
+          input_tput_per_gpu: 300,
+          ...metrics,
+        },
+      }),
+    );
+    return entry;
+  };
+
+  it('drops the theoretical prefix share from total and input throughput', () => {
+    const entry = agenticEntry({ theoretical_cache_hit_rate: 0.8 });
+    expect(applyUncachedTokenBasis(entry)).toBe(true);
+    expect(entry.input_tput_per_gpu).toBeCloseTo(60);
+    expect(entry.tput_per_gpu).toBeCloseTo(660);
+    expect(entry.output_tput_per_gpu).toBe(600);
+  });
+
+  it('rescales measured joules per input and total token to the uncached counts', () => {
+    const entry = agenticEntry({ theoretical_cache_hit_rate: 0.8 });
+    entry.joules_per_input_token = 1;
+    entry.joules_per_total_token = 2;
+    applyUncachedTokenBasis(entry);
+    expect(entry.joules_per_input_token).toBeCloseTo(5);
+    expect(entry.joules_per_total_token).toBeCloseTo((2 * 900) / 660);
+  });
+
+  it('withholds per-input-token energy when every input token is cacheable', () => {
+    const entry = agenticEntry({ theoretical_cache_hit_rate: 1 });
+    entry.joules_per_input_token = 1;
+    applyUncachedTokenBasis(entry);
+    expect(entry.input_tput_per_gpu).toBe(0);
+    expect(entry.tput_per_gpu).toBeCloseTo(600);
+    expect(entry.joules_per_input_token).toBeUndefined();
+  });
+
+  it('rejects agentic entries without a valid rate or input throughput', () => {
+    expect(applyUncachedTokenBasis(agenticEntry({}))).toBe(false);
+    expect(applyUncachedTokenBasis(agenticEntry({ theoretical_cache_hit_rate: 1.2 }))).toBe(false);
+    expect(
+      applyUncachedTokenBasis(
+        agenticEntry({ theoretical_cache_hit_rate: 0.5, input_tput_per_gpu: 0 }),
+      ),
+    ).toBe(false);
+  });
+
+  it('leaves fixed-sequence entries unchanged', () => {
+    const entry = rowToAggDataEntry(makeRow());
+    expect(applyUncachedTokenBasis(entry)).toBe(true);
+    expect(entry.tput_per_gpu).toBe(450.5);
+    expect(entry.input_tput_per_gpu).toBe(50.3);
+  });
+});
+
 describe('transformBenchmarkRows', () => {
+  it('rescales every token metric on the uncached basis and drops points it cannot rescale', () => {
+    const agentic = (id: number, metrics: Record<string, number>) =>
+      makeRow({
+        id,
+        benchmark_type: 'agentic_traces',
+        metrics: {
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 600,
+          input_tput_per_gpu: 300,
+          ...metrics,
+        },
+      });
+    const rows = [agentic(1, { theoretical_cache_hit_rate: 0.8 }), agentic(2, {})];
+    const total = transformBenchmarkRows(rows).chartData[0];
+    const uncached = transformBenchmarkRows(rows, 'median', undefined, 'uncached').chartData[0];
+    expect(total).toHaveLength(2);
+    expect(uncached).toHaveLength(1);
+    const before = total.find((p) => p.id === 1)!;
+    const after = uncached[0];
+    expect(after.tpPerGpu.y).toBeCloseTo(660);
+    expect(after.inputTputPerGpu?.y).toBeCloseTo(60);
+    expect(after.outputTputPerGpu?.y).toBe(before.outputTputPerGpu?.y);
+    expect(after.costh.y).toBeCloseTo((before.costh.y * 900) / 660);
+  });
+
   it('returns empty arrays for empty input', () => {
     const { chartData, hardwareConfig } = transformBenchmarkRows([]);
     expect(chartData).toHaveLength(2);

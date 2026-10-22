@@ -16,6 +16,7 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
+  countsInputTokens,
   isAllInMeasuredConfigKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
@@ -53,7 +54,11 @@ import {
   benchmarkCurveDate,
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
-import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import {
+  mergeRunScopedRows,
+  transformBenchmarkRows,
+  type TokenBasis,
+} from '@/lib/benchmarks/benchmark-transform';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
@@ -75,6 +80,13 @@ export {
   type RooflineDirection,
   type XAxisMode,
 } from './chart-data-core';
+
+/** Insert a token-basis qualifier ahead of a trailing unit, e.g. "… (tok/s/chip)". */
+function withTokenBasisSuffix(text: unknown, suffix: string): string | undefined {
+  if (typeof text !== 'string') return undefined;
+  const unit = /\s*[(（][^()（）]*[)）]$/u.exec(text);
+  return unit ? `${text.slice(0, unit.index)}${suffix}${unit[0]}` : `${text}${suffix}`;
+}
 
 export function useChartData(
   selectedModel: Model,
@@ -109,6 +121,7 @@ export function useChartData(
   allowDefaultRunPreference = false,
   powerCompare: PowerCompare = 'none',
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
+  tokenBasis: TokenBasis = 'total',
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -240,8 +253,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
-  }, [rows, selectedPercentile, tcoBasis]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis);
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis]);
 
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',
@@ -397,14 +410,36 @@ export function useChartData(
                   y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
+        const tokenBasisLabels: Partial<ChartDefinition> =
+          tokenBasis === 'uncached' && countsInputTokens(selectedYAxisMetric)
+            ? Object.fromEntries(
+                (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
+                  [
+                    `${selectedYAxisMetric}_${field}`,
+                    withTokenBasisSuffix(
+                      chartDef[`${selectedYAxisMetric}_${field}` as keyof ChartDefinition],
+                      ' · Uncached Input',
+                    ),
+                  ],
+                  [
+                    `${selectedYAxisMetric}_${field}Zh`,
+                    withTokenBasisSuffix(
+                      chartDef[`${selectedYAxisMetric}_${field}Zh` as keyof ChartDefinition],
+                      ' · 未缓存输入',
+                    ),
+                  ],
+                ]),
+              )
+            : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = { ...chartDef, ...revenueLabels }[yLabelKey];
+        const dynamicYLabel = { ...chartDef, ...revenueLabels, ...tokenBasisLabels }[yLabelKey];
 
         return {
           chartDefinition: {
             ...chartDef,
             ...rooflineOverrides,
             ...revenueLabels,
+            ...tokenBasisLabels,
             heading: chartHeading,
             x_scale_field: xAxisField,
             x_label: xAxisLabel,
@@ -424,6 +459,7 @@ export function useChartData(
       fixedSequenceStatistic,
       selectedSequence,
       tokenRevenuePriceSource,
+      tokenBasis,
     ],
   );
 
