@@ -136,7 +136,13 @@ Use the **same `<Figure>` block twice**: once here as the hero (so the chart anc
 Hardware-comparison posts can embed the live dashboard chart instead of a screenshot, scoped to two chips:
 
 ```mdx
-<HardwareChart model="DeepSeek-V4-Pro" a="vr200" b="gb300" metric="y_tokensPerDollarH" precisions="fp4" />
+<HardwareChart
+  model="DeepSeek-V4-Pro"
+  a="vr200"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp4"
+/>
 ```
 
 `model` is the dashboard display name, `a`/`b` are registry base keys from `packages/constants/src/gpu-keys.ts`, `metric` is a y-axis metric key, `precisions` is a comma-separated list, and `sequence` defaults to `agentic-traces`. The chart follows the dashboard's engine guard, so it never overlays vLLM and SGLang lines for the same chip; if a table quotes a line the chart hides by default, say so next to the chart.
