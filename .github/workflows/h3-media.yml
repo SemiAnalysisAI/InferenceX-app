@@ -34,7 +34,7 @@ jobs:
         env:
           H3_RUN_ID: ${{ inputs.run_id }}
           INFERENCEX_APP_URL: ${{ vars.APP_URL }}
-          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           : "${INFERENCEX_APP_URL:?APP_URL repository variable is not set}"
           bun packages/app/scripts/warm-video-results.ts

@@ -11,7 +11,7 @@ const endpoint = `${parsed.origin}/api/v1/invalidate`;
 console.log(`Invalidating: ${endpoint}`);
 
 async function invalidateCache() {
-  const bypassSecret = process.env.CACHE_PROTECTION_BYPASS_SECRET;
+  const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: {

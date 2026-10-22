@@ -24,7 +24,7 @@ if (
   throw new Error('Invalid PowerX publication manifest');
 const origin = process.argv[3] ?? process.env.INFERENCEX_APP_URL;
 if (!origin) throw new Error('Pass an origin argument or set INFERENCEX_APP_URL');
-const bypassSecret = process.env.CACHE_PROTECTION_BYPASS_SECRET;
+const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
 const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 const sql = createAdminSql();
 try {

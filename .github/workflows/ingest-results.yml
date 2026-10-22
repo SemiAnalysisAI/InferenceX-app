@@ -45,7 +45,7 @@ on:
       VERCEL_STAGING_BYPASS_SECRET:
         description: Vercel protection automation bypass token
         required: true
-      CACHE_PROTECTION_BYPASS_SECRET:
+      VERCEL_PROTECTION_BYPASS_SECRET:
         description: Optional Vercel protection bypass token for production and dev site requests
         required: false
       INFX_MAIN_PAT:
@@ -161,7 +161,7 @@ jobs:
           DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-          PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+          PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
           APP_URL: ${{ vars.APP_URL }}
           DEV_SITE_URL: ${{ vars.DEV_SITE_URL }}
@@ -257,7 +257,7 @@ jobs:
             echo "CACHE_INVALIDATE_SECRET=$cache_invalidate_secret"
             echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET"
             echo "CACHE_INVALIDATE_URL=$cache_invalidate_url"
-            echo "CACHE_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
+            echo "VERCEL_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
           } >> "$GITHUB_ENV"
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
@@ -306,8 +306,8 @@ jobs:
       - name: Invalidate Vercel cache
         run: |
           headers=()
-          if [ -n "$CACHE_PROTECTION_BYPASS_SECRET" ]; then
-            headers+=(-H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           if [ "$INGEST_DATABASE_TARGET" != "staging" ]; then
             headers+=(-H "Authorization: Bearer $CACHE_INVALIDATE_SECRET")

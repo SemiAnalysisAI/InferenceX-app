@@ -79,12 +79,12 @@ jobs:
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-          CACHE_PROTECTION_BYPASS_SECRET: ${{ secrets.CACHE_PROTECTION_BYPASS_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
           headers=(-H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET")
-          if [ -n "$CACHE_PROTECTION_BYPASS_SECRET" ]; then
-            headers+=(-H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
 

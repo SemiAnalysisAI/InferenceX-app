@@ -8,7 +8,7 @@ const SEQUENCES = SEQUENCE_OPTIONS.map((s) => sequenceToIslOsl(s)).filter(
 
 const rawUrl = process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'http://localhost:3000';
 const origin = new URL(rawUrl).origin;
-const bypassSecret = process.env.CACHE_PROTECTION_BYPASS_SECRET;
+const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
 const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 
 let total = 0;
