@@ -1,4 +1,5 @@
 import type { ChartDefinition } from './types';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
@@ -560,6 +561,11 @@ const INPUT_TOKEN_METRICS: ReadonlySet<MetricKey> = new Set<MetricKey>([
 export function countsInputTokens(metricConfigKey: string): boolean {
   const key = metricConfigKey.replace(/^y_/u, '');
   return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
+}
+
+/** The token basis a metric is charted on: only input-token metrics follow the toggle. */
+export function tokenBasisForMetric(metricConfigKey: string, tokenBasis: TokenBasis): TokenBasis {
+  return countsInputTokens(metricConfigKey) ? tokenBasis : 'total';
 }
 
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {

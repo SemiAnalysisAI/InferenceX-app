@@ -46,7 +46,10 @@ import type {
   PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
-import { countsInputTokens, resolveMetricConfigKey } from '@/components/inference/metric-registry';
+import {
+  resolveMetricConfigKey,
+  tokenBasisForMetric,
+} from '@/components/inference/metric-registry';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
@@ -713,9 +716,7 @@ export function InferenceProvider({
       selectedRunDateRev === 0,
     powerCompare,
     fixedSequenceStatistic,
-    // Only input-token metrics change with the basis; everything else (including
-    // revenue, which prices cached input separately) stays on the total basis.
-    countsInputTokens(selectedYAxisMetric) ? tokenBasis : 'total',
+    tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
   );
 
   const dbModelKeys = useMemo<string[]>(

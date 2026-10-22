@@ -1,43 +1,51 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { useInferenceActions, useInferenceDisplay } from '@/components/inference/InferenceContext';
-import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { Label } from '@/components/ui/label';
+import { InfoHelp } from '@/components/ui/option-info';
+import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
-import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { cn } from '@/lib/shared/utils';
 
-const LABELS = {
-  en: { total: 'Total', uncached: 'Uncached', aria: 'Input tokens counted' },
-  zh: { total: '全部', uncached: '未缓存', aria: '计入的输入 token' },
+const STRINGS = {
+  en: {
+    label: 'Uncached input',
+    help: "Counts only each turn's new input plus output, excluding the prompt prefix that earlier turns of the same conversation already sent. The excluded share is the trace's theoretical (infinite-cache) cacheable prefix, not the server's observed cache hits, so it doesn't depend on how well a system caches. This is an approximation, not an exact per-request count: the theoretical hit rate is measured in KV blocks and applied to the run's measured input throughput.",
+  },
+  zh: {
+    label: '未缓存输入',
+    help: '仅计入每轮新增的输入与输出，不计同一对话此前各轮已发送过的 prompt prefix。扣除的比例取自 trace 的理论（无限 cache）可缓存 prefix，而非服务端实测的 cache 命中，因此与系统的 cache 表现无关。该值为近似值，并非逐请求精确统计：理论命中率按 KV block 计算，再应用于本次运行实测的输入吞吐量。',
+  },
 } as const;
 
-export function TokenBasisToggle({ className }: { className?: string }) {
+export function TokenBasisToggle() {
   const { tokenBasis } = useInferenceDisplay();
   const { setTokenBasis } = useInferenceActions();
-  const labels = LABELS[useLocale()];
-  const options = useMemo<SegmentedToggleOption<TokenBasis>[]>(
-    () => [
-      { value: 'total', label: labels.total, testId: 'token-basis-total' },
-      { value: 'uncached', label: labels.uncached, testId: 'token-basis-uncached' },
-    ],
-    [labels],
-  );
+  const t = STRINGS[useLocale()];
 
   return (
-    <SegmentedToggle
-      role="group"
-      value={tokenBasis}
-      options={options}
-      onValueChange={(basis) => {
-        setTokenBasis(basis);
-        track('inference_token_basis_changed', { basis });
-      }}
-      ariaLabel={labels.aria}
-      testId="token-basis-toggle"
-      className={cn('w-fit self-start', className)}
-    />
+    <div className="flex items-center gap-1.5">
+      <Switch
+        id="token-basis-switch"
+        data-testid="token-basis-toggle"
+        checked={tokenBasis === 'uncached'}
+        onCheckedChange={(checked) => {
+          const basis = checked ? 'uncached' : 'total';
+          setTokenBasis(basis);
+          track('inference_token_basis_changed', { basis });
+        }}
+      />
+      <Label htmlFor="token-basis-switch" className="text-xs font-normal text-muted-foreground">
+        {t.label}
+      </Label>
+      <InfoHelp
+        label={t.label}
+        value="token-basis-switch"
+        analyticsEvent="selector_help_opened"
+        align="end"
+      >
+        {t.help}
+      </InfoHelp>
+    </div>
   );
 }

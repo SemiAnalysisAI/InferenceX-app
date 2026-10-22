@@ -166,6 +166,32 @@ describe('parseAvailableModelsAndSequences', () => {
 });
 
 describe('buildChartData', () => {
+  it('rescales agentic overlay token rates on the uncached basis', () => {
+    const rows = [
+      stubRow({
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        metrics: {
+          tput_per_gpu: 900,
+          output_tput_per_gpu: 600,
+          input_tput_per_gpu: 300,
+          theoretical_cache_hit_rate: 0.8,
+          mean_ttft: 0.5,
+          mean_tpot: 0.01,
+          mean_e2el: 1,
+          mean_intvty: 50,
+        },
+      }),
+    ];
+    const [key] = Object.keys(buildChartData(rows));
+    const total = buildChartData(rows)[key].interactivity.data[0];
+    const uncached = buildChartData(rows, 'uncached')[key].interactivity.data[0];
+    expect(total.tpPerGpu.y).toBe(900);
+    expect(uncached.tpPerGpu.y).toBeCloseTo(660);
+    expect(uncached.inputTputPerGpu?.y).toBeCloseTo(60);
+  });
+
   it('maps DB model key to display name in chart data keys', () => {
     const rows = [stubRow({ model: 'dsr1', isl: 1024, osl: 1024 })];
     const result = buildChartData(rows);

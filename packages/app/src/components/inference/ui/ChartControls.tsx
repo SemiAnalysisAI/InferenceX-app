@@ -79,9 +79,6 @@ const STRINGS = {
     tcoBasis: 'TCO Basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
-    tokenBasis: 'Input Tokens',
-    tokenBasisTooltip:
-      "Total counts every input token, including prompt prefixes earlier turns already sent. Uncached counts only each turn's new input suffix, using the trace's theoretical infinite-cache hit rate rather than the server's observed cache hits.",
     benchmarkControls: 'Benchmark Config',
     chartControls: 'Chart Config',
     compareHistory: 'Compare history',
@@ -127,9 +124,6 @@ const STRINGS = {
     tcoBasis: 'TCO 口径',
     tcoBasisTooltip:
       '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
-    tokenBasis: '输入 token',
-    tokenBasisTooltip:
-      '全部：计入所有输入 token，包括此前各轮已发送过的 prompt prefix。未缓存：仅计入每轮新增的输入 suffix，按 trace 的理论无限 cache 命中率计算，而非服务端实测命中。',
     benchmarkControls: '基准测试配置',
     chartControls: '图表配置',
     compareHistory: '对比历史趋势',
@@ -502,11 +496,14 @@ export default function ChartControls({
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
               >
-                <LabelWithTooltip
-                  htmlFor="y-axis-select"
-                  label={t.yAxisMetric}
-                  tooltip={t.yAxisMetricTooltip}
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <LabelWithTooltip
+                    htmlFor="y-axis-select"
+                    label={t.yAxisMetric}
+                    tooltip={t.yAxisMetricTooltip}
+                  />
+                  {tokenBasisVisible && <TokenBasisToggle />}
+                </div>
                 <SearchableSelect
                   triggerId="y-axis-select"
                   triggerTestId="yaxis-metric-selector"
@@ -545,13 +542,6 @@ export default function ChartControls({
                 <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
                   <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
                   <TcoBasisToggle source={tcoSource} className="md:h-9" />
-                </div>
-              )}
-
-              {tokenBasisVisible && (
-                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5">
-                  <LabelWithTooltip label={t.tokenBasis} tooltip={t.tokenBasisTooltip} />
-                  <TokenBasisToggle className="md:h-9" />
                 </div>
               )}
 
