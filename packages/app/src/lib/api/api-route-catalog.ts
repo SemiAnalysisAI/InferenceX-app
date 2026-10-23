@@ -1168,10 +1168,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: 'e48fa37f194e3cc6eaafaf634f929d913fbc78c167a87870b2d145d0250f7399',
+    sourceSha256: 'c21971c80cbebd7d41466837ad447bf2831a11358d053207bb3f774ed8ef6f95',
     reviewArea: {
-      en: 'OperatorX compact comparison reads, revision cache reuse, raw fallback and partial-read cache exclusion.',
-      zh: 'OperatorX 精简对比读取、revision 缓存复用、原始数据回退及部分读取失败时不缓存的规则。',
+      en: 'OperatorX compact comparison reads, revision cache reuse, raw fallback, partial-read cache exclusion and bounded per-run timeline reads.',
+      zh: 'OperatorX 精简对比读取、revision 缓存复用、原始数据回退、部分读取失败时不缓存及按运行限流并行读取时间线的规则。',
     },
   },
   {

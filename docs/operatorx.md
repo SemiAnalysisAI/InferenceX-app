@@ -209,3 +209,10 @@ is added: OperatorX remains a documented page-owned API.
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
 Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+
+### Parallel timeline reads
+
+Timeline reads share one raw fetch per run, with at most four runs concurrent.
+Request order, revision checks, missing/null results, and error handling are preserved.
+
+中文：时间线按运行复用读取，最多四个运行并发；保留请求顺序、revision 校验、缺失结果和错误处理。

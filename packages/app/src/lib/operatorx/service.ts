@@ -22,6 +22,7 @@ import { getOperatorXSource } from './sources';
 
 const MAX_DATASETS = 32;
 const COMPARISON_READ_BATCH = 4;
+const TIMELINE_READ_BATCH = 4;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
@@ -149,31 +150,32 @@ export async function getTimelines(
   op: ComparisonOp,
   refs: string[],
 ): Promise<{ timelines: Record<string, OperatorXTimeline | null>; known: boolean }> {
-  const timelines: Record<string, OperatorXTimeline | null> = {};
+  const timelines: Record<string, OperatorXTimeline | null> = Object.fromEntries(
+    refs.map((ref) => [ref, null]),
+  );
   let known = true;
-  const loaded = new Map<string, Promise<Normalized>>();
-  for (const ref of refs) {
-    const [runId, rawIndex, revision] = ref.split(':');
-    const index = Number(rawIndex);
+  const runs = [...Map.groupBy(refs, (ref) => ref.split(':')[0])];
+  const source = getOperatorXSource();
+  const readRun = async ([runId, runRefs]: [string, string[]]) => {
     try {
-      let bundle = loaded.get(runId);
-      if (!bundle) {
-        bundle = getOperatorXSource().getBundle(runId).then(normalizeBundle);
-        loaded.set(runId, bundle);
-      }
-      const { run, results, metrics } = await bundle;
-      const result = results[index];
-      if (!revision || revision !== run.revision || !result || result.opType !== op) {
-        timelines[ref] = null;
-        known = false;
-      } else {
-        timelines[ref] = compactTimeline(metrics[index]);
+      const { run, results, metrics } = normalizeBundle(await source.getBundle(runId));
+      for (const ref of runRefs) {
+        const [, rawIndex, revision] = ref.split(':');
+        const index = Number(rawIndex);
+        const result = results[index];
+        if (!revision || revision !== run.revision || !result || result.opType !== op) {
+          known = false;
+        } else {
+          timelines[ref] = compactTimeline(metrics[index]);
+        }
       }
     } catch (error) {
       if (!(error instanceof OperatorXSourceError) || error.status !== 404) throw error;
-      timelines[ref] = null;
       known = false;
     }
+  };
+  for (let i = 0; i < runs.length; i += TIMELINE_READ_BATCH) {
+    await Promise.all(runs.slice(i, i + TIMELINE_READ_BATCH).map(readRun));
   }
   return { timelines, known };
 }

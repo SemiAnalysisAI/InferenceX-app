@@ -801,7 +801,9 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // chart defaults are documented in docs/operatorx.md. Ingest-time compact run
 // projections are fetched in one revision-aware bulk query, preserving response
 // and source identities; legacy fallback and
-// partial-read cache behavior are documented there as well.
+// partial-read cache behavior are documented there as well. Timeline references
+// share one raw read per run, with at most four concurrent runs; reference order,
+// revision checks, null/known behavior and error contracts are preserved.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,

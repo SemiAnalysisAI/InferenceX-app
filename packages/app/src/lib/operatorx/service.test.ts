@@ -304,3 +304,75 @@ describe('bulk OperatorX comparison reads', () => {
     expect(reads.getBundle).not.toHaveBeenCalled();
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+it('reads timelines four runs at a time, reuses shared runs and preserves reference order', async () => {
+  const items = Array.from({ length: 6 }, (_, i) => bundle(String(i + 1), ['vllm', 'torch']));
+  const reads = source(items);
+  const pending = new Map(items.map((item) => [item.run.run_id, deferred<OperatorXRawBundle>()]));
+  const secondBatch = deferred<void>();
+  reads.getBundle.mockImplementation((id: string) => {
+    if (id === '6') secondBatch.resolve();
+    return pending.get(id)!.promise;
+  });
+  const { getTimelines } = await import('./service');
+  expect(await getTimelines('gemm', [])).toEqual({ known: true, timelines: {} });
+  expect(reads.getBundle).not.toHaveBeenCalled();
+  const refs = ['1:0:1', '2:0:1', '1:1:1', '3:0:1', '4:0:1', '5:0:1', '6:0:1', '1:0:1'];
+  const resultPromise = getTimelines('gemm', refs);
+  expect(reads.getBundle.mock.calls.map(([id]) => id)).toEqual(['1', '2', '3', '4']);
+  // Complete each batch out of order; completion must not reorder the response.
+  for (const id of ['4', '3', '2', '1']) pending.get(id)!.resolve(items[Number(id) - 1]);
+  await secondBatch.promise;
+  expect(reads.getBundle).toHaveBeenCalledTimes(6);
+  pending.get('6')!.resolve(items[5]);
+  pending.get('5')!.resolve(items[4]);
+  const result = await resultPromise;
+  expect(result.known).toBe(true);
+  expect(Object.keys(result.timelines)).toEqual([...new Set(refs)]);
+  expect(Object.values(result.timelines)).toHaveLength(7);
+  for (const timeline of Object.values(result.timelines)) {
+    expect(timeline).toMatchObject({ names: ['gemm_kernel'], spanUs: 10 });
+  }
+  expect(reads.getBundle.mock.calls.filter(([id]) => id === '1')).toHaveLength(1);
+});
+
+it('marks missing, stale and invalid timeline references unknown without losing valid siblings', async () => {
+  const reads = source([bundle('1', ['vllm'])]);
+  const { OperatorXSourceError } = await import('./source');
+  reads.getBundle.mockImplementation((id: string) =>
+    id === 'missing'
+      ? Promise.reject(new OperatorXSourceError('Run not found', 404))
+      : Promise.resolve(bundle(id, ['vllm'])),
+  );
+  const { getTimelines } = await import('./service');
+  const invalid = ['missing:0:1', '1:0:stale', '1:99:1', '1:0', 'missing:1:1'];
+  const result = await getTimelines('gemm', [...invalid, '1:0:1']);
+  expect(result.known).toBe(false);
+  expect(result.timelines['1:0:1']).toMatchObject({ names: ['gemm_kernel'] });
+  for (const ref of invalid) {
+    expect(result.timelines[ref]).toBeNull();
+  }
+  expect(reads.getBundle).toHaveBeenCalledTimes(2);
+  expect(await getTimelines('moe', ['1:0:1'])).toEqual({
+    known: false,
+    timelines: { '1:0:1': null },
+  });
+});
+
+it('propagates non-404 timeline read failures', async () => {
+  const reads = source([bundle('1', ['vllm'])]);
+  const { OperatorXSourceError } = await import('./source');
+  const failure = new OperatorXSourceError('Database unavailable', 503);
+  reads.getBundle.mockRejectedValue(failure);
+  const { getTimelines } = await import('./service');
+  await expect(getTimelines('gemm', ['1:0:1', '1:1:1'])).rejects.toBe(failure);
+  expect(reads.getBundle).toHaveBeenCalledTimes(1);
+});

@@ -471,3 +471,10 @@ read-role privileges, backfill, warming, and reproducible benchmark instructions
 中文：OperatorX 的页面专属对比接口优先读取写入时生成的精简记录，保留原有用例、默认值、
 测量值、状态、backend 和时间线来源。旧运行可回退至原始读取路径；部分读取失败的响应
 不会缓存。此改动优化存储读取和延迟，不改变公开筛选条件或计算，也不新增公开 OpenAPI 接口。
+
+### Parallel timeline reads
+
+Timeline reads share one raw fetch per run, with at most four runs concurrent.
+Request order, revision checks, missing/null results, and error handling are preserved.
+
+中文：时间线按运行复用读取，最多四个运行并发；保留请求顺序、revision 校验、缺失结果和错误处理。
