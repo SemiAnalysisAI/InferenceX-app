@@ -1,3 +1,5 @@
+import { gzipSync } from 'node:zlib';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -121,7 +123,7 @@ function preparedWithRates(): PreparedTraceReplay {
     serverMetricsJsonSize: 700,
     aggregateStatsJson: Buffer.from('{"version":1}'),
     chartSeriesJson: Buffer.from('{"version":12}'),
-    requestTimelineJson: Buffer.from('{"version":1}'),
+    requestTimelineGz: gzipSync(Buffer.from('{"version":1}')),
     chartWindows: 2,
     timelineRequests: 3,
     compressionMs: 10,
