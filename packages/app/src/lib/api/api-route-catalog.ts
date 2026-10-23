@@ -693,7 +693,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-run',
-    sourceSha256: '960e59d2af33ddcc3995be78feac5a510cc5b194a3bcd0ec9f1a884501a1b711',
+    sourceSha256: 'e242fb048f89d0e5eff200e63f6baac7307f066a3fbe5984007390a2095f3699',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
@@ -704,7 +704,7 @@ export const apiRouteCatalog = [
       en: 'Authenticated CollectiveX administration mutation; deletion is not part of the public read API.',
       zh: '需要身份验证的 CollectiveX 管理写操作；删除不属于公开只读 API。',
     },
-    sourceSha256: '960e59d2af33ddcc3995be78feac5a510cc5b194a3bcd0ec9f1a884501a1b711',
+    sourceSha256: 'e242fb048f89d0e5eff200e63f6baac7307f066a3fbe5984007390a2095f3699',
   },
   {
     source: 'src/app/api/v1/datasets/route.ts',
@@ -815,7 +815,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'a4dc0b8c809837dfc33d78c8bd70ad8db78558ecee4ca2e857fa9b61f86d9b9a',
+    sourceSha256: '31fa55f889aa4775fe3e62e0bc940f04d79d5a3d24a9c37d5baf904cda993a86',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',

@@ -13,12 +13,21 @@ URL, About and FAQ repository links, and the H3 video repository.
 Set these in the app's hosting environment or in the repository root `.env` for
 scripts.
 
-| Variable                          | Required                                                                                            | Effect                                                                                                                                                                                                                                                                |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `INFERENCEX_SOURCE_REPOS`         | optional                                                                                            | Comma-separated `owner/repo` list searched after `SemiAnalysisAI/InferenceX` for unofficial-run overlays, live GPU metrics, live eval samples, CollectiveX sweeps, and ETL workflow-run lookups. Entries are trimmed and deduplicated; a malformed entry is an error. |
-| `VERCEL_PROTECTION_BYPASS_SECRET` | optional                                                                                            | Sent as `x-vercel-protection-bypass` by the cache invalidate and warmup scripts, the H3 media warmer, and the PowerX publication verifier.                                                                                                                            |
-| `INFERENCEX_APP_URL`              | `warm-video-results.ts`, and `verify-power-publication.ts` without an origin argument               | Origin for those two scripts. The verifier's origin argument wins when given. The cache scripts keep their localhost default.                                                                                                                                         |
-| `INGEST_REPO`                     | ingest, backfill, and artifact-preparation scripts when no argument or run URL names the repository | Repository for those scripts. `ingest-ci-run`, `ingest-collectivex`, `ingest-operatorx`, and the backfills take a `[repo]` argument or a full run URL first. CI-mode `ingest-ci-run` and `prepare-ci-artifacts` always require it.                                    |
+| Variable                                              | Required                                                                                            | Effect                                                                                                                                                                                                                                                                                                                   |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `INFERENCEX_SOURCE_REPOS`                             | optional                                                                                            | Comma-separated `owner/repo` list searched after `SemiAnalysisAI/InferenceX` for unofficial-run overlays, live GPU metrics, live eval samples, CollectiveX sweeps, and ETL workflow-run lookups. Entries are trimmed and deduplicated; a malformed entry is an error.                                                    |
+| `VERCEL_PROTECTION_BYPASS_SECRET`                     | optional                                                                                            | Sent as `x-vercel-protection-bypass` by the cache invalidate and warmup scripts, the H3 media warmer, and the PowerX publication verifier.                                                                                                                                                                               |
+| `INFERENCEX_APP_URL`                                  | `warm-video-results.ts`, and `verify-power-publication.ts` without an origin argument               | Origin for those two scripts. The verifier's origin argument wins when given. The cache scripts keep their localhost default.                                                                                                                                                                                            |
+| `INGEST_REPO`                                         | ingest, backfill, and artifact-preparation scripts when no argument or run URL names the repository | Repository for those scripts. `ingest-ci-run`, `ingest-collectivex`, `ingest-operatorx`, and the backfills take a `[repo]` argument or a full run URL first. CI-mode `ingest-ci-run` and `prepare-ci-artifacts` always require it.                                                                                       |
+| `DATABASE_READONLY_URL`                               | yes, for the app                                                                                    | Read-only connection for the dashboard API routes. Read-only admin scripts and the MCP server use it too.                                                                                                                                                                                                                |
+| `DATABASE_DRIVER`                                     | optional                                                                                            | `neon` (serverless HTTP) or `postgres` (TCP) for the app's database clients. When unset, hosts ending in `.neon.tech` use `neon` and all others use `postgres`. Admin scripts always use `postgres`.                                                                                                                     |
+| `DATABASE_SSL`                                        | optional                                                                                            | `false` disables TLS, and `true` or `require` requires it. When unset, TLS is required except for loopback hosts. Read by the app, the admin scripts, and the MCP server.                                                                                                                                                |
+| `CACHE_NAMESPACE`                                     | optional, but give each deployment that shares a cache a distinct value                             | Prefixes the server cache keys and the `db`, `collectivex`, and `operatorx` cache tags, so one deployment never serves or purges another deployment's cached data.                                                                                                                                                       |
+| `BLOB_CACHE_PREFIX`, `BLOB_READ_WRITE_TOKEN`          | optional                                                                                            | Vercel Blob storage. The blob response cache runs only when both are set. A full invalidation deletes every blob under the prefix, so deployments that share a Blob store need distinct prefixes. H3 video storage needs only `BLOB_READ_WRITE_TOKEN`. Both features turn themselves off when their variables are unset. |
+| `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | optional                                                                                            | PostHog project key and host for browser analytics and server-side events. Without the key, analytics is off. Without the host, `https://us.i.posthog.com` is used. Both are inlined at build time (see [Vercel project](#vercel-project)).                                                                              |
+| `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID`      | optional, at build time, set together                                                               | Production builds upload source maps to PostHog only when both are set.                                                                                                                                                                                                                                                  |
+| `GITHUB_TOKEN`                                        | yes, for GitHub-backed features                                                                     | Reads Actions runs and artifacts. Without it, `/api/unofficial-run`, `/api/gpu-metrics` live telemetry, and `/api/v1/eval-samples-live` return 500, CollectiveX discovery reports `unavailable`, and framework release and GitHub star requests go out unauthenticated.                                                  |
+| `OPERATORX_SOURCE`                                    | optional                                                                                            | `database`, the behavior when unset, reads `DATABASE_OPERATORX_READONLY_URL`. `local` reads `OPERATORX_LOCAL_ARTIFACT_DIR` and works only in development. Any other value makes `/api/v1/operatorx/*` return 503.                                                                                                        |
 
 `GITHUB_TOKEN` must be able to read Actions runs and artifacts in every listed source
 repository. Artifacts from every listed repository are served to any caller through
@@ -33,21 +42,26 @@ stays incomplete and retries after a short cooldown. Runs from a repository othe
 `SemiAnalysisAI/InferenceX` record it as `source_repository` in the stored summary, and
 their links use it.
 
-### Variables outside the `.env.example` production list
+### Feature variables
 
-The production block of `.env.example` says all of its variables are required, but the
-deployed app also reads the variables below. Each one backs a single feature, which fails
-as described when the variable is unset.
+The production block of `.env.example` lists the core connection, cache, and analytics
+variables. The deployed app also reads the variables below. Each one backs a single
+feature, which fails as described when the variable is unset.
 
-| Variable                           | Read by                                   | When unset                                                                                                                                                                               |
-| ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `INVALIDATE_SECRET`                | `POST /api/v1/invalidate`                 | Every request returns 401, except requests to the shared `staging` preview that carry `x-vercel-protection-bypass`. Set it to the value of the `VERCEL_INVALIDATE_SECRET` GitHub secret. |
-| `FEEDBACK_SECRET`                  | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                             |
-| `DATABASE_WRITE_URL`               | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                             |
-| `DATABASE_COLLECTIVEX_WRITE_URL`   | `/api/v1/collectivex/*`                   | The routes read and lazily ingest through this primary connection, so they return errors.                                                                                                |
-| `COLLECTIVEX_ADMIN_SECRET`         | `DELETE /api/v1/collectivex/runs/[runId]` | Every request returns 401.                                                                                                                                                               |
-| `DATABASE_OPERATORX_READONLY_URL`  | `/api/v1/operatorx/*`                     | The routes return 503 with `The OperatorX database is not configured`.                                                                                                                   |
-| `DATABASE_PROXYTRACE_READONLY_URL` | `/api/v1/agentic-workload-explorer/*`     | The routes return 500.                                                                                                                                                                   |
+| Variable                           | Read by                                   | When unset                                                                                                                                                                                                                                                                          |
+| ---------------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALIDATE_SECRET`                | `POST /api/v1/invalidate`                 | Requests return 500 with `INVALIDATE_SECRET is not set`, except requests to the shared `staging` preview that carry `x-vercel-protection-bypass`. When it is set, a missing or wrong bearer token returns 401. Set it to the value of the `VERCEL_INVALIDATE_SECRET` GitHub secret. |
+| `FEEDBACK_SECRET`                  | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                                                                                                                        |
+| `DATABASE_WRITE_URL`               | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                                                                                                                        |
+| `DATABASE_COLLECTIVEX_WRITE_URL`   | `/api/v1/collectivex/*`                   | The routes read and lazily ingest through this primary connection, so they return errors.                                                                                                                                                                                           |
+| `COLLECTIVEX_ADMIN_SECRET`         | `DELETE /api/v1/collectivex/runs/[runId]` | Every request returns 500 with `COLLECTIVEX_ADMIN_SECRET is not set`. When it is set, a missing or wrong bearer token returns 401.                                                                                                                                                  |
+| `DATABASE_OPERATORX_READONLY_URL`  | `/api/v1/operatorx/*`                     | The routes return 503 with `The OperatorX database is not configured`.                                                                                                                                                                                                              |
+| `DATABASE_PROXYTRACE_READONLY_URL` | `/api/v1/agentic-workload-explorer/*`     | The routes return 500.                                                                                                                                                                                                                                                              |
+
+`DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes. Every CollectiveX
+route reads through `DATABASE_COLLECTIVEX_WRITE_URL`.
+
+A copy of this repository should replace the owner in `.github/CODEOWNERS` with its own.
 
 ### Vercel project
 
@@ -73,9 +87,12 @@ project, redeploy for the new value to take effect.
 
 `GITHUB_TOKEN` is provided by GitHub and is not listed. `SLACK_WEBHOOK_URL` is the
 failure alarm, so `ingest-results`, `ingest-operatorx`, and `stage-results` check it
-before doing any other work. `stage-results` also checks `PAT` up front, and
-`apply-run-overrides` and `recompute-agentic-metrics` check `DATABASE_WRITE_URL` before
-writing to the production database.
+before doing any other work. `stage-results` also checks `PAT` up front.
+`ingest-operatorx` checks `APP_URL`, `VERCEL_INVALIDATE_SECRET`,
+`DATABASE_OPERATORX_WRITE_URL`, and `INFX_MAIN_PAT` in its first step.
+`backfill-server-log-files` checks `INFX_MAIN_PAT` before the backfill. `apply-run-overrides`,
+`backfill-server-log-files`, and `recompute-agentic-metrics` check `DATABASE_WRITE_URL`
+before writing to the production database.
 
 | Secret                            | Required                                                 | Used for                                                                                                        | Workflows                                                                                                                                                                                            |
 | --------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -95,6 +112,22 @@ Values reach scripts only through step `env:`, never by inline expression in a `
 block.
 
 `Apply Run Overrides` and `Recompute Agentic Metrics` write to the `DATABASE_WRITE_URL`
-secret and invalidate `APP_URL`. Recompute writes that database only from the repository's
-default branch. `check-skills-api`, `sync-staging-database`, and `h3-media` operate the
-public site and its staging database, so they run only in `SemiAnalysisAI/InferenceX-app`.
+secret and invalidate `APP_URL`. Recompute and `Backfill Server Log Files` write that
+database only from the repository's default branch. `check-skills-api`, `publish-skills`,
+`sync-staging-database`, and `h3-media` operate the public site and its staging database,
+so they run only in `SemiAnalysisAI/InferenceX-app`.
+
+### Staging prerequisites
+
+The `staging` ingest target and `stage-results` expect:
+
+- a Neon branch named `staging`, whose write connection is `DATABASE_STAGING_WRITE_URL`
+- a Git branch named `staging`, which `stage-results` moves to the head of the repository's
+  default branch before each ingest, creating it when missing
+- a Vercel preview deployment of that Git branch
+- `STAGING_APP_URL` pointing at that preview
+
+`/api/v1/invalidate` accepts the `x-vercel-protection-bypass` header in place of
+`INVALIDATE_SECRET` only on the preview built from the `staging` Git branch
+(`VERCEL_ENV=preview` and `VERCEL_GIT_COMMIT_REF=staging`). Every other deployment
+requires the bearer token.

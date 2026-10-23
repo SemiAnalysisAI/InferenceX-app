@@ -155,4 +155,4 @@ Changes to `packages/db/src/etl/run-overrides.ts` that reach `main` or `master` 
 
 ## Deployment
 
-Deployed on Vercel. See [`.env.example`](.env.example) for the core environment variables and [`docs/deployment-configuration.md`](docs/deployment-configuration.md) for the feature-specific variables it omits, the Vercel project settings, and the GitHub Actions variables and secrets.
+Deployed on Vercel. See [`.env.example`](.env.example) for the core environment variables and [`docs/deployment-configuration.md`](docs/deployment-configuration.md) for what each runtime variable does and which are required, the Vercel project settings, the GitHub Actions variables and secrets, and the staging prerequisites.

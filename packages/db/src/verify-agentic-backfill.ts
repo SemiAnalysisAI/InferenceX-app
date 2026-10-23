@@ -69,7 +69,9 @@ async function states(ids: string[]): Promise<BackfillState[]> {
 }
 
 async function main(): Promise<void> {
-  const database = new URL(process.env.DATABASE_WRITE_URL!).hostname;
+  const databaseUrl = process.env.DATABASE_WRITE_URL;
+  if (!databaseUrl) throw new Error('DATABASE_WRITE_URL is not set');
+  const database = new URL(databaseUrl).hostname;
   if (snapshotIndex !== -1) {
     const runFilter = runId ? sql`and w.github_run_id=${runId}` : sql``;
     const ids = await sql<{ id: string }[]>`

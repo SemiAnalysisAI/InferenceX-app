@@ -67,11 +67,24 @@ describe('POST /api/v1/invalidate', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when INVALIDATE_SECRET is not set', async () => {
+  it('returns 500 when INVALIDATE_SECRET is not set', async () => {
     delete process.env.INVALIDATE_SECRET;
 
     const res = await POST(postReq({ Authorization: 'Bearer anything' }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('INVALIDATE_SECRET is not set');
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('allows the protected staging request when INVALIDATE_SECRET is not set', async () => {
+    delete process.env.INVALIDATE_SECRET;
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'staging';
+    mockPurgeAll.mockResolvedValueOnce(1);
+
+    const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
+    expect(res.status).toBe(200);
+    expect(mockPurgeAll).toHaveBeenCalledOnce();
   });
 
   it('returns 401 for length mismatch (timing-safe)', async () => {

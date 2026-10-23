@@ -229,8 +229,8 @@ jobs:
             echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
-          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ "$REQUESTED_DATABASE_TARGET" != "neon-branch" ] && [ -z "$cache_invalidate_secret" ]; then
-            echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ -z "$cache_invalidate_secret" ]; then
+            echo "::error::VERCEL_INVALIDATE_SECRET secret is not set for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
           if { [ "$REQUESTED_DATABASE_TARGET" = "staging" ] || [ "$REQUESTED_DATABASE_TARGET" = "neon-branch" ]; } && [ -z "$protection_bypass_secret" ]; then

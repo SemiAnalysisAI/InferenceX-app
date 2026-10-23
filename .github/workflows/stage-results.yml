@@ -157,16 +157,20 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Point the shared staging Git branch at master
+      contents: write # Point the shared staging Git branch at the default branch
     steps:
-      - name: Point staging at master
+      - name: Point staging at the default branch
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const defaultBranch = context.payload.repository?.default_branch;
+            if (!defaultBranch) {
+              throw new Error('Repository default branch is missing from the event payload');
+            }
             const source = await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'heads/master',
+              ref: `heads/${defaultBranch}`,
             });
             const sha = source.data.object.sha;
             try {
