@@ -40,6 +40,15 @@ format uses the raw reader with revision-keyed in-process normalization reuse.
 Permission, network, and other storage errors remain failures; a partial comparison
 is not cached. Local-directory sources keep the raw path.
 
+### Bulk compact reads
+
+One SQL query loads the listed run revisions; merging keeps newest-first order.
+Missing/stale projections alone use bounded raw fallback; only a missing table
+suppresses a SQL error. Responses and timeline identities are preserved.
+
+中文：一次 SQL 查询读取所列 revision，按最新优先合并；仅缺失或过期的记录回退至原始数据，
+仅缺表错误可触发整体回退。响应和时间线标识保持一致。
+
 ### Rollout and backfill
 
 1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.

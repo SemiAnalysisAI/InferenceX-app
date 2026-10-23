@@ -104,11 +104,14 @@ async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Com
   const comparisons: Comparison[] = [];
   let failedReads = 0;
   const source = getOperatorXSource();
+  const compactRuns = source.getRunComparisons ? await source.getRunComparisons(runs, op) : null;
   for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
     const batch = runs.slice(i, i + COMPARISON_READ_BATCH);
     const loaded = await Promise.allSettled(
       batch.map(async (run) => {
-        const compact = await source.getRunComparison?.(run.run_id, op);
+        const compact = compactRuns
+          ? compactRuns.get(run.run_id)
+          : await source.getRunComparison?.(run.run_id, op);
         if (compact) return compact;
         // Legacy/local sources retain the same normalizer and source indices.
         // Reuse revision-keyed normalization rather than loading raw artifacts twice.
