@@ -23,8 +23,13 @@ export async function POST(request: Request) {
     process.env.VERCEL_GIT_COMMIT_REF === 'staging' &&
     Boolean(request.headers.get('x-vercel-protection-bypass'));
 
-  if (!isProtectedStagingRequest && (!secret || !bearerMatches(authHeader, secret))) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!isProtectedStagingRequest) {
+    if (!secret) {
+      return new NextResponse('INVALIDATE_SECRET is not set', { status: 500 });
+    }
+    if (!bearerMatches(authHeader, secret)) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
   }
 
   // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the

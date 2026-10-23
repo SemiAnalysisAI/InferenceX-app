@@ -201,7 +201,11 @@ jobs:
           working-directory: packages/app
           install: false
           start: bun run start
-          wait-on: 'http://localhost:3000'
+          # The action's URL probe retries only a fixed list of error codes, and the
+          # runner's Node reports a refused startup connection as "Socket closed before
+          # the connection was established", which fails the step immediately. curl
+          # retries every error for up to 60 seconds instead.
+          wait-on: curl --silent --fail --output /dev/null --retry 60 --retry-delay 1 --retry-all-errors --retry-max-time 60 http://127.0.0.1:3000
           browser: ${{ matrix.browser }}
           publish-summary: false
         env:

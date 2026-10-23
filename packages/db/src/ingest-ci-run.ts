@@ -209,6 +209,7 @@ if (isDownloadMode) {
     'DATABASE_WRITE_URL',
     'GITHUB_TOKEN',
     'INGEST_RUN_ID',
+    'INGEST_RUN_ATTEMPT',
     'INGEST_ARTIFACTS_PATH',
     'INGEST_REPO',
   ]) {
@@ -219,7 +220,11 @@ if (isDownloadMode) {
   }
 
   runIdStr = process.env.INGEST_RUN_ID!;
-  runAttemptNum = parseInt(process.env.INGEST_RUN_ATTEMPT ?? '1', 10);
+  runAttemptNum = Number(process.env.INGEST_RUN_ATTEMPT);
+  if (!Number.isSafeInteger(runAttemptNum) || runAttemptNum < 1) {
+    console.error('INGEST_RUN_ATTEMPT must be a positive integer');
+    process.exit(1);
+  }
   artifactsDir = process.env.INGEST_ARTIFACTS_PATH!;
   REPO = process.env.INGEST_REPO!;
 }

@@ -91,7 +91,13 @@ export function fetchRunAttempt(repo: string, runId: string): number {
   const attemptStr = execSync(`gh api "repos/${repo}/actions/runs/${runId}" --jq '.run_attempt'`, {
     encoding: 'utf8',
   }).trim();
-  return parseInt(attemptStr || '1', 10);
+  const attempt = Number(attemptStr);
+  if (!attemptStr || !Number.isSafeInteger(attempt) || attempt < 1) {
+    throw new Error(
+      `GitHub returned no valid run_attempt for ${repo} run ${runId}: '${attemptStr}'`,
+    );
+  }
+  return attempt;
 }
 
 export function assertRequestedRunAttempt(input: string, currentAttempt: number): void {

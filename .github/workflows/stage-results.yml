@@ -69,7 +69,14 @@ jobs:
           RESET_STAGING_DATABASE: ${{ inputs.reset-staging-database || false }}
           BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || vars.BENCHMARK_REPO }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PAT_PRESENT: ${{ secrets.PAT != '' }}
         run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          if [ "$PAT_PRESENT" != true ]; then
+            echo "::error::PAT secret is not set"
+            exit 1
+          fi
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::run-id must be numeric"
@@ -150,16 +157,20 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Point the shared staging Git branch at master
+      contents: write # Point the shared staging Git branch at the default branch
     steps:
-      - name: Point staging at master
+      - name: Point staging at the default branch
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const defaultBranch = context.payload.repository?.default_branch;
+            if (!defaultBranch) {
+              throw new Error('Repository default branch is missing from the event payload');
+            }
             const source = await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'heads/master',
+              ref: `heads/${defaultBranch}`,
             });
             const sha = source.data.object.sha;
             try {

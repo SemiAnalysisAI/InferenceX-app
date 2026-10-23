@@ -100,7 +100,10 @@ export async function DELETE(
 ) {
   const secret = process.env.COLLECTIVEX_ADMIN_SECRET;
   const authHeader = request.headers.get('Authorization') ?? '';
-  if (!secret || !bearerMatches(authHeader, secret)) {
+  if (!secret) {
+    return new NextResponse('COLLECTIVEX_ADMIN_SECRET is not set', { status: 500 });
+  }
+  if (!bearerMatches(authHeader, secret)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 
