@@ -28,7 +28,7 @@ const STRINGS = {
     breakdown: 'System power breakdown',
     drillTitle: (chip: string) => `${chip} across load`,
     drillSubtitle:
-      'Every benchmark point of this chip, split the same way. Lower interactivity means more concurrent users.',
+      'Every benchmark point of this chip, split the same way, one evenly spaced bar each. Lower interactivity means more concurrent users. The dashed outline marks the point compared above.',
     fitSummary: 'How power scales with output rate',
     fitHint: 'A straight-line fit per config: idle-ish floor plus joules per extra output token.',
   },
@@ -37,7 +37,8 @@ const STRINGS = {
     fit: '功耗与输出速率拟合',
     breakdown: '系统功耗构成',
     drillTitle: (name: string) => `${name} 随负载的变化`,
-    drillSubtitle: '该芯片的每个基准测试点按相同方式拆分。交互性越低，并发用户越多。',
+    drillSubtitle:
+      '该芯片的每个基准测试点按相同方式拆分，每个点一根等距柱。交互性越低，并发用户越多。虚线框标出上方对比所用的点。',
     fitSummary: '功耗如何随输出速率变化',
     fitHint: '按配置做直线拟合：近似空载功耗，加上每多输出一个 Token 的焦耳数。',
   },

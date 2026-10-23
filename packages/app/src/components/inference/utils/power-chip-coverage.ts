@@ -1,9 +1,9 @@
-import type { InferenceData } from '../types';
+import type { AggDataEntry, InferenceData } from '../types';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { isPositive } from '@/lib/power/power-basis';
-import { observedPoints } from './equal-service-comparison';
+import { getRolePoints, observedPoints } from './equal-service-comparison';
 import { powerBreakdownSeriesKey, type PowerBreakdownSeries } from './power-breakdown';
 
 /**
@@ -32,4 +32,23 @@ export function chipsWithoutSystemModel(
     );
   }
   return [...missing.values()].toSorted((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Whether any visible disaggregated point carries validated prefill or decode
+ * telemetry on this axis. Disaggregated results alone are not enough: a model
+ * can have them with no role-level power, which would open an empty panel.
+ */
+export function hasRoleTelemetry(
+  points: readonly InferenceData[],
+  xField: keyof AggDataEntry,
+): boolean {
+  return getRolePoints(points, xField).some(
+    (role) =>
+      role.prefillWattsPerGpu !== null ||
+      role.decodeWattsPerGpu !== null ||
+      role.prefillJoulesPerInputToken !== null ||
+      role.decodeJoulesPerOutputToken !== null ||
+      role.energy !== null,
+  );
 }

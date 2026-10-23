@@ -191,6 +191,8 @@ import {
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
+import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
+import { useSetPowerXCompareTarget } from '@/components/inference/ui/powerx-surface';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -1870,6 +1872,12 @@ const ScatterGraph = React.memo(
       [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
+    const setCompareTarget = useSetPowerXCompareTarget();
+    const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
+    compareFollowsHoverRef.current =
+      setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
+        ? setCompareTarget
+        : null;
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
@@ -2203,11 +2211,14 @@ const ScatterGraph = React.memo(
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
-        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          // PowerX: the chip comparison follows the hovered point's interactivity.
+          if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
           applyHoverState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
+          );
+        },
         onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
           applyNormalState(
             sel.select('.visible-shape') as any,
