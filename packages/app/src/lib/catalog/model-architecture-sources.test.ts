@@ -55,8 +55,24 @@ describe('architecture parity with published checkpoint configs', () => {
       activeParams: 16,
       conditionalMemoryParams: 196,
     });
-    expect(arch.diagramStages?.map(({ label }) => label)).toContain('20-layer causal encoder');
-    expect(arch.diagramStages?.map(({ label }) => label)).toContain('20-layer decoder');
+    expect(arch.encoderDecoder).toEqual({
+      encoderLayers: 20,
+      decoderLayers: 20,
+      globalKVSource: 'final-encoder-hidden-states',
+      encoderSlidingOnlyLayers: 2,
+      decoderAttention: 'joint-local-swa-and-shared-global-kv',
+    });
+    expect(arch.encoderDecoder!.encoderLayers + arch.encoderDecoder!.decoderLayers).toBe(
+      arch.numLayers,
+    );
+    const source = fixtures.models.find(({ model }) => model === arch.model)!.config;
+    expect(arch.encoderDecoder!.encoderSlidingOnlyLayers).toBe(
+      ('compress_ratios' in source ? (source.compress_ratios as number[]) : [])
+        .slice(0, arch.encoderDecoder!.encoderLayers)
+        .filter((ratio) => ratio === 0).length,
+    );
+    expect(arch.attentionLabel).toBe('CSA2');
+    expect(arch.conditionalMemoryName).toBe('Engram');
   });
 
   it('does not project a K3 routed expert directly to the residual hidden size', () => {
@@ -107,12 +123,14 @@ describe('architecture parity with published checkpoint configs', () => {
   it('does not treat the eager execution variant as a different checkpoint architecture', () => {
     const {
       model: _standard,
-      diagramStages: _standardStages,
+      features: _standardFeatures,
+      featuresZh: _standardFeaturesZh,
       ...standard
     } = getModelArchitecture(Model.Qwen3_8_27B)!;
     const {
       model: _eager,
-      diagramStages: _eagerStages,
+      features: _eagerFeatures,
+      featuresZh: _eagerFeaturesZh,
       ...eager
     } = getModelArchitecture(Model.Qwen3_8_27B_Eager)!;
     expect(eager).toEqual(standard);

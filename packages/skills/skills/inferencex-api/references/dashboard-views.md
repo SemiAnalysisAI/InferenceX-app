@@ -493,6 +493,25 @@ prefetch use existing APIs and preserve both locales' selectors and measurements
 
 ## Model architecture coverage
 
+Arrow diagrams expose the same attention-layer categories and exact layer counts
+as this catalog. `alternatingLayers` groups repeated layer types; use
+`alternatingNote` / `alternatingNoteZh` for their interleaving, rather than
+interpreting the categories as contiguous blocks. Expanding a Transformer or FFN
+block is presentation only and does not change the returned data.
+
+DeepSeek V4.1 Flash returns `encoderDecoder` with `encoderLayers: 20`,
+`decoderLayers: 20`, `encoderSlidingOnlyLayers: 2`,
+`globalKVSource: "final-encoder-hidden-states"`, and
+`decoderAttention: "joint-local-swa-and-shared-global-kv"`.
+`attentionLabel: "CSA2"` names the mechanism, and
+`conditionalMemoryName: "Engram"` identifies the separate memory table.
+The encoder is causal. Decoder attention combines shared encoder-derived global
+KV with each layer's local sliding-window KV in one sparse-attention operation;
+there is no separate T5-style cross-attention block. Prefill/decode active counts
+remain separate, and conditional-memory parameters remain outside the backbone
+count. Component-summary `diagramStages` cards are replaced by these structured
+fields and expandable arrow diagrams.
+
 `GET /api/v1/views/model-architectures` returns the same `MODEL_ARCHITECTURES`
 registry used by `/model/<slug>`, `/zh/model/<slug>`, and dashboard diagrams.
 Omit `model` for all entries, or pass an exact display name such as `Kimi-K3` or
@@ -508,7 +527,7 @@ use `Cache-Control: public, max-age=0, s-maxage=300`.
 | Model architecture selection                                                                           | `model` selects one entry; omission returns all registry entries, including hidden models.                                                                    |
 | Parameter counts, dimensions, context, attention, FFN, expert routing, optional architectural features | `architecture` preserves registry values exactly; parameter counts are in billions, dimensions/context in exact counts. Missing optional fields stay omitted. |
 | Vendor provenance and model identity                                                                   | Preserve `architecture.sourceUrl`, `architecture.model`, and `slug`; related checkpoints can share a model identity.                                          |
-| English and Chinese model architecture pages                                                           | Both render the same facts; bilingual stage descriptions are included when supplied.                                                                          |
+| English and Chinese model architecture pages                                                           | Both render the same facts; bilingual pattern notes are included when supplied.                                                                               |
 | Diagram expansion, collapse, layout, tooltip visibility and navigation                                 | Presentation only; these controls do not change architecture facts.                                                                                           |
 | Model-page benchmark controls and unofficial overlays                                                  | Existing `inference` view; this architecture catalog does not read benchmark data or unofficial runs.                                                         |
 | Static model editorial prose                                                                           | Discover through the existing model pages and text feeds; no separate measurement calculation.                                                                |

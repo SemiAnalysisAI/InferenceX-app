@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import type { Locale } from '@/lib/i18n/i18n';
-import { renderArchitectureStages } from './model-architecture-stages';
+import { renderCausalEncoderDecoder } from './model-architecture-ced';
 
 import {
   type ArchSubBlock,
@@ -52,6 +52,10 @@ const ARCHITECTURE_TEXT_ZH: Record<string, string> = {
   'Scaled SiLU': '带缩放系数的 SiLU',
   'gated MLA at layers 4, 8, …, 92, 93': '第 4、8、…、92、93 层使用 gated MLA',
   'Gated MLA': '门控 MLA',
+  'Gated Attention': '门控注意力',
+  'Sliding GQA': '滑动窗口 GQA',
+  'Full GQA (NoPE)': '全局 GQA（NoPE）',
+  'Qwen Sparse Attention (QSA)': 'Qwen 稀疏注意力（QSA）',
   'Q Projection': 'Q 投影',
   'K Projection': 'K 投影',
   'V Projection': 'V 投影',
@@ -233,8 +237,8 @@ export function deriveArchitectureVariant(
     hasAlternatingLayers && expandedBlocks.has('altBlock1'),
   ];
   const altExpertsExpanded = [
-    hasAlternatingLayers && expandedBlocks.has('altExperts0'),
-    hasAlternatingLayers && expandedBlocks.has('altExperts1'),
+    hasAlternatingLayers && expandedBlocks.has(isMoE ? 'altExperts0' : 'altFFN0'),
+    hasAlternatingLayers && expandedBlocks.has(isMoE ? 'altExperts1' : 'altFFN1'),
   ];
   const altAttnExpandable =
     hasAlternatingLayers &&
@@ -309,14 +313,14 @@ export function renderDiagram(
   onBlockClick: (blockId: string) => void,
   locale: Locale = 'en',
 ) {
-  if (arch.diagramStages) {
-    renderArchitectureStages(svgEl, arch, isDark, locale);
+  if (arch.encoderDecoder) {
+    renderCausalEncoderDecoder(svgEl, arch, isDark, expandedBlocks, onBlockClick, locale);
     return;
   }
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
 
-  const containerWidth = svgEl.parentElement?.clientWidth || 600;
+  const containerWidth = svgEl.clientWidth || svgEl.parentElement?.clientWidth || 600;
   const width = Math.min(containerWidth, 640);
 
   const fg = isDark ? '#eaebec' : '#131416';
@@ -556,10 +560,10 @@ export function renderDiagram(
         y += smallH + arrowH;
 
         altRouterY[bi] = y;
-        y += blockH + arrowH;
+        if (isMoE) y += blockH + arrowH;
 
         altExpertY[bi] = y;
-        y += expertGridH;
+        y += isMoE ? expertGridH : blockH;
 
         altFFNExpandedStartY[bi] = y;
         if (isExpExperts) {
@@ -1948,7 +1952,7 @@ export function renderDiagram(
     for (let bi = 0; bi < 2; bi++) {
       const spec = alternatingSpecs[bi];
       const blockId = `altBlock${bi}`;
-      const expertsId = `altExperts${bi}`;
+      const expertsId = isMoE ? `altExperts${bi}` : `altFFN${bi}`;
       const isExp = altBlockExpanded[bi];
       const isExpExperts = altExpertsExpanded[bi];
 
@@ -2041,17 +2045,41 @@ export function renderDiagram(
         drawBlock(innerX, altNorm2Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm2Y[bi] + smallH, altNorm2Y[bi] + smallH + arrowH);
 
-        drawExpertGrid(
-          altExpertY[bi],
-          isExpExperts,
-          altExpertsExpandedH[bi],
-          altFFNExpandedStartY[bi],
-          altNorm2Y[bi],
-          altMerge2Y[bi],
-          expertsId,
-        );
+        if (isMoE) {
+          drawExpertGrid(
+            altExpertY[bi],
+            isExpExperts,
+            altExpertsExpandedH[bi],
+            altFFNExpandedStartY[bi],
+            altNorm2Y[bi],
+            altMerge2Y[bi],
+            expertsId,
+          );
+        } else {
+          drawExpandableBlock(
+            innerX,
+            altExpertY[bi],
+            innerW,
+            blockH,
+            'ffn',
+            'Feed-Forward Network',
+            `intermediate = ${arch.ffnDim?.toLocaleString()}`,
+            isExpExperts,
+            expertsId,
+          );
+          if (isExpExperts) {
+            drawFlow(ffnFlow, altFFNExpandedStartY[bi], innerX, innerW, `${ffnVariant} FFN`);
+          }
+          const bottom = isExpExperts
+            ? altFFNExpandedStartY[bi] + altExpertsExpandedH[bi]
+            : altExpertY[bi] + blockH;
+          drawArrow(bottom, altMerge2Y[bi] - circleR);
+          drawResidualBypass(altNorm2Y[bi], altMerge2Y[bi]);
+        }
       } else {
-        const collapsedSub = `\u00D7${spec.count} layers \u00B7 Top-${arch.activeExperts}/${arch.numExperts} MoE`;
+        const collapsedSub = isMoE
+          ? `\u00D7${spec.count} layers \u00B7 Top-${arch.activeExperts}/${arch.numExperts} MoE`
+          : `\u00D7${spec.count} layers \u00B7 Dense FFN`;
         drawCollapsedTransformerBlock(
           pad.left,
           altBlockStart[bi],
@@ -2067,7 +2095,11 @@ export function renderDiagram(
         drawArrow(altBlockEnd[0] + 2, altEntryY[1]);
 
         const cardBg = isDark ? '#131416' : '#eaebec';
-        const labelText = `\u21C5 ${localizedText(arch.alternatingNote ?? 'alternating every layer')}`;
+        const labelText = `\u21C5 ${
+          locale === 'zh' && arch.alternatingNoteZh
+            ? arch.alternatingNoteZh
+            : localizedText(arch.alternatingNote ?? 'alternating every layer')
+        }`;
         const labelPadX = 6;
         const labelPadY = 4;
         const labelFontSize = 10;

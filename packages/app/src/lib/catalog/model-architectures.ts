@@ -13,13 +13,6 @@ export interface AlternatingLayerSpec {
   attentionShape?: string;
 }
 
-export interface ArchitectureStage {
-  label: string;
-  labelZh: string;
-  detail: string;
-  detailZh: string;
-}
-
 export interface ModelArchitecture {
   model: Model;
   totalParams: number;
@@ -28,6 +21,7 @@ export interface ModelArchitecture {
   activeParamsPrefill?: number;
   /** Conditional-memory parameters outside the vendor's backbone count. */
   conditionalMemoryParams?: number;
+  conditionalMemoryName?: string;
   architectureType: ArchitectureType;
   attentionType: AttentionType;
   numLayers?: number;
@@ -56,6 +50,7 @@ export interface ModelArchitecture {
   alternatingAttentionExpandable?: boolean;
   sharedExperts?: number;
   alternatingNote?: string;
+  alternatingNoteZh?: string;
   denseLayerAttentionLabel?: string;
   ffnVariant?: string;
   ffnGateActivation?: string;
@@ -64,8 +59,14 @@ export interface ModelArchitecture {
   routedExpertHiddenSize?: number;
   attentionLabel?: string;
   residualType?: 'AttnRes' | 'gated';
-  /** Explicit stages for architectures a generic decoder block cannot represent. */
-  diagramStages?: ArchitectureStage[];
+  /** Causal encoder followed by a decoder whose global KV comes from encoder output. */
+  encoderDecoder?: {
+    encoderLayers: number;
+    decoderLayers: number;
+    globalKVSource: 'final-encoder-hidden-states';
+    encoderSlidingOnlyLayers: number;
+    decoderAttention: 'joint-local-swa-and-shared-global-kv';
+  };
 }
 
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
@@ -457,31 +458,34 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     residualType: 'gated',
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-models/Muse-Spark-Open-816B-A42B',
-    diagramStages: [
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    alternatingLayers: [
       {
-        label: 'Perception encoders + token embedding',
-        labelZh: '感知编码器与 token 嵌入',
-        detail: 'Text, image, video and audio inputs',
-        detailZh: '支持文本、图像、视频和音频输入',
+        label: 'Sliding GQA',
+        description: '46 local attention layers; 2048-token sliding window.',
+        count: 46,
+        colorKey: 'attention',
+        slidingWindow: 2048,
       },
       {
-        label: '62 MoE Transformer layers',
-        labelZh: '62 层 MoE Transformer',
-        detail: '46 sliding GQA (2048) + 16 full GQA',
-        detailZh: '46 层滑动窗口 GQA（2048）与 16 层全局 GQA',
+        label: 'Full GQA (NoPE)',
+        description: 'Full attention at zero-based layer indices 1, 5, …, 61.',
+        count: 16,
+        colorKey: 'norm',
       },
-      {
-        label: 'Pooled MoE + learned residual gates',
-        labelZh: 'Pooled MoE 与可学习残差门控',
-        detail: 'Top-8 / 256 experts; 4096-dim latent',
-        detailZh: '从 256 个 expert 中选取 top-8；潜在维度 4096',
-      },
-      {
-        label: 'Text output head',
-        labelZh: '文本输出头',
-        detail: '816B total · 42B active · 1M context',
-        detailZh: '总参数 816B；激活参数 42B；1M 上下文',
-      },
+    ],
+    alternatingNote: 'full GQA: layers 1, 5, …, 61 (0-based)',
+    alternatingNoteZh: '全局 GQA：第 1、5、…、61 层（从 0 计数）',
+    features: [
+      'Pooled MoE (4096-dim latent)',
+      'Learned residual gates',
+      'Native text/image/video/audio input',
+    ],
+    featuresZh: [
+      'Pooled MoE（潜在维度 4096）',
+      '可学习残差门控',
+      '原生支持文本、图像、视频和音频输入',
     ],
   },
   [Model.DeepSeek_V4_1_Flash]: {
@@ -490,8 +494,10 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     activeParams: 16,
     activeParamsPrefill: 8,
     conditionalMemoryParams: 196,
+    conditionalMemoryName: 'Engram',
     architectureType: 'moe',
     attentionType: 'Hybrid',
+    attentionLabel: 'CSA2',
     numLayers: 40,
     hiddenSize: 5120,
     numHeads: 64,
@@ -508,38 +514,13 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     slidingWindow: 128,
     developer: 'DeepSeek',
     sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash',
-    diagramStages: [
-      {
-        label: 'Vision encoder + token embedding',
-        labelZh: '视觉编码器与 token 嵌入',
-        detail: '552B backbone; separate 196B Engram memory',
-        detailZh: '主干参数 552B；另有 196B Engram 条件记忆',
-      },
-      {
-        label: '20-layer causal encoder',
-        labelZh: '20 层因果编码器',
-        detail: 'CSA2 + 128-token SWA; shared KV sources',
-        detailZh: 'CSA2 与 128-token 滑动窗口；共享 KV 来源',
-      },
-      {
-        label: '20-layer decoder',
-        labelZh: '20 层解码器',
-        detail: 'Global KV from final encoder states',
-        detailZh: '全局 KV 由编码器最终隐藏状态投影得到',
-      },
-      {
-        label: 'Prefill / decode activation',
-        labelZh: 'Prefill 与 decode 激活参数',
-        detail: '8B during prefill · 16B during decode',
-        detailZh: 'Prefill 激活 8B；decode 激活 16B',
-      },
-      {
-        label: 'Text output + DSpark draft',
-        labelZh: '文本输出与 DSpark draft',
-        detail: '1M context · single-pass mHC',
-        detailZh: '1M 上下文；单次计算的 mHC',
-      },
-    ],
+    encoderDecoder: {
+      encoderLayers: 20,
+      decoderLayers: 20,
+      globalKVSource: 'final-encoder-hidden-states',
+      encoderSlidingOnlyLayers: 2,
+      decoderAttention: 'joint-local-swa-and-shared-global-kv',
+    },
   },
   [Model.GLM_5]: {
     model: Model.GLM_5,
@@ -563,32 +544,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 202752,
     developer: 'Z.ai',
     sourceUrl: 'https://huggingface.co/zai-org/GLM-5.1',
-    diagramStages: [
-      {
-        label: 'Token embedding',
-        labelZh: 'Token 嵌入',
-        detail: '154880 vocabulary · 6144 hidden',
-        detailZh: '词表大小 154880；隐藏维度 6144',
-      },
-      {
-        label: '3 dense + 75 MoE layers',
-        labelZh: '3 个稠密层与 75 个 MoE 层',
-        detail: 'Dense FFN 12288 · expert FFN 2048',
-        detailZh: '稠密 FFN 中间维度 12288；expert FFN 2048',
-      },
-      {
-        label: 'DeepSeek Sparse Attention (DSA)',
-        labelZh: 'DeepSeek 稀疏注意力（DSA）',
-        detail: '64 heads; 256-dim QK; 512-dim KV latent',
-        detailZh: '64 个 head；QK 维度 256；KV 潜在维度 512',
-      },
-      {
-        label: 'MoE routing',
-        labelZh: 'MoE 路由',
-        detail: 'Top-8 / 256 routed + 1 shared expert',
-        detailZh: '从 256 个路由 expert 中选 top-8，另有 1 个共享 expert',
-      },
-    ],
+    features: ['DSA: top-2048 tokens', '512-dim KV latent'],
+    featuresZh: ['DSA：选取 top-2048 token', 'KV 潜在维度 512'],
   },
   [Model.GLM_5_2]: {
     model: Model.GLM_5_2,
@@ -612,37 +569,15 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 1048576,
     developer: 'Z.ai',
     sourceUrl: 'https://huggingface.co/zai-org/GLM-5.2',
-    diagramStages: [
-      {
-        label: 'Token embedding',
-        labelZh: 'Token 嵌入',
-        detail: '154880 vocabulary · 6144 hidden',
-        detailZh: '词表大小 154880；隐藏维度 6144',
-      },
-      {
-        label: '3 dense + 75 MoE layers',
-        labelZh: '3 个稠密层与 75 个 MoE 层',
-        detail: 'Dense FFN 12288 · expert FFN 2048',
-        detailZh: '稠密 FFN 中间维度 12288；expert FFN 2048',
-      },
-      {
-        label: 'DeepSeek Sparse Attention (DSA)',
-        labelZh: 'DeepSeek 稀疏注意力（DSA）',
-        detail: '64 heads; 256-dim QK; 512-dim KV latent',
-        detailZh: '64 个 head；QK 维度 256；KV 潜在维度 512',
-      },
-      {
-        label: 'MoE routing',
-        labelZh: 'MoE 路由',
-        detail: 'Top-8 / 256 routed + 1 shared expert',
-        detailZh: '从 256 个路由 expert 中选 top-8，另有 1 个共享 expert',
-      },
-      {
-        label: 'IndexShare',
-        labelZh: 'IndexShare',
-        detail: '3 full indexers, then shared/shared/shared/full',
-        detailZh: '前 3 层独立索引，之后按共享、共享、共享、独立排列',
-      },
+    features: [
+      'DSA: top-2048 tokens',
+      '512-dim KV latent',
+      'IndexShare: 3 full, then shared/shared/shared/full',
+    ],
+    featuresZh: [
+      'DSA：选取 top-2048 token',
+      'KV 潜在维度 512',
+      'IndexShare：前 3 层独立，之后按共享、共享、共享、独立排列',
     ],
   },
   [Model.Qwen3_5]: {
@@ -666,32 +601,26 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     numExperts: 513,
     activeExperts: 10,
     hasSharedExpert: true,
-    diagramStages: [
+    alternatingLayers: [
       {
-        label: 'Vision encoder + token embedding',
-        labelZh: '视觉编码器与 token 嵌入',
-        detail: '397B total · 17B active',
-        detailZh: '总参数 397B；激活参数 17B',
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 45,
+        colorKey: 'attention',
+        attentionShape: '64 V / 16 QK heads · 128d',
       },
       {
-        label: '45 Gated DeltaNet layers',
-        labelZh: '45 层 Gated DeltaNet',
-        detail: '15 groups of 3 linear-attention layers',
-        detailZh: '15 组，每组含 3 层线性注意力',
-      },
-      {
-        label: '15 Gated Attention layers',
-        labelZh: '15 层门控注意力',
-        detail: '32 Q / 2 KV heads · head dim 256',
-        detailZh: '32 个 Q head、2 个 KV head；head 维度 256',
-      },
-      {
-        label: 'MoE FFN',
-        labelZh: 'MoE FFN',
-        detail: 'Top-10 / 512 routed + 1 shared; FFN 1024',
-        detailZh: '512 个路由 expert 中选 top-10，另有 1 个共享；FFN 1024',
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 15,
+        colorKey: 'norm',
+        attentionShape: '32 Q / 2 KV heads · 256d',
       },
     ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input'],
+    featuresZh: ['原生支持图像和视频输入'],
   },
   [Model.Qwen3_8_Flash_Next]: {
     model: Model.Qwen3_8_Flash_Next,
@@ -714,38 +643,35 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     numExperts: 513,
     activeExperts: 10,
     hasSharedExpert: true,
-    diagramStages: [
+    alternatingLayers: [
       {
-        label: 'Vision encoder + token embedding',
-        labelZh: '视觉编码器与 token 嵌入',
-        detail: '176B total · 6B active',
-        detailZh: '总参数 176B；激活参数 6B',
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 36,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
       },
       {
-        label: '36 Gated DeltaNet layers',
-        labelZh: '36 层 Gated DeltaNet',
-        detail: '12 groups of 3 linear-attention layers',
-        detailZh: '12 组，每组含 3 层线性注意力',
-      },
-      {
-        label: '12 Qwen Sparse Attention (QSA) layers',
-        labelZh: '12 层 Qwen 稀疏注意力（QSA）',
-        detail: '24 Q / 2 KV heads · head dim 256',
-        detailZh: '24 个 Q head、2 个 KV head；head 维度 256',
-      },
-      {
-        label: 'MoE FFN',
-        labelZh: 'MoE FFN',
-        detail: 'Top-10 / 512 routed + 1 shared; FFN 640',
-        detailZh: '512 个路由 expert 中选 top-10，另有 1 个共享；FFN 640',
-      },
-      {
-        label: 'N-gram embedding + gated residual',
-        labelZh: 'N-gram 嵌入与门控残差',
-        detail: '125B main + 51B n-gram; separate 4B MTP',
-        detailZh: '主模型 125B 加 n-gram 表 51B；另有 4B MTP',
+        label: 'Qwen Sparse Attention (QSA)',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 12,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 2 KV heads · 256d',
       },
     ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: [
+      'Native image/video input',
+      'N-gram embedding + gated residual',
+      '125B main + 51B n-gram; separate 4B MTP',
+    ],
+    featuresZh: [
+      '原生支持图像和视频输入',
+      'N-gram 嵌入与门控残差',
+      '主模型 125B 加 n-gram 表 51B；另有 4B MTP',
+    ],
+    residualType: 'gated',
   },
   [Model.Qwen3_8_27B]: {
     model: Model.Qwen3_8_27B,
@@ -765,32 +691,26 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 262144,
     developer: 'Alibaba (Qwen)',
     sourceUrl: 'https://huggingface.co/Qwen/Qwen3.8-27B',
-    diagramStages: [
+    alternatingLayers: [
       {
-        label: 'Vision encoder + token embedding',
-        labelZh: '视觉编码器与 token 嵌入',
-        detail: '27B total · 27B active',
-        detailZh: '总参数 27B；激活参数 27B',
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 48,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
       },
       {
-        label: '48 Gated DeltaNet layers',
-        labelZh: '48 层 Gated DeltaNet',
-        detail: '16 groups of 3 linear-attention layers',
-        detailZh: '16 组，每组含 3 层线性注意力',
-      },
-      {
-        label: '16 Gated Attention layers',
-        labelZh: '16 层门控注意力',
-        detail: '24 Q / 4 KV heads · head dim 256',
-        detailZh: '24 个 Q head、4 个 KV head；head 维度 256',
-      },
-      {
-        label: 'Dense FFN',
-        labelZh: '稠密 FFN',
-        detail: 'Intermediate dimension 17408',
-        detailZh: '中间维度 17408',
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 16,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 4 KV heads · 256d',
       },
     ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input'],
+    featuresZh: ['原生支持图像和视频输入'],
   },
   [Model.Qwen3_8_27B_Eager]: {
     model: Model.Qwen3_8_27B_Eager,
@@ -810,38 +730,26 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 262144,
     developer: 'Alibaba (Qwen)',
     sourceUrl: 'https://huggingface.co/Qwen/Qwen3.8-27B',
-    diagramStages: [
+    alternatingLayers: [
       {
-        label: 'Vision encoder + token embedding',
-        labelZh: '视觉编码器与 token 嵌入',
-        detail: '27B total · 27B active',
-        detailZh: '总参数 27B；激活参数 27B',
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 48,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
       },
       {
-        label: '48 Gated DeltaNet layers',
-        labelZh: '48 层 Gated DeltaNet',
-        detail: '16 groups of 3 linear-attention layers',
-        detailZh: '16 组，每组含 3 层线性注意力',
-      },
-      {
-        label: '16 Gated Attention layers',
-        labelZh: '16 层门控注意力',
-        detail: '24 Q / 4 KV heads · head dim 256',
-        detailZh: '24 个 Q head、4 个 KV head；head 维度 256',
-      },
-      {
-        label: 'Dense FFN',
-        labelZh: '稠密 FFN',
-        detail: 'Intermediate dimension 17408',
-        detailZh: '中间维度 17408',
-      },
-      {
-        label: 'Same model, eager execution',
-        labelZh: '相同模型，采用 eager 执行',
-        detail: 'Same weights and architecture as Qwen3.8-27B',
-        detailZh: '权重与架构均与 Qwen3.8-27B 相同',
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 16,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 4 KV heads · 256d',
       },
     ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input', 'Same model, eager execution'],
+    featuresZh: ['原生支持图像和视频输入', '相同模型，采用 eager 执行'],
   },
 };
 
