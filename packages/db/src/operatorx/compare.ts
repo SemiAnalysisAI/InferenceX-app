@@ -155,7 +155,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
       const sources = workloadSources(op, r.testlist, [...new Set(r.sources.map((s) => s.model))]);
       for (const s of sources) {
         const w = workloads.get(s.id) ?? { source: s, cases: new Set(), hardware: new Set() };
-        w.cases.add(caseKey);
+        w.cases.add(stableJson(r.args));
         w.hardware.add(hw);
         workloads.set(s.id, w);
       }
@@ -210,6 +210,8 @@ export interface ComparisonCase {
 }
 
 export interface ComparisonColumns {
+  /** Backend selected for each operation; omitted only by older cached payloads. */
+  backend?: (string | null)[];
   status: (OperatorXStatus | null)[];
   latencyUs: (number | null)[];
   kernel: (number | null)[];
@@ -231,12 +233,36 @@ export interface ComparisonView {
   measurements: Record<string, ComparisonColumns>;
 }
 
+const measured = (r: ComparisonRow) =>
+  r.status === 'ok' && r.latencyUs !== null && Number.isFinite(r.latencyUs) && r.latencyUs > 0;
+
 export function comparisonView(comparison: Comparison, workloadId: string | null): ComparisonView {
   const workload =
     comparison.workloads.find((w) => w.id === workloadId)?.id ??
     comparison.workloads[0]?.id ??
     null;
-  const rows = workload ? comparison.rows.filter((r) => r.workloads.includes(workload)) : [];
+  // Raw rows retain backend identity. Hardware comparisons align full operation
+  // arguments across vendor-specific backends, selecting the fastest valid result.
+  const candidates = workload ? comparison.rows.filter((r) => r.workloads.includes(workload)) : [];
+  const selected = new Map<string, ComparisonRow & { backend: string }>();
+  for (const row of candidates) {
+    const separator = row.caseKey.lastIndexOf('|');
+    const r = {
+      ...row,
+      backend: separator === -1 ? '' : row.caseKey.slice(separator + 1),
+      caseKey: separator === -1 ? row.caseKey : row.caseKey.slice(0, separator),
+    };
+    const key = `${r.hardware}|${r.caseKey}`;
+    const previous = selected.get(key);
+    if (
+      !previous ||
+      (previous.status === 'missing' && r.status !== 'missing') ||
+      (measured(r) && (!measured(previous) || r.latencyUs! < previous.latencyUs!))
+    ) {
+      selected.set(key, r);
+    }
+  }
+  const rows = [...selected.values()];
   const caseIndex = new Map<string, number>();
   const cases: ComparisonCase[] = [];
   const models: string[] = [];
@@ -289,6 +315,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   for (const h of hardware) {
     const empty = () => Array.from({ length: cases.length }, () => null);
     measurements[h.id] = {
+      backend: empty(),
       status: empty(),
       latencyUs: empty(),
       kernel: empty(),
@@ -301,6 +328,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   for (const r of rows) {
     const i = caseIndex.get(r.caseKey)!;
     const col = measurements[r.hardware];
+    col.backend![i] = r.backend;
     col.status[i] = r.status;
     col.latencyUs[i] = r.latencyUs;
     col.cudaGraph[i] = r.cudaGraph;

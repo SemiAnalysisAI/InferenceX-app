@@ -433,3 +433,25 @@ coverage applies; no additional endpoint or OpenAPI change is needed.
 中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
 `/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
 API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
+
+### Cross-backend case alignment
+
+The comparison API and all charts align cases by the full serialized operation
+arguments, including precision, quantization, layout, and shape, rather than the
+vendor-specific backend name. For each hardware/case, the view selects the fastest
+successful finite positive latency across backends; ties keep the first result.
+If no backend succeeds, the first explicit status is retained without inventing a
+measurement. The newest-per-hardware/case/backend raw selection is unchanged.
+`measurements[hardware].backend` identifies the selected backend alongside its
+original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
+points and timeline inspection use these same selected measurements. Thus identical
+BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
+precision or quantization arguments remain separate. No public OpenAPI operation
+is added: OperatorX remains a documented page-owned API.
+
+中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
+不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为
+有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
+原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
+记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
+Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。

@@ -109,3 +109,26 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
   });
 });
+
+for (const prefix of ['', '/zh']) {
+  it(`plots head-to-head measurements across vendor backends at ${prefix || '/'}`, () => {
+    const ascend = normalizeBundle(run('105', 'ascend950pr-external', [64, 128]));
+    ascend.results = ascend.results.map((r) => ({ ...r, backend: 'torch_npu_linear' }));
+    const nvidia = normalizeBundle(run('106', 'h200-dgxc', [64, 128]));
+    const view = comparisonView(
+      buildComparison('gemm', [
+        { runner: 'ascend950pr-external', dataset: ascend },
+        { runner: 'h200-dgxc', dataset: nvidia },
+      ]),
+      null,
+    );
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('crossBackend');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@crossBackend');
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]').within(() => {
+      cy.contains('No case was measured on both.').should('not.exist');
+      cy.contains('of 2').should('be.visible');
+      cy.get('svg').should('exist');
+    });
+  });
+}
