@@ -1,19 +1,19 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { trackServer } from '@/lib/analytics-server';
-import { getCachedBenchmarks } from '@/lib/compare-ssr';
+import { trackServer } from '@/lib/analytics/analytics-server';
+import { getCachedBenchmarks } from '@/lib/compare/compare-ssr';
 import {
   computeVariantCompareImageRows,
   computeVariantCompareTableData,
   pickVariantPairDefaults,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
-import { getLogoSrc } from '@/lib/og-assets';
-import { renderComparePngChart } from '@/lib/png-chart';
+} from '@/lib/compare/compare-variant-slug';
+import { getLogoSrc } from '@/lib/seo/og-assets';
+import { renderComparePngChart } from '@/lib/compare/png-chart';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -25,8 +25,6 @@ export async function GET(
   const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
   const parsed = parsePrecisionCompareSlug(slug);
-  // Compare case-insensitively. The HTML pages lowercase before their 308, so
-  // a mixed-case PNG URL should serve rather than 404.
   if (
     !parsed ||
     canonicalPrecisionCompareSlug(parsed.model.slug, parsed.gpu, parsed.precA, parsed.precB) !==

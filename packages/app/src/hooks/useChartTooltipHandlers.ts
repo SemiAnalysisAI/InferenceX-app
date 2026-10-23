@@ -5,31 +5,17 @@ import {
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '@/lib/d3-chart/layers/scatter-points';
+import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
 import { useStickyTooltip } from './useStickyTooltip';
 
 import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
 
 export interface ChartTooltipConfig<TData> {
-  /**
-   * Type of ruler to display
-   * - 'vertical': Single vertical line (for bar charts)
-   * - 'crosshair': Both vertical and horizontal lines (for scatter charts)
-   */
   rulerType: RulerType;
 
-  /**
-   * Function to generate tooltip HTML content
-   * @param data - The data point
-   * @param isPinned - Whether the tooltip is pinned
-   */
   generateTooltipContent: (data: TData, isPinned: boolean) => string;
 
-  /**
-   * Function to get X coordinate for ruler positioning
-   * For bar charts: typically xScale(label) + bandwidth/2
-   * For scatter charts: xScale(data.x)
-   */
   getRulerX?: (
     data: TData,
     xScale:
@@ -38,10 +24,6 @@ export interface ChartTooltipConfig<TData> {
       | d3.ScaleLogarithmic<number, number, never>,
   ) => number;
 
-  /**
-   * Function to get Y coordinate for ruler positioning (crosshair only)
-   * For scatter charts: yScale(data.y)
-   */
   getRulerY?: (
     data: TData,
     yScale:
@@ -50,20 +32,10 @@ export interface ChartTooltipConfig<TData> {
       | d3.ScaleLogarithmic<number, number, never>,
   ) => number;
 
-  /**
-   * Optional function to apply hover state to element
-   * For scatter charts with custom shapes
-   */
   onHoverStart?: (selection: d3.Selection<any, TData, any, any>, data: TData) => void;
 
-  /**
-   * Optional function to remove hover state from element
-   */
   onHoverEnd?: (selection: d3.Selection<any, TData, any, any>, data: TData) => void;
 
-  /**
-   * Optional analytics tracking function called on click
-   */
   onPointClick?: (data: TData) => void;
 }
 
@@ -78,15 +50,6 @@ export interface ChartTooltipHandlers<TData> {
     svgRef: React.RefObject<SVGSVGElement | null>,
   ) => void;
 
-  /**
-   * Creates ruler elements in the chart
-   * @param group - D3 selection of the group to append rulers to
-   * @param rulerType - Type of ruler ('vertical' or 'crosshair')
-   * @param width - Chart width (for horizontal ruler)
-   * @param height - Chart height
-   * @param foregroundColor - Color for the ruler lines
-   * @returns Object with ruler group and individual ruler selections
-   */
   createRulers: (
     group: d3.Selection<SVGGElement, unknown, null, undefined>,
     rulerType: RulerType,
@@ -99,17 +62,6 @@ export interface ChartTooltipHandlers<TData> {
     horizontalRuler?: d3.Selection<SVGLineElement, unknown, null, undefined>;
   };
 
-  /**
-   * Attaches tooltip event handlers to a D3 selection
-   * @param selection - D3 selection to attach handlers to
-   * @param config - Tooltip configuration
-   * @param containerElement - Container element for positioning
-   * @param tooltipElement - Tooltip div element
-   * @param rulers - Ruler elements from createRulers
-   * @param xScale - X scale for ruler positioning
-   * @param yScale - Y scale for ruler positioning (optional, for crosshairs)
-   * @param svgRef - SVG ref for zoom transform (optional, for scatter charts)
-   */
   attachHandlers: (
     selection: d3.Selection<any, TData, any, any>,
     config: ChartTooltipConfig<TData>,
@@ -133,10 +85,6 @@ export interface ChartTooltipHandlers<TData> {
   ) => void;
 }
 
-/**
- * Hook for managing chart tooltip interactions with rulers/crosshairs
- * Consolidates common tooltip patterns across all D3 charts
- */
 export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
   const {
     pinnedPoint,
@@ -155,7 +103,6 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
       height: number,
       foregroundColor: string,
     ) => {
-      // Idempotent: reuse existing ruler group or create new
       let rulerGroup = group.select<SVGGElement>('.ruler-group');
       if (rulerGroup.empty()) {
         rulerGroup = group.append('g').attr('class', 'ruler-group').style('pointer-events', 'none');
@@ -224,7 +171,6 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
       const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
       const effectiveZoomAxes = zoomAxes;
 
-      /** Apply zoom transform to scales, respecting which axes are zoomed. */
       const getZoomedScales = () => {
         let curX = xScale;
         let curY = yScale;
@@ -244,19 +190,19 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         return { curX, curY };
       };
 
-      selection
-        .on('mouseenter', function (_event, d) {
-          if (isPinned()) return;
+      installTouchInputTracking();
 
-          // Apply custom hover state if provided
+      selection
+        .on('mouseenter', function (event, d) {
+          if (isPinned()) return;
+          if (isTouchCompatMouseEvent(event)) return;
+
           if (config.onHoverStart) {
             config.onHoverStart(d3.select(this), d);
           } else {
-            // Default: reduce opacity slightly
             d3.select(this).attr('opacity', 0.8);
           }
 
-          // Show tooltip
           tooltipElement
             .style('opacity', 1)
             .style('display', 'block')
@@ -264,10 +210,6 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
             .html(config.generateTooltipContent(d, false));
           invalidateTooltipGeometry(tooltipElement.node());
 
-          // Position rulers. During a data transition the bound scales already
-          // describe the destination while the marker is still interpolating.
-          // Prefer the live translated marker position so rulers pass through
-          // what is actually painted.
           const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
           const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
 
@@ -286,6 +228,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         })
         .on('mousemove', (event) => {
           if (isPinned()) return;
+          if (isTouchCompatMouseEvent(event)) return;
 
           const geometry = getTooltipContainerGeometry(containerElement);
           const mx = event.clientX - geometry.bounds.left;
@@ -303,11 +246,9 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         .on('mouseleave', function (_event, d) {
           if (isPinned()) return;
 
-          // Remove custom hover state if provided
           if (config.onHoverEnd) {
             config.onHoverEnd(d3.select(this), d);
           } else {
-            // Default: restore full opacity
             d3.select(this).attr('opacity', 1);
           }
 
@@ -317,7 +258,6 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         .on('click', function (event, d) {
           event.stopPropagation();
 
-          // Set content first so dimensions are available for position calc
           const geometry = getTooltipContainerGeometry(containerElement);
           const mx = event.clientX - geometry.bounds.left;
           const my = event.clientY - geometry.bounds.top;

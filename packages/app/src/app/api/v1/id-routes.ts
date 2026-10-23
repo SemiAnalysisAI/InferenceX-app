@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
-import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/public-api-errors';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError, tooManyIdsError } from '@/lib/api/public-api-errors';
 
 /**
  * Shared GET-handler factories for the agentic benchmark routes, which all
@@ -71,7 +71,7 @@ export function idQueryRoute<T>(options: {
   const { logLabel, fetch } = options;
   return async (request: NextRequest) => {
     const id = Number(request.nextUrl.searchParams.get('id'));
-    if (!id || !Number.isFinite(id)) {
+    if (!Number.isSafeInteger(id) || id <= 0) {
       return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
     }
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useMemo } from 'react';
 
@@ -16,23 +16,22 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
-} from '@/lib/chart-rendering';
-import { getChartWatermark } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
+} from '@/lib/charts/chart-rendering';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 
-interface TrendChartProps {
+export interface TrendChartProps {
   trendLines: Map<string, TrendDataPoint[]>;
   lineConfigs: TrendLineConfig[];
   yLabel: string;
   logScale: boolean;
-  /** Unique ID for this chart instance (used for SVG clip path IDs). Defaults to 'trend'. */
   chartId?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Selected precisions, in selection order; controls scatter-point shape assignment. */
   selectedPrecisions?: readonly string[];
+  lowerIsBetter?: boolean;
 }
 
 const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
@@ -52,18 +51,13 @@ const STRINGS = {
   },
 } as const;
 
-/** Prepared line data point with parsed date and timestamp for D3 scales. */
 interface PreparedPoint {
   date: Date;
   value: number;
-  /** Interactivity value from interpolation. */
   interactivity: number;
   raw: TrendDataPoint;
-  /** Timestamp in ms — used as the x-coordinate in line/point layers. */
   ts: number;
-  /** Precision string for shape rendering. */
   precision: string;
-  /** Mapped for renderScatterPoints: x = ts, y = value. */
   x: number;
   y: number;
 }
@@ -100,7 +94,6 @@ const TrendChart = React.memo(
         }),
       [],
     );
-    // All data points flattened for computing axis domains — only from VISIBLE configs
     const visibleConfigIds = useMemo(() => new Set(lineConfigs.map((c) => c.id)), [lineConfigs]);
 
     const allPoints = useMemo(() => {
@@ -118,7 +111,6 @@ const TrendChart = React.memo(
       return points;
     }, [trendLines, visibleConfigIds]);
 
-    // Prepare line data: Record<safeId, PreparedPoint[]> and a flat array for renderPoints
     const { lineDataRecord, flatPointData } = useMemo(() => {
       const record: Record<string, { x: number; y: number }[]> = {};
       const flat: PreparedPoint[] = [];
@@ -152,14 +144,12 @@ const TrendChart = React.memo(
       return { lineDataRecord: record, flatPointData: flat };
     }, [lineConfigs, trendLines]);
 
-    // Reverse lookup: safeId -> config
     const safeIdToConfig = useMemo(() => {
       const map = new Map<string, TrendLineConfig>();
       for (const c of lineConfigs) map.set(c.id.replaceAll(/[|]/gu, '_'), c);
       return map;
     }, [lineConfigs]);
 
-    // Stable callback to find which config a PreparedPoint belongs to
     const getPointConfig = useCallback(
       (d: PreparedPoint): TrendLineConfig | undefined => {
         for (const config of lineConfigs) {
@@ -171,7 +161,6 @@ const TrendChart = React.memo(
       [lineConfigs, trendLines],
     );
 
-    // Compute scale domains
     const xScaleConfig = useMemo<ScaleConfig>(() => {
       if (allPoints.length === 0) {
         return { type: 'time', domain: [new Date(), new Date()] };
@@ -187,7 +176,6 @@ const TrendChart = React.memo(
       const valueExtent = d3.extent(allPoints, (d) => d.value) as [number, number];
       const dataMin = valueExtent[0];
       const dataMax = valueExtent[1];
-      // Pad a degenerate extent so the axis renders multiple ticks instead of one raw float.
       const yRange =
         dataMax - dataMin > 0 ? dataMax - dataMin : Math.max(Math.abs(dataMax) * 0.1, 1);
       let yMin: number;
@@ -208,7 +196,6 @@ const TrendChart = React.memo(
         : { type: 'linear', domain: [yMin, yMax], nice: true };
     }, [allPoints, logScale]);
 
-    // Apply logTickFormat to the y-axis after render (needs the built scale)
     const applyLogTickFormat = useCallback(
       (ctx: Pick<RenderContext, 'layout' | 'yScale' | 'renderedYScale'>) => {
         if (!logScale) return;

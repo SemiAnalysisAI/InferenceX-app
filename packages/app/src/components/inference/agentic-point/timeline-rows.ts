@@ -1,31 +1,13 @@
-/**
- * Pure row-building logic for the request timeline: cid parsing, deep-link
- * hrefs, stable ordering/coloring, and grouping requests into Gantt rows.
- * No React — everything here is unit-testable data transformation.
- */
-
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import { localePath, type Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n/i18n';
 
 export type RowMode = 'conversation' | 'worker';
 
-/**
- * The dataset conversation id for a request: the cid with any subagent/forked
- * suffix (`::sa:…`, `::fa:…`) stripped. This is exactly the `conv_id` stored in
- * dataset_conversations, so it deep-links into /agentx/<slug>/conversations/.
- */
 export function datasetConvId(cid: string): string {
   const i = cid.indexOf('::');
   return i === -1 ? cid : cid.slice(0, i);
 }
 
-/**
- * The subagent id encoded in a cid (`…::sa:<agent_id>[:s<n>|:aux:<n>]`), or null
- * for a main-conversation request. The harness fans a single subagent into
- * parallel streams with a `:s<n>` or `:aux:<n>` suffix; the dataset
- * SubagentNode.agentId is the bare base (e.g. `subagent_001_b00fdc12`). Agent
- * ids never contain a colon, so the base is everything up to the first one.
- */
 export function subagentIdOf(cid: string): string | null {
   const i = cid.indexOf('::sa:');
   if (i === -1) return null;
@@ -34,13 +16,6 @@ export function subagentIdOf(cid: string): string | null {
   return colon === -1 ? raw : raw.slice(0, colon);
 }
 
-/**
- * Deep-link URL for the dataset conversation a request maps to. Carries the turn
- * (and, for subagent requests, the subagent id) so the flamegraph can scroll to
- * / highlight the exact node. Used both for SPA navigation on click and as the
- * real `href` on the request bar so the browser's native "open in new tab"
- * (right-click, ⌘/Ctrl-click, middle-click) works.
- */
 export function conversationHref(
   datasetSlug: string,
   req: RequestRecord,
@@ -62,7 +37,6 @@ export function conversationHref(
   );
 }
 
-/** Human label for where a request came from (raw trace index or replay turn). */
 export function requestSourceLabel(req: RequestRecord, locale: Locale = 'en'): string {
   if (typeof req.srcOuter === 'number') {
     if (typeof req.srcInner === 'number')
@@ -75,16 +49,10 @@ export function requestSourceLabel(req: RequestRecord, locale: Locale = 'en'): s
 }
 
 export interface RequestIdleStats {
-  /** Total time between the first start and last end with no request running. */
   idleNs: number;
-  /** Wall-clock span from the first request start to the final request end. */
   spanNs: number;
 }
 
-/**
- * Merge request intervals and sum the gaps between them. Queue time before a
- * request starts is intentionally excluded: "in flight" means [start, end].
- */
 export function requestIdleStats(requests: readonly RequestRecord[]): RequestIdleStats {
   const intervals = requests
     .filter(({ start, end }) => Number.isFinite(start) && Number.isFinite(end) && end >= start)
@@ -103,7 +71,6 @@ export function requestIdleStats(requests: readonly RequestRecord[]): RequestIdl
   return { idleNs, spanNs: mergedEnd - firstStart };
 }
 
-/** A stable color palette indexed by row-key hash. */
 const ROW_COLORS = [
   '#3b82f6',
   '#ef4444',
@@ -119,19 +86,6 @@ const ROW_COLORS = [
   '#eab308',
 ];
 
-/**
- * Row kinds:
- *   parent           — top-level conversation (depth 0)
- *   worker           — worker swimlane (depth 0, worker mode)
- *   subagent         — a subagent invocation (depth 1). Either a single
- *                      stream (renders its own bars), or a multi-stream
- *                      container whose bars are the union of its streams
- *                      when collapsed.
- *   stream           — one :sN stream of a multi-stream subagent (depth 2).
- *                      Hidden by default; toggled in via the parent's chevron.
- *   aux              — one :aux:N parallel lane (depth 2). Always visible
- *                      beneath its owning subagent.
- */
 type RowKind = 'parent' | 'worker' | 'subagent' | 'stream' | 'aux';
 
 export interface RequestTimelineRow {
@@ -141,28 +95,11 @@ export interface RequestTimelineRow {
   requests: RequestRecord[];
   depth: number;
   kind: RowKind;
-  /** Number of streams under this subagent (>=1). Only set for subagent rows. */
   streamCount?: number;
-  /** For stream rows: the parent subagent's row key (drives expand/collapse). */
   parentRowKey?: string;
-  /** Number of always-visible auxiliary lanes under this subagent. */
   auxCount?: number;
 }
 
-/**
- * Conversation ids for subagent calls look like
- *   <parent_cid>::sa:<agent_id>[:s<stream_idx>|:aux:<aux_idx>]
- * The optional `:s<N>` suffix is set when the harness fans a single
- * subagent into multiple parallel "streams" (interval-graph
- * decomposition in weka_trace._pack_into_streams). We split it off so
- * we can group every parallel lane under a single subagent header row.
- *
- * Aux lanes can also hang directly off the main conversation (no `::sa:`
- * segment): `<parent_cid>::aux:<aux_idx>` or `<parent_cid>::aux:red:<aux_idx>`.
- * These are parallel requests belonging to the main agent itself, so they
- * nest under the parent conversation row rather than forming their own
- * top-level group.
- */
 export function splitTimelineCid(cid: string): {
   parent: string;
   subagentBase: string | null;
@@ -198,41 +135,16 @@ export function splitTimelineCid(cid: string): {
   return { parent, subagentBase: raw, stream: null, aux: null };
 }
 
-/**
- * Top-level grouping identity for conversation mode. AIPerf can replay the
- * same source conversation in several trajectory lanes at once, so the source
- * id alone is not an execution lane. Legacy timelines have no `ri` and retain
- * the historical conversation-only grouping.
- */
 export function conversationReplayKey(request: RequestRecord): string {
   const parent = splitTimelineCid(request.cid).parent;
   return request.ri === undefined ? parent : `${parent}::replay-lane:${request.ri}`;
 }
 
-/**
- * Stable order/color index for the top-level row groups (conversations in
- * conversation mode, workers in worker mode), keyed by group id and computed
- * over the FULL (unfiltered) request set. Both the row ordering and the color
- * palette are driven by this index, so a conversation/worker keeps the same
- * position and color when the phase filter changes the visible subset — without
- * it, filtering to warmup vs profiling re-sorts and re-colors by whatever subset
- * is showing, making rows jump and swap colors.
- *
- * Groups that span BOTH phases sort first. The shared set is by definition
- * present in either phase's view, so this leading block renders identically in
- * both — a conversation that carries over from warmup into profiling stays on
- * the exact same row when the toggle flips. Phase-exclusive groups follow, and
- * only they reflow between views. Within each block the order key is the
- * group's earliest request start across all phases; ties break on the group id
- * for determinism.
- */
 export function computeStableRowIndex(
   requests: readonly RequestRecord[],
   mode: RowMode,
 ): Map<string, number> {
   const firstStart = new Map<string, number>();
-  // Which phases each group appears in. Mirrors requestsForPhase's split:
-  // 'profiling' is exact, anything else counts as warmup.
   const inProfiling = new Set<string>();
   const inWarmup = new Set<string>();
   for (const r of requests) {
@@ -254,25 +166,6 @@ export function computeStableRowIndex(
   return index;
 }
 
-/**
- * Group requests into rows. In conversation mode, output order is:
- *   parent_conv
- *     subagent_001                  (collapsed by default, container)
- *       :s0                         (hidden unless expanded)
- *       :s1
- *       aux 011 · parallel          (always visible)
- *     subagent_002
- *     ...
- *
- * `expandedSubagents` controls which subagent containers reveal their
- * stream children. Bars on a collapsed subagent are the UNION of all its
- * streams' requests — overlapping bars visually communicate the
- * stream-level parallelism without expanding.
- *
- * `stableRowIndex` (optional) pins the top-level order + color per group so they
- * survive phase-filter changes; when omitted it's derived from `requests` (the
- * legacy self-contained behavior, used by unit tests).
- */
 export function buildRequestTimelineRows(
   requests: RequestRecord[],
   mode: RowMode,
@@ -287,7 +180,6 @@ export function buildRequestTimelineRows(
     ]!;
   const orderOf = (key: string) => index.get(key) ?? Number.POSITIVE_INFINITY;
   if (mode !== 'conversation') {
-    // Worker mode: flat rows, sorted by first activity.
     const groups = new Map<string, RequestRecord[]>();
     for (const r of requests) {
       let list = groups.get(r.wid);
@@ -315,7 +207,6 @@ export function buildRequestTimelineRows(
     return rows;
   }
 
-  // Conversation mode — tree: parent → subagent → stream/aux lane.
   interface SubagentLanes {
     streams: Map<number | null, RequestRecord[]>;
     aux: Map<string, RequestRecord[]>;
@@ -325,9 +216,7 @@ export function buildRequestTimelineRows(
     parentCid: string;
     replayIndex?: number;
     parentReqs: RequestRecord[];
-    // Aux lanes hanging directly off the main agent (`<cid>::aux:…`).
     parentAux: Map<string, RequestRecord[]>;
-    // subagentBase → primary streams + always-visible auxiliary lanes.
     subagents: Map<string, SubagentLanes>;
     firstStart: number;
   }
@@ -379,7 +268,6 @@ export function buildRequestTimelineRows(
   const rows: RequestTimelineRow[] = [];
   for (const tree of sortedTrees) {
     const color = colorFor(tree.groupKey);
-    // Parent row (use a placeholder key if the parent itself wasn't replayed).
     tree.parentReqs.sort((a, b) => a.start - b.start);
     const parentRowKey = tree.parentReqs.length > 0 ? tree.groupKey : `__parent_${tree.groupKey}`;
     const replayLabel =
@@ -395,8 +283,6 @@ export function buildRequestTimelineRows(
       kind: 'parent',
     });
 
-    // Aux lanes belonging to the main agent itself (`<cid>::aux:…`), nested
-    // directly beneath the parent row. Always visible, like subagent aux lanes.
     const parentAuxEntries = [...tree.parentAux.entries()].toSorted(
       (a, b) =>
         (a[1][0]?.start ?? Number.POSITIVE_INFINITY) - (b[1][0]?.start ?? Number.POSITIVE_INFINITY),
@@ -414,7 +300,6 @@ export function buildRequestTimelineRows(
       });
     }
 
-    // One subagent row per base (which may contain N streams).
     const subagentEntries = [...tree.subagents.entries()].toSorted((a, b) => {
       const aStart = Math.min(
         ...[...a[1].streams.values(), ...a[1].aux.values()].map(
@@ -430,8 +315,6 @@ export function buildRequestTimelineRows(
     });
     for (const [saBase, lanes] of subagentEntries) {
       const subagentKey = `${tree.groupKey}::sa:${saBase}`;
-      // Union of primary stream requests for collapsed-view bars. Aux lanes
-      // stay separate so their overlap remains visible as parallel work.
       const allReqs: RequestRecord[] = [];
       for (const reqs of lanes.streams.values()) {
         for (const request of reqs) allReqs.push(request);
@@ -449,11 +332,8 @@ export function buildRequestTimelineRows(
         auxCount: lanes.aux.size,
       });
 
-      // Stream children only when expanded AND there's more than one
-      // stream (a single-stream subagent has nothing extra to show).
       if (streamCount > 1 && expandedSubagents.has(subagentKey)) {
         const streamEntries = [...lanes.streams.entries()].toSorted((a, b) => {
-          // Sort by stream index (null first as the "default" stream)
           const ai = a[0] ?? -1;
           const bi = b[0] ?? -1;
           return ai - bi;
@@ -472,9 +352,6 @@ export function buildRequestTimelineRows(
         }
       }
 
-      // Aux lanes encode concurrent requests within the subagent. Keep them
-      // visible even when primary streams are collapsed so parallelism is not
-      // hidden behind an interaction.
       const auxEntries = [...lanes.aux.entries()].toSorted(
         (a, b) =>
           (a[1][0]?.start ?? Number.POSITIVE_INFINITY) -
@@ -497,14 +374,12 @@ export function buildRequestTimelineRows(
   return rows;
 }
 
-/** `subagent_001_bf1c5c16` → `subagent 001 · bf1c` (compact, readable). */
 export function formatSubagentLabel(raw: string, _locale: Locale): string {
   const m = /^subagent_(?<index>\d+)_(?<hash>[0-9a-f]+)$/iu.exec(raw);
   if (!m) return raw;
   return `subagent ${m[1]} · ${m[2]!.slice(0, 4)}`;
 }
 
-/** `worker_4ae87bea` → `w_4ae8` (compact worker swimlane label). */
 export function shortenWid(wid: string): string {
   return wid.replace(/^worker_/, 'w_').slice(0, 12);
 }

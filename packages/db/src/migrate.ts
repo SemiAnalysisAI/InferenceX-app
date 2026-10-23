@@ -1,13 +1,3 @@
-/**
- * Run database migrations against the Neon Postgres instance.
- *
- * Always uses the direct (non-pooled) connection — migrations must not go
- * through PgBouncer's transaction pooling mode.
- *
- * Usage:
- *   bun run admin:db:migrate
- */
-
 import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
@@ -19,7 +9,7 @@ const MIGRATIONS_DIR = path.join(import.meta.dirname, '..', 'migrations');
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
   max: 1,
-  onnotice: () => {}, // suppress "relation already exists" notices
+  onnotice: () => {},
 });
 
 async function migrate(): Promise<void> {

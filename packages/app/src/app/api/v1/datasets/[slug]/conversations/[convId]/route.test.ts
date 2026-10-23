@@ -14,7 +14,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/datasets', () => ({
   getConversation: mockGetConversation,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (data: unknown) => Response.json(data),
 }));
@@ -26,14 +26,6 @@ function req(): NextRequest {
   return new NextRequest(new URL('http://localhost/api/v1/datasets/ds/conversations/x'));
 }
 
-/**
- * App Router decodes each dynamic route segment EXACTLY ONCE before handing it to
- * the handler, so `params.convId` is already the raw conversation id. These tests
- * pin the route's contract: it must pass that value straight to the query with NO
- * further decodeURIComponent (which would over-decode, mis-key '%'/'/' ids, or
- * throw on a lone '%'). The client (useDatasetConversation) encodeURIComponent's
- * the id before the fetch, so the whole pipeline decodes once end-to-end.
- */
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetConversation.mockResolvedValue({ conv_id: 'x', turns: [] });
@@ -44,8 +36,6 @@ describe('GET /api/v1/datasets/[slug]/conversations/[convId] — decode exactly 
     const params = Promise.resolve({ slug: 'ds', convId: 'a/b%c' });
     const res = await GET(req(), { params });
     expect(res.status).toBe(200);
-    // 'a/b%c' contains a lone '%'; a second decodeURIComponent here would THROW
-    // (→ 500). Passing through means the query sees the raw id verbatim.
     expect(mockGetConversation).toHaveBeenCalledWith('mock-sql', 'ds', 'a/b%c');
   });
 

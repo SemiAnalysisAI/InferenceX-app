@@ -1,7 +1,5 @@
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 
-/** Chinese sibling of `/overview` — see `app/overview/layout.tsx` for why this
- *  route skips DashboardShell. */
 export default function ZhOverviewLayout({ children }: { children: React.ReactNode }) {
   return (
     <>

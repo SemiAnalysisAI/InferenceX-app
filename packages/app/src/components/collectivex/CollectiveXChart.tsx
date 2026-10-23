@@ -4,8 +4,8 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { chartPoints, collectiveXColorKey, collectiveXRunDasharray, fitAlphaBeta } from './data';
 import type {
@@ -151,9 +151,6 @@ export function CollectiveXChart({
     [series, operation, percentile, yAxis, locale],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
-  // Per-series α/β fit for the current operation (p50). β is the per-GPU
-  // bandwidth term, α the fixed overhead; surfaced in the tooltip. Null when a
-  // series has too few points / a degenerate byte axis to fit.
   const fitsBySeries = useMemo(
     () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
     [series, operation],

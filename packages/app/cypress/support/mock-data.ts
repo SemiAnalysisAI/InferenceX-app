@@ -22,20 +22,15 @@ import type {
   GlobalFilterRunContextType,
   GlobalFilterSelectionContextType,
   GlobalFilterWorkflowContextType,
-} from '@/components/GlobalFilterContext';
-import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
+} from '@/providers/GlobalFilterContext';
+import type { UnofficialRunContextType } from '@/providers/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { Model, Sequence, Precision } from '@/lib/data-mappings';
+import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
 import React from 'react';
 
-/** cy.stub() with .as() alias — cast to any to work around Cypress type limitation. */
 function namedStub(alias: string) {
   return (cy.stub() as any).as(alias);
 }
-
-// ---------------------------------------------------------------------------
-// Hardware config
-// ---------------------------------------------------------------------------
 
 export function createMockHardwareConfig(): HardwareConfig {
   return {
@@ -86,16 +81,14 @@ export function createMockHardwareConfig(): HardwareConfig {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Chart definition
-// ---------------------------------------------------------------------------
-
 export function createMockChartDefinition(overrides?: Partial<ChartDefinition>): ChartDefinition {
+  const chartType = overrides?.chartType ?? 'e2e';
+  const x = overrides?.x ?? (chartType === 'interactivity' ? 'median_intvty' : 'median_e2el');
   return {
-    chartType: 'e2e',
+    chartType,
     heading: 'End-to-End Latency vs Throughput',
-    x: 'conc' as keyof AggDataEntry,
-    x_label: 'Concurrency',
+    x,
+    x_label: chartType === 'interactivity' ? 'Interactivity' : 'End-to-end Latency (s)',
     y: 'mean_e2el' as keyof AggDataEntry,
     y_label: 'Mean E2E Latency (ms)',
     y_tpPerGpu: 'tput_per_gpu',
@@ -103,14 +96,11 @@ export function createMockChartDefinition(overrides?: Partial<ChartDefinition>):
     y_tpPerGpu_title: 'Throughput per Chip',
     y_tpPerGpu_roofline: 'upper_right',
     ...overrides,
-    x_scale_field: overrides?.x_scale_field ?? String(overrides?.x ?? 'conc'),
-    x_labelZh: overrides?.x_labelZh ?? '并发数',
+    x_scale_field: overrides?.x_scale_field ?? String(x),
+    x_labelZh:
+      overrides?.x_labelZh ?? (chartType === 'interactivity' ? '交互性' : '端到端延迟（s）'),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Inference data
-// ---------------------------------------------------------------------------
 
 export function createMockInferenceData(overrides?: Partial<InferenceData>): InferenceData {
   return {
@@ -160,10 +150,6 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Inference domain contexts
-// ---------------------------------------------------------------------------
 
 export type MockInferenceContextValues = InferenceDataContextType &
   InferenceFiltersContextType &
@@ -224,14 +210,20 @@ export function createMockInferenceContextValues(
     openRouterPricingError: null,
     setTokenRevenuePriceSource: namedStub('setTokenRevenuePriceSource'),
     selectedPercentile: 'p90',
-    setSelectedPercentile: namedStub('setSelectedPercentile'),
+    fixedSequenceStatistic: 'median',
+    setFixedSequenceStatistic: namedStub('setFixedSequenceStatistic'),
+    tokenBasis: 'total',
+    setTokenBasis: namedStub('setTokenBasis'),
     selectedXAxisMetric: null,
     setSelectedXAxisMetric: namedStub('setSelectedXAxisMetric'),
     selectedE2eXAxisMetric: null,
     selectedXAxisMode: 'interactivity' as const,
+    defaultXAxisMode: 'interactivity' as const,
     setSelectedXAxisMode: namedStub('setSelectedXAxisMode'),
     scaleType: 'auto',
     setScaleType: namedStub('setScaleType'),
+    powerCompare: 'none' as const,
+    setPowerCompare: namedStub('setPowerCompare'),
     quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     setQuickFilterVendors: namedStub('setQuickFilterVendors'),
@@ -239,12 +231,11 @@ export function createMockInferenceContextValues(
     setQuickFilterDeployment: namedStub('setQuickFilterDeployment'),
     setQuickFilterSpec: namedStub('setQuickFilterSpec'),
     setQuickFilterPower: namedStub('setQuickFilterPower'),
+    setQuickFilterTopologies: namedStub('setQuickFilterTopologies'),
     isLegendExpanded: true,
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
     setHideNonOptimal: namedStub('setHideNonOptimal'),
-    showAllMeasurements: false,
-    setShowAllMeasurements: namedStub('setShowAllMeasurements'),
     showPointLabels: false,
     setShowPointLabels: namedStub('setShowPointLabels'),
     highContrast: false,
@@ -301,10 +292,6 @@ export function createMockInferenceContextValues(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Evaluation chart data
-// ---------------------------------------------------------------------------
-
 export function createMockEvaluationChartData(
   overrides?: Partial<EvaluationChartData>,
 ): EvaluationChartData {
@@ -343,10 +330,6 @@ export function createMockEvaluationChartData(
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Evaluation context
-// ---------------------------------------------------------------------------
 
 export function createMockEvaluationContext(
   overrides?: Partial<EvaluationChartContextType>,
@@ -392,10 +375,6 @@ export function createMockEvaluationContext(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Reliability data
-// ---------------------------------------------------------------------------
-
 export function createMockReliabilityData(
   overrides?: Partial<ModelSuccessRateData & { modelLabel: string }>,
 ): ModelSuccessRateData & { modelLabel: string } {
@@ -408,10 +387,6 @@ export function createMockReliabilityData(
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Reliability context
-// ---------------------------------------------------------------------------
 
 export function createMockReliabilityContext(
   overrides?: Partial<ReliabilityChartContextType>,
@@ -449,9 +424,6 @@ export function createMockReliabilityContext(
     ...overrides,
   };
 }
-
-// Global filter contexts
-// ---------------------------------------------------------------------------
 
 export type GlobalFilterContextOverrides = Partial<
   GlobalFilterSelectionContextType &
@@ -547,10 +519,6 @@ export function createMockGlobalFilterContexts(
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Unofficial run context
-// ---------------------------------------------------------------------------
 
 export function createMockUnofficialRunContext(
   overrides?: Partial<UnofficialRunContextType>,

@@ -1,21 +1,9 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import { agenticMetrics } from '../support/agentic-fixtures';
 
-// ---------------------------------------------------------------------------
-// Spec-scoped fixture helpers
-//
-// The shared cypress/fixtures/api/*.json files contain ZERO agentic_traces rows
-// (by design — agentic coverage is injected per-spec so fixed-seq specs stay
-// lean). This spec therefore injects minimal agentic data via spec-scoped
-// cy.intercept overrides that shadow the fixture server, following the same
-// pattern used in ttft-x-axis-toggle.cy.ts.
-// ---------------------------------------------------------------------------
-
-const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro
+const DEFAULT_MODEL_DB_KEY = 'dsv4';
 const AGENTIC_DATE = '2026-06-12';
 
-// Three configs with agentic + single_turn entries so the scenario selector resolves
-// to agentic (agentic preferred when both types exist for the same model).
 const AGENTIC_HARDWARE = [
   { hardware: 'b200', framework: 'vllm', disagg: false },
   { hardware: 'b200', framework: 'sglang', disagg: false },
@@ -23,7 +11,6 @@ const AGENTIC_HARDWARE = [
 ];
 
 const agenticAvailability = [
-  // Agentic rows (isl/osl null).
   ...AGENTIC_HARDWARE.map((g) => ({
     model: DEFAULT_MODEL_DB_KEY,
     isl: null,
@@ -36,8 +23,6 @@ const agenticAvailability = [
     benchmark_type: 'agentic_traces',
     date: AGENTIC_DATE,
   })),
-  // Single-turn rows alongside — without these the scenario selector may not
-  // see the "both exist" signal it needs to confidently pick agentic.
   ...AGENTIC_HARDWARE.map((g) => ({
     model: DEFAULT_MODEL_DB_KEY,
     isl: 8192,
@@ -52,8 +37,6 @@ const agenticAvailability = [
   })),
 ];
 
-// IDs must be unique numbers — the GPU graph uses them as D3 data keys and
-// trace-availability is keyed on them.
 let benchIdCursor = 800100;
 const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
   [16, 64, 128].map((conc) => ({
@@ -96,19 +79,19 @@ const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
   })),
 );
 
-// All injected IDs with a stored trace blob — the GPU graph renders the
-// "View charts" link only when trace-availability returns true for the id.
 const agenticIds = new Set(agenticBenchmarks.map((b) => b.id));
+
+function expectCompatibleSelection($inputs: JQuery<HTMLElement>) {
+  const ids = [...$inputs].map((input) => input.id).sort();
+  expect(ids).to.deep.equal(['checkbox-b200_sglang', 'checkbox-b300_vllm']);
+}
 
 describe('GPU comparison agentic point detail', () => {
   it('exposes the per-point charts as a normal browser link', () => {
-    // Shadow the fixture-server availability + benchmarks responses with
-    // spec-scoped agentic data so the GPU graph renders agentic dots.
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
       'agenticAvailability',
     );
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
-    // Return true for all injected ids so the "View charts" link appears.
     cy.intercept('GET', '/api/v1/trace-availability*', (request) => {
       const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
       if (ids.length < 20) request.alias = 'gpuTraceAvailability';
@@ -125,8 +108,6 @@ describe('GPU comparison agentic point detail', () => {
         ),
       });
     }).as('gpuLogAvailability');
-    // The agentic default x-axis mode (E2E Normalized Interactivity) fetches derived metrics on
-    // mount; without values every point drops out of the (remapped) data set.
     interceptDerivedAgenticMetrics();
 
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -184,10 +165,6 @@ describe('GPU comparison agentic point detail', () => {
         expect($link).not.to.have.attr('target');
         const href = $link.attr('href') ?? '';
         expect(href).to.match(/^\/inference\/agentic\/\d+\?/u);
-        // The chart state rides along so the detail page can link back to the
-        // view the reader left — see agentic-detail-back-nav.cy.ts. Only
-        // non-default values are carried, so `g_model` (DeepSeek-V4-Pro IS the
-        // default) is absent while the scenario and GPU selection are not.
         const params = new URLSearchParams(href.slice(href.indexOf('?')));
         expect(params.get('i_seq')).to.equal('agentic-traces');
         expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
@@ -209,6 +186,84 @@ describe('GPU comparison agentic point detail', () => {
   const CONFLICTING_GPU_URL =
     '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
 
+  it('restores a soloed compatible selection without requesting engine consent', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
+    cy.get(checked).should(expectCompatibleSelection);
+    cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
+    cy.get(checked).should('have.length', 1).and('have.attr', 'id', 'checkbox-b200_sglang');
+    cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('not.exist');
+    cy.get(checked).should(expectCompatibleSelection);
+  });
+
+  it('defaults to the scored winner and requires consent before showing both engines', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).not.to.contain('b200_vllm');
+    });
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]')
+      .should('have.attr', 'data-state', 'checked')
+      .click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('be.visible');
+    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]')
+      .should('have.attr', 'data-state', 'checked')
+      .click();
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]').should(
+      'have.attr',
+      'data-state',
+      'unchecked',
+    );
+    cy.contains('button', 'Done').click();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).to.contain('b200_vllm');
+    });
+    cy.reload();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids.includes('b200_sglang') && ids.includes('b200_vllm')).to.equal(false);
+    });
+    cy.get('[data-testid="chart-legend"] input[id^="checkbox-b200_"]:not(:checked)')
+      .first()
+      .invoke('attr', 'id')
+      .then((id) => cy.get(`[data-testid="chart-legend"] label[for="${id}"]`).click());
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).to.contain('b200_vllm');
+      expect(ids).to.contain('b300_vllm');
+    });
+  });
+
   it('surfaces automatic resolution of conflicting GPU URL state', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
       'agenticAvailability',
@@ -216,19 +271,14 @@ describe('GPU comparison agentic point detail', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 
-    // Agentic surfaces are public, so this test must run with the ↑↑↓↓ feature
-    // gate LOCKED: an unlocked gate lifts the cross-engine guard (see the next
-    // test). testIsolation is off, so clear the flag an earlier test seeded.
     cy.visit(CONFLICTING_GPU_URL, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-filter-hint-nudge-dismissed', 'true');
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
 
-    // Official DeepSeek-V4-Pro agentic charts prefer vLLM when they first resolve
-    // a cross-engine conflict with no sticky selection (comparisonDefaultGroup,
-    // PR #632). Before that the winner was the alphabetically-first group, SGLang.
     cy.get('[data-testid="engine-comparison-conflict-toast"]')
       .should('be.visible')
       .and('contain.text', 'Kept vLLM and removed SGLang configs');
@@ -236,6 +286,13 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.contains('button', 'Review comparison warning').click();
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
+      .should('contain.text', 'vLLM')
+      .and('contain.text', 'SGLang');
   });
 
   it('lets vLLM and SGLang share the graph when the feature gate is unlocked', () => {
@@ -252,8 +309,6 @@ describe('GPU comparison agentic point detail', () => {
       },
     });
 
-    // With the ↑↑↓↓ gate unlocked the comparability guard is lifted, so both
-    // engine families stay selected and no conflict toast is raised.
     cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
       .should('contain.text', 'vLLM')
       .and('contain.text', 'SGLang');

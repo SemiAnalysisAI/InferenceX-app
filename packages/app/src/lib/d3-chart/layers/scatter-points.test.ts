@@ -2,13 +2,20 @@
 import * as d3 from 'd3';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { ShapeKey } from '@/lib/chart-rendering';
+import {
+  applyNormalState,
+  getShapeConfig,
+  normalStateAttrs,
+  type ShapeKey,
+} from '@/lib/charts/chart-rendering';
 
 import {
   computeTooltipPosition,
   invalidateTooltipGeometry,
   renderScatterPoints,
+  syncPointLabel,
   syncPointShape,
+  updateScatterPointsForDisplay,
 } from './scatter-points';
 
 interface TestPoint {
@@ -66,7 +73,6 @@ describe('renderScatterPoints with getShapeKey', () => {
 
   it('swaps shape elements in place when the accessor result changes', () => {
     const group = makeZoomGroup();
-    // Single selected precision: everything is a circle.
     const shapeState: { fp4: ShapeKey } = { fp4: 'circle' };
     const config = {
       getColor: () => '#123456',
@@ -81,15 +87,11 @@ describe('renderScatterPoints with getShapeKey', () => {
         .every((n) => n.tagName.toLowerCase() === 'circle'),
     ).toBe(true);
 
-    // Second precision selected: fp4 points become squares. Same config
-    // object — the accessor reads current state, mirroring the ref-based
-    // accessors ScatterGraph passes so a precision toggle doesn't have to
-    // recreate the layer config.
     shapeState.fp4 = 'square';
     renderScatterPoints(group, POINTS, xScale, yScale, config, keyFn);
 
     const dotGroups = group.selectAll<SVGGElement, TestPoint>('.dot-group');
-    expect(dotGroups.size()).toBe(3); // reused, not recreated
+    expect(dotGroups.size()).toBe(3);
     const fp4Shape = dotGroups
       .filter((d) => d.precision === 'fp4')
       .select<SVGElement>('.visible-shape');
@@ -150,7 +152,7 @@ describe('syncPointShape', () => {
 
     syncPointShape(g, 'circle', '#00ff00');
     const shape = g.select<SVGElement>('.visible-shape');
-    expect(shape.node()).toBe(node); // same element, no swap
+    expect(shape.node()).toBe(node);
     expect(shape.attr('fill')).toBe('#00ff00');
   });
 
@@ -164,7 +166,6 @@ describe('syncPointShape', () => {
     expect(after.node()).not.toBe(before);
     expect(after.node()!.tagName.toLowerCase()).toBe('rect');
     expect(after.attr('data-shape-key')).toBe('square');
-    // Only one visible shape remains.
     expect(g.selectAll('.visible-shape').size()).toBe(1);
   });
 });
@@ -287,4 +288,117 @@ describe('computeTooltipPosition', () => {
       top: 316,
     });
   });
+});
+
+function recordMutations(root: Node, run: () => void): string[] {
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(root, { attributes: true, childList: true, characterData: true, subtree: true });
+  run();
+  const records = observer.takeRecords();
+  observer.disconnect();
+  return records.map((r) =>
+    r.type === 'attributes' ? `${(r.target as Element).tagName}.${r.attributeName}` : r.type,
+  );
+}
+
+describe('syncPointLabel', () => {
+  function makePointGroup() {
+    return makeZoomGroup().append('g').attr('class', 'dot-group').node()!;
+  }
+
+  it('creates the label with its tspans', () => {
+    const group = makePointGroup();
+    syncPointLabel(group, 'TP8\nEP4', '#fff', false);
+
+    const label = group.querySelector('.point-label')!;
+    expect(label.getAttribute('fill')).toBe('#fff');
+    expect(label.getAttribute('text-anchor')).toBe('middle');
+    expect((label as SVGTextElement).style.opacity).toBe('1');
+    const tspans = [...label.querySelectorAll('tspan')];
+    expect(tspans.map((t) => t.textContent)).toEqual(['TP8', 'EP4']);
+    expect(tspans.map((t) => t.getAttribute('dy'))).toEqual([`${-(0.8 + 1.1)}em`, '1.1em']);
+  });
+
+  it('emits no mutation records when re-synced with the same state', () => {
+    const group = makePointGroup();
+    syncPointLabel(group, 'TP8\nEP4', '#fff', false);
+
+    expect(recordMutations(group, () => syncPointLabel(group, 'TP8\nEP4', '#fff', false))).toEqual(
+      [],
+    );
+  });
+
+  it('writes only what changed', () => {
+    const group = makePointGroup();
+    syncPointLabel(group, 'TP8', '#fff', false);
+
+    expect(recordMutations(group, () => syncPointLabel(group, 'TP4', '#fff', true))).toEqual([
+      'text.style',
+      'text.style',
+      'childList',
+    ]);
+    const label = group.querySelector<SVGTextElement>('.point-label')!;
+    expect(label.style.display).toBe('none');
+    expect(label.style.opacity).toBe('0');
+    expect(label.textContent).toBe('TP4');
+  });
+});
+
+describe('updateScatterPointsForDisplay', () => {
+  const config = {
+    getColor: (d: TestPoint) => (d.hwKey === 'h100' ? 'green' : 'red'),
+    getOpacity: (d: TestPoint) => (d.hwKey === 'h100' ? 1 : 0.2),
+    getPointerEvents: (d: TestPoint) => (d.hwKey === 'h100' ? 'auto' : 'none'),
+    getLabelText: (d: TestPoint) => `TP${d.tp}`,
+    foreground: '#fff',
+  };
+
+  it('emits no mutation records when the display state is unchanged', () => {
+    const group = makeZoomGroup();
+    renderScatterPoints(group, POINTS, xScale, yScale, config, keyFn);
+    updateScatterPointsForDisplay(group, config);
+
+    expect(
+      recordMutations(group.node()!, () => updateScatterPointsForDisplay(group, config)),
+    ).toEqual([]);
+  });
+
+  it('still applies a changed display state', () => {
+    const group = makeZoomGroup();
+    renderScatterPoints(group, POINTS, xScale, yScale, config, keyFn);
+    updateScatterPointsForDisplay(group, config);
+
+    updateScatterPointsForDisplay(group, {
+      ...config,
+      getOpacity: () => 0.2,
+      getColor: () => 'blue',
+      hideLabels: true,
+    });
+
+    const points = group.selectAll<SVGGElement, TestPoint>('.dot-group').nodes();
+    expect(points.map((p) => p.style.opacity)).toEqual(['0.2', '0.2', '0.2']);
+    expect(points.map((p) => p.querySelector('.visible-shape')!.getAttribute('fill'))).toEqual([
+      'blue',
+      'blue',
+      'blue',
+    ]);
+    expect(
+      points.map((p) => (p.querySelector('.point-label') as SVGTextElement).style.display),
+    ).toEqual(['none', 'none', 'none']);
+  });
+});
+
+describe('normalStateAttrs', () => {
+  it.each(['circle', 'square', 'triangle', 'diamond'] as ShapeKey[])(
+    'matches what applyNormalState writes for %s',
+    (shapeKey) => {
+      const element = document.createElementNS(
+        'http://www.w3.org/2000/svg',
+        getShapeConfig(shapeKey).type,
+      ) as SVGCircleElement | SVGRectElement | SVGPathElement;
+      applyNormalState(d3.select(element), shapeKey);
+      const written = [...element.attributes].map((a) => [a.name, a.value]);
+      expect(normalStateAttrs(shapeKey)).toEqual(written);
+    },
+  );
 });

@@ -1,19 +1,10 @@
-/**
- * @file canonicalFrontier.ts
- * @description Canonical agentic Pareto-frontier helpers.
- *
- * E2E Normalized Interactivity is the agentic "north star" axis. Its true
- * Pareto frontier supplies the canonical eligibility set for every agentic
- * x-axis. Each displayed axis still computes its own true Pareto frontier, and
- * only points that belong to both sets may be drawn as optimal.
- */
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 
 import type { InferenceData } from '../types';
 
@@ -21,14 +12,6 @@ interface ProjectedPoint extends InferenceData {
   canonicalId: number;
 }
 
-/**
- * Compute the true Pareto frontier in (E2E Normalized Interactivity, y) space,
- * independently for each (hardware, precision, date) series.
- *
- * `null` means the selected y metric has no declared frontier direction, so
- * callers should retain the chart's normal unrestricted behavior. An empty set
- * means the canonical rule applies but no point has a usable persisted metric.
- */
 export function canonicalNormalizedFrontierIds(
   points: InferenceData[],
   derivedMetrics: DerivedAgenticMetricMap,
@@ -67,18 +50,6 @@ export function canonicalNormalizedFrontierIds(
   return winners;
 }
 
-/**
- * Return the intersection of the selected-axis Pareto frontier and the
- * normalized-interactivity frontier when canonical flags are present.
- *
- * The selected-axis frontier must be computed from all eligible points before
- * applying the canonical restriction. Computing Pareto(canonicalPoints) would
- * incorrectly retain a canonical point that is dominated on the selected axis
- * by a non-canonical point.
- *
- * `null` means no canonical restriction was stamped, so the caller should
- * compute its ordinary local Pareto frontier.
- */
 export function canonicalParetoIntersection(
   points: InferenceData[],
   direction: ParetoDirection,

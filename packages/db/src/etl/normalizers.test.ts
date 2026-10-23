@@ -14,6 +14,35 @@ import {
 } from './normalizers';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
+describe('Muse Spark Open ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'musespark' },
+    { model_prefix: 'musespark' },
+    { model: 'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4' },
+    { model: 'meta-models/Muse-Spark-Open-816B-A42B-NVFP4' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('musespark');
+  });
+
+  it('does not mistake the DFlash2 draft for the target model', () => {
+    expect(resolveModelKey({ model: 'RadixArk/Muse-Spark-Open-DFlash2' })).toBeNull();
+  });
+});
+
+describe('MiniMax M3.1 Flash ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'minimaxm31flash' },
+    { model_prefix: 'minimaxm31flash' },
+    { model: 'MiniMaxAI/MiniMax-M3.1-Flash' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('minimaxm31flash');
+  });
+
+  it('keeps MiniMax M3 rows in their own bucket', () => {
+    expect(resolveModelKey({ infmax_model_prefix: 'minimaxm3' })).toBe('minimaxm3');
+  });
+});
+
 describe('hwToGpuKey', () => {
   it('strips -nv suffix', () => {
     expect(hwToGpuKey('h200-nv')).toBe('h200');
@@ -29,6 +58,12 @@ describe('hwToGpuKey', () => {
   it('strips a v3 scope prefix (cluster:…)', () => {
     expect(hwToGpuKey('cluster:b300-nv')).toBe('b300');
     expect(hwToGpuKey('cluster:h200')).toBe('h200');
+  });
+
+  it('maps the vrnvl72 runner label to vr200', () => {
+    expect(hwToGpuKey('vrnvl72-nv')).toBe('vr200');
+    expect(hwToGpuKey('vrnvl72-nv_12_1')).toBe('vr200');
+    expect(hwToGpuKey('cluster:vrnvl72-nv')).toBe('vr200');
   });
 
   it('strips -amds suffix', () => {
@@ -119,8 +154,6 @@ describe('resolveModelKey', () => {
   it('resolves from infmax_model_prefix', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'dsr1' })).toBe('dsr1');
     expect(resolveModelKey({ infmax_model_prefix: 'llama70b' })).toBe('llama70b');
-    // GLM-5.3 is its own DB key (InferenceX#3330 reports it as `glm5.3`), shown in
-    // the GLM-5.2 display bucket; both the prefix and the HF id must resolve.
     expect(resolveModelKey({ infmax_model_prefix: 'glm5.3' })).toBe('glm5.3');
     expect(resolveModelKey({ model: 'zai-org/GLM-5.3' })).toBe('glm5.3');
   });
@@ -146,16 +179,10 @@ describe('resolveModelKey', () => {
   });
 
   it('resolves AMD Kimi-K2.7-Code identifiers to the canonical kimik2.7-code key', () => {
-    // AMD AgentX sweeps emit the bare prefix `kimik2.7` (no `-code`) and the
-    // MXFP4 model path `amd/Kimi-K2.7-Code-MXFP4`; both must fold into the
-    // canonical `kimik2.7-code` DB bucket. Regression for GitHub Actions run
-    // 29975243963, whose overlay rendered nothing because every row was skipped
-    // as an unmapped model.
     expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
     expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-fp4' })).toBe('kimik2.7-code');
     expect(resolveModelKey({ model_prefix: 'kimik2.7' })).toBe('kimik2.7-code');
     expect(resolveModelKey({ model: 'amd/Kimi-K2.7-Code-MXFP4' })).toBe('kimik2.7-code');
-    // Canonical identifiers still resolve to the same bucket.
     expect(resolveModelKey({ infmax_model_prefix: 'kimik2.7-code' })).toBe('kimik2.7-code');
     expect(resolveModelKey({ model: 'moonshotai/Kimi-K2.7-Code' })).toBe('kimik2.7-code');
   });
@@ -200,9 +227,6 @@ describe('resolveModelKey', () => {
   });
 
   it('resolves Kimi-K3 identifiers to the kimik3 key, not the K2 buckets', () => {
-    // K3 is a distinct architecture, so it must land in its own DB bucket.
-    // AMD AgentX sweeps emit the bare `kimik3` prefix; the MXFP4 checkpoint is
-    // published under the plain moonshotai path. GitHub Actions run 30298924344.
     expect(resolveModelKey({ infmax_model_prefix: 'kimik3' })).toBe('kimik3');
     expect(resolveModelKey({ infmax_model_prefix: 'kimik3-fp4' })).toBe('kimik3');
     expect(resolveModelKey({ model_prefix: 'kimik3' })).toBe('kimik3');
@@ -304,8 +328,16 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('forces disagg=true for mori-* canonicals regardless of disaggField', () => {
+  it('preserves explicit MoRI topology and infers disaggregation only for legacy rows', () => {
     expect(normalizeFramework('mori-sglang', false)).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', 'False')).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', true)).toEqual({
       framework: 'mori-sglang',
       disagg: true,
     });
@@ -421,7 +453,7 @@ describe('parseInt2', () => {
   });
 
   it('truncates decimal strings to integer', () => {
-    expect(parseInt2('3.7')).toBe(3); // parseInt behavior: truncates at decimal
+    expect(parseInt2('3.7')).toBe(3);
   });
 
   it('returns undefined for null/undefined', () => {
@@ -453,7 +485,6 @@ describe('parseIslOsl', () => {
   });
 
   it('requires delimiters around the pattern', () => {
-    // Pattern requires [_-] before and [_\-.] after
     expect(parseIslOsl('x1k1ky')).toBeNull();
   });
 

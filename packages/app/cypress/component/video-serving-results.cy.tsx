@@ -4,7 +4,6 @@ import ServingResults from '@/components/video-benchmark/ServingResults';
 import type { ServingCell } from '@/components/video-benchmark/serving';
 import { at, entries, rows, type Bundle } from '@/components/video-benchmark/bundle';
 
-// Synthetic fixtures exercise the serving contract; they are never benchmark results.
 const cells: ServingCell[] = [1, 2, 4].map((concurrency) => {
   const id = `c${concurrency}`;
   const request = (phase: string, slot: string) => ({

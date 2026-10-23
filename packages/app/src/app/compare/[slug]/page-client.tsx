@@ -14,15 +14,15 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track } from '@/lib/analytics/analytics';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 
 const STRINGS = {
   en: {
@@ -48,28 +48,15 @@ const STRINGS = {
 interface ComparePageClientProps {
   a: string;
   b: string;
-  /** Canonical compare slug (e.g. `deepseek-r1-h100-vs-h200`). Used for the
-   *  cross-link to the sibling `/compare-per-dollar/<same-slug>` route. */
   slug: string;
   label: string;
-  /** Human-readable model name from the slug — drives the eyebrow above the
-   *  H1 so the URL-grouping ("Kimi K2.6", "GLM 5.1", etc.) is legible without
-   *  scanning the URL bar. */
   modelLabel: string;
   defaultModel: string;
   defaultSequence: string | null;
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   initialBenchmarkRows?: BenchmarkRow[];
-  /** One SSR-rendered prose paragraph per interpolated-table row (default
-   *  interactivity target). Each paragraph picks a template variant
-   *  deterministically from the slug so prose stays stable across renders
-   *  but varies across pages in the catalog. Empty array when there's no
-   *  comparable data. */
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains what
-   *  AgentX measures before the head-to-head numbers, since a reader who
-   *  arrived from a GPU query has no reason to expect a replayed trace. */
   agenticIntro?: AgenticScenarioIntro | null;
   aLabel: string;
   bLabel: string;
@@ -140,9 +127,6 @@ export default function ComparePageClient({
               <div className="text-xs uppercase tracking-wider text-muted-foreground">
                 {modelLabel} · {t.eyebrowSuffix}
               </div>
-              {/* `vt-compare-title` pairs with the compare-catalog card the
-                  visitor clicked for a cross-document shared-element morph
-                  (see motion.css); inert without View Transitions support. */}
               <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
                 {label}
               </h1>
@@ -281,15 +265,11 @@ function CompareTableSection({
     sequenceResolved,
   );
 
-  // Extract GPUDataPoint arrays for just the two GPUs in the pair.
-  // The group keys may be plain hwKeys or composite (hwKey__precision).
-  // Match prefix since keys include framework (e.g., "h200_sglang", "h100_dynamo-trt").
   const { pointsA, pointsB } = useMemo(() => {
     const pA: GPUDataPoint[] = [];
     const pB: GPUDataPoint[] = [];
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
-      // Match if groupKey starts with the base GPU key
-      const hwKey = groupKey.split('__')[0]; // Remove precision suffix if present
+      const hwKey = groupKey.split('__')[0];
       if (hwKey === a || hwKey.startsWith(`${a}_`)) pA.push(...points);
       else if (hwKey === b || hwKey.startsWith(`${b}_`)) pB.push(...points);
     }

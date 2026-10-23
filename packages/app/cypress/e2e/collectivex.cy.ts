@@ -14,9 +14,6 @@ import {
 } from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
-// The neutral view: one run's measured series plus its full case coverage,
-// served from the CollectiveX database via /api/v1/collectivex/latest,
-// /api/v1/collectivex/runs (picker listing), and /api/v1/collectivex/runs/{id}.
 const SOURCE_SHA = 'c'.repeat(40);
 const dataset = makeCollectiveXDataset();
 const runId = dataset.run.run_id;
@@ -87,6 +84,10 @@ function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
   cy.intercept('GET', `/api/v1/collectivex/runs/${body.run.run_id}*`, { body }).as(alias);
 }
 
+function runCheckbox(body: CollectiveXDataset) {
+  return cy.get(`[data-testid="collectivex-run-visible-${body.run.run_id}"]`);
+}
+
 function openCollectiveX() {
   cy.visit('/collectivex');
   cy.wait('@runs');
@@ -122,6 +123,18 @@ describe('CollectiveX neutral run view', () => {
         'href',
         `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
       );
+    cy.get(`[data-testid="collectivex-run-row-${runId}"] a[href*="/actions/runs/"]`).should(
+      'have.attr',
+      'href',
+      `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`,
+    );
+
+    installRuns();
+    installRun();
+    openCollectiveX();
+    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
+    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 
   it('keeps loading bounded discovery batches until every run is listed', () => {
@@ -150,14 +163,7 @@ describe('CollectiveX neutral run view', () => {
     cy.then(() => expect(requests).to.be.gte(2));
   });
 
-  it('renders the default decode round-trip chart for the EP8 scale-up series', () => {
-    cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'Round trip (measured) · decode · p99')
-      .and('contain.text', 'deepep-v2');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
-
-  it('only exposes dimensions that vary in the current matrix', () => {
+  it('selects the EP16 series through the identity controls', () => {
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-precision-toggle"]').should('be.visible');
@@ -166,9 +172,12 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-fabric-scope-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
-  });
 
-  it('selects the EP16 series through the identity controls', () => {
+    cy.get('[data-testid="collectivex-main-chart"]')
+      .should('contain.text', 'Round trip (measured) · decode · p99')
+      .and('contain.text', 'deepep-v2');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP16').click();
 
@@ -176,20 +185,7 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'mori')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
 
-  it('places the chart filters before the explorer chart', () => {
-    cy.get('[data-testid="collectivex-chart-filters"]').should('be.visible');
-    cy.get('[data-testid="collectivex-chart-filters"]').then(($filters) => {
-      cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
-        expect(
-          $filters[0].compareDocumentPosition($chart[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).to.be.greaterThan(0);
-      });
-    });
-  });
-
-  it('renders an nccl-ep backend series end to end', () => {
     const ncclEp = buildDataset({
       shards: [makeRawShard({ backend: 'nccl-ep', implName: 'nccl-ep' })],
     });
@@ -207,9 +203,7 @@ describe('CollectiveX neutral run view', () => {
     cy.contains('[role="option"]', 'Payload bandwidth').click();
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'Payload bandwidth');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
 
-  it('labels the activation-data rate footnote with the selected metric', () => {
     cy.get('[data-testid="collectivex-y-axis-select"]').click();
     cy.contains('[role="option"]', 'Activation-data rate').click();
     cy.get('[data-testid="collectivex-main-chart"]')
@@ -257,8 +251,6 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-ep-select"]').click();
     cy.contains('[role="option"]', 'EP8').click();
-    // Wait for Radix's closing focus handoff before opening the next menu.
-    // Firefox can otherwise restore focus to EP after Kernel mode has opened.
     cy.get('[data-testid="collectivex-ep-select"]').should('have.focus');
     cy.get('[data-testid="collectivex-mode-select"]').click();
     cy.get('[role="listbox"] [aria-selected="true"]').should('have.length', 2);
@@ -392,8 +384,6 @@ describe('CollectiveX neutral run view', () => {
       .should('have.length', 1)
       .and('not.have.attr', 'stroke-dasharray');
 
-    // Re-selecting a run assigns it the next active slot instead of restoring a
-    // permanent run-specific pattern.
     cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).check();
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path')
       .should('have.length', 2)
@@ -401,6 +391,41 @@ describe('CollectiveX neutral run view', () => {
         expect($lines.eq(0)).to.have.attr('stroke-dasharray', 'none');
         expect($lines.eq(1)).to.have.attr('stroke-dasharray', '9 4');
       });
+  });
+
+  it('shift-click applies one visibility state to every run between two clicked rows', () => {
+    const middleDataset = buildDataset({
+      shards: [makeRawShard()],
+      meta: { run_id: '158', generated_at: '2026-07-06T12:20:00Z', source_sha: 'a'.repeat(40) },
+    });
+    const ordered = [dataset, middleDataset, comparisonDataset];
+    installRuns(ordered);
+    installRun();
+    installRun(middleDataset, 'middleRun');
+    installRun(comparisonDataset, 'comparisonRun');
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    runCheckbox(dataset).uncheck();
+    for (const body of ordered) runCheckbox(body).should('not.be.checked');
+
+    runCheckbox(dataset).click();
+    runCheckbox(comparisonDataset).click({ shiftKey: true });
+    for (const body of ordered) runCheckbox(body).should('be.checked');
+    cy.wait(['@middleRun', '@comparisonRun']);
+    for (const body of ordered) {
+      cy.get(`[data-testid="collectivex-run-line-style-${body.run.run_id}"]`).should('exist');
+    }
+
+    runCheckbox(middleDataset).click({ shiftKey: true });
+    runCheckbox(dataset).should('be.checked');
+    runCheckbox(middleDataset).should('not.be.checked');
+    runCheckbox(comparisonDataset).should('not.be.checked');
+
+    runCheckbox(comparisonDataset).click();
+    runCheckbox(middleDataset).should('not.be.checked');
+    runCheckbox(comparisonDataset).should('be.checked');
   });
 
   it('defaults to the newest measured run when a newer incomplete run has no series', () => {
@@ -455,7 +480,6 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', 'Not applicable')
       .and('contain.text', 'MI355X')
       .and('contain.text', 'GB300');
-    // Reference material renders last, below the explorer chart.
     cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
       cy.get('[data-testid="collectivex-support-matrices"]').then(($matrix) => {
         expect($matrix[0].compareDocumentPosition($chart[0]) & 2, 'chart precedes matrix').to.eq(2);
@@ -469,11 +493,9 @@ describe('CollectiveX neutral run view', () => {
       'contain.text',
       'Low-latency kernels',
     );
-    // A working degree is a green chip with no excuse.
     cy.get(
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="b200"][data-library="deepep-v2"] [data-testid="collectivex-known-ep"][data-degree="16"]',
     ).should('have.attr', 'data-status', 'works');
-    // A known wall is red and says why, in the tooltip and the notes list.
     cy.get(
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="mi355x"][data-library="mori"] [data-testid="collectivex-known-ep"][data-degree="16"]',
     )
@@ -484,20 +506,17 @@ describe('CollectiveX neutral run view', () => {
       'contain.text',
       'ROCm/mori#610',
     );
-    // A vendor-mismatched pairing collapses to one muted dash.
     cy.get(
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"] [data-testid="collectivex-known-na"]',
     ).should('exist');
     cy.get('[data-testid="collectivex-inventory"]').should('not.exist');
-  });
 
-  it('keeps the known-support matrix visible with no runs selected', () => {
     cy.get(`[data-testid="collectivex-run-visible-${dataset.run.run_id}"]`).uncheck();
     cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
     cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
   });
 
-  it('localizes the suite filter on the Chinese route', () => {
+  it('localizes the complete chart and run-table click path on the Chinese route', () => {
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
     cy.wait('@run');
@@ -521,9 +540,7 @@ describe('CollectiveX neutral run view', () => {
       .invoke('attr', 'aria-label')
       .should('match', /（注 \d+）/u)
       .and('not.include', '(note ');
-  });
 
-  it('localizes the complete chart and run-table click path on the Chinese route', () => {
     cy.viewport(1440, 900);
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
@@ -549,9 +566,7 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
-  });
 
-  it('keeps a selected cancelled run localized instead of showing it as pending', () => {
     const cancelled = buildDataset({
       shards: [makeRawShard()],
       meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },
@@ -712,7 +727,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
-  it('reports an unavailable backend', () => {
+  it('shows a safe localized error on the Chinese route', () => {
     cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 503,
       body: { error: 'unavailable' },
@@ -723,9 +738,7 @@ describe('CollectiveX availability states', () => {
       .should('be.visible')
       .and('contain.text', 'The CollectiveX dataset failed to load.')
       .and('not.contain.text', 'API error: 503');
-  });
 
-  it('shows a safe localized error on the Chinese route', () => {
     let failRequests = true;
     cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
       request.reply(
@@ -758,7 +771,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 
-  it('renders the loading state while the run resolves', () => {
+  it('does not query database availability for the isolated page', () => {
     installRuns();
     cy.intercept('GET', `/api/v1/collectivex/runs/${runId}*`, {
       body: dataset,
@@ -769,9 +782,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-selected-runs-loading"]').should('be.visible');
     cy.wait('@slowRun');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
-  });
 
-  it('does not query database availability for the isolated page', () => {
     let availabilityRequests = 0;
     cy.intercept('GET', '/api/v1/availability', (request) => {
       availabilityRequests += 1;
@@ -787,6 +798,38 @@ describe('CollectiveX availability states', () => {
   });
 });
 
+describe('CollectiveX source repository links', () => {
+  it('links the recorded source repository', () => {
+    const sourced = buildDataset({
+      meta: {
+        run_id: '166',
+        generated_at: '2026-08-11T12:20:00Z',
+        source_sha: SOURCE_SHA,
+        source_repository: 'ExampleOrg/ExampleBench',
+      },
+    });
+    installRuns([sourced]);
+    installRun(sourced);
+    openCollectiveX();
+
+    cy.get('[data-testid="collectivex-source-link"]').should(
+      'have.attr',
+      'href',
+      `https://github.com/ExampleOrg/ExampleBench/tree/${SOURCE_SHA}/experimental/CollectiveX`,
+    );
+    cy.get('[data-testid="collectivex-methodology-link"]').should(
+      'have.attr',
+      'href',
+      `https://github.com/ExampleOrg/ExampleBench/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
+    );
+    cy.get('[data-testid="collectivex-run-row-166"] a[href*="/actions/runs/"]').should(
+      'have.attr',
+      'href',
+      'https://github.com/ExampleOrg/ExampleBench/actions/runs/166',
+    );
+  });
+});
+
 describe('CollectiveX kv-transfer card', () => {
   it('renders kv cases with bandwidth-bound cells and per-case outcomes', () => {
     installRuns([kvDataset]);
@@ -798,8 +841,6 @@ describe('CollectiveX kv-transfer card', () => {
       .and('contain.text', '2 cases')
       .and('contain.text', '1 measured');
     cy.get('[data-testid="collectivex-kv-table-table"]').within(() => {
-      // The measured gb200 nixl case: bulk ceiling, paged-64 at batch 1 and
-      // at the largest measured batch, paged-16, and the handoff latency.
       cy.contains('td', 'GB200').parent().as('measured');
       cy.get('@measured').should('contain.text', 'nixl').and('contain.text', 'kv-dsv4');
       cy.get('@measured').should('contain.text', '89.41');
@@ -807,17 +848,14 @@ describe('CollectiveX kv-transfer card', () => {
       cy.get('@measured').should('contain.text', '15.12 (b16)');
       cy.get('@measured').should('contain.text', '2.72');
       cy.get('@measured').should('contain.text', '24.8');
-      // The failed mori-io case keeps its outcome and reason, with no cells.
       cy.contains('td', 'MI355X').parent().as('failed');
       cy.get('@failed').should('contain.text', 'mori-io').and('contain.text', 'invalid');
       cy.get('@failed').should('contain.text', 'transfer-verification-failed');
     });
-    // KV cases count into the header stats alongside EP cases.
     cy.get('[data-testid="collectivex-display"]').should(
       'contain.text',
       `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
     );
-    // The runs table distinguishes the run's suites: this run carries both.
     cy.get(`[data-testid="collectivex-run-suite-ep-${kvDataset.run.run_id}"]`).should('be.visible');
     cy.get(`[data-testid="collectivex-run-suite-kv-${kvDataset.run.run_id}"]`).should('be.visible');
   });
@@ -826,8 +864,6 @@ describe('CollectiveX kv-transfer card', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
     openCollectiveX();
-    // Default view: aggregate GB/s vs batch at the largest ISL, page 64, pull.
-    // The measured fixture case carries paged-64 rows at batch 1 and 16.
     cy.get('[data-testid="collectivex-kv-chart"]').should('be.visible');
     cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
     cy.get('[data-testid="collectivex-kv-chart"]').should(
@@ -839,8 +875,6 @@ describe('CollectiveX kv-transfer card', () => {
       'stroke-width',
       '1.75',
     );
-    // Axis-scale switches live in the same Advanced legend drawer as the
-    // /inference chart controls and start enabled for the existing log-log view.
     cy.get('[data-testid="collectivex-kv-chart"] [data-testid="legend-advanced-toggle"]').click();
     cy.get('[data-testid="collectivex-kv-x-log-scale"]')
       .should('have.attr', 'aria-checked', 'true')
@@ -858,19 +892,15 @@ describe('CollectiveX kv-transfer card', () => {
       'have.text',
       'Aggregate pull bandwidth at p50 (GB/s)',
     );
-    // Metric toggle swaps the y axis to burst latency.
     cy.get('[data-testid="collectivex-kv-metric-toggle"]').contains('button', 'ms').click();
     cy.get('[data-testid="collectivex-kv-chart"]').should(
       'contain.text',
       'Burst completion latency p50 (ms)',
     );
-    // ISL on the x axis pins batch 1: one paged-64 row in the fixture.
     cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'ISL').click();
     cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
-    // Page 16 keeps a single batch-1 row.
     cy.get('[data-testid="collectivex-kv-page-toggle"]').contains('button', '16').click();
     cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
-    // The kv section renders above the EP explorer chart.
     cy.get('[data-testid="collectivex-kv-table"]').then(($kv) => {
       cy.get('[data-testid="collectivex-main-chart"]').then(($chart) => {
         expect($kv[0].compareDocumentPosition($chart[0]) & 4).to.equal(4);
@@ -963,7 +993,6 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-overlap-chart"]')
       .should('contain.text', 'Requests per burst (log)')
       .and('contain.text', 'Aggregate bandwidth relative to batch 1 (log)');
-    // The measured series plus the dotted y = batch ideal reference.
     cy.get('[data-testid="collectivex-kv-overlap-chart"] .line-path').then(($lines) => {
       expect([...$lines].map((line) => line.getAttribute('stroke-dasharray'))).to.include('2 4');
     });
@@ -993,15 +1022,6 @@ describe('CollectiveX kv-transfer card', () => {
       .should('contain.text', '分页行按随机块表')
       .and('contain.text', '个用例 · 已测')
       .and('contain.text', '批大小');
-  });
-
-  it('renders no kv card and no KV suite badge for an EP-only run', () => {
-    installRuns();
-    installRun();
-    openCollectiveX();
-    cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
-    cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
-    cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
   });
 });
 

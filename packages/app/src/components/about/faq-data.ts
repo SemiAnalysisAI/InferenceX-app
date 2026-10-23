@@ -2,8 +2,6 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 
 import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
-/* ---------- FAQ content ---------- */
-
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     id: 'faq-what-is-inferencex',
@@ -107,7 +105,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     id: 'faq-old-runs',
     question: 'Are old runs preserved?',
     answer:
-      'Yes. GitHub Actions retains workflow run logs and artifacts for 90 days. For longer auditability, we also publish a weekly snapshot of the full benchmark database as a public GitHub Release, so anyone can download the historical dataset and reproduce or reanalyze any chart in the dashboard.',
+      'Yes. GitHub Actions retains workflow run logs and artifacts for 90 days. Benchmark results stay in the InferenceX database after that, so the dashboard charts and the public API keep serving historical runs.',
   },
   {
     id: 'faq-data-use',

@@ -18,8 +18,8 @@ import {
   useDatasetConversations,
   type ConversationSort,
 } from '@/hooks/api/use-datasets';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
 import { Stat } from './stat';
@@ -231,7 +231,6 @@ export function DatasetDetail({ slug }: { slug: string }) {
 
   return (
     <div className="min-h-svh flex flex-col gap-6">
-      {/* header */}
       <div>
         <div className="mb-1 flex items-center gap-2">
           <Link
@@ -270,7 +269,6 @@ export function DatasetDetail({ slug }: { slug: string }) {
         )}
       </div>
 
-      {/* summary stats */}
       <Card className="p-4">
         <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
           <section className="min-w-0" aria-labelledby="dataset-overview-group">
@@ -336,7 +334,6 @@ export function DatasetDetail({ slug }: { slug: string }) {
         )}
       </Card>
 
-      {/* distribution cards */}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-foreground">{t.distributions}</h2>
         <div className="grid gap-4 lg:grid-cols-2">
@@ -386,7 +383,6 @@ export function DatasetDetail({ slug }: { slug: string }) {
         </div>
       </section>
 
-      {/* conversation list */}
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-foreground">

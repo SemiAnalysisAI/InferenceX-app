@@ -12,7 +12,7 @@ import {
 } from '@/components/ai-chart/types';
 import { buildParsePrompt, buildSummaryPrompt } from '@/components/ai-chart/prompt-templates';
 import type { InferenceData } from '@/components/inference/types';
-import { callLlm } from '@/lib/ai-providers';
+import { callLlm } from '@/lib/ai-chart/ai-providers';
 import {
   fetchBenchmarks,
   fetchBenchmarkHistory,
@@ -20,15 +20,15 @@ import {
   fetchReliability,
   type EvalRow,
   type ReliabilityRow,
-} from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+} from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import {
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig,
-} from '@/lib/benchmark-run-selection';
-import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import type { Locale } from '@/lib/i18n';
+} from '@/lib/benchmarks/benchmark-run-selection';
+import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   buildAiLineData,
@@ -39,10 +39,6 @@ import {
 } from './ai-chart-data';
 
 import chartDefinitions from '@/components/inference/metric-registry';
-
-// ---------------------------------------------------------------------------
-// Result types
-// ---------------------------------------------------------------------------
 
 export interface AiRadarItem {
   hwKey: string;
@@ -75,10 +71,6 @@ interface UseAiChartReturn {
   reset: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// LLM response parsing
-// ---------------------------------------------------------------------------
-
 function parseSpecsFromLlm(raw: string, locale: Locale): AiChartSpec[] {
   const cleaned = raw
     .replaceAll(/```json\s*/gu, '')
@@ -86,7 +78,6 @@ function parseSpecsFromLlm(raw: string, locale: Locale): AiChartSpec[] {
     .trim();
   const parsed = JSON.parse(cleaned);
   const arr = Array.isArray(parsed) ? parsed : [parsed];
-  // Validate each spec and limit to 2
   return arr.slice(0, 2).map((s: unknown) => validateSpec(s as Record<string, unknown>, locale));
 }
 
@@ -95,10 +86,6 @@ function sortBars(bars: AiChartBarPoint[], order: AiChartSpec['sortOrder']): voi
   else if (order === 'desc') bars.sort((a, b) => b.value - a.value);
   else bars.sort((a, b) => getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey));
 }
-
-// ---------------------------------------------------------------------------
-// Benchmark helpers
-// ---------------------------------------------------------------------------
 
 function buildBenchmarkBarData(
   data: InferenceData[],
@@ -153,10 +140,6 @@ function sequenceToIslOsl(seq: string): { isl: number; osl: number } {
   return { isl: parseSeqPart(parts[0] ?? '1k'), osl: parseSeqPart(parts[1] ?? '1k') };
 }
 
-// ---------------------------------------------------------------------------
-// Evaluation helpers
-// ---------------------------------------------------------------------------
-
 function buildEvalBarData(
   rows: EvalRow[],
   spec: AiChartSpec,
@@ -202,10 +185,6 @@ function buildEvalBarData(
   return bars;
 }
 
-// ---------------------------------------------------------------------------
-// Reliability helpers
-// ---------------------------------------------------------------------------
-
 function buildReliabilityBarData(
   rows: ReliabilityRow[],
   spec: AiChartSpec,
@@ -246,10 +225,6 @@ function buildReliabilityBarData(
   return bars;
 }
 
-// ---------------------------------------------------------------------------
-// Resolve a single spec into chart data
-// ---------------------------------------------------------------------------
-
 const EMPTY_RESULT: Pick<AiSingleChartResult, 'lineData' | 'radarData' | 'radarAxes'> = {
   lineData: {},
   radarData: [],
@@ -276,7 +251,6 @@ function buildRadarData(
   const chartDef = (chartDefinitions as any[])[0];
   const target = spec.targetInteractivity ?? 40;
 
-  // Group by hwKey and pick the point closest to target interactivity
   const groups = new Map<string, InferenceData>();
   for (const p of points) {
     const hwKey = p.hwKey ?? '';
@@ -287,7 +261,6 @@ function buildRadarData(
     }
   }
 
-  // Extract raw values per metric per GPU
   const rawMatrix = new Map<string, (number | null)[]>();
   for (const [hwKey, point] of groups) {
     const vals = metrics.map((m) => {
@@ -351,7 +324,6 @@ async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleC
     };
   }
 
-  // Benchmarks or History
   const isAgentic = spec.sequence === 'agentic-traces';
   const { isl, osl } = isAgentic ? { isl: 0, osl: 0 } : sequenceToIslOsl(spec.sequence);
   const fetchedRows =
@@ -416,7 +388,6 @@ async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleC
     });
   }
 
-  // topN: rank configs by their best value in the metric's canonical direction.
   if (spec.topN) {
     const chartDef = (chartDefinitions as any[])[0];
     const yFieldPath: string = chartDef[spec.yAxisMetric] ?? 'tpPerGpu.y';
@@ -452,10 +423,6 @@ async function resolveSpec(spec: AiChartSpec, locale: Locale): Promise<AiSingleC
   };
 }
 
-// ---------------------------------------------------------------------------
-// Main hook
-// ---------------------------------------------------------------------------
-
 const ERROR_STRINGS = {
   en: {
     parse: 'Could not parse your request. Try rephrasing.',
@@ -482,7 +449,6 @@ export function useAiChart(locale: Locale = 'en'): UseAiChartReturn {
       setResult(null);
 
       try {
-        // Step 1: Parse prompt into validated spec(s)
         const rawResponse = await callLlm(provider, apiKey, buildParsePrompt(locale), prompt);
         const specs = parseSpecsFromLlm(rawResponse, locale);
 
@@ -492,10 +458,8 @@ export function useAiChart(locale: Locale = 'en'): UseAiChartReturn {
           return;
         }
 
-        // Step 2: Resolve each spec into chart data (parallel for multi-chart)
         const charts = await Promise.all(specs.map((spec) => resolveSpec(spec, locale)));
 
-        // Check if any chart has data
         const hasData = charts.some(
           (c) =>
             c.barData.length > 0 ||
@@ -510,7 +474,6 @@ export function useAiChart(locale: Locale = 'en'): UseAiChartReturn {
           return;
         }
 
-        // Step 3: Generate summary (best-effort)
         let summary: string | null = null;
         try {
           const allBars = charts.flatMap((c) => c.barData);
@@ -531,9 +494,7 @@ export function useAiChart(locale: Locale = 'en'): UseAiChartReturn {
             locale === 'zh' ? '请给出总结。' : 'Provide the summary.',
           );
           summary = summaryRaw.trim();
-        } catch {
-          // Summary generation is non-critical
-        }
+        } catch {}
 
         setResult({ charts, summary });
       } catch {

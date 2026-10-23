@@ -1,4 +1,3 @@
-// React requires this flag for warnings about updates outside `act()` to be meaningful.
 Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', {
   configurable: true,
   writable: true,
@@ -33,15 +32,11 @@ class MemoryStorage implements Storage {
   }
 }
 
-// Override Node's unavailable experimental implementation without reading its warning getter.
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: new MemoryStorage(),
 });
 
-// jsdom ships no `matchMedia`. Components that gate rendering on a breakpoint
-// need it to exist; default to "matches" so a component under test behaves as
-// it does on a desktop viewport unless a test overrides the stub.
 if (globalThis.window !== undefined && !globalThis.window.matchMedia) {
   Object.defineProperty(globalThis.window, 'matchMedia', {
     configurable: true,

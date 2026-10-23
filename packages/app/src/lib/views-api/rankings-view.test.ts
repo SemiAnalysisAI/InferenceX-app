@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { getAllRankingPageEntries } from '@/lib/rankings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 import { buildRankingsViewEntries, newestRowDate, rankingsViewCsvRows } from './rankings-view';
 
@@ -80,8 +80,6 @@ describe('buildRankingsViewEntries', () => {
   });
 
   it('follows the curated overview scenarios when no scenario is given', () => {
-    // Kimi K3 is curated to agentx only — the default must not add a
-    // single-turn entry even though single-turn rows exist.
     const entries = buildRankingsViewEntries(
       entryFor('cheapest-gpu', 'kimi-k3'),
       ROWS.map((r) => ({ ...r, model: 'kimik3' })),

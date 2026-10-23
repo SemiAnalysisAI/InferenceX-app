@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 export function ReadingProgressBar({ slug }: { slug: string }) {
   const [progress, setProgress] = useState(0);
@@ -17,7 +17,6 @@ export function ReadingProgressBar({ slug }: { slug: string }) {
 
         const rect = article.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
-        // 0 when article top is at viewport top, 1 when article bottom reaches viewport bottom
         const totalDistance = rect.height - viewportHeight;
         const p = totalDistance <= 0 ? 1 : Math.min(1, Math.max(0, -rect.top / totalDistance));
 

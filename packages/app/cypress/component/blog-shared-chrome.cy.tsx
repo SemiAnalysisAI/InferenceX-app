@@ -1,5 +1,5 @@
 import { HeadingLink } from '@/components/blog/heading-link';
-import { registerAnalyticsClient } from '@/lib/analytics';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 describe('Blog shared chrome', () => {
   it('localizes heading-link feedback and tracks a Chinese copy interaction', () => {

@@ -23,7 +23,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
   collectiveXDatasetFromRow: mockFromRow,
 }));
 
-vi.mock('@/lib/collectivex-lazy-ingest', () => ({
+vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
   ensureCollectiveXRun: mockEnsureRun,
   collectiveXSweepErrorStatus: (error: unknown) => {
     const code = error instanceof Error && 'code' in error ? (error.code as string) : null;
@@ -34,7 +34,7 @@ vi.mock('@/lib/collectivex-lazy-ingest', () => ({
   },
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
   cachedJson: (data: unknown) => Response.json(data),
@@ -138,10 +138,11 @@ describe('DELETE /api/v1/collectivex/runs/[runId]', () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('rejects all requests when the secret is not configured', async () => {
+  it('returns 500 when the secret is not configured', async () => {
     vi.stubEnv('COLLECTIVEX_ADMIN_SECRET', '');
-    const res = await del(runId, '');
-    expect(res.status).toBe(401);
+    const res = await del(runId, 'anything');
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('COLLECTIVEX_ADMIN_SECRET is not set');
     expect(mockDelete).not.toHaveBeenCalled();
   });
 

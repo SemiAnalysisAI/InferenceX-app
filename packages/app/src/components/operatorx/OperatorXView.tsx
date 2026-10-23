@@ -3,7 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { replaceClientSearch } from '@/lib/client-navigation';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
 import { ModelView } from './model-view/ModelView';

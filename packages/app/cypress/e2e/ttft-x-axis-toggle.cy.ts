@@ -7,16 +7,7 @@ import {
 import { agenticMetrics, measuredPowerMetrics } from '../support/agentic-fixtures';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
-// This spec exercises the agentic x-axis modes, which only exist when the
-// selected model resolves to the Agentic scenario. The default e2e
-// fixtures (cypress/fixtures/api/*.json) have NO agentic rows for any model, so
-// bare /inference always resolves to a fixed-seq scenario there. We therefore
-// inject agentic availability + benchmark rows for the default model VIA
-// SPEC-SCOPED INTERCEPTS (not the shared fixtures) so this spec — and only this
-// spec — sees the agentic view. Most cases still pass ?i_seq=agentic-traces
-// explicitly; the "Default scenario" block below covers the implicit path,
-// where availability opens the agentic scenario on its own.
-const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro is the default model
+const DEFAULT_MODEL_DB_KEY = 'dsv4';
 const AGENTIC_DATE = '2026-06-12';
 
 const agenticGpus = [
@@ -24,8 +15,6 @@ const agenticGpus = [
   { hardware: 'b300', framework: 'vllm', disagg: false },
 ];
 
-// Availability: default model has BOTH agentic and fixed-seq, so the scenario
-// the chart lands on is a real choice rather than the only option.
 const agenticAvailability = [
   ...agenticGpus.map((g) => ({
     model: DEFAULT_MODEL_DB_KEY,
@@ -71,8 +60,6 @@ const agenticBenchmarks = agenticGpus.flatMap((g) =>
     isl: null,
     osl: null,
     conc,
-    // Keep both visual variants in the fixture: the middle point gets the
-    // dashed offload halo while the others remain plain.
     offload_mode: conc === 64 ? 'on' : 'off',
     benchmark_type: 'agentic_traces',
     image: 'vllm/vllm-openai:v0.9.0',
@@ -96,8 +83,6 @@ const interceptAgenticData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
 };
 
-// Same rows re-keyed to another model to prove the default follows availability
-// rather than a hard-coded model registry.
 const OTHER_MODEL_DB_KEY = 'dsr1';
 const otherModelAvailability = agenticAvailability.map((row) => ({
   ...row,
@@ -117,8 +102,6 @@ const interceptFixedSequenceData = () => {
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
-    // Agentic defaults to Interactivity, which needs no derived metrics. The stub
-    // covers the first switch into E2E Normalized Interactivity further down.
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
@@ -130,17 +113,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
-  // Cypress clears intercepts between tests, so the derived-metrics stub is
-  // re-registered per test rather than once in `before`. Until #736 the
-  // agentic default was E2E Normalized Interactivity, so the fetch happened
-  // during `before` while the stub was still alive and React Query held the
-  // result for the rest of the spec. The default no longer fetches, so any
-  // later switch into that mode issues a fresh request.
   beforeEach(() => {
     interceptDerivedAgenticMetrics();
   });
 
-  it('defaults to Interactivity and offers all four full names in one axis dropdown', () => {
+  it('defaults to Interactivity and offers every full name in one axis dropdown', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', 'Interactivity');
     cy.get('[data-testid="x-axis-mode-buttons"]').should('not.exist');
@@ -157,6 +134,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
+
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {
@@ -178,18 +160,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="normalized-interactivity-faq-link"]').should('not.exist');
   });
 
-  it('switches to E2E Normalized Interactivity and updates the heading', () => {
-    // The first entry into this mode fetches the trace-derived metrics, which the
-    // suite's intercept stubs; the default no longer fetches them on load.
-    selectXAxisMode('e2e-normalized-interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 E2E Normalized Interactivity',
-    );
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
-  });
-
   it('explains the offload halo in the info footer and distinguishes it from plain points', () => {
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
@@ -200,42 +170,23 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         expect($halos.length).to.be.lessThan($points.length);
       });
     });
-  });
 
-  it('keeps the offload halo explanation out of the chart capture tree', () => {
-    // The key lives in the axis-metric info footer (a `no-export` sibling of
-    // the chart), so the PNG export clone — built from #chart-0 — carries the
-    // halo decoration itself but not the textual key.
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
       'be.visible',
     );
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
   });
 
-  it('shows the selected percentile in the Interactivity axis label', () => {
-    // Explicitly select the mode — do not rely on the agentic default mode.
+  it('shows the fixed p90 percentile in the Interactivity axis label', () => {
     selectXAxisMode('interactivity', 'Interactivity');
-    // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
   });
 
-  it('defaults to parallelism, point, and line labels for the agentic view', () => {
-    // Line labels name the curve and point labels name the point, so the
-    // agentic view turns on both — it differs from fixed-seq only in the
-    // parallelism and point labels.
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-  });
-
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
-    // Fresh page load → fresh React Query cache → the default E2E Normalized Interactivity
-    // mode refetches derived metrics.
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=0', {
       onBeforeLoad(win) {
@@ -250,11 +201,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
-  it('switches the x-axis to TTFT and updates the heading', () => {
-    selectXAxisMode('ttft', 'TTFT');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-  });
-
   it('switches the x-axis to E2E Latency and updates the heading', () => {
     selectXAxisMode('e2e', 'E2E Latency');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
@@ -262,9 +208,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   });
 
   it('switches back to request-level E2E Normalized Interactivity', () => {
-    // No cy.wait here: the derived metrics were fetched (and stubbed) on the
-    // initial default-mode load and are still fresh in the React Query cache
-    // (staleTime 5 min), so re-entering the mode fires no new request.
     selectXAxisMode('e2e-normalized-interactivity');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
@@ -273,22 +216,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P90 E2E Normalized Interactivity (tok/s/user)',
-    );
-
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P75 E2E Normalized Interactivity',
-    );
-
-    // The percentile selector is shared page state for the whole suite —
-    // restore the p90 default so later tests assert against a known value.
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p90').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 E2E Normalized Interactivity',
     );
   });
 
@@ -303,37 +230,18 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       .and('have.focus');
   });
 
-  it('switches back to Interactivity', () => {
+  it('keeps the agentic Latency Percentile control removed and labels the fixed p90 basis', () => {
     selectXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
+    cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P90 Interactivity (tok/s/user)',
     );
   });
-
-  it('follows the percentile selector in the Interactivity axis label', () => {
-    // Select p75 here rather than inheriting it from another test — the axis
-    // label must track the selector on its own.
-    selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
-    cy.get('[data-testid="chart-figure"] svg').should(
-      'contain.text',
-      'P75 Interactivity (tok/s/user)',
-    );
-  });
 });
 
 describe('X-axis mode URL param', () => {
-  // Regression: the reconcile effect used to run before availability resolved
-  // the sequence. It recorded the fixed-seq placeholder kind, then treated the
-  // switch to agentic as a user-driven kind change and clobbered the
-  // URL-restored mode with the agentic default.
-  //
-  // The restored mode must differ from that default or the test cannot fail:
-  // #736 moved the default to Interactivity, so restoring Interactivity now
-  // proves nothing. TTFT is a mode the snap would visibly overwrite.
   it('keeps a URL-restored mode through the agentic sequence resolving', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
@@ -347,20 +255,16 @@ describe('X-axis mode URL param', () => {
     cy.get('[data-testid="x-axis-mode-selector"]')
       .should('have.attr', 'data-value', 'ttft')
       .and('contain.text', 'TTFT');
-    // Assert on the rendered chart too: the clobber happened one tick after
-    // the buttons first painted, so a button-only check could pass too early.
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  // AgentX publishes on P90, so the percentile control is insider-only. With
-  // the gate locked it must not render, and the chart must still plot P90.
-  it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+  it('never shows the latency percentile selector and labels the fixed P90 basis', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        unlockAgenticGate(win);
       },
     });
 
@@ -373,6 +277,18 @@ describe('X-axis mode URL param', () => {
 describe('Default scenario', () => {
   for (const width of [1280, 375]) {
     it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
+      cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+      cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+
       cy.viewport(width, 800);
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
@@ -396,33 +312,13 @@ describe('Default scenario', () => {
     });
   }
 
-  it('restores the labeled scenario field on the Chinese dashboard', () => {
+  it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
     cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
     cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
-  });
 
-  it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
-    // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
-    // so the untouched 8K/1K selection must not win.
-    interceptAgenticData();
-    interceptDerivedAgenticMetrics();
-    cy.visit('/inference', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
-    // The explainer sits beside the trigger, linking out to the dataset page.
-    cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
-  });
-
-  it('keeps 8K / 1K when the link asks for it explicitly', () => {
-    // An explicit selection always beats the availability-driven default.
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k', {
       onBeforeLoad(win) {
@@ -432,14 +328,23 @@ describe('Default scenario', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
     cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
+
+    interceptFixedSequenceData();
+    cy.visit('/inference?i_seq=8k%2F1k', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
   });
 
   it('opens the Agentic scenario for another model with corresponding data', () => {
-    // DeepSeek-R1 is intentionally outside the original hard-coded model list;
-    // its agentic availability must still make the Agentic scenario the default.
     cy.intercept('GET', '/api/v1/availability', { body: otherModelAvailability }).as(
       'availability',
     );
@@ -455,20 +360,6 @@ describe('Default scenario', () => {
 });
 
 describe('Label defaults for fixed-sequence scenarios', () => {
-  it('keeps parallelism labels off and line labels on by default', () => {
-    interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
-  });
-
   it('keeps the fixed-sequence chart unchanged while keyboard-browsing other options', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k');
@@ -506,15 +397,6 @@ describe('Label defaults for fixed-sequence scenarios', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Overlay path — regression coverage for unofficial-run overlays with agentic
-// x-axis modes (finding #8 / AGENTS.md: chart features must have overlay tests).
-// The overlay behavior itself is verified correct by prior review; this suite
-// guards against regressions only and does NOT change overlay behavior.
-// ---------------------------------------------------------------------------
-
-// Build a minimal unofficial-run API response that contains one agentic
-// overlay benchmark row so the provider builds overlay chart data.
 const OVERLAY_RUN_ID = 99900000001;
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 
@@ -545,8 +427,6 @@ const overlayBenchmarkRow = {
 
 const interceptAgenticDataWithOverlay = () => {
   cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
-  // The official path has no halo in this suite, so the legend key below can
-  // only be activated by the offloaded unofficial-run point.
   cy.intercept('GET', '/api/v1/benchmarks*', {
     body: agenticBenchmarks.map((row) => ({ ...row, offload_mode: 'off' })),
   }).as('benchmarks');
@@ -586,8 +466,8 @@ const expectCoordinates = (selector: string, expected: number[]) => {
   });
 };
 const expectInteractivity = () => {
-  cy.get('#chart-0 .x-axis-label').should('have.text', 'Interactivity (tok/s/user)');
-  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Interactivity');
+  cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Interactivity (tok/s/user)');
+  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Median Interactivity');
   expectCoordinates('.dot-group', [80, 40, 20]);
   expectCoordinates('.unofficial-overlay-pt', [60, 30]);
 };
@@ -598,7 +478,6 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
       ...row,
       framework: 'dynamo-sglang',
       disagg: true,
-      // Fixed-sequence telemetry has medians but no P90 latency fields.
       metrics: {
         ...measuredPowerMetrics(row.conc, { disagg: true }),
         median_intvty: [80, 40, 20][index],
@@ -694,7 +573,6 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {
     interceptAgenticDataWithOverlay();
-    // Default agentic mode is E2E Normalized Interactivity → derived metrics fetch on mount.
     interceptDerivedAgenticMetrics();
     cy.visit(`/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces`, {
       onBeforeLoad(win) {
@@ -707,24 +585,15 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
   });
 
-  // Cypress clears intercepts between tests, so the derived-metrics stub is
-  // re-registered per test rather than once in `before`. Until #736 the
-  // agentic default was E2E Normalized Interactivity, so the fetch happened
-  // during `before` while the stub was still alive and React Query held the
-  // result for the rest of the spec. The default no longer fetches, so any
-  // later switch into that mode issues a fresh request.
   beforeEach(() => {
     interceptDerivedAgenticMetrics();
   });
 
   it('shows overlay (unofficial-run) watermark SVG when an overlay is loaded', () => {
-    // Explicitly select Interactivity — do not rely on the agentic default mode.
     selectXAxisMode('interactivity', 'Interactivity');
-    // The unofficial-run pattern watermark appears when isUnofficialRun is true.
     cy.get('[data-testid="inference-chart-display"] svg pattern[id^="unofficial-pattern-"]').should(
       'exist',
     );
-    // Overlay shares the chartDefinition label — the percentile prefix applies here too.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P90 Interactivity (tok/s/user)',
@@ -734,25 +603,8 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
       .and('contain.text', 'KV offload ON');
   });
 
-  it('switches to ttft x-axis mode and renders SVG with overlay points', () => {
-    selectXAxisMode('ttft', 'TTFT');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
-    // Overlay points render as triangles or circles inside the chart SVG.
-    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
-    cy.get('[data-testid="inference-chart-display"] svg').then(($svgs) => {
-      let total = 0;
-      $svgs.each((_i, svg) => {
-        total += svg.querySelectorAll('circle, polygon, path').length;
-      });
-      expect(total).to.be.greaterThan(0);
-    });
-  });
-
   it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {
-    // Derived metrics are cached from the initial default-mode load.
     selectXAxisMode('e2e-normalized-interactivity');
-    // The suppression message appears because isUnofficialRun is true and the
-    // mode is 'e2e-normalized-interactivity' (documented in ChartDisplay.tsx).
     cy.contains(
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     ).should('be.visible');

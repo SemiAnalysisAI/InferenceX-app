@@ -1,30 +1,57 @@
 import { describe, expect, it } from 'vitest';
 
-import { MEASURED_ENERGY_METRIC_CONFIG_KEYS, METRIC_CONFIG_KEYS } from './metric-registry';
+import {
+  MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+  METRIC_CONFIG_KEYS,
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+  resolveMetricConfigKey,
+} from './metric-registry';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
+  measuredMetricBases,
 } from './measured-metric-config';
 
 describe('measured metric configuration', () => {
-  it.each(MEASURED_ENERGY_METRIC_CONFIG_KEYS)(
-    'round-trips the existing share-link metric %s',
-    (key) => {
-      const config = getMeasuredMetricConfig(key);
-      expect(config).toBeDefined();
-      expect(changeMeasuredMetricConfig(key, {})).toBe(key);
-      expect(changeMeasuredMetricConfig('y_tpPerGpu', config!)).toBe(key);
-    },
-  );
+  it.each([
+    'y_measuredAvgPower',
+    'y_measuredPowerTimeline',
+    'y_measuredJPerOutputToken',
+    'y_measuredWhPerSuccessfulQuery',
+  ] as const)('round-trips the existing share-link metric %s', (key) => {
+    const config = getMeasuredMetricConfig(key);
+    expect(config).toBeDefined();
+    expect(changeMeasuredMetricConfig(key, {})).toBe(key);
+    expect(changeMeasuredMetricConfig('y_tpPerGpu', config!)).toBe(key);
+  });
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(13);
-    expect(new Set(grouped)).toEqual(new Set(MEASURED_ENERGY_METRIC_CONFIG_KEYS));
-    expect(getMeasuredMetricConfig('y_modeledChassisPowerPerGpu')).toBeUndefined();
+    expect(grouped).toHaveLength(18);
+    expect(new Set(grouped)).toEqual(
+      new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
+    );
+    for (const key of MEASURED_ENERGY_METRIC_CONFIG_KEYS) {
+      expect(getMeasuredMetricConfig(key)?.basis, key).toBe('gpu-measured');
+    }
     expect(getMeasuredMetricConfig('y_removedMetric')).toBeUndefined();
     expect(getMeasuredMetricConfig('')).toBeUndefined();
+  });
+
+  it('offers provisioned boundaries for energy only and lands old provisioned-watt links on measured power', () => {
+    expect(measuredMetricBases('power')).toEqual(['gpu-measured', 'utility-modeled']);
+    expect(measuredMetricBases('energy')).toEqual([
+      'gpu-measured',
+      'gpu-provisioned',
+      'utility-provisioned',
+      'utility-modeled',
+    ]);
+    expect(changeMeasuredMetricConfig('y_gpuProvisionedJPerOutputToken', { family: 'power' })).toBe(
+      'y_measuredAvgPower',
+    );
+    expect(resolveMetricConfigKey('y_gpuProvisionedWatts')).toBe('y_measuredAvgPower');
+    expect(resolveMetricConfigKey('y_utilityProvisionedWatts')).toBe('y_measuredAvgPower');
   });
 
   it('starts newly selected families at whole-deployment average power or output energy', () => {
@@ -42,6 +69,7 @@ describe('measured metric configuration', () => {
   it('keeps fleet percentiles, role averages and TDP normalization distinct', () => {
     expect(getMeasuredMetricConfig('y_measuredP90Power')).toEqual({
       family: 'power',
+      basis: 'gpu-measured',
       scope: 'all',
       statistic: 'p90',
       display: 'watts',
@@ -78,6 +106,7 @@ describe('measured metric configuration', () => {
     );
     expect(getMeasuredMetricConfig('y_measuredPrefillJPerInputToken')).toEqual({
       family: 'energy',
+      basis: 'gpu-measured',
       scope: 'prefill',
       denominator: 'input',
       unit: 'joules',

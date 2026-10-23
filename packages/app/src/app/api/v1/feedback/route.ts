@@ -5,7 +5,7 @@ import { utf8ToBytes } from '@noble/ciphers/utils.js';
 import { getWriteDb } from '@semianalysisai/inferencex-db/connection';
 import { type Cipher, createCipher, loadKey } from '@semianalysisai/inferencex-db/lib/encryption';
 
-import { trackServer } from '@/lib/analytics-server';
+import { trackServer } from '@/lib/analytics/analytics-server';
 import { parseFeedbackBody } from './parse';
 
 const aadFor = (column: string) => utf8ToBytes(`user_feedback:${column}`);

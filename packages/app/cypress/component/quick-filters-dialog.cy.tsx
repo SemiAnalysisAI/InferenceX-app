@@ -2,7 +2,7 @@ import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { QuickFilters } from '@/components/inference/types';
-import { Sequence } from '@/lib/data-mappings';
+import { Sequence } from '@/lib/catalog/data-mappings';
 import { mountWithProviders } from '../support/test-utils';
 
 const availableQuickFilters: QuickFilters = {
@@ -96,7 +96,6 @@ describe('QuickFiltersDialog', () => {
     mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub().as('changeOpen')} />, {
       inference: { availableQuickFilters },
     });
-    // Wait for the modal's initial focus before moving to another help button.
     cy.get('[data-testid="option-help-quick-filter-vendor"]').should('have.focus');
     cy.get('[data-testid="option-help-quick-filter-framework"]').focus().should('have.focus');
     cy.press(Cypress.Keyboard.Keys.SPACE);
@@ -164,7 +163,6 @@ describe('QuickFiltersDialog', () => {
       },
     });
 
-    // Every option is rendered up front — nothing to open before selecting.
     cy.get('[data-testid="quick-filter-vendor-options"]')
       .should('have.attr', 'role', 'group')
       .find('button')

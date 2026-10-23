@@ -2,7 +2,6 @@ import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from './types';
 
-/** A scale that can be either continuous (linear/log), banded, or time-based. */
 export type AnyScale = ContinuousScale | d3.ScaleBand<string> | d3.ScaleTime<number, number>;
 
 export interface AxisUpdateConfig {
@@ -12,15 +11,11 @@ export interface AxisUpdateConfig {
   yTickCount?: number;
   xTickValues?: (number | Date)[];
   yTickValues?: (number | Date)[];
-  /** Override tick size for Y axis (default: 6, use 0 for band scales). */
   yTickSize?: number;
-  /** When set, axes animate to new positions over this duration (ms). */
   transitionDuration?: number;
-  /** Limit the update to axes that actually changed. Defaults to both. */
   axes?: 'x' | 'y' | 'both';
 }
 
-/** Render or update axes with current scales. */
 export function renderAxes(
   layout: ChartLayout,
   xScale: AnyScale,
@@ -84,12 +79,8 @@ export function renderAxes(
   }
 }
 
-/** Render or update grid lines with current scales. */
-/** Which grid line sets to draw; each defaults to true when omitted. */
 export interface GridVisibility {
-  /** Vertical lines at x-axis ticks. */
   x?: boolean;
-  /** Horizontal lines at y-axis ticks. */
   y?: boolean;
 }
 
@@ -112,8 +103,6 @@ export function renderGrid(
   const showY = visible.y ?? true;
 
   if (updateX && !showX) {
-    // Vertical grid lines disabled: drop any lines from a previous render so
-    // toggling the flag at runtime does not leave stale lines behind.
     gridGroup.select('.grid-v').selectAll('line').remove();
   } else if (updateX) {
     let vGroup = gridGroup.select<SVGGElement>('.grid-v');
@@ -215,4 +204,57 @@ function visibleTickValues(
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric >= min && numeric <= max;
   });
+}
+
+export function setAttrIfChanged(element: Element, name: string, value: string): void {
+  if (element.getAttribute(name) !== value) element.setAttribute(name, value);
+}
+
+export function setStyleIfChanged(
+  element: HTMLElement | SVGElement,
+  name: string,
+  value: string,
+): void {
+  if (element.style.getPropertyValue(name) === value) return;
+  if (value === '') element.style.removeProperty(name);
+  else element.style.setProperty(name, value);
+}
+
+export function setTextIfChanged(element: Element, value: string): void {
+  if (element.textContent !== value) element.textContent = value;
+}
+
+export function raiseInOrder(
+  root: { selectAll: (selector: string) => { nodes: () => Element[] } },
+  selectors: readonly string[],
+): void {
+  const groups = selectors.map((selector) => root.selectAll(selector).nodes());
+  const tails = new Map<Node, Element[]>();
+  for (const nodes of groups) {
+    for (const node of nodes) {
+      const parent = node.parentNode;
+      if (!parent) continue;
+      let tail = tails.get(parent);
+      if (!tail) tails.set(parent, (tail = []));
+      tail.push(node);
+    }
+  }
+  let ordered = true;
+  for (const [parent, tail] of tails) {
+    let child = parent.lastChild;
+    for (let index = tail.length - 1; index >= 0; index--) {
+      if (child !== tail[index]) {
+        ordered = false;
+        break;
+      }
+      child = child.previousSibling;
+    }
+    if (!ordered) break;
+  }
+  if (ordered) return;
+  for (const selector of selectors) {
+    for (const node of root.selectAll(selector).nodes()) {
+      if (node.nextSibling) node.parentNode?.append(node);
+    }
+  }
 }

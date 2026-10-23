@@ -1,17 +1,4 @@
 import { selectXAxisMode } from '../support/e2e';
-/**
- * Regression: the chart action toolbar (view toggle, download, reset
- * zoom) renders as an absolute overlay in the chart figure's top-right corner
- * from `md` up. The chart heading spanned the full card width, so at reduced
- * tab widths (browser side panel, split screen) a long title — e.g. the
- * default "DeepSeek V4 Pro 1.6T Agentic Total Tokens per $1 TCO vs. P90
- * Interactivity" — wrapped underneath the toolbar and was covered by it.
- *
- * The heading now reserves the overlay's width (`md:mr-80`), so the title and
- * toolbar bounding boxes must never intersect at any viewport width, in both
- * Chart and Table views. Below `md` the toolbar is a normal-flow row above
- * the card (#948), which must stay overlap-free too.
- */
 
 interface Box {
   left: number;
@@ -28,9 +15,7 @@ const boxOf = ($el: JQuery): Box => {
 const intersects = (a: Box, b: Box): boolean =>
   a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-/** md boundary, side-panel width (the reported repro), lg, and full desktop. */
 const OVERLAY_WIDTHS = [768, 880, 1024, 1280] as const;
-/** Below md the toolbar renders as a normal-flow row above the card. */
 const FLOW_WIDTH = 500;
 
 function assertHeaderClearsToolbar(width: number) {
@@ -56,8 +41,6 @@ function assertHeaderClearsToolbar(width: number) {
 }
 
 function assertToolbarActionsPresent() {
-  // Sharing applies to the whole comparison and lives in the page controls,
-  // while download, view mode, and zoom remain scoped to each chart figure.
   cy.get('[data-testid="inference-chart-display"] > section')
     .first()
     .find('[data-testid="share-button"]')
@@ -83,11 +66,6 @@ describe('chart header toolbar overlap', () => {
     cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
   });
 
-  it('keeps every toolbar action available in chart view', () => {
-    cy.viewport(1280, 900);
-    assertToolbarActionsPresent();
-  });
-
   for (const width of OVERLAY_WIDTHS) {
     it(`chart view: title and toolbar do not overlap at ${width}px`, () => {
       assertHeaderClearsToolbar(width);
@@ -109,7 +87,6 @@ describe('chart header toolbar overlap', () => {
       assertHeaderClearsToolbar(width);
     }
     assertToolbarActionsPresent();
-    // Restore chart view for any spec that runs after this one.
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="inference-chart-view-btn"]')

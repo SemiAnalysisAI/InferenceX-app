@@ -3,39 +3,25 @@ import * as d3 from 'd3';
 import { CHART_TYPE, px } from '../typography';
 
 export interface RadarConfig<T = any> {
-  /** Labels for each axis spoke. */
   axes: { label: string; unit?: string }[];
-  /** Get normalized value (0–1) for datum at axis index. Null = missing data. */
   getValue: (d: T, axisIndex: number) => number | null;
-  /** Get raw (unscaled) value for tooltip display. */
   getRawValue?: (d: T, axisIndex: number) => number | null;
-  /** Color per datum. */
   getColor: (d: T) => string;
-  /** Label per datum (for tooltips). */
   getLabel?: (d: T) => string;
-  /** Concentric grid rings. Default 5. */
   levels?: number;
-  /** Margin around the radar for axis labels (px). Default 30. */
   labelMargin?: number;
-  /** Key function for polygon data join. */
   keyFn?: (d: T) => string;
 }
 
-/** Data bound to each radar dot element — used for tooltip targeting. */
 export interface RadarDot<T> {
   item: T;
   axisIndex: number;
   cx: number;
   cy: number;
   color: string;
-  /** Stable identity for D3 data joins. */
   key: string;
 }
 
-/**
- * Render a full radar chart: concentric grid, axis spokes, labels, polygons, and dots.
- * Returns the dot selection for tooltip attachment.
- */
 export function renderRadar<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -52,7 +38,6 @@ export function renderRadar<T>(
   const centerX = width / 2;
   const centerY = height / 2;
 
-  // Center group — idempotent
   let radarG = group.select<SVGGElement>('.radar-center');
   if (radarG.empty()) {
     radarG = group.append('g').attr('class', 'radar-center');
@@ -63,7 +48,6 @@ export function renderRadar<T>(
     return radarG.selectAll<SVGCircleElement, RadarDot<T>>('.radar-dot').data([] as RadarDot<T>[]);
   }
 
-  // Pre-compute trig for each axis — avoids recalculating per element
   const cosAngles = new Float64Array(numAxes);
   const sinAngles = new Float64Array(numAxes);
   for (let i = 0; i < numAxes; i++) {
@@ -74,7 +58,6 @@ export function renderRadar<T>(
 
   const rPerLevel = radius / levels;
 
-  // ── Concentric grid circles ──
   const gridData = d3.range(1, levels + 1);
   radarG
     .selectAll<SVGCircleElement, number>('.radar-grid')
@@ -89,7 +72,6 @@ export function renderRadar<T>(
     .attr('stroke-width', 0.5)
     .attr('stroke-dasharray', (d) => (d < levels ? '2,3' : 'none'));
 
-  // Grid level labels
   radarG
     .selectAll<SVGTextElement, number>('.radar-grid-label')
     .data(gridData, (d) => d)
@@ -102,7 +84,6 @@ export function renderRadar<T>(
     .attr('opacity', 0.6)
     .text((d) => `${Math.round((d / levels) * 100)}%`);
 
-  // ── Axis spokes ──
   radarG
     .selectAll<SVGLineElement, number>('.radar-spoke')
     .data(d3.range(numAxes), (d) => d)
@@ -116,7 +97,6 @@ export function renderRadar<T>(
     .attr('stroke-width', 0.8)
     .attr('opacity', 0.4);
 
-  // ── Axis labels ──
   const labelRadius = radius + 20;
   const axisData = axes.map((a, i) => ({ ...a, index: i }));
   radarG
@@ -137,7 +117,6 @@ export function renderRadar<T>(
     .attr('fill', 'var(--foreground)')
     .text((d) => d.label);
 
-  // ── Polygons ──
   const lineGen = d3
     .line<[number, number]>()
     .x((d) => d[0])
@@ -155,7 +134,7 @@ export function renderRadar<T>(
         const r = val === null ? 0 : val * radius;
         points.push([cosAngles[i] * r, sinAngles[i] * r]);
       }
-      points.push(points[0]); // close
+      points.push(points[0]);
       return lineGen(points);
     })
     .attr('fill', (d) => getColor(d))
@@ -164,7 +143,6 @@ export function renderRadar<T>(
     .attr('stroke-width', 1.5)
     .attr('stroke-opacity', 0.7);
 
-  // ── Dots ──
   const dots: RadarDot<T>[] = [];
   for (let di = 0; di < data.length; di++) {
     const item = data[di];

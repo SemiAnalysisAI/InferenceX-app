@@ -40,9 +40,7 @@ describe('Fixed-sequence benchmark logs', () => {
       .should('have.attr', 'href')
       .and('include', 'id=96255')
       .and('include', 'download=1');
-  });
 
-  it('provides the same viewer on the Simplified Chinese route', () => {
     cy.visit('/zh/inference/logs/96255', { onBeforeLoad: unlockAgenticGate });
     cy.wait('@logFiles');
     cy.wait('@logContent');

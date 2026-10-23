@@ -2,22 +2,14 @@
 
 import Link from 'next/link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Badge } from '@/components/ui/badge';
 import { TooltipContent, TooltipRoot, TooltipTrigger } from '@/components/ui/tooltip';
-import { getModelSlugEntryForDisplayName } from '@/lib/compare-slug';
-import { formatParamCount, getModelArchitecture } from '@/lib/model-architectures';
-import { type Model, getModelLabel } from '@/lib/data-mappings';
-import { localePath } from '@/lib/i18n';
+import { getModelSlugEntryForDisplayName } from '@/lib/compare/compare-slug';
+import { formatParamCount, getModelArchitecture } from '@/lib/catalog/model-architectures';
+import { type Model, getModelLabel } from '@/lib/catalog/data-mappings';
+import { localePath } from '@/lib/i18n/i18n';
 
-/**
- * Compact replacement for the old full-width "Learn more about the … architecture"
- * banner row: an icon link that sits beside the closed model-selector trigger and
- * deep-links to the model's `/model/[slug]` page. The former banner copy and the
- * architecture badges (MoE/Dense, attention type, param count) move into the
- * tooltip so the dashboard no longer spends a whole row of vertical space on them.
- * Renders nothing for models without a public slug (hidden models).
- */
 export function ModelArchitectureInfoLink({
   model,
   locale,

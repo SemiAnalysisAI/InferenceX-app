@@ -2,7 +2,7 @@
 
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import {
   OVERVIEW_TIERS,
   type OverviewComparisonMode,
@@ -12,8 +12,8 @@ import {
   type OverviewReferenceHardware,
   type OverviewRowScope,
   type OverviewTier,
-} from '@/lib/overview-data';
-import { overviewTierHref } from '@/lib/overview-links';
+} from '@/lib/overview/overview-data';
+import { overviewTierHref } from '@/lib/overview/overview-links';
 
 import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 
@@ -55,15 +55,10 @@ export function OverviewTierSlider({
   useEffect(() => {
     const index = tierIndex(tier);
     committedIndex.current = index;
-    // A payload settling mid-drag must not yank the thumb away from the stop
-    // the pointer is choosing; the gesture's own pointerup/cancel settles it.
     if (!pointerActive.current) setSelectedIndex(index);
   }, [tier]);
 
   useEffect(() => {
-    // A failed load leaves the settled tier behind while the thumb and URL
-    // stay on the unsuccessful stop. Re-open the guard so activating that
-    // same stop again retries the navigation instead of returning early.
     if (navigationError) committedIndex.current = tierIndex(tier);
   }, [navigationError, tier]);
 

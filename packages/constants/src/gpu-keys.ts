@@ -1,26 +1,15 @@
 export interface HwEntry {
-  /** GPU vendor (e.g. "NVIDIA", "AMD") */
   vendor: string;
-  /** Architecture codename (e.g. "Hopper", "Blackwell", "CDNA 4") */
   arch: string;
-  /** Display label (e.g. "H100", "GB200 NVL72") */
   label: string;
-  /** Optional compact label for power/TCO badges. Defaults to the uppercase key. */
   badgeLabel?: string;
-  /** Chart sort order (lower = first) */
   sort: number;
-  /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
-  /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
-   * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
   power: number;
-  /** $/GPU/hr — owning at large hyperscaler volume */
   costh: number;
-  /** $/GPU/hr — retail tier */
   costr: number;
 }
 
-/** Single source of truth for GPU metadata. Add new GPUs here. */
 export const HW_REGISTRY: Record<string, HwEntry> = {
   vr200: {
     vendor: 'NVIDIA',
@@ -122,10 +111,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     costh: 1.5,
     costr: 2.9,
   },
-  // NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, PCIe Gen5, 96 GB GDDR7).
-  // A workstation-class PCIe card benchmarked in 8× TP configs (no NVLink/NVSwitch);
-  // sorts last, after the datacenter SXM/OAM parts. TDP is the datasheet 600 W max
-  // board power; power and cost tiers are from the SemiAnalysis AI Cloud TCO model.
   rtx6000pro: {
     vendor: 'NVIDIA',
     arch: 'Blackwell',
@@ -155,46 +140,27 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 980,
     power: 1.207,
     costh: 1.21,
-    /** GCP 3-year commit rental rate per chip-hour (SemiAnalysis AI Cloud TCO Model). */
     costr: 2,
   },
 };
 
-/** Canonical set of GPU key strings used across all packages. */
 export const GPU_KEYS = new Set(Object.keys(HW_REGISTRY));
 
-/** Maps each GPU key to its vendor for display grouping. */
+/**
+ * Runner names that differ from their canonical GPU key. Benchmark artifacts and
+ * changelog config keys carry the runner name (`vrnvl72`); stored rows, chart
+ * points and the legend use the GPU key (`vr200`).
+ */
+export const GPU_RUNNER_ALIASES: Record<string, string> = {
+  vrnvl72: 'vr200',
+};
+
 export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
   Object.entries(HW_REGISTRY).map(([k, v]) => [k, v.vendor]),
 );
 
-// ---------------------------------------------------------------------------
-// Vendor color zones
-//
-// To add a new vendor: add an entry to HW_REGISTRY above, then add color
-// zones to both maps below (OKLch for normal mode, HSL for high-contrast).
-// ---------------------------------------------------------------------------
-
-/** Google brand blue, used unchanged for a single Google hardware series. */
 export const GOOGLE_BLUE = '#4285F4';
 
-/**
- * OKLch hue zones for normal-mode vendor-aware colors.
- * Narrow, precise bands for assigning brand-matching color shades.
- *
- * Layout (approximate):
- *   0-12    (gap)
- *   12-42   AMD reds/oranges
- *   42-120  (gap)
- *   120-170 NVIDIA greens
- *   170-185 (gap)
- *   185-235 unknown / fallback (cyans/teals)
- *   235-250 (gap)
- *   250-275 Google blues (brand hue ~260)
- *   275-290 (gap)
- *   290-330 OpenAI purples
- *   330-360 (gap)
- */
 export const VENDOR_OKLCH_ZONES: Record<
   string,
   { start: number; end: number; chroma: { light: number; dark: number } }
@@ -206,24 +172,6 @@ export const VENDOR_OKLCH_ZONES: Record<
   unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
 };
 
-/**
- * Preferred HSL hue zones for high-contrast mode.
- * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
- * from different vendors are visually distinct and vendor-appropriate
- * (NVIDIA = greens, AMD = reds/oranges, Google = blues, OpenAI = purples).
- * When a vendor has too many items to fit with sufficient spacing, the zone
- * expands symmetrically — these are preferred zones, not hard constraints.
- *
- * Layout (360° wheel):
- *   NVIDIA:  40–180  (140°) — yellow-greens through cyans
- *   unknown: 180–205 (25°) — cyans
- *   Google:  205–235 (30°) — blues (brand hue ~217)
- *   OpenAI:  255–300 (45°) — purples/violets
- *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
- *
- * Each entry is an array of linear {start, span} segments (wrapping bands
- * are split into two segments).
- */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
   nvidia: [{ start: 40, span: 140 }],
   openai: [{ start: 255, span: 45 }],

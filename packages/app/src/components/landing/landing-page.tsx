@@ -2,15 +2,15 @@ import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
-import { IntroSection } from '@/components/intro-section';
+import { IntroSection } from '@/components/landing/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
 import { CountUp } from '@/components/motion/count-up';
 import { Reveal } from '@/components/motion/reveal';
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: {
@@ -26,9 +26,6 @@ const STRINGS = {
     openRecipesTitle: 'Open recipes',
     openRecipesDesc:
       'Every model, framework, precision, and parallelism setting is committed to the public repo as a shell script.',
-    dbSnapshotsTitle: 'Weekly DB snapshots',
-    dbSnapshotsDesc:
-      'The full benchmark database is published as a public GitHub Release every week so the historical dataset stays auditable.',
     browseSubmissions: 'Browse submissions',
     viewRuns: 'View benchmark runs on GitHub Actions',
     howItWorks: 'How it works',
@@ -47,9 +44,6 @@ const STRINGS = {
     actionsRunsDesc: '每次基准测试都通过 GitHub Actions 执行，运行期间即可查看完整日志。',
     openRecipesTitle: '公开测试配置',
     openRecipesDesc: '每个模型、框架、精度和并行配置都以 shell 脚本形式保存在公开仓库中。',
-    dbSnapshotsTitle: '每周数据库快照',
-    dbSnapshotsDesc:
-      '完整的基准测试数据库每周都会作为公开的 GitHub Release 发布，方便任何人核查历史数据。',
     browseSubmissions: '浏览提交记录',
     viewRuns: '查看 GitHub Actions 运行记录',
     howItWorks: '了解复现流程',
@@ -58,26 +52,16 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Quick Comparisons is hidden for now. The card, its `quickComparisons*`
- * strings, `CuratedViewCard`, and `FAVORITE_PRESETS` are all left in place —
- * flip this to `true` to bring the section back.
- */
 const SHOW_QUICK_COMPARISONS = false;
 
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
-  // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
     <main className="relative">
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
-        {/* Same AgentX hero that leads /compare, above the quote carousel. The
-            landing page owns no h1 of its own, but keep this an h2 so the hero
-            stays a section within the page rather than retitling the whole
-            site. */}
         <Reveal>
           <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
         </Reveal>
@@ -86,9 +70,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
           <IntroSection locale={locale} />
         </Reveal>
 
-        {/* Split: exploration entry points vs presets */}
         <section className="flex flex-col gap-4 pb-8">
-          {/* Reproducibility callout */}
           <Reveal>
             <Card>
               <div className="flex items-center gap-2 mb-3">
@@ -104,7 +86,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
                 </span>{' '}
                 {t.reproStatTail}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <Reveal delayMs={100} className="rounded-md border border-border bg-card p-3">
                   <div className="text-sm font-semibold text-foreground">{t.actionsRunsTitle}</div>
                   <div className="text-xs text-muted-foreground mt-1">{t.actionsRunsDesc}</div>
@@ -112,10 +94,6 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
                 <Reveal delayMs={170} className="rounded-md border border-border bg-card p-3">
                   <div className="text-sm font-semibold text-foreground">{t.openRecipesTitle}</div>
                   <div className="text-xs text-muted-foreground mt-1">{t.openRecipesDesc}</div>
-                </Reveal>
-                <Reveal delayMs={240} className="rounded-md border border-border bg-card p-3">
-                  <div className="text-sm font-semibold text-foreground">{t.dbSnapshotsTitle}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{t.dbSnapshotsDesc}</div>
                 </Reveal>
               </div>
               <div className="flex flex-wrap gap-3 text-sm">
@@ -150,7 +128,6 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </Card>
           </Reveal>
 
-          {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
           {SHOW_QUICK_COMPARISONS && (
             <Card data-testid="landing-quick-comparisons">
               <div className="flex items-center gap-2 mb-3">

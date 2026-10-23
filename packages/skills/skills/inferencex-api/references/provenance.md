@@ -124,6 +124,11 @@ For AgentX it also sends `benchmarkType=agentic_traces`. Matching `runs` and
 The collector does not fetch the GitHub URL and does not guess an image from
 same-day config entries.
 
+`workflow-info` is date-scoped across models. Its changelog keys retain raw model
+prefixes: the `GLM-5.2` display/API model groups both `glm5.2` and `glm5.3`. Match
+the selected result's raw model and precision when locating its changelog; do not
+interpret every run on that date as a run of the selected model.
+
 `workflow-info` lists **latest attempts only**. A conflicting run attempt, date,
 run URL, or producer start time fails the collection instead of silently
 replacing the producer. Start times are compared at second precision because

@@ -1,14 +1,5 @@
-import { cachedText } from '@/lib/api-cache';
-import { escapeCsvCell } from '@/lib/csv-export';
-
-/**
- * Minimal RFC 4180 CSV serialization for views-API alternate representations.
- *
- * Header row from the union of row keys (first-seen order), CRLF line endings,
- * and the same cell quoting as the dashboard's chart export (`escapeCsvCell`).
- * Deliberately not the `tco-feed` Power Query contract (LF, unquoted, fixed
- * columns) and without the download license preamble.
- */
+import { cachedText } from '@/lib/cache/api-cache';
+import { escapeCsvCell } from '@/lib/export/csv-export';
 
 export function toCsv(rows: readonly Readonly<Record<string, unknown>>[]): string {
   const columns: string[] = [];

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ArrowUpRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-providers';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-chart/ai-providers';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useAiChart } from '@/hooks/api/use-ai-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -269,7 +269,6 @@ export default function AiChartDisplay() {
         )}
       </div>
 
-      {/* Loading state */}
       {isLoading && (
         <Card>
           <CardContent className="space-y-4">
@@ -280,7 +279,6 @@ export default function AiChartDisplay() {
         </Card>
       )}
 
-      {/* Error state */}
       {error && (
         <Card className="border-destructive">
           <CardContent className="flex items-start gap-3">
@@ -304,7 +302,6 @@ export default function AiChartDisplay() {
         </Card>
       )}
 
-      {/* Result */}
       {result && (
         <>
           <UnofficialDomainNotice />

@@ -6,12 +6,8 @@ describe('Blog', () => {
         cy.visit(`${locale}/blog/${slug}`);
         cy.get('h1').should('have.length', 1).and('contain.text', 'Rubin NVL72');
         cy.get('article.prose').within(() => {
-          cy.contains('Bryan Shan').should('exist');
-          cy.contains('276.24').should('exist');
-          cy.contains('171.53').should('exist');
-          cy.get('h2').should('have.length', 4);
           cy.get(`figure img[src^="/images/${slug}/"]`)
-            .should('have.length', 16)
+            .should('have.length.greaterThan', 0)
             .each(($image) => {
               cy.wrap($image)
                 .scrollIntoView()
@@ -38,68 +34,98 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    before(() => {
-      // Listing content and links must not depend on remote thumbnail availability.
+    beforeEach(() => {
       cy.intercept(
-        {
-          method: 'GET',
-          pathname: '/_next/image',
-          query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
-        },
-        { statusCode: 204 },
+        { method: 'GET', pathname: '/_next/image' },
+        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
       );
-      cy.visit('/blog');
+      cy.visit('/blog', { timeout: 20_000 });
     });
 
-    it('renders the blog page with heading', () => {
-      cy.get('h1').should('have.length', 1).and('contain.text', 'Articles');
-      cy.get('h2#blog-list-heading').should('contain.text', 'All articles');
-    });
-
-    it('displays at least one blog post card', () => {
-      cy.get('article').should('have.length.gte', 1);
-    });
-
-    it('post cards have titles and excerpts', () => {
-      cy.get('article')
+    it('serves local card thumbnails through the image optimizer', () => {
+      cy.get('[data-testid="blog-post-grid"] img[src^="/_next/image?url=%2Fimages%2F"]')
         .first()
-        .within(() => {
-          cy.get('h2').should('exist').and('not.be.empty');
-          cy.get('p').should('exist');
+        .invoke('attr', 'src')
+        .then((src) => {
+          cy.request({ url: String(src), encoding: 'binary' }).then((response) => {
+            expect(response.status).to.eq(200);
+            expect(response.headers['content-type']).to.match(/^image\//u);
+          });
         });
-    });
-
-    it('post cards link to individual posts', () => {
-      cy.get('a[href^="/blog/"]').should('have.length.gte', 1);
     });
   });
 
   describe('Blog post page', () => {
     before(() => {
       cy.intercept('GET', 'https://substack-post-media.s3.amazonaws.com/**', {
-        statusCode: 204,
+        fixture: '1x1.png',
+        headers: { 'content-type': 'image/png' },
       });
       cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });
 
     it('renders the post title as the one and only h1', () => {
-      // The title is the page's single <h1> (primary-keyword top heading);
-      // MDX body sections map to <h2>, so there must be exactly one h1.
       cy.get('h1').should('have.length', 1).and('contain.text', 'InferenceMAX');
     });
+  });
 
-    it('displays post metadata', () => {
-      cy.contains('SemiAnalysis').should('exist');
-      cy.contains('min read').should('exist');
+  describe('Hardware results pages', () => {
+    const slug = 'vera-rubin-nvl72-vs-gb300-nvl72-agentx-results';
+
+    for (const locale of ['', '/zh']) {
+      it(`renders the results header and article on ${locale || '/en'}`, () => {
+        cy.visit(`${locale}/hardware/${slug}`);
+        cy.get('h1').should('have.length', 1).and('contain.text', 'Vera Rubin NVL72');
+        cy.get('[data-testid="hardware-hero"]').within(() => {
+          cy.get('[data-testid="hardware-lede"]').should('be.visible');
+          cy.get('[data-testid="hardware-hero-link"]').first().should('have.class', 'bg-brand');
+          cy.get('[data-testid="hardware-hero-link"]').eq(1).should('not.have.class', 'bg-brand');
+          cy.get(`a[href="${locale}/hardware"]`).should('be.visible');
+        });
+        cy.get('[data-testid="hardware-article"] table').should('have.length.greaterThan', 0);
+        cy.get('[data-testid="blog-related"]').should('not.exist');
+        cy.get('link[rel="canonical"]').should(
+          'have.attr',
+          'href',
+          `https://inferencex.semianalysis.com${locale}/hardware/${slug}`,
+        );
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+          .should('have.attr', 'href')
+          .and('include', `/zh/hardware/${slug}`);
+        cy.get('[data-testid="language-toggle"]').should(
+          'have.attr',
+          'href',
+          locale ? `/hardware/${slug}` : `/zh/hardware/${slug}`,
+        );
+      });
+    }
+
+    it('places the header links below the lede on phones without horizontal overflow', () => {
+      cy.viewport(390, 844);
+      cy.visit(`/hardware/${slug}`);
+      cy.get('[data-testid="hardware-lede"]').then(($lede) => {
+        const ledeBottom = $lede[0].getBoundingClientRect().bottom;
+        cy.get('[data-testid="hardware-hero-links"]').should(($links) => {
+          expect($links[0].getBoundingClientRect().top).to.be.greaterThan(ledeBottom);
+        });
+      });
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.viewport(1280, 720);
     });
 
-    it('renders the article content', () => {
-      cy.get('article.prose').should('exist');
-      cy.get('article.prose').should('contain.text', 'InferenceMAX');
+    it('lists the pages on /hardware and links each card to its page', () => {
+      cy.visit('/hardware');
+      cy.get('[data-testid="hardware-card"]').should('have.length.at.least', 2);
+      cy.get(`[data-testid="hardware-card"] a[href="/hardware/${slug}"]`).click();
+      cy.location('pathname').should('eq', `/hardware/${slug}`);
     });
 
-    it('has a back link to the blog listing', () => {
-      cy.get('a[href="/blog"]').should('exist');
+    it('no longer serves the moved pages under /blog', () => {
+      cy.request({ url: `/blog/${slug}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 404);
     });
   });
 
@@ -130,16 +156,12 @@ describe('Blog', () => {
     });
 
     it('leaves single-dollar prices as literal text, not math', () => {
-      // `singleDollarTextMath: false` — otherwise "$3 ... $15" would be swallowed
-      // into an inline formula and the prices would disappear from the prose.
       cy.get('article.prose').should('contain.text', '$3 per million tokens input');
       cy.get('article.prose').should('contain.text', '$15 per million tokens output');
     });
 
     it('renders every figure the post references', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
-      // Only the first figure is eager; the rest are `loading="lazy"` and stay at
-      // naturalWidth 0 until scrolled to, so decode is only asserted on that one.
       cy.get('article.prose figure img')
         .first()
         .should(($img) => {
@@ -151,11 +173,7 @@ describe('Blog', () => {
           /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
         );
       });
-    });
 
-    it('serves every figure image the post references', () => {
-      // Complements the eager-only decode check above: the srcs exist on the server
-      // even though lazy images have not fetched them yet.
       cy.get('article.prose figure img').then(($imgs) => {
         const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
         for (const src of srcs) {

@@ -3,13 +3,13 @@ import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
-import { type Locale, localePath } from '@/lib/i18n';
+import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperBreadcrumbJsonLd,
   buildWhitepaperJsonLd,
@@ -19,8 +19,8 @@ import {
   type WhitepaperKpiIcon,
   whitepaperCopy,
   whitepaperIndexPath,
-} from '@/lib/whitepapers';
-import { cn } from '@/lib/utils';
+} from '@/lib/content/whitepapers';
+import { cn } from '@/lib/shared/utils';
 
 import {
   WhitepaperBackLink,
@@ -31,7 +31,6 @@ import {
 
 const ESTIMATOR_PATH = '/profit-estimator-per-gigawatt';
 
-/** Chart red family from the figures; the light value is the plot's profit segment. */
 const KPI_NUMBER_CLASS = 'text-[#ba534b] dark:text-[#d97a70]';
 
 const KPI_ICONS: Record<WhitepaperKpiIcon, typeof DollarSign> = {
@@ -40,7 +39,6 @@ const KPI_ICONS: Record<WhitepaperKpiIcon, typeof DollarSign> = {
   percent: Percent,
 };
 
-/** Fine dot grid, faded toward the bottom-right so the chip render sits on clean ground. */
 const HERO_GRID_STYLE: CSSProperties = {
   backgroundImage:
     'radial-gradient(circle at center, rgba(234, 235, 236, 0.16) 1px, transparent 1.2px), linear-gradient(rgba(234, 235, 236, 0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(234, 235, 236, 0.035) 1px, transparent 1px)',
@@ -146,7 +144,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
       <JsonLd data={buildWhitepaperJsonLd(paper, locale)} />
       <JsonLd data={buildWhitepaperBreadcrumbJsonLd(paper, locale)} />
       <div className="container mx-auto flex flex-col gap-10 px-4 pb-16 lg:gap-12 lg:px-8">
-        {/* Hero band: dark surface in every theme, so the `dark` class scopes the dark tokens here. */}
         <section
           className="dark relative isolate overflow-hidden rounded-2xl border border-border/40 bg-[linear-gradient(135deg,#0b0c0e_0%,#131416_100%)] text-foreground lg:min-h-[420px]"
           data-testid="whitepaper-hero"
@@ -221,7 +218,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           </div>
         </section>
 
-        {/* Stat strip */}
         <section
           className="flex flex-col gap-4"
           aria-labelledby="whitepaper-key-numbers"
@@ -277,7 +273,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           </p>
         </section>
 
-        {/* Figures */}
         <section className="flex flex-col gap-6" aria-labelledby="whitepaper-figures">
           <h2 id="whitepaper-figures" className="sr-only scroll-mt-24">
             {t.figures}
@@ -339,7 +334,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
                     )}
                   </p>
                 </div>
-                {/* The chart is wide; below sm it keeps a readable width and scrolls sideways. */}
                 <div className="-mx-1 overflow-x-auto px-1 pb-1">
                   <div
                     className="min-w-[36rem] overflow-hidden rounded-lg border border-border/40 sm:min-w-0"
@@ -365,7 +359,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           })}
         </section>
 
-        {/* Body */}
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex min-w-0 flex-col gap-12">
             <Section id="whitepaper-summary" title={t.summary}>
@@ -468,7 +461,6 @@ export function WhitepaperDetailContent({ paper, locale }: { paper: Whitepaper; 
           </aside>
         </div>
 
-        {/* Closing CTA */}
         <section
           className="flex flex-col items-start gap-5 rounded-2xl border border-primary/30 bg-primary/5 p-6 md:flex-row md:items-center md:justify-between md:p-8"
           aria-labelledby="whitepaper-closing"

@@ -19,7 +19,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getAllBenchmarksForHistory: mockGetAllBenchmarksForHistory,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -30,7 +30,7 @@ import {
   LIFECYCLE_DEFAULTS,
   MS_PER_MONTH,
 } from '@/components/calculator/lifecycle';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import { GET } from './route';
 
@@ -76,11 +76,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/**
- * Two run dates for one config, each with a frontier bracketing the 35
- * tok/s/user target; the second date is ~33% faster, so the best-so-far
- * staircase has two rungs.
- */
 const HISTORY_ROWS: BenchmarkRow[] = [
   makeRow({ conc: 8 }),
   makeRow({
@@ -116,7 +111,6 @@ const HISTORY_ROWS: BenchmarkRow[] = [
   }),
 ];
 
-/** DeepSeek-V4-Pro's registered release date — the series' month-0 anchor. */
 const ANCHOR_MS = Date.parse('2026-04-24T00:00:00Z');
 
 beforeEach(() => {
@@ -159,7 +153,6 @@ describe('GET /api/v1/views/fleet', () => {
     expect(body.view).toBe('fleet');
     expect(body.apiVersion).toBe('v1');
     expect(body.generatedAt).toBe('2026-07-01');
-    // Fixed sequence → 1k/1k resolves to its ISL/OSL history query.
     expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith(
       expect.anything(),
       expect.arrayContaining(['dsv4']),
@@ -172,24 +165,20 @@ describe('GET /api/v1/views/fleet', () => {
     expect(series.hwKey).toBe('b300');
     expect(series.hwKeysUsed).toEqual(['b300_sglang']);
     expect(series.gpus).toBeGreaterThan(0);
-    expect(series.improvementCount).toBe(1); // the July rung beat the June one
+    expect(series.improvementCount).toBe(1);
     expect(series.improvementFactor).toBeGreaterThan(1);
     expect(series.points.length).toBeGreaterThan(2);
     expect(series.points.every((p: { month: number }) => Number.isFinite(p.month))).toBe(true);
 
-    // Parity: availability comes straight from the default interrupt assumptions.
     expect(series.availability).toBeCloseTo(availabilityFromInterrupts(24, 12), 12);
     expect(body.assumptions.availability).toBeCloseTo(availabilityFromInterrupts(24, 12), 12);
 
-    // Default horizon: ceil(months from release anchor to last sweep + 2).
     const measuredMonths = (Date.parse('2026-07-01T00:00:00Z') - ANCHOR_MS) / MS_PER_MONTH;
     expect(body.assumptions.horizonMonths).toBe(Math.max(1, Math.ceil(measuredMonths + 2)));
     expect(body.assumptions.anchorDate).toBe('2026-04-24');
   });
 
   it('seeds both prices from the cheapest fleet break-even at the 4x ratio', async () => {
-    // ramp=0 so the latest config is at full rate by the horizon — break-even
-    // pricing must then close the final margin to ~zero (relative to cost).
     const bodyRes = await GET(
       request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&sequence=1k/1k&mw=100&ramp=0'),
     );
@@ -200,7 +189,6 @@ describe('GET /api/v1/views/fleet', () => {
     expect(body.params.oprice).toBeCloseTo(breakEven * 4, 12);
     expect(body.series[0].breakEvenPricePerMTok).toBeCloseTo(breakEven, 12);
 
-    // Break-even prices mean the fully-rolled-out fleet earns exactly its cost.
     const lastPoint = body.series[0].points.at(-1);
     expect(Math.abs(lastPoint.margin)).toBeLessThan(lastPoint.cost * 1e-9);
   });
@@ -242,7 +230,6 @@ describe('GET /api/v1/views/fleet', () => {
     const revenuePoints = revenueBody.series[0].points;
     expect(marginPoints[0].value).toBeCloseTo(marginPoints[0].margin, 12);
     expect(revenuePoints[0].value).toBeCloseTo(revenuePoints[0].revenue, 12);
-    // Same underlying series either way.
     expect(revenuePoints[0].margin).toBeCloseTo(marginPoints[0].margin, 12);
   });
 

@@ -1,12 +1,14 @@
 'use client';
 
 import { curveLinear } from 'd3';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -19,26 +21,34 @@ import type { VizDefinition } from './types';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
+const STRINGS = {
+  en: {
+    ascendBasis:
+      '950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
+  },
+  zh: {
+    ascendBasis:
+      '950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
+  },
+};
+
 interface Point {
   hw: string;
   i: number;
   x: number;
   y: number;
-  /** Effective FLOP/byte and measured TFLOPS; x/y are these or their normalized forms. */
   ai: number;
   tflops: number;
   us: number;
   bound: RooflineBound | null;
 }
 
-/** Key of the one roofline every device shares once normalized. */
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
-/** ` · 42% of peak compute`, or nothing when the device's peak is unknown. */
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
-/** `Roofline 12 µs · 71% of it · bound by compute 60%, memory 35%, link 5%`. */
+/** `37% of roofline (88 µs · compute 41%, memory 59%)`. */
 function boundRow(b: RooflineBound, us: number): string {
   const parts = (
     [
@@ -55,6 +65,7 @@ function boundRow(b: RooflineBound, us: number): string {
 }
 
 function Roofline({ model }: { model: ComparisonModel }) {
+  const strings = STRINGS[useLocale()];
   const { view } = model;
   const counts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
@@ -63,17 +74,12 @@ function Roofline({ model }: { model: ComparisonModel }) {
     return m;
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
+  const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [normalized, setNormalized] = useState(true);
-  const precision =
-    picked && precisions.includes(picked)
-      ? picked
-      : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
-  // A case's stages each hit their own roof, so its intensity is effective: placed where
-  // the device's roofline min(peak, AI × bandwidth) reaches the case's own bound, F / t_roof.
-  // The gap under the roof is then measured time against that bound. For a single stage
-  // this is plain FLOP/byte. Normalized, intensity is divided by the ridge point
-  // (peak / bandwidth) and throughput by the peak, so every roofline becomes min(1, x).
+  const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
+  // Each stage hits its own roof, so a case sits at its effective intensity: where the
+  // device's roofline reaches the case's bound, F / t_roof (plain FLOP/byte for one stage).
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {
@@ -151,6 +157,9 @@ function Roofline({ model }: { model: ComparisonModel }) {
           </Label>
         </div>
       </div>
+      {model.hardware.includes('ascend950pr') && (
+        <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
+      )}
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-roofline"

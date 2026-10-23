@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 import { AgentXMethodologyArticle } from '@/components/datasets/agentx-methodology-article';
-import { JsonLd } from '@/components/json-ld';
-import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =

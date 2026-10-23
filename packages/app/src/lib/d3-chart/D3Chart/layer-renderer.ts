@@ -1,7 +1,6 @@
-import * as d3 from 'd3';
+import type * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
-import { CHART_TYPE, px } from '../typography';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
 import {
   renderHorizontalBars,
@@ -19,6 +18,7 @@ import {
 import { renderBarLabels, updateBarLabelsOnZoom } from '../layers/bar-labels';
 import {
   renderScatterPoints,
+  syncPointLabel,
   updateScatterPointsForDisplay,
   updateScatterPointsOnZoom,
 } from '../layers/scatter-points';
@@ -27,10 +27,6 @@ import { renderRadar } from '../layers/radar';
 import type { BuiltScale } from './scale-builders';
 import type { LayerConfig, RenderContext, ZoomContext } from './types';
 
-/**
- * Render a single layer into the chart's zoomGroup (or g for non-clipped charts).
- * Returns the D3 selection if the layer produces one (for tooltip attachment).
- */
 export function renderLayer<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -136,9 +132,6 @@ export function renderLayer<T>(
   }
 }
 
-/**
- * Cheap geometry updates that should follow every zoom event.
- */
 export function updateLayerPositionOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -180,10 +173,6 @@ export function updateLayerPositionOnZoom<T>(
   }
 }
 
-/**
- * Expensive path, label, and annotation work. The renderer coalesces this
- * phase through one animation frame.
- */
 export function updateLayerDecorationOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -236,9 +225,6 @@ export function updateLayerDecorationOnZoom<T>(
   }
 }
 
-/**
- * Update metric coordinates without re-running the scatter data join.
- */
 export function updateLayerForMetric<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -265,26 +251,7 @@ export function updateLayerForMetric<T>(
   const foreground = layer.config.foreground;
   if (getLabelText && foreground) {
     selection.each(function (datum) {
-      const lines = getLabelText(datum).split('\n');
-      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
-      d3.select(this)
-        .selectAll<SVGTextElement, boolean>('.point-label')
-        .data([true])
-        .join('text')
-        .attr('class', 'point-label')
-        .attr('text-anchor', 'middle')
-        .attr('fill', foreground)
-        .attr('font-size', px(CHART_TYPE.dataLabel))
-        .attr('font-weight', '700')
-        .attr('pointer-events', 'none')
-        .style('display', layer.config.hideLabels ? 'none' : '')
-        .style('opacity', layer.config.hideLabels ? 0 : 1)
-        .selectAll<SVGTSpanElement, string>('tspan')
-        .data(lines)
-        .join('tspan')
-        .attr('x', 0)
-        .attr('dy', (_line, index) => (index === 0 ? `${firstDy}em` : '1.1em'))
-        .text((line) => line);
+      syncPointLabel(this, getLabelText(datum), foreground, layer.config.hideLabels);
     });
   } else {
     selection.selectAll('.point-label').remove();
@@ -293,7 +260,6 @@ export function updateLayerForMetric<T>(
   return selection;
 }
 
-/** Update scale-neutral decoration without rebuilding joins, scales, or paths. */
 export function updateLayerForDisplay<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,

@@ -1,14 +1,3 @@
-/**
- * Pre-compute the per-row aggregate stats for an `agentic_trace_replay`
- * blob pair. The output lands in the `aggregate_stats` JSONB column so the
- * detail page can serve the "Aggregates across configs" view and the
- * derived chart x-axis modes from a single SQL row read, instead of
- * parsing the raw blobs on demand.
- *
- * Shape is intentionally versioned — bump `STATS_VERSION` whenever the
- * computation changes so the backfill script knows which rows to recompute.
- */
-
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { createGunzip } from 'node:zlib';
@@ -31,13 +20,7 @@ export interface AggregateStats {
   osl: MetricPercentiles | null;
   kvCacheUtil: MetricPercentiles | null;
   prefixCacheHitRate: MetricPercentiles | null;
-  /**
-   * Per-request E2E latency / OSL (seconds per output token) percentiles.
-   * The read path inverts to plot the slow-tail "E2E Normalized Interactivity" x-axis metric
-   * (tok/s/user): pXX E2E Normalized Interactivity = 1 / pXX(E2EL/OSL).
-   */
   e2elPerOsl: MetricPercentiles | null;
-  /** Bounded mergeable distributions used by the chart-level subtitle. */
   sequenceLengths: SequenceLengthSketches;
 }
 
@@ -63,12 +46,6 @@ function profileMetricValue(value: ProfileMetricEnvelope | number | undefined): 
   return typeof number === 'number' && Number.isFinite(number) ? number : undefined;
 }
 
-/**
- * Stream a profile export line by line so exceptionally large traces never
- * materialize their multi-gigabyte decompressed JSONL as one string. The
- * numeric sample arrays are tiny relative to the source and are needed for
- * exact percentile calculation.
- */
 async function extractProfileSamples(
   compressedChunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
 ): Promise<{
@@ -76,7 +53,10 @@ async function extractProfileSamples(
   osl: number[];
   e2elPerOsl: number[];
 }> {
-  const input = Readable.from(compressedChunks).pipe(createGunzip());
+  const source = Readable.from(compressedChunks);
+  const input = createGunzip();
+  source.on('error', (error) => input.destroy(error));
+  source.pipe(input);
   const lines = createInterface({ input, crlfDelay: Infinity });
   const isl: number[] = [];
   const osl: number[] = [];
@@ -120,11 +100,6 @@ async function extractProfileSamples(
   return { isl, osl, e2elPerOsl };
 }
 
-/**
- * Compute the profile-derived half of the aggregate bundle from compressed
- * chunks. Backfills use this for oversized TOAST values so neither Postgres
- * nor the JS driver has to materialize one enormous bytea response.
- */
 export async function computeProfileAggregateStatsFromCompressedChunks(
   compressedChunks: Iterable<Uint8Array> | AsyncIterable<Uint8Array>,
 ): Promise<AggregateStats> {
@@ -139,9 +114,7 @@ export async function computeProfileAggregateStatsFromCompressedChunks(
     oslPct = percentilesOf(osl);
     sequenceLengths = sequenceLengthSketches(isl, osl);
     e2elPerOsl = percentilesOf(ratios);
-  } catch {
-    // Ignore malformed blobs and leave the profile-derived fields null.
-  }
+  } catch {}
 
   return {
     version: STATS_VERSION,
@@ -154,12 +127,6 @@ export async function computeProfileAggregateStatsFromCompressedChunks(
   };
 }
 
-/**
- * The subset of an older-version bundle a profile-only upgrade carries
- * forward. Pre-v6 bundles also carry the since-retired derived metrics
- * (normalizedSessionTimeS, p90PrefillTpsPerUser, normalizedE2e400) — spreading
- * `profile` first drops them from the merged result.
- */
 interface ProfileUpgradeCarryover {
   isl: MetricPercentiles | null;
   osl: MetricPercentiles | null;
@@ -167,11 +134,6 @@ interface ProfileUpgradeCarryover {
   prefixCacheHitRate: MetricPercentiles | null;
 }
 
-/**
- * Upgrade an existing stats bundle when only profile-derived fields changed.
- * This avoids re-reading and decompressing the much larger server-metrics blob
- * while preserving its already-computed KV/cache distributions.
- */
 export function mergeProfileStatsUpgrade(
   existing: ProfileUpgradeCarryover,
   profile: AggregateStats,
@@ -185,7 +147,6 @@ export function mergeProfileStatsUpgrade(
   };
 }
 
-/** Metric subtrees we extract via stream-parse on oversized server blobs. */
 export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
   'vllm:kv_cache_usage_perc',
   'vllm:gpu_cache_usage_perc',
@@ -205,11 +166,6 @@ export const AGGREGATE_SERVER_METRIC_KEYS = new Set([
   'trtllm_prompt_tokens_total',
 ]);
 
-/**
- * Stream-parse the gzipped server_metrics_json and collect just the metric
- * subtrees we care about when the full JSON exceeds the in-memory fast-path
- * ceiling.
- */
 async function streamExtractServer(
   buffer: Buffer,
 ): Promise<{ kvCacheUtil: number[]; prefixCacheHitRate: number[] }> {
@@ -221,12 +177,6 @@ async function streamExtractServer(
   return extractServerMetricSamples(JSON.stringify({ metrics: collected }));
 }
 
-/**
- * Add server-derived distributions to profile stats using an already parsed
- * profiling metric map. Ingest uses this to share one server JSON parse with
- * chart-series generation; the output shape and ordering match
- * `computeAggregateStats()` exactly.
- */
 export function withServerMetricAggregateStats(
   profileStats: AggregateStats,
   metrics: Record<string, unknown>,
@@ -243,11 +193,6 @@ export function withServerMetricAggregateStats(
   }
 }
 
-/**
- * Compute the full versioned stats bundle from a (profile, server-metrics)
- * blob pair. Either blob may be null (e.g. only the server file existed) —
- * the corresponding stats just come back null.
- */
 export async function computeAggregateStats(args: {
   profileBlob: Buffer | null;
   serverBlob: Buffer | null;
@@ -266,9 +211,7 @@ export async function computeAggregateStats(args: {
         json === null
           ? await streamExtractServer(args.serverBlob)
           : extractServerMetricSamples(json);
-    } catch {
-      // malformed blob or failed stream fallback — leave nulls
-    }
+    } catch {}
     if (server) {
       kvPct = percentilesOf(server.kvCacheUtil);
       prefixPct = percentilesOf(server.prefixCacheHitRate);

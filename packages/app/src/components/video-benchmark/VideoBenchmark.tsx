@@ -5,8 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Heading } from '@/components/ui/heading';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import ResultPower from './ResultPower';
 import VideoSelect from './VideoSelect';
 import ServingResults from './ServingResults';
@@ -404,7 +404,6 @@ export default function VideoBenchmark({
     }
   }
   useEffect(() => {
-    // A shared preview link must not trigger requests to a URL supplied by its sender.
     if (['127.0.0.1', 'localhost'].includes(location.hostname)) {
       const initial = new URLSearchParams(location.search).get('manifest');
       if (initial) {

@@ -4,15 +4,15 @@ import * as d3 from 'd3';
 import React, { useCallback, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, D3ChartHandle, RenderContext } from '@/lib/d3-chart/D3Chart/types';
-import { getChartWatermark } from '@/lib/data-mappings';
-import type { Locale } from '@/lib/i18n';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import type { Locale } from '@/lib/i18n/i18n';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   formatCap,
@@ -24,7 +24,6 @@ import {
 import { getCostTypeLabel } from './ThroughputBarChart';
 import type { CostType } from './types';
 
-/** One bar: a cap × series cell that found a qualifying configuration. */
 export interface FirstTokenBar {
   key: string;
   cap: number;
@@ -84,12 +83,10 @@ const TOKEN_TYPE_WORD = {
   zh: { total: '总', input: '输入', output: '输出' },
 } as const;
 
-/** Three decimals below a dollar, two above — the calculator's cost labels. */
 export function formatCost(cost: number): string {
   return `$${cost.toFixed(cost < 1 ? 3 : 2)}`;
 }
 
-/** Bare SKU (`GB300`) for the under-axis summary, where the full label will not fit. */
 function skuLabel(hwKey: string, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[hwKey] ?? getHardwareConfig(hwKey);
   return config?.label ?? hwKey;
@@ -154,8 +151,6 @@ export function generateFirstTokenTooltipHTML(
   const { winner } = bar;
   const isOverlay = winner.runIndex !== undefined;
   const runInfo = isOverlay ? runInfoByIndex[winner.runIndex!] : undefined;
-  // Branch names and run URLs come from the GitHub API for whatever run the
-  // reader pasted; labels are ours but are escaped for uniformity.
   const label = escapeHtml(configLabel(winner.hwKey, hardwareConfig));
   const runUrl = isOverlay ? runInfo?.url : winner.point.sourceRow?.run_url;
   const runLink = runUrl
@@ -192,9 +187,7 @@ interface FirstTokenLimitsChartProps {
   result: FirstTokenResult;
   hardwareConfig: HardwareConfig;
   costType: CostType;
-  /** `P90` / `Median`, naming the statistic the TTFT cap is read on. */
   ttftStat: string;
-  /** `P90` / `Median`, naming the statistic the interactivity floor is read on. */
   interactivityStat: string;
   colorResolver: (hwKey: string) => string;
   runInfoByIndex: Record<number, { branch: string; url: string }>;
@@ -204,7 +197,6 @@ interface FirstTokenLimitsChartProps {
 
 const MARGIN = { top: 24, right: 20, bottom: 104, left: 76 };
 const HEIGHT = 500;
-/** Inner gap between a cap's bars, as a fraction of the inner band. */
 const SERIES_PADDING = 0.15;
 
 const FirstTokenLimitsChart = React.memo(
@@ -242,7 +234,6 @@ const FirstTokenLimitsChart = React.memo(
       () => ({ type: 'band' as const, domain: caps.map((c) => t.capTick(c)), padding: 0.28 }),
       [caps, t],
     );
-    // Headroom for the value label above the tallest bar.
     const yScale = useMemo(
       () => ({
         type: 'linear' as const,
@@ -306,8 +297,6 @@ const FirstTokenLimitsChart = React.memo(
           .style('pointer-events', 'none')
           .text((b) => formatCost(b.winner.cost));
 
-        // A slot with nothing under the cap is the finding, so mark it rather
-        // than leaving a gap the eye reads as a missing vendor.
         group
           .selectAll<SVGTextElement, FirstTokenCell>('.ft-empty')
           .data(emptyCells, (c) => `${c.cap}|${c.series.key}`)
@@ -328,10 +317,6 @@ const FirstTokenLimitsChart = React.memo(
       return [{ type: 'custom', key: 'first-token-bars', render }];
     }, [bars, emptyCells, seriesKeys, barColor, t]);
 
-    /**
-     * Under-axis summary per cap — the winning SKU against the runner-up and the
-     * gap — plus the x title. Drawn on the root group so it sits below the axis.
-     */
     const onRender = useCallback(
       (ctx: RenderContext) => {
         const x0 = ctx.xScale as d3.ScaleBand<string>;

@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
-import { getExportFooterText } from '@/lib/export-footer';
-import { useLocale } from '@/lib/use-locale';
+import { getExportFooterText } from '@/lib/export/export-footer';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { hasDarkTheme } from '@/lib/themes/themes';
 
 const STRINGS = {
   en: { exportFailed: 'Failed to export image. Please try again.' },
@@ -12,13 +13,10 @@ const STRINGS = {
 interface UseChartExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
-  /** Omit the legend from the PNG without changing the interactive chart. */
   hideLegend?: boolean;
-  /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
 }
 
-/** Apply inline styles to an element */
 function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration>) {
   if (!el) return;
   for (const [key, value] of Object.entries(styles)) {
@@ -59,23 +57,15 @@ function getResolvedExportFontFamily(): string {
   return resolved || getExportFontFamily();
 }
 
-/**
- * Resolve all CSS `var(--*)` references in SVG presentation attributes and
- * inline styles within a subtree. html-to-image cannot resolve CSS custom
- * properties, so we bake the computed values into inline attributes/styles
- * before capture.
- */
 function resolveCssVarsForExport(root: HTMLElement) {
   const rootStyles = getComputedStyle(document.documentElement);
 
   function resolve(raw: string): string {
     let resolved = raw;
     let match: RegExpExecArray | null;
-    // Loop handles nested/multiple var() references
     while ((match = CSS_VAR_RE.exec(resolved)) !== null) {
       const computed = rootStyles.getPropertyValue(`--${match[1]}`).trim();
       resolved = resolved.replace(match[0], computed || match[0]);
-      // Safety: if nothing changed, break to avoid infinite loop
       if (resolved === raw) break;
       raw = resolved;
     }
@@ -92,7 +82,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
   ];
 
   for (const el of [...root.querySelectorAll('svg, svg *')] as SVGElement[]) {
-    // Resolve presentation attributes (e.g. fill="var(--foreground)")
     for (const attr of PRESENTATION_ATTRS) {
       const val = el.getAttribute(attr);
       if (val && CSS_VAR_RE.test(val)) {
@@ -100,7 +89,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
       }
     }
 
-    // Resolve inline style properties that use var()
     const style = el.style;
     for (const prop of style) {
       const val = style.getPropertyValue(prop);
@@ -110,8 +98,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
     }
   }
 
-  // Also resolve computed styles applied via CSS rules (globals.css chart theming).
-  // These aren't in inline style/attributes, so we read the computed value and bake it in.
   const COMPUTED_STYLE_SELECTORS: { selector: string; attrs: Record<string, string> }[] = [
     { selector: '.chart-root .grid line', attrs: { stroke: 'stroke' } },
     {
@@ -125,7 +111,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
 
   for (const { selector, attrs } of COMPUTED_STYLE_SELECTORS) {
     for (const el of [...root.querySelectorAll(selector)] as SVGElement[]) {
-      // Only set if the attribute isn't already resolved (from the loop above)
       for (const [svgAttr, cssProp] of Object.entries(attrs)) {
         const current = el.getAttribute(svgAttr);
         if (!current || CSS_VAR_RE.test(current)) {
@@ -137,24 +122,17 @@ function resolveCssVarsForExport(root: HTMLElement) {
   }
 }
 
-/**
- * Bake computed font-family into inline styles so html-to-image retains
- * Minecraft typography even when ancestor-based selectors (e.g. .minecraft *)
- * are not preserved in its internal clone tree.
- */
 function inlineComputedFontFamilyForExport(root: HTMLElement, resolvedFontFamily: string) {
   const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
   for (const el of elements) {
     el.style.fontFamily = resolvedFontFamily;
   }
 
-  // Ensure SVG text nodes also carry explicit font-family attributes.
   for (const textNode of root.querySelectorAll<SVGTextElement>('svg text, svg tspan')) {
     textNode.setAttribute('font-family', resolvedFontFamily);
   }
 }
 
-/** Collect @font-face rules from all accessible stylesheets */
 function getFontEmbedCSS(): string {
   const fontFaces: string[] = [];
   for (const sheet of document.styleSheets) {
@@ -162,14 +140,11 @@ function getFontEmbedCSS(): string {
       for (const rule of sheet.cssRules || []) {
         if (rule instanceof CSSFontFaceRule) fontFaces.push(rule.cssText);
       }
-    } catch {
-      // skip CORS-restricted stylesheets
-    }
+    } catch {}
   }
   return fontFaces.join('\n');
 }
 
-/** Wait for a React re-render to flush */
 function waitForRender(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() =>
@@ -180,11 +155,6 @@ function waitForRender(): Promise<void> {
   });
 }
 
-/**
- * html-to-image measures `clientWidth`/`clientHeight`, which exclude content
- * overflowing the export host. The sidebar legend deliberately grows beyond
- * that host for long labels, so capture the larger scroll dimensions instead.
- */
 export function getExportCaptureDimensions(element: HTMLElement): {
   width: number;
   height: number;
@@ -196,7 +166,6 @@ export function getExportCaptureDimensions(element: HTMLElement): {
   };
 }
 
-/** Keep the plot responsive without stretching small UI icons in the clone. */
 export function normalizeChartSvgWidthsForExport(root: HTMLElement): void {
   for (const svg of root.querySelectorAll<SVGElement>('svg[data-testid="d3-chart-svg"]')) {
     svg.style.width = '100%';
@@ -216,19 +185,11 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/**
- * Compose the final export: theme background, the (transparent) chart capture
- * on top, and the branded footer bar. The chart's own SVG logo watermark is
- * the only background mark, so nothing else is painted behind the plot.
- */
 async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
   const img = await loadImage(chartDataUrl);
   if (!img) return chartDataUrl;
 
-  const isDark =
-    document.documentElement.classList.contains('dark') ||
-    document.documentElement.classList.contains('minecraft') ||
-    bgColor.includes('0 0%');
+  const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
   const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
@@ -237,19 +198,14 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   const ctx = canvas.getContext('2d');
   if (!ctx) return chartDataUrl;
 
-  // Solid theme background (the chart capture itself is transparent)
   ctx.fillStyle = bgColor || (isDark ? '#131416' : '#eaebec');
   ctx.fillRect(0, 0, canvas.width, img.height);
 
-  // Draw chart capture over the background
   ctx.drawImage(img, 0, 0);
 
-  // Draw watermark bar
   ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
   ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
 
-  // Draw footer text: the page route this export came from (shrink to fit on
-  // narrow exports), e.g. "inferencex.semianalysis.com/inference/kimi-k3".
   const footerText = getExportFooterText();
   let fontSize = 40;
   ctx.font = watermarkFont(fontSize);
@@ -267,9 +223,6 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   return canvas.toDataURL('image/png');
 }
 
-/**
- * Custom hook for exporting charts as PNG images.
- */
 export function useChartExport({
   chartId,
   setIsLegendExpanded,
@@ -283,9 +236,6 @@ export function useChartExport({
   const exportToImage = useCallback(async () => {
     setIsExporting(true);
 
-    // A fully-closed sidebar legend renders only its reopen button (no
-    // .legend-container), so temporarily open it for the clone and restore
-    // the closed state right after.
     let wasClosed = false;
     if (setIsLegendExpanded && !hideLegend) {
       const el = document.querySelector(`#${chartId}`);
@@ -306,13 +256,14 @@ export function useChartExport({
       if (!exportElement) throw new Error('Export container not found');
 
       const clone = element.cloneNode(true) as HTMLElement;
+      const liveSelects = element.querySelectorAll('select');
+      clone.querySelectorAll('select').forEach((select, i) => {
+        select.value = liveSelects[i].value;
+      });
       clone.removeAttribute('id');
-      // Remove duplicate export container from the clone to avoid DOM id conflicts
       const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
       if (nestedExport) nestedExport.remove();
       if (hideLegend) {
-        // Remove the entire column, including its spacing and closed-state
-        // reopen button. Labels already identify the series in the plot.
         for (const legend of clone.querySelectorAll(
           '[data-slot="chart-legend-wrapper"], .legend-container',
         )) {
@@ -320,11 +271,8 @@ export function useChartExport({
         }
       }
 
-      // Bake computed text colors on the figcaption — html-to-image can't resolve
-      // CSS custom properties (e.g. text-muted-foreground → var(--muted-foreground)).
       const figcaption = clone.querySelector('figcaption');
       if (figcaption) {
-        // Prevent title from wrapping mid-phrase in the export (e.g. "End-to-end Latency")
         const heading = figcaption.querySelector('h2');
         if (heading) (heading as HTMLElement).style.whiteSpace = 'nowrap';
 
@@ -341,7 +289,6 @@ export function useChartExport({
 
       exportElement.append(clone);
 
-      // Restore closed state immediately after cloning
       if (wasClosed && setIsLegendExpanded) {
         setIsLegendExpanded(false);
       }
@@ -353,10 +300,15 @@ export function useChartExport({
         | HTMLElement
         | undefined;
 
-      // Layout: force side-by-side flex row for export
       applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
 
-      const flexContainer = clone.querySelector(':scope > .flex') as HTMLElement | null;
+      for (const scroller of clone.querySelectorAll<HTMLElement>('[data-chart-scroll]')) {
+        applyStyles(scroller, { width: 'fit-content', overflow: 'visible' });
+        scroller.scrollLeft = 0;
+      }
+      const flexContainer = clone.querySelector(
+        ':scope > .flex, [data-chart-scroll] > .flex',
+      ) as HTMLElement | null;
       applyStyles(flexContainer, {
         flexDirection: 'row',
         width: 'fit-content',
@@ -364,19 +316,16 @@ export function useChartExport({
         overflow: 'visible',
       });
 
-      // Lock chart SVG width to prevent collapse
       const svgWrapper = clone.querySelector('.relative > .relative') as HTMLElement | null;
       if (svgWrapper) {
         const originalWidth =
           (element.querySelector('.relative > .relative') as HTMLElement)?.offsetWidth ||
           (element as HTMLElement).offsetWidth;
         applyStyles(svgWrapper, { width: `${originalWidth}px`, flexShrink: '0' });
-        // Also lock the flex-1 parent so min-w-0 doesn't collapse it
         const svgParent = svgWrapper.parentElement as HTMLElement | null;
         applyStyles(svgParent, { width: `${originalWidth}px`, flexShrink: '0', minWidth: 'auto' });
       }
 
-      // Force legend into inline flow
       if (legendContainer) {
         legendContainer.style.cssText +=
           '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; height: auto !important; min-height: 0 !important; max-height: none !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
@@ -414,12 +363,9 @@ export function useChartExport({
         });
       }
 
-      // Hide no-export elements, nested export containers
       for (const el of clone.querySelectorAll('.no-export')) {
         (el as HTMLElement).style.display = 'none';
       }
-      // Reveal export-only twins: plain-text stand-ins for interactive
-      // controls in the caption (e.g. the Cost Tier selector's label).
       for (const el of clone.querySelectorAll('.export-only')) {
         (el as HTMLElement).style.display = 'inline';
       }
@@ -427,7 +373,6 @@ export function useChartExport({
         (el as HTMLElement).parentElement!.style.display = 'none';
       }
 
-      // Strip red changelog highlighting from legend items in the export clone
       if (legendContainer) {
         for (const el of legendContainer.querySelectorAll('.text-red-900')) {
           (el as HTMLElement).style.color = 'inherit';
@@ -435,7 +380,6 @@ export function useChartExport({
         }
       }
 
-      // Remove scroll container border if no visible bottom controls remain after hiding no-export
       if (legendContainer) {
         const scrollContainer = legendContainer.querySelector(
           'ul, [class*="overflow"]',
@@ -453,7 +397,6 @@ export function useChartExport({
         }
       }
 
-      // Pad first visible legend item if earlier siblings are hidden
       if (legendContainer) {
         const legendList = legendContainer.querySelector('ul');
         if (legendList) {
@@ -468,12 +411,9 @@ export function useChartExport({
 
       const resolvedExportFontFamily = getResolvedExportFontFamily();
 
-      // Resolve all CSS var(--*) references in SVG elements (html-to-image can't resolve them)
       resolveCssVarsForExport(exportElement);
-      // Inline computed font family to preserve Minecraft pixel font in PNG exports.
       inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
 
-      // Normalize font sizes and SVG widths
       for (const label of clone.querySelectorAll('label')) {
         label.style.fontSize = '12px';
       }
@@ -482,7 +422,6 @@ export function useChartExport({
       }
       normalizeChartSvgWidthsForExport(clone);
 
-      // Wait for fonts before capture
       try {
         await document.fonts.ready;
       } catch {
@@ -491,20 +430,15 @@ export function useChartExport({
         });
       }
 
-      // Capture chart image
       const htmlToImage = await htmlToImagePromise;
       const { toPng } = htmlToImage;
       let fontEmbedCSS = getFontEmbedCSS();
       if (typeof htmlToImage.getFontEmbedCSS === 'function') {
         try {
           fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
-        } catch {
-          // Fallback to @font-face extraction from loaded stylesheets.
-        }
+        } catch {}
       }
       const captureDimensions = getExportCaptureDimensions(exportElement);
-      // Capture without a background: addWatermark paints the theme background
-      // and layers this capture on top.
       const chartDataUrl = await toPng(exportElement, {
         ...captureDimensions,
         quality: 1,
@@ -520,7 +454,6 @@ export function useChartExport({
         },
       });
 
-      // Compose background + chart + footer bar
       const dataUrl = await addWatermark(chartDataUrl, bgColor);
 
       const link = document.createElement('a');
@@ -528,7 +461,6 @@ export function useChartExport({
       link.href = dataUrl;
       link.click();
 
-      // Dispatch action event for post-action star prompt
       window.dispatchEvent(new CustomEvent('inferencex:action'));
     } catch (error) {
       console.error('Error exporting image:', error);

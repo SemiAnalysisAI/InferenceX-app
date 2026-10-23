@@ -1,5 +1,3 @@
-/** Public GCS backup discovery and download helpers. */
-
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,7 +31,6 @@ export function publicGcsObjectUrl(objectName: string): string {
   return `${GCS_BUCKET_BASE}/${objectName.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-/** Parse one backed-up GitHub artifact ZIP path into its original artifact metadata. */
 export function parseGcsArtifactObject(object: GcsObject): {
   runId: number;
   artifact: GcsArtifactMeta;
@@ -61,8 +58,6 @@ export function parseGcsArtifactObject(object: GcsObject): {
     artifact: {
       id: artifactId,
       name: artifactName,
-      // Backup upload timestamps do not preserve GitHub creation order. Leave
-      // this empty so pairing uses the monotonically increasing artifact id.
       created_at: '',
       archive_download_url: publicGcsObjectUrl(object.name),
       expired: false,
@@ -72,10 +67,6 @@ export function parseGcsArtifactObject(object: GcsObject): {
   };
 }
 
-/**
- * Build a run-id index using GCS's public JSON API. Only benchmark and
- * server-log ZIPs are retained in memory; the other backup objects are ignored.
- */
 export async function listGcsServerLogArtifacts(
   fetchImpl: typeof fetch = fetch,
 ): Promise<Map<number, GcsArtifactMeta[]>> {
@@ -106,7 +97,6 @@ export async function listGcsServerLogArtifacts(
   return byRun;
 }
 
-/** Download and extract one public GCS artifact into a temporary run directory. */
 export function downloadGcsArtifact(artifact: GcsArtifactMeta, destRoot: string): string {
   const safeName = path.basename(artifact.name);
   if (safeName !== artifact.name || safeName === '.' || safeName === '..') {

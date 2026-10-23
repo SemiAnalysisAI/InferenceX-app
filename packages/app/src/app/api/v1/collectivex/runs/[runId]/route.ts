@@ -17,10 +17,13 @@ import {
   collectiveXCacheTag,
   cachedJson,
   purgeCollectiveX,
-} from '@/lib/api-cache';
-import { bearerMatches } from '@/lib/bearer-auth';
-import { collectiveXSweepErrorStatus, ensureCollectiveXRun } from '@/lib/collectivex-lazy-ingest';
-import { loadFixture } from '@/lib/test-fixtures';
+} from '@/lib/cache/api-cache';
+import { bearerMatches } from '@/lib/api/bearer-auth';
+import {
+  collectiveXSweepErrorStatus,
+  ensureCollectiveXRun,
+} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -97,7 +100,10 @@ export async function DELETE(
 ) {
   const secret = process.env.COLLECTIVEX_ADMIN_SECRET;
   const authHeader = request.headers.get('Authorization') ?? '';
-  if (!secret || !bearerMatches(authHeader, secret)) {
+  if (!secret) {
+    return new NextResponse('COLLECTIVEX_ADMIN_SECRET is not set', { status: 500 });
+  }
+  if (!bearerMatches(authHeader, secret)) {
     return new NextResponse('Unauthorized', { status: 401 });
   }
 

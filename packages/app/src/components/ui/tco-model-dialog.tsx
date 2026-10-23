@@ -13,11 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   LOCKED_RENT_TIERS,
@@ -66,7 +66,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Trailing lock glyph for selector options whose pricing lives in the TCO model. */
 export function LockedTierBadge({ className }: { className?: string }) {
   const t = STRINGS[useLocale()];
   return (
@@ -82,17 +81,11 @@ export function LockedTierBadge({ className }: { className?: string }) {
 }
 
 interface TcoModelDialogProps {
-  /** Tier the reader clicked; null keeps the dialog closed. */
   tier: LockedRentTier | null;
   onClose: () => void;
-  /** Analytics surface, e.g. "yaxis_metric" or "profit_cost_provider". */
   source: string;
 }
 
-/**
- * Modal that opens when a locked rental tier is picked. It plugs the
- * SemiAnalysis AI Cloud TCO Model, where those rental rates are published.
- */
 export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -142,11 +135,6 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
   );
 }
 
-/**
- * State for a selector that mixes real options with locked rental tiers.
- * `interceptLocked(value)` returns true (and opens the dialog) when the value
- * is a locked tier, so callers can bail before writing to their own state.
- */
 export function useLockedTierDialog(source: string): {
   lockedTier: LockedRentTier | null;
   interceptLocked: (value: string) => boolean;
@@ -171,10 +159,6 @@ export function useLockedTierDialog(source: string): {
   };
 }
 
-/**
- * Locked rental tiers shaped as `MultiSelect` options for the calculator
- * Cost Provider selectors. The caller runs `interceptLocked` in `onChange`.
- */
 export function lockedCostProviderOptions(locale: Locale): {
   value: string;
   label: string;

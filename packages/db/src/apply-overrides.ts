@@ -1,23 +1,3 @@
-/**
- * Enforce all run-overrides.ts entries against the DB:
- *   1. Patch conclusions for CONCLUSION_OVERRIDES
- *   2. Patch changelogs listed in CHANGELOG_BACKFILLS
- *   3. Patch benchmark points listed in BENCHMARK_POINT_BACKFILLS
- *   4. Purge runs listed in PURGED_RUNS
- *   5. Purge specific attempts listed in PURGED_RUN_ATTEMPTS
- *   6. Purge individual benchmark points listed in PURGED_BENCHMARK_POINTS
- * Previews changes (read-only), then confirms before writing.
- *
- * Usage:
- *   bun run db:apply-overrides            # preview + confirm
- *   bun run db:apply-overrides --yes      # skip confirmation
- *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
- *   bun run db:apply-overrides --run-id 33721476500 --allow-unregistered-run --yes  # ingest
- *
- * Commits to run-overrides.ts are applied to production automatically after merge.
- * Use this command directly only for local preview or manual recovery.
- */
-
 import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
@@ -49,15 +29,12 @@ const sql = createAdminSql({
   onnotice: () => {},
 });
 
-// ── Conclusion overrides ──────────────────────────────────────────────────────
-
 interface StaleRow {
   githubRunId: number;
   current: string | null;
   expected: string;
 }
 
-/** Find runs whose conclusion doesn't match CONCLUSION_OVERRIDES. */
 async function previewConclusions(): Promise<StaleRow[]> {
   if (CONCLUSION_OVERRIDES.size === 0) return [];
 
@@ -92,8 +69,6 @@ async function applyConclusions(stale: StaleRow[]): Promise<void> {
   }
 }
 
-// ── Audited backfills ────────────────────────────────────────────────────────
-
 interface ChangelogBackfillTarget {
   backfill: ChangelogBackfill;
   changelogId: number;
@@ -114,7 +89,6 @@ function changelogBackfillIsApplied(
   );
 }
 
-/** Resolve one exact changelog row and return it only when its patch is stale. */
 async function previewChangelogBackfill(
   backfill: ChangelogBackfill,
 ): Promise<ChangelogBackfillTarget | null> {
@@ -210,7 +184,6 @@ function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
   );
 }
 
-/** Resolve one source/desired point identity and fail closed on ambiguity. */
 async function previewBenchmarkPointBackfill(
   backfill: BenchmarkPointBackfill,
 ): Promise<BenchmarkPointBackfillTarget | null> {
@@ -305,8 +278,6 @@ async function applyBenchmarkPointBackfillToDatabase(
   console.log(`    ${backfill.id} patched.`);
 }
 
-// ── Purge ─────────────────────────────────────────────────────────────────────
-
 interface PurgeTarget {
   githubRunId: number;
   wrIds: number[];
@@ -317,11 +288,6 @@ interface PurgeTarget {
   changelogs: number;
 }
 
-/**
- * Preview a run: print metadata and row counts. Returns null if not in DB.
- * If `attempts` is provided, only those `run_attempt` values are targeted;
- * otherwise every attempt for the run is included.
- */
 async function previewPurge(
   githubRunId: number,
   attempts?: ReadonlySet<number>,
@@ -358,17 +324,28 @@ async function previewPurge(
     );
   }
 
-  const [[bmk], [stats], [evals], [changelogs], [logs]] = await Promise.all([
+  const [[bmk], [stats], [evals], [changelogs], [logs], [telemetry]] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(DISTINCT server_log_id)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL`,
+    sql`
+      SELECT count(*)::int AS series, coalesce(sum(sample_count), 0)::bigint AS samples,
+        (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+          JOIN gpu_metric_series ls ON ls.id = l.series_id
+          WHERE ls.workflow_run_id = ANY(${wrIds})) AS links
+      FROM gpu_metric_series WHERE workflow_run_id = ANY(${wrIds})
+    `,
   ]);
 
   console.log(
     `    ${bmk.n} benchmarks, ${logs.n} server_logs, ${stats.n} run_stats, ${evals.n} evals, ${changelogs.n} changelogs`,
   );
+  if (telemetry.series > 0)
+    console.log(
+      `    ${telemetry.series} gpu_metric_series (${Number(telemetry.samples).toLocaleString('en-US')} samples, ${telemetry.links} point links)`,
+    );
 
   return {
     githubRunId,
@@ -381,10 +358,6 @@ async function previewPurge(
   };
 }
 
-/**
- * Delete benchmark results and any sidecars or availability rows left orphaned by
- * the deletion. The result IDs may come from a whole run or selected points.
- */
 async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void> {
   if (resultIds.length === 0) return;
 
@@ -470,13 +443,7 @@ async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void
   }
 }
 
-/**
- * Delete data for the given workflow_run rows (one or more attempts) in a transaction.
- * `wrIds` is the set of `workflow_runs.id` values to remove; sibling attempts of the
- * same `github_run_id` that aren't in `wrIds` are left intact.
- */
 async function purge(wrIds: number[]): Promise<void> {
-  // postgres TransactionSql Omit drops the call signature — cast to Sql type
   await sql.begin(async (_tx) => {
     const tx = _tx as unknown as Sql;
 
@@ -488,13 +455,10 @@ async function purge(wrIds: number[]): Promise<void> {
       resultRows.map((row) => row.id as number),
     );
 
-    // Children first
     await tx`DELETE FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`;
 
-    // Parent last (target the specific workflow_runs rows so partial purges
-    // leave sibling attempts of the same github_run_id intact)
     await tx`DELETE FROM workflow_runs WHERE id = ANY(${wrIds})`;
   });
 
@@ -505,13 +469,14 @@ interface BenchmarkPointPurgeTarget {
   resultIds: number[];
 }
 
-/** Preview exact benchmark rows selected by an audited point override. */
 async function previewBenchmarkPointPurge(
   point: PurgedBenchmarkPoint,
 ): Promise<BenchmarkPointPurgeTarget | null> {
   console.log(`  ${point.githubRunId} (attempt ${point.runAttempt})`);
   const rows = await sql`
-    SELECT br.id
+    SELECT br.id,
+      (SELECT count(*)::int FROM benchmark_result_gpu_metrics l
+        WHERE l.benchmark_result_id = br.id) AS telemetry_links
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     WHERE wr.github_run_id = ${point.githubRunId}
@@ -533,6 +498,9 @@ async function previewBenchmarkPointPurge(
     return null;
   }
   console.log(`    ${description}, ${rows.length} benchmark row(s).`);
+  const links = rows.reduce((sum, row) => sum + (row.telemetry_links as number), 0);
+  if (links > 0)
+    console.log(`    removes ${links} gpu_metric_series link(s); the series stay with the run.`);
   return { resultIds: rows.map((row) => row.id as number) };
 }
 
@@ -543,14 +511,11 @@ async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
   console.log(`    deleted ${resultIds.length} benchmark point(s).`);
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
 async function main(): Promise<void> {
   validateRunBackfills();
   console.log('=== apply-overrides ===');
   if (runId !== undefined) console.log(`  Scoped to GitHub run ${runId}`);
 
-  // Phase 1: preview (read-only)
   let hasWork = false;
 
   const stale = await previewConclusions();
@@ -602,7 +567,6 @@ async function main(): Promise<void> {
   if (attemptTargets.length > 0) {
     console.log(`\n  Purge attempt targets (${attemptTargets.length}):`);
     for (const [id, attempts] of attemptTargets) {
-      // Skip if the whole run is already covered by PURGED_RUNS
       if (PURGED_RUNS.has(id)) {
         console.log(`  ${id} — already in PURGED_RUNS, skipping per-attempt purge.`);
         continue;
@@ -638,7 +602,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Phase 2: confirm before writes
   if (!hasYesFlag()) {
     const ok = await confirm('\nApply changes? (y/N) ');
     if (!ok) {
@@ -647,7 +610,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Phase 3: apply
   if (stale.length > 0) {
     console.log('\n  Patching conclusions...');
     await applyConclusions(stale);
@@ -681,7 +643,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Phase 4: verify every requested backfill reached its declared state.
   for (const backfill of CHANGELOG_BACKFILLS) {
     const staleTarget = await previewChangelogBackfill(backfill);
     if (staleTarget) throw new Error(`${backfill.id}: changelog verification failed`);
@@ -691,7 +652,6 @@ async function main(): Promise<void> {
     if (staleTarget) throw new Error(`${backfill.id}: benchmark point verification failed`);
   }
 
-  // Phase 5: refresh mat view
   await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');

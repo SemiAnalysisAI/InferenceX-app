@@ -8,25 +8,25 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { languageAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-scenario-route';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import {
   AGENTIC_SCENARIO_INTRO,
   getCachedBenchmarks,
   KNOWN_SEQUENCES,
   pickString,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
   precisionDisplayLabel,
   specMethodDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 import {
   buildVariantBreadcrumbJsonLd,
   buildVariantJsonLd,
@@ -36,18 +36,12 @@ import {
   summarizeVariantSide,
   variantCompareNarrative,
   type VariantCompareSide,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 
 import CompareSpecDecodePageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/compare-spec-decode/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
@@ -84,10 +78,6 @@ export function buildSpecDecodeMetadata(
     parsed.precision,
     parsed.method,
   );
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
@@ -128,7 +118,6 @@ export async function renderSpecDecodePage(
   const parsed = parseSpecDecodeCompareSlug(slug);
   if (!parsed) notFound();
 
-  // 308 canonical redirect: alias model, reversed 'none-vs-mtp' form.
   const canonical = canonicalSpecDecodeCompareSlug(
     parsed.model.slug,
     parsed.gpu,
@@ -144,8 +133,6 @@ export async function renderSpecDecodePage(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
@@ -156,7 +143,6 @@ export async function renderSpecDecodePage(
   const aLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
   const bLabel = 'Off';
 
-  // Precision is fixed by the slug — both sides share it.
   const sideA: VariantCompareSide = { specMethod: parsed.method, precision: parsed.precision };
   const sideB: VariantCompareSide = { specMethod: 'none', precision: parsed.precision };
 

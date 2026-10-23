@@ -1,6 +1,3 @@
-/** Time formatting shared by the timeline axis, header stats, and tooltips. */
-
-/** Format ns offset → "+12.3s" / "+1.2m". */
 export function formatTickLabel(ns: number): string {
   const ms = ns / 1e6;
   if (ms < 1000) return `+${ms.toFixed(0)}ms`;

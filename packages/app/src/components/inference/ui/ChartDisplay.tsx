@@ -1,19 +1,29 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
   costTierLabel,
   costTierOptionLabel,
-  isMeasuredEnergyConfigKey,
-  isModeledSystemPowerConfigKey,
   metricCostTier,
+  tokenBasisForMetric,
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import {
+  AIR_COOLED_SYSTEM_PUE,
+  LIQUID_COOLED_RACK_PUE,
+  SYSTEM_POWER_MODEL_REVISION,
+} from '@/lib/power/system-power-model';
+import {
+  ALL_IN_MEASURED_AGENTIC_NOTE,
+  ALL_IN_MEASURED_EMPTY,
+  ALL_IN_MEASURED_NOTE,
+} from '@/lib/power/power-basis';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -26,8 +36,9 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import type {
+  AggDataEntry,
   ChartDefinition,
   HardwareConfig,
   InferenceData,
@@ -46,6 +57,8 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import PowerTimeline from '@/components/inference/ui/PowerTimeline';
+import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -54,17 +67,17 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
-import { exportToCsv } from '@/lib/csv-export';
-import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
-import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
-import { getDisplayLabel, getFrameworkLabel } from '@/lib/utils';
-import { supportsChartTokenMetric } from '@/lib/supplemental-benchmarks';
+import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/charts/chart-utils';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
+import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/benchmarks/known-issues';
+import { getDisplayLabel, getFrameworkLabel } from '@/lib/shared/utils';
+import { supportsChartTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
   useUnofficialRun,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import {
   type Model,
   type Precision,
@@ -73,7 +86,7 @@ import {
   getPrecisionLabel,
   getSequenceLabel,
   sequenceKind,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
@@ -86,15 +99,14 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
-import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { useLocale } from '@/lib/use-locale';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
-import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 import { ModelLogo } from '@/components/ui/model-logo';
@@ -131,15 +143,18 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    systemPowerAssumptions:
-      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Eight-GPU chassis models; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    noSystemPowerData:
-      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
+    powerBasisAssumptions: {
+      'gpu-provisioned':
+        'GPU Level Provisioned (TDP) · Joules per output token = rated TDP per GPU from the hardware registry × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
+      'utility-provisioned':
+        'All in Provisioned · Joules per output token = all-in provisioned utility W per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model) × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
+      'utility-modeled': `All in Measured · Measured GPU power carried through the InferenceX power model to the utility meter: modeled IT power (chassis CPU, DRAM, NICs, fans, and PSU losses, plus the chassis share of scale-out switches) × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled, applied once), divided by the measured GPUs; joules per output token scale measured joules by the same ratio. On GB200/GB300 NVL72, measured Grace-socket power replaces the modeled CPU and memory when the run has validated socket telemetry (otherwise both are modeled); each tray adds NICs, drives, fans, and conversion loss and an equal share of its rack's NVSwitch trays, power shelves, and scale-out switches, × PUE ${LIQUID_COOLED_RACK_PUE} (liquid-cooled). Host power follows each run's workload state (fixed sequence length, agentic, or agentic with KV cache offload) and whether scale-out is on (more than one chassis or NVL72 rack, disaggregated, or Mooncake KV store runs). Power model revision ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}. Requires validated GPU telemetry on supported eight-GPU HGX/OAM or NVL72 hardware; points without values are omitted from the chart, while the table keeps them with their measured GPU power and reason.`,
+    },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -159,22 +174,21 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    systemPowerAssumptions:
-      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 采用八卡机箱模型；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
-    noSystemPowerData:
-      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
+    powerBasisAssumptions: {
+      'gpu-provisioned':
+        'GPU 额定功耗（TDP）· 每输出 token 能耗 = 硬件注册表中每 GPU 的额定 TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
+      'utility-provisioned':
+        '整体预配功耗 · 每输出 token 能耗 = 硬件注册表中每 GPU 的整体预配市电功率（来源：SemiAnalysis Datacenter Industry Model）× 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
+      'utility-modeled': `整体实测功耗 · 将 GPU 实测功耗经 InferenceX 功耗模型推算至市电侧：IT 功耗估算（机箱内 CPU、DRAM、NIC、风扇与 PSU 损耗，加上该机箱分摊的 scale-out 交换机功耗）× PUE ${AIR_COOLED_SYSTEM_PUE}（风冷，仅应用一次），再除以实测 GPU 数；每输出 token 能耗按同一比例放大实测能耗。GB200/GB300 NVL72 的运行带有已验证的 Grace socket 遥测时，以实测功耗代替 CPU 和内存的估算值（否则二者均按模型估算）；每个 tray 另计网卡、硬盘、风扇和转换损耗，并平均分摊所在机架的 NVSwitch tray、电源架和 scale-out 交换机功耗，再 × PUE ${LIQUID_COOLED_RACK_PUE}（液冷）。主机功耗按每次运行的工作负载状态（固定序列长度、智能体，或带 KV cache offload 的智能体）以及是否开启 scale-out（跨多个机箱或 NVL72 机架、分离式部署或使用 Mooncake KV 存储的运行）建模。功耗模型版本 ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}。需要已验证的 GPU 遥测数据及受支持的八卡 HGX/OAM 或 NVL72 硬件；缺少数值的数据点不绘制，但表格仍保留这些数据点，并显示实测 GPU 功耗和不可用原因。`,
+    },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
 } as const;
 
-// Translate the "vs. …" chart-heading suffix from the metric registry
-// into Chinese. useChartData rewrites the heading with the selected percentile
-// for agentic sequences (e.g. "vs. P90 Interactivity"), so this matches the
-// pattern instead of a fixed string; unknown headings pass through unchanged.
 const HEADING_SUBJECT_ZH: Record<string, string> = {
   'E2E Normalized Interactivity': '端到端归一化交互性',
   Interactivity: '交互性',
@@ -189,10 +203,11 @@ function zhHeading(configured: string): string {
   const subjectZh = match?.groups && HEADING_SUBJECT_ZH[match.groups.subject];
   if (!subjectZh) return configured;
   const pctl = match.groups?.pctl;
-  return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
+  const statisticZh =
+    pctl === 'Mean' ? '平均' : pctl === 'Median' ? '中位' : pctl ? `${pctl} ` : '';
+  return `vs. ${statisticZh}${subjectZh}`;
 }
 
-/** Presentation and data plumbing for trace-derived agentic x-axis modes. */
 interface DerivedXModeSpec {
   xField: (percentile: string) => string;
   xLabel: (percentileLabel: string) => string;
@@ -239,16 +254,6 @@ export function formatTokenLength(value: number): string {
   return `${(rounded / 1_000_000).toFixed(2).replace(/\.0+$/u, '')}m`;
 }
 
-/**
- * Renders the inference chart cards, captions, and overlay controls for the current filtered
- * benchmark data.
- *
- * `embedded` renders the chart without the header section (title, description,
- * share actions, and selector controls) — used by the `/model/[slug]` pages,
- * which seed the model/scenario/metric via providers instead of user-facing
- * selectors. The run-date changelog strip and the charts themselves remain.
- */
-// Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
 function renderInferenceTcoBadges(props: {
   label: string;
   values: Record<string, number>;
@@ -288,12 +293,19 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
+    powerCompare,
+    tokenBasis,
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
+  const selectedPowerBasis = selectedMeasuredConfig?.basis;
+  const isPowerTimeline =
+    selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -314,11 +326,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
   );
-  // Stable run numbering shared by the changelog and the chart legend: each of a
-  // date's runs gets a fixed 1-based number (by start time) regardless of which
-  // are on the chart, so the two surfaces always show the same #N for a run and a
-  // removed run leaves a matching gap. Built from the same data-run enumeration
-  // the changelog uses.
   const runNumbering = useMemo(() => {
     const map = new Map<string, number>();
     for (const c of changelogs) {
@@ -334,11 +341,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     return map;
   }, [changelogs, modelDbKeys, selectedGPUs, selectedPrecisions, selectedBenchmarkType]);
 
-  // Expand a plain-date selection into one entry per run once that date's runs are
-  // known. Picking a date that has multiple runs shows each run as its own series
-  // (matching the changelog, which renders a block per run) instead of a single
-  // merged "latest" line with no changelog row — keeping the legend and changelog
-  // in sync. Idempotent: after expansion no expandable plain date remains.
   useEffect(() => {
     const runConfigsByDate = new Map(changelogs.map((c) => [c.date, c.runConfigs]));
     const scope = {
@@ -405,17 +407,20 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useUnofficialRun();
   const { tcoBasis } = useGlobalFilterSelection();
 
-  // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
       return { e2e: null, interactivity: null };
     }
 
-    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e');
-    const interactivityRaw = getOverlayData(selectedModel, selectedSequence, 'interactivity');
+    const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
+    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e', overlayTokenBasis);
+    const interactivityRaw = getOverlayData(
+      selectedModel,
+      selectedSequence,
+      'interactivity',
+      overlayTokenBasis,
+    );
 
-    // Per-row run lookup used by the overlay tooltip so hovering a point shows
-    // its OWN run's branch, not the banner-level first-run fallback.
     const getRunForRow = (row: InferenceData) => {
       const url = row.run_url ?? null;
       if (!url) return undefined;
@@ -454,14 +459,20 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          fixedSequenceStatistic,
           tcoBasis,
           selectedXAxisMode,
+          powerCompare,
         },
       );
 
       let overlayPoints = processed.data;
       let clippedOverlayPoints = processed.clippedData;
+      let tableOverlayPoints = processed.tableData;
       if (compareGpuPair?.length === 2) {
+        tableOverlayPoints = tableOverlayPoints?.filter((p) =>
+          hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
+        );
         overlayPoints = overlayPoints.filter((p) =>
           hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
         );
@@ -470,10 +481,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         );
       }
 
-      if (overlayPoints.length === 0 && clippedOverlayPoints.length === 0) return null;
+      if (
+        overlayPoints.length === 0 &&
+        clippedOverlayPoints.length === 0 &&
+        !tableOverlayPoints?.length
+      )
+        return null;
 
       const keySet = new Set([
-        ...overlayPoints.map((p) => String(p.hwKey)),
+        ...(tableOverlayPoints ?? overlayPoints).map((p) => String(p.hwKey)),
         ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
       ]);
       const hardwareConfigFiltered = Object.fromEntries(
@@ -483,6 +499,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return {
         data: overlayPoints,
         clippedData: clippedOverlayPoints,
+        tableData: tableOverlayPoints,
         hardwareConfig: hardwareConfigFiltered,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
@@ -505,9 +522,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
+    powerCompare,
     selectedXAxisMode,
     tokenRevenuePricing,
     tcoBasis,
+    tokenBasis,
     compareGpuPair,
   ]);
 
@@ -515,7 +535,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
       const points = [
-        ...(overlay?.data ?? []),
+        ...(overlay?.tableData ?? overlay?.data ?? []),
         ...(overlay?.clippedData ?? []).map((entry) => entry.point),
       ];
       for (const point of points) {
@@ -533,7 +553,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -561,8 +584,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return { official: officialScope, overlay: overlayScope };
     }
     const overlay = overlayDataByChartType[wantedType];
-    const officialBest = bestSeriesPerSku(graph.data, direction);
-    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction);
+    const officialBest = bestSeriesPerSku(graph.data, direction, selectedPrecisions);
+    const overlayBest = bestSeriesPerSku(overlay?.data ?? [], direction, selectedPrecisions);
     return {
       official: officialBest.size > 0 ? officialBest : officialScope,
       overlay: overlayBest.size > 0 ? overlayBest : overlayScope,
@@ -575,6 +598,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     overlayScope,
     selectedXAxisMode,
     selectedYAxisMetric,
+    selectedPrecisions,
   ]);
   const overlayRowsScopeKey = `${selectedModel}|${selectedSequence}|${selectedPrecisions.join(
     ',',
@@ -588,9 +612,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     () => new Set([...activeOverlayHwTypes].filter((key) => overlayScope.has(key))),
     [activeOverlayHwTypes, overlayScope],
   );
-  // Caption spec badges (TCO $/chip/hr, Power/Chip) should only quote chips
-  // that can actually appear on the plot: the active official legend selection
-  // plus any active unofficial-overlay selection.
   const captionHwKeys = useMemo(
     () => new Set([...selectedOfficialHwTypes, ...scopedActiveOverlayHwTypes]),
     [selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
@@ -651,28 +672,35 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     },
     [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
+  const visibleDateComparisonRows = useCallback(
+    (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => ({
+      officialRows: officialRows.filter(
+        (point) =>
+          !point.powerVariant &&
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeDates.has(`${point.date}_${point.hwKey}`),
+      ),
+      overlayRows: visibleComparisonRows([], overlay).overlayRows.filter(
+        (point) => !point.powerVariant,
+      ),
+    }),
+    [selectedPrecisions, quickFilters, activeDates, visibleComparisonRows],
+  );
 
   if (!loading && error) {
     console.error(error);
     throw new Error('Something went wrong.');
   }
 
-  // Show skeletons only on first load (no data yet). Same-model query-key
-  // changes keep the previous rows rendered (placeholderData in
-  // benchmarkQueryOptions), so switching dates/runs/scopes never flashes
-  // skeletons — those windows surface as `refreshing` instead.
   const isFirstLoad = loading && graphs.length === 0;
-  // Stale-while-refetching: previous charts stay rendered but dim slightly
-  // (motion.css `.motion-stale`) so the update reads as "updating", not
-  // "frozen". aria-busy mirrors the cue for assistive tech.
   const isRefetching = refreshing && graphs.length > 0;
 
-  // When the selected model has no DB data but an unofficial run provides overlay
-  // data for this (model, sequence), synthesize empty-data stub graphs from the
-  // chart-config so the overlay has a base chart to render on.
   const effectiveGraphs = useMemo(() => {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
+      (overlayDataByChartType.e2e?.tableData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.tableData?.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
       (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
@@ -684,6 +712,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       chartDefinition,
       data: [] as InferenceData[],
       clippedData: [],
+      tableData: undefined,
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
@@ -698,7 +727,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -711,9 +743,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     }
     return [...ids];
   }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
-  // Unofficial-run artifacts are transformed in memory and do not have
-  // persisted aggregate_stats sketches. Suppress the footer summary in overlay mode
-  // rather than presenting official-only values as if they covered the overlay.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
     isAgenticSequence && !isUnofficialRun,
@@ -728,7 +757,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
@@ -749,10 +781,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const renderableGraphs = useMemo(() => {
     if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
-      // Legacy AgentX axes can still render transient/non-persisted rows, which
-      // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
-      return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
+      return visibleGraphs.map((graph) => ({
+        ...graph,
+        data: [],
+        clippedData: [],
+        tableData: graph.tableData ? [] : undefined,
+      }));
     }
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
@@ -781,7 +816,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-      if (!derivedSpec) return { ...graph, data, clippedData };
+      const tableData = graph.tableData?.map(
+        (point) => preparePoint(point) ?? { ...point, x: NaN },
+      );
+      if (!derivedSpec) return { ...graph, data, clippedData, tableData };
 
       const chartDefinition = {
         ...graph.chartDefinition,
@@ -791,12 +829,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         y_latency_limit: undefined,
         ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
-      return { ...graph, chartDefinition, data, clippedData };
+      return { ...graph, chartDefinition, data, clippedData, tableData };
     });
   }, [
     isAgenticSequence,
     derivedSpec,
     derivedTargetIds.length,
+    selectedXAxisMode,
     visibleGraphs,
     derivedMetrics,
     selectedYAxisMetric,
@@ -814,17 +853,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         ]
       : renderableGraphs.length === 0
         ? [
-            // Reserved-height empty state: without it the chart region
-            // collapses to zero height, which shifts the page and breaks
-            // scroll restoration when a selection has no data.
             <Card
               key="empty-0"
               data-testid="chart-empty-state"
               className="flex min-h-[320px] items-center justify-center"
             >
               <p className="max-w-md text-center text-sm text-muted-foreground">
-                {isModeledSystemPowerConfigKey(selectedYAxisMetric)
-                  ? t.noSystemPowerData
+                {selectedPowerBasis === 'utility-modeled'
+                  ? ALL_IN_MEASURED_EMPTY[locale]
                   : t.noChartData}
               </p>
             </Card>,
@@ -835,54 +871,34 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
-            // Chart-level notices: the KV-offload halo
-            // key, the agentic optimization note, and the ATOM engine
-            // footnote. Detected from the same data the chart plots —
-            // official points plus any loaded unofficial-run overlay for
-            // this chart type — so they moved out of the legend without
-            // changing when they appear.
-            // GPU/date comparison renders GPUGraph, which plots official
-            // points only — skip the unofficial overlay there so the footer
-            // can't advertise a halo or ATOM series that isn't on the chart.
             const isGpuComparison =
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const footerOverlay = isGpuComparison
-              ? undefined
-              : selectUnofficialOverlayForMode(
-                  selectedXAxisMode,
-                  graph.chartDefinition.chartType,
-                  overlayDataByChartType,
-                );
+            const footerOverlay = selectUnofficialOverlayForMode(
+              selectedXAxisMode,
+              graph.chartDefinition.chartType,
+              overlayDataByChartType,
+            );
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
             const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
-            // Legacy-power rings render only on Measured Energy axes, so the
-            // key follows the same gate to never advertise an absent ring.
-            const hasLegacyPowerPoints =
-              isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-              footerPoints.some((point) => point.power_tier === 'legacy');
             const hasAtomSeries = footerPoints.some(
               (point) =>
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            // The resident ISL/OSL percentile summary (agentic only) renders
-            // here as the footer's last block rather than in the chart subtitle,
-            // keeping the result-context header compact.
             const footerNotices =
-              hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                     {isAgenticSequence && <AgenticOptimizationNote />}
                     {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
                     {hasAtomSeries && (
@@ -948,20 +964,34 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : undefined
                       }
                       onExportCsv={() => {
-                        const candidateVisibleData = isTimelineMode
-                          ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                          : graph.data;
                         const overlay = selectUnofficialOverlayForMode(
                           selectedXAxisMode,
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        const tableMode = getViewMode(graphIndex) === 'table';
+                        const exportData = tableMode
+                          ? (graph.tableData ?? [
+                              ...graph.data,
+                              ...(graph.clippedData ?? []).map((entry) => entry.point),
+                            ])
+                          : graph.data;
+                        const exportOverlay =
+                          tableMode && overlay
+                            ? {
+                                ...overlay,
+                                data: overlay.tableData ?? [
+                                  ...overlay.data,
+                                  ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                                ],
+                              }
+                            : overlay;
                         const {
                           officialRows: visibleData,
                           overlayRows: visibleOverlayRowsForExport,
-                        } = isTimelineMode
-                          ? { officialRows: candidateVisibleData, overlayRows: [] }
-                          : visibleComparisonRows(candidateVisibleData, overlay);
+                        } = isGpuComparison
+                          ? visibleDateComparisonRows(exportData, exportOverlay)
+                          : visibleComparisonRows(exportData, exportOverlay);
                         const { headers, rows } = inferenceChartToCsv(
                           visibleData,
                           graph.model,
@@ -979,8 +1009,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             xHeader: resolvedXLabel,
                           },
                         );
-                        // Match warnings against the same series the chart annotates,
-                        // including visible unofficial-run overlay series.
                         const issueNotes = matchKnownConfigIssues(graph.model, [
                           ...visibleData,
                           ...visibleOverlayRowsForExport,
@@ -1002,9 +1030,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
-                              {/* Model + workload lead the heading; the cost tier that used
-                                  to trail the metric title lives in the caption's Cost Tier
-                                  line instead, so the title reads as one measurement. */}
                               <ModelLogo
                                 model={graph.model as Model}
                                 className="mr-2 size-6 align-[-0.3em]"
@@ -1013,6 +1038,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
+                                if (isPowerTimeline) return null;
+                                if (!isAgenticSequence) {
+                                  const heading = String(graph.chartDefinition.heading);
+                                  return locale === 'zh' ? zhHeading(heading) : heading;
+                                }
                                 const xField = graph.chartDefinition.x_scale_field;
                                 if (xField?.endsWith('_ttft')) {
                                   const percentile = xField.replace(/_ttft$/u, '');
@@ -1021,8 +1051,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                   );
                                 }
 
-                                // The e2e chart heading follows the branch-level x-axis
-                                // mode selector.
                                 if (graph.chartDefinition.chartType === 'e2e') {
                                   const modeSpec = DERIVED_X_MODE_SPECS[selectedXAxisMode];
                                   if (modeSpec) {
@@ -1037,7 +1065,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                     : t.vsE2eLatency();
                                 }
 
-                                // Fall back to configured heading
                                 const configured = graph.chartDefinition.heading;
                                 return locale === 'zh' ? zhHeading(String(configured)) : configured;
                               })()}
@@ -1058,9 +1085,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            // The dashboard shows the Precision selector right above the
-                            // chart, so the caption omits it there; embedded model pages
-                            // render no controls and keep it as the only precision cue.
                             precision={
                               embedded
                                 ? selectedPrecisions
@@ -1073,17 +1097,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                               );
                               if (!tier) return undefined;
-                              // With the selector in the caption, the export twin
-                              // prints the selector's own copy so a PNG export
-                              // matches the control; plain-text captions keep
-                              // the caption label.
                               return embedded || minimalChrome
                                 ? costTierLabel(tier, locale)
                                 : costTierOptionLabel(tier, locale);
                             })()}
-                            // The dashboard picks the pricing basis right here in the
-                            // caption; embedded model pages render no controls and
-                            // keep the plain-text tier.
                             costTierControl={
                               embedded || minimalChrome ? undefined : <CostTierSelector />
                             }
@@ -1132,14 +1149,36 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}
-                          {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
+                          {selectedPowerBasis && selectedPowerBasis !== 'gpu-measured' && (
                             <p
                               className="mb-2 text-xs text-muted-foreground"
-                              data-testid="modeled-system-power-assumptions"
+                              data-testid="power-basis-assumptions"
+                              data-power-basis={selectedPowerBasis}
                             >
-                              {t.systemPowerAssumptions}
+                              {t.powerBasisAssumptions[selectedPowerBasis]}
                             </p>
                           )}
+                          {selectedPowerBasis &&
+                            powerCompare === 'boundaries' &&
+                            selectedPowerBasis !== 'utility-modeled' && (
+                              <p
+                                className="mb-2 text-xs text-muted-foreground"
+                                data-testid="power-compare-model-note"
+                              >
+                                {ALL_IN_MEASURED_NOTE[locale]}
+                              </p>
+                            )}
+                          {isAgenticSequence &&
+                            selectedPowerBasis &&
+                            (selectedPowerBasis === 'utility-modeled' ||
+                              powerCompare === 'boundaries') && (
+                              <p
+                                className="mb-2 text-xs text-muted-foreground"
+                                data-testid="power-agentic-model-note"
+                              >
+                                {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
+                              </p>
+                            )}
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1156,27 +1195,22 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
-                        // Display limits keep outliers off the plotted domain but
-                        // must not silently remove measured rows from the table.
-                        // Restore both official and unofficial clipped points before
-                        // applying the shared precision, quick-filter, and legend gates.
-                        const tableOfficialData = [
+                        const tableOfficialData = graph.tableData ?? [
                           ...graph.data,
                           ...(graph.clippedData ?? []).map((entry) => entry.point),
                         ];
                         const tableOverlay = overlay
                           ? {
                               ...overlay,
-                              data: [
+                              data: overlay.tableData ?? [
                                 ...overlay.data,
                                 ...(overlay.clippedData ?? []).map((entry) => entry.point),
                               ],
                             }
                           : overlay;
-                        const { officialRows, overlayRows } = visibleComparisonRows(
-                          tableOfficialData,
-                          tableOverlay,
-                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(tableOfficialData, tableOverlay)
+                          : visibleComparisonRows(tableOfficialData, tableOverlay);
                         return (
                           <>
                             {chartCaption}
@@ -1189,15 +1223,45 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         );
                       }
 
+                      if (isPowerTimeline) {
+                        return (
+                          <div className="relative">
+                            <PowerTimeline
+                              chartId={`chart-${graphIndex}`}
+                              data={[
+                                ...graph.data,
+                                ...(graph.clippedData ?? []).map((entry) => entry.point),
+                              ]}
+                              overlayData={
+                                selectUnofficialOverlayForMode(
+                                  selectedXAxisMode,
+                                  graph.chartDefinition.chartType,
+                                  overlayDataByChartType,
+                                ) ?? undefined
+                              }
+                              yLabel={metricLabel(
+                                graph.chartDefinition,
+                                selectedYAxisMetric,
+                                locale,
+                              )}
+                              caption={chartCaption}
+                              comparison={Boolean(isGpuComparison)}
+                              runNumbering={runNumbering}
+                            />
+                          </div>
+                        );
+                      }
+
                       return isGpuComparison ? (
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
-                          data={graph.data}
+                          data={graph.data.filter((point) => !point.powerVariant)}
                           xLabel={resolvedXLabel}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
+                          overlayData={footerOverlay ?? undefined}
                           runNumbering={runNumbering}
                         />
                       ) : (
@@ -1223,6 +1287,29 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
+                    {selectedMeasuredConfig &&
+                      !isPowerTimeline &&
+                      getViewMode(graphIndex) !== 'table' &&
+                      (() => {
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, overlay)
+                          : visibleComparisonRows(graph.data, overlay);
+                        return (
+                          <PowerAnalysisPanels
+                            chartId={`chart-${graphIndex}`}
+                            contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                            data={[...officialRows, ...overlayRows]}
+                            overlayData={overlayRows}
+                            xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
+                            xLabel={resolvedXLabel}
+                          />
+                        );
+                      })()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
                     {replayAvailable && !minimalChrome && (
                       <ReplayLauncher
@@ -1279,8 +1366,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
                   onAddDate={(date) => {
-                    // Functional updater: adding several runs in quick succession must
-                    // each build on the latest state, not the value captured at render.
                     setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
                   }}
                   onRemoveDate={(date) => {

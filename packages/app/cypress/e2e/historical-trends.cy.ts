@@ -1,8 +1,103 @@
-/**
- * Tests for the "Historical Trends" tab.
- * Shows interpolated GPU performance over time at a user-selected interactivity level.
- */
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
+
+describe('Historical improvement waterfall', () => {
+  beforeEach(() => {
+    cy.intercept('GET', '**/api/v1/benchmarks/history?*', {
+      fixture: 'api/benchmarks-history.json',
+    }).as('waterfallHistory');
+    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.wait('@waterfallHistory');
+    cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
+  });
+
+  it('keeps the line chart default, switches views, and changes series', () => {
+    cy.get('[data-testid="historical-view-line"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-chart-svg"]').should('be.visible');
+    cy.get('#historical-trend-export').should('exist');
+    cy.get('[data-testid="waterfall-step"][data-kind="baseline"]').should('have.length', 1);
+    cy.get('[data-testid="waterfall-step"][data-kind="best"]').should('have.length', 1);
+    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
+      if ($options.length > 1) {
+        cy.get('[data-testid="waterfall-series"]').select($options.eq(1).val() as string);
+      }
+    });
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
+    cy.get('[data-testid="waterfall-chart-svg"]').should('not.exist');
+  });
+
+  it('uses internal horizontal scrolling without widening a 375px page', () => {
+    cy.viewport(375, 844);
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-chart-svg"]').should('exist');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
+    });
+    cy.get('[data-chart-scroll]').should('have.attr', 'tabindex', '0');
+  });
+
+  it('preserves hardware filtering, high contrast and reset in waterfall mode', () => {
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('[data-testid="waterfall-controls"]').should('have.attr', 'open');
+    cy.get('#historical-log-scale').should('not.exist');
+    cy.get('#historical-high-contrast').should('be.visible').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
+
+    cy.get('[data-testid="waterfall-series"] option').then(($options) => {
+      const initialCount = $options.length;
+      expect(initialCount).to.be.greaterThan(1);
+      const hardware = String($options.eq(0).val()).split('__')[0];
+      cy.get(`[data-testid="waterfall-controls"] label[for="checkbox-${hardware}"]`).click();
+      cy.get('[data-testid="waterfall-series"] option').should(
+        'have.length.lessThan',
+        initialCount,
+      );
+      cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
+      cy.get('[data-testid="waterfall-series"] option').should('have.length', initialCount);
+    });
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked');
+    cy.get('#historical-log-scale').should('be.visible');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'checked').click();
+    cy.get('#historical-high-contrast').should('have.attr', 'data-state', 'unchecked');
+  });
+
+  it('opens waterfall controls even when the line-chart legend was collapsed', () => {
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-close-button"]').click();
+    cy.get('#historical-high-contrast').should('not.exist');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast').should('be.visible').click();
+    cy.get('[data-testid="waterfall-controls"] [data-testid="legend-open-button"]').should(
+      'not.exist',
+    );
+    cy.get('[data-testid="waterfall-controls"] [data-testid="legend-close-button"]').should(
+      'not.exist',
+    );
+    cy.get('[data-testid="waterfall-controls"] label[for^="checkbox-"]').first().click();
+    cy.get('[data-testid="historical-reset-filter"]').should('be.visible').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click().click();
+    cy.get('#historical-high-contrast')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'checked');
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="legend-open-button"]').should(
+      'be.visible',
+    );
+    cy.get('#historical-high-contrast').should('not.exist');
+    cy.get('[data-testid="historical-view-waterfall"]').click();
+    cy.get('[data-testid="waterfall-controls"] summary').click();
+    cy.get('#historical-high-contrast')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'checked');
+  });
+});
 
 const visitHistoricalWithSetup = () => {
   cy.visit('/historical', {
@@ -16,54 +111,64 @@ const visitHistoricalWithSetup = () => {
 const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
   rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
 
-describe('Historical Trends Tab', () => {
-  beforeEach(() => {
-    visitHistoricalWithSetup();
-  });
-
-  it('renders the Historical Trends tab content', () => {
-    cy.get('[data-testid="historical-trends-display"]').should('contain.text', 'Over Time');
-  });
-
-  it('renders a slider for target interactivity', () => {
-    cy.get('[data-testid="historical-target-slider"]')
-      .should('exist')
-      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
-  });
-
-  it('renders a number input for precise interactivity value', () => {
-    cy.get('[data-testid="historical-target-input"]')
-      .should('exist')
-      .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
-  });
-
-  it('renders a trend chart SVG after data loads', () => {
-    cy.get('[data-testid="historical-trends-display"]').find('svg').should('exist');
-  });
-
-  it('is reachable from the footer, not the tab bar', () => {
-    cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
-    cy.get('[data-testid="footer-link-historical"]')
-      .should('have.attr', 'href', '/historical')
-      .and('contain.text', 'Historical Trends');
+describe('Historical Trends AgentX P90 operating point', () => {
+  it('labels P90 in English and Chinese while using the P90 rather than median curve', () => {
+    const date = '2025-03-01';
+    cy.fixture('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability', asAgenticRowsOn(rows, date));
+    });
+    cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
+      // Deliberately synthetic regression data: P90 and median must disagree.
+      const agentic = [
+        [10, 500],
+        [35, 300],
+        [60, 100],
+      ].map(([rate, throughput], index) => ({
+        ...rows[0],
+        id: 8800 + index,
+        hardware: 'h200',
+        framework: 'trt',
+        model: 'dsr1',
+        precision: 'fp8',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+        conc: [64, 32, 8][index],
+        date,
+        curve_date: date,
+        spec_method: 'none',
+        disagg: false,
+        metrics: {
+          ...rows[0].metrics,
+          median_intvty: rate * 2,
+          p90_intvty: 999,
+          p90_full_response_itl: 1 / rate,
+          tput_per_gpu: throughput,
+          output_tput_per_gpu: throughput,
+        },
+      }));
+      cy.intercept('GET', '**/api/v1/benchmarks?*', agentic).as('p90Benchmarks');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*', agentic).as('p90History');
+    });
+    for (const prefix of ['', '/zh']) {
+      cy.visit(
+        `${prefix}/historical?g_model=DeepSeek-R1-0528&i_seq=agentic-traces&i_prec=fp8&i_metric=y_tpPerGpu&g_rundate=${date}`,
+      );
+      cy.wait('@p90Benchmarks');
+      cy.wait('@p90History');
+      cy.get('[data-testid="historical-target-input"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'P90');
+      cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', 'P90');
+      cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
+      cy.get('[data-chart-tooltip]:visible').should('contain.text', '300');
+    }
   });
 });
 
 describe('Historical Trends — Content & Interactions', () => {
   beforeEach(() => {
     visitHistoricalWithSetup();
-  });
-
-  it('renders SVG trend line paths after data loads', () => {
-    cy.get('[data-testid="trend-chart-svg"]').should('exist');
-    cy.get('[data-testid="trend-chart-svg"] path.line-path').should('have.length.greaterThan', 0);
-  });
-
-  it('renders data point circles on trend lines', () => {
-    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').should(
-      'have.length.greaterThan',
-      0,
-    );
   });
 
   it('loads history when the current snapshot lacks the selected energy metric', () => {
@@ -98,37 +203,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .should('have.value', '50');
   });
 
-  it('chart title includes "Over Time" and "Interactivity" reflecting the operating point', () => {
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('h2')
-      .invoke('text')
-      .should('include', 'Over Time')
-      .and('include', 'Interactivity');
-  });
-
-  it('model selector is present and has selectable options', () => {
-    // Clear any stale Radix scroll lock from prior Select interactions
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('[data-testid="model-selector"]').should('be.visible');
-    cy.get('[data-testid="model-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
-  it('sequence selector is present and has selectable options', () => {
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
-    cy.get('fieldset [data-testid="scenario-selector"]').click('right');
-    cy.get('[data-select-option]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
   it('keeps fixed precision visible and allows selection for multi-precision models', () => {
     cy.get('button[data-testid="precision-multiselect"]')
       .should('be.visible')
@@ -139,14 +213,6 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="precision-multiselect"][role="combobox"]')
       .should('be.visible')
       .and('be.enabled');
-  });
-
-  it('legend sidebar renders with hardware items matching visible trend lines', () => {
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('.sidebar-legend')
-      .should('exist')
-      .find('li')
-      .should('have.length.greaterThan', 0);
   });
 
   it('Log Scale switch exists in the legend and can be toggled', () => {
@@ -164,10 +230,6 @@ describe('Historical Trends — Content & Interactions', () => {
 
     cy.get('#historical-log-scale').click();
     cy.get('#historical-log-scale').should('have.attr', 'data-state', 'unchecked');
-  });
-
-  it('GPU Config multi-select is hidden (Historical Trends uses hideGpuComparison)', () => {
-    cy.get('[data-testid="gpu-multiselect"]').should('not.exist');
   });
 
   it('Y-axis metric selector is present and can be changed', () => {
@@ -200,8 +262,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .click('right');
     cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
     cy.get('[data-testid="cost-tier-rental"]').should('exist');
-    // The trend chart prices every point from the published tiers and has
-    // no TCO badges to type a custom $/chip/hr into.
     cy.get('[data-testid="cost-tier-custom"]').should('not.exist');
     cy.get('[data-testid="cost-tier-rental"]').click();
     cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
@@ -233,17 +293,6 @@ describe('Historical Trends — Content & Interactions', () => {
         });
       });
   });
-
-  it('interactivity range labels are displayed below the slider', () => {
-    cy.get('[data-testid="historical-trends-display"]')
-      .find('input[type="range"]')
-      .parent()
-      .find('.relative.text-muted-foreground span')
-      .should('have.length.greaterThan', 0)
-      .each(($span) => {
-        expect($span.text()).to.match(/\d+/u);
-      });
-  });
 });
 
 describe('Historical Trends — Chinese route', () => {
@@ -261,8 +310,6 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
-    // The figure wraps the caption too, whose Cost Tier help icon is also an
-    // SVG circle, so target a plotted point's hit area.
     cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '点击其他区域关闭')

@@ -2,7 +2,10 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
+import { getStagedChartScopes } from './staged-chart-links';
 import type { DbClient } from '../connection';
+import { stablePowerPointIdentity } from '../etl/power-publication';
+import { loadStoredCurvePoints, publishedCurve } from '../etl/required-power-curve';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
@@ -73,6 +76,44 @@ async function seed() {
   await addRun(11, { githubId: 34413290524 });
   for (const [i, conc] of [1, 20, 30, 60, 227, 260].entries()) await addPoint(i + 2, 11, 2, conc);
   await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+}
+const CURVE_MODEL = 'glm5.2';
+interface CurveEntry {
+  scope: string;
+  point: string;
+  run: number;
+  snapshot: number;
+}
+const byEntry = (a: CurveEntry, b: CurveEntry) =>
+  a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
+const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
+async function expectSameCurve(state: string) {
+  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+  const projected = [...publishedCurve(await loadCurvePoints())]
+    .flatMap(([scope, points]) =>
+      points.map((point) => ({
+        scope,
+        point: stablePowerPointIdentity(point.identity),
+        run: point.workflowRunId,
+        snapshot: points[0].workflowRunId,
+      })),
+    )
+    .toSorted(byEntry);
+  expect(projected.length, state).toBeGreaterThan(0);
+  for (const [path, rows] of [
+    ['latest_benchmarks', await getLatestBenchmarks(sql, CURVE_MODEL)],
+    ['dated query', await getLatestBenchmarks(sql, CURVE_MODEL, '9999-12-31')],
+  ] as const) {
+    const published = rows
+      .map((row) => ({
+        scope: benchmarkCurveScope(row),
+        point: stablePowerPointIdentity({ ...row }),
+        run: Number(row.workflow_run_id),
+        snapshot: Number(row.curve_workflow_run_id),
+      }))
+      .toSorted(byEntry);
+    expect(published, `${state} (${path})`).toEqual(projected);
+  }
 }
 beforeAll(async () => {
   db = await PGlite.create();
@@ -398,5 +439,77 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', false, '34413290524')),
     ).toEqual(currentIds);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', true))).toEqual([8]);
+  });
+  it('projects the same curve in TypeScript as latest_benchmarks and the dated query', async () => {
+    await addPoint(100, 1, 3, 1);
+    await addPoint(101, 1, 4, 1);
+    await expectSameCurve('agentic scope collapses topology and offload variants');
+    await addRun(12, { append: true });
+    await addPoint(8, 12, 2, 1, { fingerprint: 'alternate-recipe' });
+    await addPoint(9, 12, 2, 20, { fingerprint: 'recipe-3' });
+    await expectSameCurve('recipe fingerprint distinguishes points');
+    await addRun(13, { append: true });
+    await addPoint(10, 13, 1, 300, { offload: 'off' });
+    await expectSameCurve('same-image append-only chain inherits earlier points');
+    await addRun(14, { date: '2026-09-13', started: '2026-09-13T06:00:00Z' });
+    await addPoint(11, 14, 2, 500);
+    await expectSameCurve('same-date tie resolved by run_started_at');
+    await addRun(15, { date: '2026-09-13', append: true });
+    await sql`UPDATE workflow_runs SET run_started_at = NULL WHERE id = 15`;
+    await addPoint(12, 15, 2, 600);
+    await expectSameCurve('NULL run_started_at sorts last');
+    await addRun(16, { append: true });
+    await addPoint(13, 16, 2, 700, { image: 'trt:rc27' });
+    await expectSameCurve('image mismatch stops the chain');
+    await addRun(17, { append: true });
+    await addPoint(14, 17, 2, 800, { image: 'trt:rc27' });
+    await addPoint(15, 17, 2, 900, { image: 'trt:rc28' });
+    await expectSameCurve('mixed-image seed publishes only itself');
+    await addRun(18, { append: true });
+    await addPoint(16, 18, 2, 1000, { image: 'trt:rc27' });
+    await expectSameCurve('mixed-image older run is not inherited');
+    await addRun(19, { append: true });
+    await addPoint(17, 19, 2, 1100, { image: 'trt:rc27' });
+    await addPoint(18, 19, 2, 1200, { image: null });
+    await expectSameCurve('partially NULL-image seed publishes only itself');
+    await addRun(20, { append: true });
+    await addPoint(19, 20, 2, 1300, { image: 'trt:rc27' });
+    await expectSameCurve('partially NULL-image older run is not inherited');
+    await addRun(21, { date: '2026-09-20', githubId: 20, attempt: 2 });
+    await addPoint(20, 21, 2, 1400, { image: 'trt:rc27' });
+    await expectSameCurve('newer attempt supersedes the older attempt');
+  });
+});
+
+describe('staged chart scope discovery in PostgreSQL', () => {
+  it('reads successful lines from the latest attempt and preserves workload/precision identity', async () => {
+    await addRun(12, { githubId: 34413290524, attempt: 2, conclusion: 'failure' });
+    await addPoint(20, 12, 3, 1);
+    await addPoint(21, 12, 3, 2);
+    await addPoint(22, 12, 4, 3, { type: 'single_turn', isl: 8192, osl: 1024 });
+    await addPoint(23, 12, 1, 4, { error: 'failed' });
+    const scopes = await getStagedChartScopes(sql, '34413290524');
+    expect(scopes).toHaveLength(2);
+    expect(scopes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          framework: 'sglang',
+          precision: 'fp4',
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          date: '2026-09-12',
+        }),
+        expect.objectContaining({
+          framework: 'dynamo-trt',
+          precision: 'fp8',
+          benchmark_type: 'single_turn',
+          isl: 8192,
+          osl: 1024,
+          date: '2026-09-12',
+        }),
+      ]),
+    );
+    expect(await getStagedChartScopes(sql, '999999999')).toEqual([]);
   });
 });

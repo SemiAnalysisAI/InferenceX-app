@@ -1,19 +1,33 @@
-import { formatNumber, getDisplayLabel } from '@/lib/utils';
-import { getPointHardwareConfig } from '@/lib/inference-labels';
-import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
-import { agenticDetailHref } from '@/lib/agentic-detail-link';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { frameworkFamily } from '@/lib/framework-family';
-import type { Locale } from '@/lib/i18n';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { chipCounts } from '@/lib/chip-counts';
-import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
+import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
+import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import type { Locale } from '@/lib/i18n/i18n';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { chartStateHref } from '@/lib/routing/url-state';
+import type {
+  SystemPowerUnit,
+  SystemPowerUnsupportedReason,
+} from '@/lib/power/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+  type SystemPowerWorkload,
+} from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {
+  isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
-  isModeledSystemPowerConfigKey,
 } from '@/components/inference/metric-registry';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { powerVariantLabel } from '@/components/inference/utils/power-compare';
+import {
+  POWER_TIMELINE_METRIC_KEY,
+  traceKeyForPoint,
+} from '@/components/inference/utils/powerTimeline';
+import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -25,61 +39,30 @@ import {
 } from '@/components/inference/utils/runtime-metadata-labels';
 
 export interface TooltipConfig {
-  /** The data point to display */
   data: InferenceData;
-  /** Whether the tooltip is pinned (enables text selection) */
   isPinned: boolean;
-  /** X-axis label for the chart */
   xLabel: string;
-  /** Y-axis label for the chart */
   yLabel: string;
-  /** Currently selected Y-axis metric */
   selectedYAxisMetric: string;
-  /** Hardware configuration for looking up labels */
   hardwareConfig: HardwareConfig;
-  /** URL to the GitHub Actions workflow run */
   runUrl?: string;
-  /**
-   * Whether this agentic point has a stored trace_replay blob. Controls
-   * visibility of the "View charts" button — the actual distributions are
-   * rendered on the detail page, not inline, so all the tooltip needs is a
-   * presence boolean (sourced from the bulk `/api/v1/trace-availability`
-   * call so we don't ship megabytes of profile JSONL just for this check).
-   */
   hasTrace?: boolean;
-  /** Whether this official DB-backed point has a linked `server_logs` row. */
   hasLog?: boolean;
-  /** Page locale for tooltip metadata labels. Defaults to English. */
+  showPowerTelemetry?: boolean;
   locale?: Locale;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
-  /** Overlay data containing label and run URL */
   overlayData: OverlayData;
 }
 
-// `dp_attention` is `boolean | string` on InferenceData (DB sends raw, the
-// transform narrows "true"/"false" → boolean). Coerce to a plain boolean for
-// the shared labeler, treating the legacy string form correctly.
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
   typeof v === 'string' ? v === 'true' : v;
 
-/**
- * Returns the short label for a data point on the chart.
- * - Non-multinode: e.g. "TP8", "EP8", "TEP8", "DEP8", "DPAEP8"
- * - Multinode disagg: e.g. "2xEP4+1xDPAEP32"
- * - Old data (no ep field): falls back to tp value
- *
- * Delegates to the shared {@link parallelismLabel} so the chart points and the
- * agentic sibling navigator describe a config identically.
- */
 export const getPointLabel = (d: InferenceData): string => {
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   const label = parallelismLabel({
-    // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
-    // into it for aggregated rows) — the label wants the actual TP width, so
-    // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
     tp: d.decode_tp ?? d.tp,
     dp: d.dp,
     ep: d.ep,
@@ -94,6 +77,7 @@ export const getPointLabel = (d: InferenceData): string => {
     prefillPp: d.prefill_pp,
     prefillDcp: d.prefill_dcp_size,
     prefillPcp: d.prefill_pcp_size,
+    prefillDwdp: d.prefill_dwdp_size,
     prefillDpAttention: asBool(d.prefill_dp_attention),
     prefillNumWorkers: d.prefill_num_workers,
     decodeTp: d.decode_tp,
@@ -107,8 +91,8 @@ export const getPointLabel = (d: InferenceData): string => {
   return label;
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
-  runUrl
+const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: string) =>
+  runUrl && !hardware.startsWith('tpu')
     ? `<div style="font-size: 11px; margin-top: 4px;">
         <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
       </div>`
@@ -129,8 +113,6 @@ const formatTooltipDate = (value: string, locale: Locale): string => {
   return `${Number(match.groups.year)}年${Number(match.groups.month)}月${Number(match.groups.day)}日`;
 };
 
-/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
- *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
 export const fmt = (v: number): string => {
   if (!Number.isFinite(v)) return String(v);
   const rounded = parseFloat(v.toFixed(3));
@@ -148,7 +130,6 @@ const TOOLTIP_STRINGS = {
     branch: 'Branch',
     chipConfig: 'Chip Config',
     totalChips: 'Total Chips',
-    configuredChips: 'Configured Chip Count',
     concurrency: 'Concurrency',
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
@@ -157,6 +138,8 @@ const TOOLTIP_STRINGS = {
     powerCertified: 'Validated (current PowerX method)',
     powerLegacy: 'Historical (not validated under the current method)',
     powerWithheld: 'Measured power withheld',
+    series: 'Series',
+    roleEnergyShare: 'Share of request energy',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -167,7 +150,6 @@ const TOOLTIP_STRINGS = {
     branch: '分支',
     chipConfig: '芯片配置',
     totalChips: '芯片总数',
-    configuredChips: '配置中的芯片数',
     concurrency: '并发数',
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
@@ -176,34 +158,40 @@ const TOOLTIP_STRINGS = {
     powerCertified: '已验证（采用当前 PowerX 方法）',
     powerLegacy: '历史测量（尚未按当前方法验证）',
     powerWithheld: '实测功耗未采信',
+    series: '系列',
+    roleEnergyShare: '在请求能耗中的占比',
   },
 } as const;
 
-const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
+const powerVariantHTML = (
+  d: InferenceData,
+  selectedYAxisMetric: string,
+  locale: Locale,
+): string => {
+  const variant = d.powerVariant;
+  if (!variant) return '';
   const t = TOOLTIP_STRINGS[locale];
-  const { physical, configured } = chipCounts(
-    d,
-    isModeledSystemPowerConfigKey(selectedYAxisMetric),
-  );
-  return (
-    tooltipLine(t.totalChips, physical) +
-    (physical === configured ? '' : tooltipLine(t.configuredChips, configured))
-  );
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  if (
+    variant.kind === 'role' &&
+    variant.id !== 'all' &&
+    getMeasuredMetricConfig(selectedYAxisMetric)?.family === 'energy'
+  ) {
+    const energy = reconstructedRoleEnergy(d);
+    if (energy) {
+      const share = variant.id === 'prefill' ? energy.prefillShare : 100 - energy.prefillShare;
+      html += tooltipLine(t.roleEnergyShare, `${share.toFixed(1)}%`);
+    }
+  }
+  return html;
 };
 
-/**
- * Measured-power certification tier line. Rendered only while a Measured
- * Energy y-axis is selected and the point carries a tier — non-measured axes
- * and telemetry-free points stay unchanged.
- */
 const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
   const t = TOOLTIP_STRINGS[locale];
   return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
 };
 
-/** Escape strings that arrive from artifact JSONB (worker role / hosts)
- *  before interpolating them into tooltip HTML. */
 const escapeHtml = (s: string): string =>
   s
     .replaceAll('&', '&amp;')
@@ -214,26 +202,64 @@ const escapeHtml = (s: string): string =>
 
 const SYSTEM_POWER_STRINGS = {
   en: {
-    heading: 'Draft System-Power Model · 8k1k',
+    heading: 'InferenceX Power Model (beta)',
     measuredGpu: 'Measured GPU power',
-    normalizedAc: 'Modeled chassis AC per GPU',
-    deploymentAc: 'Modeled deployment chassis AC',
+    itPerGpu: 'Modeled IT power per GPU',
+    deploymentIt: 'Modeled deployment IT power',
     facility: 'Modeled facility power',
-    assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
-    platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
-    sweep: 'Fixed README inference sweep',
-    topology: (chassis: number, measured: number, modeled: number) =>
-      measured === modeled
-        ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
-        : `${chassis} eight-GPU chassis · ${measured} of ${modeled} GPUs measured, extrapolated to full chassis`,
-    extrapolation:
-      'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
-    normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
-    boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+    state: 'Operating state',
+    workloads: {
+      'fixed-seq-len': 'fixed sequence length',
+      agentic: 'agentic',
+      'agentic-cpu-offloading': 'agentic with KV cache offload',
+    } satisfies Record<SystemPowerWorkload, string>,
+    scaleOut: (on: boolean) => (on ? 'scale-out on' : 'scale-out off'),
+    graceSocket: 'Measured Grace socket power',
+    units: {
+      chassis: {
+        assumptions:
+          'Host CPU, DRAM, and NIC power follow the operating state; fan power and PSU losses follow chassis load.',
+        network:
+          'IT power adds the chassis share of scale-out switches, at idle power when scale-out is off.',
+        topology: (units: number, measured: number, modeled: number) =>
+          measured === modeled
+            ? `${units} full eight-GPU chassis · ${measured} GPUs`
+            : `${units} eight-GPU chassis · ${measured} of ${modeled} GPUs measured, extrapolated to full chassis`,
+        extrapolation:
+          'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
+        uniformHosts:
+          'No per-host telemetry for this multinode deployment; every chassis is modeled at the deployment-mean GPU power.',
+        normalization:
+          'IT power is divided by all modeled chassis GPUs, including prefill and decode.',
+        boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+      },
+      'nvl72-tray': {
+        assumptions:
+          'Measured: GPU boards and whole Grace sockets (CPU, SysIO, LPDDR5X). Modeled: tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+        modeledCpuAssumptions:
+          'Measured: GPU boards. Modeled: Grace CPUs and LPDDR5X for the operating state (no validated Grace-socket telemetry for this run), tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+        network:
+          'IT power adds the rack share of scale-out switches, at idle power when scale-out is off.',
+        topology: (units: number, measured: number, modeled: number) => {
+          const noun = units === 1 ? 'tray' : 'trays';
+          return measured === modeled
+            ? `${units} full NVL72 compute ${noun} · ${measured} GPUs`
+            : `${units} NVL72 compute ${noun} · ${measured} of ${modeled} GPUs measured, extrapolated to full ${noun}`;
+        },
+        extrapolation:
+          'Unmeasured tray GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
+        uniformHosts:
+          'No per-host telemetry for this multinode deployment; every tray is modeled at the deployment-mean GPU power.',
+        normalization:
+          'The measured trays fold into an 18-tray rack at their mean GPU power (and measured Grace power, when available); each tray takes 1/18 of the rack, divided by its four GPUs.',
+        boundary:
+          'Includes the trays’ Grace CPUs; excludes separate CPU-only frontend/router hosts.',
+      },
+    } satisfies Record<SystemPowerUnit, unknown>,
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
     reasons: {
-      workload: 'Only non-agentic 8k1k workloads are supported.',
+      workload: 'The power model has no workload state for this benchmark type.',
       hardware: 'No matching chassis model is available for this hardware.',
       telemetry: 'Validated measured GPU power is required.',
       'gpu-count': 'A valid deployment GPU count is required.',
@@ -243,26 +269,56 @@ const SYSTEM_POWER_STRINGS = {
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
   zh: {
-    heading: '系统功耗模型（草案）· 8k1k',
+    heading: 'InferenceX 功耗模型（Beta）',
     measuredGpu: 'GPU 实测功耗',
-    normalizedAc: '每 GPU 分摊的机箱交流功耗估算',
-    deploymentAc: '整个部署的机箱交流功耗估算',
+    itPerGpu: '每 GPU 分摊的 IT 功耗估算',
+    deploymentIt: '整个部署的 IT 功耗估算',
     facility: '数据中心功耗估算',
-    assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
-    platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
-    sweep: 'README 中的固定推理参数扫描',
-    topology: (chassis: number, measured: number, modeled: number) =>
-      measured === modeled
-        ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
-        : `${chassis} 个八卡机箱 · 实测 ${measured}/${modeled} 张 GPU，按满机箱外推`,
-    extrapolation:
-      '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
-    normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
-    boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
+    state: '运行状态',
+    workloads: {
+      'fixed-seq-len': '固定序列长度',
+      agentic: '智能体',
+      'agentic-cpu-offloading': '智能体（含 KV cache offload）',
+    } satisfies Record<SystemPowerWorkload, string>,
+    scaleOut: (on: boolean) => (on ? 'scale-out 开启' : 'scale-out 关闭'),
+    graceSocket: 'Grace socket 实测功耗',
+    units: {
+      chassis: {
+        assumptions:
+          '主机 CPU、DRAM 和 NIC 功耗取决于运行状态；风扇功耗和 PSU 损耗随机箱负载变化。',
+        network: 'IT 功耗包含该机箱分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
+        topology: (units: number, measured: number, modeled: number) =>
+          measured === modeled
+            ? `${units} 个完整八卡机箱 · ${measured} 张 GPU`
+            : `${units} 个八卡机箱 · 实测 ${measured}/${modeled} 张 GPU，按满机箱外推`,
+        extrapolation:
+          '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
+        uniformHosts: '该多节点部署没有逐主机功耗数据；每个机箱按部署平均每卡功耗建模。',
+        normalization: 'IT 功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
+        boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
+      },
+      'nvl72-tray': {
+        assumptions:
+          '实测：GPU 板卡和整个 Grace socket（CPU、SysIO、LPDDR5X）。建模：tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+        modeledCpuAssumptions:
+          '实测：GPU 板卡。建模：按运行状态估算的 Grace CPU 和 LPDDR5X（该运行没有通过验证的 Grace socket 遥测），tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+        network: 'IT 功耗包含机架分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
+        topology: (units: number, measured: number, modeled: number) =>
+          measured === modeled
+            ? `${units} 个完整 NVL72 计算 tray · ${measured} 张 GPU`
+            : `${units} 个 NVL72 计算 tray · 实测 ${measured}/${modeled} 张 GPU，按满 tray 外推`,
+        extrapolation:
+          '假设 tray 内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
+        uniformHosts: '该多节点部署没有逐主机功耗数据；每个 tray 按部署平均每卡功耗建模。',
+        normalization:
+          '实测 tray 按 GPU 平均功耗（以及可用时的 Grace 实测功耗）合并为一个 18 tray 的机架；每个 tray 分摊机架的 1/18，再除以 tray 内 4 张 GPU。',
+        boundary: '计入 tray 内的 Grace CPU；不计入独立的纯 CPU 前端或路由主机。',
+      },
+    } satisfies Record<SystemPowerUnit, unknown>,
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
     reasons: {
-      workload: '仅支持非智能体 8k1k 工作负载。',
+      workload: '功耗模型没有适用于该基准测试类型的工作负载状态。',
       hardware: '该硬件没有匹配的机箱功耗模型。',
       telemetry: '需要通过验证的 GPU 实测功耗。',
       'gpu-count': '需要有效的部署 GPU 数量。',
@@ -283,7 +339,7 @@ const modeledSystemPowerHTML = (
   if (
     !estimate ||
     (!isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-      !isModeledSystemPowerConfigKey(selectedYAxisMetric))
+      !isAllInMeasuredConfigKey(selectedYAxisMetric))
   ) {
     return '';
   }
@@ -292,20 +348,20 @@ const modeledSystemPowerHTML = (
     if (!isPinned || estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
-  const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
-  const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
-  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
+  const u = t.units[estimate.unit];
+  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${tooltipLine(t.normalizedAc, `${fmt(estimate.chassisAcWattsPerGpu)} W/GPU`)}
+    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
     ${
       isPinned
         ? `
-      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
+      ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
+      ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
-      <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
     }
@@ -327,10 +383,6 @@ const WORKER_POWER_STRINGS = {
 
 const WORKER_ROWS_LIMIT = 8;
 
-/**
- * Render worker telemetry only in pinned tooltips so hover tooltips stay lean.
- * Missing or empty worker payloads produce no section.
- */
 const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
   if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';
   const t = WORKER_POWER_STRINGS[locale];
@@ -348,8 +400,6 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
       );
     }
     if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
-    // avg_mem_used_mb follows the nvidia-smi/telemetry convention (MiB despite
-    // the _mb suffix), so divide by 1024 when displaying GiB.
     if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
     return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
@@ -389,10 +439,6 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-/**
- * Cache configuration and hit-rate rows shared by fixed-sequence, agentic,
- * official, comparison, and unofficial-run tooltips.
- */
 const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
   const t = CACHE_STRINGS[locale];
   const parts: string[] = [];
@@ -429,10 +475,6 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   return parts.join('');
 };
 
-/**
- * Agentic-only request success and token totals. Cache metadata is rendered
- * separately because fixed-sequence rows can carry it too.
- */
 const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative Decoding',
@@ -485,47 +527,109 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
     parts.push(tooltipLine(t.generatedTokens, formatNumber(d.total_generation_tokens)));
   }
 
-  // Histograms + time-series live on the dedicated detail page now; the
-  // "View charts" button (rendered by the wrapper when pinned + has trace
-  // data) takes the user there.
-
   return parts.join('');
 };
 
 const ACTION_STRINGS = {
-  en: { charts: 'View charts', logs: 'View logs' },
-  zh: { charts: '查看图表', logs: '查看日志' },
+  en: {
+    charts: 'View charts',
+    logs: 'View logs',
+    powerTelemetry: 'View PowerX',
+    powerTrace: 'View power trace',
+  },
+  zh: {
+    charts: '查看图表',
+    logs: '查看日志',
+    powerTelemetry: '查看 PowerX',
+    powerTrace: '查看功耗曲线',
+  },
 } as const;
 
-const pointDetailActionLink = (action: 'view-charts' | 'view-logs', href: string, label: string) =>
+type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace';
+
+const pointDetailActionLink = (action: TooltipAction, href: string, label: string) =>
   `<a data-action="${action}" href="${href}" style="
     display: block; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
   ">${label} &rarr;</a>`;
 
-/** Point-detail links rendered only for persisted, pinned official points. */
-const viewActionsHTML = (
-  isPinned: boolean,
-  hasTraceData: boolean,
-  hasLogData: boolean,
-  pointId: number | undefined,
-  benchmarkType: string | undefined,
-  locale: Locale,
-): string => {
-  const isAgentic = benchmarkType === 'agentic_traces';
-  const showCharts = isAgentic && hasTraceData;
-  if (!isPinned || !isPersistedBenchmarkId(pointId) || (!showCharts && !hasLogData)) return '';
-  const prefix = locale === 'zh' ? '/zh' : '';
-  const agenticHref = agenticDetailHref(pointId, locale);
-  const logHref = isAgentic
-    ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
-    : `${prefix}/inference/logs/${pointId}`;
+export const tooltipShellStyle = (opts: { isPinned: boolean; border?: string }): string => {
+  const border = opts.border ?? '1px solid var(--border)';
+  return [
+    'background: var(--popover)',
+    `border: ${border}`,
+    'border-radius: 8px',
+    'padding: 12px',
+    'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    `user-select: ${opts.isPinned ? 'text' : 'none'}`,
+    'max-width: min(320px, calc(100vw - 16px))',
+    'max-height: min(70vh, calc(100dvh - 16px))',
+    'overflow-x: hidden',
+    'overflow-y: auto',
+    'overscroll-behavior: contain',
+    'box-sizing: border-box',
+  ].join('; ');
+};
+
+export const showsPowerTraceAction = (
+  point: Pick<InferenceData, 'power_audit' | 'run_url'>,
+  selectedYAxisMetric: string,
+): boolean =>
+  selectedYAxisMetric !== POWER_TIMELINE_METRIC_KEY &&
+  getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
+  traceKeyForPoint(point) !== null;
+
+const powerTraceHref = (): string =>
+  typeof window === 'undefined' ? '#' : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY });
+
+interface ViewActionsInput {
+  isPinned: boolean;
+  hasTraceData: boolean;
+  hasLogData: boolean;
+  point: InferenceData;
+  powerTraceMetric?: string;
+  showPowerTelemetry?: boolean;
+  locale: Locale;
+}
+
+const viewActionsHTML = ({
+  isPinned,
+  hasTraceData,
+  hasLogData,
+  point,
+  powerTraceMetric,
+  showPowerTelemetry,
+  locale,
+}: ViewActionsInput): string => {
+  if (!isPinned) return '';
   const t = ACTION_STRINGS[locale];
-  const actions = [
-    showCharts ? pointDetailActionLink('view-charts', agenticHref, t.charts) : '',
-    hasLogData ? pointDetailActionLink('view-logs', logHref, t.logs) : '',
-  ].filter(Boolean);
+  const actions: string[] = [];
+  const pointId = point.id;
+  const isAgentic = point.benchmark_type === 'agentic_traces';
+  const showCharts = isAgentic && hasTraceData;
+  if (isPersistedBenchmarkId(pointId) && (showCharts || hasLogData)) {
+    const prefix = locale === 'zh' ? '/zh' : '';
+    const agenticHref = agenticDetailHref(pointId, locale);
+    if (showCharts) {
+      actions.push(pointDetailActionLink('view-charts', agenticHref, t.charts));
+    }
+    if (hasLogData) {
+      const logHref = isAgentic
+        ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
+        : `${prefix}/inference/logs/${pointId}`;
+      actions.push(pointDetailActionLink('view-logs', logHref, t.logs));
+    }
+  }
+  if (showPowerTelemetry && isPersistedBenchmarkId(pointId)) {
+    actions.push(
+      `<button type="button" data-action="view-power-telemetry" class="w-full rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-accent-foreground cursor-pointer">${t.powerTelemetry} &rarr;</button>`,
+    );
+  }
+  if (powerTraceMetric !== undefined && showsPowerTraceAction(point, powerTraceMetric)) {
+    actions.push(pointDetailActionLink('view-power-trace', powerTraceHref(), t.powerTrace));
+  }
+  if (actions.length === 0) return '';
   return `<div style="display: grid; gap: 6px; margin-top: 8px;">${actions.join('')}</div>`;
 };
 
@@ -582,19 +686,14 @@ const PARALLELISM_STRINGS = {
   },
 } as const;
 
-const contextParallelismParts = (dcp?: number, pcp?: number): string => {
+const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): string => {
   const parts: string[] = [];
   if (dcp !== undefined && dcp > 1) parts.push(`DCP: ${dcp}`);
   if (pcp !== undefined && pcp > 1) parts.push(`PCP: ${pcp}`);
+  if (dwdp !== undefined && Number.isInteger(dwdp) && dwdp > 1) parts.push(`DWDP: ${dwdp}`);
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
-/**
- * Generates HTML for the parallelism configuration section of a tooltip.
- * Falls back to GPU count for old data without parallelism fields.
- * Pipeline parallelism is only rendered when > 1 (pp of 0/1 means "no PP",
- * matching the point-label rule in {@link parallelismLabel}).
- */
 const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
   const t = PARALLELISM_STRINGS[locale];
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
@@ -602,7 +701,8 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   if (
     (d.ep === null || d.ep === undefined) &&
-    (d.prefill_ep === null || d.prefill_ep === undefined)
+    (d.prefill_ep === null || d.prefill_ep === undefined) &&
+    !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
     return (
       tooltipLine(t.deployment, deployment) +
@@ -623,7 +723,11 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
     const ddpa = d.decode_dp_attention ?? d.dp_attention ?? false;
     const pw = d.prefill_num_workers ?? 1;
     const dw = d.decode_num_workers ?? 1;
-    const prefillContext = contextParallelismParts(d.prefill_dcp_size, d.prefill_pcp_size);
+    const prefillContext = contextParallelismParts(
+      d.prefill_dcp_size,
+      d.prefill_pcp_size,
+      d.prefill_dwdp_size,
+    );
     const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
     return `
       ${tooltipLine(t.deployment, deployment)}
@@ -638,6 +742,7 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
   return `
     ${tooltipLine(t.deployment, deployment)}
     ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
+    ${d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? tooltipLine('DWDP', d.prefill_dwdp_size) + tooltipLine(t.workers, d.prefill_num_workers ?? 1) : ''}
     ${d.dp === undefined ? '' : tooltipLine(t.dataParallelism, d.dp)}
     ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
     ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}
@@ -648,7 +753,6 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
 
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 
-/** Raw tooltip HTML must not trust producer-supplied reason codes. */
 const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
   const codes = d.power_invalid_reasons
@@ -660,12 +764,6 @@ const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   return tooltipLine(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '));
 };
 
-/**
- * Generates HTML content for official data point tooltips.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,
@@ -681,7 +779,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
   const t = TOOLTIP_STRINGS[locale];
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
@@ -708,8 +806,9 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -717,19 +816,20 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
+      ${runLinkHTML(runUrl, locale, d.hwKey)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: Boolean(hasTrace),
+        hasLogData: Boolean(config.hasLog),
+        point: d,
+        showPowerTelemetry: config.showPowerTelemetry,
+        powerTraceMetric: selectedYAxisMetric,
+        locale,
+      })}
     </div>
   `;
 };
 
-/**
- * Generates HTML content for overlay (unofficial run) data point tooltips.
- * These tooltips have a distinct red border and "UNOFFICIAL" label.
- *
- * @param config - Configuration for the overlay tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
   const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
@@ -739,7 +839,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
   const branch = perRow?.branch ?? overlayData.label;
 
   return `
-    <div style="background: var(--popover); border: 2px solid #dc2626; border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
         ${t.unofficialRun}
@@ -752,8 +852,9 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -761,17 +862,18 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: false,
+        hasLogData: false,
+        point: d,
+        powerTraceMetric: selectedYAxisMetric,
+        locale,
+      })}
     </div>
   `;
 };
 
-/**
- * Generates HTML content for GPU graph tooltips (date comparison view).
- * Similar to regular tooltips but shows "GPU Config" instead of hardware label at top.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,
@@ -788,7 +890,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
   const t = TOOLTIP_STRINGS[locale];
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
@@ -813,8 +915,9 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -822,8 +925,16 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, d.benchmark_type, locale)}
+      ${runLinkHTML(runUrl, locale, d.hwKey)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: Boolean(hasTrace),
+        hasLogData: Boolean(hasLog),
+        point: d,
+        showPowerTelemetry: config.showPowerTelemetry,
+        powerTraceMetric: selectedYAxisMetric,
+        locale,
+      })}
     </div>
   `;
 };

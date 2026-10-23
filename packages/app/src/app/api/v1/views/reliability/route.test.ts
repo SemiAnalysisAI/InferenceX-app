@@ -15,7 +15,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/reliability', () => ({
   getReliabilityStats: mockGetReliabilityStats,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
@@ -58,7 +58,6 @@ describe('GET /api/v1/views/reliability', () => {
     expect(body.apiVersion).toBe('v1');
     expect(body.params).toEqual({ range: 'last-3-months', format: 'json', gpus: [], asOf: null });
     expect(body.range).toBe('last-3-months');
-    // The 400-day-old row is outside last-3-months.
     const h200 = body.hardware.find((h: { key: string }) => h.key === 'h200');
     expect(h200).toMatchObject({ successRate: 50, successes: 10, total: 20 });
     expect(h200.label).toBeTruthy();
@@ -107,7 +106,7 @@ describe('GET /api/v1/views/reliability', () => {
     const text = await res.text();
     const lines = text.trim().split('\r\n');
     expect(lines[0]).toBe('range,key,label,successRate,successes,total');
-    expect(lines.length).toBe(3); // header + h200 + b200
+    expect(lines.length).toBe(3);
     expect(lines.some((line) => line.startsWith('all-time,h200,'))).toBe(true);
   });
 

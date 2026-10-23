@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
-import { getGpuSpecs } from '@/lib/constants';
+import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -46,7 +46,6 @@ describe('ChartShareActions', () => {
   });
 });
 
-// Stand-in for the /inference editable badge row.
 const renderCostBadges = ({
   label,
   values,
@@ -70,9 +69,6 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('calculate power per decode chip or per prefill chip');
   });
 
-  // Total tok/s/MW divides throughput per chip overall by per-chip power — the
-  // same denominator an aggregated config uses — so, like the total-token cost
-  // metrics, it keeps the power badges but must not carry the disagg caveat.
   it('hides the disaggregation caveat for the total per-MW metric', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tpPerMw" />);
 
@@ -142,9 +138,6 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleCaveatText()).toContain('token cost comparison');
   });
 
-  // The prefill/decode split only skews per-token-type metrics; the
-  // total-token metric divides by the whole chip count, exactly as an aggregated
-  // config does, so it must not carry the caveat.
   it.each([
     'y_outputTokensPerDollarH',
     'y_outputTokensPerDollarR',
@@ -174,7 +167,6 @@ describe('MetricAssumptionNotes', () => {
     (metric) => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
-      // The TCO badges and source attribution still explain the hourly-price input.
       expect(getVisibleText()).toContain('TCO $/chip/hr:');
       expect(getVisibleText()).toContain(TCO_SOURCE_TITLE);
       expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
@@ -240,8 +232,6 @@ describe('MetricAssumptionNotes', () => {
     );
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
 
-    // The custom tier shows the same badge row (so the reader can type into
-    // it) but cites no TCO source: the numbers are theirs.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -256,8 +246,6 @@ describe('MetricAssumptionNotes', () => {
   });
 
   it("quotes the reader's own prices on the custom tier and the hyperscaler price before any exist", () => {
-    // The plot prices Custom User Values from `userCosts`, so the badges
-    // must quote those, not a published tier; a blanked chip has no badge.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -269,8 +257,6 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleText()).toContain('MI355X: 0.75');
     expect(getVisibleText()).not.toContain('B200:');
 
-    // Every selected chip blanked: hand the renderer an empty list rather
-    // than every other registry chip the reader never selected.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -282,14 +268,10 @@ describe('MetricAssumptionNotes', () => {
     expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
       'TCO $/chip/hr:',
     );
-    // Every blanked chip is named so the renderer can keep its badge. A
-    // blanked chip has no point and so leaves the active selection, which is
-    // why the list is not narrowed to `activeHwKeys`.
     expect(container.querySelector<HTMLElement>('[data-testid="editable"]')?.dataset.blanked).toBe(
       'gb300,b200',
     );
 
-    // Nothing entered yet: show the seed the custom costs will start from.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costUser"
@@ -299,7 +281,6 @@ describe('MetricAssumptionNotes', () => {
     );
     expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costh}`);
 
-    // Published tiers ignore `userCosts`.
     renderUi(
       <MetricAssumptionNotes
         selectedYAxisMetric="y_costr"

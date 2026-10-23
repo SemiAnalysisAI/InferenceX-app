@@ -5,9 +5,9 @@ import * as React from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_HEIGHT,
   CONTROL_FOCUS,
@@ -39,7 +39,6 @@ export interface SearchableSelectOption {
   label: string;
   help?: React.ReactNode;
   testId?: string;
-  /** Optional trailing visual (e.g. a lock glyph) rendered after the label. */
   badge?: React.ReactNode;
 }
 
@@ -51,21 +50,15 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
-  /** Search options may include aliases for the same value; groups owns the selected label. */
   searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
-  /** Hydration-safe label for selectors with a known server-side default. */
   initialLabel?: string;
   className?: string;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
-  /**
-   * Accessible name for the trigger when no visible <label htmlFor> points at
-   * it, e.g. when the select sits inline in a caption next to a <dt>.
-   */
   triggerAriaLabel?: string;
   size?: 'sm' | 'default';
   disabled?: boolean;
@@ -76,7 +69,6 @@ interface SearchableSelectProps {
   searchAriaLabel?: string;
   clearSearchLabel?: string;
   noResultsLabel?: string;
-  /** Analytics event prefix, e.g. "yaxis_metric" → "yaxis_metric_searched" */
   trackPrefix?: string;
 }
 
@@ -113,10 +105,6 @@ export function SearchableSelect({
   const isOpen = !disabled && (open ?? internalOpen);
   const [search, setSearch] = React.useState('');
   const listboxId = React.useId();
-  // Defer the trigger label until the component has mounted on the client.
-  // The selected value derives from URL params / persisted state which only
-  // resolve client-side, so SSR would otherwise lock in the default label and
-  // leave it stale after hydration.
   const [mounted, setMounted] = React.useState(false);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
@@ -124,8 +112,6 @@ export function SearchableSelect({
   const searchUsedRef = React.useRef(false);
   const escapeDismissedRef = React.useRef(false);
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
-  // A grid gives option selection and help their own cells/buttons. A listbox
-  // option cannot contain another interactive action accessibly.
   const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
     group.options.some((option) => option.help),
   );
@@ -275,9 +261,6 @@ export function SearchableSelect({
         </PopoverTrigger>
         {selectedHelp && selectedOption && !isOpen && (
           <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
-            {/* Mirror the label's width so help follows short labels and stays
-                inside long ones. This copy is only a layout spacer; the real
-                label and native select button above own the accessible name. */}
             <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
               {triggerLabel}
             </span>
@@ -295,9 +278,6 @@ export function SearchableSelect({
           align="start"
           sideOffset={4}
           onKeyDown={(event) => {
-            // Grid navigation uses arrows; Tab leaves the field instead of
-            // walking every option/help action or looping in Radix's scope.
-            // A nested help dialog retains its own keyboard behavior.
             if (
               hasOptionHelp &&
               event.key === 'Tab' &&
@@ -332,9 +312,6 @@ export function SearchableSelect({
               tabFocusRef.current = null;
               return;
             }
-            // Keyboard cancellation returns to the field, even if another
-            // page interaction was recorded while the non-modal menu was open.
-            // Outside clicks retain Radix's normal focus behavior.
             if (escapeDismissedRef.current) {
               event.preventDefault();
               triggerRef.current?.focus({ preventScroll: true });
@@ -356,9 +333,6 @@ export function SearchableSelect({
             contentClassName,
           )}
         >
-          {/* Search header lives outside the scrollable region so it never picks up
-           * `sticky` → `position: fixed` resolution that puts it behind the page
-           * header (and breaks Cypress's visibility check on the input). */}
           {searchable && (
             <div className="flex items-center gap-1.5 px-2 py-1 border-b bg-popover">
               <SearchIcon className="size-3.5 shrink-0 text-muted-foreground mr-2" />

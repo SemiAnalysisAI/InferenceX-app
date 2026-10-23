@@ -1,44 +1,28 @@
-/**
- * Backfill every .log/.out file from GitHub and the historical GCS backup.
- *
- * The script pairs server_logs_/multinode_server_logs_ artifacts with their
- * bmk[_agentic]_ sibling, maps the raw benchmark rows through the production
- * mapper, and attaches the log bundle to the exact persisted points. Inserts
- * use filename conflicts plus files_complete metadata, so reruns are safe.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-server-log-files
- *   bun run --cwd packages/db db:backfill-server-log-files --run 31415828111 --yes
- *   bun run --cwd packages/db db:backfill-server-log-files --all --from-run 26606969606 --yes
- *   bun run --cwd packages/db db:backfill-server-log-files --all --source gcs --dry-run
- *   bun run --cwd packages/db db:backfill-server-log-files --all --source auto --yes
- */
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { hasNoSslFlag } from './cli-utils.js';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
-import { createSkipTracker } from './etl/skip-tracker.js';
-import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
+import { downloadArtifact } from './lib/github-artifacts.js';
 import {
   downloadGcsArtifact,
   listGcsServerLogArtifacts,
   type GcsArtifactMeta,
 } from './lib/gcs-artifacts.js';
-import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
-import { retryArtifactOperation } from './lib/artifact-retry.js';
-import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 import {
-  pairServerLogArtifacts,
-  resolveServerLogResultCandidates,
-} from './lib/server-log-backfill.js';
+  confirmProceed,
+  listBackfillRunArtifacts,
+  parseLimitForceFlags,
+  runBackfillMain,
+} from './lib/backfill-runner.js';
+import { retryArtifactOperation } from './lib/artifact-retry.js';
+import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
+import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
+import { pairServerLogArtifacts } from './lib/server-log-backfill.js';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const RETENTION_DAYS = 90;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 2, onnotice: () => {} });
 
@@ -94,86 +78,6 @@ function parseBackfillFlags(): BackfillFlags {
   };
 }
 
-function findJsonFiles(root: string): string[] {
-  const files: string[] = [];
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const pathname = path.join(root, entry.name);
-    if (entry.isDirectory()) files.push(...findJsonFiles(pathname));
-    else if (entry.isFile() && entry.name.endsWith('.json')) files.push(pathname);
-  }
-  return files.toSorted();
-}
-
-function readMappedRows(root: string): BenchmarkParams[] {
-  const tracker = createSkipTracker();
-  const rows: BenchmarkParams[] = [];
-  for (const file of findJsonFiles(root)) {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-    const rawRows = Array.isArray(parsed) ? parsed : [parsed];
-    for (const raw of rawRows) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
-      const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker);
-      if (mapped) rows.push(mapped);
-    }
-  }
-  return rows;
-}
-
-async function findBenchmarkResultIds(
-  run: CandidateRun,
-  rows: readonly BenchmarkParams[],
-): Promise<number[]> {
-  const ids = new Set<number>();
-  for (const row of rows) {
-    const c = row.config;
-    const candidates = await sql<{ id: number; offload_mode: string }[]>`
-      select br.id, br.offload_mode
-      from benchmark_results br
-      join workflow_runs wr on wr.id = br.workflow_run_id
-      join configs cfg on cfg.id = br.config_id
-      where wr.github_run_id = ${run.github_run_id}
-        and wr.run_attempt = ${run.run_attempt}
-        and cfg.hardware = ${c.hardware}
-        and cfg.framework = ${c.framework}
-        and cfg.model = ${c.model}
-        and cfg.precision = ${c.precision}
-        and cfg.spec_method = ${c.specMethod}
-        and cfg.disagg = ${c.disagg}
-        and cfg.is_multinode = ${c.isMultinode}
-        and cfg.prefill_tp = ${c.prefillTp}
-        and cfg.prefill_ep = ${c.prefillEp}
-        and cfg.prefill_dp_attention = ${c.prefillDpAttn}
-        and cfg.prefill_num_workers = ${c.prefillNumWorkers}
-        and cfg.decode_tp = ${c.decodeTp}
-        and cfg.decode_ep = ${c.decodeEp}
-        and cfg.decode_dp_attention = ${c.decodeDpAttn}
-        and cfg.decode_num_workers = ${c.decodeNumWorkers}
-        and cfg.num_prefill_gpu = ${c.numPrefillGpu}
-        and cfg.num_decode_gpu = ${c.numDecodeGpu}
-        and br.benchmark_type = ${row.benchmarkType}
-        and br.isl is not distinct from ${row.isl}
-        and br.osl is not distinct from ${row.osl}
-        and br.conc = ${row.conc}
-        and br.recipe_fingerprint is not distinct from ${row.recipeFingerprint}
-    `;
-    const resolution = resolveServerLogResultCandidates(
-      candidates.map((candidate) => ({
-        id: Number(candidate.id),
-        offloadMode: candidate.offload_mode,
-      })),
-      row.offloadMode,
-    );
-    if (resolution.usedUniqueFallback) {
-      console.warn(
-        `  [WARN] benchmark result ${resolution.ids[0]} uses a historical offload label; ` +
-          `matched uniquely without offload_mode`,
-      );
-    }
-    for (const id of resolution.ids) ids.add(id);
-  }
-  return [...ids];
-}
-
 async function resultLogsAreComplete(resultIds: readonly number[]): Promise<boolean> {
   if (resultIds.length === 0) return false;
   const [row] = await sql<{ complete: boolean }[]>`
@@ -204,7 +108,7 @@ async function main(): Promise<void> {
     throw new Error('--run and --from-run cannot be combined');
   }
   const flags = parseBackfillFlags();
-  const { limit } = parseLimitForceFlags();
+  const { limit, force } = parseLimitForceFlags();
   const runs = await sql<CandidateRun[]>`
     select distinct wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date
     from workflow_runs wr
@@ -268,7 +172,7 @@ async function main(): Promise<void> {
   let githubRuns = 0;
   for (const [runIndex, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `server-log-backfill-${runId}-`));
     try {
       let source: Exclude<ArtifactSource, 'auto'> | null = null;
@@ -281,11 +185,8 @@ async function main(): Promise<void> {
         flags.source !== 'gcs' &&
         (flags.source === 'github' || isWithinGithubRetention(run.date))
       ) {
-        const artifacts = await retryArtifactOperation(
-          `listing GitHub artifacts for run ${runId}`,
-          () => listRunArtifacts(repository, String(runId)),
-        );
-        pairs = pairServerLogArtifacts(artifacts.filter((artifact) => !artifact.expired));
+        const artifacts = await listBackfillRunArtifacts(repository, runId);
+        pairs = pairServerLogArtifacts((artifacts ?? []).filter((artifact) => !artifact.expired));
         if (pairs.length > 0) {
           source = 'github';
           githubRuns++;
@@ -311,14 +212,19 @@ async function main(): Promise<void> {
               : await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
                   downloadArtifact(pair.benchmarks, tempDir),
                 );
-          const mappedRows = readMappedRows(benchmarkDir);
-          const resultIds = await findBenchmarkResultIds(run, mappedRows);
+          const mappedRows = readMappedBenchmarkRows(benchmarkDir);
+          const resultIds = await findBenchmarkResultIds(sql, run, mappedRows, (id) =>
+            console.warn(
+              `  [WARN] benchmark result ${id} uses a historical offload label; ` +
+                `matched uniquely without offload_mode`,
+            ),
+          );
           if (resultIds.length === 0) {
             unmatchedArtifacts++;
             console.warn(`  [WARN] ${pair.serverLogs.name}: no matching benchmark rows`);
             continue;
           }
-          if (await resultLogsAreComplete(resultIds)) {
+          if (!force && (await resultLogsAreComplete(resultIds))) {
             completeSkipped++;
             continue;
           }

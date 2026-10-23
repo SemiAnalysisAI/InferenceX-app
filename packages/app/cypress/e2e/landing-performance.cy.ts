@@ -73,7 +73,7 @@ describe('Landing page performance', () => {
 
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
         observeLayoutShifts(win);
       },
     });
@@ -94,7 +94,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });
@@ -118,15 +118,13 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
         false,
       );
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
-      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
-      // The landing AgentX ledger has five lazy model marks. A mobile viewport may
-      // fetch any visible subset, but the text-only supporter strip must not pull
-      // in its former logo set.
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
-        [...landingLogos].filter((name) => !new URL(name).pathname.endsWith('-color.svg')),
+        [...landingLogos].filter((name) => {
+          const pathname = new URL(name).pathname;
+          return !pathname.endsWith('-color.svg') && pathname !== '/logos/muse-mascot.webp';
+        }),
       ).to.deep.eq([]);
       expect(
         resourceNames.some(
@@ -138,12 +136,6 @@ describe('Landing page performance', () => {
 
   it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
-      // Next emits resource preloads as a `Link` response header (when `/` renders
-      // dynamically) and/or as inlined <link rel="preload"> tags in the document
-      // <head> (when `/` is statically prerendered) — and a production build can
-      // surface the same resource in BOTH places at once. Collect a deduplicated
-      // set of preloaded URLs per `as` type, keyed by URL, so the assertion holds
-      // in every render mode and never double-counts a resource listed twice.
       const linkHeader = String(response.headers.link ?? '');
       const body = String(response.body ?? '');
 
@@ -155,7 +147,6 @@ describe('Landing page performance', () => {
         else if (as === 'image' && url.startsWith('/logos/')) logos.add(url);
       };
 
-      // `Link` header entries: <url>; rel=preload; as="font"|"image"; ...
       for (const entry of linkHeader.split(',')) {
         if (!/\brel=preload\b/u.test(entry)) continue;
         add(
@@ -164,7 +155,6 @@ describe('Landing page performance', () => {
         );
       }
 
-      // Inlined <link rel="preload"> tags.
       for (const tag of body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? []) {
         add(
           tag.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
@@ -173,25 +163,7 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      // The supporters band no longer renders a quote block, so no supporter
-      // logo is visible on the landing page and none should be preloaded.
       expect([...logos]).to.have.length(0);
-    });
-  });
-
-  it('loads Minecraft assets after the theme is activated', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'dark');
-        win.localStorage.setItem('minecraft-music', 'false');
-      },
-    });
-
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-    cy.window().should((win) => {
-      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
     });
   });
 });

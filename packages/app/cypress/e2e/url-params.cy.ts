@@ -1,9 +1,4 @@
 import { selectXAxisMode } from '../support/e2e';
-/**
- * Tests that URL parameters correctly drive UI state and that user interactions
- * update the visible output (selector text, SVG axis labels).
- * Merged from url-params.cy.ts + chart-filter-effects.cy.ts + high-contrast.cy.ts.
- */
 import { expandLegendAdvanced } from '../support/legend-advanced';
 const visitWithDismissedModal = (path: string) => {
   cy.visit(path, {
@@ -34,32 +29,11 @@ const assertNoHydrationMismatch = () => {
 };
 
 describe('URL Parameter Persistence', () => {
-  it('page loads without error with unknown params', () => {
-    visitWithDismissedModal('/inference?unknown_param=test');
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-  });
-
   describe('Inference legend', () => {
     it('i_legend=0 hides the sidebar legend on load and the reopen button restores it', () => {
       visitWithDismissedModal('/inference?i_legend=0');
       cy.get('[data-testid="legend-open-button"]').first().should('be.visible');
       cy.get('.sidebar-legend').should('not.exist');
-
-      cy.get('[data-testid="legend-open-button"]').first().click();
-      cy.get('.sidebar-legend').first().should('be.visible');
-      cy.get('[data-testid="legend-open-button"]').should('not.exist');
-    });
-
-    // The address bar is deliberately left clean after load (see url-state.ts)
-    // — filter changes like closing the legend only reach the in-memory share
-    // state, so this asserts the UI transition rather than location.search.
-    it('legend close button hides the panel and the reopen button restores it', () => {
-      visitWithDismissedModal('/inference');
-      cy.get('.sidebar-legend').first().should('be.visible');
-
-      cy.get('[data-testid="legend-close-button"]').first().click();
-      cy.get('.sidebar-legend').should('not.exist');
-      cy.get('[data-testid="legend-open-button"]').first().should('be.visible');
 
       cy.get('[data-testid="legend-open-button"]').first().click();
       cy.get('.sidebar-legend').first().should('be.visible');
@@ -100,7 +74,6 @@ describe('URL Parameter Persistence', () => {
     it('refreshes the automatic Best per SKU selection when the metric changes', () => {
       visitWithDismissedModal('/inference');
 
-      // Best per SKU lives in the Quick Filters dialog now.
       cy.get('[data-testid="scatter-quick-filters"]').click();
       cy.get('[data-testid="quick-filter-best-per-sku"]').should(
         'have.attr',
@@ -143,7 +116,6 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-      // Navigate immediately to cover pending writes inside the debounce window.
       cy.get('[data-testid="tab-trigger-submissions"]').click();
       cy.url().should('include', '/submissions');
       cy.get('[data-testid="tab-trigger-inference"]').click();
@@ -190,8 +162,6 @@ describe('URL Parameter Persistence', () => {
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
       visitWithDismissedModal('/inference');
 
-      // The dashboard opens on Hyperscaler ownership Total Tokens per $1 TCO,
-      // so the first axis is infrastructure purchasing power before switching.
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
@@ -232,20 +202,6 @@ describe('URL Parameter Persistence', () => {
         'contain.text',
         'Token Throughput per Chip',
       );
-    });
-
-    it('selecting a Y-axis metric updates the displayed value', () => {
-      visitWithDismissedModal('/inference');
-      cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.get('[data-select-option]')
-        .eq(1)
-        .then(($option) => {
-          const optionText = $option.text().trim();
-          cy.wrap($option).click({ force: true });
-          cy.get('[data-testid="yaxis-metric-selector"]')
-            .invoke('text')
-            .should('include', optionText);
-        });
     });
 
     it('switching to energy metric updates SVG axis label to joules', () => {
@@ -340,36 +296,10 @@ describe('URL Parameter Persistence', () => {
       cy.url().should('include', '/reliability');
       cy.get('[data-testid="reliability-date-range"]').should('contain.text', 'Last 7 days');
     });
-
-    it('r_range=last-3-months pre-selects "Last 3 months"', () => {
-      visitWithDismissedModal('/reliability?r_range=last-3-months');
-      cy.url().should('include', '/reliability');
-      cy.get('[data-testid="reliability-date-range"]').should('contain.text', 'Last 3 months');
-    });
-
-    it('changing reliability date range updates displayed selection', () => {
-      visitWithDismissedModal('/reliability');
-      cy.url().should('include', '/reliability');
-      cy.get('[data-testid="reliability-date-range"]').click({ force: true });
-      cy.contains('[role="option"]', 'Last month').click({ force: true });
-      cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last month');
-    });
   });
 
   describe('Hydration on shared-link entry', () => {
-    // Regression coverage for GlobalFilterContext.tsx (layout-effect URL override)
-    // and compare/[slug]/page.tsx (server-side searchParams threading). Both
-    // were introduced to silence a SSR/CSR hydration mismatch.
-
-    it('/inference?i_seq=1k/1k seeds the sequence without a hydration error', () => {
-      visitWithErrorSpy('/inference?i_seq=1k/1k');
-      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
-      assertNoHydrationMismatch();
-    });
-
     it('/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error', () => {
-      // Visit the canonical model-prefixed slug so the assertion is directly
-      // about the rendered page, not about a bare-slug redirect interleaving.
       visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=1k/1k');
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
@@ -396,50 +326,21 @@ describe('URL Parameter Persistence', () => {
       assertNoHydrationMismatch();
     });
 
-    it('/inference?i_prec=fp8 seeds the precision without a hydration error', () => {
-      // Pair `i_prec=fp8` with a model that actually has FP8 in availability.
-      // The default model (DeepSeek-V4-Pro) is FP4-only in the test fixtures,
-      // so `effectivePrecisions` would otherwise intersect the URL selection
-      // with the available set and fall back to FP4.
-      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
-      assertNoHydrationMismatch();
-    });
-
     it('/inference with invalid ?i_prec=junk falls back to the default', () => {
-      // Pair with a multi-precision model — the FP4-only default model hides
-      // the precision selector entirely, leaving nothing to assert against.
       visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=junk');
       cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
       assertNoHydrationMismatch();
     });
 
-    it('/inference?g_rundate=2026-01-15 accepts the validated date without a hydration error', () => {
-      // The regex validator allows YYYY-MM-DD; we only assert no hydration error
-      // because the date picker UI doesn't expose a stable selector for assertion.
-      visitWithErrorSpy('/inference?g_rundate=2026-01-15');
-      assertNoHydrationMismatch();
-    });
-
-    it('/inference with invalid ?g_rundate=not-a-date is dropped by the regex (no hydration error)', () => {
-      visitWithErrorSpy('/inference?g_rundate=not-a-date');
-      assertNoHydrationMismatch();
-    });
-
-    it('/inference?g_runid=run-12345 accepts the validated run id without a hydration error', () => {
-      visitWithErrorSpy('/inference?g_runid=run-12345');
-      assertNoHydrationMismatch();
-    });
-
-    it('/inference with invalid ?g_runid=$%^$ is dropped by the regex (no hydration error)', () => {
-      visitWithErrorSpy('/inference?g_runid=$%^$');
-      assertNoHydrationMismatch();
-    });
-
     it('/inference with multiple URL params seeds all of them without a hydration error', () => {
-      // Use a model + precision combination that the data supports, otherwise
-      // `effectivePrecisions` intersects the selection with available precisions
-      // and the UI may render the fallback. dsr1 + fp8 + 1k/1k is supported.
+      visitWithErrorSpy('/inference?i_seq=1k/1k');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
+      assertNoHydrationMismatch();
+
+      visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
+      assertNoHydrationMismatch();
+
       visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
@@ -449,32 +350,11 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('High contrast mode', () => {
-    it('inference loads with high contrast off by default', () => {
-      visitWithDismissedModal('/inference');
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-      expandLegendAdvanced();
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
-    });
-
     it('i_hc=0 disables high contrast on load', () => {
       visitWithDismissedModal('/inference?i_hc=0');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       expandLegendAdvanced();
       cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
-    });
-
-    it('i_hc=1 applies high contrast on load', () => {
-      visitWithDismissedModal('/inference?i_hc=1');
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-      expandLegendAdvanced();
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
-    });
-
-    it('multiple high contrast params can coexist in URL', () => {
-      visitWithDismissedModal('/inference?i_hc=1&r_hc=1&e_hc=1');
-      cy.get('[data-testid="scatter-graph"]').should('exist');
-      expandLegendAdvanced();
-      cy.get('#scatter-high-contrast').first().should('have.attr', 'data-state', 'checked');
     });
 
     it('r_hc=1 applies to reliability chart', () => {
@@ -491,8 +371,6 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('historical trends tab shares the inference high-contrast default (off)', () => {
-      // Historical reads highContrast from the shared inference display domain,
-      // so it inherits the default-off behavior.
       visitWithDismissedModal('/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');

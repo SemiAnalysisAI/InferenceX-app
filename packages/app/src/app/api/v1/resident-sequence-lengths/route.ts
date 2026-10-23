@@ -5,7 +5,7 @@ import {
   type ResidentSequenceLengthSketches,
 } from '@semianalysisai/inferencex-db/queries/resident-sequence-lengths';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

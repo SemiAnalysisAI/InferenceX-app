@@ -10,8 +10,8 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXKvChart } from './CollectiveXKvChart';
 import { CollectiveXKvFrontierChart } from './CollectiveXKvFrontierChart';
@@ -187,8 +187,6 @@ export function CollectiveXKvSection({
   runIndexById,
 }: {
   datasets: CollectiveXDataset[];
-  /** Selection-order style index per run id, shared with the EP explorer so
-   * the same run keeps the same dash pattern on both charts. */
   runIndexById: ReadonlyMap<string, number>;
 }) {
   const locale = useLocale();
@@ -197,26 +195,16 @@ export function CollectiveXKvSection({
   const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
     'batch',
   );
-  // The page ladder lives in the data (the sweep moved from 64/16 to the
-  // production block 256); a stored choice the current rows no longer carry
-  // falls back to the largest measured page rather than an empty chart.
   const [pageChoice, setPageChoice] = useState<string | null>(null);
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
-  // Overlap view only: 'max' normalizes each series at its own largest
-  // measured ISL; a numeric string pins every series to that ISL.
   const [overlapIsl, setOverlapIsl] = useState<string>('max');
   const [xLogScale, setXLogScale] = useState(true);
   const [yLogScale, setYLogScale] = useState(true);
   const [showWireCeilings, setShowWireCeilings] = useState(true);
-  // Legend toggles are keyed to the current series set: when checked runs
-  // change, the stored selection is stale and every series starts active
-  // again (the EP explorer resets the same way).
   const [seriesSelection, setSeriesSelection] = useState<{
     ids: Set<string>;
     signature: string;
   } | null>(null);
-  // Default open: with the closable sidebar panel, `false` now means fully
-  // hidden (reopen button only), so the legend must start expanded.
   const [legendExpanded, setLegendExpanded] = useState(true);
 
   const rows = useMemo<CollectiveXKvRunCase[]>(
@@ -236,8 +224,6 @@ export function CollectiveXKvSection({
     pageChoice !== null && pageValues.includes(Number(pageChoice))
       ? Number(pageChoice)
       : (pageValues[0] ?? 64);
-  // Table cells always read the ladder's top page (and the runner-up when one
-  // exists) so the columns stay stable while the chart toggle moves.
   const primaryPage = pageValues[0] ?? 64;
   const secondaryPage = pageValues[1];
   const seriesSignature = useMemo(
@@ -259,10 +245,6 @@ export function CollectiveXKvSection({
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
     [activeIds, measuredCases],
   );
-  // ISL options come from all measured cases (not the legend-active subset)
-  // so the selector is stable while series are toggled. A stored value that
-  // no longer exists for the current direction and page size falls back to
-  // 'max' rather than an empty chart.
   const overlapIslValues = useMemo(
     () => collectiveXKvIslValues(measuredCases, { op, pageTokens }),
     [measuredCases, op, pageTokens],

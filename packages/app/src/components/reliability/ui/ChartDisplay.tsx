@@ -9,9 +9,9 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { exportToCsv } from '@/lib/csv-export';
-import { reliabilityChartToCsv } from '@/lib/csv-export-helpers';
-import { useLocale } from '@/lib/use-locale';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { reliabilityChartToCsv } from '@/lib/export/csv-export-helpers';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import ReliabilityBarChartD3 from './BarChartD3';
 import ReliabilityChartControls from './ChartControls';

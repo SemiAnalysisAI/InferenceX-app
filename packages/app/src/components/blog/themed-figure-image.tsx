@@ -2,8 +2,10 @@
 
 import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme, LIGHT_THEMES } from '@/lib/themes/themes';
 
-const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=document.documentElement.classList.contains('light'),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
+// Pre-hydration copy of LIGHT_THEMES; a static literal so no value is spliced into script source.
+const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=['light','excalidraw'].some((c)=>document.documentElement.classList.contains(c)),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
 
 const subscribeClient = () => () => {};
 const getClientSnapshot = () => true;
@@ -17,12 +19,6 @@ interface ThemedFigureImageProps {
   className: string;
 }
 
-/**
- * The server leaves `src` out of the hydrated image, then a parser-time script
- * selects the saved root theme before first paint. Client-created figures use
- * the live theme or root class directly. The noscript image preserves article
- * content for non-JavaScript readers and crawlers.
- */
 export function ThemedFigureImage({
   srcLight,
   srcDark,
@@ -34,12 +30,10 @@ export function ThemedFigureImage({
   const isClient = useSyncExternalStore(subscribeClient, getClientSnapshot, getServerSnapshot);
   const clientTheme =
     resolvedTheme ??
-    (isClient && document.documentElement.classList.contains('light') ? 'light' : 'dark');
-  const src = isClient
-    ? clientTheme === 'dark' || clientTheme === 'minecraft'
-      ? srcDark
-      : srcLight
-    : undefined;
+    (isClient && LIGHT_THEMES.some((theme) => document.documentElement.classList.contains(theme))
+      ? 'light'
+      : 'dark');
+  const src = isClient ? (isDarkTheme(clientTheme) ? srcDark : srcLight) : undefined;
 
   return (
     <>

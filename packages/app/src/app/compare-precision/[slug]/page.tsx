@@ -8,24 +8,24 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { languageAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-scenario-route';
+import { languageAlternates } from '@/lib/i18n/i18n';
 import {
   AGENTIC_SCENARIO_INTRO,
   getCachedBenchmarks,
   KNOWN_SEQUENCES,
   pickString,
-} from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-ssr';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 import {
   buildVariantBreadcrumbJsonLd,
   buildVariantJsonLd,
@@ -34,18 +34,12 @@ import {
   pickVariantPairDefaults,
   summarizeVariantSide,
   variantCompareNarrative,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 
 import ComparePrecisionPageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/compare-precision/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
@@ -82,10 +76,6 @@ export function buildPrecisionMetadata(
     parsed.precA,
     parsed.precB,
   );
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
@@ -125,7 +115,6 @@ export async function renderPrecisionPage(
   const parsed = parsePrecisionCompareSlug(slug);
   if (!parsed) notFound();
 
-  // 308 redirect to canonical — normalizes alias models and precision order.
   const canonical = canonicalPrecisionCompareSlug(
     parsed.model.slug,
     parsed.gpu,
@@ -141,8 +130,6 @@ export async function renderPrecisionPage(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
@@ -159,8 +146,6 @@ export async function renderPrecisionPage(
   );
 
   const urlSeq = pickString(sp.i_seq);
-  // Path beats query beats the pair's default: a scenario segment is an
-  // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
   const effectiveSequence =
     pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);

@@ -4,17 +4,12 @@ import { useRef, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart, type D3ChartHandle, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
+import { escapeHtml } from '@/lib/shared/utils';
 
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
 import { ticksFor } from './scales';
 
-/**
- * D3Chart with the OperatorX defaults: logo watermark, no zoom hint, and readable
- * ticks on log axes unless the axis sets its own. With `inspect`, clicking a point
- * opens that case's drill-down instead of pinning the tooltip.
- */
 export function OpxChart<T>({
   inspect,
   ...props
@@ -51,7 +46,6 @@ export function OpxChart<T>({
   );
 }
 
-/** Tooltip markup in the site's chart tooltip style. */
 export function tooltipHtml({
   title,
   color,
@@ -61,7 +55,6 @@ export function tooltipHtml({
   title: string;
   color?: string;
   rows: string[];
-  /** Muted closing line, e.g. what a click does. */
   footer?: string;
 }): string {
   return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 180px; max-width: 360px">
@@ -73,10 +66,6 @@ export function tooltipHtml({
 
 export const esc = escapeHtml;
 
-/**
- * Sidebar legend of the workload's GPUs; clicking one selects or deselects it for
- * the whole dashboard.
- */
 export function HardwareLegend({
   model,
   hardware,

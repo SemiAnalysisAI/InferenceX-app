@@ -2,9 +2,9 @@
 
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { cn } from '@/lib/shared/utils';
 
 interface RunInfo {
   id: number;
@@ -17,24 +17,11 @@ interface RunInfo {
 
 interface UnofficialBannerProps {
   runs: RunInfo[];
-  /** Join the bottom edge of the dashboard navigation card. */
   attached?: boolean;
-  /** Remove a single run from the URL + state. */
   onDismissRun?: (runId: string) => void;
-  /** Clear all runs at once. Surfaced as "Dismiss all" when `runs.length > 1`. */
   onDismissAll?: () => void;
 }
 
-/**
- * Compact banner that advertises that the page is showing unofficial run data.
- *
- * When multiple runs are loaded, each gets a chip with a color swatch (matching
- * the chart's per-run color from {@link overlayRunColor}), a link to the
- * workflow run, and its own dismiss `×`. A single "Dismiss all" button is
- * rendered at the right edge when more than one run is loaded. Previously each
- * run rendered its OWN full-width banner and the dismiss button cleared every
- * run, which both wasted vertical space and made partial dismissal impossible.
- */
 export function UnofficialBanner({
   runs,
   attached = false,
@@ -90,8 +77,6 @@ export function UnofficialBanner({
     </div>
   );
 
-  // Compare and model pages render the standalone banner outside their own
-  // content containers, so it needs the same width and page gutters here.
   return attached ? banner : <div className="container mx-auto mb-4 px-4 lg:px-8">{banner}</div>;
 }
 

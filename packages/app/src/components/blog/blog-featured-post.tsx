@@ -7,9 +7,9 @@ import { BlogGridTexture, BlogThumbnail } from '@/components/blog/blog-thumbnail
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
-import { track } from '@/lib/analytics';
-import type { PostThumbnail } from '@/lib/blog';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { PostThumbnail } from '@/lib/blog/blog';
+import { cn } from '@/lib/shared/utils';
 
 export interface BlogFeaturedPostProps {
   slug: string;
@@ -21,13 +21,11 @@ export interface BlogFeaturedPostProps {
   tags?: string[];
   thumbnail: PostThumbnail | null;
   basePath?: string;
-  /** Localized strings: eyebrow ("Latest"), CTA ("Read article"), tag-list label. */
   labels: { eyebrow: string; read: string; tags: string };
 }
 
 const MAX_TAGS = 4;
 
-/** Wide two-column card for the newest post at the top of the index. */
 export function BlogFeaturedPost({
   slug,
   title,

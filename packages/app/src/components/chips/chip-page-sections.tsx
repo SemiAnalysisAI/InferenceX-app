@@ -1,18 +1,10 @@
-/**
- * Server-rendered sections shared by the /chips and /zh/chips pages.
- *
- * Locale is passed as a prop per AGENTS.md rule 5 (server components take an
- * optional `locale`); all prose comes from `chip-pages.ts` (en) and
- * `chip-pages-zh.ts` (zh), and every number is derived from GPU_SPECS and
- * HW_REGISTRY so the pages can never drift from the dashboard.
- */
 import Link from 'next/link';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { getPostBySlug } from '@/lib/blog';
+import { getPostBySlug } from '@/lib/blog/blog';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_EN,
   buildChipFaq,
@@ -25,18 +17,18 @@ import {
   getAllChipVsPages,
   getChipHw,
   getChipSpec,
-} from '@/lib/chip-pages';
+} from '@/lib/catalog/chip-pages';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_ZH,
   buildZhChipFaq,
   buildZhChipVsFaq,
   getZhChipTranslation,
   localizeVsHighlightValueZh,
-} from '@/lib/chip-pages-zh';
-import { getGlossaryEntry } from '@/lib/glossary';
-import { getZhGlossaryEntry } from '@/lib/glossary-zh';
-import { formatScaleUpTopology } from '@/lib/gpu-specs';
-import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n';
+} from '@/lib/catalog/chip-pages-zh';
+import { getGlossaryEntry } from '@/lib/content/glossary';
+import { getZhGlossaryEntry } from '@/lib/content/glossary-zh';
+import { formatScaleUpTopology } from '@/lib/catalog/gpu-specs';
+import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import {
   ACCELERATOR_MODEL_TITLE,
   ACCELERATOR_MODEL_URL,
@@ -333,11 +325,11 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
               <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
                 <th
                   scope="row"
-                  className="w-[52%] py-2.5 pr-4 text-left font-medium text-muted-foreground"
+                  className="w-[52%] px-4 py-2.5 text-left font-medium text-muted-foreground"
                 >
                   {label}
                 </th>
-                <td className="whitespace-nowrap py-2.5 text-right font-mono">{value}</td>
+                <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">{value}</td>
               </tr>
             ))}
           </tbody>

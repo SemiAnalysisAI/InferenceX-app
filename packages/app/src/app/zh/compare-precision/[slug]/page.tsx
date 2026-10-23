@@ -8,48 +8,40 @@ import {
   SUPPORTERS_LINE_ZH,
 } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
-import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare-ssr-zh';
+import { JsonLd } from '@/components/seo/json-ld';
+import { AGENTIC_SCENARIO_INTRO_ZH } from '@/lib/compare/compare-ssr-zh';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-scenario-route';
+import { getCachedBenchmarks, KNOWN_SEQUENCES, pickString } from '@/lib/compare/compare-ssr';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 import {
   computeVariantCompareTableData,
   dateRangeForVariantPair,
   pickVariantPairDefaults,
   summarizeVariantSide,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 import {
   buildVariantBreadcrumbJsonLdZh,
   buildVariantJsonLdZh,
   variantCompareNarrativeZh,
-} from '@/lib/compare-variant-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-variant-ssr-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 import ComparePrecisionPageClient from '../../../compare-precision/[slug]/page-client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/zh/compare-precision/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
 
-/** English twin of `scenarioPath` — hreflang pairs are keyed off the
- *  English route, so the segment has to survive the locale swap. */
 function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
   return scenarioSegment
     ? `/compare-precision/${canonical}/${scenarioSegment}`
@@ -88,10 +80,6 @@ export function buildPrecisionMetadataZh(
     parsed.precA,
     parsed.precB,
   );
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
   const description = `在 ${gpuLabel} 上比较 ${aLabel} 与 ${bLabel} 两种量化精度对 ${parsed.model.label} 推理性能的影响。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}查看不同量化精度在各交互性水平下的吞吐量和成本表现。`;
@@ -143,8 +131,6 @@ export async function renderPrecisionPageZh(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
@@ -161,8 +147,6 @@ export async function renderPrecisionPageZh(
   );
 
   const urlSeq = pickString(sp.i_seq);
-  // Path beats query beats the pair's default: a scenario segment is an
-  // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
   const effectiveSequence =
     pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
@@ -184,7 +168,6 @@ export async function renderPrecisionPageZh(
   const bLabel = precisionDisplayLabel(parsed.precB);
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
-  // The PNG route exists only under the EN tree; zh JSON-LD references it there.
   const imageUrl = `${SITE_URL}/compare-precision/${canonical}/precision-comparison.png?lang=zh`;
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideA, sideB);
   const jsonLd = buildVariantJsonLdZh(

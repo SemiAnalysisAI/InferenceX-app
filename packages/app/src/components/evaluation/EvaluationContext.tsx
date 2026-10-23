@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 import {
@@ -19,8 +19,8 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+} from '@/providers/GlobalFilterContext';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useEvaluations } from '@/hooks/api/use-evaluations';
 import {
   resolveAvailableSelection,
@@ -29,8 +29,8 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import type { EvalRow } from '@/lib/api';
-import type { Model } from '@/lib/data-mappings';
+import type { EvalRow } from '@/lib/api/api';
+import type { Model } from '@/lib/catalog/data-mappings';
 
 import {
   aggregateEvaluationChartRows,
@@ -39,7 +39,6 @@ import {
 } from './chart-data';
 import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
-/** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
 import { resolveEvaluationDate } from './date-resolution';
@@ -125,8 +124,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     remove: removeHwRaw,
   } = useChartToggleSet();
 
-  // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hardware availability settles.
   const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
     const value = getUrlParam('e_active');
     if (!value) return null;
@@ -296,7 +293,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [setSelectedModel],
   );
 
-  // ── Debounced hardware selection tracking ────────────────────────────────
   const evalTrackMounted = useRef(false);
   useEffect(() => {
     if (!evalTrackMounted.current) {
@@ -316,7 +312,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [enabledHardware]);
 
-  // Serialize the legend-active set, omitting when it equals all hwTypesWithData.
   const eActiveStr = useMemo(() => {
     if (enabledHardware.size === 0) return '';
     if (enabledHardware.size === hwTypesWithData.size) {

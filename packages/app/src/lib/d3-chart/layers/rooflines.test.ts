@@ -3,14 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createMockGroup, mockD3Select, type MockElement } from './test-helpers';
 
-// Partially mock d3 so that `d3.select(this)` inside .each() works with MockElements.
-// We keep all real d3 exports and only replace `select`.
 vi.mock('d3', async () => {
   const actual = await vi.importActual<typeof d3>('d3');
   return {
     ...actual,
     select: (node: any) => {
-      // If it's a MockElement (has our attrs/styles shape), wrap it
       if (node && typeof node === 'object' && 'attrs' in node && 'styles' in node) {
         return mockD3Select(node as MockElement);
       }
@@ -19,9 +16,12 @@ vi.mock('d3', async () => {
   };
 });
 
-import { renderRooflines, updateRooflinesOnZoom, type RooflineConfig } from './rooflines';
-
-// ── Fixtures ─────────────────────────────────────────────────────────
+import {
+  renderRooflines,
+  updateRooflinesForDisplay,
+  updateRooflinesOnZoom,
+  type RooflineConfig,
+} from './rooflines';
 
 const COLORS: Record<string, string> = {
   modelA: '#f00',
@@ -59,8 +59,6 @@ function makeScales() {
   const yScale = d3.scaleLinear().domain([0, 30]).range([300, 0]);
   return { xScale, yScale };
 }
-
-// ── renderRooflines ──────────────────────────────────────────────────
 
 describe('renderRooflines', () => {
   it('creates one path per roofline series', () => {
@@ -201,6 +199,30 @@ describe('renderRooflines', () => {
     }
   });
 
+  it('dashes each curve from getDasharray and keeps the dashes on display updates', () => {
+    const group = createMockGroup();
+    const { xScale, yScale } = makeScales();
+    const config = makeConfig({
+      strokeDasharray: '5,3',
+      getDasharray: (key) => (key === 'modelB' ? '2 3' : null),
+    });
+    const dashes = () =>
+      Object.fromEntries(
+        group
+          .selectAll('.roofline-path')
+          .elements.map((el) => [el.attrs['class'], el.attrs['stroke-dasharray']]),
+      );
+    const expected = {
+      'roofline-path roofline-modelA': null,
+      'roofline-path roofline-modelB': '2 3',
+    };
+
+    renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, config);
+    expect(dashes()).toEqual(expected);
+    updateRooflinesForDisplay(group as any, config);
+    expect(dashes()).toEqual(expected);
+  });
+
   it('does not set strokeDasharray when not specified', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
@@ -254,17 +276,12 @@ describe('renderRooflines', () => {
       getOpacity: (key) => (key === 'modelA' ? 0.5 : 1),
     });
 
-    // We can verify getOpacity is called correctly by checking the config
     expect(config.getOpacity!('modelA')).toBe(0.5);
     expect(config.getOpacity!('modelB')).toBe(1);
 
-    // The render should not throw even though .each uses d3.select(this)
-    // In our mock, `this` will be a MockElement
     renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, config);
   });
 });
-
-// ── updateRooflinesOnZoom ────────────────────────────────────────────
 
 describe('updateRooflinesOnZoom', () => {
   it('keeps explicitly linear operating curves straight after zooming', () => {
@@ -304,10 +321,8 @@ describe('updateRooflinesOnZoom', () => {
     const { xScale, yScale } = makeScales();
     renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, makeConfig());
 
-    // Add a tiny roofline to the update data
     const withTiny = { ...SAMPLE_ROOFLINES, tiny: [{ x: 1, y: 5 }] };
     updateRooflinesOnZoom(group as any, withTiny, xScale, yScale);
-    // Should not throw
   });
 
   it('updates d attribute for existing rooflines', () => {
@@ -318,9 +333,6 @@ describe('updateRooflinesOnZoom', () => {
     const newXScale = d3.scaleLinear().domain([0, 10]).range([0, 500]);
     const newYScale = d3.scaleLinear().domain([0, 50]).range([300, 0]);
 
-    // The function internally does group.select(`.roofline-${key}`)
-    // Our mock may not perfectly support this nested select pattern,
-    // but we verify it doesn't throw.
     updateRooflinesOnZoom(group as any, SAMPLE_ROOFLINES, newXScale, newYScale);
   });
 
@@ -328,7 +340,6 @@ describe('updateRooflinesOnZoom', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
 
-    // Render with one set of keys
     renderRooflines(
       group as any,
       { modelA: SAMPLE_ROOFLINES.modelA },
@@ -337,7 +348,6 @@ describe('updateRooflinesOnZoom', () => {
       makeConfig(),
     );
 
-    // Update with different keys — should skip non-existent ones
     updateRooflinesOnZoom(
       group as any,
       {

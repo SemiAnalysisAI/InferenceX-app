@@ -1,6 +1,5 @@
 const TRAILING_SLASHES = /\/+$/u;
 
-/** Dataset provenance emitted by aiperf and preserved in agentic benchmark rows. */
 export interface DatasetProvenance {
   source_type?: unknown;
   loader?: unknown;
@@ -10,13 +9,6 @@ export interface DatasetProvenance {
   num_dataset_entries?: unknown;
 }
 
-/**
- * Resolve the dashboard dataset slug from a benchmark row's provenance.
- *
- * Dataset ingest uses the final path component of the Hugging Face dataset id
- * as `datasets.slug`, so `semianalysisai/cc-traces-weka-062126` maps to
- * `cc-traces-weka-062126` here as well.
- */
 export function datasetSlugFromBenchmarkRow(row: Record<string, unknown>): string | null {
   const dataset = row.dataset;
   if (!dataset || typeof dataset !== 'object' || Array.isArray(dataset)) return null;

@@ -1,10 +1,12 @@
-/** Database table names. */
 export const TABLE_NAMES = {
   configs: 'configs',
   workflowRuns: 'workflow_runs',
   agenticTraceReplay: 'agentic_trace_replay',
   benchmarkResults: 'benchmark_results',
   serverLogs: 'server_logs',
+  gpuMetricSeries: 'gpu_metric_series',
+  gpuMetricSamples: 'gpu_metric_samples',
+  benchmarkResultGpuMetrics: 'benchmark_result_gpu_metrics',
   runStats: 'run_stats',
   evalResults: 'eval_results',
   evalSamples: 'eval_samples',

@@ -4,10 +4,12 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { requireIngestRepo } from './cli-utils.js';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
-
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+import { verifyRequiredPowerArtifacts } from './etl/required-power-publication.js';
+import { describeRetryCopySelection, dropSupersededJobCopies } from './etl/retry-copies.js';
+import { isRunAttemptPurged } from './etl/run-overrides.js';
 
 interface GithubRunMetadata {
   head_sha?: string;
@@ -66,6 +68,7 @@ function writeOutputs(values: Record<string, string | number | boolean>): void {
 
 function writeReuseMetadata(
   artifactsPath: string,
+  repo: string,
   sourceRunId: string,
   mergeRunId: string,
   source: GithubRunMetadata,
@@ -79,16 +82,12 @@ function writeReuseMetadata(
       {
         source_run_id: sourceRunId,
         source_run_attempt: source.run_attempt ?? 1,
-        source_run_url:
-          source.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${sourceRunId}`,
+        source_run_url: source.html_url ?? `https://github.com/${repo}/actions/runs/${sourceRunId}`,
         source_pr_number: source.pull_requests?.[0]?.number ?? null,
         source_head_sha: source.head_sha ?? null,
         ingest_run_id: mergeRunId,
         ingest_run_attempt: merge.run_attempt ?? 1,
-        ingest_run_url:
-          merge.html_url ??
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${mergeRunId}`,
+        ingest_run_url: merge.html_url ?? `https://github.com/${repo}/actions/runs/${mergeRunId}`,
       },
       null,
       2,
@@ -105,7 +104,7 @@ function main(): void {
     process.env.MERGE_RUN_ID ?? positional[1] ?? sourceRunId,
     'MERGE_RUN_ID',
   );
-  const repo = process.env.INGEST_REPO ?? DEFAULT_REPO;
+  const repo = requireIngestRepo();
   const artifactsPath = process.env.ARTIFACTS_PATH ?? path.resolve('artifacts');
 
   const sourceMetadata = fetchRunMetadata(repo, sourceRunId);
@@ -148,8 +147,26 @@ function main(): void {
     console.log(`Downloading artifact: ${artifact.name}`);
     downloadWithRetries(artifact, artifactsPath);
   }
+  for (const line of describeRetryCopySelection(
+    dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
+  )) {
+    console.log(line);
+  }
+  if (isRunAttemptPurged(Number(sourceRunId), sourceMetadata.run_attempt ?? 1)) {
+    console.log(`Source run ${sourceRunId} is purged; skipping required-power verification.`);
+  } else {
+    verifyRequiredPowerArtifacts(
+      artifactsPath,
+      {
+        runId: Number(sourceRunId),
+        runAttempt: sourceMetadata.run_attempt ?? 1,
+        headSha: sourceMetadata.head_sha ?? null,
+      },
+      process.env.INGEST_REQUIRE_POWER === 'true',
+    );
+  }
   if (plan.reused) {
-    writeReuseMetadata(artifactsPath, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
+    writeReuseMetadata(artifactsPath, repo, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
   }
 }
 

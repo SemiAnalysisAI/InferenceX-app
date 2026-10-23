@@ -2,21 +2,17 @@ import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
 
 import type { PreparedTraceReplay } from './trace-replay-ingest';
-import type {
-  PreparedTraceReplayWire,
-  TraceReplayWorkerJob,
-  TraceReplayWorkerRequest,
-  TraceReplayWorkerResponse,
+import {
+  PREPARED_TRACE_REPLAY_BUFFER_FIELDS,
+  type PreparedTraceReplayWire,
+  type TraceReplayWorkerJob,
+  type TraceReplayWorkerRequest,
+  type TraceReplayWorkerResponse,
 } from './trace-replay-worker-protocol';
 
 const DEFAULT_MAX_WORKERS = 4;
 const OVERRIDE_MAX_WORKERS = 8;
 
-/**
- * Reserve roughly three quarters of the vCPUs for Bun, gzip, database IO, and
- * runner overhead. Four GiB-scale parser workers are enough to saturate the
- * current 16-vCPU ingest runner without multiplying memory use excessively.
- */
 export function resolveTraceReplayWorkerCount(
   vcpus = availableParallelism(),
   override = process.env.INGEST_TRACE_WORKERS,
@@ -44,18 +40,9 @@ interface WorkerSlot {
   task: PendingTask | null;
 }
 
-const BUFFER_FIELDS = [
-  'profileGz',
-  'serverMetricsCsv',
-  'serverMetricsJsonGz',
-  'aggregateStatsJson',
-  'chartSeriesJson',
-  'requestTimelineJson',
-] as const;
-
 function fromWire(wire: PreparedTraceReplayWire): PreparedTraceReplay {
   const prepared = { ...wire } as unknown as PreparedTraceReplay;
-  for (const field of BUFFER_FIELDS) {
+  for (const field of PREPARED_TRACE_REPLAY_BUFFER_FIELDS) {
     const value = wire[field];
     prepared[field] = value
       ? Buffer.from(value.buffer as ArrayBuffer, value.byteOffset, value.byteLength)
@@ -64,12 +51,6 @@ function fromWire(wire: PreparedTraceReplayWire): PreparedTraceReplay {
   return prepared;
 }
 
-/**
- * A fixed worker pool whose slot remains reserved until `consume` finishes.
- * This bounds prepared-buffer memory to the worker count even when Postgres is
- * slower than computation, instead of allowing completed GiB-scale jobs to
- * accumulate in an unbounded upload queue.
- */
 export class TraceReplayWorkerPool {
   private readonly queue: PendingTask[] = [];
   private readonly slots: WorkerSlot[] = [];

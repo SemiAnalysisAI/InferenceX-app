@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 interface CatalogLinkCardProps {
   href: string;
@@ -16,7 +16,6 @@ interface CatalogLinkCardProps {
   event: 'run_index_entry_clicked' | 'ranking_index_entry_clicked' | 'chip_index_entry_clicked';
 }
 
-/** A scan-friendly, keyboard-visible link used by public catalog indexes. */
 export function CatalogLinkCard({
   href,
   title,

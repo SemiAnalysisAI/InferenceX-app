@@ -1,10 +1,10 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
@@ -14,8 +14,8 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { type Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { type Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 
@@ -56,7 +56,6 @@ const generateReliabilityTooltipContent = (
   `;
 };
 
-/** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: d3.ScaleLinear<number, number>,
@@ -190,7 +189,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
     [filteredReliabilityData, enabledModels, toggleModel, resolveColor],
   );
 
-  // Sort chart data by model sort index (same as legend)
   const sortedChartData = useMemo(
     () =>
       [...chartData].toSorted(
@@ -233,7 +231,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       ),
     [getCssColor, resolveColor, sortedChartData],
   );
-  // Reverse so first in sort order appears at top (band scale range is [height, 0]).
   const yDomain = useMemo(
     () => [...sortedChartData].toReversed().map((datum) => datum.modelLabel),
     [sortedChartData],
@@ -309,7 +306,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         render: (group, ctx) => {
           const yScale = ctx.yScale as d3.ScaleBand<string>;
 
-          // Value labels (top line, bold) — percentage
           group
             .selectAll<SVGTextElement, ChartItem>('.value-label')
             .data(sortedChartData, (d) => d.modelLabel)
@@ -322,7 +318,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             .style('pointer-events', 'none')
             .text((d) => `${d.successRate.toFixed(1)}%`);
 
-          // Overlay labels (bottom line, muted) — run count
           group
             .selectAll<SVGTextElement, ChartItem>('.overlay-label')
             .data(sortedChartData, (d) => d.modelLabel)

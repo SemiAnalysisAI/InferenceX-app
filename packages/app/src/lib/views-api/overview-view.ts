@@ -1,14 +1,3 @@
-/**
- * Pure projection from the /overview page payload (`OverviewPageData`) to the
- * documented public shape served by GET /api/v1/views/overview.
- *
- * The page BFF (`/api/v1/overview`) exposes the raw page shape and stays
- * undocumented; this module maps it to a stable, self-describing projection —
- * one row per (model, scenario), one cell per reference platform — so the
- * public contract can hold still while the page payload keeps evolving.
- * No numbers are computed here: every value is read straight off the payload
- * `getOverviewPageData` already derived.
- */
 import {
   OVERVIEW_SCENARIOS,
   OVERVIEW_TIERS,
@@ -18,7 +7,7 @@ import {
   type OverviewMissingReason,
   type OverviewPageData,
   type OverviewScenario,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 
 export interface OverviewViewCellConfig {
   framework: string;
@@ -41,13 +30,9 @@ export interface OverviewViewHistory {
 export interface OverviewViewCell {
   hardware: string;
   hardwareLabel: string;
-  /** $ per million total tokens at the hyperscaler $/GPU/hr tier. */
   costPerMtok: number | null;
-  /** Total tok/s per deployed GPU on the frontier at the selected tier. */
   throughputPerGpu: number | null;
-  /** True when the tier value is interpolated between observed frontier knots. */
   estimated: boolean;
-  /** Cost delta vs the row's reference cell in percent; negative = cheaper. */
   deltaVsRefPct: number | null;
   missingReason: OverviewMissingReason | null;
   config: OverviewViewCellConfig | null;
@@ -67,9 +52,7 @@ export interface OverviewViewPayload {
   scenarios: readonly OverviewScenario[];
   referenceHardware: string;
   historicalWindow: OverviewHistoricalWindow | null;
-  /** Rows with no historical change over the full matrix (history modes). */
   unchangedRowCount: number;
-  /** Rows quoting no platform at all over the full matrix (hardware mode). */
   emptyRowCount: number;
   rows: OverviewViewRow[];
 }
@@ -125,12 +108,6 @@ export function projectOverviewView(data: OverviewPageData): OverviewViewPayload
   };
 }
 
-/**
- * Newest benchmark date backing any cell — a stable `generatedAt` source that
- * moves with the data instead of the wall clock (per the views envelope
- * convention). Falls back to the historical snapshot date; null when the
- * matrix is empty.
- */
 export function overviewViewGeneratedAt(data: OverviewPageData): string | null {
   let latest: string | null = null;
   for (const summary of data.models) {
@@ -142,7 +119,6 @@ export function overviewViewGeneratedAt(data: OverviewPageData): string | null {
   return latest ?? data.historicalWindow?.snapshotDate ?? null;
 }
 
-/** Flat CSV projection: one row per (model, scenario, hardware) cell. */
 export function overviewViewCsvRows(
   payload: OverviewViewPayload,
   tier: number,

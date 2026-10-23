@@ -28,7 +28,6 @@ function canonical(value: Json): string {
   return JSON.stringify(value);
 }
 
-/** Read the backend's single-runtime matrix without manufacturing paired results. */
 export function servingCells(
   bundle: Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'>,
 ): ServingCell[] {
@@ -184,11 +183,6 @@ export function servingCells(
   });
 }
 
-/**
- * The run record behind the selected slot, else the first measurement-phase
- * record, else the first record. Shared by the serving panel and the video
- * evidence view so both resolve the same record for the same selection.
- */
 export function selectServingRecord(run: Json, slot: string | null): Json | null {
   const records = rows(at(run, 'records'));
   return (
@@ -199,7 +193,6 @@ export function selectServingRecord(run: Json, slot: string | null): Json | null
   );
 }
 
-/** Distinct, fully identified GPU UUIDs on the spec; null when the list is unusable. */
 export function participatingGpuCount(spec: Json): number | null {
   const uuids = rows(at(spec, 'gpu_uuids')).map(text);
   return uuids.length > 0 && uuids.every(Boolean) && new Set(uuids).size === uuids.length
@@ -207,7 +200,6 @@ export function participatingGpuCount(spec: Json): number | null {
     : null;
 }
 
-/** Per-second metric → per GPU-hour for the chosen GPU basis; null without a usable count. */
 export function perGpuHour(value: Json, gpuCount: number | null): number | null {
   const n = number(value);
   return n !== null && gpuCount !== null && gpuCount > 0 ? n * (3600 / gpuCount) : null;

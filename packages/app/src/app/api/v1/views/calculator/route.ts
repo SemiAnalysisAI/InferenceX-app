@@ -41,16 +41,16 @@ import type {
   GPUDataPoint,
   InterpolatedResult,
 } from '@/components/calculator/types';
-import { cachedJson } from '@/lib/api-cache';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import {
   getCachedBenchmarksForRun,
   getCachedCalculatorBenchmarks,
-} from '@/lib/benchmark-query-cache.server';
-import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
-import { Percentile, Sequence } from '@/lib/data-mappings';
-import { loadFixture } from '@/lib/test-fixtures';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
+import { loadFixture } from '@/lib/testing/test-fixtures';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 

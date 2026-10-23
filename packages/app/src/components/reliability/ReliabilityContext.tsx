@@ -19,11 +19,10 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 
 import type { ModelSuccessRateData, ReliabilityChartContextType } from './types';
 
-/** @internal Exported for test provider wrapping only. */
 export const ReliabilityContext = createContext<ReliabilityChartContextType | undefined>(undefined);
 
 import { aggregateByDateRange } from './aggregate';
@@ -61,8 +60,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     remove: removeModelRaw,
   } = useChartToggleSet();
 
-  // Pending legend-active selection restored from `r_active` URL param.
-  // Consumed once when modelsWithData first populates.
   const [pendingActiveModels, setPendingActiveModels] = useState<Set<string> | null>(() => {
     const v = getUrlParam('r_active');
     if (!v) return null;
@@ -146,7 +143,6 @@ export function ReliabilityProvider({ children }: { children: ReactNode }) {
     [selectAllModelsRaw, modelsWithData],
   );
 
-  // Serialize the legend-active set, omitting when it equals all modelsWithData.
   const rActiveStr = useMemo(() => {
     if (enabledModels.size === 0) return '';
     if (enabledModels.size === modelsWithData.size) {

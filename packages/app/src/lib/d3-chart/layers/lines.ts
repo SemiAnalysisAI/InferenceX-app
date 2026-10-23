@@ -6,11 +6,10 @@ type AnyXScale = ContinuousScale | d3.ScaleTime<number, number>;
 
 export interface LineConfig {
   getColor: (key: string) => string;
-  /** Optional per-series SVG dash pattern; return `none` for a solid line. */
   getStrokeDasharray?: (key: string) => string;
   strokeWidth?: number;
+  getStrokeWidth?: (key: string) => number;
   curve?: d3.CurveFactory;
-  /** Return false to create gaps in the line (e.g., missing data points). */
   isDefined?: (d: { x: number; y: number }) => boolean;
 }
 
@@ -19,7 +18,6 @@ interface LineEntry {
   points: { x: number; y: number }[];
 }
 
-/** Render multiple keyed line paths using enter/update/exit. */
 export function renderLines(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   lines: Record<string, { x: number; y: number }[]>,
@@ -45,27 +43,23 @@ export function renderLines(
     .selectAll<SVGPathElement, LineEntry>('.line-path')
     .data(entries, (d) => d.key);
 
-  // Enter
   const entered = selection
     .enter()
     .append('path')
     .attr('class', (d) => `line-path line-${d.key}`)
     .attr('fill', 'none');
 
-  // Exit
   selection.exit().remove();
 
-  // Update all
   entered
     .merge(selection)
     .attr('class', (d) => `line-path line-${d.key}`)
     .attr('stroke', (d) => config.getColor(d.key))
     .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
-    .attr('stroke-width', config.strokeWidth ?? 2)
+    .attr('stroke-width', (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2)
     .attr('d', (d) => lineGenerator(d.points));
 }
 
-/** Update line paths on zoom (recompute d attribute). */
 export function updateLinesOnZoom(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   lines: Record<string, { x: number; y: number }[]>,

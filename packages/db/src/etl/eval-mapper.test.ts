@@ -3,7 +3,6 @@ import { configCacheKey } from './config-cache';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
-/** Minimal valid meta_env.json for eval ZIPs. */
 function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -19,7 +18,6 @@ function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid results JSON for eval ZIPs. */
 function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     lm_eval_version: '0.4.7',
@@ -39,7 +37,6 @@ function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid flat row from agg_eval_all.json. */
 function makeAggRow(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -357,7 +354,6 @@ describe('mapAggEvalRow', () => {
   });
 
   describe('v2 schema (disagg / multinode)', () => {
-    /** Row carrying the v2 prefill/decode fields produced by disagg CI runs. */
     function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
       return makeAggRow({
         hw: 'B300',
@@ -425,36 +421,38 @@ describe('mapAggEvalRow', () => {
         tracker,
       );
 
-      // dynamo-* / mori-* canonicals carry disagg semantics via their name — the
-      // standalone disagg signal (workers, multinode) is moot under these frameworks.
       expect(result!.config.disagg).toBe(true);
     });
 
-    it('preserves explicit disagg=false for a multi-node Dynamo eval', () => {
-      const tracker = createSkipTracker();
-      const result = mapAggEvalRow(
-        makeV2Row({
-          disagg: false,
-          prefill_tp: 8,
-          prefill_ep: 1,
-          prefill_num_workers: 1,
-          num_prefill_gpu: 16,
-          decode_tp: 0,
-          decode_ep: 0,
-          decode_num_workers: 0,
-          num_decode_gpu: 0,
-        }),
-        tracker,
-      );
+    it.each(['dynamo-trt', 'mori-sglang'])(
+      'preserves explicit aggregate eval topology for %s',
+      (framework) => {
+        const tracker = createSkipTracker();
+        const result = mapAggEvalRow(
+          makeV2Row({
+            framework,
+            disagg: false,
+            prefill_tp: 8,
+            prefill_ep: 1,
+            prefill_num_workers: 1,
+            num_prefill_gpu: 16,
+            decode_tp: 0,
+            decode_ep: 0,
+            decode_num_workers: 0,
+            num_decode_gpu: 0,
+          }),
+          tracker,
+        );
 
-      expect(result!.config.framework).toBe('dynamo-trt');
-      expect(result!.config.disagg).toBe(false);
-      expect(result!.config.isMultinode).toBe(true);
-      expect(result!.config.prefillTp).toBe(8);
-      expect(result!.config.decodeTp).toBe(8);
-      expect(result!.config.numPrefillGpu).toBe(16);
-      expect(result!.config.numDecodeGpu).toBe(16);
-    });
+        expect(result!.config.framework).toBe(framework);
+        expect(result!.config.disagg).toBe(false);
+        expect(result!.config.isMultinode).toBe(true);
+        expect(result!.config.prefillTp).toBe(8);
+        expect(result!.config.decodeTp).toBe(8);
+        expect(result!.config.numPrefillGpu).toBe(16);
+        expect(result!.config.numDecodeGpu).toBe(16);
+      },
+    );
 
     it('treats a decode worker pool as disaggregated despite a legacy false field', () => {
       const tracker = createSkipTracker();
@@ -501,7 +499,6 @@ describe('mapAggEvalRow', () => {
         tracker,
       )!.config;
 
-      // Any difference in the natural-key fields is enough to separate configs.
       expect(configCacheKey(a)).not.toBe(configCacheKey(b));
     });
   });

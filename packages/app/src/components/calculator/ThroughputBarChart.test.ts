@@ -19,10 +19,6 @@ import {
   getValueLabel,
 } from './ThroughputBarChart';
 
-// ---------------------------------------------------------------------------
-// Test fixtures
-// ---------------------------------------------------------------------------
-
 function makeResult(overrides: Partial<InterpolatedResult> = {}): InterpolatedResult {
   const hwKey = overrides.hwKey ?? 'h100';
   return {
@@ -43,10 +39,6 @@ function makeResult(overrides: Partial<InterpolatedResult> = {}): InterpolatedRe
   };
 }
 
-// =========================================================================
-// getCostForType()
-// =========================================================================
-
 describe('getCostForType', () => {
   const result = makeResult({ cost: 1.5, costInput: 0.8, costOutput: 2.2 });
 
@@ -63,10 +55,6 @@ describe('getCostForType', () => {
   });
 });
 
-// =========================================================================
-// getCostTypeLabel()
-// =========================================================================
-
 describe('getCostTypeLabel', () => {
   it('returns "/M tok" for total', () => {
     expect(getCostTypeLabel('total')).toBe('/M tok');
@@ -80,10 +68,6 @@ describe('getCostTypeLabel', () => {
     expect(getCostTypeLabel('output')).toBe('/M output tok');
   });
 });
-
-// =========================================================================
-// getThroughputForType()
-// =========================================================================
 
 describe('getThroughputForType', () => {
   const result = makeResult({ value: 500, outputTputValue: 450, inputTputValue: 50 });
@@ -101,10 +85,6 @@ describe('getThroughputForType', () => {
   });
 });
 
-// =========================================================================
-// getTpPerMwForType()
-// =========================================================================
-
 describe('getTpPerMwForType', () => {
   const result = makeResult({ tpPerMw: 1200, inputTpPerMw: 300, outputTpPerMw: 1100 });
 
@@ -120,10 +100,6 @@ describe('getTpPerMwForType', () => {
     expect(getTpPerMwForType(result, 'output')).toBe(1100);
   });
 });
-
-// =========================================================================
-// getMetricValue()
-// =========================================================================
 
 describe('getMetricValue', () => {
   const result = makeResult({
@@ -172,10 +148,6 @@ describe('getMetricValue', () => {
     expect(getMetricValue(result, 'cost', 'output')).toBe(2.2);
   });
 });
-
-// =========================================================================
-// getMetricLabel()
-// =========================================================================
 
 describe('getMetricLabel', () => {
   it('returns localized Chinese axis labels while preserving protected units', () => {
@@ -249,10 +221,6 @@ describe('getMetricLabel', () => {
   });
 });
 
-// =========================================================================
-// getValueLabel()
-// =========================================================================
-
 describe('getValueLabel', () => {
   it('formats total power metric value', () => {
     const result = makeResult({ tpPerMw: 1234 });
@@ -318,10 +286,6 @@ describe('getValueLabel', () => {
   });
 });
 
-// =========================================================================
-// getCostProviderLabel()
-// =========================================================================
-
 describe('getCostProviderLabel', () => {
   it('returns natural Chinese ownership labels', () => {
     expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · 超大规模云大批量');
@@ -336,10 +300,6 @@ describe('getCostProviderLabel', () => {
     expect(getCostProviderLabel('costr')).toBe('Rent - 3 Year Commit');
   });
 });
-
-// =========================================================================
-// getChartTitle()
-// =========================================================================
 
 describe('getChartTitle', () => {
   it('returns total throughput title with interactivity target label', () => {
@@ -417,10 +377,6 @@ describe('getChartTitle', () => {
   });
 });
 
-// =========================================================================
-// getSortedResults()
-// =========================================================================
-
 describe('getSortedResults', () => {
   const results: InterpolatedResult[] = [
     makeResult({
@@ -480,13 +436,11 @@ describe('getSortedResults', () => {
 
   it('sorts by input tpPerMw descending for power metric with input type', () => {
     const sorted = getSortedResults(results, 'power', 'input');
-    // inputTpPerMw: a=200, b=100, c=500 → descending: c, a, b
     expect(sorted.map((r) => r.hwKey)).toEqual(['c', 'a', 'b']);
   });
 
   it('sorts by output tpPerMw descending for power metric with output type', () => {
     const sorted = getSortedResults(results, 'power', 'output');
-    // outputTpPerMw: a=700, b=1100, c=1500 → descending: c, b, a
     expect(sorted.map((r) => r.hwKey)).toEqual(['c', 'b', 'a']);
   });
 
@@ -518,13 +472,7 @@ describe('getSortedResults', () => {
   });
 });
 
-// =========================================================================
-// getResultLabel() — official + unofficial-run overlay bars
-// =========================================================================
-
 describe('getResultLabel', () => {
-  // Empty config → the helper falls back to the global getHardwareConfig
-  // lookup, which resolves 'b300' to its registry display label.
   const noConfig = {};
 
   it('returns the bare hardware name for a single-precision official bar', () => {
@@ -556,8 +504,6 @@ describe('getResultLabel', () => {
       }),
       noConfig,
     );
-    // One paren group only — twoRowYAxisLabels({split:'parens'}) splits on the
-    // last "(...)", so a second group would break the two-row y-axis label.
     expect(label).toBe('B300 (FP8 · ✕ feat/my-branch)');
     expect(splitLabel(label, 'parens')).toEqual(['B300', '(FP8 · ✕ feat/my-branch)']);
   });
@@ -568,10 +514,6 @@ describe('getResultLabel', () => {
     );
   });
 });
-
-// =========================================================================
-// generateTooltipHTML() — overlay treatment
-// =========================================================================
 
 describe('generateTooltipHTML overlay treatment', () => {
   const officialRunUrl = 'https://github.com/org/repo/actions/runs/999';
@@ -607,8 +549,6 @@ describe('generateTooltipHTML overlay treatment', () => {
     );
     expect(html).toContain('UNOFFICIAL RUN');
     expect(html).toContain('feat/my-branch');
-    // Links to the overlay's own workflow run, not the official one behind the
-    // DB data — the two are unrelated.
     expect(html).toContain(overlayRunUrl);
     expect(html).not.toContain(officialRunUrl);
   });
@@ -712,7 +652,6 @@ describe('generateTooltipHTML overlay treatment', () => {
   });
 });
 
-/** An interpolated read, aggregated by default: 800 + 100 = 900 = the total. */
 const rankResult = (over: Partial<InterpolatedResult> = {}): InterpolatedResult =>
   ({
     hwKey: 'mi355x',
@@ -739,15 +678,12 @@ describe('getComparableTpPerMwForType', () => {
   });
 
   it('is an identity for an aggregated config, whose rates already sum to the total', () => {
-    // 800 + 100 = 900, so the share is 8/9 and tpPerMw x share is inputTpPerMw.
     const r = rankResult({ inputTokenShare: 800 / 900 });
     expect(getComparableTpPerMwForType(r, 'input')).toBeCloseTo(8000, 6);
     expect(getComparableTpPerMwForType(r, 'output')).toBeCloseTo(1000, 6);
   });
 
   it('deflates a disaggregated config back onto the per-total-chip basis', () => {
-    // 16 prefill + 8 decode chips serving 8192:1024. The reported rates sum to
-    // 1.667x the total, so ranking on them raw reads high.
     const r = rankResult({
       value: 300,
       inputTputValue: 400,
@@ -758,10 +694,8 @@ describe('getComparableTpPerMwForType', () => {
       inputTokenShare: 8192 / 9216,
     });
     expect(getTpPerMwForType(r, 'output')).toBe(1000);
-    // Output is a ninth of the tokens, on 3000 tok/s/MW overall.
     expect(getComparableTpPerMwForType(r, 'output')).toBeCloseTo(3000 / 9, 6);
     expect(getComparableTpPerMwForType(r, 'output')).toBeLessThan(getTpPerMwForType(r, 'output'));
-    // And the two token types partition the total rather than exceeding it.
     expect(
       getComparableTpPerMwForType(r, 'input') + getComparableTpPerMwForType(r, 'output'),
     ).toBeCloseTo(3000, 6);

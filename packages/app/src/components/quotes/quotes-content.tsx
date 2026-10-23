@@ -5,9 +5,9 @@ import { Fragment } from 'react';
 import { Card } from '@/components/ui/card';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES, orgAnchorId } from './quotes-data';
@@ -27,7 +27,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Deduplicated logos from all quote orgs. */
 const orgLogos: { org: string; logo: string }[] = [];
 const seenOrgs = new Set<string>();
 for (const q of QUOTES) {
@@ -37,7 +36,6 @@ for (const q of QUOTES) {
   }
 }
 
-/** Index of the first quote for each org — only that card gets the anchor id. */
 const firstQuoteIndexForOrg: Record<string, number> = {};
 QUOTES.forEach((q, i) => {
   if (!(q.org in firstQuoteIndexForOrg)) firstQuoteIndexForOrg[q.org] = i;

@@ -3,14 +3,12 @@
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as React from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 const TooltipProvider = TooltipPrimitive.Provider;
 const TooltipRoot = TooltipPrimitive.Root;
 const TooltipTrigger = TooltipPrimitive.Trigger;
 
-// Informational hints and interactive help use the same visual surface. Keep
-// Tooltip semantics for hints on controls whose click already performs an action.
 export const HELP_CONTENT_CLASS_NAME =
   'rounded-md border bg-popover p-3 text-sm font-normal not-italic leading-relaxed text-popover-foreground shadow-md';
 

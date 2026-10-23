@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
@@ -12,11 +12,11 @@ const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted((
   ),
 }));
 
-vi.mock('@/lib/overview-data.server', () => ({
+vi.mock('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));
@@ -149,7 +149,6 @@ describe('GET /api/v1/views/overview', () => {
     expect(row.model).toBe('DeepSeek-V4-Pro');
     expect(row.scenario).toBe('single_turn_8k1k');
     expect(row.cells).toHaveLength(2);
-    // Cell projection: page-internal fields (boundary, evidence, hwKey) stay out.
     expect(row.cells[0]).toEqual({
       hardware: 'b200',
       hardwareLabel: 'B200',
@@ -231,7 +230,7 @@ describe('GET /api/v1/views/overview', () => {
     const lines = text.trim().split('\r\n');
     expect(lines[0]).toContain('model');
     expect(lines[0]).toContain('cost_per_mtok');
-    expect(lines).toHaveLength(3); // header + 2 cells
+    expect(lines).toHaveLength(3);
     expect(lines[1]).toContain('b200');
     expect(lines[1]).toContain('0.42');
     expect(lines[2]).toContain('cannot_reach_at_tier');

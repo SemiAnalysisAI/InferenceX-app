@@ -1,7 +1,7 @@
 import { rooflineBound } from '@/components/operatorx/compare/roofline-bound';
 import type { NextRequest } from 'next/server';
 
-import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
+import { cachedJson, operatorXCacheTag } from '@/lib/cache/api-cache';
 import { getComparison, isPartialComparison } from '@/lib/operatorx/service';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError, ViewsUpstreamError } from '@/lib/views-api/errors';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import {
+  comparisonModels,
   type ComparisonOp,
   comparisonView,
   type ComparisonView,
@@ -120,16 +121,17 @@ export function GET(request: NextRequest) {
       console.error('OperatorX view', error);
       throw new ViewsUpstreamError(503);
     }
+    const models = comparisonModels(comparison);
     const workloadIds = comparison.workloads.map((w) => w.id);
     const workload = s.get('workload');
     if (workload && !workloadIds.includes(workload))
       throw new ViewsApiParamError('workload', `Unknown workload: ${workload}`, workloadIds);
     const modelParam = s.get('model');
     const model = modelParam
-      ? comparison.models.find((m) => m.toLowerCase() === modelParam.toLowerCase())
+      ? models.find((m) => m.toLowerCase() === modelParam.toLowerCase())
       : null;
     if (modelParam && !model)
-      throw new ViewsApiParamError('model', `Unknown model: ${modelParam}`, comparison.models);
+      throw new ViewsApiParamError('model', `Unknown model: ${modelParam}`, models);
 
     const scope = comparisonView(comparison, workload, model ?? null);
     const splits = scope.parallelOptions.map((o) => o.key || ONE_DEVICE);
@@ -185,7 +187,7 @@ export function GET(request: NextRequest) {
             cases: w.cases,
             hardware: w.hardware,
           })),
-          models: comparison.models,
+          models,
           parallel: view.parallelOptions.map((o) => ({
             key: o.key || ONE_DEVICE,
             label: o.label,

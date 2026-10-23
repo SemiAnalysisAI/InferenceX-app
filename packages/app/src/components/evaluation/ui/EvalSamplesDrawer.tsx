@@ -7,10 +7,10 @@ import type { EvaluationChartData } from '@/components/evaluation/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
-import { track } from '@/lib/analytics';
-import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
-import { buildShareUrl } from '@/lib/url-state';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api/api';
+import { buildShareUrl } from '@/lib/routing/url-state';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const PAGE_SIZE = 50;
 
@@ -87,22 +87,11 @@ const STRINGS = {
 } as const;
 
 interface EvalSamplesDrawerProps {
-  /** The selected row from the EvaluationTable, or null when closed. */
   row: EvaluationChartData | null;
   onClose: () => void;
-  /** Sample selected by a shared URL. */
   initialDocId?: number | null;
 }
 
-/**
- * Drawer (dialog rendered as a right-side panel) that lists every prompt the
- * model saw in this eval run, with the model's response, the gold target, and
- * a passed/failed badge derived from the canonical metric (strict-match for
- * lm-eval tasks, score>=0.5 otherwise).
- *
- * Inspired by the vLLM eval dashboard PoC
- * (credit: @khluu, @simon-mo, @robertgshaw2-redhat).
- */
 export default function EvalSamplesDrawer({
   row,
   onClose,
@@ -119,7 +108,6 @@ export default function EvalSamplesDrawer({
   const [copiedTarget, setCopiedTarget] = useState<number | 'drawer' | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
-  // Reset transient state whenever a new row is opened.
   useEffect(() => {
     if (!open) return;
     setFilter('all');
@@ -130,8 +118,6 @@ export default function EvalSamplesDrawer({
     setCopiedTarget(null);
   }, [row?.evalResultId, open, initialDocId]);
 
-  // Build a live-fetch context for unofficial runs from the row's identifying
-  // fields. The hook ignores this when `evalResultId > 0` (DB-backed path).
   const liveContext = useMemo<EvalSamplesLiveContext | null>(() => {
     if (!row || row.evalResultId > 0) return null;
     const runId = extractRunIdFromUrl(row.runUrl);
@@ -158,8 +144,6 @@ export default function EvalSamplesDrawer({
     docId: requestedDocId,
   });
 
-  // Client-side substring filter on the page slice — server-side full-text
-  // search is overkill at PAGE_SIZE rows.
   const filteredSamples = useMemo(() => {
     if (!data) return [];
     const q = search.trim().toLowerCase();
@@ -240,8 +224,6 @@ export default function EvalSamplesDrawer({
   };
 
   const isUnofficial = row !== null && row.evalResultId <= 0;
-  // Unofficial runs are renderable as long as we resolved a runId from the row's url.
-  // If we couldn't (no run_url, malformed url, etc.), fall back to the empty-state copy below.
   const liveUnavailable = isUnofficial && liveContext === null;
 
   return (
@@ -269,8 +251,6 @@ export default function EvalSamplesDrawer({
         "
         aria-describedby={undefined}
       >
-        {/* Header — `DialogContent` renders its own absolute-positioned close
-            button in the top-right, so we leave room with `pr-10`. */}
         <div className="flex items-start gap-3 border-b border-border px-4 py-4 pr-12 sm:px-6 sm:pr-12">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-base leading-snug">{t.title}</DialogTitle>
@@ -310,7 +290,6 @@ export default function EvalSamplesDrawer({
           )}
         </div>
 
-        {/* Filter chips + search */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-4 py-3 sm:px-6">
           <FilterChip
             label={t.filterAll}
@@ -351,7 +330,6 @@ export default function EvalSamplesDrawer({
           </div>
         </div>
 
-        {/* Body */}
         <div ref={bodyRef} className="min-h-0 overflow-auto px-4 py-4 sm:px-6">
           {liveUnavailable && (
             <p className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
@@ -467,7 +445,6 @@ export default function EvalSamplesDrawer({
           </ul>
         </div>
 
-        {/* Footer pagination */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-xs text-muted-foreground tabular-nums sm:px-6">
           <span>
             {t.pagination(
@@ -513,12 +490,6 @@ interface FilterChipProps {
   tone?: 'passed' | 'failed';
 }
 
-/**
- * Pull the numeric run id out of a GitHub Actions URL.
- * Accepts both `https://github.com/owner/repo/actions/runs/12345` and
- * trailing-slash / fragment variants. Returns null on any malformed input —
- * the caller falls back to a "live unavailable" empty state when null.
- */
 function extractRunIdFromUrl(url: string | undefined): string | null {
   if (!url) return null;
   const m = url.match(/\/actions\/runs\/(?<runId>\d+)/u);
@@ -572,16 +543,6 @@ function PassFailBadge({ passed }: { passed: boolean | null }) {
   );
 }
 
-/**
- * Render the few-shot demonstration prefix.
- *
- * Demonstrations are parsed server-side from lm-eval's `arguments` JSONB; the
- * route handles both multi-turn chat-array shape and the pre-concatenated
- * single-message shape. Returns null when there are no demonstrations.
- *
- * Default-expanded so the demos are visible immediately — they're the whole
- * point of clicking a sample on a 5-shot eval.
- */
 function FewShotBlock({
   demonstrations,
   locale,

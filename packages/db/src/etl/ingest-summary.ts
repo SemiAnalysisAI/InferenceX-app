@@ -14,7 +14,6 @@ export interface IngestSummaryOptions {
   includeUnmappedPrecisions?: boolean;
 }
 
-/** Print the DB totals and shared skip/unmapped-value footer used by ingest scripts. */
 export function printIngestSummaryFooter(
   totals: IngestDatabaseTotals,
   tracker: SkipTracker,
@@ -38,6 +37,7 @@ export function printIngestSummaryFooter(
     ['unmapped hw', skips.unmappedHw],
     ['bad/empty zip', skips.badZip],
     ['DB errors', skips.dbError],
+    ['telemetry errors (non-fatal)', skips.telemetryError],
   );
 
   const nonzeroSkipLines = skipLines.filter(([, count]) => count > 0);

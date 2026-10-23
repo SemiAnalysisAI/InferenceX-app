@@ -5,12 +5,6 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 
-// Regression coverage for GH #470: when one hardware type contributes several
-// curves (e.g. b300_sglang_fp4 / _fp8 / _bf16) the render keeps a single line
-// label ("B300 (SGLang)") and hides the rest via `data-visible="0"`. Every
-// duplicate shares the same `data-hw-key`, so the visibility-sync paths must
-// honour `data-visible` or they re-show the hidden duplicates.
-
 describe('labelOpacityForActiveState', () => {
   const active = new Set(['b300_sglang', 'gb300_dynamo-sglang']);
   const precisions = ['fp4'];
@@ -22,8 +16,6 @@ describe('labelOpacityForActiveState', () => {
   });
 
   it('keeps hidden duplicate line labels hidden even though their hw is active', () => {
-    // The fp8 / bf16 B300 curves: same data-hw-key as the visible fp4 label,
-    // but the render hid them. They must NOT be re-shown (the #470 bug).
     expect(
       labelOpacityForActiveState({ hwKey: 'b300_sglang', visible: '0' }, active, precisions),
     ).toBe(0);
@@ -36,7 +28,6 @@ describe('labelOpacityForActiveState', () => {
   });
 
   it('treats a missing data-visible attribute as kept (parallelism labels)', () => {
-    // Parallelism labels carry a precision and no data-visible gate.
     expect(
       labelOpacityForActiveState({ hwKey: 'b300_sglang', precision: 'fp4' }, active, precisions),
     ).toBe(1);
@@ -50,6 +41,26 @@ describe('labelOpacityForActiveState', () => {
 
   it('returns 0 when there is no hardware key', () => {
     expect(labelOpacityForActiveState({}, active, precisions)).toBe(0);
+  });
+});
+
+describe('labelOpacityForActiveState with ?unofficialrun= overlays', () => {
+  const official = new Set(['gb200_dynamo-sglang']);
+  const precisions = ['fp8'];
+
+  it('hides an overlay label when its overlay hardware row is off, even if the official row is on', () => {
+    expect(
+      labelOpacityForActiveState(
+        {
+          hwKey: 'gb200_dynamo-sglang',
+          lineKey: 'overlay-gb200_dynamo-sglang_fp8_run1',
+          visible: '1',
+        },
+        official,
+        precisions,
+        new Set(['gb300_dynamo-sglang']),
+      ),
+    ).toBe(0);
   });
 });
 

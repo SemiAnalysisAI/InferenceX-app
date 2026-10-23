@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   FAVORITE_PRESETS,
@@ -10,11 +10,9 @@ import {
   subtractMonths,
 } from './favorite-presets';
 
-// ── matchesPresetHwFilter ────────────────────────────────────────────
-
 describe('matchesPresetHwFilter', () => {
-  const dsv4 = Model.DeepSeek_V4_Pro; // has an MTP exclusion rule
-  const dsr1 = Model.DeepSeek_R1; // no exclusion rule
+  const dsv4 = Model.DeepSeek_V4_Pro;
+  const dsr1 = Model.DeepSeek_R1;
 
   it('matches a bare GPU prefix against any framework variant on that GPU', () => {
     expect(matchesPresetHwFilter('b300_sglang', ['b300'], dsv4)).toBe(true);
@@ -23,10 +21,8 @@ describe('matchesPresetHwFilter', () => {
   });
 
   it('skips _mtp keys via a bare GPU prefix only for models with an exclusion rule', () => {
-    // dsv4 has an MTP exclusion rule → MTP keys filtered out under bare prefix
     expect(matchesPresetHwFilter('b300_sglang_mtp', ['b300'], dsv4)).toBe(false);
     expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], dsv4)).toBe(false);
-    // dsr1 (and other models) → bare prefix still pulls MTP variants through
     expect(matchesPresetHwFilter('h100_dynamo-trt_mtp', ['h100'], dsr1)).toBe(true);
     expect(matchesPresetHwFilter('gb300_dynamo-trt_mtp', ['gb300'], dsr1)).toBe(true);
   });
@@ -53,8 +49,6 @@ describe('matchesPresetHwFilter', () => {
     expect(matchesPresetHwFilter('b300_vllm_mtp', ['b300'], undefined)).toBe(true);
   });
 });
-
-// ── findClosestDate ──────────────────────────────────────────────────
 
 describe('findClosestDate', () => {
   it('returns empty string for empty array', () => {
@@ -92,8 +86,6 @@ describe('findClosestDate', () => {
   });
 });
 
-// ── subtractMonths ───────────────────────────────────────────────────
-
 describe('subtractMonths', () => {
   it('subtracts 1 month', () => {
     expect(subtractMonths('2025-03-15', 1)).toBe('2025-02-15');
@@ -108,7 +100,6 @@ describe('subtractMonths', () => {
   });
 
   it('handles month-end overflow (Mar 31 - 1 month)', () => {
-    // March 31 minus 1 month: Feb has no 31st, JS Date rolls to Mar 3
     const result = subtractMonths('2025-03-31', 1);
     expect(result).toMatch(/^2025-0[23]-/u);
   });
@@ -121,8 +112,6 @@ describe('subtractMonths', () => {
     expect(subtractMonths('2025-06-15', 3)).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
   });
 });
-
-// ── FAVORITE_PRESETS data integrity ─────────────────────────────────
 
 describe('FAVORITE_PRESETS data integrity', () => {
   it('has unique IDs', () => {
@@ -173,10 +162,7 @@ describe('FAVORITE_PRESETS data integrity', () => {
   });
 });
 
-// ── Precision compatibility ──────────────────────────────────────────
-
 describe('precision compatibility', () => {
-  // FP8-only hardware: H200, MI300X, MI325X cannot use FP4
   const FP8_ONLY_HW_PREFIXES = ['h200', 'mi300x', 'mi325x'];
 
   it('presets with FP8-only hardware do not use fp4-only precisions', () => {
@@ -205,8 +191,6 @@ describe('precision compatibility', () => {
   });
 });
 
-// ── Description/config alignment ─────────────────────────────────────
-
 describe('description/config alignment', () => {
   it('hwFilter GPU base names are mentioned in title, description, or tags', () => {
     for (const preset of FAVORITE_PRESETS) {
@@ -214,18 +198,13 @@ describe('description/config alignment', () => {
       const searchText =
         `${preset.title} ${preset.description} ${preset.tags.join(' ')}`.toLowerCase();
       for (const hw of hwKeys) {
-        // Prefix-only entries (no underscore) are vendor-wide filters that match
-        // any framework for a given GPU — they don't require a specific callout.
         if (!hw.includes('_')) continue;
-        // Extract base GPU name (e.g. 'b200' from 'b200_dynamo-trt')
         const base = hw.split('_')[0];
         expect(searchText).toContain(base.toLowerCase());
       }
     }
   });
 });
-
-// ── findConfigChangeDates ─────────────────────────────────────────────
 
 const makeConfigRow = (
   date: string,
@@ -261,19 +240,13 @@ describe('findConfigChangeDates', () => {
 
   it('returns dates where config set differs from previous date', () => {
     const rows = [
-      // Oct 1: config A
       makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 2: same config A → should be skipped (no change)
       makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 3: config A + new config B → config set changed
       makeConfigRow('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
       makeConfigRow('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 4: same as Oct 3 → should be skipped (no change)
       makeConfigRow('2025-10-04', 'b200', 'sglang', 1, 8, 8, false),
       makeConfigRow('2025-10-04', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 5: only config B (subset of Oct 4) → config set changed (removal)
       makeConfigRow('2025-10-05', 'b200', 'sglang', 2, 16, 16, true),
-      // Oct 6: new config C → config set changed
       makeConfigRow('2025-10-06', 'b200', 'sglang', 4, 32, 32, true),
     ];
     const result = findConfigChangeDates(
@@ -288,13 +261,10 @@ describe('findConfigChangeDates', () => {
 
   it('detects config removals as changes', () => {
     const rows = [
-      // Oct 1: full run with configs A, B, C
       makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
       makeConfigRow('2025-10-01', 'b200', 'sglang', 2, 16, 16, true),
       makeConfigRow('2025-10-01', 'b200', 'sglang', 4, 32, 32, false),
-      // Oct 2: partial run with only config A → config set changed (B, C removed)
       makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false),
-      // Oct 3: partial run with configs A, B → config set changed (B added back)
       makeConfigRow('2025-10-03', 'b200', 'sglang', 1, 8, 8, false),
       makeConfigRow('2025-10-03', 'b200', 'sglang', 2, 16, 16, true),
     ];
@@ -311,7 +281,7 @@ describe('findConfigChangeDates', () => {
   it('filters by GPU prefix', () => {
     const rows = [
       makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      makeConfigRow('2025-10-02', 'h200', 'sglang', 1, 8, 8, false), // different GPU
+      makeConfigRow('2025-10-02', 'h200', 'sglang', 1, 8, 8, false),
     ];
     const result = findConfigChangeDates(
       rows,
@@ -326,7 +296,7 @@ describe('findConfigChangeDates', () => {
   it('filters by precision', () => {
     const rows = [
       makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false, 'fp4'),
-      makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false, 'fp8'), // different precision
+      makeConfigRow('2025-10-02', 'b200', 'sglang', 1, 8, 8, false, 'fp8'),
     ];
     const result = findConfigChangeDates(
       rows,
@@ -340,9 +310,9 @@ describe('findConfigChangeDates', () => {
 
   it('filters by date range', () => {
     const rows = [
-      makeConfigRow('2025-09-01', 'b200', 'sglang', 1, 8, 8, false), // before range
+      makeConfigRow('2025-09-01', 'b200', 'sglang', 1, 8, 8, false),
       makeConfigRow('2025-10-01', 'b200', 'sglang', 1, 8, 8, false),
-      makeConfigRow('2025-12-01', 'b200', 'sglang', 1, 8, 8, false), // after range
+      makeConfigRow('2025-12-01', 'b200', 'sglang', 1, 8, 8, false),
     ];
     const result = findConfigChangeDates(
       rows,
@@ -354,8 +324,6 @@ describe('findConfigChangeDates', () => {
     expect(result).toEqual(['2025-10-01']);
   });
 });
-
-// ── findClosestDate + subtractMonths integration ─────────────────────
 
 describe('findClosestDate + subtractMonths integration', () => {
   it('finds a reasonable start date for a 2-month range', () => {

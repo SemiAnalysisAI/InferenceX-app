@@ -13,13 +13,16 @@ export interface TraceReplayWorkerRequest {
   job: TraceReplayWorkerJob;
 }
 
-type BufferField =
-  | 'profileGz'
-  | 'serverMetricsCsv'
-  | 'serverMetricsJsonGz'
-  | 'aggregateStatsJson'
-  | 'chartSeriesJson'
-  | 'requestTimelineJson';
+export const PREPARED_TRACE_REPLAY_BUFFER_FIELDS = [
+  'profileGz',
+  'serverMetricsCsv',
+  'serverMetricsJsonGz',
+  'aggregateStatsJson',
+  'chartSeriesJson',
+  'requestTimelineGz',
+] as const satisfies readonly (keyof PreparedTraceReplay)[];
+
+type BufferField = (typeof PREPARED_TRACE_REPLAY_BUFFER_FIELDS)[number];
 
 export type PreparedTraceReplayWire = Omit<PreparedTraceReplay, BufferField> &
   Record<BufferField, Uint8Array | null>;

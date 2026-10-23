@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { NotFoundContent } from '@/components/not-found-content';
+import { NotFoundContent } from '@/components/errors/not-found-content';
 
 export const metadata: Metadata = {
   title: 'Page Not Found',

@@ -24,7 +24,6 @@ interface Bar {
   cases: number;
 }
 
-/** Case indices per group, in display order. */
 function groupCases(model: ComparisonModel, grouping: Grouping): [string, number[]][] {
   const all = model.view.cases.map((_, i) => i);
   if (grouping === 'none') return [['All', all]];

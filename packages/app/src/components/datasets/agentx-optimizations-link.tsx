@@ -2,12 +2,8 @@
 
 import Link from 'next/link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
-/**
- * Analytics-instrumented link for the AgentX optimizations pages. The pages
- * themselves are server components, so every tracked click goes through here.
- */
 interface AgentXOptimizationsLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;
   analyticsEvent:

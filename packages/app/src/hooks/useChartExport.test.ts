@@ -67,7 +67,6 @@ describe('useChartExport failure messages', () => {
     ['/inference', 'Failed to export image. Please try again.'],
     ['/zh/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
-    // Keep the hook mounted across locale navigation to catch a stale callback.
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));
     const error = new Error('PNG capture failed');
@@ -131,6 +130,59 @@ describe('useChartExport failure messages', () => {
     },
   );
 
+  it.each([false, true])(
+    'exports the whole plot with scrolling=%s without moving the live chart',
+    async (scrolling) => {
+      const plot =
+        '<div class="flex"><div class="relative"><div class="relative"><svg data-testid="d3-chart-svg"><text>First bar</text><text>Last bar</text></svg></div></div></div>';
+      chart.innerHTML = `<figcaption>Power comparison</figcaption>${scrolling ? `<div data-chart-scroll style="overflow-x: auto">${plot}</div>` : plot}`;
+      const liveScroller = chart.querySelector<HTMLElement>('[data-chart-scroll]');
+      if (liveScroller) liveScroller.scrollLeft = 250;
+      const original = chart.innerHTML;
+      let snapshot: HTMLElement;
+      exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+        snapshot = element.cloneNode(true) as HTMLElement;
+        throw new Error('stop after capture');
+      });
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await act(() => current.exportToImage());
+      expect(exportMocks.toPng).toHaveBeenCalledOnce();
+      expect(snapshot!.textContent).toContain('Power comparison');
+      expect(snapshot!.textContent).toContain('First bar');
+      expect(snapshot!.textContent).toContain('Last bar');
+      const exportedScroller = snapshot!.querySelector<HTMLElement>('[data-chart-scroll]');
+      if (scrolling) {
+        expect(exportedScroller?.style.overflow).toBe('visible');
+        expect(exportedScroller?.scrollLeft).toBe(0);
+      } else expect(exportedScroller).toBeNull();
+      expect(chart.innerHTML).toBe(original);
+      if (liveScroller) expect(liveScroller.scrollLeft).toBe(250);
+    },
+  );
+
+  it('exports the option each dropdown shows, not its first option', async () => {
+    chart.innerHTML = `
+      <select data-testid="power-timeline-concurrency">
+        <option value="">All</option>
+        <option value="4">c4</option>
+        <option value="8">c8</option>
+      </select>`;
+    const live = chart.querySelector('select')!;
+    live.value = '4';
+    let exportedValue: string | undefined;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      exportedValue = element.querySelector('select')?.value;
+      throw new Error('stop after capture');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(exportedValue).toBe('4');
+    expect(live.value).toBe('4');
+  });
+
   it('includes the legend again after line labels are toggled off', async () => {
     chart.innerHTML =
       '<div data-slot="chart-legend-wrapper"><div class="legend-container">B200</div></div>';
@@ -153,19 +205,7 @@ describe('useChartExport failure messages', () => {
 });
 
 describe('getExportFontFamily', () => {
-  it('uses Minecraft font stack when minecraft theme is active', () => {
-    document.documentElement.classList.add('minecraft');
-
-    expect(getExportFontFamily()).toContain('var(--font-minecraft)');
-    expect(getExportFontFamily()).toContain('"Monocraft"');
-
-    document.documentElement.classList.remove('minecraft');
-  });
-
-  it('uses default sans stack when minecraft theme is inactive', () => {
-    document.documentElement.classList.remove('minecraft');
-    document.body.classList.remove('minecraft');
-
+  it('uses the default sans stack for standard pages', () => {
     expect(getExportFontFamily()).toContain('var(--font-dm-sans)');
     expect(getExportFontFamily()).toContain('"Segoe UI"');
   });

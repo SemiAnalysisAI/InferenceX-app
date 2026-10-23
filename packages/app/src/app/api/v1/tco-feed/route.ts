@@ -5,8 +5,8 @@ import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getLatestBenchmarks } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { cachedJson, cachedQuery, cachedText } from '@/lib/api-cache';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery, cachedText } from '@/lib/cache/api-cache';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 import {
   computeTcoFeed,
@@ -21,7 +21,7 @@ import {
   type TcoFeedRow,
   type TcoFeedSourceRow,
   type TcoFeedWorkload,
-} from '@/lib/tco-feed';
+} from '@/lib/calculator/tco-feed';
 
 export const dynamic = 'force-dynamic';
 

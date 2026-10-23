@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 
 import { AgentXMethodology } from '@/components/datasets/agentx-methodology';
 import { DatasetList } from '@/components/datasets/dataset-list';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =

@@ -4,45 +4,46 @@ import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { canonicalCompareSlug, compareModelSeoName, parseCompareSlug } from '@/lib/compare-slug';
-import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-scenario-route';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import {
+  canonicalCompareSlug,
+  compareModelSeoName,
+  parseCompareSlug,
+} from '@/lib/compare/compare-slug';
+import {
+  KNOWN_MODELS,
+  KNOWN_PRECISIONS,
+  KNOWN_SEQUENCES,
+  pickString,
+} from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
-} from '@/lib/compare-page-data.server';
+} from '@/lib/compare/compare-page-data.server';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
   buildJsonLdZh,
   compareMetaDescriptionZh,
   compareTableNarrativeZh,
-} from '@/lib/compare-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-ssr-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/zh/compare/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
 
-/** English twin of `scenarioPath` — hreflang pairs are keyed off the
- *  English route, so the segment has to survive the locale swap. */
 function enScenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): string {
   return scenarioSegment ? `/compare/${canonical}/${scenarioSegment}` : `/compare/${canonical}`;
 }
@@ -79,19 +80,11 @@ export async function buildCompareMetadataZh(
   const fullLabel = `${parsed.model.label} — ${gpuLabel}`;
   const modelSeoName = compareModelSeoName(parsed.model);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
 
-  // GPU-pair-first title (mirrors the English page) via `absolute` so the long
-  // root template doesn't bury the search phrase. Model name / SKUs stay English.
   const title = `${gpuLabel}：${modelSeoName} 推理基准测试 | ${SITE_NAME}`;
 
-  // Stat-led Chinese meta description from the interpolated head-to-head numbers
-  // at the slug's default operating point (falls back to boilerplate when thin).
   const { ssrRows } = await getComparePageDerivedData(
     parsed.model.dbKeys,
     parsed.a,
@@ -144,15 +137,9 @@ export function renderComparePageZh(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
-  // In-page Suspense, NOT loading.tsx: a route-level loading boundary would
-  // stream a 200 shell before the notFound()/permanentRedirect() above run,
-  // degrading real 404/308 responses to soft client-side handling. See the
-  // English page for the full rationale.
   return (
     <Suspense fallback={<CompareDetailRouteSkeleton />}>
       <CompareDetailZh
@@ -183,8 +170,6 @@ async function CompareDetailZh({
   const urlModel = pickString(sp.g_model);
   const effectiveModel =
     urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
-  // Path beats query beats the pair's default: a scenario segment is an
-  // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
   const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
   const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;

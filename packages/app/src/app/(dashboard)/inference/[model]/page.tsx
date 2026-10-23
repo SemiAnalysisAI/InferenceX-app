@@ -5,24 +5,13 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
-import { enAlternates } from '@/lib/i18n';
-import { inferenceModelMeta } from '@/lib/inference-model-meta';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
 import {
   getInferenceModelBySlug,
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
-} from '@/lib/inference-model-slug';
-
-/**
- * `/inference/<model>` — an indexable path form of `/inference?g_model=<model>`.
- *
- * The query form stays supported for share links, but this page gives every
- * model its own crawlable URL with model-specific metadata, a self-canonical,
- * and a `/zh` hreflang sibling. The chart body is identical to `/inference`;
- * the model is pinned from the pathname by the dashboard shell
- * (`GlobalFilterProvider` seeding via `inferenceModelForPathname`), and an
- * explicit `?g_model=` param still wins over the path pin.
- */
+} from '@/lib/routing/inference-model-slug';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -61,9 +50,6 @@ export default async function InferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Known aliases are canonicalized in next.config.ts before this SSG route
-  // renders. Keeping redirects out of the page avoids a production-only
-  // DYNAMIC_SERVER_USAGE failure when an on-demand alias reads searchParams.
   return (
     <InferenceProvider activeTab="inference">
       <InferenceChartDisplay />

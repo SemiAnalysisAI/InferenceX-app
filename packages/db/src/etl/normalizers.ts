@@ -1,53 +1,25 @@
-/**
- * Pure normalizer functions and lookup tables shared across all ingest scripts.
- * No DB access, no state — safe to import anywhere.
- */
-
 import {
   DB_MODEL_TO_DISPLAY,
   FRAMEWORK_ALIASES,
   GPU_KEYS,
+  GPU_RUNNER_ALIASES,
 } from '@semianalysisai/inferencex-constants';
 
 export { GPU_KEYS };
 
-/**
- * Strip everything from the first `-` onwards (and any trailing `_<digits>`
- * runner-index suffix) from a raw hardware identifier and return the canonical
- * lowercase GPU key. All keys in `GPU_KEYS` are single-segment, so this is
- * sufficient; unknown bases return `null`.
- *
- * @param hw - Raw hardware string from the benchmark artifact (e.g. `"h200-nv"`, `"mi355x-amds"`).
- * @returns The canonical GPU key (e.g. `"h200"`, `"mi355x"`), or `null` if the
- *   stripped base is not in `GPU_KEYS`.
- */
 export function hwToGpuKey(hw: string): string | null {
-  // v3 agentic artifacts scope the hw id (`cluster:b300-nv`) — drop everything
-  // up to the last `:` first. Then take the first segment before `-` as the
-  // canonical key; that subsumes all the prior explicit suffix strips
-  // (-nv, -amds, -dgxc-slurm, -p1, -cw, …).
-  const base = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
+  const base = GPU_RUNNER_ALIASES[raw] ?? raw;
   return GPU_KEYS.has(base) ? base : null;
 }
 
-/**
- * DB model keys derived from `DB_MODEL_TO_DISPLAY` — the single source of truth.
- * A prefix resolves automatically if it matches a DB key after stripping precision
- * suffixes (e.g. `-fp8`, `-fp4`). Only non-obvious aliases need explicit entries
- * in `PREFIX_ALIASES`.
- */
 const DB_MODEL_KEYS = new Set(Object.keys(DB_MODEL_TO_DISPLAY));
 
-/** Precision suffixes that can appear on `infmax_model_prefix` values. */
 const PRECISION_SUFFIX = /-(?:fp4|fp8|mxfp4|nvfp4)(?:-.*)?$/iu;
 
-/** Explicit aliases for prefixes that don't match any DB key after suffix stripping. */
 const PREFIX_ALIASES: Record<string, string> = {
   gptoss: 'gptoss120b',
   dsv4pro: 'dsv4',
-  // AMD AgentX sweeps emit the bare prefix `kimik2.7` instead of the canonical
-  // `kimik2.7-code` DB key; alias it so those rows resolve (and precision-suffixed
-  // forms like `kimik2.7-fp4` fold in via PRECISION_SUFFIX stripping too).
   'kimik2.7': 'kimik2.7-code',
 };
 
@@ -60,12 +32,7 @@ function resolvePrefixToKey(prefix: string): string | null {
   return PREFIX_ALIASES[stripped] ?? null;
 }
 
-/**
- * Full model path/name → DB model key. Covers all variants seen across the
- * backup history (HuggingFace paths, local mounts, shorthand names, etc.).
- */
 export const MODEL_TO_KEY: Record<string, string> = {
-  // DeepSeek-R1
   'nvidia/DeepSeek-R1-0528-FP4-V2': 'dsr1',
   'nvidia/DeepSeek-R1-0528-FP4-v2': 'dsr1',
   'nvidia/DeepSeek-R1-0528-FP4': 'dsr1',
@@ -83,65 +50,36 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'dsr1-0528-fp8': 'dsr1',
   'dsr1-0528-nvfp4-v2': 'dsr1',
   'dsr1-fp8': 'dsr1',
-  // GPT-OSS-120B
   'openai/gpt-oss-120b': 'gptoss120b',
   '/mnt/lustre01/models/gpt-oss-120b': 'gptoss120b',
-  // Llama-3.3-70B
   'nvidia/Llama-3.3-70B-Instruct-FP8': 'llama70b',
   'nvidia/Llama-3.3-70B-Instruct-FP4': 'llama70b',
   'amd/Llama-3.3-70B-Instruct-FP8-KV': 'llama70b',
   'amd/Llama-3.3-70B-Instruct-MXFP4-Preview': 'llama70b',
-  // Qwen3.5
   'Qwen/Qwen3.5-397B-A17B': 'qwen3.5',
   'Qwen/Qwen3.5-397B-A17B-FP8': 'qwen3.5',
-  // Qwen3.8-Flash-Next (Qwen4 architecture preview — distinct bucket from 3.5).
-  // Hopper has no NVFP4 path, so H200 serves the FP8 checkpoint while Blackwell
-  // serves NVFP4. Both paths are taken from executed sweeps rather than inferred:
-  // FP8 from run 33038487711 (H200, PR #2753), NVFP4 from run 33039186365
-  // (B300, PR #2752). Both report `infmax_model_prefix: qwen3.8next`, so no
-  // PREFIX_ALIASES entry is needed.
   'Qwen/Qwen3.8-Flash-Next-FP8': 'qwen3.8next',
   'RadixArk/Qwen3.8-Flash-Next-NVFP4': 'qwen3.8next',
-  // Qwen3.8-27B (dense 27B, bf16). Both recipes serve this checkpoint and report
-  // `infmax_model_prefix` equal to their DB key (`qwen3.827b`, or `qwen3.827beager`
-  // for the --enforce-eager variant), so the prefix resolves first and this path
-  // entry only backs rows that lack the prefix. Seen in run 35362390175
-  // (H200, InferenceX#3263) and run 35359530151 (H100, InferenceX#3260).
   'Qwen/Qwen3.8-27B': 'qwen3.827b',
-  // Kimi-K2.5 / K2.6 / K2.7-Code (same architecture, distinct DB buckets)
   'moonshotai/Kimi-K2.5': 'kimik2.5',
   'moonshotai/Kimi-K2.6': 'kimik2.6',
   'moonshotai/Kimi-K2.7-Code': 'kimik2.7-code',
   'amd/Kimi-K2.7-Code-MXFP4': 'kimik2.7-code',
-  // Kimi-K3 (2.8T KDA/MLA hybrid — distinct architecture from the K2 series)
   'moonshotai/Kimi-K3': 'kimik3',
-  // MiniMax-M2.5
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
-  // MiniMax-M3 (428B, distinct architecture from the M2 series)
   'MiniMaxAI/MiniMax-M3': 'minimaxm3',
-  // GLM-5
+  'MiniMaxAI/MiniMax-M3.1-Flash': 'minimaxm31flash',
   'zai-org/GLM-5-FP8': 'glm5',
   'amd/GLM-5.1-MXFP4': 'glm5.1',
   'zai-org/GLM-5.2-FP8': 'glm5.2',
   'zai-org/GLM-5.3': 'glm5.3',
-  // DeepSeek-V4-Pro
   'deepseek-ai/DeepSeek-V4-Pro': 'dsv4',
-  // DeepSeek-V4.1-Flash
   'deepseek-ai/DeepSeek-V4.1-Flash': 'dsv41flash',
+  'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4': 'musespark',
+  'meta-models/Muse-Spark-Open-816B-A42B-NVFP4': 'musespark',
 };
 
-/**
- * Resolve a DB model key from a raw benchmark row.
- * Prefers `infmax_model_prefix` (canonical, present 2025-12-08+) over the
- * full `model` path, which may be a HuggingFace path, local mount, or shorthand.
- *
- * @param row - Raw benchmark dict from the artifact JSON.
- * @returns The canonical DB model key (e.g. `"dsr1"`, `"llama70b"`), or `null`
- *   if neither field can be resolved.
- */
 export function resolveModelKey(row: Record<string, any>): string | null {
-  // infmax_model_prefix is the canonical source when present;
-  // eval artifacts use model_prefix instead.
   const prefix = row.infmax_model_prefix ?? row.model_prefix;
   if (prefix) {
     const k = resolvePrefixToKey(String(prefix));
@@ -150,21 +88,6 @@ export function resolveModelKey(row: Record<string, any>): string | null {
   return row.model ? (MODEL_TO_KEY[String(row.model)] ?? null) : null;
 }
 
-/**
- * Normalize a raw framework string and derive the disaggregated-inference flag.
- * Handles special cases: `sglang-disagg` is normalized to `mori-sglang` + `disagg=true`;
- * `dynamo-trtllm` is renamed to `dynamo-trt`.
- *
- * An explicit `disagg` value from the artifact is authoritative for Dynamo:
- * Dynamo can orchestrate a non-disaggregated server. Legacy Dynamo artifacts
- * that omit the field still fall back to `disagg=true`, preserving their
- * historical classification. Canonical `mori-*` frameworks and aliases that
- * explicitly declare `disagg: true` remain intrinsically disaggregated.
- *
- * @param fw - Raw framework value from the artifact (e.g. `"sglang"`, `"sglang-disagg"` → `"mori-sglang"`).
- * @param disaggField - Raw disagg field from the artifact (boolean or string true/false).
- * @returns An object with the canonical `framework` string and the `disagg` boolean flag.
- */
 export function normalizeFramework(
   fw: string,
   disaggField: unknown,
@@ -175,81 +98,42 @@ export function normalizeFramework(
   const explicitDisagg = parseOptionalBool(disaggField);
   const disagg =
     alias?.disagg ??
-    (canonical.startsWith('mori-') ? true : (explicitDisagg ?? canonical.startsWith('dynamo-')));
+    explicitDisagg ??
+    (canonical.startsWith('mori-') || canonical.startsWith('dynamo-'));
   return { framework: canonical, disagg };
 }
 
-/** Vendor-specific precision aliases → canonical DB key. */
 const PRECISION_ALIASES: Record<string, string> = {
   nvfp4: 'fp4',
   mxfp4: 'fp4',
 };
 
-/**
- * Normalize a precision string to a canonical lowercase key.
- * Vendor-specific formats (e.g. `nvfp4`, `mxfp4`) are mapped to their canonical form.
- */
 export function normalizePrecision(raw: string): string {
   const lower = raw.toLowerCase();
   return PRECISION_ALIASES[lower] ?? lower;
 }
 
-/**
- * Normalize a speculative decoding method to a lowercase string.
- * Absent, empty, or null values are canonicalized to `'none'`.
- *
- * @param spec - Raw `spec_decoding` value from the artifact.
- * @returns Lowercase method name, or `'none'` if absent/empty.
- */
 export function normalizeSpecMethod(spec: unknown): string {
   if (!spec || spec === '') return 'none';
   return String(spec).toLowerCase();
 }
 
-/**
- * Parse an explicitly provided, loosely typed boolean.
- * Accepts JS booleans and lowercase/Python-style string booleans.
- *
- * @param v - Value to parse.
- * @returns The parsed boolean, or `undefined` when the value is absent or unrecognized.
- */
 export function parseOptionalBool(v: unknown): boolean | undefined {
   if (v === true || v === 'true' || v === 'True') return true;
   if (v === false || v === 'false' || v === 'False') return false;
   return undefined;
 }
 
-/**
- * Coerce a loosely-typed value to a boolean.
- * Accepts JS `true`, the string `'true'`, and the Python-style string `'True'`.
- *
- * @param v - Value to coerce (any type).
- * @returns `true` if the value is one of the recognized truthy forms, `false` otherwise.
- */
 export function parseBool(v: unknown): boolean {
   return parseOptionalBool(v) ?? false;
 }
 
-/**
- * Parse a floating-point number from a loosely-typed value.
- * Handles both numeric and string representations.
- *
- * @param v - Value to parse (number, string, null, or undefined).
- * @returns The parsed number, or `undefined` if the input is null/undefined/NaN.
- */
 export function parseNum(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
   const n = typeof v === 'string' ? parseFloat(v) : Number(v);
   return isNaN(n) ? undefined : n;
 }
 
-/**
- * Parse an integer from a loosely-typed value.
- * Strings are parsed with base 10; non-integer numbers are rounded.
- *
- * @param v - Value to parse (number, string, null, or undefined).
- * @returns The parsed integer, or `undefined` if the input is null/undefined/NaN.
- */
 export function parseInt2(v: unknown): number | undefined {
   if (v === null || v === undefined) return undefined;
   const n = typeof v === 'string' ? parseInt(v, 10) : Math.round(Number(v));
@@ -258,17 +142,6 @@ export function parseInt2(v: unknown): number | undefined {
 
 const ISL_OSL_PATTERN = /[_-](?<isl>\d+)k(?<osl>\d+)k[_\-.]/iu;
 
-/**
- * Extract ISL (input sequence length) and OSL (output sequence length) in tokens
- * from a file/directory name that encodes them as `{n}k{m}k`.
- *
- * @example
- * parseIslOsl('Full_Sweep_-_1k1k_12345')            // { isl: 1024, osl: 1024 }
- * parseIslOsl('results_dsr1_1k8k_4305020262.zip')   // { isl: 1024, osl: 8192 }
- *
- * @param name - File or directory name containing the encoded sequence lengths.
- * @returns An object with `isl` and `osl` in tokens, or `null` if no match is found.
- */
 export function parseIslOsl(name: string): { isl: number; osl: number } | null {
   const m = name.match(ISL_OSL_PATTERN);
   if (!m) return null;

@@ -5,12 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
-import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
-import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
+import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { formatEvaluationDate } from './BarChartD3';
 
@@ -87,8 +87,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
 
   const openDrawer = (row: EvaluationChartData) => {
     setDrawerRow(row);
-    // Notify the first-visit nudge to dismiss itself once the user has
-    // discovered the affordance on their own.
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
     }
@@ -130,8 +128,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       {
         header: '',
         cell: (row) => {
-          // Official rows have a real eval_results.id; unofficial rows ship -1 but can
-          // still be served live as long as we have a workflow URL to fetch the artifact from.
           const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
           return canOpen ? (
             <button
@@ -153,9 +149,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.chip,
         cell: (row) => {
           const isUnofficial = row.evalResultId <= 0;
-          // Inset a per-run colored dot — same palette the unofficial banner and
-          // overlay chart points use, so a row, its banner chip, and its bar in
-          // the bar chart all share the same color.
           const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
           return (
             <span className="inline-flex items-center gap-1.5">

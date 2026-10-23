@@ -1,16 +1,17 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
+const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX } = vi.hoisted(() => ({
   mockPurgeAll: vi.fn(),
   mockPurgeCollectiveX: vi.fn(),
+  mockPurgeOperatorX: vi.fn(),
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,
   purgeCollectiveX: mockPurgeCollectiveX,
-  purgeOperatorX: vi.fn(),
+  purgeOperatorX: mockPurgeOperatorX,
 }));
 
 import { POST } from './route';
@@ -67,11 +68,24 @@ describe('POST /api/v1/invalidate', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when INVALIDATE_SECRET is not set', async () => {
+  it('returns 500 when INVALIDATE_SECRET is not set', async () => {
     delete process.env.INVALIDATE_SECRET;
 
     const res = await POST(postReq({ Authorization: 'Bearer anything' }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('INVALIDATE_SECRET is not set');
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('allows the protected staging request when INVALIDATE_SECRET is not set', async () => {
+    delete process.env.INVALIDATE_SECRET;
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'staging';
+    mockPurgeAll.mockResolvedValueOnce(1);
+
+    const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
+    expect(res.status).toBe(200);
+    expect(mockPurgeAll).toHaveBeenCalledOnce();
   });
 
   it('returns 401 for length mismatch (timing-safe)', async () => {
@@ -138,6 +152,25 @@ describe('POST /api/v1/invalidate', () => {
     const body = await res.json();
     expect(body).toEqual({ invalidated: true, scope: 'collectivex' });
     expect(mockPurgeCollectiveX).toHaveBeenCalledOnce();
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('waits for the OperatorX shared cache purge before reporting success', async () => {
+    const purge = Promise.withResolvers<void>();
+    mockPurgeOperatorX.mockReturnValueOnce(purge.promise);
+    let completed = false;
+    const pending = POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx'),
+    ).then((response) => {
+      completed = true;
+      return response;
+    });
+    await Promise.resolve();
+    expect(mockPurgeOperatorX).toHaveBeenCalledOnce();
+    expect(completed).toBe(false);
+    purge.resolve();
+    const response = await pending;
+    expect(await response.json()).toEqual({ invalidated: true, scope: 'operatorx' });
     expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 

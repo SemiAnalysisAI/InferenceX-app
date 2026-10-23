@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Heading } from '@/components/ui/heading';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 type HeadingTag = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
 
@@ -14,11 +14,6 @@ interface DashboardSectionHeaderProps {
   descriptionClassName?: string;
 }
 
-/**
- * Shared title row for dashboard sections. Keeping the action in a shrinkable
- * sibling makes chart controls and share actions align consistently without
- * changing the section's heading semantics or copy.
- */
 export function DashboardSectionHeader({
   title,
   description,

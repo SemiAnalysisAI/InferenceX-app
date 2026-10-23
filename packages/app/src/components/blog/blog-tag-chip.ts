@@ -1,6 +1,5 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
-/** Shared chip recipe for tag links and the "More tags" disclosure summary. */
 export const TAG_CHIP_CLASS =
   'inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors';
 

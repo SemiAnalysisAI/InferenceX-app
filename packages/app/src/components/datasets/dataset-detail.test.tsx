@@ -63,8 +63,8 @@ vi.mock('@/components/ui/select', () => ({
   SelectValue: () => null,
 }));
 vi.mock('@/components/datasets/distribution-card', () => ({ DistributionCard: () => null }));
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => testState.locale }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => testState.locale }));
 vi.mock('@/hooks/api/use-datasets', () => ({
   useDataset: () => testState.dataset,
   useDatasetConversations: (args: (typeof conversationQueries)[number]) => {
@@ -74,7 +74,7 @@ vi.mock('@/hooks/api/use-datasets', () => ({
 }));
 
 import { DatasetDetail } from './dataset-detail';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 function changeInput(input: HTMLInputElement, value: string): void {
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);

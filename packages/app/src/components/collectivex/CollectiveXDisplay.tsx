@@ -3,6 +3,8 @@
 import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
+
 import { Button } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
@@ -23,8 +25,8 @@ import {
   useDeleteCollectiveXRun,
 } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';
@@ -254,8 +256,6 @@ const CONCLUSION_CLASSES: Record<string, string> = {
 };
 const CONCLUSION_FALLBACK_CLASS =
   'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
-// Remembered admin bearer token for run deletion; cleared on a 401 so a
-// rotated secret re-prompts instead of failing silently forever.
 const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 
 function ControlGroup({
@@ -347,11 +347,7 @@ export default function CollectiveXDisplay() {
   const [epSize, setEpSize] = useState(8);
   const [operation, setOperation] = useState<CollectiveXOperation>('roundtrip');
   const [phase, setPhase] = useState<CollectiveXPhase>('decode');
-  // Compare throughput-oriented and low-latency kernels by default. The
-  // availability effect below falls back when a slice has neither preference.
   const [modes, setModes] = useState<CollectiveXMode[]>(['normal', 'low-latency']);
-  // Prefer FP8 when the run measured it; the availability effect below falls
-  // back to bf16 for runs (or EP/phase slices) without FP8 series.
   const [precision, setPrecision] = useState<CollectiveXPrecision>('fp8');
   const [percentile, setPercentile] = useState<CollectiveXPercentile>('p99');
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
@@ -370,8 +366,6 @@ export default function CollectiveXDisplay() {
     label: collectiveXVersionLabel(value),
   }));
 
-  // Runs are per-version. Start each version on its newest run with measured
-  // data so an incomplete newest sweep cannot blank the explorer.
   useEffect(() => {
     initializedVersionRef.current = null;
     setVisibleRunIds(new Set());
@@ -386,8 +380,6 @@ export default function CollectiveXDisplay() {
     initializedVersionRef.current = version;
   }, [runsQuery.data, version]);
 
-  // A deleted run disappears from both the table and the checked set after the
-  // list refetch. Preserve deliberate "none checked" state.
   useEffect(() => {
     if (!runsQuery.data || initializedVersionRef.current !== version) return;
     const liveIds = new Set(runsQuery.data.runs.map((run) => run.run_id));
@@ -457,11 +449,6 @@ export default function CollectiveXDisplay() {
     if (availablePhases.length > 0 && !availablePhases.includes(phase)) {
       setPhase(availablePhases[0]);
     }
-    // Keep the user's full multi-mode preference while availability cascades
-    // through EP/phase changes. In particular, an intermediate empty slice
-    // must not erase both selections; modes that become available again should
-    // still be selected. Fall back only when a settled, non-empty slice has no
-    // overlap with the preference at all.
     if (availableModes.length > 0 && !modes.some((mode) => availableModes.includes(mode))) {
       setModes([availableModes[0]]);
     }
@@ -482,8 +469,6 @@ export default function CollectiveXDisplay() {
     () => ({ epSize, phase, modes, precision }),
     [epSize, modes, phase, precision],
   );
-  // SKU and EP determine topology; V1 fixes routing. EP, phase, kernel mode,
-  // and precision are needed before the library/SKU comparison filters.
   const matchedSeries = useMemo(
     () => combinedSeries.filter((item) => seriesMatchesSelection(item, seriesSelection)),
     [combinedSeries, seriesSelection],
@@ -575,11 +560,13 @@ export default function CollectiveXDisplay() {
     const runId = deleteRun.isPending ? deleteRun.variables?.runId : undefined;
     return new Set(runId ? [runId] : []);
   }, [bulkDeletingRunIds, deleteRun.isPending, deleteRun.variables?.runId]);
-  const handleVisibleRunChange = useCallback((runId: string, visible: boolean) => {
+  const handleVisibleRunChange = useCallback((runIds: string[], visible: boolean) => {
     setVisibleRunIds((previous) => {
       const next = new Set(previous);
-      if (visible) next.add(runId);
-      else next.delete(runId);
+      for (const runId of runIds) {
+        if (visible) next.add(runId);
+        else next.delete(runId);
+      }
       return next;
     });
   }, []);
@@ -697,6 +684,7 @@ export default function CollectiveXDisplay() {
     );
   }
   const singleDataset = datasets.length === 1 ? datasets[0] : null;
+  const sourceRepository = singleDataset?.run.source_repository ?? GITHUB_REPO_FULL;
   const measuredCases = datasets.reduce((sum, dataset) => sum + dataset.run.measured_cases, 0);
   const requestedCases = datasets.reduce((sum, dataset) => sum + dataset.run.requested_cases, 0);
   const terminalCases = datasets.reduce((sum, dataset) => sum + dataset.run.terminal_cases, 0);
@@ -744,7 +732,7 @@ export default function CollectiveXDisplay() {
               <>
                 <a
                   data-testid="collectivex-source-link"
-                  href={`https://github.com/SemiAnalysisAI/InferenceX/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
+                  href={`https://github.com/${sourceRepository}/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -758,7 +746,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/SemiAnalysisAI/InferenceX/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -1081,9 +1069,6 @@ export default function CollectiveXDisplay() {
           )}
         </>
       )}
-      {/* The curated support picture is run-independent, so it renders even
-          with nothing checked, and last: it is reference material, not data
-          from the selection above. */}
       <CollectiveXSupportMatrices />
     </section>
   );
@@ -1123,8 +1108,6 @@ function SelectControl<T extends string | number>({
   placeholder?: string;
   className?: string;
 }) {
-  // Radix Select speaks strings; numeric option values (e.g. the release version)
-  // round-trip through String() and are recovered from the option list on change.
   return (
     <div className={className}>
       <ControlGroup label={label} htmlFor={testId}>

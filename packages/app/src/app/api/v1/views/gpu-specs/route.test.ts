@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
 }));
 
-import { GPU_CHART_METRICS, GPU_SPECS, parseNumericFromString } from '@/lib/gpu-specs';
+import { GPU_CHART_METRICS, GPU_SPECS, parseNumericFromString } from '@/lib/catalog/gpu-specs';
 
 import { GET } from './route';
 
@@ -45,7 +45,6 @@ describe('GET /api/v1/views/gpu-specs', () => {
       scaleUpBandwidthGBs: 450,
       scaleUpWorldSize: 8,
     });
-    // Derived domain metrics: usable memory × world size.
     expect(h100.domainMemoryTB).toBeCloseTo(0.64, 10);
     expect(h100.domainMemoryBandwidthTBs).toBeCloseTo(26.8, 10);
   });

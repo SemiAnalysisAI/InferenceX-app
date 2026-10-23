@@ -6,11 +6,11 @@ import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
-import type { BenchmarkRow } from '@/lib/api';
-import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/constants';
-import { type Sequence, Percentile, type Model } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
+import { type Sequence, Percentile, type Model } from '@/lib/catalog/data-mappings';
 
-import { overlayRunIndex } from '@/lib/overlay-run-style';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 
 import {
   getCostField,
@@ -24,8 +24,8 @@ import {
   sign,
 } from './interpolation';
 import type { CostProvider, CostType, GPUDataPoint, InterpolatedResult } from './types';
+import { interpolateProfitForGPU, type ProfitPowerBasis } from './profit-power';
 
-// Re-export pure functions so existing imports from this module keep working.
 export {
   getCostField,
   hermiteInterpolate,
@@ -41,15 +41,8 @@ export {
 import { buildGpuGroups, type GroupMeta, type OverlayGroupMeta } from './throughput-data';
 export { buildGpuGroups, type GroupMeta, type OverlayGroupMeta } from './throughput-data';
 
-/**
- * Optional unofficial-run overlay inputs. When a run is loaded via
- * `?unofficialrun=…`, its raw rows are interpolated into a *separate* set of
- * results so official bars keep their own Pareto frontier untouched.
- */
 export interface OverlayInput {
-  /** Raw rows from the unofficial-run API — every model, unfiltered. */
   rows: BenchmarkRow[] | null;
-  /** `run.url`/id → position in the loaded set, from the provider. */
   runIndexByUrl: Record<string, number>;
 }
 
@@ -73,7 +66,6 @@ export function useThroughputData(
         : undefined,
     [initialRows],
   );
-  // Reuse the same API + React Query cache as the inference charts
   const {
     data: allRows,
     isLoading: queryLoading,
@@ -91,15 +83,12 @@ export function useThroughputData(
           sequence: selectedSequence,
           ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
         },
-    // A calculator projection cannot seed the raw-power query cache.
     includePower ? undefined : initialRows,
   );
 
   const loading = queryLoading || !allRows;
   const error = queryError ? queryError.message : null;
 
-  // Build GPUDataPoints directly from raw rows, skipping transformBenchmarkRows.
-  // This avoids the expensive roofline/chart-data pipeline that isn't needed for interpolation.
   const overlayRows = overlay?.rows ?? null;
   const runIndexByUrl = overlay?.runIndexByUrl;
 
@@ -140,8 +129,6 @@ export function useThroughputData(
       }),
     });
 
-    // Overlay rows arrive unfiltered by model (the official path gets model
-    // filtering server-side from /api/v1/benchmarks), so scope them here.
     const overlayForModel = (overlayRows ?? []).filter(
       (row) => (DB_MODEL_TO_DISPLAY[row.model] ?? row.model) === selectedModel,
     );
@@ -157,8 +144,6 @@ export function useThroughputData(
       },
     });
 
-    // Sort hardware config. Overlay-only hardware is merged in so its bars and
-    // legend entries can resolve a display label.
     const mergedConfig = { ...overlayGroups.hwConfigMap, ...official.hwConfigMap };
     const sortedKeys = Object.keys(mergedConfig).toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
@@ -189,13 +174,9 @@ export function useThroughputData(
     runIndexByUrl,
   ]);
 
-  // All available GPU hardware keys from data, ordered by hardwareConfig (HARDWARE_CONFIG order)
-  // This returns unique GPU-level hwKeys (not composite keys) for the legend
   const orderHwKeys = useCallback(
     (dataHwKeys: Set<string>) => {
-      // Use hardwareConfig key order (already sorted by HARDWARE_CONFIG), then append any extras
       const ordered = Object.keys(hardwareConfig).filter((k) => dataHwKeys.has(k));
-      // Add any keys in data but not in hardwareConfig at the end
       for (const k of dataHwKeys) {
         if (!hardwareConfig[k]) ordered.push(k);
       }
@@ -209,15 +190,11 @@ export function useThroughputData(
     [gpuGroupMeta, orderHwKeys],
   );
 
-  /** Hardware present in the loaded unofficial run(s) for the current selection. */
   const overlayAvailableHwKeys = useMemo(
     () => orderHwKeys(new Set(Object.values(overlayGroupMeta).map((meta) => meta.hwKey))),
     [overlayGroupMeta, orderHwKeys],
   );
 
-  // Compute global ranges from GPUDataPoints. Overlay points are included so
-  // the target-interactivity slider can reach operating points that only an
-  // unofficial run covers.
   const ranges = useMemo(() => {
     const allPoints = [
       ...Object.values(gpuDataByGroupKey).flat(),
@@ -253,7 +230,6 @@ export function useThroughputData(
     };
   }, [gpuDataByGroupKey, overlayGpuDataByGroupKey]);
 
-  // Interpolate results for all GPUs at a given target value
   const getResults = useCallback(
     (
       targetValue: number,
@@ -261,27 +237,26 @@ export function useThroughputData(
       costProvider: CostProvider,
       visibleHwKeys?: Set<string>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
       for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
         const { hwKey, precision } = gpuGroupMeta[groupKey] ?? { hwKey: groupKey };
 
-        // Skip GPUs that are not visible (legend filters by hwKey)
         if (visibleHwKeys && !visibleHwKeys.has(hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,
-            hwKey, // always the base hwKey for color/config lookup
-            resultKey: groupKey, // unique key (hwKey or hwKey__precision)
-            precision, // precision label when multi-precision
+            hwKey,
+            resultKey: groupKey,
+            precision,
           });
         }
       }
 
-      // Sort by value descending (highest throughput or interactivity first)
       results.sort((a, b) => b.value - a.value);
 
       return results;
@@ -289,14 +264,6 @@ export function useThroughputData(
     [gpuDataByGroupKey, gpuGroupMeta],
   );
 
-  /**
-   * Interpolate the unofficial-run overlay groups at the same target value.
-   * Kept separate from `getResults` so official bars keep their own Pareto
-   * frontier — overlay points never enter the official interpolation.
-   *
-   * `visibleHwKeys` is the same legend selection `getResults` is filtered by,
-   * so one legend entry governs a GPU's official and overlay bars together.
-   */
   const getOverlayResults = useCallback(
     (
       targetValue: number,
@@ -305,6 +272,7 @@ export function useThroughputData(
       visibleHwKeys?: Set<string>,
       runInfoByIndex?: Record<number, { branch: string; url: string }>,
       hideSkuAboveConfigLimit = false,
+      powerBasis: ProfitPowerBasis = 'provisioned',
     ): InterpolatedResult[] => {
       const results: InterpolatedResult[] = [];
 
@@ -313,7 +281,7 @@ export function useThroughputData(
         if (!meta) continue;
         if (visibleHwKeys && !visibleHwKeys.has(meta.hwKey)) continue;
 
-        const result = interpolateForGPU(points, targetValue, mode, costProvider);
+        const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
         if (result && result.value > 0 && !(hideSkuAboveConfigLimit && result.clampedAbove)) {
           results.push({
             ...result,

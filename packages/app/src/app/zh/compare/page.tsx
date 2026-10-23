@@ -6,17 +6,21 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
-import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor } from '@/lib/compare-ssr';
-import { formatModelListZh } from '@/lib/compare-ssr-zh';
-import { type Model } from '@/lib/data-mappings';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
+import {
+  type ComparePair,
+  COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare/compare-slug';
+import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
+import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
+import { type Model } from '@/lib/catalog/data-mappings';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,7 +95,6 @@ export default function CompareIndexPageZh() {
     <>
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="zh" />
-      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
       <Suspense fallback={<CompareRouteSkeleton />}>
         <CompareCatalogZh />
       </Suspense>
@@ -165,10 +168,6 @@ async function CompareCatalogZh() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                {/* `displayName` 按约定即 Model 枚举值（见 compare-slug.ts 中的
-                    CompareModelSlug），因此共享的 ModelLogo 可从 MODEL_CONFIG
-                    解析各区块的品牌标识（DeepSeek、MiniMax、Kimi 等）；没有
-                    配置 logo 的模型则不渲染任何内容。 */}
                 <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
                   <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
                   {model.label}

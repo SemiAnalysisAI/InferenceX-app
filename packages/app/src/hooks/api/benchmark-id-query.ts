@@ -1,21 +1,8 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-/**
- * Shared React Query plumbing for the agentic endpoints keyed by
- * `benchmark_results.id` (`/api/v1/<endpoint>?ids=…` bulk maps and
- * `/api/v1/<endpoint>?id=N` single lookups).
- *
- * Conventions kept identical across all of these hooks:
- *  - queryKey = [endpoint, sorted-deduped-ids-comma-joined] so any
- *    permutation of the same id set hits the same cache entry
- *  - staleTime = 5 minutes (the underlying blobs are immutable per run)
- *  - bulk queries disabled for empty id sets; single queries 404 → null
- */
-
 const STALE_TIME_MS = 5 * 60 * 1000;
 
-/** Build the standard bulk fetcher: GET `/api/v1/<endpoint>?ids=…` → map. */
 export function bulkIdsFetcher<T>(
   endpoint: string,
 ): (ids: number[], signal?: AbortSignal) => Promise<Record<number, T>> {
@@ -27,7 +14,6 @@ export function bulkIdsFetcher<T>(
   };
 }
 
-/** Bulk map query over a set of benchmark_results ids. */
 export function useBulkIdsQuery<T>(
   endpoint: string,
   ids: number[],
@@ -43,12 +29,12 @@ export function useBulkIdsQuery<T>(
   });
 }
 
-/** Single-payload query for one benchmark_results id; 404 resolves to null. */
 export function useByIdQuery<T, TSelected = T>(
   endpoint: string,
   id: number | null,
   enabled: boolean,
   select?: (data: T) => TSelected,
+  freshness?: { staleTime: number; refetchOnWindowFocus: boolean },
 ) {
   const selectNullable = useCallback(
     (data: T | null): TSelected | null =>
@@ -67,9 +53,7 @@ export function useByIdQuery<T, TSelected = T>(
     },
     enabled,
     staleTime: STALE_TIME_MS,
-    // TanStack Query re-runs select when its function identity changes. Keep
-    // this wrapper stable so decoding a large compact payload happens only
-    // when the cached wire data or the caller's selector actually changes.
+    ...freshness,
     select: selectNullable,
   });
 }

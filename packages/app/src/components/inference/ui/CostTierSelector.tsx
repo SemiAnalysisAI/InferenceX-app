@@ -2,7 +2,7 @@
 
 import { useId, useMemo } from 'react';
 
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import {
   useInferenceActions,
@@ -31,9 +31,9 @@ import {
   LockedTierBadge,
   useLockedTierDialog,
 } from '@/components/ui/tco-model-dialog';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
@@ -48,30 +48,11 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * The published tier the selected metric is on, or `undefined` when the
- * metric has no pricing basis. Callers gate the selector on this so the
- * caption only carries a tier line for cost metrics.
- */
 export function selectedCostTier(selectedYAxisMetric: string): CostTier | undefined {
   const key = selectedYAxisMetric.replace(/^y_/u, '');
   return isMetricKey(key) ? metricCostTier(key) : undefined;
 }
 
-/**
- * Inline Cost Tier selector for the chart caption. It swaps the selected
- * y-axis metric between its pricing bases: the two published tiers, Custom
- * User Values, and the rental terms locked behind the TCO model dialog.
- *
- * It renders where the caption used to print the tier as plain text, so the
- * pricing basis reads as part of the result the chart shows. The trigger is
- * `no-export`; PNG exports keep the plain-text label via the caption's
- * `export-only` twin.
- *
- * `allowCustom={false}` leaves Custom User Values out of the list for charts
- * that price every point from the published tiers and have nowhere to enter
- * a custom $/chip/hr (the /historical trend chart).
- */
 export function CostTierSelector({
   className,
   allowCustom = true,
@@ -81,7 +62,6 @@ export function CostTierSelector({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  // One selector per figure on /inference, so the trigger id is per instance.
   const triggerId = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { selectedModel, selectedSequence, selectedPrecisions, userCosts } = useInferenceFilters();
@@ -95,8 +75,6 @@ export function CostTierSelector({
     : undefined;
   const selectedTier = selectedCostTier(selectedYAxisMetric);
 
-  // Published tiers first, in registry order, then Custom User Values, then
-  // the shorter rental terms locked behind the TCO model dialog.
   const options = useMemo(() => {
     if (!selectedFamily) return [];
     const published = costTiersForFamily(selectedFamily)
@@ -123,9 +101,6 @@ export function CostTierSelector({
   const handleChange = (value: string) => {
     if (interceptLocked(value)) return;
     const tierKey = value.replace(/^y_/u, '');
-    // First visit to Custom User Values: start from the prices the caption
-    // was showing, so the reader edits the badges from there. Later visits
-    // keep whatever they typed.
     if (
       isMetricKey(tierKey) &&
       metricCostTier(tierKey) === 'custom' &&
@@ -160,16 +135,10 @@ export function CostTierSelector({
       <SearchableSelect
         triggerId={triggerId}
         triggerTestId="cost-tier-selector"
-        // The caption's <dt> is not a <label>, so name the combobox directly.
         triggerAriaLabel={t.costTier}
         value={selectedYAxisMetric}
         onValueChange={handleChange}
         placeholder={t.costTier}
-        // The tier resolves client-side from the URL, but the caption's
-        // server render already knows the default metric's tier, so the
-        // trigger can show it before hydration instead of the placeholder.
-        // Same copy as the option list, so the label does not change once
-        // the select hydrates.
         initialLabel={costTierOptionLabel(selectedTier, locale)}
         searchable={false}
         trackPrefix="cost_tier"

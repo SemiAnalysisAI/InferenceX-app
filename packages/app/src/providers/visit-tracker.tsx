@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import { recordVisitIfNew } from '@/lib/visit-tracking';
+import { recordVisitIfNew } from '@/lib/analytics/visit-tracking';
 
 export function VisitTracker() {
   useEffect(() => {

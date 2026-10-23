@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ReliabilityRow } from '@/lib/api';
+import type { ReliabilityRow } from '@/lib/api/api';
 
 import { aggregateByDateRange, DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from './aggregate';
 
 const DAY_MS = 86_400_000;
-// Fixed reference clock so bucket membership is deterministic.
 const NOW = new Date('2026-08-27T12:00:00Z').getTime();
 
 function daysAgo(days: number): string {

@@ -1,28 +1,16 @@
-/**
- * SVG renderer for known-issue warning annotations on the inference scatter
- * chart: a stacked column of warning boxes at the top of the plot, each with
- * an arrow pointing at its affected series. Drawn inside the chart SVG so PNG
- * exports carry the warnings; colors are passed in resolved because CSS
- * variables don't survive html-to-image.
- */
-
 import * as d3 from 'd3';
 
-import type { KnownConfigIssue } from '@/lib/known-issues';
+import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
-  /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
   label: string;
-  /** Resolved stroke color of the affected series */
   color: string;
-  /** Data-space coordinates of the series' visible points (arrow targets) */
   points: { x: number; y: number }[];
 }
 
-/** A filed upstream issue or a non-interactive preview notice rendered inside a chart. */
 export type KnownIssueAnnotation = AnnotationBase &
   (
     | { issue: KnownConfigIssue; preview?: never }
@@ -46,10 +34,6 @@ export interface AnnotationRenderOptions {
   background: string;
   foreground: string;
   mutedForeground: string;
-  /**
-   * Horizontal space reserved at the plot's right edge (e.g. for a legend
-   * panel floating over the SVG). Boxes right-align against it.
-   */
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
 }
@@ -59,7 +43,6 @@ export type KnownIssueLayerOptions = Omit<
   'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
 >;
 
-/** Build the shared render/zoom lifecycle for chart-level known-issue callouts. */
 export function createKnownIssueLayer(
   resolveOptions: () => KnownIssueLayerOptions,
   displayIdentity?: string,
@@ -119,28 +102,44 @@ const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
 
-/** getComputedTextLength with an estimate fallback for jsdom/test environments. */
 function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: number): number {
   if (node && typeof node.getComputedTextLength === 'function') {
     try {
       const len = node.getComputedTextLength();
       if (Number.isFinite(len) && len > 0) return len;
-    } catch {
-      // fall through to estimate
-    }
+    } catch {}
   }
   return chars * fontSize * 0.58;
+}
+
+function fitTextToWidth(
+  target:
+    | d3.Selection<SVGTextElement, unknown, null, undefined>
+    | d3.Selection<SVGTSpanElement, unknown, null, undefined>,
+  full: string,
+  maxWidth: number,
+  fontSize: number,
+  measureNode?: d3.Selection<SVGTextElement, unknown, null, undefined>,
+): number {
+  const node = (
+    measureNode ?? (target as d3.Selection<SVGTextElement, unknown, null, undefined>)
+  ).node();
+  let chars = full.length;
+  let width = measureTextWidth(node, chars, fontSize);
+  while (chars > 1 && width > maxWidth) {
+    const ratio = maxWidth / width;
+    chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
+    const text = `${full.slice(0, chars).trimEnd()}…`;
+    target.text(text);
+    width = measureTextWidth(node, text.length, fontSize);
+  }
+  return Math.min(width, maxWidth);
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Live overlap of the floating legend panel over the SVG's right edge, used
- * as `rightInset` so warning boxes sit beside the legend instead of under it.
- * Returns 0 when no legend is present (or outside the browser).
- */
 export function measureLegendRightInset(
   chartId: string,
   svgNode: SVGSVGElement | null,
@@ -227,15 +226,26 @@ export function renderKnownIssueAnnotations(
         .text(issue.issueRef);
     }
 
-    const w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
-    const w2 = measureTextWidth(
+    const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
+    const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
+    let w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
+    if (w1 > maxTextW) {
+      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, LINE1_SIZE) + SWATCH_SPACE;
+    }
+    let w2 = measureTextWidth(
       text2.node(),
       detail.length + (issue?.issueRef.length ?? 0),
       LINE2_SIZE,
     );
+    if (w2 > maxTextW && issue === undefined) {
+      const detailTspan = text2.select<SVGTSpanElement>('tspan');
+      const summary = preview!.summary;
+      detailTspan.text(summary);
+      w2 = measureTextWidth(text2.node(), summary.length, LINE2_SIZE);
+      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, LINE2_SIZE, text2);
+    }
     const boxW = Math.max(w1, w2) + PAD_X * 2;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
-    const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
     const bx = Math.max(2, boxRight - boxW);
     const by = yCursor;
 
@@ -260,9 +270,6 @@ export function renderKnownIssueAnnotations(
     text1.attr('x', bx + PAD_X + SWATCH_SPACE).attr('y', by + PAD_Y + LINE1_H - 4);
     text2.attr('x', bx + PAD_X).attr('y', by + PAD_Y + LINE1_H + LINE2_H - 4);
 
-    // Arrow from the box's bottom edge to the nearest on-screen point of the
-    // affected series. Skipped when the series is panned/zoomed out of view or
-    // the target sits right under the box.
     const bottomY = by + boxH;
     const onScreen = points
       .map((p) => ({ px: xScale(p.x), py: yScale(p.y) }))
@@ -282,7 +289,6 @@ export function renderKnownIssueAnnotations(
       if (len >= MIN_ARROW_LEN) {
         const endX = target.px - (dx / len) * ARROW_STANDOFF;
         const endY = target.py - (dy / len) * ARROW_STANDOFF;
-        // Slight quadratic bend so stacked arrows don't read as one straight rule
         const midX = (startX + endX) / 2 + (dy > 0 ? -dx * 0.12 : dx * 0.12);
         const midY = (bottomY + endY) / 2;
         arrowGroup

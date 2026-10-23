@@ -12,6 +12,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -19,14 +20,14 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { type CalculatorUrlSeed, profitTargetUrlValue } from '@/components/calculator/url-seed';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { cachedInputPricePerMillion, formatTokenPrice } from '@/components/inference/token-revenue';
 import { COST_TIER_LABELS, type CostTier } from '@/components/inference/metric-registry';
 import type { TokenRevenuePricing } from '@/components/inference/types';
@@ -41,7 +42,7 @@ import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
-import { ModelSelector, PercentileSelector } from '@/components/ui/chart-selectors';
+import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -60,14 +61,16 @@ import { captionControlTriggerClassName, ResultContext } from '@/components/ui/r
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basis';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { exportToCsv } from '@/lib/csv-export';
+import { track } from '@/lib/analytics/analytics';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { exportToCsv } from '@/lib/export/csv-export';
 import {
   getModelLabel,
   getOpenRouterModelId,
@@ -75,24 +78,26 @@ import {
   Percentile,
   Sequence,
   type Model,
-} from '@/lib/data-mappings';
-import { modelRoutesForTab, type ModelRouteTab } from '@/lib/model-routes';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
+  applyCacheHitMode,
   clampPercent,
+  DEFAULT_CACHE_HIT_MODE,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
   profitModelDefaults,
+  type CacheHitMode,
   type ProfitBasis,
   type ProfitEstimatorRow,
-  type ProfitEstimatorSkipReason,
 } from './profit-estimator';
-import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
 import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
@@ -112,19 +117,12 @@ import type { CostProvider } from './types';
 import { useProfitHistory } from './useProfitHistory';
 import { useThroughputData } from './useThroughputData';
 
-/**
- * Where the $/M tok sale price comes from: the OpenRouter catalog, the lab's
- * published list price (offered only for models that have one in
- * `profitModelDefaults`), or a typed triple.
- */
 type PriceSource = 'openrouter' | 'list' | 'custom';
 
-/** Source a model opens on: its list price when it has one, else OpenRouter. */
 function defaultPriceSource(model: Model): PriceSource {
   return profitModelDefaults(model).listPricing ? 'list' : 'openrouter';
 }
 
-/** The two published TCO tiers plus a per-chip $/GPU/hr the reader types. */
 type ProfitCostProvider = CostProvider | 'custom';
 
 const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
@@ -133,8 +131,6 @@ const COST_PROVIDER_TIER: Record<ProfitCostProvider, CostTier> = {
   custom: 'custom',
 };
 
-// The published tiers use the same option labels as the /inference y-axis
-// selector (Owning at Large Hyperscaler Volume, Rent - 3 Year Commit).
 const COST_PROVIDER_OPTIONS: { value: ProfitCostProvider; label: string; labelZh: string }[] = [
   ...(['costh', 'costr'] as const).map((value) => ({
     value,
@@ -150,34 +146,23 @@ function costProviderOptionLabel(provider: ProfitCostProvider, locale: 'en' | 'z
   return locale === 'zh' ? option.labelZh : option.label;
 }
 
-/** Tier the custom inputs are seeded from, and the tier interpolation runs on. */
 const CUSTOM_COST_SEED: CostProvider = 'costh';
 
-// Each basis opens on a different published tier. Per chip-hour is the view
-// an operator renting capacity reads, so it opens on Rent - 3 Year Commit;
-// per GW-year models a fleet owner, so it stays on Owning at Large
-// Hyperscaler Volume.
 const DEFAULT_COST_PROVIDER: Record<ProfitBasis, CostProvider> = {
   'chip-hour': 'costr',
   'gw-year': 'costh',
 };
 
-/** Base GPU (`h200`, `gb300`) of a legend key like `gb300_dynamo-sglang`. */
 function baseGpuOf(hwKey: string): string {
   return hwKey.split('_')[0] ?? hwKey;
 }
 
-/**
- * A typed custom cost. Empty or non-numeric → undefined, so the SKU drops out
- * with the `no-cost` reason instead of being priced at zero.
- */
 export function parseCustomCostInput(raw: string | undefined): number | undefined {
   if (raw === undefined || raw.trim() === '') return undefined;
   const value = Number(raw);
   return Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-/** Options in selector order; the list-price entry is filtered out per model when absent. */
 function priceSourceOptions(
   listVendor: string | null,
 ): { value: PriceSource; label: string; labelZh: string }[] {
@@ -199,25 +184,26 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & Profit Estimator per GigaWatt',
-      'chip-hour': 'Revenue & Profit Estimator',
+      'gw-year': 'Revenue & Profit Estimator per GigaWatt (Beta)',
+      'chip-hour': 'Revenue & Profit Estimator (Beta)',
     },
     benchmarkGroup: 'Benchmark Config',
     powerLabel: 'Power Estimation',
     powerTooltip:
-      'Change only the power budget used to scale the same benchmark result to one GW. Pricing, throughput, utilization and unit costs stay the same.',
+      'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
-      provisioned: 'Provisioned power',
-      modeled: 'Measured + modeled power',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       compare: 'Compare both',
     },
     powerBarLabels: {
-      provisioned: 'Provisioned',
-      modeled: 'Measured + modeled',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       extrapolated: 'Full-chassis extrapolation',
     },
-    powerPreview:
-      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server. AgentX system power is not yet qualified.',
+    powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
+    powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays share one modeled rack equally and use measured Grace-socket power when the run has validated socket telemetry (otherwise modeled Grace power); the two are not interpolated together. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
+    csvPowerHeaders: ['Power basis', 'Power model revision'],
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -234,6 +220,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
+    cacheHitLabel: 'Cache Hit Rates',
+    cacheHitTooltip:
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theroticial Roofline',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
@@ -249,9 +242,9 @@ const STRINGS = {
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
     },
     sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
@@ -294,18 +287,6 @@ const STRINGS = {
         'Revenue ($/GPU/hr, 100% util)',
       ],
     },
-    skipped: (entries: string) => `Not priced: ${entries}.`,
-    skipReason: {
-      'outside-measured-range': 'no measured point at the target interactivity',
-      'no-power': 'no all-in power figure',
-      'no-measured-power': 'no usable measured power for these benchmark points',
-      'unsupported-power-hardware': 'no system power model for this hardware',
-      'unsupported-power-topology':
-        'this topology cannot be modeled as whole replicas on one eight-GPU server',
-      'outside-power-model': 'these benchmark points are outside the supported power model',
-      'no-cost': 'no TCO for this tier',
-      'no-token-mix': 'no input/output token mix recorded',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: 'Compare history',
     gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
@@ -321,21 +302,26 @@ const STRINGS = {
   },
   zh: {
     title: {
-      'gw-year': '每吉瓦收入与利润估算器',
-      'chip-hour': '收入与利润估算器',
+      'gw-year': '每吉瓦收入与利润估算器（Beta）',
+      'chip-hour': '收入与利润估算器（Beta）',
     },
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
     powerTooltip:
-      '仅更改将同一基准测试结果换算为每 GW 收益时采用的功耗预算。价格、吞吐量、利用率和单位成本保持不变。',
+      '整体实测功耗在选定目标下采用功耗有效的最优曲线。对比两种估算方式时，若实测估算可用，两根柱子采用同一条曲线。价格、利用率和单位成本保持不变。',
     powerOptions: {
-      provisioned: '预配功耗',
-      modeled: '实测 GPU + 系统功耗估算',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
       compare: '对比两种估算方式',
     },
-    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算', extrapolated: '整机外推' },
-    powerPreview:
-      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。整机外推假设在八卡服务器上部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。AgentX 系统功耗模型尚未完成验证。',
+    powerBarLabels: {
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
+      extrapolated: '整机外推',
+    },
+    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
+    powerDetails: `GPU 功耗在相同的吞吐量数据点间插值，计入 PUE（风冷机箱为 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 为 ${LIQUID_COOLED_RACK_PUE}）和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。NVL72 tray 平均分摊同一个建模机架的功耗；运行带有已验证的 Grace socket 遥测时使用实测功耗，否则使用 Grace 功耗估算值，两者不会相互插值。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。`,
+    csvPowerHeaders: ['功耗口径', '功耗模型版本'],
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -352,6 +338,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
+    cacheHitLabel: 'Cache 命中率',
+    cacheHitTooltip:
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theroticial Roofline',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
       '利用率 % 考虑了 token 流量在昼夜间的起伏波动，以及大规模部署横向扩展时的效率损失。',
@@ -367,9 +360,9 @@ const STRINGS = {
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
     },
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
@@ -412,17 +405,6 @@ const STRINGS = {
         '收入（$/GPU/hr，100% 利用率）',
       ],
     },
-    skipped: (entries: string) => `未定价：${entries}。`,
-    skipReason: {
-      'outside-measured-range': '未在该交互性下实测',
-      'no-power': '缺少全电源配置功率数据',
-      'no-measured-power': '同一组基准测试数据点缺少有效功耗',
-      'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
-      'unsupported-power-topology': '该拓扑无法按完整实例部署在单台八卡服务器上建模',
-      'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
-      'no-cost': '该层级无 TCO 数据',
-      'no-token-mix': '未记录输入/输出 token 比例',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: '对比历史趋势',
     gpuConfig: '芯片配置',
     gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用当日实测的运行结果，在每个对比日期（日期范围的起止两端，以及从下方配置变更日志中添加的日期或运行）重新估价，软件更新带来的差异会直接体现在柱形上。`,
@@ -438,7 +420,6 @@ const STRINGS = {
   },
 } as const;
 
-/** A plain note under the chart that folds behind its title, like the metric notes on /inference. */
 function InfoFold({
   title,
   toggleLabel,
@@ -450,7 +431,6 @@ function InfoFold({
   children: React.ReactNode;
   testId: string;
 }) {
-  // Collapsed by default; the formula is reference material, not the result.
   const [open, setOpen] = useState(false);
   return (
     <div className="py-1 text-xs" data-testid={testId}>
@@ -477,12 +457,10 @@ function InfoFold({
   );
 }
 
-/** Number inputs step on mouse wheel while focused; drop focus so a scroll over the box only scrolls the page. */
 function blurOnWheel(event: React.WheelEvent<HTMLInputElement>): void {
   event.currentTarget.blur();
 }
 
-/** Dashboard tab each basis is served from; drives the model allow-list and the URL rewrite. */
 export const PROFIT_BASIS_TAB: Record<ProfitBasis, ModelRouteTab> = {
   'chip-hour': 'profit-estimator',
   'gw-year': 'profit-estimator-per-gigawatt',
@@ -493,25 +471,21 @@ export default function ProfitEstimatorDisplay({
   basis,
 }: {
   urlSeed?: CalculatorUrlSeed;
-  /** `/profit-estimator` is per chip-hour; `/profit-estimator-per-gigawatt` scales to a GW-year. */
   basis: ProfitBasis;
 }) {
   return (
     <GlobalFilterProvider
+      key={`${basis}:${urlSeed?.model}:${urlSeed?.profitTarget}:${urlSeed?.profitRouteKey}`}
       initialModel={urlSeed?.model}
       initialSequence={Sequence.AgenticTraces}
       initialRunDate={urlSeed?.runDate}
       initialRunId={urlSeed?.runId}
     >
-      <ProfitEstimatorInner
-        initialPercentile={urlSeed?.percentile ?? Percentile.P90}
-        basis={basis}
-      />
+      <ProfitEstimatorInner initialTarget={urlSeed?.profitTarget} basis={basis} />
     </GlobalFilterProvider>
   );
 }
 
-/** A percentage field: the raw string the user is typing plus the clamped number in use. */
 function usePercentField(defaultValue: number, eventName: string) {
   const [raw, setRaw] = useState(String(defaultValue));
   const [value, setValue] = useState(defaultValue);
@@ -538,10 +512,10 @@ function usePercentField(defaultValue: number, eventName: string) {
 }
 
 function ProfitEstimatorInner({
-  initialPercentile,
+  initialTarget,
   basis,
 }: {
-  initialPercentile: Percentile;
+  initialTarget?: number;
   basis: ProfitBasis;
 }) {
   const locale = useLocale();
@@ -550,14 +524,9 @@ function ProfitEstimatorInner({
   const { setUrlParam, getUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
   const { resolvedTheme } = useTheme();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
     useLockedTierDialog('profit_cost_provider');
 
-  // Precision is not a control here: `effectivePrecisions` stays in auto mode,
-  // which resolves to the densest measured precision per model, so the bars
-  // always reflect the best-covered run set.
   const {
     tcoBasis,
     selectedModel,
@@ -569,11 +538,6 @@ function ProfitEstimatorInner({
   const { setSelectedModel, setSelectedSequence } = useGlobalFilterActions();
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableModels, availabilityRows } = useGlobalFilterAvailability();
-  // This page is agentic only: the sequence is pinned, and the model list is
-  // the tab's route allow-list intersected with models that have an agentic-traces
-  // run, so the selector never offers a model that would draw an empty chart. If the
-  // intersection is still loading or empty, the allow-list alone is offered so
-  // the selector is never blank.
   const selectedSequence = Sequence.AgenticTraces;
   const agenticModels = useMemo(() => {
     const allowed = modelRoutesForTab(PROFIT_BASIS_TAB[basis]).map((route) => route.model);
@@ -606,9 +570,12 @@ function ProfitEstimatorInner({
   const [customCachedPrice, setCustomCachedPrice] = useState('0.1');
   const [customOutputPrice, setCustomOutputPrice] = useState('1');
   const [targetValue, setTargetValue] = useState<number>(
-    () => profitModelDefaults(selectedModel).interactivity,
+    () => initialTarget ?? profitModelDefaults(selectedModel).interactivity,
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
+  useEffect(() => {
+    setUrlParam('c_ivtarget', profitTargetUrlValue(selectedModel, targetValue));
+  }, [selectedModel, targetValue, setUrlParam]);
   const featureGateUnlocked = useFeatureGate();
   const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
@@ -617,20 +584,16 @@ function ProfitEstimatorInner({
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
   }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>(DEFAULT_CACHE_HIT_MODE);
+  useEffect(() => {
+    const value = getUrlParam('c_chmode');
+    setCacheHitMode(value === 'actual' ? 'actual' : DEFAULT_CACHE_HIT_MODE);
+  }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
     profitModelDefaults(selectedModel).labCutPct,
     'profit_lab_cut_set',
   );
-  // Each model has its own operating point, price source, and license fee
-  // (Kimi K3: 45 tok/s/user on the Moonshot list price at 30%; GLM 5.2/5.3: 100 tok/s/user
-  // on the Z.ai list price at 10%; MiniMax M3: 83 tok/s/user on the MiniMax
-  // list price at 20%; DeepSeek V4 Pro: 24 tok/s/user on the DeepSeek list
-  // price at 0%, MIT-licensed; DeepSeek V4.1 Flash: 125 tok/s/user on the
-  // DeepSeek Flash list price at 0%, MIT-licensed), so a model switch re-seeds
-  // all three. The ref keeps
-  // this to actual switches: re-renders with the same model leave the
-  // reader's edits alone.
   const defaultsAppliedFor = useRef<Model>(selectedModel);
   const resetLabCut = labCut.reset;
   useEffect(() => {
@@ -643,11 +606,9 @@ function ProfitEstimatorInner({
     resetLabCut(defaults.labCutPct);
   }, [selectedModel, resetLabCut]);
   const listPricing = profitModelDefaults(selectedModel).listPricing;
-  // A model without a list price cannot stay on 'list' (e.g. the route seeded
-  // one model and the allow-list swapped it); fall back to the catalog.
   const effectivePriceSource: PriceSource =
     priceSource === 'list' && !listPricing ? 'openrouter' : priceSource;
-  const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
+  const selectedPercentile = Percentile.P90;
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
 
   const {
@@ -671,13 +632,6 @@ function ProfitEstimatorInner({
     basis === 'gw-year' && powerBasis !== 'provisioned',
   );
 
-  // ── Compare history ───────────────────────────────────────────────────────
-  // The `/inference` panel, pinned to this page's workload: up to four chip
-  // configs, a date range, and the Config Changelog from which individual
-  // dates or runs are pinned onto the chart. The selection lives in the same
-  // `i_gpus`, `i_dstart`, `i_dend`, and `i_dates` URL params, so a comparison
-  // built on `/inference` pastes straight into the estimator. Hydrated after
-  // mount so the first client render matches the server one.
   const [selectedGPUs, setSelectedGPUs] = useState<string[]>([]);
   const [selectedDateRange, setSelectedDateRange] = useState({ startDate: '', endDate: '' });
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
@@ -705,11 +659,6 @@ function ProfitEstimatorInner({
       profitHistoryChipOptions(availabilityRows, dbModelKeys, selectedPrecisions, selectedModel),
     [availabilityRows, dbModelKeys, selectedPrecisions, selectedModel],
   );
-  // A chip the new model (or precision) has no agentic rows for leaves the
-  // selection, the way `/inference` prunes its comparison on a model switch.
-  // When that empties the selection the range and pins go with it, exactly as
-  // clearing the chips by hand does, so the next chip starts a fresh comparison
-  // instead of inheriting the previous model's dates.
   useEffect(() => {
     if (!availabilityRows || selectedGPUs.length === 0 || historyChipOptions.length === 0) return;
     const offered = new Set(historyChipOptions.map((o) => o.value));
@@ -729,8 +678,6 @@ function ProfitEstimatorInner({
       profitHistoryAvailableDates(availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs),
     [availabilityRows, dbModelKeys, selectedPrecisions, selectedGPUs],
   );
-  // A range whose endpoints the selected chips no longer have data for is
-  // dropped together with the pinned dates, as `InferenceContext` does.
   useEffect(() => {
     if (!historyHydrated || !availabilityRows || selectedGPUs.length === 0) return;
     const { startDate, endDate } = selectedDateRange;
@@ -764,8 +711,6 @@ function ProfitEstimatorInner({
     },
     [setUrlParam],
   );
-  // Changelog pins. Functional updaters so "Add all" and quick successive
-  // clicks never overwrite each other (the `/inference` fix for the same race).
   const handleHistoryAddDate = useCallback((entry: string) => {
     setSelectedDates((prev) => (prev.includes(entry) ? prev : [...prev, entry]));
   }, []);
@@ -785,17 +730,12 @@ function ProfitEstimatorInner({
     [setUrlParam],
   );
 
-  // Config Changelog for the selected chips: one workflow-info query per
-  // available date (bounded to the range once one is set), the same feed
-  // `/inference` renders under its chart.
   const historyChangelogs = useComparisonChangelogs(
     selectedGPUs,
     selectedDateRange,
     historyAvailableDates,
     'agentic_traces',
   );
-  // Same-day runs are numbered from the changelog's run enumeration so a bar
-  // labelled "#2" is the run the changelog calls "#2" (as `ChartDisplay` does).
   const historyRunScope = useMemo(
     () => ({
       modelDbKeys: dbModelKeys,
@@ -805,10 +745,6 @@ function ProfitEstimatorInner({
     }),
     [dbModelKeys, selectedGPUs, selectedPrecisions],
   );
-  // Per chip, the run its current bar already shows (the main query is an
-  // as-of-date fetch, so chips can sit on different runs). Pinning that run
-  // from the changelog must not draw a second bar of the same data, the case
-  // `/inference` covers by handing `buildComparisonDates` its `selectedRunId`.
   const historyCurrentRunIds = useMemo(
     () =>
       profitHistoryCurrentRunIds(historyChangelogs.changelogs, selectedRunDate, historyRunScope),
@@ -836,10 +772,6 @@ function ProfitEstimatorInner({
     }
     return numbering;
   }, [historyChangelogs.changelogs, historyRunScope]);
-  // A pinned plain date that turns out to have several runs expands into one
-  // entry per run once the changelog knows them, so the bars match the
-  // changelog's per-run blocks instead of a single merged "latest" bar
-  // (`ChartDisplay` does the same). Idempotent once expanded.
   useEffect(() => {
     const runConfigsByDate = new Map(
       historyChangelogs.changelogs.map((c) => [c.date, c.runConfigs] as const),
@@ -868,13 +800,8 @@ function ProfitEstimatorInner({
     (entry: string) => profitHistoryEntryLabel(entry, historyRunNumbering),
     [historyRunNumbering],
   );
-  // A comparison date still in flight holds the chart, as on `/inference`, so
-  // the bars never show today's chips with the history half missing.
   const loading = throughputLoading || history.loading;
 
-  // Per-base-GPU $/GPU/hr typed by the reader; seeded from the hyperscaler
-  // tier the first time each chip appears so the custom view starts from the
-  // published owning rate on either basis.
   const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
   const customCostBases = useMemo(
     () =>
@@ -907,8 +834,6 @@ function ProfitEstimatorInner({
   const interpolationCostProvider: CostProvider =
     costProvider === 'custom' ? CUSTOM_COST_SEED : costProvider;
 
-  // Entering the custom tier copies the published $/GPU/hr the caption was
-  // showing, so the badges keep their numbers and the reader edits from there.
   const enterCustomCosts = useCallback(() => {
     if (costProvider === 'custom') return;
     const seedFrom = costProvider;
@@ -930,8 +855,6 @@ function ProfitEstimatorInner({
     },
     [interceptLockedTier, enterCustomCosts],
   );
-  // Typing into a caption badge is the custom-cost entry: the first
-  // keystroke on a published tier moves the chart onto Custom $/GPU/hr.
   const handleCustomCostChange = useCallback(
     (base: string, raw: string) => {
       if (costProvider !== 'custom') {
@@ -985,16 +908,17 @@ function ProfitEstimatorInner({
     [utilization.value, labCut.value, basis, powerBasis],
   );
 
-  // Price every SKU first, then build the legend from the ones that produced a
-  // bar. A config the target falls outside of (or that cannot be priced) is
-  // named in the caption instead of being offered as a legend chip.
-  //
-  // With a history comparison active, only the compared chips are drawn, as on
-  // `/inference`: today's bar for each, then one per comparison date priced
-  // from that date's run with the same target, prices, and TCO tier.
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const current = getResults(targetValue, mode, interpolationCostProvider);
+    const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
+    const current = getResults(
+      targetValue,
+      mode,
+      interpolationCostProvider,
+      undefined,
+      false,
+      curvePowerBasis,
+    );
     const results = historyActive
       ? [
           ...current.filter((r) => selectedGPUs.includes(r.hwKey)),
@@ -1005,12 +929,14 @@ function ProfitEstimatorInner({
             targetValue,
             mode,
             costProvider: interpolationCostProvider,
+            powerBasis: curvePowerBasis,
             currentRunIds: historyCurrentRunIds,
           }),
         ]
       : current;
+    const pricedResults = applyCacheHitMode(results, cacheHitMode);
     const estimated = estimateProfitByPower(
-      results,
+      pricedResults,
       (hwKey) => ({
         powerKwPerGpu: getGpuSpecs(hwKey).power,
         costPerGpuHour: costPerGpuHourFor(hwKey),
@@ -1032,6 +958,8 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
+    basis,
+    cacheHitMode,
     powerBasis,
     t.powerBarLabels,
     targetValue,
@@ -1048,9 +976,6 @@ function ProfitEstimatorInner({
     historyEntryLabel,
   ]);
 
-  // `availableHwKeys` describes today's run; with a comparison active a chip
-  // that only priced on an earlier date still owns bars, so it stays in the
-  // legend (appended in registry order) rather than being dropped with them.
   const legendHwKeys = useMemo(
     () => profitHistoryLegendKeys(availableHwKeys, fullEstimate.rows, historyActive),
     [fullEstimate.rows, availableHwKeys, historyActive],
@@ -1067,9 +992,6 @@ function ProfitEstimatorInner({
   const visibleKeysArray = useMemo(() => [...visibleHwKeys], [visibleHwKeys]);
   const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: visibleKeysArray });
 
-  // Bar colour: the chip's vendor colour, faded toward the page background for
-  // older comparison dates (oldest lightest, today solid), the lightness ramp
-  // the `/inference` comparison uses to tell one config's dates apart.
   const historyRanks = useMemo(
     () => profitHistoryDateRanks(fullEstimate.rows),
     [fullEstimate.rows],
@@ -1078,7 +1000,7 @@ function ProfitEstimatorInner({
     (row: ProfitEstimatorRow) => {
       const base = resolveColor(row.hwKey);
       if (!row.date) return base;
-      const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
       return shadeHistoryColor(
         base,
         historyFadeShare(historyRanks.rank(row.date), historyRanks.count),
@@ -1117,15 +1039,6 @@ function ProfitEstimatorInner({
       track('profit_model_selected', { model: value });
     },
     [setSelectedModel],
-  );
-
-  const handlePercentileChange = useCallback(
-    (value: Percentile) => {
-      setSelectedPercentile(value);
-      setUrlParam('i_pctl', value);
-      track('profit_percentile_selected', { percentile: value });
-    },
-    [setUrlParam],
   );
 
   const toggleGpuVisibility = useCallback(
@@ -1181,16 +1094,12 @@ function ProfitEstimatorInner({
 
   const pricingNotice = useMemo(() => {
     if (effectivePriceSource !== 'openrouter') return null;
-    // A model with no OpenRouter listing never starts the query, and TanStack v5
-    // leaves a disabled query `isPending`, so check the id before the fetch state.
     if (openRouterModelId === null) return t.pricingUnavailable(null);
     if (openRouterQuery.isLoading) return t.pricingLoading;
     if (!openRouterQuery.data) return t.pricingUnavailable(openRouterModelId);
     return null;
   }, [effectivePriceSource, openRouterQuery.isLoading, openRouterQuery.data, openRouterModelId, t]);
 
-  // The caption prints the selector's own option copy (also in the PNG export
-  // twin), so the trigger reads the same before and after hydration.
   const costTier = costProviderOptionLabel(costProvider, locale);
   const priceSourceLabel =
     pricing?.source === 'openrouter'
@@ -1203,9 +1112,6 @@ function ProfitEstimatorInner({
           ? '自定义'
           : 'custom';
 
-  // Only the SKUs the legend currently shows; hiding a bar drops its badge.
-  // On the custom tier a chip whose price is blank has no bar and no legend
-  // entry, but its badge stays so the reader can type the price back in.
   const tcoBadges = useMemo(() => {
     const bases = new Set<string>();
     for (const key of legendHwKeys) {
@@ -1226,17 +1132,11 @@ function ProfitEstimatorInner({
       .map((base) => ({
         base,
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
-        // Custom shows the text as typed (an empty field stays empty
-        // instead of snapping to 0); published tiers show the model rate.
         value:
           costProvider === 'custom' ? (customCosts[base] ?? '') : String(costPerGpuHourFor(base)),
       }));
   }, [legendHwKeys, visibleHwKeys, availableHwKeys, costPerGpuHourFor, costProvider, customCosts]);
 
-  // The cost provider is chosen in the caption's Cost Tier line, where the
-  // tier used to print as plain text. Unlocked tiers first, then Custom
-  // $/GPU/hr, then the locked rent tiers so the free-form option is never
-  // buried below rows that only open the TCO model dialog.
   const costProviderControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-cost-selector">
       <SearchableSelect
@@ -1276,9 +1176,6 @@ function ProfitEstimatorInner({
     </span>
   );
 
-  // Utilization and the model license fee are typed straight into the caption,
-  // next to the Cost Tier selector, so the assumptions line is where every
-  // pricing assumption gets changed.
   const utilizationControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-utilization-control">
       <CaptionPercentInput
@@ -1320,9 +1217,6 @@ function ProfitEstimatorInner({
     </span>
   );
 
-  // Compared chips with no bar on a comparison date (or on the current date,
-  // when the chip only priced earlier), named in the caption so a missing bar
-  // reads as "no run that day", not as a zero.
   const historyMissing = useMemo(() => {
     if (!historyActive) return [];
     return profitHistoryMissing(
@@ -1330,8 +1224,6 @@ function ProfitEstimatorInner({
       history.comparisonDates,
       selectedGPUs,
       (hwKey) => {
-        // `hardwareConfig` covers today's rows only; a chip that priced
-        // earlier alone still has a registry entry to label it by.
         const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
         return config ? getDisplayLabel(config) : hwKey;
       },
@@ -1350,27 +1242,8 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  const powerUnavailable = useMemo(
-    () =>
-      t.skipped(
-        fullEstimate.skipped
-          .map((row) => {
-            const label = rowLabel(
-              { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
-              hardwareConfig,
-            );
-            return `${label}: ${t.skipReason[row.reason]}`;
-          })
-          .join('; '),
-      ),
-    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
-  );
-
-  // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
-    // Right padding keeps the title and price lines clear of the export
-    // button, which sits in the figure corner.
     return (
       <div className="mb-2 pr-12" data-testid="profit-caption">
         <Heading as="h2" level="card">
@@ -1385,12 +1258,6 @@ function ProfitEstimatorInner({
         {powerControlsEnabled && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
-            {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
-          </p>
-        )}
-        {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
-          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-unavailable">
-            {powerUnavailable}
           </p>
         )}
         <ResultContext
@@ -1469,8 +1336,6 @@ function ProfitEstimatorInner({
     pricing,
     powerBasis,
     powerControlsEnabled,
-    powerUnavailable,
-    fullEstimate.skipped,
     hardwareConfig,
     effectivePriceSource,
     listPricing,
@@ -1501,8 +1366,13 @@ function ProfitEstimatorInner({
       : `InferenceX_profit_estimator_${selectedModel}`;
 
   const handleExportCsv = useCallback(() => {
-    // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
+    const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
+    const basisColumns = (row: ProfitEstimatorRow) => {
+      const source = row.powerSource;
+      if (!source) return [t.powerBarLabels.provisioned, ''];
+      return [powerBasisLabel(source, locale), source.modelRevision];
+    };
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
@@ -1514,16 +1384,24 @@ function ProfitEstimatorInner({
       usd(row.profit),
       row.revenue > 0 ? (row.profit / row.revenue).toFixed(4) : '',
       row.revenuePerGpuHour.toFixed(4),
-      // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
+      ...(includeBasis ? basisColumns(row) : []),
     ]);
     const [sku, precision, ...rest] = t.csvHeaders[basis];
-    exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
+    const headers = [
+      sku,
+      precision,
+      t.csvDateHeader,
+      ...rest,
+      ...(includeBasis ? t.csvPowerHeaders : []),
+    ];
+    exportToCsv(exportFileName, headers, rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
+      `${t.cacheHitLabel}: ${t.cacheHitOptions[cacheHitMode]}`,
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
-            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview]),
+            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview, t.powerDetails]),
           ]
         : []),
     ]);
@@ -1532,9 +1410,11 @@ function ProfitEstimatorInner({
     hardwareConfig,
     exportFileName,
     t,
+    locale,
     assumptions,
     basis,
     selectedRunDate,
+    cacheHitMode,
     powerBasis,
     powerControlsEnabled,
   ]);
@@ -1558,13 +1438,16 @@ function ProfitEstimatorInner({
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-5">
+              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-4">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-2"
+                  className={cn(
+                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' ? 'xl:col-span-4' : 'xl:col-span-3',
+                  )}
                 >
-                  <div className="min-w-0 md:col-span-2">
+                  <div className="min-w-0">
                     <ModelSelector
                       id="profit-model"
                       data-testid="profit-model-selector"
@@ -1575,17 +1458,7 @@ function ProfitEstimatorInner({
                       availableModels={agenticModels}
                     />
                   </div>
-                  {featureGateUnlocked && (
-                    <div className="min-w-0 md:col-span-2">
-                      <PercentileSelector
-                        id="profit-percentile"
-                        data-testid="profit-percentile-selector"
-                        value={selectedPercentile}
-                        onChange={handlePercentileChange}
-                      />
-                    </div>
-                  )}
-                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-target"
                       label={t.targetAgenticLabel(percentileLabel)}
@@ -1604,12 +1477,44 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="profit-cache-hit"
+                      label={t.cacheHitLabel}
+                      tooltip={t.cacheHitTooltip}
+                    />
+                    <div data-testid="profit-cache-hit-selector">
+                      <MultiSelect
+                        triggerId="profit-cache-hit"
+                        options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
+                          value,
+                          label,
+                        }))}
+                        value={[cacheHitMode]}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (next !== 'actual' && next !== 'theoretical') return;
+                          setCacheHitMode(next);
+                          setUrlParam('c_chmode', next === DEFAULT_CACHE_HIT_MODE ? '' : next);
+                          track('profit_cache_hit_mode_changed', { mode: next });
+                        }}
+                        open={openDropdown === 'cacheHit'}
+                        onOpenChange={handleDropdownOpenChange('cacheHit')}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        searchable={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
+                  </div>
                   {powerControlsEnabled && (
-                    <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
                         htmlFor="profit-power"
                         label={t.powerLabel}
-                        tooltip={t.powerTooltip}
+                        tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
                       />
                       <div data-testid="profit-power-selector">
                         <MultiSelect
@@ -1643,7 +1548,10 @@ function ProfitEstimatorInner({
                 <ControlPanel
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-3"
+                  className={cn(
+                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' && 'xl:col-span-4 xl:grid-cols-4',
+                  )}
                 >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
@@ -1662,9 +1570,6 @@ function ProfitEstimatorInner({
                         onChange={(values) => {
                           const next = values[0];
                           if (!next) return;
-                          // Seed the custom fields from the price in force (list or
-                          // live catalog) so switching over starts from a real price
-                          // instead of $1/M.
                           if (next === 'custom' && pricing) {
                             setCustomInputPrice(formatTokenPrice(pricing.inputPerMillion));
                             setCustomCachedPrice(
@@ -1687,11 +1592,10 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {/* Custom token prices get their own row so the main controls keep their width. */}
                   {effectivePriceSource === 'custom' && (
                     <div
                       data-testid="profit-custom-prices"
-                      className="grid min-w-0 gap-4 md:col-span-2 md:grid-cols-3"
+                      className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
@@ -1757,7 +1661,7 @@ function ProfitEstimatorInner({
                   )}
 
                   {showsTcoBasis && (
-                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                       <LabelWithTooltip
                         label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                         tooltip={
@@ -1773,7 +1677,9 @@ function ProfitEstimatorInner({
               </div>
 
               <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
-                <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                <div
+                  className={cn('grid min-w-0 gap-3', selectedGPUs.length > 0 && 'md:grid-cols-2')}
+                >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-history-gpu"
@@ -1887,16 +1793,6 @@ function ProfitEstimatorInner({
           )}
           {pricing ? (
             <figure data-testid="profit-figure" className="relative rounded-lg">
-              {basis === 'gw-year' &&
-                estimate.rows.length === 0 &&
-                powerBasis !== 'provisioned' && (
-                  <p
-                    className="mb-3 text-xs text-muted-foreground"
-                    data-testid="profit-power-unavailable"
-                  >
-                    {t.powerPreview} {powerUnavailable}
-                  </p>
-                )}
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"

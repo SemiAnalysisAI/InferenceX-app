@@ -24,11 +24,9 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(entry.description.zh.length).toBeGreaterThan(10);
     expect(entry.formula.en.length).toBeGreaterThan(5);
     expect(entry.formula.zh.length).toBeGreaterThan(5);
-    // Chinese strings must actually be Chinese, not copied English.
     expect(entry.description.zh).toMatch(CJK);
     expect(entry.formula.zh).toMatch(CJK);
     expect(entry.description.en).not.toMatch(CJK);
-    // Formulas are structural: they must show a computation, not a number soup.
     expect(entry.formula.en).toMatch(/[÷×=]/u);
   });
 
@@ -36,24 +34,6 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     for (const key of ['tpPerMw', 'inputTputPerMw', 'outputTputPerMw', 'powerUser'] as const) {
       expect(METRIC_EXPLANATIONS[key].formula.en).toContain('all-in utility MW');
     }
-  });
-
-  it('limits system power to GPU chassis while retaining their CPU and DRAM assumptions', () => {
-    const { description, formula } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
-    expect(description.en).toContain(
-      'divided by the modeled chassis GPU count (eight per chassis)',
-    );
-    expect(description.en).not.toContain('deployment GPU count');
-    expect(formula.en).toContain('÷ modeled chassis GPU count (8 per chassis)');
-    expect(description.zh).toContain('再除以建模机箱的 GPU 总数（每机箱 8 张）');
-    expect(formula.zh).toContain('÷ 建模机箱的 GPU 总数（每机箱 8 张）');
-    expect(description.en).toContain('CPU and DRAM utilization set to 20%');
-    expect(description.en).toContain(
-      'extrapolated to a full chassis at the measured per-GPU power',
-    );
-    expect(description.en).toContain('Separate CPU-only frontend/router hosts are excluded.');
-    expect(description.zh).toContain('CPU 与 DRAM 利用率均设为 20%');
-    expect(description.zh).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
 
   it('cost metrics show the $/Mtok formula', () => {
@@ -136,8 +116,6 @@ describe('resolveXAxisKind', () => {
   });
 
   it('interactivity chart keeps interactivity for input metrics without a TTFT override', () => {
-    // Input metric with no `*_x` config override: `resolveXAxisField` falls
-    // back to the chart's natural x, so the footer must say interactivity.
     expect(resolveXAxisKind('interactivity', { ...base, xAxisField: 'p90_intvty' })).toBe(
       'interactivity',
     );

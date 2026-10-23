@@ -1,16 +1,3 @@
-/**
- * @file axis-metric-explanations.ts
- * @description Bilingual plain-English explanations (and, for y-axis metrics,
- * structural formulas) backing the info buttons in axis metric dropdowns. Y-axis entries are keyed by `METRIC_REGISTRY`
- * keys; x-axis entries are keyed by the resolved x-axis kind. A unit test
- * asserts completeness against the registry, so adding a metric without an
- * explanation fails CI.
- *
- * Formulas are structural descriptions of the derived-field math in
- * `buildDerivedChartFields` (src/lib/chart-utils.ts) and the glossary
- * (src/lib/glossary.ts) — they describe how a value is computed, they do not
- * restate assumed constants.
- */
 import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
@@ -19,13 +6,10 @@ export interface LocalizedText {
 }
 
 export interface MetricExplanation {
-  /** 1–3 sentence plain-language explanation of the metric. */
   description: LocalizedText;
-  /** Structural formula, rendered in monospace in metric help. */
   formula: LocalizedText;
 }
 
-/** Cost-basis flavor shared by the $ and cost-per-million metric families. */
 type CostBasis = 'h' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
@@ -184,14 +168,13 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
   };
 }
 
-/** Validation-status note appended to every Measured Energy explanation. */
 const MEASURED_TIER_NOTE_EN =
   ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
-  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
-  'marks them. Filter either status under Quick Filters → Measured Power.';
+  "older measurements but lack the information needed to confirm today's method. Filter either " +
+  'status under Quick Filters → Measured Power.';
 const MEASURED_TIER_NOTE_ZH =
-  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
-  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息。' +
+  '可在快捷筛选的“实测功耗”中按测量状态筛选。';
 
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
@@ -281,12 +264,6 @@ function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanati
   };
 }
 
-/**
- * Every `METRIC_REGISTRY` key gets a bilingual explanation and a structural
- * formula. Grounded in `buildDerivedChartFields` (src/lib/chart-utils.ts) and
- * the glossary entries for throughput, cost per million tokens, tokens per
- * dollar, tokens per megawatt, and energy per token.
- */
 export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   tpPerGpu: throughputPerChip('total'),
   inputTputPerGpu: throughputPerChip('input'),
@@ -371,16 +348,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: '整组 GPU P90 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P90 ÷ GPU 数量',
     },
   },
-  modeledChassisPowerPerGpu: {
-    description: {
-      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the modeled chassis GPU count (eight per chassis). Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Supported hardware with known eight-GPU chassis placement is included; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power, matching the source sweep. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
-      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以建模机箱的 GPU 总数（每机箱 8 张）。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。纳入硬件受支持、八卡机箱位置已知的运行；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱，与模型源码的扫描口径一致。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
-    },
-    formula: {
-      en: 'W/GPU = sum of modeled chassis AC power (W) ÷ modeled chassis GPU count (8 per chassis); facility W = chassis AC W × PUE',
-      zh: 'W/GPU = 各机箱交流功耗估算之和（W）÷ 建模机箱的 GPU 总数（每机箱 8 张）；数据中心 W = 机箱交流 W × PUE',
-    },
-  },
   measuredPrefillAvgPower: measuredPower('prefill'),
   measuredDecodeAvgPower: measuredPower('decode'),
   measuredJPerOutputToken: measuredJoulesPerToken('output'),
@@ -431,13 +398,89 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: '% TDP = 每芯片实测平均功耗（W）÷ 额定 TDP（W）× 100',
     },
   },
+  measuredPowerTimeline: {
+    description: {
+      en:
+        `The per-second accelerator power samples behind each measured average, drawn over ` +
+        `the whole benchmark job (server start, warmup, and the validated measurement window, ` +
+        `which is emphasized). One trace per config, mean of its GPUs by default; the rated TDP ` +
+        `is a dashed reference per hardware. Configs whose telemetry artifact is missing are ` +
+        `listed under the chart rather than estimated.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个实测平均值背后的逐秒加速器功耗采样，覆盖整个基准测试任务（服务启动、warmup ` +
+        `以及被突出显示的有效测量窗口）。每个配置一条曲线，默认取其 GPU 的平均值；` +
+        `每种硬件的额定 TDP 以虚线作为参考。缺少遥测产物的配置会列在图表下方，而不会用估算值代替。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
+    },
+    formula: {
+      en: 'W(t) = mean over GPUs of the sampled power draw in each one-second bucket',
+      zh: 'W(t) = 每个一秒时间桶内各 GPU 功耗采样值的平均',
+    },
+  },
+  gpuProvisionedJPerOutputToken: {
+    description: {
+      en:
+        'Energy per output token if every allocated accelerator drew exactly its rated TDP for ' +
+        'the whole run. Disaggregated deployments count prefill and decode GPUs together, so ' +
+        'this is the GPU-only provisioning boundary the measured J/token can be compared against.',
+      zh:
+        '假设所有已分配加速器在整个运行中恒以额定 TDP 耗电时的每输出 token 能耗。' +
+        '分离式部署将 prefill 与 decode GPU 一并计入，因此它是可与实测 J/token 对照的 GPU 侧额定边界。',
+    },
+    formula: {
+      en: 'J/tok = rated TDP (W) × allocated GPUs ÷ total output tokens per second',
+      zh: 'J/tok = 额定 TDP（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+    },
+  },
+  utilityProvisionedJPerOutputToken: {
+    description: {
+      en:
+        'Energy per output token at the all-in provisioned power boundary, normalized by every ' +
+        'allocated accelerator. It differs from the public All-in Provisioned J per Output Token ' +
+        'metric only for disaggregated runs, where that metric normalizes by decode GPUs alone.',
+      zh:
+        '在整体预配功耗边界下的每输出 token 能耗，按全部已分配加速器归一。' +
+        '仅在分离式运行中与公开的 All-in Provisioned J per Output Token 指标不同，后者只按 decode GPU 归一。',
+    },
+    formula: {
+      en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ total output tokens per second',
+      zh: 'J/tok = 每 GPU 整体预配功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+    },
+  },
+  utilityModeledWatts: {
+    description: {
+      en:
+        'Modeled facility power per allocated accelerator: the InferenceX power model carries measured ' +
+        'GPU power to IT power for the run’s workload state and scale-out, then multiplies once by PUE. ' +
+        'Supports eight-GPU HGX/OAM chassis and GB200/GB300 NVL72, where measured Grace-socket power ' +
+        'is a second input and every compute tray takes an equal share of a modeled rack.',
+      zh:
+        '每已分配加速器的整体实测功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
+        '支持八卡 HGX/OAM 机箱和 GB200/GB300 NVL72；NVL72 另以 Grace socket 实测功耗为输入，每个计算 tray 平均分摊建模机架的功耗。',
+    },
+    formula: {
+      en: 'W/GPU = modeled IT power (W) × PUE ÷ allocated GPUs',
+      zh: 'W/GPU = IT 建模功耗（W）× PUE ÷ 已分配 GPU 数',
+    },
+  },
+  utilityModeledJPerOutputToken: {
+    description: {
+      en:
+        'Measured energy per output token scaled to the modeled facility boundary, so its ratio to ' +
+        'measured GPU energy equals the ratio of modeled facility power to measured GPU power. ' +
+        'Missing where the system power model or validated measured power is unavailable.',
+      zh:
+        '将实测每输出 token 能耗按整体实测功耗边界缩放，其与 GPU 实测能耗之比等于整体实测功耗与 GPU 实测功耗之比。' +
+        '系统功耗模型或通过验证的实测功耗缺失时不显示。',
+    },
+    formula: {
+      en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 整体实测功耗（W）÷ 每 GPU 实测功耗（W）',
+    },
+  },
 };
 
-/**
- * The four logical x-axis metrics an inference chart can plot, independent of
- * the percentile prefix. Mirrors the branch logic in `resolveXAxisField` plus
- * the derived agentic x-axis mode handled in `ChartDisplay`.
- */
 export type XAxisKind = 'interactivity' | 'e2eLatency' | 'ttft' | 'e2eNormalizedInteractivity';
 
 export const X_AXIS_KINDS: readonly XAxisKind[] = [
@@ -448,7 +491,6 @@ export const X_AXIS_KINDS: readonly XAxisKind[] = [
 ];
 
 export interface XAxisExplanation {
-  /** Full metric name for contextual help; `pctl` is e.g. 'P90' | 'Median' | null. */
   name: {
     en: (pctl: string | null) => string;
     zh: (pctl: string | null) => string;
@@ -457,7 +499,7 @@ export interface XAxisExplanation {
 }
 
 const zhPctl = (pctl: string | null): string =>
-  pctl === null ? '' : pctl === 'Median' ? '中位' : `${pctl} `;
+  pctl === null ? '' : pctl === 'Median' ? '中位' : pctl === 'Mean' ? '平均' : `${pctl} `;
 
 const enPctl = (pctl: string | null): string => (pctl === null ? '' : `${pctl} `);
 
@@ -471,7 +513,8 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
       en:
         'Interactivity is the rate at which a single user receives generated tokens while the ' +
         'model streams its answer — how quickly new words appear on screen. Higher values feel ' +
-        'snappier; operators trade it against batch throughput.',
+        'snappier; operators trade it against batch throughput. For fixed-sequence Mean, the rate ' +
+        'is 1 divided by mean TPOT in seconds, not the arithmetic mean of per-request rates.',
       zh:
         '交互性（interactivity）指模型流式输出回答时，单个用户接收生成 token 的速率——' +
         '即新内容出现在屏幕上的快慢。数值越高体验越流畅；运营方需要在交互性与批量吞吐量之间权衡。',
@@ -524,24 +567,10 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
   },
 };
 
-/**
- * Resolve which logical x-axis metric a chart is currently plotting.
- * Classifies off the x-axis data field that `resolveXAxisField` actually
- * resolved for the chart's current state, so contextual help can never disagree
- * with the drawn axis — `resolveXAxisField` is the single source of truth for
- * the field, including the input-metric fallback where a metric without a
- * `*_x` config override keeps plotting the chart's natural x. Trace-derived
- * agentic x-axis modes bypass that resolver entirely, so they arrive as an
- * explicit flag. Applies to both the official pipeline and `?unofficialrun=`
- * overlays — the overlay path shares the chart's resolved x-axis, so one
- * explanation describes both.
- */
 export function resolveXAxisKind(
   chartType: 'interactivity' | 'e2e',
   opts: {
-    /** Resolved x-axis data field from `resolveXAxisField` (e.g. `p90_ttft`). */
     xAxisField: string;
-    /** Agentic trace-derived normalized-interactivity x-axis mode. */
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
@@ -550,12 +579,9 @@ export function resolveXAxisKind(
   return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';
 }
 
-/**
- * Extract the percentile word from a resolved x-axis label (e.g.
- * "P90 Time To First Token (s)" → "P90"). The chart pipelines always render
- * the percentile prefix in this English form, including on /zh pages.
- */
 export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
+  if (xAxisLabel.startsWith('平均')) return 'Mean';
+  if (xAxisLabel.startsWith('中位')) return 'Median';
   const match = /^(?<pctl>Median|Mean|P\d+(?:\.\d+)?)\s/iu.exec(xAxisLabel);
   if (!match?.groups?.pctl) return null;
   const pctl = match.groups.pctl;
@@ -566,7 +592,6 @@ export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
       : pctl.toUpperCase();
 }
 
-/** Locale-aware y-axis row label (metric plus cost tier) from the registry. */
 export function metricRowLabel(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   return metricOptionTitle(metricKey, locale);
 }

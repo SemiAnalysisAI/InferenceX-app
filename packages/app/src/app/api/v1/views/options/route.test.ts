@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
 }));
 
@@ -93,7 +93,6 @@ describe('GET /api/v1/views/options', () => {
       percentile: 'p90',
       xmode: 'interactivity',
     });
-    // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
     expect(body.quickFilters.deployments).toEqual(['single-node', 'multi-node', 'disagg']);
     expect(body.fleet.defaults).toEqual({

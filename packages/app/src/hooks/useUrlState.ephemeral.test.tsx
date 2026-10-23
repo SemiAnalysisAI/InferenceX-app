@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/model/test-model',
 }));
 
-vi.mock('@/lib/url-state', () => ({
+vi.mock('@/lib/routing/url-state', () => ({
   readUrlParams: mocks.readUrlParams,
   refreshUrlParamsOnNavigation: mocks.refreshUrlParamsOnNavigation,
   writeUrlParams: mocks.writeUrlParams,
@@ -71,11 +71,6 @@ describe('useUrlState outside an ephemeral scope', () => {
 });
 
 describe('useUrlState inside an ephemeral scope', () => {
-  // The /model/[slug] embed reuses the dashboard providers, whose URL-sync
-  // effects write every state change (auto-selected chip configs included)
-  // into the module-scoped share-link store. Inside the ephemeral scope those
-  // writes must be dropped, or Back-navigating to a bare /inference rebuilds
-  // with the embed's auto-populated state instead of the user's own.
   it('drops writes so embed state cannot leak into the dashboard', () => {
     mount(
       <EphemeralUrlStateContext.Provider value={true}>

@@ -3,7 +3,7 @@
 import { memo } from 'react';
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   CHART_WIDTH,
@@ -16,45 +16,32 @@ import {
 import { formatTickLabel } from './timeline-format';
 import { conversationHref, type RequestTimelineRow } from './timeline-rows';
 
-/** Phase color overlay drawn as a thin strip at the bottom of each bar. */
 const PHASE_COLORS: Record<string, string> = {
   profiling: '#22c55e',
   warmup: '#94a3b8',
   unknown: '#64748b',
 };
 
-// Time-axis tick spacing candidates (~8 ticks across the visible window,
-// snapped to the first nice multiple that fits).
 const NICE_TICK_MS = [
   100, 250, 500, 1000, 2000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000, 600_000, 1_800_000,
 ];
 
 export interface TimelineBarsProps {
   rows: RequestTimelineRow[];
-  /** Absolute index of rows[0] within the full virtualized row list. */
   firstRowIndex: number;
   scrollTop: number;
   viewportHeight: number;
   expandedSubagents: ReadonlySet<string>;
-  /** Absolute ns timestamp of the visible data's origin (min credit). */
   dataStart: number;
-  /** Visible window (ns offsets from dataStart). */
   vStart: number;
   vEnd: number;
   datasetSlug?: string | null;
   locale: Locale;
   onBarHover: (e: React.MouseEvent, row: RequestTimelineRow, req: RequestRecord) => void;
   onBarLeave: () => void;
-  /** Plain left-click SPA navigation; modified clicks fall through to the href. */
   onBarClick: (e: React.MouseEvent, req: RequestRecord) => void;
 }
 
-/**
- * The static SVG content of the timeline: time axis, row separators, and every
- * request bar. Memoized so tooltip/cursor mousemove state changes in the parent
- * (which fire on every pointer move) don't re-render thousands of bar rects —
- * only zoom/pan, filter, and expansion changes reach this subtree.
- */
 export const TimelineBars = memo(
   ({
     rows,
@@ -73,10 +60,8 @@ export const TimelineBars = memo(
   }: TimelineBarsProps) => {
     const visibleDur = Math.max(vEnd - vStart, 1);
     const scale = (CHART_WIDTH - PADDING_RIGHT) / visibleDur;
-    // Local coords: convert ns offset from dataStart to x px.
     const xOf = (ns: number) => (ns - dataStart - vStart) * scale;
 
-    // Time-axis ticks (~8 across visible window, snapped to nice second multiples).
     const targetMs = visibleDur / 1e6 / 8;
     const tickMs = NICE_TICK_MS.find((n) => n >= targetMs) ?? targetMs;
     const tickNs = tickMs * 1e6;
@@ -98,7 +83,6 @@ export const TimelineBars = memo(
             />
           </clipPath>
         </defs>
-        {/* Header / time-axis baseline */}
         <line
           x1={0}
           y1={HEADER_HEIGHT}
@@ -108,10 +92,7 @@ export const TimelineBars = memo(
           opacity={0.15}
         />
 
-        {/* Time axis ticks */}
         {ticks.map((t) => {
-          // Convert visible-window ns offset → x px (the tick array
-          // is already in dataStart-relative coords).
           const x = (t - vStart) * scale;
           return (
             <g key={t}>
@@ -139,7 +120,6 @@ export const TimelineBars = memo(
         })}
 
         <g clipPath="url(#timeline-body-clip)">
-          {/* Row separators */}
           {rows.map((row, idx) => (
             <line
               key={`sep-${row.key}`}
@@ -152,14 +132,10 @@ export const TimelineBars = memo(
             />
           ))}
 
-          {/* Request bars */}
           {rows.map((row, rowIdx) => {
             const yTop =
               HEADER_HEIGHT + (firstRowIndex + rowIdx) * (ROW_HEIGHT + ROW_GAP) - scrollTop + 2;
             const barH = ROW_HEIGHT - 4;
-            // For multi-stream subagent containers, suppress the union
-            // bars when expanded — the child stream rows draw them
-            // individually instead, so we'd double-draw otherwise.
             if (
               row.kind === 'subagent' &&
               (row.streamCount ?? 1) > 1 &&
@@ -171,8 +147,6 @@ export const TimelineBars = memo(
               const xCredit = xOf(req.credit);
               const xStart = xOf(req.start);
               const xEnd = xOf(req.end);
-              // Cull bars entirely outside the visible window so big
-              // benchmarks don't render thousands of zero-width rects.
               if (xEnd < -2 || xCredit > CHART_WIDTH + 2) return null;
               const runW = Math.max(xEnd - xStart, 1);
               const queueW = Math.max(xStart - xCredit, 0);
@@ -180,7 +154,6 @@ export const TimelineBars = memo(
               const barKey = `${req.cid}-${req.ti}-${req.start}`;
               const barChildren = (
                 <>
-                  {/* Queue lead-in (faint) — only drawn when noticeable. */}
                   {queueW >= 1 && (
                     <rect
                       x={xCredit}
@@ -191,8 +164,6 @@ export const TimelineBars = memo(
                       opacity={0.35}
                     />
                   )}
-                  {/* Main bar — opacity stepped down with depth so
-                parent > subagent > stream reads visually. */}
                   <rect
                     x={xStart}
                     y={yTop}
@@ -210,7 +181,6 @@ export const TimelineBars = memo(
                             : 0.85
                     }
                   />
-                  {/* Phase strip at bottom */}
                   <rect
                     x={xStart}
                     y={yTop + barH - 2}
@@ -220,7 +190,6 @@ export const TimelineBars = memo(
                     fill={phaseColor}
                     opacity={0.85}
                   />
-                  {/* Cancelled X overlay */}
                   {req.cancelled && runW > 6 && (
                     <line
                       x1={xStart + 1}
@@ -234,7 +203,6 @@ export const TimelineBars = memo(
                   )}
                 </>
               );
-              // No source dataset → not linkable; plain group.
               if (!datasetSlug) {
                 return (
                   <g
@@ -246,12 +214,6 @@ export const TimelineBars = memo(
                   </g>
                 );
               }
-              // Linkable: render a real SVG anchor with the conversation
-              // href so the browser's native "open in new tab" works
-              // (right-click menu, ⌘/Ctrl-click, middle-click). Plain
-              // left-click stays an in-app navigation; modified or
-              // non-primary clicks fall through to the browser. Suppress
-              // the native link drag so it doesn't fight the pan gesture.
               return (
                 <a
                   key={barKey}

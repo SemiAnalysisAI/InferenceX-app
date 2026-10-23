@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   buildCacheReuse,
+  cacheReuseRecipes,
   cacheShareOf,
+  recipeKeyOf,
   defaultCacheReuseGroup,
   formatShare,
   tieredRowCount,
@@ -69,7 +71,6 @@ function makePoint(
 
 describe('cacheShareOf', () => {
   it('reproduces the article: B200 + SGLang at concurrency 8, 12, 16', () => {
-    // Live GLM-5.2 rows, 2026-09-17. The article rounds the remainder to one decimal.
     const rows = [
       [8, 0.903, 0.06, 0.056],
       [12, 0.765, 0.192, 0.123],
@@ -87,8 +88,6 @@ describe('cacheShareOf', () => {
         ),
       ),
     );
-    // The CPU-offload figure is the HiCache host tier the article plots; the
-    // router's external figure is reported too and must not be added on top.
     expect(shares.map((s) => s?.hostSource)).toEqual(['cpu', 'cpu', 'cpu']);
     expect(shares.map((s) => formatShare(s!.hbm))).toEqual(['90.3%', '76.5%', '54.8%']);
     expect(shares.map((s) => formatShare(s!.host))).toEqual(['6.0%', '19.2%', '40.3%']);
@@ -127,7 +126,6 @@ describe('cacheShareOf', () => {
         {
           server_gpu_cache_hit_rate: 0.8,
           server_cpu_cache_hit_rate: 0.1,
-          // The descriptor is a string inside the numeric metrics bag on real rows.
           kv_offloading: 'none' as unknown as number,
         },
         { framework: 'trt', offload_mode: 'on' },
@@ -137,7 +135,6 @@ describe('cacheShareOf', () => {
   });
 
   it('clamps an over-reported runtime figure and keeps the raw total for the caveat', () => {
-    // GB300 Dynamo rows report 1.012 on occasion.
     const share = cacheShareOf(makePoint({ server_gpu_cache_hit_rate: 1.012 }));
     expect(share).toMatchObject({ hbm: 1, host: 0, unreused: 0 });
     expect(share!.reportedTotal).toBeCloseTo(1.012);
@@ -155,7 +152,6 @@ describe('cacheShareOf', () => {
       cacheShareOf(makePoint({ server_gpu_cache_hit_rate: 0.5, theoretical_cache_hit_rate: 0.97 }))!
         .theoretical,
     ).toBe(0.97);
-    // A GB300 row scraped only at the frontend: ceiling but no measured tier.
     expect(cacheShareOf(makePoint({ theoretical_cache_hit_rate: 0.97 }))).toBeNull();
     expect(cacheShareOf(makePoint({ tput_per_gpu: 100 }))).toBeNull();
     expect(
@@ -196,7 +192,6 @@ describe('buildCacheReuse', () => {
           ),
           makePoint({ server_gpu_cache_hit_rate: 0.6 }, { conc: 24 }),
         ],
-        // Another chip in the same run: not this configuration, so not drawn.
         mi355x_sglang__run0: [
           makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware: 'mi355x' }),
         ],
@@ -284,5 +279,133 @@ describe('defaultCacheReuseGroup', () => {
     expect(defaultCacheReuseGroup(groups, meta)).toBe('b200_sglang');
     expect(tieredRowCount(groups.h100_sglang)).toBe(0);
     expect(defaultCacheReuseGroup({ h100_sglang: groups.h100_sglang }, meta)).toBeNull();
+  });
+});
+
+describe('recipe identity', () => {
+  it('keeps DWDP variants separate and preserves the legacy default key', () => {
+    const topology = { is_multinode: true, prefill_tp: 1, prefill_num_workers: 2 };
+    const legacy = recipeKeyOf(makePoint({}, topology));
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 1 }, topology))).toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(legacy);
+    expect(recipeKeyOf(makePoint({ prefill_dwdp_size: 8 }, topology))).not.toBe(
+      recipeKeyOf(makePoint({ prefill_dwdp_size: 4 }, topology)),
+    );
+  });
+  const dep8 = {
+    is_multinode: true,
+    prefill_tp: 8,
+    prefill_ep: 32,
+    prefill_dp_attention: true,
+    prefill_num_workers: 4,
+    decode_tp: 8,
+    decode_ep: 32,
+    decode_dp_attention: true,
+    decode_num_workers: 4,
+    num_prefill_gpu: 32,
+    num_decode_gpu: 32,
+    spec_method: 'mtp',
+  };
+  const tp16 = {
+    ...dep8,
+    prefill_tp: 16,
+    decode_tp: 16,
+    prefill_num_workers: 2,
+    decode_num_workers: 2,
+  };
+  const off = (conc: number, gpu: number) =>
+    makePoint({ server_gpu_cache_hit_rate: gpu }, { ...dep8, conc, offload_mode: 'off' });
+  const on = (conc: number, gpu: number, cpu: number) =>
+    makePoint(
+      { server_gpu_cache_hit_rate: gpu, server_cpu_cache_hit_rate: cpu },
+      { ...dep8, conc, offload_mode: 'on' },
+    );
+  const wide = (conc: number, gpu: number) =>
+    makePoint({ server_gpu_cache_hit_rate: gpu }, { ...tp16, conc, offload_mode: 'off' });
+  const official = [
+    off(4, 0.6),
+    wide(4, 0.62),
+    on(8, 0.55, 0.11),
+    off(8, 0.54),
+    wide(8, 0.5),
+    off(10, 0.53),
+    on(10, 0.52, 0.12),
+    on(16, 0.38, 0.16),
+    on(24, 0.33, 0.22),
+  ];
+  const config = { hwKey: 'h200_vllm' };
+
+  it('tells recipes apart by layout and offload, not by concurrency', () => {
+    expect(recipeKeyOf(off(8, 0.5))).toBe(recipeKeyOf(off(16, 0.4)));
+    expect(recipeKeyOf(off(8, 0.5))).not.toBe(recipeKeyOf(on(8, 0.5, 0.1)));
+    expect(recipeKeyOf(off(8, 0.5))).not.toBe(recipeKeyOf(wide(8, 0.5)));
+  });
+
+  it('never mixes recipes along one sweep', () => {
+    const result = buildCacheReuse({ official, config });
+    const plotted = new Set(result.bars.map((b) => recipeKeyOf(b.point)));
+    expect(plotted.size).toBe(1);
+  });
+
+  it('defaults to the recipe with the most tiered rows and keeps all of its rows', () => {
+    const result = buildCacheReuse({ official, config });
+    expect(result.recipe).toBe(recipeKeyOf(on(8, 0, 0)));
+    expect(result.bars.map((b) => b.concurrency)).toEqual([8, 10, 16, 24]);
+    expect(result.bars.every((b) => b.share.host > 0)).toBe(true);
+  });
+
+  it('plots the requested recipe and falls back when it is unknown', () => {
+    const offKey = recipeKeyOf(off(8, 0));
+    const picked = buildCacheReuse({ official, config, recipe: offKey });
+    expect(picked.recipe).toBe(offKey);
+    expect(picked.bars.map((b) => [b.concurrency, b.share.hbm])).toEqual([
+      [4, 0.6],
+      [8, 0.54],
+      [10, 0.53],
+    ]);
+    expect(buildCacheReuse({ official, config, recipe: 'nope' }).recipe).toBe(
+      recipeKeyOf(on(8, 0, 0)),
+    );
+  });
+
+  it('lists each recipe once with a readable label and its row counts', () => {
+    const recipes = cacheReuseRecipes(official);
+    expect(recipes.map((r) => [r.rows, r.tiered])).toEqual([
+      [4, 4],
+      [3, 3],
+      [2, 2],
+    ]);
+    expect(recipes[0]!.label).toContain('KV offload');
+    expect(recipes[1]!.label).toContain('no offload');
+    expect(new Set(recipes.map((r) => r.label)).size).toBe(3);
+  });
+
+  it('selects recipes in an overlay-only configuration', () => {
+    const result = buildCacheReuse({
+      official: [],
+      config,
+      recipe: recipeKeyOf(off(8, 0)),
+      overlay: { h200_vllm__run0: official },
+      overlayMeta: { h200_vllm__run0: { hwKey: 'h200_vllm', runIndex: 0 } },
+    });
+    expect(result.recipes).toHaveLength(3);
+    expect(result.recipe).toBe(recipeKeyOf(off(8, 0)));
+    expect(result.bars.map((bar) => [bar.concurrency, bar.share.hbm])).toEqual([
+      [4, 0.6],
+      [8, 0.54],
+      [10, 0.53],
+    ]);
+  });
+
+  it('keeps a run on its own recipe when it did not measure the plotted one', () => {
+    const run = [wide(8, 0.7), wide(16, 0.6)];
+    const result = buildCacheReuse({
+      official,
+      config,
+      overlay: { h200_vllm__run0: run },
+      overlayMeta: { h200_vllm__run0: { hwKey: 'h200_vllm', runIndex: 0 } as never },
+    });
+    const runBars = result.bars.filter((b) => b.seriesKey === 'run:0');
+    expect(runBars.map((b) => b.concurrency)).toEqual([8, 16]);
   });
 });

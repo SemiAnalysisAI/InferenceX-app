@@ -5,8 +5,8 @@ import Link from 'next/link';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { headingVariants } from '@/components/ui/heading';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 interface PostLink {
   slug: string;
@@ -16,7 +16,6 @@ interface PostLink {
 interface BlogPostNavProps {
   prev: PostLink | null;
   next: PostLink | null;
-  /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
   labels?: { prev: string; next: string };
 }
@@ -74,7 +73,6 @@ function NavCard({
   );
 }
 
-/** Previous / next article cards under the post body. Slot stays empty at either end of the list. */
 export function BlogPostNav({
   prev,
   next,

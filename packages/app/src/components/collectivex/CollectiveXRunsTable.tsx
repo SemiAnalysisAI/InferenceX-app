@@ -1,11 +1,14 @@
 'use client';
 
 import { ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { useRef } from 'react';
+
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
 import { Button } from '@/components/ui/button';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 import { collectiveXConclusionLabel, collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import type { CollectiveXRunSummary } from './types';
@@ -16,7 +19,7 @@ interface CollectiveXRunsTableProps {
   visibleRunIds: ReadonlySet<string>;
   loadingRunIds: ReadonlySet<string>;
   deletingRunIds: ReadonlySet<string>;
-  onVisibleChange: (runId: string, visible: boolean) => void;
+  onVisibleChange: (runIds: string[], visible: boolean) => void;
   onDelete: (runId: string) => void;
   emptyMessage?: string;
 }
@@ -24,6 +27,7 @@ interface CollectiveXRunsTableProps {
 const STRINGS = {
   en: {
     shown: 'Shown',
+    shownHint: 'Shift-click a checkbox to set every run between it and the last one clicked',
     run: 'Run',
     result: 'Result',
     swapSuite: (m: number, n: number) => `swap_blocks: ${m}/${n} measured`,
@@ -44,6 +48,7 @@ const STRINGS = {
   },
   zh: {
     shown: '显示',
+    shownHint: '按住 Shift 点击复选框，可一次性勾选或取消勾选它与上次点击行之间的全部运行',
     run: '运行',
     result: '结果',
     swapSuite: (m: number, n: number) => `swap_blocks：已测量 ${m}/${n}`,
@@ -95,6 +100,7 @@ export function CollectiveXRunsTable({
 }: CollectiveXRunsTableProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const anchorRunIdRef = useRef<string | null>(null);
 
   if (runs.length === 0) {
     return (
@@ -110,7 +116,9 @@ export function CollectiveXRunsTable({
       <table className="w-full min-w-[940px] text-sm">
         <thead className="sticky top-0 z-1 bg-background">
           <tr className="border-b-2 border-border text-left text-muted-foreground">
-            <th className="px-3 py-1.5 font-medium">{t.shown}</th>
+            <th className="px-3 py-1.5 font-medium" title={t.shownHint}>
+              {t.shown}
+            </th>
             <th className="px-3 py-1.5 font-medium">{t.run}</th>
             <th className="px-3 py-1.5 font-medium">{t.result}</th>
             <th className="px-3 py-1.5 font-medium">{t.suites}</th>
@@ -122,13 +130,12 @@ export function CollectiveXRunsTable({
           </tr>
         </thead>
         <tbody>
-          {runs.map((run) => {
+          {runs.map((run, rowIndex) => {
             const visible = visibleRunIds.has(run.run_id);
             const loading = loadingRunIds.has(run.run_id);
             const deleting = deletingRunIds.has(run.run_id);
             const conclusion = run.conclusion;
             const selectedRunIndex = selectedRunIndexById.get(run.run_id);
-            // Summaries stored before the kv suite carry no kv_cases: EP-only.
             const kvRequested = run.kv_cases?.requested ?? 0;
             const kvMeasured = run.kv_cases?.measured ?? 0;
             const swapRequested = run.swap_cases?.requested ?? 0;
@@ -154,9 +161,30 @@ export function CollectiveXRunsTable({
                       disabled={deletingRunIds.size > 0}
                       aria-label={t.showRun(run.run_id)}
                       data-testid={`collectivex-run-visible-${run.run_id}`}
+                      title={t.shownHint}
                       onChange={(event) => {
                         const next = event.target.checked;
-                        onVisibleChange(run.run_id, next);
+                        const shiftKey = (event.nativeEvent as MouseEvent).shiftKey === true;
+                        const anchorIndex = runs.findIndex(
+                          (candidate) => candidate.run_id === anchorRunIdRef.current,
+                        );
+                        anchorRunIdRef.current = run.run_id;
+                        if (shiftKey && anchorIndex !== -1 && anchorIndex !== rowIndex) {
+                          const range = runs
+                            .slice(
+                              Math.min(anchorIndex, rowIndex),
+                              Math.max(anchorIndex, rowIndex) + 1,
+                            )
+                            .map((candidate) => candidate.run_id);
+                          onVisibleChange(range, next);
+                          track('collectivex_run_visibility_range_toggled', {
+                            run: run.run_id,
+                            count: range.length,
+                            visible: next,
+                          });
+                          return;
+                        }
+                        onVisibleChange([run.run_id], next);
                         track('collectivex_run_visibility_toggled', {
                           run: run.run_id,
                           visible: next,
@@ -192,7 +220,7 @@ export function CollectiveXRunsTable({
                       </svg>
                     )}
                     <a
-                      href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
+                      href={`https://github.com/${run.source_repository ?? GITHUB_REPO_FULL}/actions/runs/${run.run_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={t.openRun(run.run_id)}

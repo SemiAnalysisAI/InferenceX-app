@@ -67,8 +67,17 @@ jobs:
           REQUESTED_BY: ${{ github.event.client_payload.requested-by || inputs.requested-by }}
           COMMENT_ID: ${{ github.event.client_payload.comment-id || inputs.comment-id }}
           RESET_STAGING_DATABASE: ${{ inputs.reset-staging-database || false }}
-          SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || 'SemiAnalysisAI/InferenceX' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
+          SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || vars.BENCHMARK_REPO }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PAT_PRESENT: ${{ secrets.PAT != '' }}
         run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          if [ "$PAT_PRESENT" != true ]; then
+            echo "::error::PAT secret is not set"
+            exit 1
+          fi
+          : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::run-id must be numeric"
             exit 1
@@ -97,7 +106,7 @@ jobs:
             echo "::error::reset-staging-database must be true or false"
             exit 1
           fi
-          if [ "$SOURCE_REPOSITORY" != "SemiAnalysisAI/InferenceX" ]; then
+          if [ "$SOURCE_REPOSITORY" != "$BENCHMARK_REPO" ]; then
             echo "::error::Unsupported source repository: $SOURCE_REPOSITORY"
             exit 1
           fi
@@ -119,13 +128,18 @@ jobs:
           PR_NUMBER: ${{ steps.request.outputs.pr-number }}
           REQUESTED_BY: ${{ steps.request.outputs.requested-by }}
           COMMENT_ID: ${{ steps.request.outputs.comment-id }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.PAT }}
           script: |
+            if (!process.env.BENCHMARK_REPO) {
+              throw new Error('BENCHMARK_REPO repository variable is not set');
+            }
+            const [owner, repo] = process.env.BENCHMARK_REPO.split('/');
             await github.rest.repos.createDispatchEvent({
-              owner: 'SemiAnalysisAI',
-              repo: 'InferenceX',
+              owner,
+              repo,
               event_type: 'stage-results-started',
               client_payload: {
                 'source-repository': `${context.repo.owner}/${context.repo.repo}`,
@@ -143,16 +157,20 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Point the shared staging Git branch at master
+      contents: write # Point the shared staging Git branch at the default branch
     steps:
-      - name: Point staging at master
+      - name: Point staging at the default branch
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
+            const defaultBranch = context.payload.repository?.default_branch;
+            if (!defaultBranch) {
+              throw new Error('Repository default branch is missing from the event payload');
+            }
             const source = await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'heads/master',
+              ref: `heads/${defaultBranch}`,
             });
             const sha = source.data.object.sha;
             try {
@@ -254,7 +272,7 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: $/.github/workflows/ingest-agentic-results.yml
+    uses: $/.github/workflows/ingest-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}
@@ -267,6 +285,8 @@ jobs:
 
   refresh-chart-series:
     name: Refresh staged chart series
+    outputs:
+      chart-links: ${{ steps.chart-links.outputs.chart-links }}
     needs: [validate, ingest]
     runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
@@ -288,6 +308,13 @@ jobs:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           RUN_ID: ${{ needs.validate.outputs.run-id }}
         run: bun run --cwd packages/db db:backfill-chart-series --run-id "$RUN_ID" --yes
+      - name: Build links to the staged Pareto lines
+        id: chart-links
+        env:
+          DATABASE_READONLY_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+          RUN_ID: ${{ needs.validate.outputs.run-id }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
+        run: bun run --cwd packages/app scripts/staged-chart-links.ts
 
   report:
     name: Report staging result
@@ -304,13 +331,19 @@ jobs:
           PR_NUMBER: ${{ needs.validate.outputs.pr-number }}
           REQUESTED_BY: ${{ needs.validate.outputs.requested-by }}
           COMMENT_ID: ${{ needs.validate.outputs.comment-id }}
+          CHART_LINKS: ${{ needs['refresh-chart-series'].outputs.chart-links }}
           STAGE_SUCCEEDED: ${{ needs['sync-staging-branch'].result == 'success' && needs['prepare-staging-database'].result == 'success' && needs.ingest.result == 'success' && needs['refresh-chart-series'].result == 'success' }}
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
         with:
           github-token: ${{ secrets.PAT }}
           script: |
+            if (!process.env.BENCHMARK_REPO) {
+              throw new Error('BENCHMARK_REPO repository variable is not set');
+            }
+            const [owner, repo] = process.env.BENCHMARK_REPO.split('/');
             await github.rest.repos.createDispatchEvent({
-              owner: 'SemiAnalysisAI',
-              repo: 'InferenceX',
+              owner,
+              repo,
               event_type: 'stage-results-completed',
               client_payload: {
                 'source-repository': `${context.repo.owner}/${context.repo.repo}`,
@@ -320,6 +353,7 @@ jobs:
                 'requested-by': process.env.REQUESTED_BY,
                 'comment-id': process.env.COMMENT_ID,
                 'stage-succeeded': process.env.STAGE_SUCCEEDED,
+                'chart-links': JSON.parse(process.env.CHART_LINKS || '[]'),
                 'app-run-id': String(context.runId),
               },
             });

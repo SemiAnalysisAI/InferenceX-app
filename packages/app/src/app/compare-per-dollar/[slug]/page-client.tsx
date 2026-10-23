@@ -16,21 +16,18 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track } from '@/lib/analytics/analytics';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 
-/** Only show Cost + Concurrency in the interpolated table — the rest of the
- *  metric rows (Throughput, tok/s/MW) live on the sibling /compare page. */
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
-/** Localized display labels keyed by the table's stable English metric key. */
 const PER_DOLLAR_LABEL_OVERRIDES = {
   en: {
     'Cost ($/M tok)': 'Dollar per Million Tokens',
@@ -40,8 +37,6 @@ const PER_DOLLAR_LABEL_OVERRIDES = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). Defined in
- *  packages/app/src/components/inference/metric-registry.ts. */
 const PER_DOLLAR_DEFAULT_Y_AXIS = 'y_costh';
 
 const STRINGS = {
@@ -74,8 +69,6 @@ const STRINGS = {
 interface ComparePerDollarPageClientProps {
   a: string;
   b: string;
-  /** Canonical compare slug (e.g. `deepseek-r1-h100-vs-h200`). Used for the
-   *  cross-link to the sibling `/compare/<same-slug>` route. */
   slug: string;
   label: string;
   modelLabel: string;
@@ -84,14 +77,7 @@ interface ComparePerDollarPageClientProps {
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   initialBenchmarkRows?: BenchmarkRow[];
-  /** One SSR-rendered prose paragraph per interpolated-table row (default
-   *  interactivity target). Each paragraph picks a template variant
-   *  deterministically from the slug so prose stays stable across renders
-   *  but varies across pages in the catalog. Empty array when there's no
-   *  comparable data. */
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   aLabel: string;
   bLabel: string;
@@ -99,12 +85,8 @@ interface ComparePerDollarPageClientProps {
   bVendor: string;
   aArch: string;
   bArch: string;
-  /** Large-hyperscaler-volume ownership $/GPU/hr for each GPU — sourced from HW_REGISTRY.costh
-   *  (the same input the per-dollar cost-per-token math uses). Rendered in the
-   *  header so readers can audit the pricing assumptions. */
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
-  /** Crawlable data graphic generated for the canonical default comparison. */
   heroImageSrc: string;
   locale?: 'en' | 'zh';
 }

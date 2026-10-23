@@ -1,13 +1,11 @@
-/**
- * Server-side OperatorX reads: the active source plus normalization and in-process
- * caching. API routes call only this module.
- */
+import {
+  buildRunComparison,
+  mergeRunComparisons,
+  OPERATORX_COMPARISON_VERSION,
+} from '@semianalysisai/inferencex-db/operatorx/comparison-cache';
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
-  buildComparison,
-  comparisonCaseKey,
   type Comparison,
-  type ComparisonInput,
   type ComparisonOp,
   opFamily,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -21,29 +19,24 @@ import {
   type OperatorXTimeline,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
+import { cachedQuery, operatorXBlobPrefix } from '@/lib/cache/api-cache';
+
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
 
-/*
- * Responses are cached at the CDN until an ingest purges them. What the server keeps in
- * memory is keyed by stored revision instead of by time, so the request after a purge
- * reads the new data: the run list is read fresh (one small query), and a run's bundle or
- * an op's comparison is reused only while the revisions it was built from are current.
- */
 const MAX_DATASETS = 32;
 const COMPARISON_READ_BATCH = 4;
+const TIMELINE_READ_BATCH = 4;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
 let runsInFlight: Promise<OperatorXRunRef[]> | null = null;
-/** Normalized bundles by `runId:revision`, least recently used first. */
 const datasets = new Map<string, Promise<Normalized>>();
 
 export function sourceName(): string {
   return getOperatorXSource().name;
 }
 
-/** The stored runs; concurrent callers share one read. */
 export function listRuns(): Promise<OperatorXRunRef[]> {
   if (!runsInFlight) {
     runsInFlight = getOperatorXSource().listRuns();
@@ -61,10 +54,15 @@ async function normalized(runId: string): Promise<Normalized> {
   const runs = await listRuns();
   const run = runs.find((r) => r.run_id === runId);
   if (!run) throw new OperatorXSourceError('Run not found', 404);
+  return normalizedRun(run);
+}
+
+function normalizedRun(run: OperatorXRunRef): Promise<Normalized> {
+  const runId = run.run_id;
   const key = `${runId}:${revisionOf(run)}`;
   const hit = datasets.get(key);
   if (hit) {
-    datasets.delete(key); // refresh LRU position
+    datasets.delete(key);
     datasets.set(key, hit);
     return hit;
   }
@@ -96,9 +94,7 @@ const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = {
   attention: 'attn',
 };
 
-/** Each op's comparison and the `runId:revision` list it was built from. */
 const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
-/** Comparisons built while some run could not be read: served, but never cached. */
 const partial = new WeakSet<Comparison>();
 
 export function isPartialComparison(comparison: Comparison): boolean {
@@ -113,68 +109,84 @@ function comparisonRuns(op: ComparisonOp, listed: OperatorXRunRef[]): OperatorXR
   });
 }
 
-/**
- * Keep the newest actual result for each hardware/case/backend. A missing row only
- * stands until an older run supplies a result; errors and unsupported results are
- * real outcomes and remain newest-wins. Read a few bundles at a time and retain only
- * selected rows, not every historical profile.
- */
 async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Comparison> {
-  const selected = new Map<
-    string,
-    { runner: string; run: Normalized['run']; result: Normalized['results'][number] }
-  >();
+  const comparisons: Comparison[] = [];
   let failedReads = 0;
   const source = getOperatorXSource();
+  const compactRuns = source.getRunComparisons ? await source.getRunComparisons(runs, op) : null;
   for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
     const batch = runs.slice(i, i + COMPARISON_READ_BATCH);
     const loaded = await Promise.allSettled(
-      batch.map((run) => source.getBundle(run.run_id).then(normalizeBundle)),
+      batch.map(async (run) => {
+        const compact = compactRuns
+          ? compactRuns.get(run.run_id)
+          : await source.getRunComparison?.(run.run_id, op);
+        if (compact) return compact;
+        // Legacy/local sources retain the same normalizer and source indices.
+        // Reuse revision-keyed normalization rather than loading raw artifacts twice.
+        const dataset = await normalizedRun(run);
+        return buildRunComparison(op, { runner: run.plan!.runner, dataset });
+      }),
     );
-    for (const [j, outcome] of loaded.entries()) {
-      if (outcome.status === 'rejected') {
-        failedReads++;
-        continue;
-      }
-      const { run: summary, results } = outcome.value;
-      const runner = batch[j].plan!.runner;
-      for (const result of results) {
-        const key = comparisonCaseKey(op, runner, result);
-        if (key === null) continue;
-        const previous = selected.get(key);
-        if (!previous || (previous.result.status === 'missing' && result.status !== 'missing')) {
-          selected.set(key, { runner, run: summary, result });
-        }
-      }
+    for (const outcome of loaded) {
+      if (outcome.status === 'rejected') failedReads++;
+      else comparisons.push(outcome.value);
     }
   }
-  if (selected.size === 0 && failedReads > 0)
+  const comparison = mergeRunComparisons(op, comparisons);
+  if (comparison.rows.length === 0 && failedReads > 0)
     throw new OperatorXSourceError('OperatorX run documents could not be read', 503);
-
-  const byRun = new Map<string, ComparisonInput>();
-  for (const { runner, run, result } of selected.values()) {
-    let input = byRun.get(run.runId);
-    if (!input) {
-      input = { runner, dataset: { run, results: [] } };
-      byRun.set(run.runId, input);
-    }
-    input.dataset.results.push(result);
-  }
-  const comparison = buildComparison(op, [...byRun.values()]);
   if (failedReads > 0) partial.add(comparison);
   return comparison;
 }
 
-/**
- * An op's comparison, rebuilt when a run it reads is added, replaced or removed. A
- * partial one (some run failed to read) is not kept, so the next request tries again.
- */
+// Throw before cache persistence; carry the partial response back to the caller.
+class UncacheableComparisonError extends Error {
+  readonly comparison: Comparison;
+
+  constructor(comparison: Comparison) {
+    super('OperatorX comparison is incomplete or its revision changed during the read');
+    this.name = 'UncacheableComparisonError';
+    this.comparison = comparison;
+  }
+}
+
+async function sharedComparison(
+  op: ComparisonOp,
+  runs: OperatorXRunRef[],
+  revisions: string,
+): Promise<Comparison> {
+  if (getOperatorXSource().name !== 'database') return compareOp(op, runs);
+  const read = cachedQuery(
+    async (_revisions: string) => {
+      const comparison = await compareOp(op, runs);
+      const expected = new Map(runs.map((run) => [run.run_id, revisionOf(run)]));
+      if (
+        partial.has(comparison) ||
+        comparison.rows.some((row) => expected.get(row.runId) !== row.revision)
+      ) {
+        partial.add(comparison);
+        throw new UncacheableComparisonError(comparison);
+      }
+      return comparison;
+    },
+    `${operatorXBlobPrefix()}comparison:v${OPERATORX_COMPARISON_VERSION}:${op}`,
+    { blobOnly: true },
+  );
+  try {
+    return await read(revisions);
+  } catch (error) {
+    if (error instanceof UncacheableComparisonError) return error.comparison;
+    throw error;
+  }
+}
+
 export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   const runs = comparisonRuns(op, await listRuns());
   const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
   const hit = compared.get(op);
   if (hit?.revisions === revisions) return hit.value;
-  const value = compareOp(op, runs);
+  const value = sharedComparison(op, runs, revisions);
   compared.set(op, { revisions, value });
   const drop = () => {
     if (compared.get(op)?.value === value) compared.delete(op);
@@ -183,41 +195,36 @@ export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   return value;
 }
 
-/**
- * Read timelines from their original stored runs. A newer comparison can replace a
- * row without removing the older result that a client's open detail still names.
- * Read current bundles rather than the run-ID cache: a re-ingest replaces the stored
- * revision while keeping the run ID and result indices.
- */
 export async function getTimelines(
   op: ComparisonOp,
   refs: string[],
 ): Promise<{ timelines: Record<string, OperatorXTimeline | null>; known: boolean }> {
-  const timelines: Record<string, OperatorXTimeline | null> = {};
+  const timelines: Record<string, OperatorXTimeline | null> = Object.fromEntries(
+    refs.map((ref) => [ref, null]),
+  );
   let known = true;
-  const loaded = new Map<string, Promise<Normalized>>();
-  for (const ref of refs) {
-    const [runId, rawIndex, revision] = ref.split(':');
-    const index = Number(rawIndex);
+  const runs = [...Map.groupBy(refs, (ref) => ref.split(':')[0])];
+  const source = getOperatorXSource();
+  const readRun = async ([runId, runRefs]: [string, string[]]) => {
     try {
-      let bundle = loaded.get(runId);
-      if (!bundle) {
-        bundle = getOperatorXSource().getBundle(runId).then(normalizeBundle);
-        loaded.set(runId, bundle);
-      }
-      const { run, results, metrics } = await bundle;
-      const result = results[index];
-      if (!revision || revision !== run.revision || !result || opFamily(result.opType) !== op) {
-        timelines[ref] = null;
-        known = false;
-      } else {
-        timelines[ref] = compactTimeline(metrics[index]);
+      const { run, results, metrics } = normalizeBundle(await source.getBundle(runId));
+      for (const ref of runRefs) {
+        const [, rawIndex, revision] = ref.split(':');
+        const index = Number(rawIndex);
+        const result = results[index];
+        if (!revision || revision !== run.revision || !result || opFamily(result.opType) !== op) {
+          known = false;
+        } else {
+          timelines[ref] = compactTimeline(metrics[index]);
+        }
       }
     } catch (error) {
       if (!(error instanceof OperatorXSourceError) || error.status !== 404) throw error;
-      timelines[ref] = null;
       known = false;
     }
+  };
+  for (let i = 0; i < runs.length; i += TIMELINE_READ_BATCH) {
+    await Promise.all(runs.slice(i, i + TIMELINE_READ_BATCH).map(readRun));
   }
   return { timelines, known };
 }
@@ -226,7 +233,6 @@ export function errorStatus(error: unknown): number {
   return error instanceof OperatorXSourceError ? error.status : 503;
 }
 
-/** Our own source errors say what failed; anything else stays generic. */
 export function errorMessage(error: unknown, fallback: string): string {
   return error instanceof OperatorXSourceError ? `${fallback}: ${error.message}` : fallback;
 }

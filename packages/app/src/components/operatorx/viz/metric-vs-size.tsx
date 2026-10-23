@@ -1,6 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -27,7 +28,11 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
     [view],
   );
   const [slice, setSlice] = useState<string | null>(null);
-  const current = groups.find(([k]) => k === slice) ?? groups[0];
+  const defaults = view.defaults ?? comparisonDefaults(view);
+  const current =
+    groups.find(([k]) => k === slice) ??
+    groups.find(([k]) => k === defaults.metricVsSizeSlice) ??
+    groups[0];
   const points = useMemo<Point[]>(
     () =>
       current

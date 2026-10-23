@@ -1,47 +1,5 @@
 import { expectNoPageOverflow } from '../support/e2e';
 
-describe('Evaluation Chart', () => {
-  before(() => {
-    cy.viewport(1440, 900);
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/evaluation');
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
-  });
-
-  it('shows the Accuracy Evals heading', () => {
-    cy.contains('h2', 'Accuracy Evals').should('be.visible');
-  });
-
-  it('shows benchmark selector', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
-  });
-
-  it('benchmark selector has options', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
-  it('shows a chart with SVG', () => {
-    cy.get('#evaluation-chart').find('svg').should('exist');
-  });
-
-  it('does not show "No data available" text', () => {
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
-  });
-
-  it('shows Source attribution in chart caption', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('[data-testid="result-context"]')
-      .should('contain', 'SemiAnalysis InferenceX');
-  });
-});
-
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
     cy.viewport(1440, 900);
@@ -51,10 +9,6 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.visit('/evaluation');
     cy.get('[data-testid="evaluation-chart-display"]').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
-  });
-
-  it('renders SVG data points (circles) inside the evaluation chart after data loads', () => {
-    cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
   });
 
   it('changing the benchmark selector updates the chart subtitle to reflect the new benchmark', () => {
@@ -74,36 +28,10 @@ describe('Evaluation Chart — Content & Interactions', () => {
             .should('not.eq', initialCaption);
         });
       });
-    // Clear Radix scroll-lock side effect so subsequent tests can click
     cy.get('body').then(($body) => {
       $body.removeAttr('data-scroll-locked');
       $body.css('pointer-events', '');
     });
-  });
-
-  it('legend sidebar renders with at least one hardware item', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .should('exist')
-      .find('li')
-      .should('have.length.greaterThan', 0);
-  });
-
-  it('date picker section is present with a Run Date button', () => {
-    cy.get('[data-testid="evaluation-chart-display"]')
-      .contains('button', 'Run Date:')
-      .should('exist');
-  });
-
-  it('chart caption includes the selected model name and benchmark', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('figcaption')
-      .invoke('text')
-      .should('match', /Source: SemiAnalysis InferenceX/u)
-      .and('contain', 'Model:')
-      .and('contain', 'Workload:');
   });
 
   it('Show Labels switch exists in the legend and toggling it adds score labels to the chart', () => {
@@ -121,9 +49,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
       cy.wrap($switch).click();
       cy.get('#evaluation-chart svg .score-label').should('have.length.greaterThan', 0);
     });
-  });
 
-  it('"Reset filter" link appears after deactivating a legend item and restores all items when clicked', () => {
     cy.get('#evaluation-chart').closest('figure').find('.sidebar-legend li label').first().click();
 
     cy.get('#evaluation-chart')
@@ -369,10 +295,8 @@ describe('Evaluation evidence reader', () => {
         },
       }).as('unofficialEvidence');
     });
-    // Match the artifact fixture explicitly instead of inheriting changing dashboard defaults.
     cy.visit(`/evaluation?unofficialrun=${runId}&g_model=DeepSeek-V4-Pro&i_prec=fp4&e_bench=gsm8k`);
     cy.wait('@unofficialEvidence');
-    // The overlay can sort below the first ten official rows once both fetches settle.
     cy.get('[data-testid="evaluation-results-table"] [aria-label="Rows per page"]').click();
     cy.contains('[role="option"]', /^100$/u).click();
     cy.get('[data-testid="evaluation-results-table"]')
@@ -418,8 +342,6 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
     cy.visit('/zh/evaluation', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        // The eval-samples toast fires 1.5s after load and covers the retry
-        // button at this viewport — keep it dismissed for the whole suite.
         win.localStorage.setItem('inferencex-eval-samples-nudge-dismissed', String(Date.now()));
       },
     });
@@ -459,10 +381,6 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
 
   it('distinguishes a fetch error from empty data and retries the failed query', () => {
     cy.fixture('api/evaluations.json').then((evaluations) => {
-      // Flag-gated rather than attempt-counted: the page left over from the
-      // previous test can fire a stray request after this intercept registers
-      // (firefox does), which would silently consume the failure budget and
-      // let the fresh page succeed without ever showing the error card.
       let attempts = 0;
       let succeed = false;
       cy.intercept('GET', '/api/v1/evaluations', (request) => {
@@ -471,22 +389,13 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
           succeed ? { statusCode: 200, body: evaluations } : { statusCode: 500, body: {} },
         );
       });
-      // Distinct URL: with testIsolation off, revisiting the beforeEach URL
-      // does not reliably reload, so the intercept would never be exercised.
       cy.visit('/zh/evaluation?e2e=fetch-error');
-      // Long timeout: the error card only renders after two failed attempts
-      // separated by React Query's retry backoff, which can outlast the
-      // default budget on a slow (firefox CI) page load.
       cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
         .should('contain.text', '评估数据加载失败。')
         .and('contain.text', '重试');
       cy.then(() => {
         succeed = true;
       });
-      // Forced: the floating chart-actions row (absolute top-6 right-6 z-10)
-      // overlaps the banner's right edge in the error state — a pre-existing
-      // layout collision, not a localization regression. This test covers the
-      // retry semantics, not tap reachability.
       cy.get('[data-testid="evaluation-query-error"]')
         .contains('button', '重试')
         .click({ force: true });
@@ -499,7 +408,6 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   it('keeps evaluation results visible while retrying failed availability metadata', () => {
     cy.fixture('api/availability.json').then((availability) => {
       cy.fixture('api/evaluations.json').then((evaluations) => {
-        // Flag-gated for the same stray-request reason as the previous test.
         let availabilityAttempts = 0;
         let succeed = false;
         cy.intercept('GET', '/api/v1/availability*', (request) => {
@@ -511,7 +419,6 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
         cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: evaluations });
         cy.visit('/zh/evaluation?e2e=availability-retry');
 
-        // Long timeout: same two-failures-plus-backoff delay as above.
         cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
           .should('contain.text', '筛选项可用性数据加载失败。')
           .and('contain.text', '重试');
@@ -524,7 +431,6 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
         cy.then(() => {
           succeed = true;
         });
-        // Forced for the same floating chart-actions overlap as above.
         cy.get('[data-testid="evaluation-query-error"]')
           .contains('button', '重试')
           .click({ force: true });

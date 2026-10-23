@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import type * as BlogLib from '@/lib/blog';
-import type { BlogPostMeta } from '@/lib/blog';
+import type * as BlogLib from '@/lib/blog/blog';
+import type { BlogPostMeta } from '@/lib/blog/blog';
 
 const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
   slug,
@@ -28,7 +28,7 @@ const THUMBNAILS: Record<string, BlogLib.PostThumbnail | null> = {
   mid: { light: '/images/mid/context.png', dark: '/images/mid/context.png' },
 };
 
-vi.mock('@/lib/blog', async (importOriginal) => {
+vi.mock('@/lib/blog/blog', async (importOriginal) => {
   const actual = await importOriginal<typeof BlogLib>();
   return {
     ...actual,
@@ -60,21 +60,16 @@ describe('BlogIndexContent', () => {
   it('uses post figures as thumbnails and a text-free tile when a post has none', () => {
     const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
 
-    // Paired light/dark figures go through the themed image (per-theme data
-    // attributes), resized by the Next image optimizer. The featured card asks
-    // for the wide variant.
     expect(html).toContain(
       'data-src-light="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-light.png&amp;w=1200&amp;q=75"',
     );
     expect(html).toContain(
       'data-src-dark="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-dark.png&amp;w=1200&amp;q=75"',
     );
-    // A single theme-neutral figure renders as a plain responsive image.
     expect(html).toContain(
       'src="/_next/image?url=%2Fimages%2Fmid%2Fcontext.png&amp;w=640&amp;q=75"',
     );
     expect(html).toContain('sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"');
-    // Posts without figures get the tile; the title never appears inside it.
     expect(html.match(/data-testid="blog-thumbnail-tile"/gu)).toHaveLength(2);
     expect(html.match(/data-testid="blog-thumbnail-figure"/gu)).toHaveLength(2);
     const tile = html.slice(html.indexOf('data-testid="blog-thumbnail-tile"'));

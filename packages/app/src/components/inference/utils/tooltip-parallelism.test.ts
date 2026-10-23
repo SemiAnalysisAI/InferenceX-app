@@ -7,9 +7,6 @@ import {
   type TooltipConfig,
 } from '@/components/inference/utils/tooltipUtils';
 
-// ---------------------------------------------------------------------------
-// fixture factories
-// ---------------------------------------------------------------------------
 function pt(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -54,9 +51,6 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
   };
 }
 
-// ===========================================================================
-// parallelism HTML in tooltips, old data (no ep field)
-// ===========================================================================
 describe('tooltip parallelism — old data (no ep field)', () => {
   it('shows GPU count when ep and prefill_ep are absent', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 4 }) }));
@@ -77,10 +71,29 @@ describe('tooltip parallelism — old data (no ep field)', () => {
   });
 });
 
-// ===========================================================================
-// parallelism HTML in tooltips, standard parallelism (ep exists)
-// ===========================================================================
 describe('tooltip parallelism — standard (ep field present)', () => {
+  it('shows the prefill DWDP group width without calling it TP8', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        data: pt({
+          ep: 1,
+          disagg: true,
+          is_multinode: true,
+          prefill_tp: 1,
+          prefill_ep: 1,
+          prefill_dwdp_size: 8,
+          prefill_num_workers: 2,
+          decode_tp: 8,
+          decode_ep: 8,
+          decode_dp_attention: true,
+          decode_num_workers: 1,
+        }),
+      }),
+    );
+    expect(html).toContain('DWDP: 8');
+    expect(html).toContain('TP: 1, DWDP: 8');
+    expect(html).toContain('Workers: 2');
+  });
   it('shows multinode aggregate as one topology without prefill/decode roles', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -125,8 +138,6 @@ describe('tooltip parallelism — standard (ep field present)', () => {
       tooltipConfig({ data: pt({ tp: 16, decode_tp: 8, ep: 1, pp: 2, dp_attention: false }) }),
     );
     expect(html).toContain('Pipeline Parallelism');
-    // The Tensor Parallelism line shows the raw TP width, not the pp-folded
-    // total GPU count.
     expect(html).toMatch(/Tensor Parallelism:<\/strong> 8/u);
   });
 
@@ -177,20 +188,12 @@ describe('tooltip parallelism — standard (ep field present)', () => {
   it('omits Expert Parallelism line when ep is null', () => {
     const d = pt({ tp: 4 });
     (d as any).ep = null;
-    // Set prefill_ep so it doesn't fall into "old data" path
     (d as any).prefill_ep = 2;
-    // multinode disagg path requires is_multinode && disagg
-    // Since ep is null, it takes the standard path
     const html = generateTooltipContent(tooltipConfig({ data: d }));
-    // When ep == null but prefill_ep exists, the standard path runs
-    // and ep line is omitted via the conditional
     expect(html).toContain('Tensor Parallelism');
   });
 });
 
-// ===========================================================================
-// parallelism HTML in tooltips, multinode disaggregated
-// ===========================================================================
 describe('tooltip parallelism — multinode disagg', () => {
   it('shows prefill and decode sections for multinode disagg', () => {
     const html = generateTooltipContent(
@@ -233,7 +236,6 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    // falls back to d.tp=8, d.ep=4, d.dp_attention=true for both prefill and decode
     expect(html).toContain('Prefill:');
     expect(html).toContain('Decode:');
     expect(html).toContain('TP: 8');
@@ -263,7 +265,6 @@ describe('tooltip parallelism — multinode disagg', () => {
         }),
       }),
     );
-    // prefill line carries PP: 2; decode line (pp=1) has no PP part
     expect(html).toContain('PP: 2');
     expect(html).not.toContain('PP: 1');
   });
@@ -334,9 +335,6 @@ describe('tooltip parallelism — multinode disagg', () => {
   });
 });
 
-// ===========================================================================
-// zh locale
-// ===========================================================================
 describe('tooltip parallelism — zh locale', () => {
   it('localizes the standard parallelism labels', () => {
     const html = generateTooltipContent(
@@ -388,9 +386,6 @@ describe('tooltip parallelism — zh locale', () => {
   });
 });
 
-// ===========================================================================
-// total GPUs line
-// ===========================================================================
 describe('tooltip — Total GPUs line', () => {
   it('always shows Total GPUs in standard tooltip', () => {
     const html = generateTooltipContent(tooltipConfig({ data: pt({ tp: 16 }) }));

@@ -1,4 +1,4 @@
-import type { ScenarioKind } from '@/lib/data-mappings';
+import type { ScenarioKind } from '@/lib/catalog/data-mappings';
 
 export interface LabelState {
   showPointLabels: boolean;
@@ -22,10 +22,6 @@ export function resolveLabelState(kind: ScenarioKind, params: LabelUrlParams): L
     showPointLabels,
     useAdvancedLabels:
       params.i_advlabel === '1' ? true : params.i_advlabel === '0' ? false : agentic,
-    // Line labels are on by default in every scenario, agentic included. They
-    // name the curve rather than the point, so they stay readable where the
-    // per-point labels the agentic view turns on would otherwise be the only
-    // way to tell series apart.
     showLineLabels: params.i_linelabel === '1' ? true : params.i_linelabel !== '0',
   };
 }

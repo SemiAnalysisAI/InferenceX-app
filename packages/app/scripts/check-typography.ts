@@ -1,18 +1,4 @@
 #!/usr/bin/env bun
-/**
- * Typography ratchet gate — CLI.
- *
- *   bun run check:typography            # verify (CI + lefthook)
- *   bun run check:typography --update   # shrink the allowlist after fixes
- *
- * Scans packages/app/src for arbitrary font sizes (text-[11px]), arbitrary
- * letter-spacing (tracking-[0.16em]), and quoted font-size literals in the
- * shared D3 chart library, then compares per-file counts against
- * scripts/typography-allowlist.json. New offenders fail immediately; the
- * allowlisted ones are the migration burndown and may only ever decrease.
- * Rules and exemptions live in src/lib/typography-gate.ts; docs/typography.md
- * explains the token system these rules point at.
- */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -21,7 +7,7 @@ import {
   countViolations,
   scanSource,
   type ViolationCounts,
-} from '../src/lib/typography-gate';
+} from '../src/lib/testing/typography-gate';
 
 const APP_ROOT = path.resolve(import.meta.dirname, '..');
 const ALLOWLIST_PATH = path.join(import.meta.dirname, 'typography-allowlist.json');

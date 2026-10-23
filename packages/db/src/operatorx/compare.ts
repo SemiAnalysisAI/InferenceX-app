@@ -12,6 +12,7 @@ import {
   type OpWork,
   opWork,
 } from './describe';
+import { OPERATORX_HARDWARE_REFERENCES, type OperatorXHardwareReference } from './hardware';
 import {
   type OperatorXDataset,
   type OperatorXSource,
@@ -19,6 +20,7 @@ import {
   stableJson,
 } from './normalize';
 import { compareSplits, parallelKey, parallelLabel } from './parallel';
+import { comparisonDefaults, type ComparisonDefaults } from './visualization';
 import { topLevelModel, type WorkloadSource, workloadSources } from './workloads';
 
 /** An op family: GEMM, MoE, or the attention modules (several op types). */
@@ -36,6 +38,8 @@ export interface ComparisonHardware {
   id: string;
   runner: string;
   runs: { runId: string; generatedAt: string }[];
+  /** Optional normalization basis for hardware absent from the general GPU catalog. */
+  reference?: OperatorXHardwareReference;
 }
 
 export type { ComputePrecision, OpWork, WorkPart, LinkTransfer } from './describe';
@@ -99,8 +103,6 @@ export interface Comparison {
   op: ComparisonOp;
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
-  /** Models any case comes from, most cases first. */
-  models: string[];
   rows: ComparisonRow[];
 }
 
@@ -204,7 +206,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
       const sources = workloadSources(op, r.testlist, [...new Set(r.sources.map((s) => s.model))]);
       for (const s of sources) {
         const w = workloads.get(s.id) ?? { source: s, cases: new Set(), hardware: new Set() };
-        w.cases.add(caseKey);
+        w.cases.add(stableJson(r.args));
         w.hardware.add(hw);
         workloads.set(s.id, w);
       }
@@ -242,12 +244,12 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
     workloads: [...workloads.values()]
       .map((w) => ({ ...w.source, cases: w.cases.size, hardware: [...w.hardware].sort() }))
       .sort((a, b) => b.hardware.length - a.hardware.length || a.label.localeCompare(b.label)),
-    models: modelsByCases(rows.values()),
     rows: [...rows.values()],
   };
 }
 
-function modelsByCases(rows: Iterable<ComparisonRow>): string[] {
+/** Models any case comes from, most cases first. */
+export function comparisonModels({ rows }: Pick<Comparison, 'rows'>): string[] {
   const cases = new Map<string, Set<string>>();
   for (const r of rows)
     for (const s of r.sources) cases.set(s.model, (cases.get(s.model) ?? new Set()).add(r.caseKey));
@@ -275,6 +277,8 @@ export interface ComparisonCase {
 
 /** Per-GPU measurements, column arrays indexed like `ComparisonView.cases`. */
 export interface ComparisonColumns {
+  /** Backend selected for each operation; omitted only by older cached payloads. */
+  backend?: (string | null)[];
   status: (OperatorXStatus | null)[];
   latencyUs: (number | null)[];
   /** Index into `ComparisonView.kernels`. */
@@ -291,6 +295,7 @@ export interface ComparisonView {
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
   workload: string | null;
+  defaults: ComparisonDefaults;
   /** Models with cases, for picking one; see `comparisonView`'s `model`. */
   modelOptions: string[];
   /** The model the cases were picked by, instead of a workload. */
@@ -322,6 +327,9 @@ function parallelOptions(rows: ComparisonRow[]): ParallelOption[] {
     .sort((a, b) => compareSplits(a.key, b.key));
 }
 
+const measured = (r: ComparisonRow) =>
+  r.status === 'ok' && r.latencyUs !== null && Number.isFinite(r.latencyUs) && r.latencyUs > 0;
+
 /**
  * The cases of one workload (default: the best-covered), or, given `model`, every case
  * that model's checkpoints contribute, at one device split (default: one device, else
@@ -345,7 +353,27 @@ export function comparisonView(
       : [];
   const splits = parallelOptions(scoped);
   const split = splits.find((o) => o.key === parallel)?.key ?? splits[0]?.key ?? '';
-  const rows = scoped.filter((r) => r.parallel === split);
+  // Raw rows retain backend identity. Hardware comparisons align full operation
+  // arguments across vendor-specific backends, selecting the fastest valid result.
+  const selected = new Map<string, ComparisonRow & { backend: string }>();
+  for (const row of scoped.filter((r) => r.parallel === split)) {
+    const separator = row.caseKey.lastIndexOf('|');
+    const r = {
+      ...row,
+      backend: separator === -1 ? '' : row.caseKey.slice(separator + 1),
+      caseKey: separator === -1 ? row.caseKey : row.caseKey.slice(0, separator),
+    };
+    const key = `${r.hardware}|${r.caseKey}`;
+    const previous = selected.get(key);
+    if (
+      !previous ||
+      (previous.status === 'missing' && r.status !== 'missing') ||
+      (measured(r) && (!measured(previous) || r.latencyUs! < previous.latencyUs!))
+    ) {
+      selected.set(key, r);
+    }
+  }
+  const rows = [...selected.values()];
   const caseIndex = new Map<string, number>();
   const cases: ComparisonCase[] = [];
   const models: string[] = [];
@@ -392,10 +420,16 @@ export function comparisonView(
   const kernels: string[] = [];
   const kernelIndex = new Map<string, number>();
   const measurements: Record<string, ComparisonColumns> = {};
-  const hardware = comparison.hardware.filter((h) => rows.some((r) => r.hardware === h.id));
+  const hardware = comparison.hardware
+    .filter((h) => rows.some((r) => r.hardware === h.id))
+    .map((h) => {
+      const reference = OPERATORX_HARDWARE_REFERENCES[h.id];
+      return reference ? { ...h, reference } : h;
+    });
   for (const h of hardware) {
     const empty = () => Array.from({ length: cases.length }, () => null);
     measurements[h.id] = {
+      backend: empty(),
       status: empty(),
       latencyUs: empty(),
       kernel: empty(),
@@ -408,6 +442,7 @@ export function comparisonView(
   for (const r of rows) {
     const i = caseIndex.get(r.caseKey)!;
     const col = measurements[r.hardware];
+    col.backend![i] = r.backend;
     col.status[i] = r.status;
     col.latencyUs[i] = r.latencyUs;
     col.cudaGraph[i] = r.cudaGraph;
@@ -427,7 +462,7 @@ export function comparisonView(
     hardware,
     workloads: comparison.workloads,
     workload,
-    modelOptions: comparison.models,
+    modelOptions: comparisonModels(comparison),
     model,
     parallelOptions: splits,
     parallel: split,
@@ -435,5 +470,6 @@ export function comparisonView(
     models,
     kernels,
     measurements,
+    defaults: comparisonDefaults({ op: comparison.op, cases, measurements }),
   };
 }

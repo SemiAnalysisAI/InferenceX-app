@@ -29,8 +29,6 @@ import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
-// series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
-// series[1]: MoRI EP16 scale-out (xGMI scale-up + RDMA scale-out, two nodes).
 const [scaleUp, scaleOut] = dataset.series;
 
 describe('collectiveXConclusionLabel', () => {
@@ -128,7 +126,6 @@ describe('collectiveXColorKey', () => {
   it('assigns the same key to two series with identical configuration', () => {
     const a = makeCollectiveXSeries({ variant: 'a' });
     const b = makeCollectiveXSeries({ variant: 'b' });
-    // The color key is configuration-derived and excludes the series id.
     expect(collectiveXColorKey(a)).toBe(collectiveXColorKey(b));
   });
 
@@ -151,8 +148,6 @@ describe('collectiveXColorKey', () => {
   });
 
   it('leads with the system vendor so getVendor places series in vendor hue zones', () => {
-    // The chart color system reads the first "_"-separated token to classify the
-    // vendor (NVIDIA greens, AMD reds), matching the InferenceX charts.
     expect(collectiveXColorKey(scaleUp).split('_')[0]).toBe('nvidia');
     const amd = makeCollectiveXSeries({ sku: 'mi355x', vendor: 'amd' });
     expect(collectiveXColorKey(amd).split('_')[0]).toBe('amd');
@@ -257,7 +252,6 @@ describe('metricValue', () => {
     const payload = metricValue(point, 'dispatch', 'p50', 'payload-rate');
     const activation = metricValue(point, 'dispatch', 'p50', 'activation-rate');
     expect(payload).toBeGreaterThan(0);
-    // Payload uses total_logical_bytes ÷ ep; activation uses aggregate activation bytes.
     expect(payload).not.toBeCloseTo(activation as number, 1);
   });
 
@@ -272,14 +266,11 @@ function pct(value: number): CollectiveXPercentiles {
 }
 
 describe('fitAlphaBeta', () => {
-  // Build a series whose dispatch latency is exactly α + bytesPerGpu/β with
-  // α = 10 µs and β = 250 GB/s (per GPU), so the OLS must recover both. ep = 8,
-  // so aggregate payload_bytes = bytesPerGpu × 8 and fitAlphaBeta divides it back.
   const EP = 8;
   function fitSeries(): CollectiveXSeries {
     const point = (bytesPerGpu: number) => {
-      const latency = 10 + bytesPerGpu / (250 * 1e3); // µs
-      const rate = (bytesPerGpu / latency) * 1e-3; // GB/s per GPU
+      const latency = 10 + bytesPerGpu / (250 * 1e3);
+      const rate = (bytesPerGpu / latency) * 1e-3;
       const component = {
         latency_us: pct(latency),
         activation_data_rate_gbps_at_latency_percentile: pct(rate),
@@ -323,8 +314,6 @@ describe('fitAlphaBeta', () => {
   });
 
   it('returns null when the byte axis has no variance across the ladder', () => {
-    // The default fixture holds bytes constant across the ladder, so bytes/GPU
-    // reconstructs to a single value and there is no slope to fit.
     expect(fitAlphaBeta(makeCollectiveXSeries(), 'dispatch')).toBeNull();
   });
 });
@@ -345,7 +334,6 @@ describe('chartPoints', () => {
   });
 
   it('drops points whose metric is unavailable', () => {
-    // Dispatch has no per-operation token rate, so tokens-per-second is null everywhere.
     expect(chartPoints([scaleUp], 'dispatch', 'p50', 'tokens-per-second')).toHaveLength(0);
   });
 
@@ -537,7 +525,6 @@ describe('collectiveXKvChartPoints', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            // batch 1 is alone at 4096; batch 16 wins the 32768 rung.
             { isl: 4096, batch: 1, gbps_p50: 5 },
             { isl: 32768, batch: 1, gbps_p50: 7.5 },
             { isl: 32768, batch: 4, gbps_p50: 20 },
@@ -595,7 +582,6 @@ describe('collectiveXKvChartPoints', () => {
       const points = collectiveXKvOverlapPoints(
         [
           kase([
-            // The smaller-ISL ladder never enters the normalization.
             { isl: 4096, batch: 1, gbps_p50: 99 },
             { isl: 32768, batch: 1, gbps_p50: 8 },
             { isl: 32768, batch: 4, gbps_p50: 24 },
@@ -630,7 +616,6 @@ describe('collectiveXKvChartPoints', () => {
           kase([
             { isl: 4096, batch: 1, gbps_p50: 6 },
             { isl: 4096, batch: 4, gbps_p50: 18 },
-            // The larger-ISL ladder is ignored once 4096 is pinned.
             { isl: 32768, batch: 1, gbps_p50: 8 },
             { isl: 32768, batch: 4, gbps_p50: 24 },
           ]),
@@ -684,7 +669,6 @@ describe('collectiveXKvChartPoints', () => {
             bulk({ isl: 32768, gbps_p50: 89.41 }),
             bulk({ isl: 4096, gbps_p50: 52.3 }),
             bulk({ isl: 32768, op: 'push', gbps_p50: 70 }),
-            // Paged rows never enter the ceiling.
             { isl: 32768, batch: 1, gbps_p50: 7.39 },
           ]),
         ],

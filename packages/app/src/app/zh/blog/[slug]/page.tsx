@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import 'katex/dist/katex.min.css';
 
 import { BlogPostContent } from '@/components/blog/blog-post-content';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   blogDescription,
   getAllPosts,
@@ -14,9 +14,9 @@ import {
   buildBlogPostingJsonLd,
   extractHeadings,
   getPostBySlug,
-} from '@/lib/blog';
-import { compileBlogMdx } from '@/lib/blog-mdx';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/blog/blog';
+import { compileBlogMdx } from '@/lib/blog/blog-mdx';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,
@@ -40,8 +40,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = blogDescription(meta);
 
   return {
-    // Short " | InferenceX" suffix via `absolute` (mirrors the English page)
-    // so the headline keeps more of the SERP title before truncation.
     title: { absolute: `${meta.title} | ${SITE_NAME}` },
     description,
     keywords: meta.tags,

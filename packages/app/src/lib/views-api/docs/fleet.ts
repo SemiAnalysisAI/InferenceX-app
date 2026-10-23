@@ -1,14 +1,12 @@
-import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api-documentation';
+import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api/api-documentation';
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   queryParameter as parameter,
   parameterErrorSchema as errorSchema,
-} from '@/lib/api-documentation-helpers';
+} from '@/lib/api/api-documentation-helpers';
 
-// The 'views' group id is registered by the docs coordinator alongside the
-// route catalog entries; fragments are written against it ahead of that.
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const lifecyclePointSchema: ApiSchema = {

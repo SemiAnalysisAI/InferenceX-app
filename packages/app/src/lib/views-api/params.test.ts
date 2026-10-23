@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
-import { DEFAULT_TCO_BASIS } from '@/lib/constants';
-import { Sequence } from '@/lib/data-mappings';
+import { DEFAULT_TCO_BASIS } from '@/lib/catalog/constants';
+import { Sequence } from '@/lib/catalog/data-mappings';
 import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import { ViewsApiParamError } from './errors';

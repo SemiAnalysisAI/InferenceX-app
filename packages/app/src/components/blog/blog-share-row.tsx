@@ -3,20 +3,18 @@
 import { Check, Link as LinkIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ShareLinkedInButton, ShareTwitterButton } from '@/components/share-buttons';
+import { ShareLinkedInButton, ShareTwitterButton } from '@/components/ui/share-buttons';
 import { Button } from '@/components/ui/button';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 interface BlogShareRowProps {
-  /** Post title, used as the pre-filled X post text. */
   title: string;
   slug: string;
   labels: { share: string; copyLink: string; copied: string };
   className?: string;
 }
 
-/** X, LinkedIn, and copy-link actions for a post. Keeps the existing share test ids. */
 export function BlogShareRow({ title, slug, labels, className }: BlogShareRowProps) {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,9 +30,7 @@ export function BlogShareRow({ title, slug, labels, className }: BlogShareRowPro
     const url = window.location.href.split('#')[0];
     try {
       await navigator.clipboard.writeText(url);
-    } catch {
-      // Clipboard access can be denied; the URL is still in the address bar.
-    }
+    } catch {}
     track('blog_link_copied', { slug });
     setCopied(true);
     if (timerRef.current) clearTimeout(timerRef.current);

@@ -1,24 +1,5 @@
-/**
- * Pure interpolation functions — no React, no 'use client'.
- * Shared by both server-side (compare SSR) and client-side (calculator, trends).
- */
-
 import type { CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
-/**
- * Compute the upper-left pareto front for GPUDataPoints.
- * This is the same algorithm used by the main inference charts for the
- * interactivity view (y_tpPerGpu_roofline: "upper_left").
- *
- * For interactivity->throughput mode:
- *   x = interactivity (tok/s/user), y = throughput (tok/s/gpu)
- *   upper_left = for decreasing x, y must be strictly increasing
- *   (lower interactivity allows higher throughput on the frontier)
- *
- * For throughput->interactivity mode:
- *   x = throughput, y = interactivity
- *   We also use upper_left so the frontier represents the best tradeoff.
- */
 export function paretoFrontUpperLeft<T>(
   points: T[],
   getX: (p: T) => number,
@@ -55,22 +36,10 @@ export function paretoFrontUpperLeft<T>(
   return front;
 }
 
-// ---------------------------------------------------------------------------
-// Monotone cubic Hermite spline interpolation (Steffen method)
-// Matches d3.curveMonotoneX used by the main inference chart rooflines.
-// Reference: Steffen, M. 1990. A Simple Method for Monotonic Interpolation
-// in One Dimension. Astronomy and Astrophysics, Vol. 239, NO. NOV(II), P. 443.
-// ---------------------------------------------------------------------------
-
 export function sign(x: number): number {
   return x < 0 ? -1 : 1;
 }
 
-/**
- * Build spline coefficients for a monotone cubic Hermite interpolant.
- * Returns the tangent slopes m[] at each knot, using the same Steffen method
- * as d3.curveMonotoneX (d3-shape/src/curve/monotone.js).
- */
 export function monotoneSlopes(xs: number[], ys: number[]): number[] {
   const n = xs.length;
   if (n < 2) return Array.from({ length: n }, () => 0);
@@ -99,10 +68,6 @@ export function monotoneSlopes(xs: number[], ys: number[]): number[] {
   return m;
 }
 
-/**
- * Evaluate a monotone cubic Hermite spline at targetX.
- * xs must be sorted ascending with no duplicates.
- */
 export function hermiteInterpolate(
   xs: number[],
   ys: number[],
@@ -139,7 +104,6 @@ export function hermiteInterpolate(
   return h00 * ys[lo] + h10 * hh * m[lo] + h01 * ys[hi] + h11 * hh * m[hi];
 }
 
-/** Map a (costProvider, costType) pair to the correct GPUDataPoint field. */
 export function getCostField(
   p: GPUDataPoint,
   costProvider: CostProvider,
@@ -154,41 +118,10 @@ export function getCostField(
   return p[costProvider];
 }
 
-/**
- * Recover the constant numerator `c` of a metric that is defined as
- * `c / throughput`, from any frontier point that carries both values.
- *
- * Cost per million tokens is `$/GPU-hr x 1e6 / (tok/s x 3600)` and energy per
- * token is `W / (tok/s)`: both are a per-chip constant divided by a throughput,
- * and the constant is identical at every point of a config. Recovering it from
- * the points avoids threading the hardware registry into this module, which must
- * stay dependency-free for the Python port.
- *
- * Why this exists: independently splining the reciprocal metric and throughput
- * produces two curves that need not satisfy `metric x throughput = c` between
- * measured knots. Deriving from the interpolated throughput preserves that
- * defining identity. The numerical effect depends on frontier density and can
- * move either direction with Steffen splines; see docs/tco-calculator.md for a
- * dated, reproducible measurement against the live API.
- *
- * Returns null unless EVERY usable point agrees on the constant. That check is
- * the safety rail: the identity is what licenses re-deriving the metric, so a
- * metric whose numerator actually varies per point (measured power, say) must
- * fall back to being splined directly rather than have its values silently
- * rewritten from one point's ratio.
- */
 export function recoverReciprocalNumerator(
   values: readonly number[],
   throughputs: readonly number[],
 ): number | null {
-  // Dashboard values come from one getGpuSpecs(hwKey) lookup, so they agree to
-  // float rounding (~1e-16). The tolerance is far looser than that on purpose:
-  // the Python port is fed hand-assembled JSON for blog tables, where costs are
-  // written to a few decimals and a 1e-9 gate would silently reject them and
-  // fall back to the worse method. 0.1% still comfortably rejects what this
-  // guard is for — a numerator that genuinely varies per point, like measured
-  // power, which moves by whole percent across a sweep. And a numerator varying
-  // by less than 0.1% makes deriving and splining agree anyway.
   const RELATIVE_TOLERANCE = 1e-3;
   let numerator: number | null = null;
 
@@ -209,21 +142,11 @@ export function recoverReciprocalNumerator(
   return numerator;
 }
 
-/** Evaluate a `numerator / throughput` metric at an interpolated throughput. */
 export function reciprocalMetricAt(numerator: number | null, throughput: number): number {
   if (numerator === null || !(throughput > 0)) return 0;
   return numerator / throughput;
 }
 
-/**
- * The single provider rate that must explain every cost field on these points,
- * or null if it does not.
- *
- * All three token types share one `$/GPU-hr x 1e6/3600` and differ only in the
- * throughput they divide, so consistency has to be checked across all of them
- * together. Checking one family in isolation and falling back to another would
- * recover a rate from output tokens and then apply it to total throughput.
- */
 function recoverCostRate(
   sorted: readonly GPUDataPoint[],
   costProvider: CostProvider,
@@ -242,20 +165,6 @@ function recoverCostRate(
   );
 }
 
-/**
- * Given a set of data points for a single GPU, find the maximum interactivity
- * (tok/s/user) whose interpolated cost per million tokens stays at or below
- * `targetCost`, using the same Pareto frontier + monotone spline as
- * interpolateForGPU.
- *
- * Total-token cost is monotonically increasing in interactivity along the
- * frontier (throughput strictly decreases, so cost = rate/tput increases),
- * but input/output-token costs need not be — so the search is a dense scan
- * over the spline followed by a bisection refinement of the crossing segment
- * rather than a single bisection.
- *
- * Returns null when no interactivity on the frontier fits the budget.
- */
 export function maxInteractivityAtCost(
   points: GPUDataPoint[],
   targetCost: number,
@@ -279,9 +188,6 @@ export function maxInteractivityAtCost(
   }
 
   const xs = sorted.map((p) => p.interactivity);
-  // Cost is derived from the interpolated throughput of the selected token type,
-  // exactly as interpolateForGPU does it — otherwise this inverse lookup would
-  // answer against a different cost curve than the bars the user is reading.
   const getTput = (p: GPUDataPoint) =>
     costType === 'input'
       ? p.inputThroughput
@@ -290,14 +196,9 @@ export function maxInteractivityAtCost(
         : p.throughput;
   const tputs = sorted.map(getTput);
   const costs = sorted.map(getCost);
-  // Same decision as interpolateForGPU, so the inverse lookup and the bars can
-  // never answer against different cost curves.
   const rate = recoverCostRate(sorted, costProvider);
-  // Spline whichever series the identity licenses: the throughput when cost is
-  // genuinely `rate / throughput`, otherwise cost itself (previous behaviour).
   const ys = rate === null ? costs : tputs;
   const slopes = monotoneSlopes(xs, ys);
-  // Same overshoot clamp as interpolateForGPU's buildMetric.
   const lo = Math.min(...ys);
   const hi = Math.max(...ys);
   const splineAt = (x: number) => Math.max(lo, Math.min(hi, hermiteInterpolate(xs, ys, slopes, x)));
@@ -307,13 +208,11 @@ export function maxInteractivityAtCost(
   const minX = xs[0];
   const maxX = xs.at(-1)!;
 
-  // Whole frontier affordable — the max interactivity is reachable.
   if (costAt(maxX) <= targetCost) return maxX;
 
-  // Dense scan from high to low interactivity for the first affordable sample.
   const STEPS = 512;
   const step = (maxX - minX) / STEPS;
-  let below = -1; // highest scanned x with cost <= target
+  let below = -1;
   for (let i = STEPS - 1; i >= 0; i--) {
     const x = minX + i * step;
     if (costAt(x) <= targetCost) {
@@ -323,7 +222,6 @@ export function maxInteractivityAtCost(
   }
   if (below < 0) return null;
 
-  // Refine within (below, below + step): bisect for the crossing point.
   let loX = below;
   let hiX = Math.min(below + step, maxX);
   for (let iter = 0; iter < 40; iter++) {
@@ -334,14 +232,6 @@ export function maxInteractivityAtCost(
   return loX;
 }
 
-/**
- * Given a set of data points for a single GPU, apply pareto front filtering
- * and then use monotone cubic Hermite spline interpolation (matching the main
- * inference chart's roofline curve) to find values at a given target.
- *
- * Target input values outside the pareto front range are clamped to [min, max].
- * Each interpolated metric is clamped to the min/max of that metric on the frontier (no spline overshoot).
- */
 export function interpolateForGPU(
   points: GPUDataPoint[],
   targetValue: number,
@@ -365,15 +255,9 @@ export function interpolateForGPU(
   const minInput = getInputValue(sorted[0]);
   const maxInput = getInputValue(sorted.at(-1)!);
 
-  // Clamp target value to the data range to avoid null returns and prevent extrapolation
   const clampedTarget = Math.max(minInput, Math.min(maxInput, targetValue));
   const clampedBelow = targetValue < minInput;
   const clampedAbove = targetValue > maxInput;
-  // Surfaced on the result so callers can tell the user this series was NOT
-  // measured at the requested target — it is showing its nearest edge point.
-  // Series can have different ranges (and an unofficial run can widen the
-  // slider past every official point), so a clamped bar sitting next to an
-  // unclamped one is a comparison the user needs to be able to see.
   const clamped = clampedBelow || clampedAbove;
 
   if (sorted.length === 1) {
@@ -390,6 +274,7 @@ export function interpolateForGPU(
       inputTpPerMw: sorted[0].inputTpPerMw,
       outputTpPerMw: sorted[0].outputTpPerMw,
       cacheHitRate: sorted[0].cacheHitRate,
+      theoreticalCacheHitRate: sorted[0].theoreticalCacheHitRate,
       inputTokenShare: sorted[0].inputTokenShare,
       concurrency: sorted[0].concurrency,
       nearestPoints: [sorted[0]],
@@ -401,8 +286,6 @@ export function interpolateForGPU(
 
   const xs = sorted.map(getInputValue);
 
-  // Build per-metric y-arrays and precompute their data-range bounds
-  // so we can clamp the spline output to prevent overshoot.
   const buildMetric = (extract: (p: GPUDataPoint) => number) => {
     const ys = sorted.map(extract);
     let lo = ys[0];
@@ -420,14 +303,8 @@ export function interpolateForGPU(
   const outputTputValue = buildMetric((p) => p.outputThroughput);
   const inputTputValue = buildMetric((p) => p.inputThroughput);
 
-  // Cost is `$/GPU-hr / tokens` — a constant over a throughput — so it is
-  // derived from the interpolated throughput rather than splined itself. See
-  // `recoverReciprocalNumerator`. In throughput_to_interactivity mode the target
-  // axis *is* total throughput, so the clamped target is the value to divide by.
   const totalTputAtTarget = mode === 'interactivity_to_throughput' ? value : clampedTarget;
   const rate = recoverCostRate(sorted, costProvider);
-  // `rate === null` means these points do not obey the identity, so the metric
-  // is splined directly as before rather than rewritten from one point's ratio.
   const cost =
     rate === null
       ? buildMetric((p) => getCostField(p, costProvider, 'total'))
@@ -446,18 +323,14 @@ export function interpolateForGPU(
   const outputTpPerMw = buildMetric((p) => p.outputTpPerMw);
   const concurrency = Math.round(buildMetric((p) => p.concurrency));
 
-  // Only splined when every frontier point carries a measured rate. All absent
-  // is the fixed-sequence case, where there is no cache to discount. A *mixed*
-  // frontier is the interesting one: substituting 0 for the missing points
-  // would invent a dip in the cached fraction, so the whole sweep opts out and
-  // its input tokens bill at full price. That avoids inventing a cache curve,
-  // but overstates revenue and margin if the missing point actually had hits.
   const cacheHitRate = sorted.every((p) => typeof p.cacheHitRate === 'number')
     ? buildMetric((p) => p.cacheHitRate!)
     : undefined;
 
-  // Same all-or-nothing rule as the cached fraction: a frontier only partly
-  // pinned down opts out rather than having a guessed share splined into it.
+  const theoreticalCacheHitRate = sorted.every((p) => typeof p.theoreticalCacheHitRate === 'number')
+    ? buildMetric((p) => p.theoreticalCacheHitRate!)
+    : undefined;
+
   const inputTokenShare = sorted.every((p) => typeof p.inputTokenShare === 'number')
     ? buildMetric((p) => p.inputTokenShare!)
     : undefined;
@@ -489,6 +362,7 @@ export function interpolateForGPU(
     inputTpPerMw,
     outputTpPerMw,
     cacheHitRate,
+    theoreticalCacheHitRate,
     inputTokenShare,
     concurrency,
     nearestPoints,

@@ -3,6 +3,7 @@
 import { ticks } from 'd3';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -30,11 +31,6 @@ type CategoryColors = Record<KernelCategory, string>;
 
 const OTHER = 'var(--muted-foreground)';
 
-/**
- * One fixed color per kernel category, so a color means the same work on every GPU.
- * Categorical slots 1-7 of the dataviz reference palette, stepped per theme and
- * validated against the site's surfaces.
- */
 const CATEGORY_COLORS: Record<'light' | 'dark', CategoryColors> = {
   light: {
     gemm: '#2a78d6',
@@ -68,7 +64,6 @@ function formatUs(us: number): string {
   return `${Number(us.toPrecision(3))} µs`;
 }
 
-/** Qualified name of an Itanium-mangled symbol: `_ZN2ck9kernel_abI...` -> `ck::kernel_ab<…>`. */
 function demangledName(name: string): string | null {
   const m = /^_Z(?<nested>N)?/.exec(name);
   if (!m) return null;
@@ -86,7 +81,6 @@ function demangledName(name: string): string | null {
   return parts.join('::') + (name[i] === 'I' ? '<…>' : '');
 }
 
-/** `cutlass::Kernel2<cutlass_80_tensorop_...>(Params` (possibly cut short) -> `cutlass::Kernel2<…>`. */
 function shortName(name: string): string {
   const demangled = demangledName(name);
   if (demangled) return demangled;
@@ -102,7 +96,6 @@ function shortName(name: string): string {
   return out.trim() || name;
 }
 
-/** The categories present in the timelines, in legend order. */
 function CategoryLegend({
   timelines,
   palette,
@@ -322,7 +315,7 @@ function CaseTimelines({
   caseIndex: number;
 }) {
   const refs = useMemo(() => caseRefs(view, hardware, caseIndex), [view, hardware, caseIndex]);
-  const palette = CATEGORY_COLORS[useTheme().resolvedTheme === 'dark' ? 'dark' : 'light'];
+  const palette = CATEGORY_COLORS[isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light'];
   const { data, error, isLoading, refetch } = useOperatorXTimelines(
     op,
     refs.map((r) => r.ref),
@@ -368,7 +361,6 @@ function CaseTimelines({
   );
 }
 
-/** The case's layers and models, as label/value pairs. */
 function CaseOrigin({ origin }: { origin: { label: string; value: string }[] }) {
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
@@ -382,7 +374,6 @@ function CaseOrigin({ origin }: { origin: { label: string; value: string }[] }) 
   );
 }
 
-/** Floating drill-down of one case: each selected GPU's kernel timeline and kernel table. */
 export function CaseDetail({
   op,
   view,

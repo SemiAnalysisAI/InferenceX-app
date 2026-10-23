@@ -9,7 +9,6 @@ import {
   DEFAULT_METRIC_CONFIG_KEY,
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
-  isModeledSystemPowerConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
@@ -19,6 +18,7 @@ import {
   metricCostTier,
   metricForCostTier,
   metricOptionTitle,
+  POWER_BASIS_METRIC_CONFIG_KEYS,
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
 } from './metric-registry';
@@ -39,6 +39,10 @@ describe('metric registry', () => {
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBe('lower_right');
     expect(e2e.y_measuredPowerPercentTdp_roofline).toBe('lower_left');
+    for (const key of POWER_BASIS_METRIC_CONFIG_KEYS) {
+      expect(interactivity[`${key}_roofline`], key).toBe('lower_right');
+      expect(e2e[`${key}_roofline`], key).toBe('lower_left');
+    }
   });
 
   it('preserves metric-specific x overrides and bilingual labels', () => {
@@ -95,7 +99,6 @@ describe('metric registry', () => {
     for (const metricKey of metricKeys) {
       expect(METRIC_REGISTRY[metricKey].label, metricKey).toContain(' TCO ');
       expect(METRIC_REGISTRY[metricKey].labelZh, metricKey).toContain(' TCO ');
-      // Chart titles end at the metric (the cost tier is no longer appended).
       expect(METRIC_REGISTRY[metricKey].title, metricKey).toMatch(/ TCO$/u);
       expect(METRIC_REGISTRY[metricKey].titleZh, metricKey).toContain(' TCO ');
     }
@@ -150,8 +153,6 @@ describe('metric registry', () => {
     expect(costTierLabel('rental', 'en')).toBe('Rent - 3 Year Commit');
     expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模云大批量）');
 
-    // Chart definitions carry both spellings so the selector and the heading
-    // read from the same registry entry.
     const [interactivity] = chartDefinitions;
     expect(interactivity.y_tokensPerDollarH_title).toBe(
       'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
@@ -162,8 +163,6 @@ describe('metric registry', () => {
   });
 
   it('groups tiered metrics into families the Cost Tier selector can swap between', () => {
-    // Every family member carries the tier it is filed under, and every tiered
-    // registry metric belongs to exactly one family.
     const familyMembers = new Set<string>();
     for (const [family, members] of Object.entries(COST_METRIC_FAMILIES)) {
       for (const [tier, metricKey] of Object.entries(members)) {
@@ -181,14 +180,11 @@ describe('metric registry', () => {
     expect(costMetricFamily('tpPerGpu')).toBeUndefined();
     expect(costMetricFamily('costUser')).toBe('cost');
 
-    // Selector order: published tiers first, custom last; families without a
-    // custom axis stop at rental.
     expect(costTiersForFamily('tokensPerDollar')).toEqual(['hyperscaler', 'rental', 'custom']);
     expect(costTiersForFamily('costOutput')).toEqual(['hyperscaler', 'rental']);
     expect(metricForCostTier('cost', 'rental')).toBe('costr');
     expect(metricForCostTier('costInput', 'custom')).toBeUndefined();
 
-    // Family members share a chart title, so the y-axis option can drop the tier.
     for (const members of Object.values(COST_METRIC_FAMILIES)) {
       const titles = new Set(
         Object.entries(members)
@@ -200,8 +196,6 @@ describe('metric registry', () => {
   });
 
   it('keeps the Measured Energy key list in lockstep with the registry', () => {
-    // Every registry key starting `measured` must be in the exported list, so
-    // a new telemetry metric cannot silently miss the tier decorations.
     const measuredRegistryKeys = Object.keys(METRIC_REGISTRY)
       .filter((key) => key.startsWith('measured'))
       .map((key) => `y_${key}`);
@@ -210,7 +204,11 @@ describe('metric registry', () => {
     );
 
     const measuredGroup = METRIC_CONTROL_GROUPS.find((group) => group.label === 'Measured Energy');
-    expect(measuredGroup?.metrics).toBe(MEASURED_ENERGY_METRIC_CONFIG_KEYS);
+    expect(measuredGroup?.gated).toBe(true);
+    expect(measuredGroup?.metrics).toEqual([
+      ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+      ...POWER_BASIS_METRIC_CONFIG_KEYS,
+    ]);
   });
 
   it('classifies measured-energy config keys', () => {
@@ -219,21 +217,6 @@ describe('metric registry', () => {
     expect(isMeasuredEnergyConfigKey('y_tpPerGpu')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y_jTotal')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y')).toBe(false);
-    expect(isMeasuredEnergyConfigKey('y_modeledChassisPowerPerGpu')).toBe(false);
-    expect(isModeledSystemPowerConfigKey('y_modeledChassisPowerPerGpu')).toBe(true);
-    expect(isModeledSystemPowerConfigKey('y_measuredAvgPower')).toBe(false);
-    expect(isModeledSystemPowerConfigKey('modeledChassisPowerPerGpu.y')).toBe(false);
-  });
-
-  it('keeps modeled chassis AC separate from measured and provisioned power', () => {
-    const group = METRIC_CONTROL_GROUPS.find((item) => item.label === 'Modeled System Power');
-    expect(group?.metrics).toEqual(['y_modeledChassisPowerPerGpu']);
-    expect(resolveMetricConfigKey('y_modeledChassisPowerPerGpu')).toBe(
-      'y_modeledChassisPowerPerGpu',
-    );
-    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu).toBe('modeledChassisPowerPerGpu.y');
-    expect(chartDefinitions[0].y_modeledChassisPowerPerGpu_roofline).toBe('lower_right');
-    expect(chartDefinitions[1].y_modeledChassisPowerPerGpu_roofline).toBe('lower_left');
   });
 });
 

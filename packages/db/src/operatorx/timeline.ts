@@ -1,23 +1,12 @@
-/**
- * Compact kernel timelines: the runner's median-replay timeline and per-kernel summary
- * (`metrics.profile`) reduced to what the case drill-down draws. Pure.
- */
-
 type Obj = Record<string, unknown>;
 
-/** Timeline kernel names are cut at 120 characters, `void ` included, before it is stripped. */
 const TIMELINE_NAME_MAX = 115;
 
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/**
- * Shape version of `OperatorXTimeline`. Timelines are cached as immutable, so clients put
- * this in the request; bump it whenever the shape changes.
- */
 export const TIMELINE_VERSION = 4;
 
-/** What a kernel does, from its name; the drill-down colors by it. */
 export const KERNEL_CATEGORIES = [
   { id: 'gemm', label: 'GEMM' },
   { id: 'expert-gemm', label: 'Expert GEMM' },
@@ -31,14 +20,7 @@ export const KERNEL_CATEGORIES = [
 
 export type KernelCategory = (typeof KERNEL_CATEGORIES)[number]['id'];
 
-/**
- * First match wins, so the specific rules come first: a split-K reduce named `_gemm_…
- * reduce_kernel` is a reduce, a `QuantGemm` is a GEMM, `router_gemm` is a GEMM. Helpers
- * whose template arguments name `cutlass` types are caught by their own rule first.
- * Mangled names are matched as-is; their identifiers survive mangling.
- */
 const CATEGORY_RULES: [KernelCategory, RegExp][] = [
-  // TensorRT-LLM's batched GEMMs, some with a fused activation (`…swiGlu…`).
   ['gemm', /^bmm_/],
   ['expert-gemm', /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|mfma_moe|^_matmul_/i],
   ['reduce', /reduce|moe_sum|combine|finalize/i],
@@ -56,9 +38,7 @@ export function kernelCategory(name: string): KernelCategory {
   return CATEGORY_RULES.find(([, re]) => re.test(name))?.[0] ?? 'other';
 }
 
-/** Per-call totals of one kernel over the profiled replays. */
 export interface TimelineKernel {
-  /** Index into `OperatorXTimeline.names`. */
   name: number;
   usPerCall: number;
   countPerCall: number;
@@ -74,17 +54,11 @@ export interface OperatorXTimeline {
   busyUs: number;
   gapUs: number;
   overlapUs: number;
-  /** Stream (or TPU lane) labels; events refer to them by index. */
   lanes: string[];
-  /** Distinct kernel names; events and kernels refer to them by index. */
   names: string[];
-  /** Category of each name, parallel to `names`. */
   categories: KernelCategory[];
-  /** `[name, lane, startUs, durUs]`, op-relative, sorted by start. */
   events: [number, number, number, number][];
-  /** Longest first. */
   kernels: TimelineKernel[];
-  /** The runner caps the timeline; true when the replay launched more kernels than it kept. */
   truncated: boolean;
   /** A split case's ranks (the timeline is rank 0's); null on one device. */
   ranks: TimelineRanks | null;
@@ -118,14 +92,11 @@ function timelineRanks(metrics: Obj): TimelineRanks | null {
 const dims = (v: unknown): number[] | null =>
   Array.isArray(v) && v.every((x) => typeof x === 'number') ? (v as number[]) : null;
 
-/** The drill-down timeline of one result's metrics, or null when it was not profiled. */
 export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimeline | null {
   const p = metrics && isObj(metrics.profile) ? metrics.profile : null;
   if (!p || !Array.isArray(p.timeline) || p.timeline.length === 0) return null;
   const names: string[] = [];
   const nameIndex = new Map<string, number>();
-  // The runner cuts timeline names at 120 characters and kernel-table names at 200, so
-  // the two are matched on that prefix and the longer spelling is kept.
   const intern = (raw: unknown) => {
     const name = String(raw ?? '').replace(/^void /, '');
     const key = name.slice(0, TIMELINE_NAME_MAX);

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
-import { Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 import { buildInferenceSeries, type InferenceSeriesOptions } from './series';
 
@@ -73,7 +73,6 @@ const BASE_OPTIONS: InferenceSeriesOptions = {
   best: false,
 };
 
-/** Two-hardware fixture: an NVIDIA H200/TRT curve and an AMD MI300X/vLLM curve. */
 function fixtureRows(): BenchmarkRow[] {
   return [
     makeRow({ conc: 16, metrics: metrics({ median_intvty: 40, tput_per_gpu: 200 }) }),
@@ -88,8 +87,6 @@ function fixtureRows(): BenchmarkRow[] {
 }
 
 function powerSweepRows(): BenchmarkRow[] {
-  // The H100-style sweep retained in powerCurves.test.ts: the upper boundary
-  // keeps conc=1/2/128 while the minimum-power Pareto frontier keeps only 1.
   return [
     [1, 172.49, 252.22],
     [2, 149.32, 291.38],
@@ -116,6 +113,184 @@ function powerSweepRows(): BenchmarkRow[] {
 }
 
 describe('buildInferenceSeries', () => {
+  it('uses the MoRI vLLM display label while preserving API framework and hardware keys', () => {
+    const result = buildInferenceSeries(
+      [makeRow({ hardware: 'mi355x', framework: 'vllm-disagg', disagg: true })],
+      BASE_OPTIONS,
+    );
+
+    expect(result.series).toHaveLength(1);
+    expect(result.series[0]).toMatchObject({
+      hwKey: 'mi355x_vllm-disagg',
+      framework: 'vllm-disagg',
+      label: 'MI355X (MoRI vLLM)',
+    });
+  });
+
+  it('keeps the FP8 SKU winner when a faster FP4 configuration exists', () => {
+    const rows = [
+      makeRow({ hardware: 'gb300', framework: 'dynamo-sglang' }),
+      makeRow({
+        hardware: 'gb300',
+        framework: 'dynamo-trt',
+        precision: 'fp4',
+        metrics: metrics({ tput_per_gpu: 10000 }),
+      }),
+    ];
+    const result = buildInferenceSeries(rows, { ...BASE_OPTIONS, best: true });
+
+    expect(result.series.map((series) => series.hwKey)).toEqual(['gb300_dynamo-sglang']);
+    expect(result.series[0].bestPerSku).toBe(true);
+    expect(result.series[0].points.every((point) => point.precision === 'fp8')).toBe(true);
+  });
+
+  it('retains GPU-valid all-in table rows without adding unavailable estimates to chart series', () => {
+    const measured = metrics({
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 4000,
+      pp: 1,
+      pcp_size: 1,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_output_token: 2,
+    });
+    const supported = makeRow({ metrics: measured });
+    const untiled = makeRow({ hardware: 'gb200', metrics: measured });
+    const invalid = makeRow({ hardware: 'b200', metrics: { ...measured, power_valid: 0 } });
+    const otherPrecision = makeRow({ hardware: 'gb300', precision: 'fp4', metrics: measured });
+    const result = buildInferenceSeries([supported, untiled, invalid, otherPrecision], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      optimal: true,
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.series.flatMap((series) => series.points.map((point) => point.id))).toEqual([
+      supported.id,
+    ]);
+    expect(result.tableRows).toHaveLength(2);
+    expect(result.tableRows?.find((point) => point.id === supported.id)).toMatchObject({
+      y: result.series[0].points[0].y,
+      measuredGpuWatts: 500,
+      status: 'available',
+      unavailableReason: null,
+    });
+    expect(result.tableRows?.find((point) => point.id === untiled.id)).toMatchObject({
+      hwKey: 'gb200_trt',
+      y: null,
+      measuredGpuWatts: 500,
+      status: 'unavailable',
+      unavailableReason: 'topology',
+      frontier: false,
+    });
+  });
+
+  it('keeps table-only all-in SKUs under best=true like the dashboard', () => {
+    const measured = metrics({
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 4000,
+      pp: 1,
+      pcp_size: 1,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_output_token: 2,
+    });
+    const rankedWinner = makeRow({ metrics: measured });
+    const rankedLoser = makeRow({
+      framework: 'vllm',
+      metrics: { ...measured, tput_per_gpu: 100, output_tput_per_gpu: 90 },
+    });
+    const tableOnly = makeRow({ hardware: 'gb200', metrics: measured });
+    const result = buildInferenceSeries([rankedWinner, rankedLoser, tableOnly], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      best: true,
+    });
+
+    expect(result.series.map((series) => series.hwKey)).toEqual(['h200_trt']);
+    expect(result.tableRows?.map((row) => row.hwKey).toSorted()).toEqual(['gb200_trt', 'h200_trt']);
+  });
+
+  it('keeps all-in energy missing, honors selected hardware, and leaves ordinary views unchanged', () => {
+    const row = makeRow({
+      metrics: metrics({
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        pp: 1,
+        pcp_size: 1,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+      }),
+    });
+    const result = buildInferenceSeries([row], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledJPerOutputToken',
+    });
+    expect(result.series).toEqual([]);
+    expect(result.tableRows).toMatchObject([
+      { id: row.id, y: null, status: 'unavailable', unavailableReason: 'energy' },
+    ]);
+    expect(
+      buildInferenceSeries([row], {
+        ...BASE_OPTIONS,
+        metricConfigKey: 'y_utilityModeledWatts',
+        gpus: ['gb200'],
+      }).tableRows,
+    ).toEqual([]);
+    expect(buildInferenceSeries([row], BASE_OPTIONS)).not.toHaveProperty('tableRows');
+  });
+
+  it('keeps non-frontier transient rows in the table without assigning them frontier flags', () => {
+    const rows = [
+      [1, 10, 400],
+      [2, 20, 500],
+    ].map(([conc, x, watts]) => {
+      const row = makeRow({
+        conc,
+        metrics: metrics({
+          median_intvty: x,
+          avg_power_w: watts,
+          avg_total_gpu_power_w: watts * 8,
+          power_valid: 1,
+          power_metric_schema_version: 2,
+          pp: 1,
+          pcp_size: 1,
+        }),
+      });
+      Reflect.deleteProperty(row, 'id');
+      return row;
+    });
+    const result = buildInferenceSeries(rows, {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      optimal: true,
+    });
+    expect(result.count).toBe(1);
+    expect(result.tableRows).toHaveLength(2);
+    expect(result.tableRows?.map((point) => [point.concurrency, point.frontier])).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+  });
+
+  it('returns null for missing or invalid normalized axes without dropping table rows', () => {
+    const row = makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: metrics({ avg_power_w: 500, power_valid: 1, power_metric_schema_version: 2 }),
+    });
+    const result = buildInferenceSeries([row], {
+      ...BASE_OPTIONS,
+      sequence: Sequence.AgenticTraces,
+      metricConfigKey: 'y_utilityModeledWatts',
+      xmode: 'e2e-normalized-interactivity',
+      derivedMetrics: {
+        [row.id]: { id: row.id, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: 0 },
+      },
+    });
+    expect(result.series).toEqual([]);
+    expect(result.tableRows).toMatchObject([{ id: row.id, x: null, y: null }]);
+  });
+
   it('assembles one series per hardware config with x-sorted points', () => {
     const result = buildInferenceSeries(fixtureRows(), BASE_OPTIONS);
 
@@ -126,7 +301,6 @@ describe('buildInferenceSeries', () => {
 
     const h200 = result.series.find((entry) => entry.gpu === 'h200')!;
     expect(h200.points).toHaveLength(2);
-    // Points sorted by x ascending (median interactivity).
     expect(h200.points[0].x).toBeLessThan(h200.points[1].x);
     expect(h200.points.map((point) => point.concurrency).toSorted((a, b) => a - b)).toEqual([
       16, 64,
@@ -134,7 +308,6 @@ describe('buildInferenceSeries', () => {
     expect(h200.framework).toBe('trt');
     expect(h200.vendor).toBe('NVIDIA');
     expect(h200.deployment).toBe('single-node');
-    // GitHub run id parsed from run_url.
     expect(h200.points[0].runId).toBe(12345);
   });
 
@@ -142,7 +315,6 @@ describe('buildInferenceSeries', () => {
     const rows = fixtureRows();
     const result = buildInferenceSeries(rows, BASE_OPTIONS);
 
-    // Same pipeline the chart runs: transformBenchmarkRows chart 0 (interactivity).
     const { chartData } = transformBenchmarkRows(rows, 'p90');
     const expected = new Map(
       chartData[0].map((d) => [
@@ -162,9 +334,7 @@ describe('buildInferenceSeries', () => {
   it('filters by sequence, precision and vendor quick-filter', () => {
     const rows = [
       ...fixtureRows(),
-      // Different sequence — excluded.
       makeRow({ isl: 1024, osl: 1024, conc: 8 }),
-      // Non-selected precision — excluded.
       makeRow({ precision: 'bf16', conc: 128 }),
     ];
 
@@ -186,21 +356,17 @@ describe('buildInferenceSeries', () => {
   it('accepts base registry keys and full hardware keys in the gpus filter', () => {
     const rows = fixtureRows();
 
-    // Base registry key expands to every hardware key for that GPU.
     const baseKey = buildInferenceSeries(rows, { ...BASE_OPTIONS, gpus: ['h200'] });
     expect(baseKey.series.map((s) => s.gpu)).toEqual(['h200']);
 
-    // Full hardware key (as shown in dashboard legends) matches exactly.
     const fullKey = buildInferenceSeries(rows, { ...BASE_OPTIONS, gpus: ['mi300x_vllm'] });
     expect(fullKey.series.map((s) => s.hwKey)).toEqual(['mi300x_vllm']);
 
-    // Unknown key selects nothing rather than everything.
     const unknown = buildInferenceSeries(rows, { ...BASE_OPTIONS, gpus: ['tpu-v7'] });
     expect(unknown.series).toHaveLength(0);
   });
 
   it('keeps only Pareto-frontier points when optimal=true', () => {
-    // Second h200 point dominated: lower x AND lower y than conc=16 point.
     const rows = [
       makeRow({ conc: 16, metrics: metrics({ median_intvty: 40, tput_per_gpu: 200 }) }),
       makeRow({ conc: 8, metrics: metrics({ median_intvty: 30, tput_per_gpu: 100 }) }),
@@ -245,8 +411,6 @@ describe('buildInferenceSeries', () => {
       expect(optimal.frontier.direction).toBe(
         xmode === 'interactivity' ? 'upper_right' : 'upper_left',
       );
-      // The power-demand boundary does not change the registry's efficiency
-      // polarity or the direction used by Best per SKU.
       expect(optimal.metric.polarity).toBe('lower');
       expect(optimal.metric.direction).toBe(
         xmode === 'interactivity' ? 'lower_right' : 'lower_left',
@@ -270,7 +434,6 @@ describe('buildInferenceSeries', () => {
   });
 
   it('keeps only the best series per GPU SKU when best=true', () => {
-    // Two h200 series (trt vs vllm); vllm strictly better.
     const rows = [
       makeRow({ conc: 16, metrics: metrics({ median_intvty: 20, tput_per_gpu: 200 }) }),
       makeRow({

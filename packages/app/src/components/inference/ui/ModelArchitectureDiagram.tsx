@@ -1,33 +1,28 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { isDarkTheme } from '@/lib/themes/themes';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
 import { Badge } from '@/components/ui/badge';
-import type { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/catalog/data-mappings';
 import {
   type ModelArchitecture,
   formatParamCount,
   getModelArchitecture,
-} from '@/lib/model-architectures';
+} from '@/lib/catalog/model-architectures';
 import { renderDiagram } from './model-architecture-diagram-renderer';
 
 interface ModelArchitectureDiagramProps {
   model: Model;
   className?: string;
-  /**
-   * `drawer` (default) renders the collapsible bar used inside dashboard
-   * cards. `inline` renders the diagram always-expanded with no toggle —
-   * used by the `/model/[slug]` pages where the architecture is the content,
-   * not an aside.
-   */
   variant?: 'drawer' | 'inline';
 }
 
@@ -102,10 +97,8 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     const container = containerRef.current;
     if (!isExpanded || !svg || !container) return;
 
-    // Match the renderer's effective width so ResizeObserver notifications that
-    // cannot change the SVG (including its initial callback) stay no-ops.
     const width = Math.min(container.clientWidth || 600, 640);
-    const isDark = resolvedTheme === 'dark' || resolvedTheme === 'minecraft';
+    const isDark = isDarkTheme(resolvedTheme);
     const previous = lastRenderRef.current;
     if (
       previous?.width === width &&
@@ -150,13 +143,6 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     >
       <div ref={containerRef} className="px-4 pb-4">
         <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
-        {/* The drill-down only renders while its parent block is expanded, so gate
-              the caption on the parent too — collapsing the parent leaves the child
-              id in expandedBlocks (state is restored on re-expand), and the caption
-              must not outlive the drawing it explains. */}
-        {/* Mirrors `altAttnExpandable` in renderDiagram: the caption describes the
-              CSA/HCA local-vs-compressed drill-down, so hybrids that opt out of that
-              drill-down must not show it either. */}
         {arch.attentionType === 'Hybrid' &&
           arch.alternatingAttentionExpandable !== false &&
           [0, 1].some(

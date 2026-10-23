@@ -2,11 +2,11 @@
 
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -25,7 +25,7 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -51,11 +51,11 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
-} from '@/components/official-preview-notice';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { localePath } from '@/lib/i18n';
-import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
+} from '@/components/ui/official-preview-notice';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { localePath } from '@/lib/i18n/i18n';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -71,15 +71,15 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-} from '@/lib/data-mappings';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+} from '@/lib/catalog/data-mappings';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 
-import { getDisplayLabel } from '@/lib/utils';
-import { exportToCsv } from '@/lib/csv-export';
-import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
+import { getDisplayLabel } from '@/lib/shared/utils';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
 import ThroughputBarChart, {
   getChartTitle,
@@ -365,8 +365,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } = useLockedTierDialog(
     'calculator_cost_provider',
   );
@@ -391,8 +389,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [barMetric, setBarMetric] = useState<BarMetric>('throughput');
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
-  // The `c_mw` URL seed is read once here; the cost-target panel renders the
-  // input and consumes the budget. The Fleet Lifecycle page shares the param.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [barSelectionIntent, setBarSelectionIntent] = useState<{
@@ -419,9 +415,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     }));
   }, [locale, t]);
 
-  // Unofficial-run overlay (`?unofficialrun=…`). Overlay bars are interpolated
-  // separately from official ones and only ever reach the bar chart — the
-  // table, CSV export, and fleet planner stay official-only.
   const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
     useUnofficialRun();
 
@@ -457,33 +450,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const error = throughputError;
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
-  // AgentX publishes on P90, so the percentile control is an insider affordance
-  // rather than a normal filter: it stays behind the ↑↑↓↓ feature gate, matching
-  // the inference chart, and the calculator defaults to P90 without it.
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
-  /**
-   * Hardware listed in the legend: official hardware, plus hardware that only
-   * the loaded unofficial run has data for (otherwise there'd be no way to hide
-   * an overlay-only bar).
-   *
-   * `visibleHwKeys` — seeded from this list — is the SINGLE source of truth for
-   * what the calculator draws, official bars and overlay bars alike. It is
-   * deliberately not cross-wired to the provider's shared `activeOverlayHwTypes`
-   * (which the inference and evaluation tabs read/write): two visibility sets
-   * for one legend can only drift, and every way they drift renders a legend
-   * entry whose active state contradicts the bar next to it — e.g. a selection
-   * change reseeds the local set but not the shared one, or another tab
-   * re-enables a GPU this tab has hidden.
-   *
-   * Per-tab hardware visibility is already how the calculator treats official
-   * data (it has never shared `visibleHwKeys` with the inference tab), so the
-   * overlay series simply follows the same rule. AGENTS.md's "respect
-   * `activeOverlayHwTypes`" exists so overlay points can't ignore the user's
-   * hide action; here the calculator's own legend IS that hide action, and it
-   * is respected.
-   */
   const legendHwKeys = useMemo(() => {
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
@@ -500,8 +469,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [mwInput]);
 
-  // The selection key represents user-driven scope. Overlay hardware is left
-  // out on purpose so late overlay arrivals augment, rather than reset, intent.
   const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
@@ -535,7 +502,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     hideSkuAboveConfigLimit,
   ]);
 
-  /** Branch and URL per run index, stamped onto overlay results for labels and tooltips. */
   const runInfoByIndex = useMemo(() => {
     const map: Record<number, { branch: string; url: string }> = {};
     unofficialRunInfos.forEach((info, idx) => {
@@ -757,9 +723,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const runUrl = availableRuns[selectedRunId]?.runUrl;
 
-  // Selection intent is tied to the current result values. Any data or filter
-  // transition changes the key, so stale comparisons disappear without a
-  // post-render clearing effect.
   const handleBarSelect = useCallback(
     (resultKey: string) => {
       const next = new Set(selectedBars);
@@ -775,8 +738,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     [selectedBars, barResultsKey],
   );
 
-  // Generate comparison text when 2+ bars are selected. Overlay bars are
-  // selectable too, so this reads the combined chart list.
   const comparisonText = useMemo(() => {
     if (selectedBars.size < 2) return null;
 
@@ -792,7 +753,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           ? t.compMetricCost
           : t.compMetricThroughput;
 
-    // Generate pairwise comparisons — always use lower as denominator
     const comparisons: string[] = [];
     for (let i = 0; i < selectedResults.length; i++) {
       for (let j = i + 1; j < selectedResults.length; j++) {
@@ -842,11 +802,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     return comparisons;
   }, [selectedBars, barResults, hardwareConfig, barMetric, costType, mode, locale, t]);
 
-  /**
-   * Overlay legend: one entry per loaded unofficial run that contributes bars
-   * to the chart, in the same palette color as its bars. Same shape as the
-   * inference scatter and evaluation bar chart legends.
-   */
   const overlayLegendItems = useMemo(() => {
     if (overlayResults.length === 0) return [];
     return unofficialRunInfos
@@ -861,9 +816,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           isHighlighted: true,
           hw: `overlay-run-${info.id}`,
           isActive: true,
-          // A label, not a series: dismissing a run happens in the banner, and
-          // counting it as removable would let the hide control empty the chart
-          // of real GPUs.
           isRemovable: false,
           onClick: () => {},
           tooltip: (
@@ -884,7 +836,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [overlayResults, unofficialRunInfos, t]);
 
-  // Build legend items for ChartLegend sidebar, sorted by MODEL_ORDER (same as Inference Performance tab)
   const legendItems = useMemo(() => {
     const availableSet = new Set(legendHwKeys);
     return [
@@ -911,9 +862,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     resolveColor,
   ]);
 
-  // Hoisted out of the caption because the fold header needs the same words: a
-  // folded section shows only its title, and it has to be this chart's title
-  // rather than a static one, since the title carries the metric and target.
   const chartTitle =
     locale === 'zh'
       ? getChartTitleZh(
@@ -958,7 +906,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               actions={<ChartShareActions />}
             />
 
-            {/* Controls — grid layout matching inference chart controls */}
             <TooltipProvider delayDuration={0}>
               <ControlPanel
                 legend={t.benchmarkGroup}
@@ -1117,7 +1064,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       />
                     </div>
                   </div>
-                  {/* Target value slider + input */}
                   {!loading && hasAnyData && (
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -1218,8 +1164,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </Card>
       </section>
 
-      {/* The inverse of the target-interactivity slider directly above: fix a cost
-          ceiling, read off the fastest speed that stays under it. */}
       {!loading && hasData && (
         <CostTargetPanel
           gpuDataByGroupKey={gpuDataByGroupKey}
@@ -1233,12 +1177,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         />
       )}
 
-      {/* Chart / Table */}
       <section data-testid="calculator-chart-section">
         <CollapsibleSection
           title={chartTitle}
-          // The chart's own caption already carries this title, so the header
-          // shows it only while folded.
           titleWhenOpen={false}
           toggleLabel={t.toggleSection}
           testId="calculator-chart-collapse"
@@ -1357,11 +1298,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             </p>
                           </>
                         )}
-                        {/* Per-token-type cost only: the input- and output-token
-                          costs are attributed to one side of a disagg config's
-                          prefill/decode split, while the total-token cost uses
-                          the whole chip count — the same denominator an
-                          aggregated config uses — so it needs no caveat. */}
                         <div
                           className={`overflow-hidden transition-all duration-200 ease-in-out ${
                             barMetric === 'cost' && costType !== 'total'
@@ -1462,7 +1398,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </CollapsibleSection>
       </section>
 
-      {/* Comparison banner — only shown in chart view */}
       {viewMode === 'chart' && selectedBars.size > 0 && (
         <section data-testid="calculator-comparison-banner">
           <Card>
@@ -1504,8 +1439,6 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </section>
       )}
 
-      {/* Fleet lifecycle now lives on its own page (/fleet); leave a pointer
-          so calculator users can find where the section moved. */}
       {!loading && hasData && (
         <section data-testid="calculator-fleet-pointer">
           <Card>

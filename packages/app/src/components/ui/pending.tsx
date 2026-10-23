@@ -1,11 +1,7 @@
 import { Loader2 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
-/**
- * Content that stays on screen while its replacement loads: dimmed, inert, with a floating
- * status pill naming what is loading.
- */
 export function Pending({
   active,
   label = 'Loading…',

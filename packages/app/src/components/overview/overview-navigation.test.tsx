@@ -4,11 +4,9 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
-import type { OverviewPageData, OverviewTier } from '@/lib/overview-data';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import type { OverviewPageData, OverviewTier } from '@/lib/overview/overview-data';
 
-/** One stable stub, not a fresh spy per render: a per-render spy makes
- *  `expect(push).not.toHaveBeenCalled()` unfalsifiable. */
 const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 
 vi.mock('next/navigation', () => ({
@@ -163,7 +161,6 @@ describe('OverviewNavigationProvider', () => {
     expect(routerStub.replace).not.toHaveBeenCalled();
     expect(replaceState).not.toHaveBeenCalled();
     replaceState.mockRestore();
-    // The shared afterEach unmounts again; react-dom tolerates the repeat.
   });
 
   it('keeps a failed selector entry without falling back to router navigation', async () => {
@@ -188,7 +185,6 @@ describe('OverviewNavigationProvider', () => {
 
     expect(routerStub.replace).not.toHaveBeenCalled();
     expect(routerStub.push).not.toHaveBeenCalled();
-    // The failed selection stays in the address bar so a retry click still works.
     expect(window.location.search).toBe('?tier=75');
     expect(searchEvents).toEqual(['?tier=75']);
     expect(readProbe('tier')).toBe('50');
@@ -200,8 +196,6 @@ describe('OverviewNavigationProvider', () => {
     deferredFetch();
 
     renderProvider(pageData(50), '/overview');
-    // Deltas, not absolutes: beforeEach uses replaceState, so entries persist
-    // across tests in one jsdom window.
     const before = window.history.length;
     act(() => selectTier?.());
     act(() => selectTier?.());
@@ -215,8 +209,6 @@ describe('OverviewNavigationProvider', () => {
     renderProvider(pageData(50), '/overview');
 
     const { settlers } = deferredFetch();
-    // Move the URL first: snapshotting `location` before this freezes a stale
-    // search, the href resolves to the seeded one and the load hits the cache.
     window.history.pushState({}, '', '/overview?tier=75');
     const reload = vi.fn();
     vi.stubGlobal('location', {
@@ -354,7 +346,6 @@ describe('OverviewNavigationProvider', () => {
     act(() => selectEngine?.());
 
     await act(async () => {
-      // Resolve the superseded request last; it must not overwrite the winner.
       settlers[1]?.resolve(Response.json({ ...pageData(50), engineScope: 'all' }));
       await Promise.resolve();
       settlers[0]?.resolve(Response.json(pageData(75)));
@@ -415,8 +406,6 @@ describe('OverviewNavigationProvider', () => {
 
     renderProvider(pageData(50), '/overview');
     act(() => selectTier?.());
-    // Same data key, so this joins the in-flight tier request rather than
-    // starting one of its own.
     act(() => selectReference?.());
 
     await act(async () => {
@@ -430,8 +419,6 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('reference')).toBe('b300');
   });
 
-  // Both row scopes narrow the rows the server sends, so neither may collapse
-  // into the unfiltered payload's cache key the way `ref` deliberately does.
   it('requests a narrowed matrix for each row scope instead of reusing the full one', () => {
     deferredFetch();
 

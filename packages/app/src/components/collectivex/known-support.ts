@@ -1,22 +1,7 @@
-/**
- * The curated CollectiveX support picture: every SKU × library × mode ×
- * expert-parallel degree, independent of which runs are checked. Green means
- * the combination is known to work on the fleet; red means it is known NOT to
- * work, with the investigated reason; gray means the combination does not
- * exist (a vendor-mismatched library, a kernel that has no such mode, or a
- * pool the library was never brought up on).
- *
- * This mirrors `experimental/CollectiveX/configs/platform_config.json` in the
- * InferenceX repo plus the wall investigations documented in its README and
- * methodology. It is maintained by hand: when a registry row flips or a wall
- * falls upstream, update the cell and its footnote here.
- */
-
 export type CollectiveXKnownStatus = 'works' | 'broken' | 'na';
 
 export interface CollectiveXKnownEp {
   status: CollectiveXKnownStatus;
-  /** Footnote id; required whenever status is not plain `works`. */
   note?: string;
 }
 
@@ -94,13 +79,17 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's low-latency kernel asserts on AMD CU counts (kNumMaxTopK+1 exceeds the warp-group budget) — an upstream kernel limitation, not an integration gap.",
     zh: 'UCCL 低延迟 Kernel 在 AMD 的 CU 数量下触发断言（kNumMaxTopK+1 超出 warp 组预算），为上游 Kernel 限制而非集成问题。',
   },
-  'nccl-gdaki-x86': {
-    en: "NCCL EP's GPU-initiated RDMA (GDAKI) does not work for EP16 scale-out on the x86 pools — re-confirmed on bare metal 2026-08-28: every rank hits an illegal memory access in the EP kernel, so it is not a virtualization artifact. EP16 works only over MNNVL on the GB SKUs.",
-    zh: 'NCCL EP 的 GPU 发起 RDMA（GDAKI）在 x86 集群上无法支撑 EP16 横向扩展——2026-08-28 在裸金属上复验：所有 rank 在 EP Kernel 中触发非法内存访问，故并非虚拟化产物。EP16 仅在 GB SKU 的 MNNVL 上可用。',
+  'nccl-v02-gin': {
+    en: 'NCCL EP v0.2 fixes the v0.1 cross-node GIN failure. Throughput EP16 has been revalidated on B200, B300, H100 and H200; GB200/GB300 use MNNVL. Qualification is BF16 only.',
+    zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、B300、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
   },
-  'nccl-ll-fence-race': {
-    en: "Held: nccl_ep's low-latency combine is a port of DeepEP's pre-fix pipeline, missing the DeepEP #642 fence, and the shared-memory race is present on every rung — the former T≤128 clamp only reduced exposure (observed 1-in-5 corruption at T=256, bimodal). Rows are withheld until a fenced wheel ships.",
-    zh: '暂缓发布：nccl_ep 的低延迟 combine 移植自 DeepEP 修复前的流水线，缺少 DeepEP #642 的栅栏，共享内存竞争存在于每一级梯度——此前的 T≤128 限制只是降低了暴露度（T=256 观察到约五分之一的双峰型损坏）。在修复后的 wheel 发布前不发布数据。',
+  'nccl-v02-ll': {
+    en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 enabled on B200/GB200/GB300. The full decode ladder is restored; qualification is BF16 only.',
+    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试梯度已恢复；当前仅验证 BF16。',
+  },
+  'nccl-ll-ep16-not-enabled': {
+    en: 'NCCL EP low-latency EP16 is not enabled on this pool; it is enabled on B200/GB200/GB300 with v0.2.',
+    zh: '该集群尚未启用 NCCL EP 低延迟 EP16；v0.2 已在 B200/GB200/GB300 上启用此配置。',
   },
   'hseries-ll-gdr': {
     en: 'Functional and numerically correct, but the IBGDA send path runs 2.3–26x slower than bare-metal references in these virtualized pods (gdrcopy present but insufficient); held until the platform GDR question is resolved.',
@@ -154,28 +143,28 @@ const NORMAL: KnownMatrix = {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': cell(works, broken('uccl-h100-init-crash')),
-    'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
+    'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
   h200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': cell(works, worksWith('uccl-hseries-topend')),
-    'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
+    'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
   b200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': bothWork,
-    'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
+    'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
   b300: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(works, broken('nccl-gdaki-x86')),
+    'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
   gb200: {
@@ -220,42 +209,42 @@ const LOW_LATENCY: KnownMatrix = {
     'deepep-v2': cell(works, broken('hseries-ll-gdr')),
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   h200: {
     'deepep-v2': cell(works, broken('hseries-ll-gdr')),
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('nccl-v02-ll')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b300: {
     'deepep-v2': cell(worksWith('b300-ll-single-node-pin'), broken('b300-ll-create-ah')),
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   gb200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('nccl-v02-ll')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   gb300: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
-    'nccl-ep': cell(broken('nccl-ll-fence-race'), na('ll-ep16-not-enabled')),
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('nccl-v02-ll')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi300x: {
@@ -286,10 +275,6 @@ export const COLLECTIVEX_KNOWN_SUPPORT: Record<'normal' | 'low-latency', KnownMa
   'low-latency': LOW_LATENCY,
 };
 
-/**
- * Footnotes in first-use order for one mode's table, so the rendered numbers
- * read top-to-bottom, left-to-right.
- */
 export function collectiveXKnownFootnoteOrder(mode: 'normal' | 'low-latency'): string[] {
   const seen: string[] = [];
   for (const sku of COLLECTIVEX_KNOWN_SKUS) {

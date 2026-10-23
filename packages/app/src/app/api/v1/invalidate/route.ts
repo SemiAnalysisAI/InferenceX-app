@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { bearerMatches } from '@/lib/bearer-auth';
+import { bearerMatches } from '@/lib/api/bearer-auth';
 
 import {
   COLLECTIVEX_CACHE_SCOPE,
@@ -8,7 +8,7 @@ import {
   purgeAll,
   purgeCollectiveX,
   purgeOperatorX,
-} from '@/lib/api-cache';
+} from '@/lib/cache/api-cache';
 
 export async function POST(request: Request) {
   const secret = process.env.INVALIDATE_SECRET;
@@ -23,8 +23,13 @@ export async function POST(request: Request) {
     process.env.VERCEL_GIT_COMMIT_REF === 'staging' &&
     Boolean(request.headers.get('x-vercel-protection-bypass'));
 
-  if (!isProtectedStagingRequest && (!secret || !bearerMatches(authHeader, secret))) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!isProtectedStagingRequest) {
+    if (!secret) {
+      return new NextResponse('INVALIDATE_SECRET is not set', { status: 500 });
+    }
+    if (!bearerMatches(authHeader, secret)) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
   }
 
   // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the
@@ -38,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
-    purgeOperatorX();
+    await purgeOperatorX();
     return NextResponse.json({ invalidated: true, scope });
   }
 

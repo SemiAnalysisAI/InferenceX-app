@@ -1,7 +1,3 @@
-/** Shared form-control geometry. Compact controls stay touchable on phones.
- * Multi-selects use minimum heights so selected chips can wrap without clipping.
- * Keep chart text, code and dense data typography independent of these controls.
- */
 export const CONTROL_HEIGHT = {
   default: 'h-11 md:h-9',
   sm: 'h-11 md:h-8',
@@ -12,10 +8,8 @@ export const CONTROL_MIN_HEIGHT = {
   sm: 'min-h-11 md:min-h-8',
 } as const;
 
-// Focus is functional but undecorated; selected and invalid states stay independent.
 export const CONTROL_FOCUS = 'outline-none';
 
-/** Quiet header utilities share one hover surface in every theme. */
 export const HEADER_ACTION_STYLE =
   'inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200 focus-visible:outline-none cursor-pointer';
 

@@ -18,7 +18,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
@@ -42,13 +42,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getModelSortIndex } from '@/lib/constants';
-import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
-import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { Percentile, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type { CostProvider, CostType } from './types';
 import { useThroughputData } from './useThroughputData';
@@ -148,8 +148,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
     useLockedTierDialog('fleet_cost_provider');
 
@@ -171,8 +169,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const [inputValue, setInputValue] = useState<string>('35');
   const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
-  // Owned here so the `c_mw` URL seed is read once, at the page level — the
-  // lifecycle section renders the input and is its only consumer.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
@@ -191,8 +187,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
-  // AgentX publishes on P90, so the percentile control stays behind the
-  // ↑↑↓↓ feature gate, matching the calculator.
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -202,8 +196,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     writeUrlParams({ c_mw: Number.isFinite(parsed) && parsed > 0 ? raw : '' });
   }, []);
 
-  // The selection key represents user-driven scope, mirroring the calculator's
-  // rule: a data or filter transition reseeds visibility to everything.
   const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
@@ -327,11 +319,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     track('fleet_gpu_reset', { gpuCount: availableHwKeys.length });
   }, [availableHwKeys, selectionKey]);
 
-  // The legend filters which chips are candidates for the lifecycle lines,
-  // exactly as the calculator's chart legend did when the section lived there.
-  // It renders in the controls card rather than inside the chart so it stays
-  // reachable from the table view and — critically — after isolating a config
-  // that is unplottable at the current target, when the chart itself unmounts.
   const legendItems = useMemo(
     () =>
       Object.entries(hardwareConfig)
@@ -514,7 +501,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 )}
 
-                {/* Target value slider + input */}
                 {!loading && hasData && (
                   <div className="space-y-2 md:col-span-2 xl:col-span-3">
                     <LabelWithTooltip

@@ -3,7 +3,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { InferenceTcoBadges } from '@/components/inference/ui/InferenceTcoBadges';
-import { getGpuSpecs } from '@/lib/constants';
+import { getGpuSpecs } from '@/lib/catalog/constants';
 import { createMockInferenceContextValues } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
@@ -11,8 +11,6 @@ const VALUES = { gb300: 2.31, mi355x: 1.5 };
 const REGISTRY_BASES = Object.keys(HW_REGISTRY);
 const GB300_INPUT = '[data-testid="cost-input-gb300"]';
 
-// The /inference caption's TCO badges double as the custom $/chip/hr inputs,
-// so there is no Custom Chip Costs card; the badges are exercised on their own.
 describe('InferenceTcoBadges', () => {
   it('quotes the published prices on a tiered metric', () => {
     mountWithProviders(<InferenceTcoBadges label="TCO $/chip/hr:" values={VALUES} />, {
@@ -31,13 +29,8 @@ describe('InferenceTcoBadges', () => {
       inference: { selectedYAxisMetric: 'y_costh' },
       globalFilters: {},
     });
-    // The stubbed context leaves the metric on `y_costh`, so the field still
-    // quotes 2.31 and the keystroke appends to it.
     cy.get('[data-testid="cost-input-gb300"]').type('4');
     cy.get('@setSelectedYAxisMetric').should('have.been.calledOnceWith', 'y_costUser');
-    // Every registry chip is seeded from the tier being left, not only the
-    // two the caption shows, so a chip that joins the selection later is
-    // priced too.
     cy.get('@setUserCosts').should('have.been.calledOnce');
     cy.get('@setUserCosts').then((stub) => {
       const seeded = (stub as unknown as { firstCall: { args: unknown[] } }).firstCall
@@ -72,15 +65,12 @@ describe('InferenceTcoBadges', () => {
     cy.get('[data-testid="cost-input-gb300"]').should('have.value', '9');
     cy.get('[data-testid="cost-input-gb300"]').clear();
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: undefined, mi355x: 1.5 });
-    // The badge stays mounted while blank so the price can be typed back in.
     cy.get('[data-testid="cost-input-gb300"]').should('have.value', '').type('3');
     cy.get('@setUserCosts').should('have.been.calledWith', { gb300: 3, mi355x: 1.5 });
     cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
   });
 
   it('keeps an empty badge for a chip blanked from the other figure', () => {
-    // The blanked chip comes from the shared userCosts, not from this
-    // figure's own typing, so the sibling /inference figure shows it too.
     mountWithProviders(
       <InferenceTcoBadges
         label="TCO $/chip/hr:"
@@ -102,8 +92,6 @@ describe('InferenceTcoBadges', () => {
   });
 
   it('drops a typed draft once the shared costs are reseeded or edited elsewhere', () => {
-    // Two figures share one userCosts, as on /inference. The provider here
-    // holds real state so the second figure and a tier reseed reach the first.
     const base = createMockInferenceContextValues({ selectedYAxisMetric: 'y_costUser' });
     function Harness() {
       const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>({
@@ -131,11 +119,9 @@ describe('InferenceTcoBadges', () => {
     a().clear().type('2.50');
     a().should('have.value', '2.50');
     b().should('have.value', '2.5');
-    // The other figure edits the chip: figure A's "2.50" text is stale and goes.
     b().clear().type('3');
     a().should('have.value', '3');
     b().should('have.value', '3');
-    // A tier change reseeds the shared costs: both figures quote the seed.
     cy.contains('button', 'reseed').click();
     a().should('have.value', '2.31');
     b().should('have.value', '2.31');

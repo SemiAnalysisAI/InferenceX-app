@@ -14,13 +14,13 @@ import {
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { withChartState } from '@/lib/url-state';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { withChartState } from '@/lib/routing/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -33,6 +33,7 @@ import {
   type StagePhase,
 } from './phase-slice';
 import { PointSummary } from './point-summary';
+import { PowerTelemetryView } from './power-telemetry-view';
 import { RequestMetricOverTime, SequenceMetricCard } from './request-metric-cards';
 import { ServerLogViewer } from './server-log-viewer';
 import {
@@ -61,6 +62,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     ttftOverTime: 'TTFT over time',
     perPoint: 'Per-point',
     requestTimeline: 'Request timeline',
+    powerX: 'PowerX',
     aggregatesAcrossConfigs: 'Aggregates across configs',
     logs: 'Logs',
     detailView: 'Detail view',
@@ -94,6 +96,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     ttftOverTime: 'TTFT 随时间变化',
     perPoint: '单点',
     requestTimeline: '请求时间线',
+    powerX: 'PowerX',
     aggregatesAcrossConfigs: '跨配置聚合',
     logs: '日志',
     detailView: '详情视图',
@@ -133,14 +136,6 @@ export function AgenticPointDetail({ id }: Props) {
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
   const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
-  // Carry the chart state the reader arrived with back to the chart. The link
-  // used to be a bare path, so it could only ever land on the default model
-  // with the default legend, no matter what the reader was looking at.
-  //
-  // Resolved after mount, not during render: `withChartState` reads the
-  // in-memory param store (seeded from this page's own URL at load), which
-  // does not exist on the server — computing it during render would make the
-  // server and client markup disagree.
   const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
   useEffect(() => {
     setInferenceHref(withChartState(inferenceBaseHref));
@@ -149,6 +144,7 @@ export function AgenticPointDetail({ id }: Props) {
     () => [
       { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
+      { value: 'power', label: t.powerX, testId: 'detail-view-power' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
       { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
     ],
@@ -166,28 +162,16 @@ export function AgenticPointDetail({ id }: Props) {
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
     () => new Set(['input', 'decode']),
   );
-  // Fetch aggregates only when the aggregates view is active. Uses the full
-  // sibling set (across parallelism + concurrency configs) so each chart
-  // shows how the metric varies across the SKU.
   const siblingIds = siblingsData?.siblings.map((s) => s.id) ?? [];
   const aggregatesQuery = useAgenticAggregates(siblingIds, view === 'aggregates');
-  // The default charts use a compact nine-field request projection. The much
-  // larger source-rich Gantt payload is fetched only after opening Timeline.
   const requestChartQuery = useRequestChartData(id, view === 'point');
   const requestChartData = requestChartQuery.data;
   const timelineQuery = useRequestTimeline(id, view === 'timeline');
 
-  // Warmup vs profiling stage. Only meaningful when the point actually has a
-  // warmup phase (older runs are profiling-only) — when absent the toggle is
-  // hidden and everything falls back to the full (profiling) run.
   const [phase, setPhase] = useState<StagePhase>('profiling');
   const hasWarmup = useMemo(() => timelineHasWarmup(requestChartData), [requestChartData]);
   const effectivePhase: StagePhase = hasWarmup ? phase : 'profiling';
 
-  // Server-metric boundary on the chart's own t-axis (rebased through absolute
-  // ns — see phase-slice header for the origin-gap invariant). Request charts
-  // get a phase-scoped timeline (filtered + rebased) so they share a 0-based
-  // axis with the server charts for the selected phase.
   const boundarySec = useMemo(
     () => phaseBoundarySec(metrics, requestChartData),
     [metrics, requestChartData],
@@ -222,8 +206,6 @@ export function AgenticPointDetail({ id }: Props) {
     }
     return metricSourceId === 'all' ? (metrics ?? undefined) : undefined;
   }, [metrics, metricSourceId, metricSourceQuery.data]);
-  // Phase-sliced server series (+ matching durationS) consumed by every server
-  // chart. Null only when there are no server metrics at all.
   const sliced = useMemo(
     () =>
       baseServerSeries
@@ -236,11 +218,6 @@ export function AgenticPointDetail({ id }: Props) {
         : null,
     [baseServerSeries, effectivePhase, boundarySec, metrics?.durationS],
   );
-  // Some runs only scrape server metrics during profiling — `chart_series`
-  // starts at the profiling boundary, so the warmup slice collapses to ~0–1
-  // points (just the t=0 origin) even though request-level warmup data exists.
-  // Require ≥2 points in some series to count as real warmup coverage; otherwise
-  // show an explanatory note instead of six silently-blank charts.
   const slicedHasServerData =
     (sliced?.series.kvCacheUsage.length ?? 0) > 1 ||
     (sliced?.series.queueDepth.length ?? 0) > 1 ||
@@ -249,8 +226,6 @@ export function AgenticPointDetail({ id }: Props) {
 
   return (
     <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4 py-6">
-      {/* Points readers at /agentx/telemetry, which explains every chart below.
-          Non-centered, so the card never covers the charts it describes. */}
       <NudgeEngine scope="agentic-detail" />
 
       <div className="flex items-center gap-2">
@@ -347,6 +322,8 @@ export function AgenticPointDetail({ id }: Props) {
 
       {view === 'logs' ? (
         <ServerLogViewer id={id} enabled />
+      ) : view === 'power' ? (
+        <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
       ) : view === 'aggregates' ? (
         aggregatesQuery.isError ? (
           <RetryableQueryError

@@ -4,7 +4,7 @@ import {
   type ServerLogAvailabilityMap,
 } from '@semianalysisai/inferencex-db/queries/server-logs';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

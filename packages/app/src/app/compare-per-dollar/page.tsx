@@ -8,15 +8,19 @@ import {
   SUPPORTERS_LINE,
 } from '@semianalysisai/inferencex-constants';
 
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparablePairsByModelSlug } from '@/lib/compare-availability';
-import { type ComparePair, COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare-ssr';
+import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
+import {
+  type ComparePair,
+  COMPARE_MODEL_SLUGS,
+  type CompareModelSlug,
+} from '@/lib/compare/compare-slug';
+import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,11 +88,6 @@ const jsonLd = {
 };
 
 export default async function ComparePerDollarIndexPage() {
-  // Server-side filter (Neon availability): only show (model, pair) combos
-  // where both GPUs have benchmark data for that model. Matches the /compare
-  // index's behavior — no empty-state cards in navigation. The page-level
-  // handler at /compare-per-dollar/[slug] still renders the empty-state for
-  // direct URL hits.
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
   const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
@@ -152,8 +151,6 @@ export default async function ComparePerDollarIndexPage() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
-        // Same scenario split /compare uses: models with AgentX data open the
-        // agentic trace replay, the rest open the fixed 8K/1K workload.
         const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>

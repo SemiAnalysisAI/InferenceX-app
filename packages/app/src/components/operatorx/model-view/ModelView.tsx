@@ -33,8 +33,8 @@ import {
 } from '@/components/ui/tooltip';
 import { prefetchOperatorXTimelines, useOperatorXModel } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { replaceClientSearch } from '@/lib/client-navigation';
-import { generateVendorColors } from '@/lib/dynamic-colors';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
+import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from '../CaseDetail';
 import { hardwareLabel, sortHardware } from '../compare/hardware';
@@ -544,6 +544,12 @@ function SlotDetail({
   onClose: () => void;
 }) {
   const [inspected, setInspected] = useState<number | null>(null);
+  // A case opened for one op never carries over to the next op shown
+  const [inspectedFor, setInspectedFor] = useState(data);
+  if (inspectedFor !== data) {
+    setInspectedFor(data);
+    setInspected(null);
+  }
   const queryClient = useQueryClient();
   const sub = useMemo(() => {
     if (!data?.model) return null;

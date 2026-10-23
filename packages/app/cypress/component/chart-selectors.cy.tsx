@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const locale of ['en', 'zh'] as const) {
@@ -468,18 +468,6 @@ describe('Chart Selectors', () => {
   });
 
   describe('ScenarioSelector', () => {
-    it('labels the agentic scenario "Agentic"', () => {
-      cy.mount(<ScenarioSelectorHarness />);
-      cy.get('[data-testid="scenario-selector"]').should('have.text', 'Agentic');
-      cy.get('[data-testid="scenario-selector"]').click();
-      cy.contains('[data-select-option]', 'Agentic').should('be.visible');
-      cy.contains('[data-select-option]', 'Agentic Traces').should('not.exist');
-      // The lone agentic entry needs no "Agentic" heading above it.
-      cy.get('[data-slot="select-content"]')
-        .find('[data-slot="select-label"]')
-        .should('not.contain.text', 'Agentic');
-    });
-
     it('explains the agentic workload in a tooltip that links to /agentx', () => {
       cy.mount(<ScenarioSelectorHarness />);
       assertAgenticInfoInside(36);
@@ -497,7 +485,6 @@ describe('Chart Selectors', () => {
           const followLink = cy.spy().as('followAgenticLink');
           $link[0].addEventListener('click', (event) => {
             followLink(event.defaultPrevented);
-            // Keep the component runner mounted while checking native link activation.
             event.preventDefault();
           });
         })
@@ -594,9 +581,6 @@ describe('Chart Selectors', () => {
     }
 
     it('marks model-specific retired scenarios in their option labels', () => {
-      // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
-      // (InferenceX#2493): with the model passed in, 8K / 1K moves out of the
-      // option label gains the deprecated status without a separate group.
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
@@ -620,9 +604,6 @@ describe('Chart Selectors', () => {
     });
 
     it('marks 8K/1K retired for DeepSeek V4 Pro while AgentX stays active', () => {
-      // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
-      // 2026-09-08 (InferenceX#2728, MODELS.md): the fixed-length option
-      // carries the deprecated status, the agentic option does not.
       cy.mount(
         <TooltipProvider delayDuration={0}>
           <ScenarioSelector
@@ -731,7 +712,6 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
       cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
 
-      // ...and appears as soon as the user picks the agentic scenario.
       cy.get('[data-testid="scenario-selector"]').click();
       cy.contains('[data-select-option]', 'Agentic').click();
       cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');

@@ -6,18 +6,13 @@ import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
-import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n';
-import { inferenceModelMetaZh } from '@/lib/inference-model-meta';
+import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n/i18n';
+import { inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import {
   getInferenceModelBySlug,
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
-} from '@/lib/inference-model-slug';
-
-/**
- * `/zh/inference/<model>` — Chinese sibling of `/inference/<model>`. Same
- * pinned-model chart body; metadata and intro copy are Simplified Chinese.
- */
+} from '@/lib/routing/inference-model-slug';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -57,8 +52,6 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Known aliases are canonicalized in next.config.ts before this SSG route
-  // renders. Next's config redirect also preserves the incoming query string.
   return (
     <>
       <ZhTabIntro tab="inference" />

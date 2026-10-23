@@ -15,9 +15,9 @@ import {
   RunDetailContent,
   type RunStrings,
 } from '@/components/live-seo/run-page-sections';
-import { JsonLd } from '@/components/json-ld';
-import { enAlternates } from '@/lib/i18n';
-import { scenarioLabel } from '@/lib/rankings';
+import { JsonLd } from '@/components/seo/json-ld';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { scenarioLabel } from '@/lib/live-seo/rankings';
 import {
   getRunPageEntry,
   runPageDescription,
@@ -26,8 +26,8 @@ import {
   runPageKeywords,
   runPageTitle,
   type RunPageEntry,
-} from '@/lib/run-pages';
-import { getRunPageData, type RunPageData } from '@/lib/run-rankings-data.server';
+} from '@/lib/live-seo/run-pages';
+import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,8 +62,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: runPageKeywords(entry),
     authors: [{ name: AUTHOR_NAME }],
-    // Valid slugs without benchmark data render an empty state; keep those
-    // out of the index (the sitemap already excludes them).
     ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: enAlternates(`/run/${entry.slug}`),
     openGraph: { title: `${title} | ${SITE_NAME}`, description, url, type: 'article' },

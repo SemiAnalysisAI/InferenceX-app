@@ -1,16 +1,9 @@
-/**
- * Shared server-rendered body for `/rankings/<slug>` and `/zh/rankings/<slug>`.
- * One markup tree, two string bundles — the EN and ZH routes cannot drift.
- * All numbers come pre-derived from `getRankingPageData`, which reads the
- * exact cells the /overview leaderboard renders.
- */
-
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';
-import type { RankingPageData } from '@/lib/run-rankings-data.server';
-import type { RankingPageEntry, RankingRow } from '@/lib/rankings';
-import { getRunPageEntry } from '@/lib/run-pages';
+import type { RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import type { RankingPageEntry, RankingRow } from '@/lib/live-seo/rankings';
+import { getRunPageEntry } from '@/lib/live-seo/run-pages';
 
 export interface RankingsStrings {
   backLabel: string;

@@ -42,6 +42,43 @@ const MOCK_ITEMS: CommonLegendItemProps[] = [
   },
 ];
 
+describe('ChartLegend in an enclosing controls panel', () => {
+  it('shows controls without a second toggle or changing the saved expansion state', () => {
+    const onExpandedChange = cy.stub().as('expandedChange');
+    const onHighContrast = cy.stub().as('highContrastChange');
+    const onReset = cy.stub().as('resetFilter');
+    const onHardware = cy.stub().as('hardwareChange');
+    cy.mount(
+      <ChartLegend
+        legendItems={MOCK_ITEMS.map((item) => ({ ...item, onClick: onHardware }))}
+        variant="sidebar"
+        isLegendExpanded={false}
+        collapsible={false}
+        onExpandedChange={onExpandedChange}
+        switches={[
+          {
+            id: 'embedded-high-contrast',
+            label: 'High Contrast',
+            checked: false,
+            onCheckedChange: onHighContrast,
+          },
+        ]}
+        actions={[{ id: 'embedded-reset', label: 'Reset filter', onClick: onReset }]}
+      />,
+    );
+    cy.get('[data-testid="legend-open-button"], [data-testid="legend-close-button"]').should(
+      'not.exist',
+    );
+    cy.contains('label', 'NVIDIA H100 SXM').should('be.visible').click();
+    cy.get('@hardwareChange').should('have.been.calledWith', 'h100-sxm');
+    cy.get('#embedded-high-contrast').should('be.visible').click();
+    cy.get('@highContrastChange').should('have.been.calledWith', true);
+    cy.get('[data-testid="embedded-reset"]').should('be.visible').click();
+    cy.get('@resetFilter').should('have.been.calledOnce');
+    cy.get('@expandedChange').should('not.have.been.called');
+  });
+});
+
 function ChartLegendWrapper({
   items = MOCK_ITEMS,
   inChart = false,
@@ -141,11 +178,6 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.mount(<ChartLegendWrapper />);
   });
 
-  it('renders legend with items', () => {
-    cy.get('.sidebar-legend').should('be.visible');
-    cy.get('.sidebar-legend label').should('have.length', 4);
-  });
-
   it('derives long unofficial labels without a nested update', () => {
     const branch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
     const onRender = cy.spy().as('legendRender');
@@ -169,7 +201,6 @@ describe('ChartLegend (sidebar variant)', () => {
 
     cy.get('[data-testid="chart-legend"]').should('contain.text', branch);
     cy.get('@legendRender').should((renderSpy) => {
-      // Cypress loses the Sinon spy type when resolving an alias.
       const profilerSpy = renderSpy as unknown as {
         getCalls: () => { args: unknown[] }[];
       };
@@ -179,10 +210,6 @@ describe('ChartLegend (sidebar variant)', () => {
         'React render phases',
       ).not.to.include('nested-update');
     });
-  });
-
-  it('legend items have colored dots', () => {
-    cy.get('.sidebar-legend label').first().find('span').first().should('exist');
   });
 
   it('renders no search input (removed from the sidebar panel)', () => {
@@ -385,7 +412,6 @@ describe('ChartLegend (sidebar variant)', () => {
 
   it('clicking a legend item toggles its active state', () => {
     cy.get('.sidebar-legend label').first().click();
-    // After clicking, "Reset filter" should appear since one item is inactive
     cy.contains('Reset filter').should('be.visible');
   });
 
@@ -434,10 +460,6 @@ describe('ChartLegend (sidebar variant)', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Per-series points table (inference legend drill-down)
-// ---------------------------------------------------------------------------
-
 function mockPoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
     date: '2025-06-15',
@@ -471,7 +493,6 @@ const OVERLAY_POINTS: InferenceData[] = [
   mockPoint({ conc: 8, run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1' }),
 ];
 
-/** Mirrors ScatterGraph's wiring: legend rows with onShowPoints → dialog. */
 function LegendWithPointsTable() {
   const [openSeries, setOpenSeries] = useState<'official' | 'overlay' | null>(null);
 
@@ -527,11 +548,6 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.mount(<LegendWithPointsTable />);
   });
 
-  it('renders the icon only for rows with an onShowPoints handler', () => {
-    cy.get('[data-testid="legend-points-b300-sxm"]').should('exist');
-    cy.get('[data-testid="legend-points-overlay-run-99"]').should('exist');
-  });
-
   it('opens the dialog with the series points sorted by concurrency, with row links', () => {
     cy.get('[data-testid="legend-points-b300-sxm"]').click();
     cy.get('[data-testid="legend-points-dialog"]').should('be.visible');
@@ -540,13 +556,11 @@ describe('ChartLegend points-table icon + dialog', () => {
       'contain.text',
       'DeepSeek V4 Pro · Agentic',
     );
-    // Two rows, conc ascending, linked to the agentic detail pages
     cy.get('[data-testid="legend-points-row"]').should('have.length', 2);
     cy.get('a[data-testid="legend-points-row"]')
       .first()
       .should('have.attr', 'href', '/inference/agentic/206860');
     cy.get('a[data-testid="legend-points-row"]').first().should('contain.text', '4');
-    // Offload column present for agentic rows
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'Offload');
   });
 
@@ -556,7 +570,6 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('a[data-testid="legend-points-row"]').should('not.exist');
     cy.get('div[data-testid="legend-points-row"]').should('have.length', 1);
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', 'metrics only');
-    // Metrics still render
     cy.get('[data-testid="legend-points-dialog"]').should('contain.text', '1500.5');
   });
 

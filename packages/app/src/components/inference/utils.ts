@@ -1,23 +1,23 @@
-import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
-/**
- * @file utils.ts
- * @description Inference-specific utility functions for filtering chart data.
- * For Pareto front calculations, see @/lib/chart-utils
- */
+import { getGpuSpecs, type TcoBasis } from '@/lib/catalog/constants';
 
-import chartDefinitions from '@/components/inference/metric-registry';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
-import { remapInferencePoint } from '@/lib/chart-utils';
+import chartDefinitions, { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
+import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
-import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+import type {
+  ChartDefinition,
+  ClippedInferenceData,
+  InferenceData,
+  PowerCompare,
+  YAxisMetricKey,
+} from './types';
 import type { XAxisMode } from './hooks/useChartData';
 
-/**
- * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
- * is intentionally excluded: unofficial benchmark rows do not include the
- * persisted per-request trace needed to derive the per-request ratio
- * percentiles.
- */
 export function selectUnofficialOverlayForMode<T>(
   xAxisMode: string,
   chartType: 'e2e' | 'interactivity',
@@ -30,34 +30,22 @@ export function selectUnofficialOverlayForMode<T>(
 export interface ProcessedChartData {
   data: InferenceData[];
   clippedData: ClippedInferenceData[];
+  tableData?: InferenceData[];
 }
 
-/**
- * Filters data points based on cost limits defined in the chart definition.
- * Only applies filtering for cost-related metrics, and only filters based on
- * the currently selected cost metric (not all cost fields).
- *
- * @param {InferenceData[]} data - The data points to filter
- * @param {ChartDefinition} chartDefinition - The chart definition containing cost limits
- * @param {string} selectedYAxisMetric - The currently selected Y-axis metric
- * @returns {InferenceData[]} The filtered data points
- */
 export const filterDataByCostLimit = (
   data: InferenceData[],
   chartDefinition: ChartDefinition,
   selectedYAxisMetric: string,
 ): InferenceData[] => {
-  // Only apply filtering for built-in cost metrics, not custom user values
   const isCostMetric = selectedYAxisMetric.includes('cost') && selectedYAxisMetric !== 'y_costUser';
 
   if (!isCostMetric || !chartDefinition.y_cost_limit) {
     return data;
   }
 
-  // Extract the metric key from selectedYAxisMetric (e.g., "y_costr" -> "costr")
   const metricKey = selectedYAxisMetric.replace('y_', '');
 
-  // Map of metric keys to their corresponding data point fields
   const costFieldMap: Record<string, (point: InferenceData) => number | undefined> = {
     costh: (point) => point.costh?.y,
     costr: (point) => point.costr?.y,
@@ -70,14 +58,12 @@ export const filterDataByCostLimit = (
 
   const getCostValue = costFieldMap[metricKey];
 
-  // If we don't recognize the metric, don't filter
   if (!getCostValue) {
     return data;
   }
 
   return data.filter((point) => {
     const costValue = getCostValue(point);
-    // If the cost value doesn't exist, include the point (let other logic handle missing data)
     if (costValue === undefined) {
       return true;
     }
@@ -85,11 +71,6 @@ export const filterDataByCostLimit = (
   });
 };
 
-/**
- * Partition already-remapped chart points without discarding the outliers.
- * The visible array preserves the existing chart behavior; clippedData gives
- * ScatterGraph enough context to draw and explain a boundary continuation.
- */
 export function partitionChartDataByLimits(
   data: InferenceData[],
   chartDefinition: ChartDefinition,
@@ -121,19 +102,6 @@ export function partitionChartDataByLimits(
   return { data: visible, clippedData };
 }
 
-/**
- * Process overlay (unofficial run) data to match the same pipeline as official data.
- *
- * Applies: metric field filtering, x/y remapping (via the resolveXAxisField
- * resolver shared with `useChartData`, so the overlay of a run lands on the
- * identical x column as that run's official points), canonical-frontier
- * handling for agentic modes, and cost limit filtering.
- *
- * Unofficial rows do not carry persisted per-request traces, so they cannot be
- * proven members of the E2E Normalized Interactivity frontier. When the
- * canonical rule applies they remain visible in show-all mode but are never
- * classified as optimal or used to draw an alternate-axis roofline.
- */
 export function processOverlayChartData(
   data: InferenceData[],
   chartType: 'e2e' | 'interactivity',
@@ -143,8 +111,10 @@ export function processOverlayChartData(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
+    powerCompare?: PowerCompare;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -156,10 +126,6 @@ export function processOverlayChartData(
   ).data;
 }
 
-/**
- * Overlay processor variant that retains intentionally clipped points for the
- * dashed boundary-continuation layer.
- */
 export function processOverlayChartDataWithClipping(
   data: InferenceData[],
   chartType: 'e2e' | 'interactivity',
@@ -169,8 +135,10 @@ export function processOverlayChartDataWithClipping(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
+    powerCompare?: PowerCompare;
   },
 ): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
@@ -210,26 +178,23 @@ export function processOverlayChartDataWithClipping(
         })
       : data;
 
-  // selectedXAxisMetric is already the effective metric for this chart type
-  // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
   const { xAxisField } = resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric, {
     isAgentic,
     percentile: selectedPercentile,
     xAxisMode: options?.selectedXAxisMode,
+    fixedSequenceStatistic: options?.fixedSequenceStatistic,
   });
 
-  // The latency limit targets overload outliers on the TTFT axis only; skip it
-  // for the natural axis and for agentic (long TTFTs are normal there).
   const isTtftX = xAxisField.endsWith('_ttft');
 
-  const processedData = sourceData
-    .filter((d) => metricKey in d)
-    .map((d) => remapInferencePoint(d, metricKey, xAxisField));
+  const processedData = expandPowerCompareSeries(
+    sourceData
+      .filter((d) => metricKey in d)
+      .map((d) => remapInferencePoint(d, metricKey, xAxisField)),
+    selectedYAxisMetric,
+    options?.powerCompare ?? 'none',
+  );
 
-  // The normalized metric is derived from persisted request traces, which an
-  // unofficial overlay does not have. An all-false canonical stamp prevents a
-  // local E2E / Interactivity / TTFT frontier from impersonating the north-star
-  // frontier. Metrics without a declared Pareto direction remain unrestricted.
   const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
   if (options?.restrictToNormalizedFrontier && chartDef[rooflineKey]) {
     for (const point of processedData) {
@@ -237,8 +202,25 @@ export function processOverlayChartDataWithClipping(
     }
   }
 
-  return partitionChartDataByLimits(processedData, chartDef, selectedYAxisMetric, {
-    isTtftX,
-    isAgentic,
-  });
+  const partition = partitionChartDataByLimits(
+    processedData,
+    { ...chartDef, x_scale_field: xAxisField },
+    selectedYAxisMetric,
+    {
+      isTtftX,
+      isAgentic,
+    },
+  );
+  return {
+    ...partition,
+    ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+      ? {
+          tableData: expandPowerCompareSeries(
+            allInMeasuredTableData(sourceData, metricKey, xAxisField),
+            selectedYAxisMetric,
+            options?.powerCompare ?? 'none',
+          ),
+        }
+      : {}),
+  };
 }

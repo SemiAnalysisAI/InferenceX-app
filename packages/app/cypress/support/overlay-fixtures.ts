@@ -1,15 +1,3 @@
-/**
- * Shared fixtures for `?unofficialrun=` overlay e2e specs.
- *
- * The benchmark values are the real numbers from GitHub run 29682242847
- * (GLM5.2 B300 agentic hicache, offload=on rows):
- *   conc, p90_intvty (tok/s/user), tput_per_gpu, p90_e2el (s)
- * C=4 is dominated on e2e by C=8 (12874 tok/s @ 33.1s vs 9415 @ 48.0s). That
- * used to make the set a probe for the e2e-restricted frontier; #736 removed
- * that gating, so on the interactivity axes all five are Pareto-optimal —
- * throughput falls monotonically as interactivity rises. Use
- * `DOMINATED_CONFIG` when a test needs a point Optimal Only will actually drop.
- */
 export const DEFAULT_MODEL_DB_KEY = 'dsv4';
 export const AGENTIC_DATE = '2026-07-19';
 export const OVERLAY_RUN_ID = '29682242847';
@@ -19,13 +7,12 @@ export const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/act
 export const REAL_CONFIGS: [number, number, number, number][] = [
   [48, 10.6, 17199, 126.9],
   [8, 68.5, 12874, 33.1],
-  [4, 88.3, 9415, 48], // e2e-dominated by C=8 → NOT optimal
+  [4, 88.3, 9415, 48],
   [2, 111.1, 5018, 30],
   [1, 130.2, 2600, 25.8],
 ];
 
 export const metricsFor = (intvty: number, tput: number, e2el: number): Record<string, number> => ({
-  // intvty is ALWAYS derived as 1/itl by the agentic aliases — feed itl.
   median_itl: 1 / (intvty * 1.2),
   p75_itl: 1 / (intvty * 1.1),
   p90_itl: 1 / intvty,
@@ -42,16 +29,9 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
   input_tput_per_gpu: tput * 0.7,
   server_gpu_cache_hit_rate: 0.8,
   server_external_cache_hit_rate: 0.1,
-  // External already includes the offload tier; revenue must not add this again.
   server_cpu_cache_hit_rate: 0.05,
 });
 
-/**
- * A sixth config that is dominated on the *interactivity* axes: C=8 beats it on
- * both interactivity (68.5 > 60) and throughput (12874 > 5000). Since #736 the
- * Pareto frontier is computed from the selected axes alone, so this is the point
- * Optimal Only must drop — the e2e-dominated C=4 above no longer is one.
- */
 export const DOMINATED_CONFIG: [number, number, number, number] = [6, 60, 5000, 40];
 
 let idCursor = 900000;
@@ -100,11 +80,6 @@ export const availability = [
   },
 ];
 
-/**
- * Intercept availability + benchmarks + unofficial-run with the B300 fixture.
- * `overlayConfigs` overrides only the overlay run's rows, leaving the official
- * rows as the standard five.
- */
 export const interceptOverlayRun = ({
   overlayHardware = 'b300',
   overlayConfigs = REAL_CONFIGS,
@@ -138,39 +113,20 @@ export const interceptOverlayRun = ({
 export const countVisible = ($els: JQuery<HTMLElement>): number =>
   [...$els].filter((el) => getComputedStyle(el).opacity !== '0').length;
 
-// ---------------------------------------------------------------------------
-// Single-turn (fixed-sequence) overlay fixtures — for fixed-sequence calculator specs
-// ---------------------------------------------------------------------------
-//
-// The calculator supports the agentic rows above as well. These fixtures remain
-// useful for fixed-sequence coverage and for hardware/sequence combinations
-// tailored to the calculator overlay visibility tests.
-
 export const SINGLE_TURN_DATE = '2026-07-19';
 export const SINGLE_TURN_ISL = 1024;
 export const SINGLE_TURN_OSL = 1024;
-/** A second sequence, covering different hardware — switching to it and back
- *  changes the calculator's available-hardware set, which reseeds the legend. */
 export const ALT_SEQUENCE_ISL = 8192;
 export const ALT_SEQUENCE_OSL = 1024;
 export const ALT_SEQUENCE_LABEL = '8K / 1K';
 export const ALT_SEQUENCE_HARDWARE = 'h100';
-/** A model the calculator is NOT showing — used to prove overlay model filtering. */
 export const OTHER_MODEL_DB_KEY = 'glm5';
-/** Hardware present only in the unofficial run, never in the official rows. */
 export const OVERLAY_ONLY_HARDWARE = 'mi355x';
-/** A second official GPU, so a hardware filter set before the run lands is observable. */
 export const SECOND_OFFICIAL_HARDWARE = 'b200';
-/**
- * A sequence the unofficial run covers but the DB does not — the "this
- * model/sequence exists only in the run" case the overlay feature exists for.
- * Selecting it leaves the calculator with zero official hardware.
- */
 export const OVERLAY_ONLY_ISL = 1024;
 export const OVERLAY_ONLY_OSL = 8192;
 export const OVERLAY_ONLY_SEQUENCE_LABEL = '1K / 8K';
 
-/** conc, interactivity (tok/s/user), tput_per_gpu */
 export const SINGLE_TURN_CONFIGS: [number, number, number][] = [
   [48, 10.6, 17199],
   [8, 68.5, 12874],
@@ -190,12 +146,6 @@ export const singleTurnMetrics = (intvty: number, tput: number): Record<string, 
 
 let singleTurnIdCursor = 800000;
 
-/**
- * Fixed-sequence (1k/1k) rows for one hardware config.
- *
- * `tputScale` lets an overlay run report a different throughput than the
- * official rows, so the two bars are distinguishable in assertions.
- */
 export const singleTurnRows = (
   runUrl: string | null,
   {
@@ -276,21 +226,9 @@ export const singleTurnAvailability = [
   },
 ];
 
-/**
- * Intercept availability + benchmarks + unofficial-run with fixed-sequence
- * rows the calculator can actually read.
- *
- * The overlay payload deliberately carries two extra kinds of rows:
- * - `OTHER_MODEL_DB_KEY` rows, which must be filtered out — the unofficial-run
- *   API returns every model in the run, the calculator shows only the selected one.
- * - `OVERLAY_ONLY_HARDWARE` rows, hardware with no official data at all, which
- *   must still get a legend entry so its overlay bar can be hidden.
- */
 export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: number } = {}) => {
   cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', {
-    // The route is intercepted regardless of query params; the hook filters by
-    // isl/osl client-side, so both sequences ship in one payload.
     body: [
       ...singleTurnRows(null),
       ...singleTurnRows(null, { hardware: SECOND_OFFICIAL_HARDWARE, tputScale: 0.6 }),
@@ -302,8 +240,6 @@ export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: num
     ],
   }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
-    // A delay lets a spec set a GPU filter in the window after the official
-    // benchmarks land but before the run does — the real-world ordering.
     delay: runDelayMs,
     body: {
       runInfos: [
@@ -323,10 +259,6 @@ export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: num
         ...singleTurnRows(OVERLAY_RUN_URL, { tputScale: 1.3 }),
         ...singleTurnRows(OVERLAY_RUN_URL, { hardware: OVERLAY_ONLY_HARDWARE, tputScale: 0.8 }),
         ...singleTurnRows(OVERLAY_RUN_URL, { model: OTHER_MODEL_DB_KEY, tputScale: 5 }),
-        // 1k/8k: covered by the run only, so selecting it leaves zero official
-        // hardware. Same two GPUs as 1k/1k, which keeps `overlayAvailableHwKeys`
-        // unchanged across the switch — the adversarial case, since only the
-        // official-list reset can clear the now-stale official keys.
         ...singleTurnRows(OVERLAY_RUN_URL, {
           tputScale: 1.1,
           isl: OVERLAY_ONLY_ISL,
@@ -344,7 +276,6 @@ export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: num
   }).as('unofficialRun');
 };
 
-/** Second run id, for multi-run (`?unofficialruns=a,b`) specs. */
 export const SECOND_OVERLAY_RUN_ID = '29682242848';
 export const SECOND_OVERLAY_RUN_BRANCH = 'perf/second-branch';
 export const SECOND_OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${SECOND_OVERLAY_RUN_ID}`;
@@ -361,16 +292,6 @@ const runInfoFor = (id: string, branch: string, url: string) => ({
   isNonMainBranch: true,
 });
 
-/**
- * Two runs, each contributing ONE hardware config on the 1k/8k sequence — a
- * sequence the DB does not cover, so the calculator has zero official hardware
- * there.
- *
- * That combination is what exercises the "don't strand an empty chart" fallback
- * in the additive overlay effect: soloing the GPU from run A and then dismissing
- * run A empties the visible set while run B's bar still has data, and the
- * official hardware list (empty here) is not something the fallback can use.
- */
 export const interceptCalculatorMultiRunOverlay = () => {
   cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: singleTurnRows(null) }).as('benchmarks');

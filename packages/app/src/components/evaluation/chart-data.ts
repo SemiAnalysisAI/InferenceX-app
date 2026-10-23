@@ -4,33 +4,24 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import type { EvalChangelogEntry, EvaluationChartData } from '@/components/evaluation/types';
-import type { EvalRow } from '@/lib/api';
-import { normalizeEvalHardwareKey } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import { getFrameworkLabel } from '@/lib/utils';
+import type { EvalRow } from '@/lib/api/api';
+import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import { getFrameworkLabel } from '@/lib/shared/utils';
 
 interface EvalLabelParams {
   dp?: number;
   disagg?: boolean;
-  /** Decode-side (or single-node) TP. Not shown when undefined. */
   decodeTp?: number;
-  /** Decode-side (or single-node) EP. Not shown when undefined. */
   decodeEp?: number;
-  /** Decode-side (or single-node) DPA flag. */
   decodeDpa?: boolean;
-  /** Decode-side worker count (disagg only). */
   decodeNw?: number;
-  /** Prefill-side TP (disagg only). */
   prefillTp?: number;
-  /** Prefill-side EP (disagg only). */
   prefillEp?: number;
-  /** Prefill-side DPA flag (disagg only). */
   prefillDpa?: boolean;
-  /** Prefill-side worker count (disagg only). */
   prefillNw?: number;
 }
 
-/** Format a disagg side's tuple positionally as `(tp/ep/dpa/nw)`. */
 function fmtSide(
   side: 'P' | 'D',
   tp: number,
@@ -41,15 +32,6 @@ function fmtSide(
   return `${side}(${tp}/${ep}/${dpa ? 'T' : 'F'}/${nw ?? 1})`;
 }
 
-/**
- * Legend/x-axis label format:
- * - single-node: `{hw} ({framework}[, {spec}])\nC{conc} T{tp} E{ep} [DPA]`
- * - disagg:      `{hw} ({framework}[, {spec}])\nC{conc} P(tp/ep/dpa/nw) D(tp/ep/dpa/nw)`
- *
- * The P(…)/D(…) tuple format itself signals disagg (vs single-node's T#/E#).
- * Tuples are positional — the order `tp/ep/dpa/nw` is documented in the chart
- * caption so that legend items stay compact and uniformly shaped.
- */
 function buildConfigLabel(
   hwLabel: string,
   framework: string,
@@ -62,7 +44,6 @@ function buildConfigLabel(
 ): string {
   const headerSuffixes: string[] = [];
   if (framework && framework !== '1k8k') headerSuffixes.push(getFrameworkLabel(framework));
-  // M3's `mtp` spec token renders as "EAGLE"; every other model keeps "MTP".
   if (specMethod && specMethod !== 'none')
     headerSuffixes.push(resolveFrameworkPartLabel(model, specMethod));
 
@@ -92,12 +73,6 @@ function buildConfigLabel(
   return detailSuffixes.length > 0 ? `${line1}\n${detailSuffixes.join(' ')}` : line1;
 }
 
-/**
- * Convert raw eval rows into latest-per-config chart rows for a benchmark/model/precision slice.
- * When `selectedRunDate` is omitted, all matching rows are considered and the latest row date
- * per config group is kept. This is used for unofficial-run overlays, which should render
- * independently of the official eval date picker.
- */
 export function buildEvaluationChartRows(
   rawData: EvalRow[],
   selectedBenchmark: string | undefined,
@@ -196,11 +171,6 @@ export function buildEvaluationChartRows(
     })
     .filter((item): item is EvaluationChartData => item !== null);
 
-  // Dedup by (configId, conc) so each distinct config (unique prefill/decode
-  // geometry, spec method, precision, etc.) gets its own "latest date" slot
-  // per concurrency. `conc` lives on `eval_results`, not `configs`, so a
-  // single config_id spans multiple concurrencies — keying on configId alone
-  // would collapse them.
   const latestDateForConfig = new Map<string, string>();
   for (const item of allData) {
     const key = `${item.configId}|${item.conc}`;
@@ -213,15 +183,6 @@ export function buildEvaluationChartRows(
     .toSorted((a, b) => a.configLabel.localeCompare(b.configLabel));
 }
 
-/**
- * Aggregate repeated eval rows for the same config (retries, reruns on the same
- * date, etc.) into a single data point with min/max/error range metadata.
- *
- * Grouping is by `(configId, conc)` rather than `configLabel`: two distinct
- * configs could theoretically render the same label, so `configId` is the
- * stable row identity. `conc` lives on `eval_results` (not on `configs`), so a
- * single config_id can span multiple concurrencies that must stay separate.
- */
 export function aggregateEvaluationChartRows(
   unfilteredChartData: EvaluationChartData[],
   enabledHardware: Set<string>,
@@ -253,10 +214,6 @@ export function aggregateEvaluationChartRows(
       }
 
       const meanScore = sum / dataPoints.length;
-      // Pick the highest evalResultId in the group — eval_results uses a
-      // bigserial PK so the highest id is the most recently inserted run,
-      // which is the one most likely to have eval_samples persisted for the
-      // drawer. Falls back to dataPoints[0] when ids aren't set.
       const latest = dataPoints.reduce(
         (best, d) => (d.evalResultId > best.evalResultId ? d : best),
         dataPoints[0],
@@ -306,8 +263,6 @@ export function buildEvalChangelogEntries(
       const hwKey = normalizeEvalHardwareKey(item.hardware, item.framework, item.spec_method);
       const hwConfig = getHardwareConfig(hwKey, selectedModel);
       const hwLabel = hwConfig.label;
-      // Changelog labels historically omit TP/EP; keep that behavior while
-      // still surfacing the disagg marker.
       return {
         benchmark: item.task,
         configLabel: buildConfigLabel(

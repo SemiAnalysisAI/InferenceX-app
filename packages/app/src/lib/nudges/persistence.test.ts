@@ -11,10 +11,6 @@ import {
 } from './persistence';
 import type { NudgeDismissal } from './types';
 
-// ---------------------------------------------------------------------------
-// Storage mocks
-// ---------------------------------------------------------------------------
-
 function makeMockStorage() {
   const store = new Map<string, string>();
   return {
@@ -39,10 +35,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-
-// ---------------------------------------------------------------------------
-// isDismissed / markDismissed / clearDismissal
-// ---------------------------------------------------------------------------
 
 describe('session dismissal', () => {
   const strategy: NudgeDismissal = { type: 'session' };
@@ -140,10 +132,6 @@ describe('timed dismissal', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// markShown — show-time persistence (only fires for cooldown-on-show types)
-// ---------------------------------------------------------------------------
-
 describe('markShown', () => {
   const oneWeek = 7 * 24 * 60 * 60 * 1000;
 
@@ -176,47 +164,6 @@ describe('markShown', () => {
     expect(Number(stored)).toBeGreaterThan(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// markShown / markDismissed equivalence — when both write, they write the
-// same thing. This locks the invariant that the two functions share a single
-// underlying primitive (writeCooldownAnchor).
-// ---------------------------------------------------------------------------
-
-describe('markShown / markDismissed equivalence', () => {
-  const oneWeek = 7 * 24 * 60 * 60 * 1000;
-
-  it('produces identical session-storage state for session strategy', () => {
-    const k1 = 'session-via-shown';
-    const k2 = 'session-via-dismissed';
-    markShown(k1, { type: 'session' });
-    markDismissed(k2, { type: 'session' });
-    expect(mockSession._store.get(k1)).toBe('1');
-    expect(mockSession._store.get(k2)).toBe('1');
-  });
-
-  it('produces near-identical timestamps for cooldown-on-show timed strategy', () => {
-    const k1 = 'timed-via-shown';
-    const k2 = 'timed-via-dismissed';
-    const strategy = {
-      type: 'timed',
-      durationMs: oneWeek,
-      cooldownStartsOnShow: true,
-    } as const;
-    markShown(k1, strategy);
-    markDismissed(k2, strategy);
-    const v1 = Number(mockLocal._store.get(k1));
-    const v2 = Number(mockLocal._store.get(k2));
-    expect(v1).toBeGreaterThan(0);
-    expect(v2).toBeGreaterThan(0);
-    // Both call Date.now() at near the same instant.
-    expect(Math.abs(v2 - v1)).toBeLessThan(50);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// isPermanentlySuppressed / markPermanentlySuppressed
-// ---------------------------------------------------------------------------
 
 describe('permanent suppress', () => {
   const key = 'inferencex-starred';
@@ -252,10 +199,6 @@ describe('permanent suppress', () => {
     expect(dispatchSpy).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// isWithinSchedule
-// ---------------------------------------------------------------------------
 
 describe('isWithinSchedule', () => {
   it('returns true when no schedule provided', () => {

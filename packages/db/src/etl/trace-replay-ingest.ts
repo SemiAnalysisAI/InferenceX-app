@@ -1,22 +1,16 @@
-/**
- * Insert per-point aiperf trace files (`profile_export.jsonl` +
- * `server_metrics_export.csv`) into `agentic_trace_replay` and link the new row
- * to each provided benchmark_results row via `trace_replay_id`.
- *
- * Mirrors the {@link insertServerLog} idempotency contract: rows that already
- * have a non-null `trace_replay_id` are left alone so a re-ingest doesn't
- * duplicate the sibling blob.
- */
-
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
+import { PROFILE_INLINE_BYTES, writeTraceProfileChunks } from '../lib/trace-profile-storage';
+
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
+import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
+import { gzipRequestTimeline } from './request-timeline-codec.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
 type Sql = ReturnType<typeof postgres>;
@@ -28,11 +22,6 @@ export interface PreparedTraceReplayInput {
   sourceSize: number | null;
 }
 
-/**
- * Keep each postgres.js Bind message comfortably below the large payload that
- * can stall through Neon's proxy. The final row is assembled server-side in a
- * transaction, so callers still get all-or-nothing trace persistence.
- */
 export const TRACE_REPLAY_UPLOAD_CHUNK_BYTES = 4 * 1024 * 1024;
 
 type TraceReplayUploadField =
@@ -41,7 +30,7 @@ type TraceReplayUploadField =
   | 'server_metrics_json_gz'
   | 'aggregate_stats'
   | 'chart_series'
-  | 'request_timeline';
+  | 'request_timeline_gz';
 
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
@@ -57,7 +46,7 @@ export interface PreparedTraceReplay {
   serverMetricsJsonSize: number | null;
   aggregateStatsJson: Buffer | null;
   chartSeriesJson: Buffer | null;
-  requestTimelineJson: Buffer | null;
+  requestTimelineGz: Buffer | null;
   chartWindows: number;
   timelineRequests: number;
   compressionMs: number;
@@ -83,7 +72,7 @@ function elapsed(startMs: number): string {
 
 function jsonBuffer(value: unknown | null): Buffer | null {
   if (value === null) return null;
-  return Buffer.from(JSON.stringify(structuredClone(value)), 'utf8');
+  return Buffer.from(JSON.stringify(value), 'utf8');
 }
 
 function cacheHitRatesFromChartSeries(
@@ -95,8 +84,6 @@ function cacheHitRatesFromChartSeries(
 
   const sumOf = (name: string): number =>
     (chartSeries.promptTokensBySource[name] ?? []).reduce((sum, point) => sum + point.value, 0);
-  // Preserve the historical source aliases exactly: SGLang hicache reports
-  // HBM/CPU labels while vLLM LMCache reports local/external transfer labels.
   const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
   const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
   const gpuHits =
@@ -110,10 +97,6 @@ function cacheHitRatesFromChartSeries(
   };
 }
 
-/**
- * Gzip a trace input without materializing file-backed GiB-scale exports in
- * Node's heap. Buffer inputs remain supported for callers and unit tests.
- */
 export async function gzipTraceReplayInput(
   input: TraceReplayInput,
 ): Promise<PreparedTraceReplayInput> {
@@ -140,10 +123,6 @@ async function readTraceReplayInput(input: TraceReplayInput): Promise<PreparedTr
   return { data, sourceSize: data.length };
 }
 
-/**
- * Upload one trace-replay value as bounded binary parameters. The caller must
- * create `pg_temp.trace_replay_upload_parts` in the same transaction first.
- */
 export async function uploadTraceReplayPayloadChunks(
   sql: postgres.TransactionSql,
   field: TraceReplayUploadField,
@@ -163,7 +142,6 @@ export async function uploadTraceReplayPayloadChunks(
   return part;
 }
 
-/** Resolve benchmark rows which still need a trace sidecar before scheduling CPU work. */
 export async function findUnlinkedTraceReplayIds(
   sql: Sql,
   benchmarkResultIds: number[],
@@ -177,10 +155,6 @@ export async function findUnlinkedTraceReplayIds(
   return rows.map((row) => row.id);
 }
 
-/**
- * Perform the file IO and CPU-heavy derivation independently of Postgres so
- * callers can execute this stage in worker threads.
- */
 export async function prepareTraceReplay(
   profileExportJsonl: TraceReplayInput,
   serverMetricsCsv: TraceReplayInput,
@@ -198,6 +172,7 @@ export async function prepareTraceReplay(
   const computeStart = Date.now();
   const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
     await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
+  const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -210,7 +185,7 @@ export async function prepareTraceReplay(
     serverMetricsJsonSize: metricsJson.sourceSize,
     aggregateStatsJson: jsonBuffer(aggregateStats),
     chartSeriesJson: jsonBuffer(chartSeries),
-    requestTimelineJson: jsonBuffer(requestTimeline),
+    requestTimelineGz,
     chartWindows: chartSeries?.timeslicesCount ?? 0,
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
@@ -221,10 +196,6 @@ export async function prepareTraceReplay(
   };
 }
 
-/**
- * Persist a prepared trace atomically. Rows are locked and rechecked here so
- * concurrent ingest attempts cannot both attach different trace sidecars.
- */
 export async function persistPreparedTraceReplay(
   sql: Sql,
   benchmarkResultIds: number[],
@@ -246,12 +217,14 @@ export async function persistPreparedTraceReplay(
     serverMetricsJsonSize,
     aggregateStatsJson,
     chartSeriesJson,
-    requestTimelineJson,
+    requestTimelineGz,
+    timelineRequests,
     cacheHitRates,
     fullResponseMetrics,
   } = prepared;
 
   let linkedCount = 0;
+  const chunkedProfile = profileGz !== null && profileGz.length > PROFILE_INLINE_BYTES;
   const insertStart = Date.now();
   log(`uploading trace_replay payloads in ${formatBytes(TRACE_REPLAY_UPLOAD_CHUNK_BYTES)} chunks`);
   await sql.begin(async (tx) => {
@@ -276,12 +249,12 @@ export async function persistPreparedTraceReplay(
     `;
 
     const payloads: [TraceReplayUploadField, Buffer | null][] = [
-      ['profile_export_jsonl_gz', profileGz],
+      ['profile_export_jsonl_gz', chunkedProfile ? null : profileGz],
       ['server_metrics_csv', serverMetricsCsv],
       ['server_metrics_json_gz', serverMetricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
       ['chart_series', chartSeriesJson],
-      ['request_timeline', requestTimelineJson],
+      ['request_timeline_gz', requestTimelineGz],
     ];
     for (const [field, payload] of payloads) {
       const uploadStart = Date.now();
@@ -303,7 +276,9 @@ export async function persistPreparedTraceReplay(
         server_metrics_json_uncompressed_size,
         aggregate_stats,
         chart_series,
-        request_timeline
+        request_timeline_gz,
+        request_timeline_version,
+        request_count
       )
       values (
         (
@@ -335,14 +310,21 @@ export async function persistPreparedTraceReplay(
           where field = 'chart_series'
         ),
         (
-          select convert_from(string_agg(data, ''::bytea order by part), 'UTF8')::jsonb
+          select string_agg(data, ''::bytea order by part)
           from pg_temp.trace_replay_upload_parts
-          where field = 'request_timeline'
-        )
+          where field = 'request_timeline_gz'
+        ),
+        ${requestTimelineGz ? REQUEST_TIMELINE_VERSION : null},
+        ${requestTimelineGz ? timelineRequests : null}
       )
       returning id
     `;
     log(`assembled trace_replay_id=${traceReplayId}`);
+
+    if (chunkedProfile && profileGz) {
+      await writeTraceProfileChunks(tx, traceReplayId, profileGz);
+      log(`stored profile=${formatBytes(profileGz.length)} in permanent chunks`);
+    }
 
     const updateStart = Date.now();
     log(`linking trace_replay_id=${traceReplayId} to ${unlinked.length} benchmark row(s)`);
@@ -392,24 +374,6 @@ export async function persistPreparedTraceReplay(
   return linkedCount;
 }
 
-/**
- * Persist the per-point trace files and link them to `benchmarkResultIds`.
- *
- * @param sql                 Active `postgres` connection.
- * @param benchmarkResultIds  DB ids of the benchmark_results rows produced by
- *                            the same `bmk_agentic_<suffix>` artifact whose
- *                            sibling `agentic_<suffix>` directory holds these
- *                            trace files.
- * @param profileExportJsonl  Raw bytes or a file path for `profile_export.jsonl`.
- *                            Gzipped before storage; file paths stream from disk.
- * @param serverMetricsCsv    Raw bytes or a file path for `server_metrics_export.csv`.
- *                            Stored as-is.
- * @param serverMetricsJson   Raw bytes or a file path for `server_metrics_export.json` —
- *                            per-scrape time-series of every Prometheus metric.
- *                            Optional, streamed and gzipped before storage (~42x ratio).
- * @param options             Canonical framework/disagg context plus optional
- *                            progress label for CI logs.
- */
 export async function insertTraceReplay(
   sql: Sql,
   benchmarkResultIds: number[],
@@ -426,8 +390,6 @@ export async function insertTraceReplay(
   if (benchmarkResultIds.length === 0) return;
   if (!profileExportJsonl && !serverMetricsCsv && !serverMetricsJson) return;
 
-  // Only link rows that don't already point at a trace_replay row — keeps
-  // re-ingest from inserting duplicate sibling blobs.
   const linkStart = Date.now();
   log(`checking ${benchmarkResultIds.length} benchmark row(s) for existing links`);
   const unlinkedIds = await findUnlinkedTraceReplayIds(sql, benchmarkResultIds);

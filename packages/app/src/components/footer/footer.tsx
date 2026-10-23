@@ -4,17 +4,17 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { track } from '@/lib/analytics';
-import { isEmbedPathname } from '@/lib/embed-route';
-import { useLocale } from '@/lib/use-locale';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/ui/share-buttons';
+import { track } from '@/lib/analytics/analytics';
+import { isEmbedPathname } from '@/lib/embed/embed-route';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { StarButton } from './footer-star-cta';
 
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source agentic inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
+      'Continuous open-source AI accelerator system benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -31,7 +31,9 @@ const STRINGS = {
     supporters: 'Supporters',
     agentx: 'AgentX',
     telemetry: 'Telemetry',
+    comparisons: 'Comparisons',
     articles: 'Articles',
+    hardwareResults: 'Hardware Results',
     whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
     historicalTrends: 'Historical Trends',
@@ -52,7 +54,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      'InferenceX 持续开展开源的 agentic 推理基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展开源的 AI 加速器系统基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
     semianalysis: 'SemiAnalysis',
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
@@ -69,7 +71,9 @@ const STRINGS = {
     supporters: '业界评价',
     agentx: 'AgentX',
     telemetry: '遥测数据',
+    comparisons: '性能对比',
     articles: '技术文章',
+    hardwareResults: '硬件结果',
     whitepapers: '白皮书',
     historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
@@ -94,9 +98,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
   const locale = useLocale();
   const pathname = usePathname();
   const t = STRINGS[locale];
-  // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
-  // Embeds render one chart inside a third-party iframe; no site chrome.
   if (isEmbedPathname(pathname)) return null;
   return (
     <footer
@@ -104,9 +106,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
       className="relative mt-auto w-full overflow-visible pt-16 md:pt-20"
     >
       <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
-        {/* Main grid */}
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
-          {/* Left — Brand */}
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
             <Link
               data-testid="footer-brand-link"
@@ -130,7 +130,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </p>
           </div>
 
-          {/* Center — Links */}
           <div
             data-testid="footer-links"
             className="grid min-w-0 grid-cols-2 gap-x-6 gap-y-6 break-words sm:grid-cols-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,2fr)]"
@@ -223,9 +222,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 {t.visualization}
               </a>
             </div>
-            {/* "More" holds many links, so it gets a double-width column with
-                the links flowing in two sub-columns. This keeps every group on
-                one balanced row instead of wrapping below the others. */}
             <div
               data-testid="footer-links-more"
               className="col-span-full xl:col-span-1 flex min-w-0 flex-col gap-1"
@@ -257,12 +253,28 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   {t.telemetry}
                 </Link>
                 <Link
+                  data-testid="footer-link-compare"
+                  href={`${prefix}/compare`}
+                  onClick={() => track('footer_compare_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.comparisons}
+                </Link>
+                <Link
                   data-testid="footer-link-articles"
                   href={`${prefix}/blog`}
                   onClick={() => track('footer_articles_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.articles}
+                </Link>
+                <Link
+                  data-testid="footer-link-hardware"
+                  href={`${prefix}/hardware`}
+                  onClick={() => track('footer_hardware_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.hardwareResults}
                 </Link>
                 <Link
                   data-testid="footer-link-whitepapers"
@@ -380,7 +392,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </div>
           </div>
 
-          {/* Right — CTA + Social */}
           <div
             data-testid="footer-cta"
             className="flex min-w-0 flex-col gap-4 pt-6 sm:flex-row sm:items-center sm:justify-between lg:col-span-2"
@@ -402,7 +413,6 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div
           data-testid="footer-bottom-bar"
           className="border-t border-border/40 pt-6 flex flex-col md:flex-row items-center justify-between gap-4"

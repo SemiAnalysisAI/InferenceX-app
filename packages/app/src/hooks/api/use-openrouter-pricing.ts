@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/calculator/cache-pricing';
 
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 
@@ -24,7 +24,6 @@ function dollarsPerMillion(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed * 1_000_000 : null;
 }
 
-/** Parse OpenRouter's per-token catalog prices into dashboard $/M tok units. */
 export function openRouterPricingForModel(
   payload: OpenRouterModelsResponse,
   modelId: string,
@@ -59,7 +58,6 @@ export async function fetchOpenRouterPricing(
   return pricing;
 }
 
-/** Fetch the public OpenRouter model catalog only when its price source is active. */
 export function useOpenRouterPricing(modelId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ['openrouter-pricing', modelId],

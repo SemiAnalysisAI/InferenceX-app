@@ -13,16 +13,16 @@ import {
   RankingsDetailContent,
   type RankingsStrings,
 } from '@/components/live-seo/rankings-page-sections';
-import { JsonLd } from '@/components/json-ld';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/rankings';
+import { JsonLd } from '@/components/seo/json-ld';
+import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/live-seo/rankings';
 import {
   rankingPageDescriptionZh,
   rankingPageHeadingZh,
   rankingPageKeywordsZh,
   rankingPageTitleZh,
-} from '@/lib/rankings-zh';
-import { getRankingPageData, type RankingPageData } from '@/lib/run-rankings-data.server';
+} from '@/lib/live-seo/rankings-zh';
+import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,12 +1,10 @@
 import type { ArrayBufferTarget as ArrayBufferTargetType, Muxer as MuxerType } from 'mp4-muxer';
 
-import { getExportFooterText } from '@/lib/export-footer';
+import { getExportFooterText } from '@/lib/export/export-footer';
+import { hasDarkTheme } from '@/lib/themes/themes';
 
 export type Mp4ExportStage = 'init' | 'render' | 'encode' | 'flush' | 'mux';
 
-// Brand check on the `name` field — `instanceof` is unreliable here because
-// `exportMp4.ts` is dynamically imported, so the class identity can differ
-// between the caller's static type-only import and the runtime instance.
 export function isMp4ExportError(value: unknown): value is Mp4ExportError {
   return (
     typeof value === 'object' &&
@@ -15,7 +13,6 @@ export function isMp4ExportError(value: unknown): value is Mp4ExportError {
   );
 }
 
-/** Stage-tagged error thrown by exportReplayMp4; lets the caller attribute failures to the actual pipeline phase. */
 export class Mp4ExportError extends Error {
   readonly stage: Mp4ExportStage;
   readonly encoderState: VideoEncoder['state'] | 'unknown';
@@ -35,37 +32,25 @@ export class Mp4ExportError extends Error {
     this.stage = options.stage;
     this.encoderState = options.encoderState;
     this.queuedFrames = options.queuedFrames;
-    // tsconfig target is ES2017 — Error's options-arg form is ES2022, so the
-    // manual assignment is still required to preserve `cause`.
     if (options.cause !== undefined) (this as { cause?: unknown }).cause = options.cause;
   }
 }
 
 interface ExportOptions {
-  /** Live replay panel element captured each frame. Must be in the DOM. */
   captureRoot: HTMLElement;
-  /**
-   * Advance the replay to the given fraction [0, 1] and resolve once the new
-   * frame has been painted. Called once per output frame. The caller is
-   * responsible for flushing React state and waiting for paint.
-   */
   renderFrame: (fraction: number) => Promise<void>;
   fileName: string;
   fps?: number;
   durationSec?: number;
   bitrate?: number;
   onProgress?: (fraction: number) => void;
-  /** Fires when the pipeline advances stages, so callers can record where a failure happened. */
   onStage?: (stage: Mp4ExportStage) => void;
-  /** Aborting before completion throws an AbortError without writing the file. */
   signal?: AbortSignal;
 }
 
 const CSS_VAR_RE = /var\(--(?<varName>[^)]+)\)/u;
 const WATERMARK_HEIGHT = 48;
 
-// Mutates the supplied root in place — call only on a clone; baking onto the
-// live panel would freeze it on current theme.
 function resolveCssVarsForExport(root: HTMLElement) {
   const rootStyles = getComputedStyle(document.documentElement);
 
@@ -112,8 +97,6 @@ function resolveCssVarsForExport(root: HTMLElement) {
   }
 }
 
-// html-to-image can't resolve var(--*) tokens used by Tailwind text utilities,
-// so bake live computed colors onto the clone.
 function bakeTextColorsFromLive(liveRoot: HTMLElement, cloneRoot: HTMLElement) {
   const liveEls = [
     liveRoot,
@@ -131,8 +114,6 @@ function bakeTextColorsFromLive(liveRoot: HTMLElement, cloneRoot: HTMLElement) {
   }
 }
 
-// Drop the live `max-h-[480px] overflow-y-auto` wrapper so every legend item
-// appears in the rasterized frame.
 function expandLegendForExport(cloneRoot: HTMLElement) {
   const legend = cloneRoot.querySelector<HTMLElement>('[data-testid="replay-legend"]');
   if (legend) {
@@ -148,7 +129,6 @@ function expandLegendForExport(cloneRoot: HTMLElement) {
 const skipNoExport = (node: Node) =>
   !((node as Element).classList && (node as Element).classList.contains('no-export'));
 
-/** Draw the panel canvas onto a slightly taller canvas with a footer bar naming the source route. */
 function drawWithWatermark(
   source: HTMLCanvasElement,
   bgColor: string,
@@ -172,7 +152,6 @@ function drawWithWatermark(
   return out;
 }
 
-// Per-frame: caller advances replay → clone live panel → bake colors → toCanvas → encode.
 export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   const {
     captureRoot: livePanel,
@@ -214,8 +193,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     import('@jpinsonneau/html-to-image'),
   ]);
 
-  // Off-screen host: kept positioned far off-canvas (not display:none, because
-  // html-to-image needs computed styles to be available).
   const liveRect = livePanel.getBoundingClientRect();
   const host = document.createElement('div');
   host.setAttribute('aria-hidden', 'true');
@@ -231,9 +208,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
   const bgColor =
     getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#fff';
-  const isDark =
-    document.documentElement.classList.contains('dark') ||
-    document.documentElement.classList.contains('minecraft');
+  const isDark = hasDarkTheme(document.documentElement);
 
   let outWidth = 0;
   let outHeight = 0;
@@ -241,13 +216,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
   let encoder: VideoEncoder | null = null;
   const totalFrames = Math.max(2, Math.floor(durationSec * fps));
 
-  // Captured so a VideoEncoder error callback (which can fire at any point
-  // during encode/flush) surfaces as a checkable error instead of an
-  // un-awaitable throw from inside an async callback. Boxed so TS doesn't
-  // narrow the field to `never` — the only write is inside a callback TS
-  // can't see firing. The snapshot captures encoder state at the *moment*
-  // the error fires; reading it lazily after `close()` reports `closed`/0,
-  // hiding the actual back-pressure that caused the failure.
   const encoderErrorBox: {
     current: Error | null;
     snapshot: { encoderState: VideoEncoder['state'] | 'unknown'; queuedFrames: number } | null;
@@ -275,8 +243,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       advanceStage('render');
       await renderFrame(t);
 
-      // Per-frame clone: React commits new dot positions on the live SVG, so a
-      // deep clone each frame captures the current state.
       host.replaceChildren();
       const clone = livePanel.cloneNode(true) as HTMLElement;
       clone.removeAttribute('id');
@@ -286,17 +252,10 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       expandLegendForExport(clone);
       resolveCssVarsForExport(clone);
 
-      // Collapse .no-export boxes entirely. html-to-image's `filter` skips
-      // rendering, but the cloned nodes still take layout space — leaving
-      // dead space below the chart (controls bar) and inside the legend
-      // (search input, switches, action links). Matches the PNG export path.
       for (const el of clone.querySelectorAll<HTMLElement>('.no-export')) {
         el.style.display = 'none';
       }
 
-      // Legend scroll container has a `border-b` divider that only makes sense
-      // when the bottom controls below it are visible; with .no-export gone
-      // the line dangles, so strip it once nothing visible remains below.
       const legendContainer = clone.querySelector<HTMLElement>('[data-testid="chart-legend"]');
       if (legendContainer) {
         const scrollContainer =
@@ -323,13 +282,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
       const watermarked = drawWithWatermark(captured, bgColor, isDark);
 
-      // Lock encoder dimensions to the first watermarked frame and pad/crop
-      // subsequent frames to match (small reflow noise can shift the captured
-      // size by a pixel or two; H.264 needs stable dims).
       if (i === 0) {
-        // Round UP to the nearest even pixel and letterbox into the resulting
-        // canvas. Rounding down silently crops the rightmost/bottom pixel
-        // column of the watermark on odd dimensions (e.g. 1281 → 1280).
         outWidth = Math.max(2, Math.ceil(watermarked.width / 2) * 2);
         outHeight = Math.max(2, Math.ceil(watermarked.height / 2) * 2);
         const newMuxer = new Muxer({
@@ -341,18 +294,12 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
         const newEncoder = new VideoEncoder({
           // oxlint-disable-next-line no-loop-func
           output: (chunk, meta) => {
-            // Flip stage on the first chunk the encoder hands us: this is the
-            // earliest point where a muxer-thrown error would be attributable
-            // to muxing, not encoding. Without this, any throw from
-            // addVideoChunk surfaces while stage is still 'encode'.
             advanceStage('mux');
             newMuxer.addVideoChunk(chunk, meta);
           },
           // oxlint-disable-next-line no-loop-func
           error: (e: unknown) => {
             encoderErrorBox.current = e instanceof Error ? e : new Error(String(e));
-            // Snapshot synchronously: by the time the catch runs we may
-            // have already closed the encoder, hiding the back-pressure.
             encoderErrorBox.snapshot = {
               encoderState: newEncoder.state,
               queuedFrames: newEncoder.encodeQueueSize,
@@ -377,11 +324,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       if (!fctx) throw new Error('Could not allocate frame canvas');
       fctx.fillStyle = bgColor;
       fctx.fillRect(0, 0, outWidth, outHeight);
-      // Centre into the fixed encoder canvas instead of anchoring to (0,0).
-      // outW/outH are ceiled from frame 0, so subsequent frames are usually
-      // ≤ that size — letterbox bars fill with bgColor. If reflow noise
-      // pushes a frame larger, the source rect crops symmetrically rather
-      // than dropping the right/bottom edge.
       const drawW = Math.min(watermarked.width, outWidth);
       const drawH = Math.min(watermarked.height, outHeight);
       const srcX = Math.floor((watermarked.width - drawW) / 2);
@@ -390,8 +332,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
       const dstY = Math.floor((outHeight - drawH) / 2);
       fctx.drawImage(watermarked, srcX, srcY, drawW, drawH, dstX, dstY, drawW, drawH);
 
-      // mp4-muxer rejects null durations on encoded chunks; WebCodecs leaves
-      // `duration` unset on VideoFrame unless we pass it through here.
       const frame = new VideoFrame(fit, {
         timestamp: Math.round((i / fps) * 1_000_000),
         duration: Math.round(1_000_000 / fps),
@@ -434,9 +374,6 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     document.body.append(link);
     link.click();
     link.remove();
-    // Revoking synchronously races Chromium's async download dispatch — the
-    // blob URL is freed before the browser reads it, so the file lands as the
-    // bare blob UUID with no extension. Defer until the download has started.
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     onProgress?.(1);
   } catch (error) {
@@ -445,25 +382,15 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     throw new Mp4ExportError(message, { stage, ...failureSnapshot(), cause: error });
   } finally {
-    // VideoEncoder is a native resource — relying on GC orphans GPU/codec
-    // slots on error paths (esp. flush timeout, which throws but leaves the
-    // encoder still draining).
     if (encoder && encoder.state !== 'closed') {
       try {
         encoder.close();
-      } catch {
-        // Some Chromium builds throw on double-close; swallow.
-      }
+      } catch {}
     }
-    // Double-finalize corrupts the MP4 box structure; only finalize here on
-    // error paths where the muxer was constructed but never reached the
-    // happy-path finalize.
     if (muxer && !muxerFinalized) {
       try {
         muxer.finalize();
-      } catch {
-        // Best-effort cleanup; nothing to surface to the caller.
-      }
+      } catch {}
     }
     host.remove();
   }

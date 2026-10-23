@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   type ArchSubBlock,
@@ -15,7 +15,7 @@ import {
   ffnVariantLabel,
   getHybridAttentionSubBlocks,
   sharedExpertCount,
-} from '@/lib/model-architectures';
+} from '@/lib/catalog/model-architectures';
 
 const ARCHITECTURE_TEXT_ZH: Record<string, string> = {
   'Token Embedding': 'Token 嵌入',
@@ -108,7 +108,6 @@ export function localizeArchitectureDiagramText(value: string, locale: Locale): 
     )
     .replaceAll('sparse top-', '稀疏 top-');
 }
-/** Block color definitions for light/dark themes */
 export const BLOCK_COLORS = {
   embedding: { light: '#dbeafe', dark: '#1e3a5f', stroke: '#3b82f6' },
   attention: { light: '#fef3c7', dark: '#422006', stroke: '#d97706' },
@@ -121,7 +120,6 @@ export const BLOCK_COLORS = {
   expertActive: { light: '#e9d5ff', dark: '#581c87', stroke: '#7c3aed' },
 };
 
-/** Sub-block color definitions for expanded drill-down views */
 const SUB_BLOCK_COLORS = {
   projection: { light: '#e0f2fe', dark: '#0c4a6e', stroke: '#0284c7' },
   activation: { light: '#dcfce7', dark: '#14532d', stroke: '#16a34a' },
@@ -145,7 +143,6 @@ interface SubBlockLayoutMetrics {
   paddingY: number;
 }
 
-/** Pure height calculation shared by every sequential/branched drill-down. */
 export function getFlowHeight(
   flow: SubBlockFlow,
   hasLabel: boolean,
@@ -196,7 +193,6 @@ export function getFlowHeight(
   );
 }
 
-/** Derive architecture variants, expansion state, flows, and their pure heights. */
 export function deriveArchitectureVariant(
   arch: ModelArchitecture,
   expandedBlocks: ReadonlySet<string>,
@@ -299,12 +295,6 @@ export function deriveArchitectureVariant(
   };
 }
 
-/**
- * Renders the D3-based SVG architecture diagram.
- * Supports both dense (Llama) and MoE (DeepSeek R1) architectures.
- * For MoE models with denseFFNLayers, renders a separate dense transformer block.
- * MLA attention blocks are NOT expandable (shown as static blocks).
- */
 export function renderDiagram(
   svgEl: SVGSVGElement,
   arch: ModelArchitecture,
@@ -319,7 +309,6 @@ export function renderDiagram(
   const containerWidth = svgEl.parentElement?.clientWidth || 600;
   const width = Math.min(containerWidth, 640);
 
-  // Theme colors
   const fg = isDark ? '#eaebec' : '#131416';
   const mutedFg = isDark ? '#9ca3af' : '#6b7280';
   const borderColor = isDark ? '#374151' : '#d1d5db';
@@ -327,7 +316,6 @@ export function renderDiagram(
   const expandedBg = isDark ? '#111827' : '#f1f5f9';
   const localizedText = (value: string): string => localizeArchitectureDiagramText(value, locale);
 
-  // Layout constants
   const pad = { top: 20, right: 16, bottom: 16, left: 16 };
   const bw = width - pad.left - pad.right;
   const innerW = bw - 32;
@@ -341,17 +329,13 @@ export function renderDiagram(
   const residLeftX = pad.left + 6;
   const collapsedTxH = 64;
 
-  // Expert grid constants
   const expertSize = 36;
   const expertGap = 6;
   const expertGridH = 70;
 
-  // Sub-block layout constants
   const subBlockH = 34;
   const subArrowH = 12;
   const subPadY = 10;
-  // Gap between a block and its drill-down flow so the dashed expansion rect
-  // reads as separate from the block above it (not overlapping its border).
   const drillGap = 8;
 
   const {
@@ -394,18 +378,14 @@ export function renderDiagram(
     paddingY: subPadY,
   });
 
-  // Compute vertical positions
   let y = pad.top;
 
-  // Title
   const titleY = y;
   y += 44;
 
-  // Embedding
   const embedY = y;
   y += blockH + arrowH;
 
-  // === DENSE TRANSFORMER BLOCK (for MoE models with initial dense layers) ===
   let denseTxStart = 0;
   let denseNorm1Y = 0;
   let denseAttnY = 0;
@@ -461,7 +441,6 @@ export function renderDiagram(
     y += arrowH;
   }
 
-  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers use hash routing) ===
   let hashTxStart = 0;
   let hashNorm1Y = 0;
   let hashAttnY = 0;
@@ -491,7 +470,6 @@ export function renderDiagram(
       hashNorm2Y = y;
       y += smallH + arrowH;
 
-      // Hash Router + Expert grid (drawExpertGrid lays out router above eY)
       y += blockH + arrowH;
       hashExpertY = y;
       y += expertGridH;
@@ -512,7 +490,6 @@ export function renderDiagram(
     y += arrowH;
   }
 
-  // === ALTERNATING TRANSFORMER BLOCKS (for models like gpt-oss with alternating attention) ===
   const altBlockStart = [0, 0];
   const altBlockEnd = [0, 0];
   const altNorm1Y = [0, 0];
@@ -526,7 +503,6 @@ export function renderDiagram(
   const altMerge2Y = [0, 0];
   let altIndicatorY = 0;
 
-  // Main transformer container (used when NOT hasAlternatingLayers)
   const txStart = hasAlternatingLayers ? 0 : y;
   let attnY = 0;
   let attnExpandedStartY = 0;
@@ -541,7 +517,6 @@ export function renderDiagram(
   let txEnd = 0; // oxlint-disable-line no-useless-assignment -- overwritten when txExpanded
 
   if (hasAlternatingLayers) {
-    // Layout two separate transformer blocks with alternating indicator between them
     for (let bi = 0; bi < 2; bi++) {
       altBlockStart[bi] = y;
       const isExp = altBlockExpanded[bi];
@@ -556,7 +531,6 @@ export function renderDiagram(
         altAttnY[bi] = y;
         y += blockH;
 
-        // Expanded hybrid-attention sub-blocks (sliding window + compressed)
         if (altAttnExpanded[bi]) y += drillGap;
         altAttnExpandedStartY[bi] = y;
         if (altAttnExpanded[bi]) {
@@ -571,15 +545,12 @@ export function renderDiagram(
         altNorm2Y[bi] = y;
         y += smallH + arrowH;
 
-        // MoE Router
         altRouterY[bi] = y;
         y += blockH + arrowH;
 
-        // Expert grid
         altExpertY[bi] = y;
         y += expertGridH;
 
-        // Expanded expert FFN sub-blocks
         altFFNExpandedStartY[bi] = y;
         if (isExpExperts) {
           y += altExpertsExpandedH[bi];
@@ -594,7 +565,6 @@ export function renderDiagram(
       }
       altBlockEnd[bi] = y;
 
-      // Add alternating indicator between the two blocks
       if (bi === 0) {
         y += 6;
         altIndicatorY = y + 10;
@@ -604,15 +574,12 @@ export function renderDiagram(
   } else if (txExpanded) {
     y += 14;
 
-    // Pre-LN: RMSNorm 1 before attention
     norm1Y = y;
     y += smallH + arrowH;
 
-    // Attention
     attnY = y;
     y += blockH;
 
-    // Expanded attention sub-blocks (only for non-MLA, non-AlternatingSinkGQA)
     if (attnExpanded) y += drillGap;
     attnExpandedStartY = y;
     if (attnExpanded) {
@@ -623,25 +590,20 @@ export function renderDiagram(
     merge1Y = y + mergeGap / 2;
     y += mergeGap;
 
-    // Pre-LN: RMSNorm 2 before FFN
     y += arrowH;
     norm2Y = y;
     y += smallH + arrowH;
 
     if (isMoE) {
-      // Router
       y += blockH + arrowH;
 
-      // Expert grid
       expertY = y;
       y += expertGridH;
     } else {
-      // Dense FFN
       ffnY = y;
       y += blockH;
     }
 
-    // Expanded FFN sub-blocks (shared by MoE and dense paths)
     ffnExpandedStartY = y;
     if (ffnExpanded) {
       y += ffnExpandedH;
@@ -657,25 +619,20 @@ export function renderDiagram(
   txEnd = y;
   y += arrowH;
 
-  // Final RMSNorm
   const finalNormY = y;
   y += smallH + arrowH;
 
-  // Output head
   const outputY = y;
   y += blockH + 16;
 
-  // Specs bar
   const specsY = y;
   const specsH = 56;
   y += specsH;
 
   const totalH = y + pad.bottom;
 
-  // Set SVG size
   svg.attr('width', width).attr('height', totalH).attr('viewBox', `0 0 ${width} ${totalH}`);
 
-  // Defs (arrow markers)
   const defs = svg.append('defs');
   defs
     .append('marker')
@@ -706,7 +663,6 @@ export function renderDiagram(
   const bgG = svg.append('g');
   const g = svg.append('g');
 
-  // --- Helpers ---
   function drawArrow(fromY: number, toY: number) {
     g.append('line')
       .attr('x1', cx)
@@ -718,10 +674,6 @@ export function renderDiagram(
       .attr('marker-end', 'url(#arch-arrow)');
   }
 
-  // Draw a +, −, or × glyph from geometric strokes, perfectly centered at
-  // (gx, gy). Rendering these as lines instead of <text> sidesteps font
-  // baseline drift, which left the symbol sitting slightly low inside the
-  // merge / expand circles regardless of dy tuning.
   function drawCircleGlyph(gx: number, gy: number, color: string, symbol: string) {
     const arm = 5;
     const seg = (x1: number, y1: number, x2: number, y2: number) =>
@@ -739,23 +691,16 @@ export function renderDiagram(
       seg(gx - arm, gy - arm, gx + arm, gy + arm);
       seg(gx - arm, gy + arm, gx + arm, gy - arm);
     } else {
-      seg(gx - arm, gy, gx + arm, gy); // horizontal arm (+ and −)
-      if (symbol !== '−') seg(gx, gy - arm, gx, gy + arm); // vertical arm (+ only)
+      seg(gx - arm, gy, gx + arm, gy);
+      if (symbol !== '−') seg(gx, gy - arm, gx, gy + arm);
     }
   }
 
-  // Models with hyper-connections (mHC) replace the plain residual add with a
-  // multi-stream mixer; when present, residual merges render as an "mHC ×N" pill
-  // instead of a "+" circle. N = number of parallel residual streams.
   const hcStreams = arch.hyperConnections ?? 0;
   const isHyperConn = hcStreams > 1;
 
   function drawResidualBypass(branchY: number, mergeY: number) {
-    // Tap the residual from the input stream ABOVE the norm (in the arrow gap)
-    // so the horizontal connector doesn't run across the RMSNorm block.
     const tapY = branchY - arrowH / 2;
-    // Keep the node's vertical half-height = circleR so the spine arrows (drawn
-    // by callers to mergeY ± circleR) still meet its top/bottom edges.
     const nodeHalfW = isHyperConn ? 25 : circleR;
     bgG
       .append('path')
@@ -920,7 +865,6 @@ export function renderDiagram(
 
   const DEFAULT_SUB_BLOCK_FONT_SIZE = { name: '11px', detail: '9px' };
 
-  /** Draw a single sub-block at the given position */
   function drawSingleSubBlock(
     block: ArchSubBlock,
     bx: number,
@@ -963,7 +907,6 @@ export function renderDiagram(
     }
   }
 
-  /** Draw parallel sub-block flow (two columns converging into merge blocks) */
   function drawParallelFlow(
     flow: Extract<SubBlockFlow, { layout: 'parallel' }>,
     startY: number,
@@ -1053,10 +996,6 @@ export function renderDiagram(
     const maxRows = Math.max(flow.leftPath.length, flow.rightPath.length);
     const rowsH = (n: number) => n * subBlockH + Math.max(0, n - 1) * subArrowH;
     const colAreaH = rowsH(maxRows);
-    // Vertically center each column within the shared column area so an unequal
-    // split (e.g. 1 local vs 2 compressed) reads as an intentional branch merge
-    // rather than leaving the shorter column's connector dangling as a long
-    // unattached line beside the taller column.
     const leftStartY = parallelStartY + (colAreaH - rowsH(flow.leftPath.length)) / 2;
     const rightStartY = parallelStartY + (colAreaH - rowsH(flow.rightPath.length)) / 2;
 
@@ -1209,7 +1148,6 @@ export function renderDiagram(
     }
   }
 
-  /** Draw three-way parallel flow (3 columns: left+middle converge first, then merge with right) */
   function drawThreeWayFlow(
     flow: Extract<SubBlockFlow, { layout: 'threeWay' }>,
     startY: number,
@@ -1491,7 +1429,6 @@ export function renderDiagram(
     }
   }
 
-  /** Dispatch to correct rendering based on flow layout */
   function drawFlow(flow: SubBlockFlow, startY: number, x: number, w: number, label?: string) {
     if (flow.layout === 'threeWay') {
       drawThreeWayFlow(flow, startY, x, w, label);
@@ -1500,7 +1437,6 @@ export function renderDiagram(
     }
   }
 
-  /** Draw a collapsed transformer block (compact summary with expand icon) */
   function drawCollapsedTransformerBlock(
     x: number,
     by: number,
@@ -1570,7 +1506,6 @@ export function renderDiagram(
       });
   }
 
-  // === TITLE ===
   const modelName = arch.developer || '';
   const paramsSummary = [
     locale === 'zh'
@@ -1609,7 +1544,6 @@ export function renderDiagram(
     .attr('font-family', 'inherit')
     .text(paramsSummary);
 
-  // === EMBEDDING ===
   const embedSub = [
     arch.hiddenSize ? `d = ${arch.hiddenSize.toLocaleString()}` : null,
     arch.vocabSize ? `vocab = ${arch.vocabSize.toLocaleString()}` : null,
@@ -1618,9 +1552,6 @@ export function renderDiagram(
     .join('  \u00B7  ');
   drawBlock(pad.left, embedY, bw, blockH, 'embedding', 'Token Embedding', embedSub || undefined);
 
-  // A block's incoming arrow should land on its first RMSNorm when the block is
-  // expanded (so there's a continuous line into the norm, through the container
-  // border), or on the block's top when collapsed.
   const denseEntryY = denseTxExpanded ? denseNorm1Y : denseTxStart;
   const hashEntryY = hashBlockExpanded ? hashNorm1Y : hashTxStart;
   const altEntryY = [
@@ -1640,10 +1571,8 @@ export function renderDiagram(
           : mainEntryY,
   );
 
-  // === DENSE TRANSFORMER BLOCK (for MoE models with initial dense layers) ===
   if (hasDenseLayers) {
     if (denseTxExpanded) {
-      // Container
       g.append('rect')
         .attr('x', pad.left - 4)
         .attr('y', denseTxStart)
@@ -1655,7 +1584,6 @@ export function renderDiagram(
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '6,3');
 
-      // Dense layer badge (clickable to collapse)
       const denseLabel = localizedText(`\u2212 \u00D7${denseLayerCount} dense layers`);
       const denseBadgeW = denseLabel.length * 7 + 16;
       g.append('rect')
@@ -1688,11 +1616,9 @@ export function renderDiagram(
         .attr('data-testid', 'collapse-denseTransformer')
         .on('click', () => onBlockClick('denseTransformer'));
 
-      // RMSNorm 1 (Pre-LN)
       drawBlock(innerX, denseNorm1Y, innerW, smallH, 'norm', 'RMSNorm');
       drawArrow(denseNorm1Y + smallH, denseAttnY);
 
-      // Attention (expandable only for non-MLA types)
       const denseAttnLabel = denseLayerAttentionLabel(arch);
       const denseHeadSub = arch.numHeads ? `${arch.numHeads} heads` : undefined;
       if (isAttnExpandable) {
@@ -1721,11 +1647,9 @@ export function renderDiagram(
       drawResidualBypass(denseNorm1Y, denseMerge1Y);
       drawArrow(denseMerge1Y + circleR, denseNorm2Y);
 
-      // RMSNorm 2 (Pre-LN)
       drawBlock(innerX, denseNorm2Y, innerW, smallH, 'norm', 'RMSNorm');
       drawArrow(denseNorm2Y + smallH, denseFFNBlockY);
 
-      // Dense FFN (expandable)
       const denseFFNSub = arch.denseFFNDim
         ? `intermediate = ${arch.denseFFNDim.toLocaleString()}`
         : 'Dense Feed-Forward';
@@ -1751,7 +1675,6 @@ export function renderDiagram(
       drawArrow(denseFFNBottom, denseMerge2Y - circleR);
       drawResidualBypass(denseNorm2Y, denseMerge2Y);
     } else {
-      // Collapsed dense transformer block
       const denseSub = `\u00D7${denseLayerCount} dense layers${arch.denseFFNDim ? ` \u00B7 FFN = ${arch.denseFFNDim.toLocaleString()}` : ''}`;
       drawCollapsedTransformerBlock(
         pad.left,
@@ -1764,20 +1687,17 @@ export function renderDiagram(
       );
     }
 
-    // Arrow from dense block to next block
     drawArrow(
       denseTxEnd,
       hasHashBlock ? hashEntryY : hasAlternatingLayers ? altEntryY[0] : mainEntryY,
     );
   }
 
-  // Compute labels
   const attnLabel = getAttentionLabel(arch.attentionType);
   const mainLayerCount = hasDenseLayers ? moeLayerCount : arch.numLayers;
   const layerSuffix = hasDenseLayers ? ' MoE layers' : ' layers';
   const layerLabel = mainLayerCount ? `\u00D7${mainLayerCount}${layerSuffix}` : 'Transformer Block';
 
-  /** Helper: draw a MoE expert grid (used in both alternating and standard blocks) */
   function drawExpertGrid(
     eY: number,
     isExpExpanded: boolean,
@@ -1913,10 +1833,8 @@ export function renderDiagram(
     drawResidualBypass(n2Y, m2Y);
   }
 
-  // === HASH-ROUTED MoE PREFIX BLOCK (DeepSeek V4: first N layers route by token id) ===
   if (hasHashBlock) {
     if (hashBlockExpanded) {
-      // Container
       g.append('rect')
         .attr('x', pad.left - 4)
         .attr('y', hashTxStart)
@@ -1928,7 +1846,6 @@ export function renderDiagram(
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '6,3');
 
-      // Collapse badge
       const hashBadge = localizedText(`− ×${arch.hashRoutedLayers} layers`);
       const hashBadgeW = hashBadge.length * 7 + 16;
       g.append('rect')
@@ -1961,11 +1878,9 @@ export function renderDiagram(
         .attr('data-testid', 'collapse-hashBlock')
         .on('click', () => onBlockClick('hashBlock'));
 
-      // RMSNorm 1
       drawBlock(innerX, hashNorm1Y, innerW, smallH, 'norm', 'RMSNorm');
       drawArrow(hashNorm1Y + smallH, hashAttnY);
 
-      // Attention — static hybrid block (same attention stack as the rest)
       const hashHeadSub = [
         arch.numHeads ? `${arch.numHeads} heads` : null,
         arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
@@ -1986,11 +1901,9 @@ export function renderDiagram(
       drawResidualBypass(hashNorm1Y, hashMerge1Y);
       drawArrow(hashMerge1Y + circleR, hashNorm2Y);
 
-      // RMSNorm 2
       drawBlock(innerX, hashNorm2Y, innerW, smallH, 'norm', 'RMSNorm');
       drawArrow(hashNorm2Y + smallH, hashNorm2Y + smallH + arrowH);
 
-      // Hash Router + Expert grid (token-id → fixed experts, not a learned gate)
       const hashShared = sharedExpertCount(arch);
       const hashRoutedCount = (arch.numExperts ?? 0) - hashShared;
       const hashRouterSub = `token-id → ${arch.activeExperts} of ${hashRoutedCount}${hashShared > 0 ? ` + ${hashShared} shared` : ''}`;
@@ -2018,11 +1931,9 @@ export function renderDiagram(
       );
     }
 
-    // Arrow from the hash block to the first alternating block (or main transformer)
     drawArrow(hashTxEnd, hasAlternatingLayers ? altEntryY[0] : mainEntryY);
   }
 
-  // === ALTERNATING TRANSFORMER BLOCKS (gpt-oss style) ===
   if (hasAlternatingLayers) {
     for (let bi = 0; bi < 2; bi++) {
       const spec = alternatingSpecs[bi];
@@ -2032,7 +1943,6 @@ export function renderDiagram(
       const isExpExperts = altExpertsExpanded[bi];
 
       if (isExp) {
-        // === EXPANDED ALTERNATING BLOCK ===
         g.append('rect')
           .attr('x', pad.left - 4)
           .attr('y', altBlockStart[bi])
@@ -2044,7 +1954,6 @@ export function renderDiagram(
           .attr('stroke-width', 2)
           .attr('stroke-dasharray', '6,3');
 
-        // Collapse badge
         const badgeLabel = localizedText(`\u2212 \u00D7${spec.count} layers`);
         const badgeW = badgeLabel.length * 7 + 16;
         g.append('rect')
@@ -2077,21 +1986,15 @@ export function renderDiagram(
           .attr('data-testid', `collapse-${blockId}`)
           .on('click', () => onBlockClick(blockId));
 
-        // RMSNorm 1
         drawBlock(innerX, altNorm1Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm1Y[bi] + smallH, altAttnY[bi]);
 
-        // Attention — expandable hybrid drill-down (DeepSeek V4 CSA/HCA) or a
-        // static block (gpt-oss AlternatingSinkGQA).
         const headSub = [
           arch.numHeads ? `${arch.numHeads} heads` : null,
           arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
         ]
           .filter(Boolean)
           .join('  \u00B7  ');
-        // Sliding-window note is per layer-type: a hybrid model (e.g. DeepSeek
-        // V4) carries the window on every attention variant, whereas gpt-oss
-        // only puts it on its sliding block. Drive it off the spec, not bi.
         const specWindow = spec.slidingWindow;
         const attnSub = specWindow
           ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${specWindow}`
@@ -2123,11 +2026,9 @@ export function renderDiagram(
         drawResidualBypass(altNorm1Y[bi], altMerge1Y[bi]);
         drawArrow(altMerge1Y[bi] + circleR, altNorm2Y[bi]);
 
-        // RMSNorm 2
         drawBlock(innerX, altNorm2Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm2Y[bi] + smallH, altNorm2Y[bi] + smallH + arrowH);
 
-        // MoE Router + Expert Grid
         drawExpertGrid(
           altExpertY[bi],
           isExpExperts,
@@ -2138,7 +2039,6 @@ export function renderDiagram(
           expertsId,
         );
       } else {
-        // === COLLAPSED ALTERNATING BLOCK ===
         const collapsedSub = `\u00D7${spec.count} layers \u00B7 Top-${arch.activeExperts}/${arch.numExperts} MoE`;
         drawCollapsedTransformerBlock(
           pad.left,
@@ -2151,12 +2051,9 @@ export function renderDiagram(
         );
       }
 
-      // Draw alternating indicator between the two blocks
       if (bi === 0) {
-        // Arrow from block 0 end through indicator to block 1 start (drawn first, behind text)
         drawArrow(altBlockEnd[0] + 2, altEntryY[1]);
 
-        // Opaque background rect behind the label so it doesn't overlap the arrow
         const cardBg = isDark ? '#131416' : '#eaebec';
         const labelText = `\u21C5 ${localizedText(arch.alternatingNote ?? 'alternating every layer')}`;
         const labelPadX = 6;
@@ -2186,10 +2083,8 @@ export function renderDiagram(
       }
     }
 
-    // Arrow from last alternating block to final norm
     drawArrow(altBlockEnd[1], finalNormY);
   } else if (txExpanded) {
-    // === MAIN TRANSFORMER CONTAINER (expanded, non-alternating) ===
     g.append('rect')
       .attr('x', pad.left - 4)
       .attr('y', txStart)
@@ -2201,7 +2096,6 @@ export function renderDiagram(
       .attr('stroke-width', 2)
       .attr('stroke-dasharray', '6,3');
 
-    // Layer badge (clickable to collapse)
     const collapseBadgeLabel = localizedText(`\u2212 ${layerLabel}`);
     const badgeW = collapseBadgeLabel.length * 7 + 16;
     g.append('rect')
@@ -2234,11 +2128,9 @@ export function renderDiagram(
       .attr('data-testid', 'collapse-transformer')
       .on('click', () => onBlockClick('transformer'));
 
-    // === RMSNORM 1 (before attention — Pre-LN) ===
     drawBlock(innerX, norm1Y, innerW, smallH, 'norm', 'RMSNorm');
     drawArrow(norm1Y + smallH, attnY);
 
-    // === ATTENTION ===
     const headSub = [
       arch.numHeads ? `${arch.numHeads} heads` : null,
       arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
@@ -2262,7 +2154,6 @@ export function renderDiagram(
         drawFlow(attnFlow, attnExpandedStartY, innerX, innerW);
       }
     } else {
-      // MLA: non-expandable static block
       drawBlock(innerX, attnY, innerW, blockH, 'attention', attnLabel, headSub || undefined);
     }
 
@@ -2271,12 +2162,10 @@ export function renderDiagram(
     drawResidualBypass(norm1Y, merge1Y);
     drawArrow(merge1Y + circleR, norm2Y);
 
-    // === RMSNORM 2 (before FFN — Pre-LN) ===
     drawBlock(innerX, norm2Y, innerW, smallH, 'norm', 'RMSNorm');
     drawArrow(norm2Y + smallH, norm2Y + smallH + arrowH);
 
     if (isMoE) {
-      // === ROUTER + EXPERTS (via helper) ===
       drawExpertGrid(
         expertY,
         ffnExpanded,
@@ -2287,7 +2176,6 @@ export function renderDiagram(
         'experts',
       );
     } else {
-      // === FFN (expandable) for dense models ===
       const ffnSub = arch.ffnDim
         ? `intermediate = ${arch.ffnDim.toLocaleString()}`
         : `${ffnVariant} activation`;
@@ -2312,7 +2200,6 @@ export function renderDiagram(
       drawResidualBypass(norm2Y, merge2Y);
     }
   } else {
-    // === MAIN TRANSFORMER (collapsed) ===
     const collapsedLabel = isMoE ? 'MoE Transformer Block' : 'Dense Transformer Block';
     const collapsedSub = isMoE
       ? `${layerLabel} \u00B7 ${attnLabel} \u00B7 Top-${arch.activeExperts}/${arch.numExperts}`
@@ -2329,19 +2216,15 @@ export function renderDiagram(
   }
 
   if (!hasAlternatingLayers) {
-    // Arrow from transformer container to final norm
     drawArrow(txEnd, finalNormY);
   }
 
-  // === FINAL RMSNORM ===
   drawBlock(pad.left, finalNormY, bw, smallH, 'norm', 'RMSNorm');
   drawArrow(finalNormY + smallH, outputY);
 
-  // === OUTPUT HEAD ===
   const outSub = arch.vocabSize ? `vocab = ${arch.vocabSize.toLocaleString()}` : undefined;
   drawBlock(pad.left, outputY, bw, blockH, 'output', 'Output Head (LM Head)', outSub);
 
-  // === SPECS BAR ===
   const specItems: { label: string; value: string }[] = [
     { label: 'Type', value: isMoE ? 'MoE' : 'Dense' },
     {
@@ -2364,9 +2247,6 @@ export function renderDiagram(
       ? [
           {
             label: 'Experts',
-            // Active per token = routed top-k + the always-on shared experts, so
-            // show "6+1/385" (not "6/385"): the shared experts are active too.
-            // Count them from the model (Kimi K3 has 2), never assume one.
             value: `${arch.activeExperts}${sharedExperts > 0 ? `+${sharedExperts}` : ''}/${arch.numExperts}`,
           },
         ]

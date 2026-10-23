@@ -1,22 +1,8 @@
 import { interceptDerivedAgenticMetrics } from '../support/e2e';
 
-// ---------------------------------------------------------------------------
-// Regression: returning from an agentic point-detail page reset the chart.
-//
-// Chart filters only ever reach an in-memory store — `url-state.ts` strips the
-// share params from the address bar after load — and the point-detail links are
-// plain `<a href>` (they must support open-in-new-tab), so following one is a
-// full-document navigation that destroys that store. Back therefore returned to
-// a bare `/inference` and the chart rebuilt from defaults: DeepSeek V4 Pro with
-// every legend series on, no matter what the reader had been looking at.
-//
-// The shared fixtures carry ZERO agentic_traces rows, so this spec injects its
-// own agentic coverage (same pattern as gpu-compare-agentic-detail.cy.ts).
-// ---------------------------------------------------------------------------
-
 const AGENTIC_DATE = '2026-06-12';
-const DEFAULT_MODEL_DB_KEY = 'dsv4'; // DeepSeek-V4-Pro, the dashboard default
-const TARGET_MODEL_DB_KEY = 'kimik3'; // Kimi-K3, the non-default the reader picks
+const DEFAULT_MODEL_DB_KEY = 'dsv4';
+const TARGET_MODEL_DB_KEY = 'kimik3';
 const TARGET_MODEL_LABEL = 'Kimi K3';
 
 const AGENTIC_HARDWARE = [
@@ -25,7 +11,6 @@ const AGENTIC_HARDWARE = [
   { hardware: 'h200', framework: 'vllm' },
 ];
 
-/** The series the reader solos — must differ from the "all on" default. */
 const SOLO_HW_KEY = 'b300_vllm';
 const SOLO_HW_LABEL = 'B300 (vLLM)';
 
@@ -42,8 +27,6 @@ const availabilityFor = (model: string) => [
     benchmark_type: 'agentic_traces',
     date: AGENTIC_DATE,
   })),
-  // Fixed-seq rows alongside, so the scenario selector sees the "both exist"
-  // signal it needs to settle confidently on agentic.
   ...AGENTIC_HARDWARE.map((g) => ({
     model,
     isl: 8192,
@@ -130,7 +113,6 @@ const benchmarksFor = (model: string) =>
 const benchmarks = [...benchmarksFor(DEFAULT_MODEL_DB_KEY), ...benchmarksFor(TARGET_MODEL_DB_KEY)];
 const tracedIds = new Set(benchmarks.map((b) => b.id));
 
-/** Minimal detail-page payloads — this spec only cares about its nav controls. */
 function interceptDetailPage(): void {
   cy.intercept('GET', '/api/v1/trace-server-metrics*', { body: null });
   cy.intercept('GET', '/api/v1/trace-histograms*', { body: {} });
@@ -164,7 +146,6 @@ function visitChart(path: string): void {
   cy.get('[data-testid="inference-chart-display"]').should('exist');
 }
 
-/** Pick the non-default model through the dropdown, exactly as the report does. */
 function selectTargetModel(): void {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
   cy.get('[data-testid="model-selector"]').click();
@@ -172,7 +153,6 @@ function selectTargetModel(): void {
   cy.get('[data-testid="model-selector"]').should('contain.text', TARGET_MODEL_LABEL);
 }
 
-/** Solo one legend series so the restored state is distinguishable from "all on". */
 function soloLegendSeries(): void {
   cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').should(
     'have.length.greaterThan',
@@ -182,9 +162,17 @@ function soloLegendSeries(): void {
   cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').should('have.length', 1);
 }
 
-/** Pin the tooltip on a visible point of the soloed series and open its detail page. */
-function openPointDetail(): void {
-  cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
+function clickTracedPoint(): void {
+  cy.get('[data-testid="inference-chart-display"] [data-testid="d3-chart-svg"]')
+    .first()
+    .should(($svg) => {
+      const svg = $svg[0];
+      const containerWidth = svg.parentElement?.getBoundingClientRect().width ?? 0;
+      expect(
+        Number(svg.getAttribute('width')),
+        'chart rebuilt at the container width',
+      ).to.be.closeTo(containerWidth, 1);
+    });
   cy.get('[data-testid="inference-chart-display"] svg .dot-group')
     .should('have.length.greaterThan', 0)
     .then(($dots) => {
@@ -195,20 +183,19 @@ function openPointDetail(): void {
       expect(target, `a traced ${SOLO_HW_KEY} point`).to.not.equal(undefined);
       cy.wrap(target).find('.visible-shape').click({ force: true });
     });
+}
+
+function openPointDetail(): void {
+  cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
+  clickTracedPoint();
   cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').should('be.visible').click();
 }
 
-/**
- * The detail page's two nav controls, addressed by their visible label so this
- * spec fails on the restoration assertion rather than on a missing hook when
- * run against a build without the fix.
- */
 const backControl = (locale: 'en' | 'zh') =>
   cy.contains('button', locale === 'zh' ? '返回' : 'Back');
 const chartLink = (locale: 'en' | 'zh') =>
   cy.contains('a', locale === 'zh' ? '推理图表' : 'Inference chart');
 
-/** The state the reader left behind, as it must come back. */
 function assertRestoredChart(): void {
   cy.get('[data-testid="model-selector"]').should('contain.text', TARGET_MODEL_LABEL);
   cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked')
@@ -218,33 +205,6 @@ function assertRestoredChart(): void {
 }
 
 describe('Agentic point detail — returning to the chart', () => {
-  it('carries the chart state into the detail link instead of dropping it', () => {
-    visitChart('/inference');
-    selectTargetModel();
-    soloLegendSeries();
-
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group')
-      .should('have.length.greaterThan', 0)
-      .then(($dots) => {
-        const target = [...$dots].find((node) => {
-          const datum = (node as unknown as { __data__?: { hwKey?: string; id?: number } })
-            .__data__;
-          return datum?.hwKey === SOLO_HW_KEY && tracedIds.has(Number(datum?.id));
-        });
-        cy.wrap(target).find('.visible-shape').click({ force: true });
-      });
-
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
-      .should('be.visible')
-      .then(($link) => {
-        const href = $link.attr('href') ?? '';
-        expect(href, 'detail href').to.match(/^\/inference\/agentic\/\d+\?/u);
-        const params = new URLSearchParams(href.slice(href.indexOf('?')));
-        expect(params.get('g_model'), 'g_model carried into the detail link').to.equal('Kimi-K3');
-        expect(params.get('i_active'), 'legend selection carried').to.equal(SOLO_HW_KEY);
-      });
-  });
-
   it('restores the model and legend when the reader clicks Back', () => {
     visitChart('/inference');
     selectTargetModel();
@@ -254,8 +214,6 @@ describe('Agentic point detail — returning to the chart', () => {
     cy.location('pathname').should('match', /^\/inference\/agentic\/\d+$/u);
     backControl('en').click();
 
-    // Picking Kimi K3 moved the chart's history entry onto its indexable
-    // subroute, so Back returns there — the path itself now pins the model.
     cy.location('pathname').should('eq', '/inference/kimi-k3');
     assertRestoredChart();
   });
@@ -295,17 +253,7 @@ describe('Agentic point detail — returning to the chart', () => {
     visitChart('/inference?unofficialruns=987654321');
     selectTargetModel();
     soloLegendSeries();
-
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group')
-      .should('have.length.greaterThan', 0)
-      .then(($dots) => {
-        const target = [...$dots].find((node) => {
-          const datum = (node as unknown as { __data__?: { hwKey?: string; id?: number } })
-            .__data__;
-          return datum?.hwKey === SOLO_HW_KEY && tracedIds.has(Number(datum?.id));
-        });
-        cy.wrap(target).find('.visible-shape').click({ force: true });
-      });
+    clickTracedPoint();
 
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')

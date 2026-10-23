@@ -1,4 +1,4 @@
-import { GPU_SPECS } from '@/lib/gpu-specs';
+import { GPU_SPECS } from '@/lib/catalog/gpu-specs';
 import type {
   CollectiveXDataset,
   CollectiveXPercentile,
@@ -74,12 +74,6 @@ export interface SwapRoofline {
   devices: string[];
 }
 
-/** Nominal per-GPU ceilings. GB200/GB300 split 900 GB/s bidirectional C2C
- * across two GPUs: 225 GB/s per GPU per direction. HGX B300's CPU uplink
- * is Gen5, even though the GPU-to-switch connection supports Gen6.
- * Same-GPU copies read and write HBM, while our numerator counts payload once.
- * Sources and the warm-cache qualification are documented in docs/collectivex.md.
- */
 export function swapRooflines(
   points: Pick<SwapChartPoint, 'sku'>[],
   direction: CollectiveXSwapPoint['direction'],

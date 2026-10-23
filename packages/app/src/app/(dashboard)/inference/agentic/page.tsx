@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 
 import { AgenticCatalogHero } from '@/components/inference/agentic-catalog/agentic-catalog-hero';
 import { AgenticCatalogList } from '@/components/inference/agentic-catalog/agentic-catalog-list';
-import { JsonLd } from '@/components/json-ld';
-import { getAgenticCatalogGroups } from '@/lib/agentic-catalog';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AgentX Telemetry';
@@ -23,8 +23,6 @@ export const metadata: Metadata = {
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-// The catalog reads the same live benchmark tables the dashboard does, so a
-// build-time snapshot would go stale the moment a new run lands.
 export const dynamic = 'force-dynamic';
 
 const jsonLd = {

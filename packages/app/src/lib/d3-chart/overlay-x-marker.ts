@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { invalidateTooltipGeometry } from '@/lib/d3-chart/layers/scatter-points';
+import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
 
 export interface OverlayTooltipHandle<T> {
   isPinned: () => boolean;
@@ -30,7 +31,6 @@ export function xMarkerPath(size: number, armScale = 1): string {
   return `M ${-arm} ${-arm} L ${arm} ${arm} M ${-arm} ${arm} L ${arm} ${-arm}`;
 }
 
-/** Current rendered translation of an overlay marker group. */
 export function overlayMarkerPosition(marker: Element): { x: number; y: number } | null {
   const transform = marker.getAttribute('transform') ?? '';
   const match = transform.match(/translate\((?<x>[^, ]+)[, ]+(?<y>[^) ]+)\)/u);
@@ -50,9 +50,12 @@ export function attachOverlayXMarkerHandlers<T>(
     options.tooltip.style('left', `${position.left}px`).style('top', `${position.top}px`);
   };
 
+  installTouchInputTracking();
+
   points
-    .on('mouseenter', function (_event, data) {
+    .on('mouseenter', function (event, data) {
       if (options.handle?.isPinned()) return;
+      if (isTouchCompatMouseEvent(event)) return;
       d3.select(this)
         .select(options.markerSelector)
         .attr('d', options.hoverPath)
@@ -67,6 +70,7 @@ export function attachOverlayXMarkerHandlers<T>(
     })
     .on('mousemove', (event) => {
       if (options.handle?.isPinned()) return;
+      if (isTouchCompatMouseEvent(event)) return;
       positionTooltip(event);
     })
     .on('mouseleave', function () {

@@ -1,6 +1,6 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/data-mappings';
+import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -29,6 +29,7 @@ import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchma
 import {
   buildTrendLines,
   groupTrendRowsByDate,
+  historicalInteractivityAxis,
   trendMetricDependencies,
 } from '@/components/inference/hooks/interpolated-trend-core';
 import {
@@ -38,21 +39,32 @@ import {
 } from '@/components/inference/metric-registry';
 import type { YAxisMetricKey } from '@/components/inference/types';
 import { pointDeploymentMode, pointVendor } from '@/components/inference/utils/quickFilters';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   getCachedAgenticBenchmarkHistory,
   getCachedBenchmarkHistory,
-} from '@/lib/benchmark-query-cache.server';
-import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { getHardwareKey } from '@/lib/chart-utils';
+} from '@/lib/benchmarks/benchmark-query-cache.server';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
 
-import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
-import { frameworkFamily } from '@/lib/framework-family';
-import { loadFixture } from '@/lib/test-fixtures';
+import {
+  countCurvesByPrecision,
+  resolveEffectivePrecisions,
+} from '@/lib/benchmarks/default-precisions';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import { hardwareLegendLabel } from '@/lib/views-api/legend';
+import { GET as getWorkflowInfo } from '@/app/api/v1/workflow-info/route';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import type { WorkflowInfoResponse } from '@/lib/api/api';
+import {
+  buildImprovementWaterfall,
+  matchingChanges,
+  pullRequestLinks,
+} from '@/components/inference/utils/improvement-waterfall';
 
 export const dynamic = 'force-dynamic';
 
@@ -96,6 +108,7 @@ export function GET(request: NextRequest) {
     const start = parseDateParam(search.get('start'), 'start');
     const end = parseDateParam(search.get('end'), 'end');
     const format = parseFormatParam(search.get('format'));
+    const chart = parseEnumParam(search.get('chart'), 'chart', ['line', 'waterfall'], 'line');
     if (start && end && start > end)
       throw new ViewsApiParamError('end', 'end must not precede start');
     const extendToDate =
@@ -117,6 +130,7 @@ export function GET(request: NextRequest) {
         : NORMALIZED_TOKEN_REVENUE_PRICING;
 
     const isAgentic = sequence === Sequence.AgenticTraces;
+    const interactivity = historicalInteractivityAxis(isAgentic);
     const islOsl = sequenceToIslOsl(sequence);
     const allRows: BenchmarkRow[] = FIXTURES_MODE
       ? loadFixture<BenchmarkRow[]>('benchmarks').filter((row) => rowToSequence(row) === sequence)
@@ -206,6 +220,58 @@ export function GET(request: NextRequest) {
       })
       .toSorted((a, b) => a.key.localeCompare(b.key));
 
+    const waterfall =
+      chart === 'waterfall'
+        ? series.map((entry) => ({
+            ...entry,
+            excludedPointCount: (trendLines.get(entry.key) ?? []).filter(
+              (point) => !point.synthetic && point.waterfallEligible === false,
+            ).length,
+            steps: buildImprovementWaterfall(
+              trendLines.get(entry.key) ?? [],
+              registryEntry?.polarity === 'lower',
+            ),
+          }))
+        : [];
+    const dates = [
+      ...new Set(
+        waterfall.flatMap((entry) =>
+          entry.steps.flatMap((step) => step.sources.map((source) => source.date)),
+        ),
+      ),
+    ];
+    const workflows: WorkflowInfoResponse[] = [];
+    const failedDates = new Set<string>();
+    // Bound database fan-out for long histories and many selected configurations.
+    for (let offset = 0; offset < dates.length; offset += 8) {
+      await Promise.all(
+        dates.slice(offset, offset + 8).map(async (date) => {
+          try {
+            workflows.push(
+              await readResponse<WorkflowInfoResponse>(
+                await getWorkflowInfo(
+                  sourceRequest(request, '/api/v1/workflow-info', {
+                    date,
+                    benchmarkType: isAgentic ? 'agentic_traces' : undefined,
+                  }),
+                ),
+              ),
+            );
+          } catch {
+            failedDates.add(date);
+          }
+        }),
+      );
+    }
+    const waterfallSeries = waterfall.map((entry) => ({
+      ...entry,
+      steps: entry.steps.map((step) => ({
+        ...step,
+        prLinks: pullRequestLinks(matchingChanges(step.sources, workflows)),
+        linksAvailable: !step.sources.some((source) => failedDates.has(source.date)),
+      })),
+    }));
+
     const resolvedParams = {
       model: displayName,
       sequence: sequence as string,
@@ -222,9 +288,32 @@ export function GET(request: NextRequest) {
       start: start ?? null,
       end: end ?? null,
       format,
+      chart,
     };
 
     if (format === 'csv') {
+      if (chart === 'waterfall') {
+        return csvResponse(
+          waterfallSeries.flatMap((entry) =>
+            entry.steps.map((step) => ({
+              key: entry.key,
+              hwKey: entry.hwKey,
+              precision: entry.precision ?? '',
+              kind: step.kind,
+              date: step.date,
+              from: step.from,
+              to: step.to,
+              delta: step.delta,
+              runUrls: JSON.stringify(step.sources.map((source) => source.runUrl)),
+              prLinks: JSON.stringify(step.prLinks),
+              linksAvailable: step.linksAvailable,
+              targetInteractivity: target,
+              interactivityStatistic: interactivity.statistic,
+              interactivityField: interactivity.field,
+            })),
+          ),
+        );
+      }
       return csvResponse(
         series.flatMap((entry) =>
           entry.points.map((point) => ({
@@ -236,6 +325,9 @@ export function GET(request: NextRequest) {
             date: point.date,
             value: point.value,
             synthetic: point.synthetic ?? false,
+            targetInteractivity: target,
+            interactivityStatistic: interactivity.statistic,
+            interactivityField: interactivity.field,
           })),
         ),
       );
@@ -254,7 +346,8 @@ export function GET(request: NextRequest) {
       },
       target,
       hwKeysWithData,
-      series,
+      interactivity,
+      series: chart === 'waterfall' ? waterfallSeries : series,
       count: series.reduce((total, entry) => total + entry.points.length, 0),
     });
   });

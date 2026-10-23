@@ -5,12 +5,12 @@ import type {
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 
-import type { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/catalog/data-mappings';
 import {
   ffnGateActivationLabel,
   MODEL_ARCHITECTURES,
   type ModelArchitecture,
-} from '@/lib/model-architectures';
+} from '@/lib/catalog/model-architectures';
 
 /** Block colors of the model architecture diagram (`model-architecture-diagram-renderer`). */
 export type BlockKind = 'embedding' | 'attention' | 'ffn' | 'expert' | 'output';

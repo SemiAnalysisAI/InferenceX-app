@@ -1,17 +1,12 @@
 import { hermiteInterpolate, monotoneSlopes } from '@/components/calculator/interpolation';
 import type { InferenceData } from '@/components/inference/types';
-import { isFrontierEligible, paretoFrontForDirection } from '@/lib/chart-utils';
+import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
-// Named separately so the sampling density is obvious in test failures and can
-// be changed without leaving a magic number in the scoring loop.
 const SAMPLE_COUNT = 9;
-// A singleton can be a useful preview, but it should not displace a measured
-// curve merely because its lone point scores well.
 const MIN_CURVE_FRONTIER_POINTS = 2;
 
-/** The physical SKU portion shared by framework/speculative-decoding variants. */
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
   const rawHardware = String(point.hw || '').split('-')[0];
   return rawHardware || String(point.hwKey).split(/[_-]/u)[0];
@@ -24,23 +19,16 @@ interface ScoredSeries {
   maxX: number;
 }
 
-/**
- * Select the best configuration line per physical SKU using normalized frontier AUC.
- *
- * Every candidate is sampled over the common measured x-domain for that SKU,
- * so a curve cannot win merely because it spans a wider range. The chart's
- * existing Pareto direction and monotone interpolation are reused to keep the
- * ranking aligned with the line users see. Ties are deterministic by hwKey.
- *
- * TileRT is the deliberate exception to the one-line policy. Its specialized
- * operating points can be exceptional even when a broader serving curve wins
- * the AUC comparison, so every eligible TileRT series remains visible.
- */
-export function bestSeriesPerSku(points: InferenceData[], direction: Direction): Set<string> {
+export function bestSeriesPerSku(
+  points: InferenceData[],
+  direction: Direction,
+  precisions?: readonly string[],
+): Set<string> {
   const bySku = new Map<string, Map<string, InferenceData[]>>();
   const featured = new Set<string>();
   for (const point of points) {
-    if (!isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
+    if (precisions && !precisions.includes(point.precision)) continue;
+    if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
     const key = String(point.hwKey);
     if (point.framework === 'tilert') featured.add(key);
@@ -77,8 +65,6 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
     const comparable = usable.filter(
       (candidate) => candidate.points.length >= MIN_CURVE_FRONTIER_POINTS,
     );
-    // When every candidate is a singleton, retain all candidates for the
-    // existing score + deterministic key tie-break.
     const scoringPool =
       comparable.length > 0
         ? comparable
@@ -99,8 +85,6 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
       const xs = candidate.points.map((point) => point.x);
       const ys = candidate.points.map((point) => point.y);
       if (!hasCommonDomain) {
-        // No honest AUC comparison is possible. Prefer the best measured point;
-        // the key tie-break below keeps the choice stable.
         return higherYIsBetter ? Math.max(...ys) : -Math.min(...ys);
       }
       const slopes = monotoneSlopes(xs, ys);
@@ -120,5 +104,20 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
     selected.add(winner.candidate.key);
   }
 
+  return selected;
+}
+
+export function withUnrankedSkus(
+  best: ReadonlySet<string>,
+  rankedPoints: readonly InferenceData[],
+  candidates: readonly InferenceData[],
+): Set<string> {
+  const selected = new Set(best);
+  const rankedSkus = new Set(
+    [...rankedPoints, ...candidates].filter((point) => best.has(String(point.hwKey))).map(baseSku),
+  );
+  for (const point of candidates) {
+    if (!rankedSkus.has(baseSku(point))) selected.add(String(point.hwKey));
+  }
   return selected;
 }

@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { track } from '@/lib/analytics';
-import type { TocHeading } from '@/lib/blog';
-import type { Locale } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { TocHeading } from '@/lib/blog/blog';
+import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
@@ -21,23 +21,16 @@ const STRINGS = {
   },
 } as const;
 
-/** Offset from the viewport top at which a heading counts as "current". */
 const ACTIVE_OFFSET_PX = 120;
-/** Scroll target offset so the heading clears the fixed navbar. */
 const SCROLL_OFFSET_PX = 88;
 
 interface BlogTocProps {
   headings: TocHeading[];
-  /** Heading label, e.g. '本页目录' on Chinese pages. */
   label?: string;
   locale?: Locale;
-  /**
-   * `inline` renders a collapsible list for narrow layouts, `sidebar` the
-   * always-open list for the sticky column. `both` renders each and lets CSS
-   * pick (inline below `lg`, sidebar from `lg`).
-   */
   variant?: 'inline' | 'sidebar' | 'both';
   className?: string;
+  sidebarListClassName?: string;
 }
 
 function handleClick(heading: TocHeading) {
@@ -48,7 +41,6 @@ function handleClick(heading: TocHeading) {
   window.scrollTo({ top, behavior: 'smooth' });
 }
 
-/** Tracks which heading is current: the last one whose top has passed the offset line. */
 function useActiveHeading(headings: TocHeading[]): string {
   const [activeId, setActiveId] = useState('');
   const rafRef = useRef(0);
@@ -98,6 +90,7 @@ export function BlogToc({
   locale = 'en',
   variant = 'both',
   className,
+  sidebarListClassName,
 }: BlogTocProps) {
   const t = STRINGS[locale];
   const displayLabel = label ?? t.defaultLabel;
@@ -105,8 +98,6 @@ export function BlogToc({
   const activeItemRef = useRef<HTMLLIElement | null>(null);
   const scrollBoxRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep the active item visible inside the sidebar's own scroll box without
-  // touching the window scroll position.
   useEffect(() => {
     const box = scrollBoxRef.current;
     const item = activeItemRef.current;
@@ -186,7 +177,10 @@ export function BlogToc({
           </Eyebrow>
           <div
             ref={scrollBoxRef}
-            className="relative max-h-[calc(100vh-30rem)] overflow-y-auto pr-1 [scrollbar-width:thin]"
+            className={cn(
+              'relative max-h-[calc(100vh-30rem)] overflow-y-auto pr-1 [scrollbar-width:thin]',
+              sidebarListClassName,
+            )}
           >
             {list}
           </div>

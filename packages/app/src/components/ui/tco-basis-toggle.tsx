@@ -2,30 +2,24 @@
 
 import { useMemo } from 'react';
 
-import { useGlobalFilterSelection, useGlobalFilterActions } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection, useGlobalFilterActions } from '@/providers/GlobalFilterContext';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import type { TcoBasis } from '@/lib/constants';
-import { showsTcoBasisSelector } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { TcoBasis } from '@/lib/catalog/constants';
+import { showsTcoBasisSelector } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 const LABELS = {
   en: { external: 'External', internal: 'Internal', aria: 'TCO basis' },
   zh: { external: '外部', internal: '内部', aria: 'TCO 口径' },
 } as const;
 
-/**
- * Whether the current model/scenario exposes the TCO Basis selector. The basis
- * state itself is global; only the control is scoped to scenarios that
- * benchmark hardware with a distinct internal owner cost.
- */
 export function useShowsTcoBasisSelector(): boolean {
   const { selectedModel, effectiveSequence } = useGlobalFilterSelection();
   return showsTcoBasisSelector(selectedModel, effectiveSequence);
 }
 
-/** Global external customer pricing versus internal owner cost selection. */
 export function TcoBasisToggle({ source, className }: { source: string; className?: string }) {
   const { tcoBasis } = useGlobalFilterSelection();
   const { setTcoBasis } = useGlobalFilterActions();

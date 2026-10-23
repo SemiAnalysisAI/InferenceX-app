@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   type CollectiveXKvChartPoint,
@@ -24,7 +24,6 @@ interface CollectiveXKvOverlapChartProps {
   testId?: string;
 }
 
-/** Pseudo-series key for the dotted y = batch ideal-overlap reference. */
 const IDEAL_KEY = '__collectivex-kv-overlap-ideal__';
 
 const STRINGS = {
@@ -99,7 +98,6 @@ export function CollectiveXKvOverlapChart({
     for (const line of Object.values(result)) {
       line.sort((a, b) => a.x - b.x);
     }
-    // Dotted ideal: perfect request overlap is y = batch on both log axes.
     const maxBatch = Math.max(1, ...points.map((point) => point.x));
     if (maxBatch > 1) {
       result[IDEAL_KEY] = [

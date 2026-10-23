@@ -11,10 +11,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
-import { cn } from '@/lib/utils';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
+import { cn } from '@/lib/shared/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   type LegendPointsSortKey,
@@ -26,15 +26,10 @@ import {
 export interface LegendPointsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Series label, e.g. "B300 (vLLM)". */
   title: string;
-  /** Context line, e.g. "DeepSeek V4 Pro · Agentic". */
   subtitle: string;
-  /** Legend swatch color for this series (overlayRunColor for overlay runs). */
   accentColor: string;
-  /** Rows from buildLegendPointsRows — already default-sorted by concurrency. */
   rows: LegendPointsTableRow[];
-  /** Unofficial-run overlay series: metrics only, no detail links. */
   isOverlay: boolean;
   onRowClick?: (row: LegendPointsTableRow) => void;
 }
@@ -52,11 +47,6 @@ const cellValue = (row: LegendPointsTableRow, col: Column): string => {
   return formatRowValue(row[col.key]);
 };
 
-/**
- * Per-series drill-down opened from the chart legend: every currently-visible
- * point of one hardware/framework series, with the same detail links the
- * scatter points offer on click.
- */
 export default function LegendPointsDialog({
   open,
   onOpenChange,
@@ -123,7 +113,6 @@ export default function LegendPointsDialog({
     );
   };
 
-  // Trailing column reserves space for the detail-link icon.
   const gridTemplateColumns = `${columns.map(() => 'auto').join(' ')} min-content`;
 
   const renderCells = (row: LegendPointsTableRow) => (
@@ -169,9 +158,6 @@ export default function LegendPointsDialog({
         {sortedRows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">{t.empty}</p>
         ) : (
-          // One grid owns the column tracks; every row is a subgrid so cells
-          // align across ALL rows (per-row grids would auto-size independently
-          // and produce ragged columns).
           <div
             role="table"
             className="grid content-start overflow-y-auto overflow-x-auto min-h-0 text-xs"
@@ -212,11 +198,6 @@ export default function LegendPointsDialog({
                   href={row.href}
                   {...(row.isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                   onClick={() => {
-                    // In-app detail links are full-document navigations, so the
-                    // chart state has to be written into this history entry
-                    // before we leave or Back lands on a default chart. Skipped
-                    // in ephemeral scopes (/model embeds): the store holds the
-                    // primary dashboard's state there, not this chart's.
                     if (!row.isExternal && !ephemeralUrlState) rememberChartStateInUrl();
                     onRowClick?.(row);
                   }}

@@ -1,15 +1,9 @@
 import type { ChartDefinition } from './types';
-import type { TokenMetricType } from '@/lib/supplemental-benchmarks';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
-/**
- * Pricing basis behind a cost or purchasing-power metric. The chart heading
- * shows only the metric (`title`); the tier is spelled out separately in the
- * caption's "Cost Tier" line and in the Cost Tier selector that sits beside
- * the y-axis selector. `metricOptionTitle` still appends it for surfaces that
- * name a single metric out of context (explanations, share text).
- */
 export type CostTier = 'hyperscaler' | 'rental' | 'custom';
 
 export const COST_TIER_LABELS: Record<
@@ -40,7 +34,6 @@ export interface MetricDefinition {
   field: `${string}.y`;
   label: string;
   labelZh: string;
-  /** Chart-heading title: the metric alone, without its cost tier. */
   title: string;
   titleZh: string;
   costTier?: CostTier;
@@ -50,6 +43,7 @@ export interface MetricDefinition {
   xLabel?: string;
   xLabelZh?: string;
   heading?: string;
+  axisCeiling?: number;
 }
 
 export const METRIC_REGISTRY = {
@@ -298,14 +292,6 @@ export const METRIC_REGISTRY = {
     titleZh: '实测整组 GPU P90 功耗（按芯片均摊）',
     polarity: 'lower',
   },
-  modeledChassisPowerPerGpu: {
-    field: 'modeledChassisPowerPerGpu.y',
-    label: 'Modeled Chassis AC Power per GPU (W/GPU)',
-    labelZh: '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
-    title: 'Modeled Chassis AC Power per GPU (8k1k)',
-    titleZh: '每 GPU 分摊的机箱交流功耗估算（8k1k）',
-    polarity: 'lower',
-  },
   measuredPrefillAvgPower: {
     field: 'measuredPrefillAvgPower.y',
     label: 'Measured Prefill Power per Chip (W)',
@@ -385,6 +371,47 @@ export const METRIC_REGISTRY = {
     title: 'Measured Average Power as Percent of TDP',
     titleZh: '实测平均功耗占 TDP 百分比',
     polarity: 'lower',
+    axisCeiling: 100,
+  },
+  measuredPowerTimeline: {
+    field: 'measuredPowerTimeline.y',
+    label: 'Measured Average Power per Chip over Time (W)',
+    labelZh: '每芯片实测平均功耗时间线（W）',
+    title: 'Measured GPU Power over Time',
+    titleZh: 'GPU 实测功耗时间线',
+    polarity: 'lower',
+  },
+  gpuProvisionedJPerOutputToken: {
+    field: 'gpuProvisionedJPerOutputToken.y',
+    label: 'GPU Level Provisioned J per Output Token (TDP, J/tok)',
+    labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
+    title: 'GPU Level Provisioned Joules per Output Token (TDP)',
+    titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
+    polarity: 'lower',
+  },
+  utilityProvisionedJPerOutputToken: {
+    field: 'utilityProvisionedJPerOutputToken.y',
+    label: 'All in Provisioned J per Output Token, all GPUs (J/tok)',
+    labelZh: '每输出 token 整体预配能耗，按全部 GPU 归一（J/tok）',
+    title: 'All in Provisioned Joules per Output Token, all GPUs',
+    titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
+    polarity: 'lower',
+  },
+  utilityModeledWatts: {
+    field: 'utilityModeledWatts.y',
+    label: 'All in Measured Power per Chip (W)',
+    labelZh: '每芯片整体实测功耗（W）',
+    title: 'All in Measured Power per Chip',
+    titleZh: '每芯片整体实测功耗',
+    polarity: 'lower',
+  },
+  utilityModeledJPerOutputToken: {
+    field: 'utilityModeledJPerOutputToken.y',
+    label: 'All in Measured J per Output Token (J/tok)',
+    labelZh: '每输出 token 整体实测能耗（J/tok）',
+    title: 'All in Measured Joules per Output Token',
+    titleZh: '每输出 token 整体实测焦耳能耗',
+    polarity: 'lower',
   },
 } as const satisfies Record<string, MetricDefinition>;
 
@@ -400,15 +427,12 @@ export const DEFAULT_METRIC_CONFIG_KEY = 'y_tokensPerDollarH' satisfies MetricCo
 
 const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
   y_tokensPerDollar: 'y_tokensPerDollarH',
-  // The Neocloud ownership tier was removed; shared links land on the
-  // hyperscaler-volume ownership variant of the same metric.
   y_tokensPerDollarN: 'y_tokensPerDollarH',
   y_outputTokensPerDollarN: 'y_outputTokensPerDollarH',
   y_inputTokensPerDollarN: 'y_inputTokensPerDollarH',
   y_costn: 'y_costh',
   y_costnOutput: 'y_costhOutput',
   y_costni: 'y_costhi',
-  // The ¥-priced axes were removed; shared links land on the same tokens in $.
   y_tokensPerRmbH: 'y_tokensPerDollarH',
   y_tokensPerRmbN: 'y_tokensPerDollarH',
   y_tokensPerRmbR: 'y_tokensPerDollarR',
@@ -418,20 +442,15 @@ const LEGACY_METRIC_ALIASES: Readonly<Record<string, MetricConfigKey>> = {
   y_inputTokensPerRmbH: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbN: 'y_inputTokensPerDollarH',
   y_inputTokensPerRmbR: 'y_inputTokensPerDollarR',
+  y_gpuProvisionedWatts: 'y_measuredAvgPower',
+  y_utilityProvisionedWatts: 'y_measuredAvgPower',
 };
 
-/** Cost tier priced into a metric, or `undefined` for metrics without one. */
 export function metricCostTier(metricKey: MetricKey): CostTier | undefined {
   const metric: MetricDefinition = METRIC_REGISTRY[metricKey];
   return metric.costTier;
 }
 
-/**
- * Metrics that price the same quantity at different cost tiers. The y-axis
- * selector lists one option per family and the Cost Tier selector swaps
- * between its members, so the tier is not repeated in every option label.
- * Tiers are listed in selector order.
- */
 export const COST_METRIC_FAMILIES = {
   tokensPerDollar: {
     hyperscaler: 'tokensPerDollarH',
@@ -466,12 +485,10 @@ const COST_METRIC_FAMILY_BY_METRIC: ReadonlyMap<MetricKey, CostMetricFamilyId> =
   ),
 );
 
-/** Family a tiered metric belongs to, or `undefined` for untiered metrics. */
 export function costMetricFamily(metricKey: MetricKey): CostMetricFamilyId | undefined {
   return COST_METRIC_FAMILY_BY_METRIC.get(metricKey);
 }
 
-/** The family member priced at `tier`, or `undefined` when it publishes none. */
 export function metricForCostTier(
   family: CostMetricFamilyId,
   tier: CostTier,
@@ -480,35 +497,23 @@ export function metricForCostTier(
   return members[tier];
 }
 
-/** Tiers a family publishes, in selector order. */
 export function costTiersForFamily(family: CostMetricFamilyId): CostTier[] {
   return COST_TIER_ORDER.filter((tier) => metricForCostTier(family, tier) !== undefined);
 }
 
-/** Caption "Cost Tier" value for a tier. */
 export function costTierLabel(tier: CostTier, locale: 'en' | 'zh'): string {
   return locale === 'zh' ? COST_TIER_LABELS[tier].labelZh : COST_TIER_LABELS[tier].label;
 }
 
-/**
- * The copy the caption's Cost Tier selector uses for `tier`, both in its
- * option list and on its trigger. The caption's export twin prints the same
- * string so a PNG export matches the control on screen.
- */
 export function costTierOptionLabel(tier: CostTier, locale: 'en' | 'zh'): string {
   return locale === 'zh' ? COST_TIER_LABELS[tier].optionZh : COST_TIER_LABELS[tier].option;
 }
 
-/** Chart-heading title: the metric without its cost tier. */
 export function metricChartTitle(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   const metric: MetricDefinition = METRIC_REGISTRY[metricKey];
   return locale === 'zh' ? metric.titleZh : metric.title;
 }
 
-/**
- * Y-axis option label: the chart title plus its cost tier in parentheses, so
- * the Hyperscaler / Rent variants read apart in the selector.
- */
 export function metricOptionTitle(metricKey: MetricKey, locale: 'en' | 'zh'): string {
   const title = metricChartTitle(metricKey, locale);
   const tier = metricCostTier(metricKey);
@@ -518,16 +523,64 @@ export function metricOptionTitle(metricKey: MetricKey, locale: 'en' | 'zh'): st
     : `${title} (${COST_TIER_LABELS[tier].option})`;
 }
 
+export function metricAxisCeiling(metricConfigKey: string): number | undefined {
+  const metricKey = metricConfigKey.slice(2);
+  if (!isMetricKey(metricKey)) return undefined;
+  const metric: MetricDefinition = METRIC_REGISTRY[metricKey];
+  return metric.axisCeiling;
+}
+
 export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
+}
+
+/** Metrics that count input tokens, so the uncached token basis rescales them. */
+const INPUT_TOKEN_METRICS: ReadonlySet<MetricKey> = new Set<MetricKey>([
+  'tpPerGpu',
+  'inputTputPerGpu',
+  'tpPerMw',
+  'inputTputPerMw',
+  'powerUser',
+  'costh',
+  'costr',
+  'costhi',
+  'costri',
+  'costUser',
+  'tokensPerDollarH',
+  'tokensPerDollarR',
+  'inputTokensPerDollarH',
+  'inputTokensPerDollarR',
+  'tokensPerDollarUser',
+  'jTotal',
+  'jInput',
+  'measuredJPerTotalToken',
+  'measuredJPerInputToken',
+  'measuredPrefillJPerInputToken',
+]);
+
+export function countsInputTokens(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
+}
+
+/**
+ * Input-token metrics (input throughput, cost, energy) get a TTFT x-axis option.
+ * Decided from the registry title so display qualifiers can't change the answer.
+ */
+export function isInputMetric(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && metricOptionTitle(key, 'en').toLowerCase().includes('input');
+}
+
+/** The token basis a metric is charted on: only input-token metrics follow the toggle. */
+export function tokenBasisForMetric(metricConfigKey: string, tokenBasis: TokenBasis): TokenBasis {
+  return countsInputTokens(metricConfigKey) ? tokenBasis : 'total';
 }
 
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {
   return isMetricKey(metricKey) && !('source' in METRIC_REGISTRY[metricKey]);
 }
 
-/** Token basis represented by a y-axis option. Non-output metrics deliberately
- * resolve to total/input so output-only snapshots cannot leak into them. */
 export function tokenMetricTypeForConfigKey(metric: string): TokenMetricType {
   const normalized = metric.toLowerCase();
   if (normalized.includes('output')) return 'output';
@@ -535,13 +588,6 @@ export function tokenMetricTypeForConfigKey(metric: string): TokenMetricType {
   return 'total';
 }
 
-/**
- * Resolve persisted metric state to a canonical config key.
- *
- * `y` was the original chart field for total throughput and remains a
- * read-only share-link alias. Unknown persisted values fall back rather than
- * escaping the registry and reaching chart/data lookups unchecked.
- */
 export function resolveMetricConfigKey(
   metricConfigKey: string | null | undefined,
   fallback?: string,
@@ -577,12 +623,6 @@ export interface MetricControlGroup {
   gated?: boolean;
 }
 
-/**
- * The runner-telemetry y-axes in the "Measured Energy" control group.
- * Exported (and referenced by the group below, so the two cannot drift) for
- * consumers that treat measured axes specially — the legacy-power point ring,
- * tooltip tier line, and footer legend key.
- */
 export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
@@ -597,6 +637,7 @@ export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredJPerSuccessfulQuery',
   'y_measuredWhPerSuccessfulQuery',
   'y_measuredPowerPercentTdp',
+  'y_measuredPowerTimeline',
 ] as const satisfies readonly MetricConfigKey[];
 
 const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
@@ -608,21 +649,31 @@ const ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = ne
   'y_measuredDecodeJPerOutputToken',
 ]);
 
-/** Whether a y-axis config key plots one of the Measured Energy metrics. */
 export function isMeasuredEnergyConfigKey(configKey: string): boolean {
   return MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
-/** Whether a y-axis requires the explicit prefill/decode energy breakdown. */
 export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
   return ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
-export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
+export const POWER_BASIS_METRIC_CONFIG_KEYS = [
+  'y_gpuProvisionedJPerOutputToken',
+  'y_utilityProvisionedJPerOutputToken',
+  'y_utilityModeledWatts',
+  'y_utilityModeledJPerOutputToken',
+] as const satisfies readonly MetricConfigKey[];
 
-/** Whether a y-axis config key plots the modeled chassis AC power metric. */
-export function isModeledSystemPowerConfigKey(configKey: string): boolean {
-  return configKey === MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY;
+const POWER_BASIS_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+);
+
+export function isPowerBasisConfigKey(configKey: string): boolean {
+  return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
+export function isAllInMeasuredConfigKey(configKey: string): boolean {
+  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
@@ -643,9 +694,6 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     labelZh: '每 GPU 小时 token 收入',
     metrics: ['y_tokenRevenuePerGpuHour'],
   },
-  // Tiered metrics list both published tiers here so every registry key stays
-  // reachable from the controls; the y-axis selector shows one option per
-  // metric family and the Cost Tier selector picks the tier.
   {
     label: 'Tokens per $1 TCO',
     labelZh: '每 1 美元 TCO 对应的 token 数',
@@ -668,19 +716,10 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     labelZh: '每 token 全电源配置能耗',
     metrics: ['y_jTotal', 'y_jOutput', 'y_jInput'],
   },
-  // Runner power telemetry and the chassis model built on it are still being
-  // validated, so both groups stay behind the ↑↑↓↓ feature gate until the
-  // measurements are stable enough to publish.
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
-    gated: true,
-  },
-  {
-    label: 'Modeled System Power',
-    labelZh: '系统功耗估算',
-    metrics: [MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY],
+    metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
     gated: true,
   },
   {
@@ -720,8 +759,6 @@ function buildChartDefinition(chartType: 'interactivity' | 'e2e'): ChartDefiniti
     definition[configKey] = metric.field;
     definition[`${configKey}_label`] = metric.label;
     definition[`${configKey}_labelZh`] = metric.labelZh;
-    // `_title` is the selector option label (metric + cost tier); `_chartTitle`
-    // is the heading title (metric only). The tier itself travels separately.
     definition[`${configKey}_title`] = metricOptionTitle(key, 'en');
     definition[`${configKey}_titleZh`] = metricOptionTitle(key, 'zh');
     definition[`${configKey}_chartTitle`] = metric.title;

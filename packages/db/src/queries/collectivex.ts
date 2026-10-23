@@ -10,6 +10,8 @@ export interface CollectiveXRunRow {
   generated_at: string;
   source_sha: string;
   source_branch: string | null;
+  /** From the stored summary. Null for runs from SemiAnalysisAI/InferenceX. */
+  source_repository: string | null;
   conclusion: string | null;
   matrix: unknown;
   docs: unknown[];
@@ -64,7 +66,8 @@ export async function getLatestCollectiveXRun(
   const rows = await sql`
     SELECT r.run_id::text, r.run_attempt, r.version,
       to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
-      r.source_sha, r.source_branch, r.conclusion, r.matrix,
+      r.source_sha, r.source_branch, r.summary->>'source_repository' AS source_repository,
+      r.conclusion, r.matrix,
       COALESCE(d.docs, '[]'::jsonb) AS docs
     FROM cx_runs r
     LEFT JOIN LATERAL (
@@ -92,7 +95,8 @@ export async function getCollectiveXRun(
   const rows = await sql`
     SELECT r.run_id::text, r.run_attempt, r.version,
       to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
-      r.source_sha, r.source_branch, r.conclusion, r.matrix,
+      r.source_sha, r.source_branch, r.summary->>'source_repository' AS source_repository,
+      r.conclusion, r.matrix,
       COALESCE(d.docs, '[]'::jsonb) AS docs
     FROM cx_runs r
     LEFT JOIN LATERAL (
@@ -265,5 +269,6 @@ export function collectiveXDatasetFromRow(row: CollectiveXRunRow): CollectiveXDa
     generated_at: row.generated_at,
     conclusion: row.conclusion,
     source_sha: row.source_sha,
+    source_repository: row.source_repository ?? undefined,
   });
 }

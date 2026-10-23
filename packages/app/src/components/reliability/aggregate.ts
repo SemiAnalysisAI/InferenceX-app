@@ -1,4 +1,4 @@
-import type { ReliabilityRow } from '@/lib/api';
+import type { ReliabilityRow } from '@/lib/api/api';
 
 import type { DateRangeSuccessRateData } from './types';
 

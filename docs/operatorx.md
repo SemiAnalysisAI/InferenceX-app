@@ -1,20 +1,13 @@
 # OperatorX
 
-**English** | [中文](operatorx_zh.md)
+OperatorX is available directly in primary dashboard navigation without an unlock.
+CollectiveX remains in **Hidden**. `/operatorx` and `/zh/operatorx` share the
+same reader, chart, filters, and coverage.
 
-OperatorX is a feature-gated dashboard alongside CollectiveX in **Hidden**. The
-existing ↑↑↓↓ unlock exposes both tabs. `/operatorx` and `/zh/operatorx` share the
-same reader, chart, filters, and coverage. `?run=<run key>` opens a
-specific stored run.
-
-The view covers single-GPU GEMM (`gemm`, `gemm_perf`), MHA/GQA materialized MLA (`attention`, `attention_perf`), and routed MoE (`moe_gemm`) on NVIDIA and AMD, including the AMD AITER backend. The
-reader matches every requested case/backend against its newest shard attempt,
-retains earlier shards in partial reruns, validates source/run/attempt/cluster
-metadata, and separates measured, unsupported, failed, and missing rows. Zero-size
-GEMMs have no throughput value. Attention reports latency in µs and useful matmul TFLOPS. MLA measures materialized Q/K/V
-attention only; cache projection and RoPE are excluded. PyTorch expands grouped KV
-before timing; AITER retains native grouped heads. Compare identical shapes,
-precisions, and backends. Other operators remain outside this view.
+The view compares single-GPU GEMM and routed MoE operator timings on NVIDIA and AMD. The
+reader matches every requested case/backend against the stored shards, and ingest keeps each
+shard's newest attempt, so partial reruns retain earlier shards. Rows are separated into
+measured, unsupported, failed, and missing. Zero-size GEMMs have no throughput value.
 
 Cross-run comparisons select the newest available result per GPU, case, and backend.
 An explicit error or unsupported result remains visible; a missing result can be
@@ -23,55 +16,127 @@ run, so opening a profile still works after a newer comparison replaces that row
 Timeline references include the stored revision. Re-ingesting the same run replaces
 that revision, so a new comparison cannot open a cached timeline from the old data.
 
-GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
-not multiply this number. The UI preserves A/B/output precision, latency, shape,
-backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family and routed MoE separate. Attention defaults
-to TFLOPS versus batch size, with a latency selector, and preserves query/KV lengths, head counts, head
-dimensions, KV rank, causality, and Q/K/V/output precision. API dataset version 3 adds `moe_gemm` and nullable `moe` dimensions alongside `type`, original `args`, and nullable `attention`. Inapplicable operator fields are null. Existing raw bundles are read without schema migration; summary caches from earlier reader versions are rebuilt from persisted documents on the next run-list read, including previously omitted MoE coverage. Throughput is derived from measured latency on read. The chart
-shows successful measurements; the status filter exposes the other cases.
+TFLOPS is derived by the shared comparison transform as useful FLOPs (`usefulFlops()` in
+`packages/db/src/operatorx/describe.ts`, `2*M*N*K` for GEMM) divided by
+`latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
+Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
 
-## Attention TFLOPS
+## Compact comparison reads
 
-Per-GPU TFLOPS is `2*B*Hq*P*(Dqk+Dv)/(latency_us*1e6)`.
-`P` counts visible query/key pairs per head: `Sq*Sk` without a causal mask;
-with bottom-right causality, `R*(2*Sk-R+1)/2`, where `R=min(Sq,Sk)`.
-This includes the diagonal, counts all KV for single-token decode, and excludes
-fully masked leading rows when `Sq>Sk`. It follows the valid-pair accounting in
-[AITER’s prefill benchmark](https://github.com/ROCm/aiter/blob/main/op_tests/op_benchmarks/triton/bench_batch_prefill.py).
+Ingestion normalizes each run once and stores versioned per-run GEMM and MoE
+comparisons in `opx_run_comparisons`, in the same transaction as the raw documents.
+These projections contain timing rows and source identities, without profiling
+payloads. `/api/v1/operatorx/compare` reads them directly and merges newest-first;
+it no longer fetches and normalizes raw artifacts for a backfilled run. The API
+response, selectors, calculations, missing/error handling, and timeline references
+are identical to the legacy reader. Raw artifacts still serve run details and
+kernel timelines on demand.
 
-Two FLOPs are counted per multiply-add in QK and AV. GQA uses query heads, not KV
-heads. MLA uses `Dqk=head_dim_qk_nope+head_dim_qk_rope` and `Dv=head_dim_v`;
-`kv_lora_rank` does not add work to materialized attention. This is useful matmul
-throughput, not an instruction count or hardware utilization measurement. Softmax,
-projection, RoPE and masked work are excluded from the numerator; the denominator
-remains the measured attention latency. Failed, unsupported, missing, and empty
-cases have null TFLOPS. Kernel timing and saved measurements are unchanged.
+The projection is keyed by the database run revision and operator. Re-ingesting
+replaces its raw documents and compact projections atomically; deletion cascades
+to projections. `OPERATORX_COMPARISON_VERSION` must be bumped when the persisted
+projection or its derivation changes. A missing table, missing projection, or old
+format uses the raw reader with revision-keyed in-process normalization reuse.
+Permission, network, and other storage errors remain failures; a partial comparison
+is not cached. Local-directory sources keep the raw path.
 
-## Routed MoE and the Kimi K3 benchmark profile
+### Bulk compact reads
 
-MoE charts use local token count on the x-axis and show per-GPU TFLOPS or latency.
-Each point preserves the profile name, activation/weight precision, hidden size,
-global and local expert/intermediate dimensions, top-k, EP, routed/shared TP,
-shared expert count, and routing distribution. Select identical shapes before comparing GPUs.
+One SQL query loads the listed run revisions; merging keeps newest-first order.
+Missing/stale projections alone use bounded raw fallback; only a missing table
+suppresses a SQL error. Responses and timeline identities are preserved.
 
-The `kimi_k3_moe_perf` testlist follows the generic dimensions in
-[vLLM PR #50082](https://github.com/vllm-project/vllm/pull/50082): H=7168,
-I=3072, E=896 and top-k=16, with local tokens 1/16/128/1024. EP8 uses 112 local
-experts and I=3072; TP8 uses 896 experts and local I=384. These are single-GPU
-weight shapes, not live distributed groups. All selected routes target local experts;
-routing is prepared before timing. No communication is measured.
+中文：一次 SQL 查询读取所列 revision，按最新优先合并；仅缺失或过期的记录回退至原始数据，
+仅缺表错误可触发整体回退。响应和时间线标识保持一致。
 
-This profile runs generic SiLU experts, not the native K3 MoE layer. Native K3 uses
-SITU, routed hidden size 3584, latent projections, and shared experts; those are
-outside this profile. The profile name remains visible so its measurements cannot
-be mistaken for full-model throughput.
+### Rollout and backfill
 
-Useful gate/up/down matmul TFLOPS is
-`6*T*H*(top_k*I_local+n_shared*I/shared_TP)/(latency_us*1e6)`.
-`I_local=I/routed_TP`; EP changes local expert storage and is not divided out again.
-The K3 profile has `n_shared=0`. The numerator excludes activation and routing work;
-the denominator is the measured fused expert kernel latency. Missing, failed,
-unsupported, and empty cases have no TFLOPS value.
+1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.
+2. Give the role used by `DATABASE_OPERATORX_READONLY_URL` SELECT access to
+   `opx_run_comparisons` if owner default privileges do not already cover new tables.
+3. Preview existing runs: `bun run admin:db:backfill:operatorx-comparisons -- --all`.
+4. Populate compact data: `bun run admin:db:backfill:operatorx-comparisons -- --all --yes`.
+5. Deploy the reader and purge `/api/v1/invalidate?scope=operatorx`; warm
+   `/api/v1/operatorx/compare?op=gemm` and `?op=moe` by consuming their full responses.
+
+The backfill requires `DATABASE_OPERATORX_WRITE_URL`; it loads one run at a time,
+preserves run revisions and source indices, and locks the captured revision before
+writing. A concurrent re-ingest causes stale work to be skipped. It is idempotent
+and exits nonzero if a run fails. Ingest workflows now warm both default comparisons
+after invalidating their cache. No administrator credentials or mutation endpoint
+are added to the public API.
+
+### Benchmarking
+
+The reproducible benchmark at `packages/app/scripts/benchmark-operatorx.ts`
+compares raw/normalized reconstruction, compact per-run projections, and a
+precomputed view snapshot, checking full response parity before timing. Run it with
+the input flags shown by `--help`; captured normalized inputs exclude raw SQL and
+normalization costs and must not be reported as an end-to-end production speedup.
+
+中文：写入流程在同一事务中保存原始产物和按运行版本生成的 GEMM、MoE 对比数据。
+对比接口优先读取不含 profiling 数据的精简记录，再按最新结果优先的规则合并，保留原有
+筛选条件、计算、失败状态和时间线来源。缺少表、缺少精简记录或格式版本过旧时，使用原始
+读取路径；权限、网络等错误不会被静默忽略，部分读取失败的响应也不会缓存。
+迁移后需确保只读角色能读取新表，再使用上述 backfill 命令补齐历史运行；backfill 保留
+原始 revision 和 result index，并在写入前锁定对应 revision，避免与重新写入的运行混用。
+写入流程在清除缓存后预热默认 GEMM 和 MoE 对比。基准测试会先校验响应完全一致；
+仅使用已归一化输入的本地结果不代表完整生产请求的性能。
+
+## Ascend 950PR normalization
+
+The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
+Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section 5):
+378 dense BF16 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s. The compute value
+is Cube-only (Huawei Ascend 950 white paper, table 3-1), excluding the Vector
+contribution in the 425 TFLOPS combined figure. Exact memory/ECC configuration
+remains unresolved; the chart states this qualification. Other precision ceilings
+remain null. The normalized roofline divides arithmetic intensity by 236.25
+FLOP/byte and throughput by 378 TFLOPS; raw measurements are unchanged.
+
+`GET /api/v1/operatorx/compare?op=gemm` includes an optional `hardware[].reference`
+object with `label`, nullable `peakTflops.{bf16,fp8,fp4}`, `memoryBandwidthTBs`,
+`memoryBandwidthAssumed`, `source`, and `qualification`. UI helpers and the
+page-owned API use the same reference. This endpoint remains a `page-bff`, outside
+the published OpenAPI contract. Unknown hardware gets no reference. Ascend uses a
+cool crimson in light/dark charts, distinct from AMD's warm reds; color is a
+presentation-only control with no numerical API effect.
+
+### Initial chart selections
+
+The display label is `950PR` (the stored hardware key remains `ascend950pr`).
+The comparison API returns `defaults.metricVsSizeSlice`, `defaults.rooflinePrecision`,
+and `defaults.rooflineNormalized`, resolved for the selected workload by the same
+pure helper the UI uses. Metric vs size prefers the highest-ranked slice with
+successful, positive finite 950PR latency at two or more distinct positive sizes;
+otherwise it keeps the existing largest-slice fallback. Missing, failed and
+unsupported rows cannot qualify a slice. Roofline starts with BF16 when FLOP/byte
+counts exist, otherwise the most represented supported precision, and starts with
+Normalized enabled. Explicit shape/precision choices and normalization toggles
+still win; no data, hardware selection, or measurement is changed.
+
+### 中文说明
+
+`ascend950pr` 的参考值仅用于 OperatorX，依据 `Ascend-ubench.md` 的硬件配置说明和第 5 节，
+以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 稠密计算峰值为 378 TFLOPS，
+HBM 带宽**假定为** 1.6 TB/s。计算峰值取自华为 Ascend 950 白皮书表 3-1 中的 Cube 项，
+不包含 425 TFLOPS 合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
+其他精度的峰值保留为 null。归一化时，算术强度除以 236.25 FLOP/byte，吞吐量除以
+378 TFLOPS；实测数据不变。
+
+`GET /api/v1/operatorx/compare?op=gemm` 的响应在 `hardware[].reference` 中提供可选的参考值对象：
+`label`、允许为 null 的 `peakTflops.{bf16,fp8,fp4}`、`memoryBandwidthTBs`、
+`memoryBandwidthAssumed`、`source` 和 `qualification`。UI 与页面专属 API 共用参考值。
+该接口仍属于 `page-bff`，不纳入公开 OpenAPI 契约；未知硬件不返回参考值。
+Ascend 在浅色和深色图表中使用偏冷的深红色，与 AMD 的暖红色区分；颜色仅影响展示，不改变 API 数值。
+
+硬件显示名称为 `950PR`，数据库中存储的硬件标识仍为 `ascend950pr`。对比 API 通过
+`defaults.metricVsSizeSlice`、`defaults.rooflinePrecision` 和 `defaults.rooflineNormalized`
+返回当前工作负载的初始选择，计算逻辑与 UI 共用同一个纯函数。Metric vs size 在已排序的分组中
+选择排名最高的一个，条件是 950PR 在至少两个不同的正尺寸上有成功测量，且延迟为有限正数；
+若没有分组满足条件，则沿用原有逻辑，选择最大的分组。missing、error 和 unsupported 结果不计入该条件。
+Roofline 在 BF16 有 FLOP/byte 计数时默认选择 BF16，否则选择数据点最多的受支持精度；
+Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开关仍优先生效，不修改数据、硬件选择或测量值。
 
 ## Roofline
 
@@ -88,6 +153,16 @@ latency. The roofline chart plots each case at its effective intensity: where
 the GPU's roofline reaches the case's bound, so the gap under the roof is the
 case's share of roofline. For a single-stage op this is plain FLOP/byte.
 
+中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
+各阶段精度与算术强度不同，多卡切分还会引入集合通信。某用例在某 GPU 上的 roofline
+时间为各阶段中算力时间（按该阶段精度的峰值算力计算 FLOPs）与访存时间（按峰值带宽
+计算字节数）取较慢者之和，再加上各集合通信按 scale-up 带宽计算的时间：张量并行
+GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家并行的
+dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
+内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
+即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
+单阶段算子的等效强度就是普通的 FLOP/byte。
+
 ## Data API
 
 `GET /api/v1/views/operatorx` is the public, read-only OperatorX feed, listed in
@@ -95,7 +170,7 @@ the API reference and OpenAPI document. It returns one row per case and GPU,
 from that GPU's newest stored result. Each row has the case key, op type,
 device split, testlist, the models and layers the case comes from, shape and
 precision labels, dimensions, per-GPU useful FLOPs and bytes, status, latency,
-TFLOPS, TB/s, roofline time and share (see below), kernel, and the stored run ID
+TFLOPS, TB/s, roofline time and share (see Roofline), kernel, and the stored run ID
 and result index.
 
 - `op`: `gemm` (default), `moe` or `attention`.
@@ -108,29 +183,39 @@ Responses are cached until new results are ingested. A response built without an
 unreadable run is not cached. The other `/api/v1/operatorx/*` routes serve the
 page and may change with it.
 
+中文：`GET /api/v1/views/operatorx` 是公开的只读 OperatorX 数据接口，列于 API 参考与
+OpenAPI 文档中。每个用例与 GPU 返回一行，取该 GPU 最新存储的结果，包含用例键、算子类型、
+设备切分、testlist、所属模型与层、形状与精度标签、维度、每 GPU 有效 FLOPs 与字节数、
+状态、延迟、TFLOPS、TB/s、roofline 时间与占比、kernel，以及运行 ID 与结果索引。参数：
+`op`、`workload` 或 `model`、`parallel`（`1` 表示单卡）、`hardware`、`status`、`page`、
+`format=csv`。未知或重复的参数及不在可选项中的取值返回 400。在新结果入库前保持缓存；
+缺少无法读取的运行时不缓存。其余 `/api/v1/operatorx/*` 接口服务于页面，可能随页面变化。
+
 ## Persistence and deployment
 
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
 documents: each run's manifest and every shard's operatorx results JSON, verbatim.
-The normalizer turns them into the dashboard's dataset at read time; it also runs once
-at ingest, so a run that cannot be read is never stored. Runs arrive by push:
+The normalizer runs once during ingest to prepare compact comparisons; detail and
+legacy reads still normalize raw documents on demand. A run that cannot be read is
+never stored. Runs arrive by push:
 
 - `bun run admin:db:ingest:operatorx -- --download <run-url-or-id>` stores a completed
   `operatorx-sweep.yml` run (any branch), downloading its manifest and shard artifacts.
-- In CI, `admin:db:ingest:operatorx:ci` reads pre-downloaded artifacts from
+- `admin:db:ingest:operatorx:ci` (no flag) reads pre-downloaded artifacts from
   `INGEST_ARTIFACTS_PATH` for `INGEST_RUN_ID`.
 - `bun run admin:db:ingest:operatorx -- --bundle <file.json> ...` stores raw bundles
   as they are, for runs collected outside a sweep.
 
-Re-ingesting a run replaces it. Setup:
+Re-ingesting a run replaces it.
 
 When a dispatched InferenceX `operatorx-sweep.yml` run finishes, including one with
 failed shards, it sends an `ingest-operatorx` repository dispatch with its run ID, and
 the `Ingest OperatorX Results` workflow stores that run. GitHub delivers repository
-dispatches only to workflows on the default branch, so this starts working once
-`ingest-operatorx.yml` is on InferenceX-app's default branch. Run the workflow manually
-with a run ID to backfill or re-ingest a run. OperatorX API responses stay cached until
-the workflow, after storing a run, purges them with `/api/v1/invalidate?scope=operatorx`.
+dispatches only to workflows on the default branch. Run the workflow manually with a run
+ID to backfill or re-ingest a run. OperatorX API responses stay cached until the workflow,
+after storing a run, purges them with `/api/v1/invalidate?scope=operatorx`.
+
+Setup:
 
 1. `DATABASE_OPERATORX_WRITE_URL`: the owner connection (direct, non-pooled), for
    migrations and ingest only.
@@ -143,3 +228,68 @@ the workflow, after storing a run, purges them with `/api/v1/invalidate?scope=op
 With `OPERATORX_SOURCE=local`, `OPERATORX_LOCAL_ARTIFACT_DIR` points at a directory of
 `<runKey>.json` raw bundles. This works only in development; production ignores it.
 Do not replace measured latencies with synthetic values for manual verification.
+
+### Landing-page Huawei link
+
+The English and Chinese landing pages link Huawei Ascend 950PR results to
+`/operatorx` and `/zh/operatorx`, respectively. The logo and result button are
+presentation-only navigation to the existing OperatorX view: they add no data
+selectors, defaults, calculations, or API contracts. Existing OperatorX API
+coverage applies; no additional endpoint or OpenAPI change is needed.
+
+中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
+`/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
+API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
+
+### Cross-backend case alignment
+
+The comparison API and all charts align cases by the full serialized operation
+arguments, including precision, quantization, layout, and shape, rather than the
+vendor-specific backend name. For each hardware/case, the view selects the fastest
+successful finite positive latency across backends; ties keep the first result.
+If no backend succeeds, the first explicit status is retained without inventing a
+measurement. The newest-per-hardware/case/backend raw selection is unchanged.
+`measurements[hardware].backend` identifies the selected backend alongside its
+original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
+points and timeline inspection use these same selected measurements. Thus identical
+BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
+precision or quantization arguments remain separate. This adds no OpenAPI
+operation; the compare route stays page-owned.
+
+中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
+不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为
+有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
+原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
+记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
+Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+
+### Parallel timeline reads
+
+Timeline reads share one raw fetch per run, with at most four runs concurrent.
+Request order, revision checks, missing/null results, and error handling are preserved.
+
+中文：时间线按运行复用读取，最多四个运行并发；保留请求顺序、revision 校验、缺失结果和错误处理。
+
+## Shared merged-comparison cache
+
+`BLOB_CACHE_PREFIX` and `BLOB_READ_WRITE_TOKEN` enable shared database comparisons
+above Next's 2 MB limit. Keys include op, ordered revisions, format version, and
+namespace; distinct deployments need distinct namespaces or prefixes. Partial or
+replaced revisions remain uncached/no-store. Blob failures retain the source path.
+Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag; full
+purge covers the configured prefix. Warm process caches remain until revision or
+code/version changes. The run-list query remains; measure benefits in the deployment
+region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
+
+中文：配置上述 Blob 环境变量后，可共享超过 2 MB 的对比数据，按算子、revision、版本和
+namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
+不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
+覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
+
+### Progressive rendering and intent prefetch
+
+The first chart mounts eagerly; others mount within 300px of the viewport or on
+focus, then retain their controls. Without IntersectionObserver all charts render.
+Landing-link hover/focus prefetches the localized route and default GEMM query,
+sharing the destination's five-minute cache. These are presentation-only controls;
+API selectors, results, and click analytics are unaffected.

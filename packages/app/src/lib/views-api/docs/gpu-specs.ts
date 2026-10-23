@@ -1,5 +1,5 @@
-import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -10,16 +10,8 @@ import {
   errorSchema,
   objectSchema,
   arraySchema,
-} from '@/lib/api-documentation-helpers';
-import { GPU_CHART_METRICS } from '@/lib/gpu-specs';
-
-/**
- * Docs fragment for GET /api/v1/views/gpu-specs.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
+} from '@/lib/api/api-documentation-helpers';
+import { GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 

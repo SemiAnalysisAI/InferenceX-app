@@ -2,7 +2,7 @@
 
 import { ChartNoAxesCombined } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

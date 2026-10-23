@@ -57,6 +57,34 @@ Existing output directories are refused.
 Use `inferencex verify <directory>` to reconstruct the result from the saved
 responses. A later API request is separate evidence and may return different data.
 
+## NVL72 CPU measurements
+
+Raw benchmark responses may include `cpu_power_valid`, `avg_cpu_socket_power_w`,
+`avg_total_cpu_power_w`, `total_cpu_energy_j`, optional module power/energy, and
+optional CPU core and SysIO rail breakdowns (`avg_total_cpu_rail_power_w`,
+`avg_total_cpu_sysio_power_w` and their energies). The rails are inside the Grace
+socket total; never add them to it.
+CPU measurements require `cpu_power_valid === 1`, independently of GPU validity.
+`powerValid=strictV2` filters GPU measurements only. Read `power_audit.cpu` for
+sensor type, collector, socket coverage, and validation reasons. Grace socket
+readings combine CPU and LPDDR5X power; a module reading already includes GPU
+power. Missing measurements stay unavailable. These fields add no CPU samples to
+the `gpu-metrics` view and do not change the CLI export format.
+
+## GPU temperature telemetry
+
+The PowerX run explorer can display per-GPU Celsius readings from native SRT
+samples v3, preserving host-local GPU identities. Missing temperature stays
+unavailable; older v1/v2 power files do not gain inferred temperatures. Chart lines
+break at missing readings, including rolling averages and chip means with no
+contributing readings. Rolling windows ignore missing values and keep missing
+centers unavailable; zero Celsius remains a measured value. The public view's
+`chart` contains measured points only; use its `rows` to retain missing timestamps. These
+samples are exposed by the UI-owned `/api/gpu-metrics` raw-artifact reader and
+its stored digest, not the stable measured-energy export above. Do not infer
+temperature coverage from `power_valid`, or compare prefill/decode temperatures
+without matching role and time-window evidence.
+
 ## Selection and coverage
 
 The request uses `/api/v1/benchmarks` with `model`, optional `date`, and

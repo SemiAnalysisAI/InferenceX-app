@@ -9,7 +9,6 @@ const asset = (id: string, path: string) => ({
   downloadUrl: `https://synthetic.public.blob.vercel-storage.com/${id}/${path}?download=1`,
 });
 
-// Every byte is synthetic test data. The .mp4 bodies are deliberately not playable media.
 export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
   const runId = '789';
   const artifact: CIArtifact = {

@@ -1,3 +1,4 @@
+import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import {
   Model,
   MODEL_OPTIONS,
@@ -7,7 +8,7 @@ import {
   PRECISION_OPTIONS,
   Sequence,
   SEQUENCE_OPTIONS,
-} from '@/lib/data-mappings';
+} from '@/lib/catalog/data-mappings';
 
 export interface CalculatorUrlSeed {
   model?: Model;
@@ -16,6 +17,19 @@ export interface CalculatorUrlSeed {
   percentile?: Percentile;
   runDate?: string;
   runId?: string;
+  profitTarget?: number;
+  profitRouteKey?: string;
+}
+
+export function parseProfitTargetParam(value: string | undefined): number | undefined {
+  if (value === undefined || !/^\d+(?:\.\d+)?$/u.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function profitTargetUrlValue(model: Model, target: number): string {
+  if (!Number.isFinite(target) || target <= 0) return '';
+  return target === profitModelDefaults(model).interactivity ? '' : String(target);
 }
 
 function pickString(value: string | string[] | undefined): string | undefined {
@@ -24,13 +38,6 @@ function pickString(value: string | string[] | undefined): string | undefined {
   return undefined;
 }
 
-/**
- * Read the URL params that the calculator can SSR with into a typed seed.
- * Without this, `?g_model=DeepSeek-V4-Pro` only takes effect after client
- * hydration runs the `useLayoutEffect` in `GlobalFilterContext` — so the
- * initial paint (and any preview/scraper that doesn't run JS) shows the
- * default model instead of the shared one.
- */
 export function resolveCalculatorUrlSeed(
   sp: Record<string, string | string[] | undefined>,
 ): CalculatorUrlSeed {
@@ -64,6 +71,9 @@ export function resolveCalculatorUrlSeed(
     seed.runDate = runDateParam;
   }
 
+  const profitTarget = parseProfitTargetParam(pickString(sp.c_ivtarget));
+  if (profitTarget !== undefined) seed.profitTarget = profitTarget;
+
   const runIdParam = pickString(sp.g_runid);
   if (runIdParam && /^[A-Za-z0-9_-]{1,64}$/u.test(runIdParam)) {
     seed.runId = runIdParam;
@@ -72,5 +82,4 @@ export function resolveCalculatorUrlSeed(
   return seed;
 }
 
-// Re-export Model/Precision/Sequence for callers that already import this module.
 export { Model, Percentile, Precision, Sequence };

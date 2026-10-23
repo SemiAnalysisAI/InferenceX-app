@@ -1,9 +1,10 @@
-import { getAllPosts } from '@/lib/blog';
-import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
-import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/rankings';
-import { inferenceModelMeta } from '@/lib/inference-model-meta';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { getAllWhitepapers } from '@/lib/whitepapers';
+import { getAllPosts } from '@/lib/blog/blog';
+import { getAllHardwarePages, hardwarePagePath } from '@/lib/hardware/hardware';
+import { getAllChipPages, getAllChipVsPages } from '@/lib/catalog/chip-pages';
+import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/live-seo/rankings';
+import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await
@@ -19,8 +20,10 @@ export async function GET() {
     '',
     `- [Dashboard](${SITE_URL})`,
     `- [AgentX](${SITE_URL}/agentx)`,
+    `- [Benchmark your own chips with AgentX](${SITE_URL}/agentx/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
     `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
     `- [Articles](${SITE_URL}/blog)`,
+    `- [Hardware Results](${SITE_URL}/hardware)`,
     `- [Whitepapers](${SITE_URL}/whitepaper)`,
     `- [API Reference](${SITE_URL}/api)`,
     `- [OpenAPI 3.1 Specification](${SITE_URL}/api/openapi.json)`,
@@ -60,6 +63,13 @@ export async function GET() {
     `## Articles`,
     '',
     ...posts.map((post) => `- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.subtitle}`),
+    '',
+    `## Hardware Results`,
+    '',
+    ...getAllHardwarePages().map(
+      (page) =>
+        `- [${page.title}](${SITE_URL}${hardwarePagePath(page.slug)}): ${page.seoDescription}`,
+    ),
     '',
     `## Whitepapers`,
     '',

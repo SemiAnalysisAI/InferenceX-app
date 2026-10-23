@@ -41,7 +41,7 @@ describe('benchmarkPointIngestKey', () => {
   });
 });
 
-function fakeTransactionSql(linkedId: number | null) {
+function fakeTransactionSql(linkedId: number | null, storedFileNames: string[] = []) {
   const calls: { text: string; values: unknown[] }[] = [];
   const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join('');
@@ -50,6 +50,9 @@ function fakeTransactionSql(linkedId: number | null) {
       return Promise.resolve([{ id: 42, server_log_id: linkedId }]);
     }
     if (text.includes('insert into server_logs')) return Promise.resolve([{ id: 99 }]);
+    if (text.includes('select file_name from server_log_files')) {
+      return Promise.resolve(storedFileNames.map((file_name) => ({ file_name })));
+    }
     return Promise.resolve([]);
   }) as any;
   tag.array = (value: unknown) => value;
@@ -110,7 +113,7 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
     expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
     expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
     expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
-    expect(text).toContain('power_audit = excluded.power_audit');
+    expect(text).toContain('coalesce(excluded.power_audit, benchmark_results.power_audit)');
   });
 
   it('serializes present fields and contributes null lanes for absent ones', async () => {
@@ -159,6 +162,33 @@ describe('insertServerLogFiles', () => {
     expect(calls.some((call) => call.text.includes('files_complete = true'))).toBe(true);
   });
 
+  it('skips filenames an existing bundle already stores without reading them', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-ingest-test-'));
+    const serverPath = path.join(root, 'server.log');
+    const routerPath = path.join(root, 'router.log');
+    fs.writeFileSync(serverPath, 'server');
+    fs.writeFileSync(routerPath, 'router');
+    try {
+      const { sql, calls } = fakeTransactionSql(7, ['stored.log']);
+      await insertServerLogFilePaths(
+        sql,
+        [42],
+        [
+          { fileName: 'stored.log', path: path.join(root, 'missing.log') },
+          { fileName: 'router.log', path: routerPath },
+          { fileName: 'server.log', path: serverPath },
+        ],
+      );
+
+      const childNames = calls
+        .filter((call) => call.text.includes('insert into server_log_files'))
+        .map((call) => call.values[1]);
+      expect(childNames).toEqual(['router.log']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('reads archived file paths lazily and removes null bytes', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'server-log-ingest-test-'));
     const serverPath = path.join(root, 'server.log');
@@ -182,6 +212,33 @@ describe('insertServerLogFiles', () => {
       expect(childInsert?.values).toEqual([99, 'router.log', 'router']);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it('caps oversized files before sending them to PostgreSQL', async () => {
+    const previous = process.env.SERVER_LOG_MAX_FILE_BYTES;
+    process.env.SERVER_LOG_MAX_FILE_BYTES = String(128 * 1024);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const big = 'decode worker line\n'.repeat(50_000);
+      const { sql, calls } = fakeTransactionSql(null);
+      await insertServerLogFiles(
+        sql,
+        [42],
+        [
+          { fileName: 'server.log', logText: 'server' },
+          { fileName: 'cn08_decode_w0.out', logText: big },
+        ],
+      );
+
+      const childInsert = calls.find((call) => call.text.includes('insert into server_log_files'));
+      const stored = childInsert?.values[2] as string;
+      expect(Buffer.byteLength(stored, 'utf8')).toBeLessThanOrEqual(128 * 1024);
+      expect(stored).toContain('[InferenceX ingest truncated this log');
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cn08_decode_w0.out: truncated'));
+    } finally {
+      warn.mockRestore();
+      if (previous === undefined) delete process.env.SERVER_LOG_MAX_FILE_BYTES;
+      else process.env.SERVER_LOG_MAX_FILE_BYTES = previous;
     }
   });
 });

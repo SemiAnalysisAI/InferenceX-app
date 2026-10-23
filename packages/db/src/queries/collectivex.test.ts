@@ -12,6 +12,7 @@ import {
   listCollectiveXRuns,
   refreshCollectiveXRunAttempt,
   type CollectiveXRunInsert,
+  type CollectiveXRunRow,
 } from './collectivex';
 
 interface Captured {
@@ -19,7 +20,6 @@ interface Captured {
   values: unknown[];
 }
 
-/** Tagged-template stub: records each query, replays queued row sets. */
 function fakeSql(rowsQueue: Record<string, unknown>[][]) {
   const calls: Captured[] = [];
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -88,6 +88,15 @@ describe('read queries', () => {
     expect(calls[2].text).toContain('ORDER BY run_id DESC');
     expect(calls[2].text).not.toContain('LIMIT');
   });
+
+  it('reads the recorded source repository with each run row', async () => {
+    const { sql, calls } = fakeSql([[], []]);
+    await getLatestCollectiveXRun(sql, 1);
+    await getCollectiveXRun(sql, 1, '160');
+    for (const call of calls) {
+      expect(call.text).toContain("r.summary->>'source_repository' AS source_repository");
+    }
+  });
 });
 
 describe('insertCollectiveXRun', () => {
@@ -98,8 +107,6 @@ describe('insertCollectiveXRun', () => {
     await expect(insertCollectiveXRun(sql, runInsert, docs)).resolves.toBe(true);
 
     expect(calls[0].text).toContain('ON CONFLICT (run_id) DO NOTHING');
-    // Raw objects: a pre-stringified value would double-encode under
-    // postgres.js; a bare array would become a PG array literal under neon.
     expect(calls[0].values).toContainEqual(runInsert.matrix);
     expect(calls[0].values).toContainEqual({ docs });
     expect(
@@ -144,19 +151,12 @@ describe('deleteCollectiveXRun', () => {
   });
 
   it('cannot reach anything but the one run it is given', async () => {
-    // The delete route's Bearer token is held in browser localStorage, so the
-    // blast radius of a stolen token is whatever this statement can touch. It
-    // must stay: one run, in the two CollectiveX tables, and recoverable by
-    // re-ingesting the run from its GitHub artifacts.
     const { sql, calls } = fakeSql([[{ runs_deleted: 1 }]]);
     await deleteCollectiveXRun(sql, '160');
-    // The run id is the only value bound into the statement — no other row is nameable.
     expect(calls[0].values).toEqual(['160']);
-    // Documents go only via the tombstoned CTE, never a free-standing predicate.
     expect(calls[0].text).toContain(
       'DELETE FROM cx_run_docs WHERE run_id IN (SELECT run_id FROM tombstoned)',
     );
-    // No table outside the CollectiveX pair is referenced, and nothing is dropped.
     expect(new Set([...calls[0].text.matchAll(/\bcx_[a-z_]+/gu)].map((match) => match[0]))).toEqual(
       new Set(['cx_runs', 'cx_run_docs']),
     );
@@ -165,32 +165,46 @@ describe('deleteCollectiveXRun', () => {
 });
 
 describe('collectiveXDatasetFromRow', () => {
+  const shard = makeRawShard();
+  // makeRawShard returns loose JSON whose identity shape the fixture fixes.
+  const identity = shard.identity as {
+    case_id: string;
+    case_factors: { sku: string; case: Record<string, unknown> };
+  };
+  const meta = makeRunMeta();
+  const row: CollectiveXRunRow = {
+    run_id: meta.run_id,
+    run_attempt: meta.run_attempt,
+    version: 1,
+    generated_at: meta.generated_at,
+    source_sha: meta.source_sha,
+    source_branch: 'collectivex',
+    source_repository: null,
+    conclusion: meta.conclusion,
+    matrix: makeRawMatrix([
+      {
+        caseId: identity.case_id,
+        sku: identity.case_factors.sku,
+        disposition: 'runnable',
+        case: identity.case_factors.case,
+      },
+    ]),
+    docs: [shard],
+  };
+
   it('assembles a stored row through the shared reader', () => {
-    const shard = makeRawShard();
-    const identity = (
-      shard as { identity: { case_id: string; case_factors: { sku: string; case: unknown } } }
-    ).identity;
-    const meta = makeRunMeta();
-    const dataset = collectiveXDatasetFromRow({
-      run_id: meta.run_id,
-      run_attempt: meta.run_attempt,
-      version: 1,
-      generated_at: meta.generated_at,
-      source_sha: meta.source_sha,
-      source_branch: 'collectivex',
-      conclusion: meta.conclusion,
-      matrix: makeRawMatrix([
-        {
-          caseId: identity.case_id,
-          sku: identity.case_factors.sku,
-          disposition: 'runnable',
-          case: identity.case_factors.case as Record<string, unknown>,
-        },
-      ]),
-      docs: [shard],
-    });
+    const dataset = collectiveXDatasetFromRow(row);
     expect(dataset.run.run_id).toBe(meta.run_id);
     expect(dataset.series).toHaveLength(1);
     expect(dataset.run.measured_cases).toBe(1);
+    expect(JSON.stringify(dataset.run)).not.toContain('source_repository');
+  });
+
+  it('exposes the recorded source repository on the dataset run', () => {
+    const dataset = collectiveXDatasetFromRow({
+      ...row,
+      source_repository: 'ExampleOrg/ExampleBench',
+    });
+    expect(dataset.run.source_repository).toBe('ExampleOrg/ExampleBench');
   });
 });

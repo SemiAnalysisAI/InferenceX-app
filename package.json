@@ -44,12 +44,14 @@
     "admin:db:migrate:collectivex": "bun run --cwd packages/db db:migrate:collectivex",
     "admin:db:apply-overrides": "bun run --cwd packages/db db:apply-overrides",
     "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
+    "admin:db:backfill-gpu-metrics": "bun run --cwd packages/db db:backfill-gpu-metrics",
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
     "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",
     "admin:db:ingest:operatorx": "bun run --cwd packages/db db:ingest:operatorx",
-    "admin:db:ingest:operatorx:ci": "bun run --cwd packages/db db:ingest:operatorx:ci"
+    "admin:db:ingest:operatorx:ci": "bun run --cwd packages/db db:ingest:operatorx:ci",
+    "admin:db:backfill:operatorx-comparisons": "bun run --cwd packages/db db:backfill:operatorx-comparisons"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

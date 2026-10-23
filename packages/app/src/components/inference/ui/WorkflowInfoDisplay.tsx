@@ -1,6 +1,6 @@
 import { ChevronDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -12,11 +12,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { updateRepoUrl } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { updateRepoUrl } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import {
   useInferenceActions,
   useInferenceData,
@@ -60,11 +60,6 @@ export function workflowRunCountLabel(index: number, total: number, locale: Loca
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
 }
 
-/**
- * Returns the run id adjacent to `selectedRunId` in `runIds` (which is ordered
- * oldest → newest, matching the "Run i/n" labels), or `undefined` when there is
- * no run in that direction or the selection is unknown.
- */
 export function getAdjacentRunId(
   runIds: readonly string[],
   selectedRunId: string,
@@ -76,7 +71,6 @@ export function getAdjacentRunId(
   return target >= 0 && target < runIds.length ? runIds[target] : undefined;
 }
 
-/** The newest run id, i.e. the last entry of the oldest → newest `runIds` list. */
 export function getLatestRunId(runIds: readonly string[]): string | undefined {
   return runIds.at(-1);
 }
@@ -138,7 +132,6 @@ export default function WorkflowInfoDisplay() {
   const changelog = (() => {
     const raw = availableRuns[selectedRunId]?.changelog || null;
     if (!raw) return null;
-    // Filter config_keys by selected precisions, drop entries with no matching keys
     const filtered = raw.entries
       .map((entry) => ({
         ...entry,

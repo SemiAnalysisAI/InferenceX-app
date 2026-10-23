@@ -1,7 +1,10 @@
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
+import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Model } from '@/lib/catalog/data-mappings';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -19,12 +22,12 @@ const mocks = vi.hoisted(() => ({
   unofficial: vi.fn(),
   submissions: vi.fn(),
 }));
-vi.mock('@/app/api/gpu-metrics/route', () => ({ GET: mocks.metrics }));
+vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
 vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
-vi.mock('@/lib/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
+vi.mock('@/lib/cache/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
 const req = (view: string, query = '') =>
   new NextRequest(`https://example.test/api/v1/views/${view}?${query}`);
 
@@ -104,6 +107,7 @@ describe('new dashboard projections', () => {
     expect(result.headers.get('cache-control')).toContain('no-store');
     const body = await result.json();
     expect(body.rows).toEqual(metricRows.filter((r) => r.index === 1));
+    expect(body.coverage).toBeNull();
     expect(body.chart).toEqual(
       Object.fromEntries(buildGroupedData(metricRows, new Set([1]), 'temperature')),
     );
@@ -119,6 +123,26 @@ describe('new dashboard projections', () => {
     expect(corr.chart).toEqual(
       buildCorrelationData(metricRows, new Set([0]), 'temperature', 'power'),
     );
+  });
+  it('preserves run-wide partial coverage when selecting one stored host', async () => {
+    const coverage = { status: 'partial', missingArtifacts: ['gpu_metrics_missing_host'] };
+    const artifact = 'gpu_metrics_run/host-a/gpu_metrics.csv';
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        coverage,
+        artifactNames: [artifact, 'gpu_metrics_run/host-b/gpu_metrics.csv'],
+        artifacts: [{ name: artifact, data: metricRows }],
+      }),
+    );
+    const response = await gpu(
+      req('gpu-metrics', `runId=123&artifact=${encodeURIComponent(artifact)}`),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.coverage).toEqual(coverage);
+    expect(body.params.artifact).toBe(artifact);
+    expect(body.artifacts).toHaveLength(2);
   });
   it('rejects invalid GPU indices, artifacts and unsafe IDs', async () => {
     for (const query of [
@@ -137,6 +161,63 @@ describe('new dashboard projections', () => {
     const result = await gpu(req('gpu-metrics', 'runId=123'));
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({ error: 'Source data unavailable' });
+  });
+  it("returns the reader's all-chip statistics instead of recomputing them from GPU-filtered rows", async () => {
+    const stats = [0, 1].map((gpuIndex) => ({
+      gpuIndex,
+      metric: 'power_w',
+      count: 10,
+      min: 0,
+      max: 800,
+      mean: 350,
+      median: 300,
+      p95: 750,
+      p99: 790,
+      stddev: 200,
+    }));
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123&gpus=0'));
+    const body = await response.json();
+    expect(body.stats).toEqual(stats.map(({ metric: _metric, ...stat }) => stat));
+    expect(mocks.metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe('123');
+  });
+  it('returns no statistics when the reader withholds them for incomplete samples', async () => {
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats: [] } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123'));
+    const body = await response.json();
+    expect(body.stats).toEqual([]);
+  });
+  it('reports the correlation y-axis it draws when the series has no temperature', async () => {
+    const data = [
+      { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
+      { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, smClock: 1900 },
+    ];
+    mocks.metrics.mockImplementation(() =>
+      Response.json({ runInfo: { id: 123 }, artifacts: [{ name: 'h200', data }] }),
+    );
+    const correlation = async (query: string) => {
+      const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
+      return response.json();
+    };
+    const defaulted = await correlation('');
+    expect(defaulted.params.corrYMetric).toBe('smClock');
+    expect(defaulted.chart).toEqual([
+      { x: 100, y: 1500, gpuIndex: 0, raw: data[0] },
+      { x: 300, y: 1900, gpuIndex: 0, raw: data[1] },
+    ]);
+    const explicit = await correlation('&corrYMetric=temperature');
+    expect(explicit.params.corrYMetric).toBe('temperature');
+    expect(explicit.chart).toEqual([]);
   });
   it('reads published video evidence without triggering artifact publication', async () => {
     mocks.video.mockImplementation(() => new Response(null, { status: 204 }));
@@ -197,6 +278,87 @@ describe('new dashboard projections', () => {
       if (view === 'cache-reuse') expect(body.data).toBeNull();
     }
   });
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
+    async (view, handler) => {
+      const row = agenticRow();
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          row,
+          agenticRow({
+            id: 2,
+            conc: 32,
+            metrics: {
+              ...row.metrics,
+              p90_itl: 1 / 20,
+              tput_per_gpu: 9000,
+              input_tput_per_gpu: 8100,
+              output_tput_per_gpu: 900,
+            },
+          }),
+        ]),
+      );
+      const response = await handler(req(view, 'model=DeepSeek-V4-Pro'));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params).toMatchObject({ target: 35, priceSource: 'list', labCut: 0 });
+      expect(body.params.target).toBe(profitModelDefaults(Model.DeepSeek_V4_Pro).interactivity);
+      expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+
+      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=35'));
+      expect(explicit.status).toBe(200);
+      const explicitBody = await explicit.json();
+      expect(explicitBody.data).toEqual(body.data);
+
+      const custom = await handler(req(view, 'model=DeepSeek-V4-Pro&target=24'));
+      expect(custom.status).toBe(200);
+      const customBody = await custom.json();
+      expect(customBody.params.target).toBe(24);
+      expect(customBody.data).not.toEqual(body.data);
+    },
+  );
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s defaults to theoretical cache pricing but honors actual',
+    async (view, handler) => {
+      const row = agenticRow();
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          {
+            ...row,
+            metrics: { ...row.metrics, theoretical_cache_hit_rate: 0.98 },
+          },
+        ]),
+      );
+      const query = 'model=DeepSeek-V4-Pro&target=45';
+      const read = async (suffix = '') => {
+        const response = await handler(req(view, query + suffix));
+        expect(response.status).toBe(200);
+        return response.json();
+      };
+      const implicit = await read();
+      const theoretical = await read('&cacheHitMode=theoretical');
+      const actual = await read('&cacheHitMode=actual');
+      expect(implicit.params.cacheHitMode).toBe('theoretical');
+      expect(implicit.data.rows.length).toBeGreaterThan(0);
+      expect(implicit.data).toEqual(theoretical.data);
+      expect(actual.params.cacheHitMode).toBe('actual');
+      expect(actual.data).not.toEqual(implicit.data);
+
+      mocks.benchmarks.mockImplementation(() => Response.json([row]));
+      const fallback = await read();
+      const measured = await read('&cacheHitMode=actual');
+      expect(fallback.data).toEqual(measured.data);
+      const invalid = await handler(req(view, `${query}&cacheHitMode=unknown`));
+      expect(invalid.status).toBe(400);
+    },
+  );
+
   it('exact-run and public-overlay selectors are forwarded only to fixed GET handlers', async () => {
     await first(
       req(
@@ -339,7 +501,6 @@ describe('new dashboard projections', () => {
         body.data,
       ]);
 
-      // An in-progress run can change between requests; the next one must fetch it again.
       overlay = { ...overlay, hardware: 'mi355x' };
       const freshResponse = await profit(req('profit-estimator', query));
       expect(freshResponse.status).toBe(200);
@@ -349,14 +510,13 @@ describe('new dashboard projections', () => {
       expect([firstFetchCount, mocks.unofficial.mock.calls.length]).toEqual([1, 2]);
     },
   );
-  it.each(['modeled', 'compare'])(
+  it.each(['modeled'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
     async (powerBasis) => {
       const rows = [
         agenticRow({ id: 90, hardware: 'mi355x', date: '2026-09-09' }),
         agenticRow({ id: 100 }),
       ];
-      // A pinned run can legitimately contain append-only rows from an older date.
       const pinned = agenticRow({ id: 789, hardware: 'b300', date: '2026-09-08' });
       mocks.benchmarks.mockImplementation((request: NextRequest) => {
         const search = request.nextUrl.searchParams;
@@ -391,6 +551,174 @@ describe('new dashboard projections', () => {
     },
   );
   it.each(['modeled', 'compare'])(
+    'uses valid power curves at the same target in official, historical and overlay %s estimates',
+    async (powerBasis) => {
+      const curve = (scale: number, date: string) =>
+        [
+          [20, 9000, 1],
+          [40, 8000, 0],
+          [60, 3000, 1],
+        ].map(([interactivity, throughput, powerValid], index) =>
+          agenticRow({
+            id: scale * 100 + index,
+            conc: 3 - index,
+            date: scale === 2 && index === 0 ? '2026-09-08' : date,
+            run_url:
+              scale === 2 && index === 0
+                ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
+                : agenticRow().run_url,
+            curve_workflow_run_id: scale * 1000,
+            curve_date: date,
+            metrics: {
+              ...agenticRow().metrics,
+              p90_itl: 1 / interactivity,
+              tput_per_gpu: throughput * scale,
+              input_tput_per_gpu: throughput * scale * 0.9,
+              output_tput_per_gpu: throughput * scale * 0.1,
+              power_valid: powerValid,
+            },
+          }),
+        );
+      mocks.benchmarks.mockImplementation((request: NextRequest) =>
+        Response.json(
+          request.nextUrl.searchParams.get('exact') === 'true'
+            ? curve(2, '2026-09-09')
+            : curve(1, '2026-09-10'),
+        ),
+      );
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: curve(3, '2026-09-10'), evaluations: [] }),
+      );
+      const query = `model=DeepSeek-V4-Pro&precisions=fp4&target=45&priceSource=custom&inputPrice=1&cachedInputPrice=1&outputPrice=1&powerBasis=${powerBasis}&dates=2026-09-09&unofficialrun=456`;
+      const response = await gw(req('profit-estimator-per-gigawatt', query));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      for (const [output, scale] of [
+        [body.data, 1],
+        [body.comparisons[0].data, 2],
+        [body.overlays, 3],
+      ]) {
+        expect(output.skipped).toEqual([]);
+        expect(output.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
+        for (const row of output.rows)
+          expect(row.revenuePerGpuHour).toBeCloseTo(17.159765625 * scale);
+      }
+      const provisioned = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          query.replace(`powerBasis=${powerBasis}`, 'powerBasis=provisioned'),
+        ),
+      );
+      const baseline = await provisioned.json();
+      expect(baseline.data.rows).toHaveLength(1);
+      expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
+    },
+  );
+  const grace = {
+    cpu_power_valid: 1,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 196.132,
+  };
+  const nvl72Tray = (metrics: Record<string, number>, sensor: 'grace_socket' | 'module') =>
+    agenticRow({
+      hardware: 'gb300',
+      prefill_tp: 4,
+      decode_tp: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      power_audit: {
+        cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
+      },
+      metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
+    });
+  it('retains provisioned NVL72 estimates with invalid GPU telemetry and explains missing measured power', async () => {
+    mocks.benchmarks.mockImplementation(() =>
+      Response.json([nvl72Tray({ power_valid: 0 }, 'grace_socket')]),
+    );
+    for (const powerBasis of ['compare', 'modeled']) {
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
+      if (powerBasis === 'compare') {
+        expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
+        expect(body.data.rows[0].powerSource).toBeUndefined();
+      }
+      expect(body.data.skipped).toMatchObject([{ reason: 'no-measured-power' }]);
+    }
+  });
+  it.each([
+    ['GPU-only telemetry', {}, 'grace_socket'],
+    ['a module-sensor CPU audit', grace, 'module'],
+  ] as const)(
+    'prices NVL72 trays with %s on the modeled Grace sockets',
+    async (_name, metrics, sensor) => {
+      mocks.benchmarks.mockImplementation(() => Response.json([nvl72Tray(metrics, sensor)]));
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.skipped).toEqual([]);
+      expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+        undefined,
+        {
+          topology: 'nvl72-tray',
+          cpu: 'modeled',
+          pue: 1.1,
+          modelRevision: SYSTEM_POWER_MODEL_REVISION,
+        },
+      ]);
+    },
+  );
+  it('prices an NVL72 aggregate on its measured GPU and Grace-socket rack share', async () => {
+    const trays = agenticRow({
+      hardware: 'gb300',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket', expected_sockets: 8, observed_sockets: 8 },
+      },
+      metrics: {
+        ...agenticRow().metrics,
+        avg_power_w: 594.191,
+        avg_total_gpu_power_w: 9507.056,
+        ...grace,
+        avg_total_cpu_power_w: 784.528,
+      },
+    });
+    mocks.benchmarks.mockImplementation(() => Response.json([trays]));
+    const response = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.skipped).toEqual([]);
+    expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+      undefined,
+      {
+        topology: 'nvl72-tray',
+        cpu: 'measured',
+        pue: 1.1,
+        modelRevision: SYSTEM_POWER_MODEL_REVISION,
+      },
+    ]);
+  });
+  it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
       const partial = agenticRow({
@@ -416,7 +744,7 @@ describe('new dashboard projections', () => {
         expect(output.skipped).toEqual([]);
         expect(output.rows.map((row: { powerLabel: string }) => row.powerLabel)).toEqual(
           powerBasis === 'compare'
-            ? ['Provisioned', 'Measured + modeled · Full-chassis extrapolation']
+            ? ['All in Provisioned', 'All in Measured · Full-chassis extrapolation']
             : ['Full-chassis extrapolation'],
         );
       }
@@ -458,4 +786,66 @@ describe('new dashboard projections', () => {
     expect(body.rows).toEqual([]);
     expect(body.series).toEqual([{ key: 'amd', points: [] }]);
   });
+});
+
+describe('cache-reuse recipe selection', () => {
+  const query = 'model=DeepSeek-V4-Pro&sequence=agentic-traces&precisions=fp4';
+  const original = 'agg|sn|p1x8/1/-|d1x8/1/-|g8+8|spec-none|offload-off|';
+  const selected = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
+  const rows = [
+    agenticRow({ id: 1, conc: 8 }),
+    agenticRow({ id: 2, conc: 16 }),
+    agenticRow({
+      id: 3,
+      conc: 16,
+      decode_tp: 16,
+      num_decode_gpu: 16,
+      offload_mode: 'on',
+      metrics: {
+        ...agenticRow().metrics,
+        server_gpu_cache_hit_rate: 0.6,
+        server_cpu_cache_hit_rate: 0.2,
+      },
+    }),
+  ];
+  it('returns the selected recipe without mixing another recipe at the same concurrency', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json(rows));
+    const response = await cache(
+      req('cache-reuse', `${query}&recipe=${encodeURIComponent(selected)}`),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.recipe).toBe(selected);
+    expect(body.data.recipes).toHaveLength(2);
+    expect(body.data.recipe).toBe(selected);
+    expect(body.data.bars).toHaveLength(1);
+    expect(body.data.bars[0]).toMatchObject({ concurrency: 16, share: { hbm: 0.6, host: 0.2 } });
+    expect(body.data.bars[0].point.sourceRow.id).toBe(3);
+  });
+  it('offers recipe selection for overlay-only configurations', async () => {
+    mocks.unofficial.mockImplementation(() => Response.json({ benchmarks: rows, evaluations: [] }));
+    const response = await cache(
+      req('cache-reuse', `${query}&unofficialrun=123&recipe=${encodeURIComponent(selected)}`),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.recipe).toBe(selected);
+    expect(body.data.recipes).toHaveLength(2);
+    expect(body.data.series).toHaveLength(1);
+    expect(body.data.bars).toHaveLength(1);
+    expect(body.data.bars[0]).toMatchObject({ seriesKey: 'run:0', share: { hbm: 0.6, host: 0.2 } });
+  });
+  it.each(['', '&recipe=unknown'])(
+    'uses the dashboard default for missing or stale recipe keys (%s)',
+    async (suffix) => {
+      mocks.benchmarks.mockImplementation(() => Response.json(rows));
+      const response = await cache(req('cache-reuse', query + suffix));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.recipe).toBe(original);
+      expect(
+        body.data.bars.map((bar: { point: { sourceRow: BenchmarkRow } }) => bar.point.sourceRow.id),
+      ).toEqual([1, 2]);
+    },
+  );
 });

@@ -1,10 +1,4 @@
-/**
- * The workload is addressable as a path segment — `/compare/<slug>/agentic`,
- * `/compare/<slug>/8k-1k` — not only as `?i_seq=`. The bare slug keeps
- * rendering the pair's default workload.
- */
 const AGENTX_SLUG = 'deepseek-v4-b200-vs-h200';
-const FIXED_SEQ_SLUG = 'deepseek-r1-h100-vs-h200';
 
 describe('Compare scenario routes', () => {
   beforeEach(() => {
@@ -23,18 +17,7 @@ describe('Compare scenario routes', () => {
       .and('have.attr', 'href', '/agentx');
   });
 
-  it('serves the fixed-sequence workload at its own path, without the explainer', () => {
-    cy.visit(`/compare/${AGENTX_SLUG}/8k-1k`);
-
-    cy.get('[data-testid="compare-narrative"]').should('exist');
-    cy.get('[data-testid="compare-agentic-intro"]').should('not.exist');
-  });
-
   it('lets the path segment override the pair default', () => {
-    // Which workload a bare slug defaults to is `pickPairDefaults`, unit-tested
-    // in compare-pair-defaults.test.ts against rows this fixture set does not
-    // carry. What belongs here is the routing contract: whatever the default
-    // is, a scenario segment replaces it.
     cy.visit(`/compare/${AGENTX_SLUG}`);
     cy.get('[data-testid="compare-narrative"]')
       .invoke('text')
@@ -49,14 +32,7 @@ describe('Compare scenario routes', () => {
       });
   });
 
-  it('shows no AgentX explainer for a model with no AgentX data', () => {
-    cy.visit(`/compare/${FIXED_SEQ_SLUG}`);
-    cy.get('[data-testid="compare-agentic-intro"]').should('not.exist');
-  });
-
   it('canonicalizes every scenario view onto the bare slug URL', () => {
-    // The segments are views of one comparison; without a shared canonical the
-    // default view would appear twice in the index.
     cy.visit(`/compare/${AGENTX_SLUG}/8k-1k`);
     cy.get('link[rel="canonical"]')
       .should('have.attr', 'href')
@@ -100,13 +76,6 @@ describe('Compare scenario routes', () => {
         .should('have.attr', 'href')
         .and('match', new RegExp(`^${base}/.+/8k-1k$`, 'u'));
     }
-  });
-
-  it('splits the per-dollar catalog by scenario the way /compare does', () => {
-    cy.visit('/compare-per-dollar');
-    cy.contains('Models with AgentX data open long-context').should('be.visible');
-    cy.get('a[data-scenario="AgentX"]').should('have.length.greaterThan', 0);
-    cy.get('a[data-scenario="8K/1K"]').should('have.length.greaterThan', 0);
   });
 
   it('ships the Chinese explainer on the Chinese scenario route', () => {

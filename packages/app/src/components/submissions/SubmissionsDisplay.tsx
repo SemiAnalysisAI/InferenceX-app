@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -10,10 +10,10 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { exportToCsv } from '@/lib/csv-export';
-import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';
@@ -133,7 +133,6 @@ export default function SubmissionsDisplay() {
 
   return (
     <div data-testid="submissions-display" className="flex flex-col gap-4">
-      {/* Header */}
       <section>
         <Card>
           <DashboardSectionHeader
@@ -144,7 +143,6 @@ export default function SubmissionsDisplay() {
         </Card>
       </section>
 
-      {/* Stats summary */}
       {stats && (
         <section>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -171,7 +169,6 @@ export default function SubmissionsDisplay() {
         </section>
       )}
 
-      {/* Activity chart */}
       <section>
         <figure className="relative rounded-lg">
           <ChartButtons
@@ -218,7 +215,6 @@ export default function SubmissionsDisplay() {
         </figure>
       </section>
 
-      {/* Submissions table */}
       <section>
         <Card>
           <div className="mb-4">

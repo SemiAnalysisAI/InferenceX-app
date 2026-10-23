@@ -1,23 +1,8 @@
-/**
- * Pure logic for the trace flamegraph: overlap detection, deep-link resolution,
- * visible-row construction, and bracket-lane layout. No React/DOM — everything
- * here is unit-testable directly. Rendering lives in trace-flamegraph.tsx.
- */
-
 import type { StructureNode } from '@/hooks/api/use-datasets';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
-// Kept distinct from token-segment colors. A row can carry multiple rails when
-// it overlaps different requests during different parts of its lifetime.
 export const OVERLAP_COLORS = ['#06b6d4', '#ec4899', '#6366f1', '#84cc16', '#f97316'] as const;
 
-// Cap on simultaneously-drawn bracket lanes. A pathological conversation (e.g. a
-// long-running session whose subagent fans out into hundreds of children with
-// 15+ concurrent requests) can require dozens of lanes; left unbounded the
-// gutter grows wide enough to push the bars off-screen AND emits one DOM node
-// per lane per row (tens of thousands of empty divs). We bound it: lanes beyond
-// the cap fold into the last "dense" lane, which stays readable for the common
-// case (≤6 concurrent) and degrades gracefully for the outliers.
 export const MAX_LANES = 6;
 
 export interface TimedRequest {
@@ -33,13 +18,6 @@ export interface RequestOverlapGroup {
   endS: number;
 }
 
-/**
- * Find maximal sets of requests that were simultaneously in flight.
- * Intervals are half-open, so one request ending exactly when another begins
- * is serialized rather than parallel. Maximal-set filtering prevents a nested
- * A/B pair from duplicating an A/B/C marker, while preserving A/B and B/C as
- * separate groups when their overlaps happen at different times.
- */
 export function findRequestOverlapGroups(
   requests: TimedRequest[],
   scopeKey = 'scope',
@@ -117,7 +95,6 @@ export interface VisibleRow {
   overlaps: RowOverlap[];
 }
 
-/** Format seconds from conversation start as a compact elapsed timestamp. */
 export function formatElapsedTime(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
   const hours = Math.floor(total / 3600);
@@ -128,7 +105,6 @@ export function formatElapsedTime(seconds: number): string {
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-/** Elapsed-interval label for a row ("+MM:SS–MM:SS"), or undefined when untimed. */
 export function timeLabel(startS?: number, endS?: number): string | undefined {
   if (startS === undefined || !Number.isFinite(startS)) return undefined;
   const start = formatElapsedTime(startS);
@@ -148,21 +124,6 @@ export interface DeepLinkTarget {
   expandGroup: number | null;
 }
 
-/**
- * Resolve a request-timeline deep link to a flamegraph row key (+ the subagent
- * group that must be expanded to show it). Raw Weka source coordinates are
- * exact and take precedence:
- *   raw=<outer>             -> top-level Weka request
- *   raw=<outer>&inner=<idx> -> subagent child inside that top-level marker
- * Otherwise main turns match by main-turn ordinal and subagent turns match the
- * group by agentId, then the ti-th child.
- *
- * `buildConversationStructure` emits exactly one node per raw Weka entry (and
- * one child per nested entry), so a node's array position IS its raw index.
- * Structures ingested before rawIndex/innerIndex were stored omit the explicit
- * fields — fall back to the array position so deep links keep resolving against
- * those older rows instead of silently doing nothing.
- */
 export function resolveDeepLinkTarget(
   nodes: readonly StructureNode[],
   highlight: DeepLinkHighlight,
@@ -203,10 +164,6 @@ export function resolveDeepLinkTarget(
   return null;
 }
 
-/**
- * Overlap groups per row key. Main-agent turns and each subagent's children are
- * separate scopes — parallelism is only meaningful within one agent's stream.
- */
 export function buildRowOverlaps(nodes: readonly StructureNode[]): Map<string, RowOverlap[]> {
   const mainGroups = findRequestOverlapGroups(
     nodes.flatMap((node, i) =>
@@ -243,12 +200,6 @@ export function buildRowOverlaps(nodes: readonly StructureNode[]): Map<string, R
   return byRow;
 }
 
-/**
- * Flatten structure nodes into the rows currently visible: one row per main
- * turn, one header per subagent group, plus indented children for expanded
- * groups. Row keys (`t-<i>`, `g-<i>`, `g-<i>-c-<ci>`) index by node position so
- * they stay stable across expand/collapse.
- */
 export function buildVisibleRows(
   nodes: readonly StructureNode[],
   expanded: ReadonlySet<number>,
@@ -334,19 +285,9 @@ export interface BraceSeg {
 export interface BraceLayout {
   laneCount: number;
   overflowLanes: number;
-  /** Per visible row: only the lanes that actually carry a bracket segment. */
   rowSegs: { lane: number; seg: BraceSeg }[][];
 }
 
-/**
- * Geometry for the parallel-group brackets drawn in the left gutter. Each
- * overlap group becomes a vertical bracket spanning from its first to its last
- * visible member row, with a right-pointing tick on the exact member rows.
- * Non-transitive chains (a row in two groups) get separate lanes so their
- * brackets sit side by side. `through` = a row inside a group's span that is
- * NOT itself a member (the aux-stream edge case) — drawn as a faint connector
- * with no tick.
- */
 export function computeBraceLayout(rows: readonly VisibleRow[]): BraceLayout {
   const groupMap = new Map<
     string,
@@ -367,7 +308,7 @@ export function computeBraceLayout(rows: readonly VisibleRow[]): BraceLayout {
     }
   });
   const groups = [...groupMap.values()]
-    .filter((g) => g.idxs.length >= 2) // need ≥2 visible members to bracket
+    .filter((g) => g.idxs.length >= 2)
     .map((g) => ({
       ...g,
       min: Math.min(...g.idxs),
@@ -376,8 +317,6 @@ export function computeBraceLayout(rows: readonly VisibleRow[]): BraceLayout {
     }))
     .toSorted((a, b) => a.min - b.min || a.max - b.max);
 
-  // Greedy lane assignment: a group reuses a lane whose previous group ended
-  // before this one starts.
   const laneEnd: number[] = [];
   const laneOf = new Map<string, number>();
   for (const g of groups) {
@@ -391,16 +330,9 @@ export function computeBraceLayout(rows: readonly VisibleRow[]): BraceLayout {
     laneOf.set(g.id, lane);
   }
   const rawLaneCount = laneEnd.length;
-  // Bound the gutter (see MAX_LANES). Lanes past the cap collapse onto the last
-  // visible lane, so every parallel row still carries a marker but the gutter
-  // width and DOM-node count stay bounded regardless of how parallel the
-  // conversation is.
   const laneCount = Math.min(rawLaneCount, MAX_LANES);
   const displayLane = (lane: number) => Math.min(lane, laneCount - 1);
 
-  // Sparse per-row segments: only lanes that actually carry a bracket on a row
-  // are stored (and later rendered). The previous dense matrix emitted one DOM
-  // node per lane per row — catastrophic at 49 lanes × 2k rows.
   const rowSegs: { lane: number; seg: BraceSeg }[][] = rows.map(() => []);
   for (const g of groups) {
     const lane = displayLane(laneOf.get(g.id)!);
@@ -419,8 +351,6 @@ export function computeBraceLayout(rows: readonly VisibleRow[]): BraceLayout {
       };
       const cell = rowSegs[idx]!;
       const existing = cell.find((c) => c.lane === lane);
-      // Collisions only happen in the folded overflow lane. Prefer a real
-      // member marker over a faint pass-through connector.
       if (!existing) cell.push({ lane, seg });
       else if (seg.isMember && !existing.seg.isMember) existing.seg = seg;
     }

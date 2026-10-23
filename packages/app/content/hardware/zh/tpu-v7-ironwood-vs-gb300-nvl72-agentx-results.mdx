@@ -1,0 +1,208 @@
+---
+title: 'TPU v7（Ironwood）对比 GB300 NVL72：AgentX 结果'
+seoDescription: 'TPU v7（Ironwood）对比 GB300 NVL72 的 AgentX 结果：Qwen3.5 FP8 按外部 TCO 计算，每 1 美元 TCO 的 token 数最高约为 GB300 NVL72 的 5.7 倍；GB300 NVL72 FP4 在每个匹配点上领先。'
+date: '2026-10-19'
+publishDate: '2026-10-19'
+lede: '在 Qwen3.5-397B 上，200 tok/s/user 时，按外部 TCO 计算，TPU v7 FP8 每 1 美元 TCO 产出的 token 数是 GB300 NVL72 FP8 的 **1.85 倍**，按内部 TCO 计算为 2.17 倍。使用 Dynamo TensorRT-LLM 的 GB300 NVL72 FP4 在两种 TCO 口径下的每个匹配点上都领先。在 Kimi K3 上，按外部 TCO 计算 GB300 NVL72 领先，按内部 TCO 计算 TPU v7 在约 53 到 149 tok/s/user 区间领先。'
+links:
+  - label: '查看 AgentX 仪表板'
+    href: 'https://inferencex.semianalysis.com/inference?g_model=Qwen-3.5-397B-A17B&i_seq=agentic-traces&i_xmode=interactivity&i_metric=y_tokensPerDollarH'
+  - label: '阅读测试方法'
+    href: '/zh/agentx/methodology'
+tags:
+  - agentx
+  - agentic
+  - benchmark
+  - inference
+  - google
+  - tpu
+  - tpuv7
+  - ironwood
+  - gb300
+  - nvl72
+  - qwen
+  - kimi
+  - vllm
+---
+
+## 汇总
+
+| 对比                                      | tok/s/user | TPU / GB300 每美元（外部 / 内部） | TPU / GB300 每 MW | 最大 TPU / GB300 每美元比值（外部 / 内部，tok/s/user） |
+| ----------------------------------------- | ---------: | --------------------------------: | ----------------: | -----------------------------------------------------: |
+| Qwen3.5-397B，FP8 对比 FP8 Dynamo SGLang  |        200 |                     1.85x / 2.17x |             1.70x |                            约 5.7x / 约 6.7x（约 559） |
+| Qwen3.5-397B，FP8 对比 FP4 Dynamo TRT-LLM |        200 |                     0.54x / 0.64x |             0.50x |                          约 0.75x / 约 0.88x（约 360） |
+| Kimi K3，FP4 对比 FP4 Dynamo vLLM         |        100 |                     0.97x / 1.15x |             0.90x |                          约 0.98x / 约 1.15x（约 100） |
+
+## 测试方法
+
+TPU v7 目前在两个模型上有 AgentX 结果，即 Qwen3.5-397B 和 Kimi K3，仪表板上将其标为 TPU7x。横轴是 p90 交互性（1 / p90 token 间延迟），单位为 tok/s/user。相同交互性下的对比数值沿各系统的 Pareto 前沿插值得到，不做外推。吞吐量同时计入输入 token（包括 KV cache 命中的部分）和输出 token。一颗 TPU v7 芯片会向框架暴露两个设备，但仍按一颗芯片计算，因此双方的吞吐量都按单颗物理芯片计。
+
+每美元 token 数是仪表板的默认指标，统计每 1 美元 TCO 所服务的总 token 数（输入和输出）。成本采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中按超大规模云大批量采购计算的自持成本：GB300 NVL72 为每 GPU 每小时 $2.31，TPU v7 则有两个数值。外部数值为每芯片每小时 $1.21，是 Google 以外买家的自持成本。若以 3 年期承诺向 Google Cloud 租用，则为每芯片每小时 $2.00。仪表板默认采用每芯片每小时 $1.03，即 Google 自己持有并运营这颗芯片的成本。表格以“外部（$1.21）/ 内部（$1.03）”的形式同时列出两者。两种口径中只有 TPU v7 的成本不同，因此 GB300 NVL72 和其他 GPU 在两种口径下的每美元 token 数相同。图表采用仪表板默认值，因此按外部成本计算，TPU v7 的每个数据点都比图中低 15%。
+
+每 MW 指标采用 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中的单芯片全口径规划功率，TPU v7 为 1.207 kW，GB300 NVL72 为 2.12 kW，均为已部署系统的规划数值。一颗 TPU v7 芯片的规划功率是 GB300 GPU 的 57%，每小时成本按外部成本计算是其 52%，按内部成本计算是其 45%，因此每美元比值比每 MW 比值按外部成本计算高 9%，按内部成本计算高 28%。
+
+我们的 [Vera Rubin NVL72 结果](/zh/hardware/vera-rubin-nvl72-vs-gb300-nvl72-agentx-results)介绍了 AgentX 工作负载。
+
+图表实时加载仪表板数据，可能包含比文中表格和数字更新的测试运行。
+
+## 规格
+
+| 单芯片规格                   |                    TPU v7 (Ironwood) | Blackwell Ultra (GB300 NVL72) |   TPU v7 / BU |
+| ---------------------------- | -----------------------------------: | ----------------------------: | ------------: |
+| HBM 容量                     |                     192 GiB (206 GB) |   288 GB HBM3E（可用 278 GB） |         0.72x |
+| HBM 带宽                     |                            7.38 TB/s |                        8 TB/s |         0.92x |
+| 稠密 FP4 算力                |                               不支持 |                    15 PFLOP/s |        不适用 |
+| 稠密 FP8 算力                |                         4.61 PFLOP/s |                     5 PFLOP/s |         0.92x |
+| 稠密 BF16 算力               |                         2.31 PFLOP/s |                   2.5 PFLOP/s |         0.92x |
+| 单芯片 scale-up 带宽（单向） |                       600 GB/s (ICI) |           900 GB/s (NVLink 5) |         0.67x |
+| Scale-up 域                  | 3D torus，每个 pod 最多 9,216 颗芯片 |      72 颗 GPU，交换式 NVLink |        不适用 |
+| 自持 TCO（外部 / 内部）      |                 每小时 $1.21 / $1.03 |                  每小时 $2.31 | 0.52x / 0.45x |
+| 单芯片全口径功率（规划值）   |                             1.207 kW |                       2.12 kW |         0.57x |
+
+TPU v7 的数值来自 Google Cloud 的 [TPU7x 文档](https://docs.cloud.google.com/tpu/docs/tpu7x)，文档给出的芯片间互连（ICI）带宽为每芯片双向合计 1,200 GB/s。Blackwell Ultra 的数值来自 [InferenceX GPU 规格页](/zh/gpu-specs)。
+
+在完全受带宽限制的 decode 步骤中，TPU v7 每美元优势的上限等于 HBM 带宽之比除以每小时成本之比，按外部成本计算为 0.92x / 0.52x ≈ 1.8x，按内部成本计算约为 2 倍。在 200、300 和 400 tok/s/user 处，Qwen3.5 表格中两种口径的每美元比值都超过了这一上限，原因是 GB300 NVL72 的 FP8 曲线在该区间比 TPU v7 下降得更快，而且存在覆盖空缺。在略高于 200 tok/s/user、TPU v7 前沿从 22 个 agent 降到 18 个 agent 的位置，该比值按外部成本计算降到约 1.6 倍，按内部成本计算降到约 1.9 倍。
+
+## Qwen3.5-397B FP8
+
+按外部成本计算，TPU v7 从约 103 tok/s/user 起每 1 美元 TCO 产出的 token 数多于 GB300 NVL72 FP8；按内部成本计算则在每个匹配点上都更多，最小领先幅度为 0.3%，出现在其曲线低端的 81.5 tok/s/user 处。按每 MW 计算，它在约 117 tok/s/user 之前落后，按单芯片计算则在约 270 tok/s/user 之前落后。从 100 到 200 tok/s/user，GB300 NVL72 的 FP8 吞吐量下降 54%，而 TPU v7 下降 14%。
+
+Qwen3.5-397B-A17B 总参数 397B、激活参数 17B，每一层门控全注意力层配有三层 Gated DeltaNet 线性注意力层（[模型卡](https://huggingface.co/Qwen/Qwen3.5-397B-A17B)；另见[模型页面](/zh/model/qwen-3-5)）。TPU v7 在单台 4 芯片主机上以聚合式部署运行 vLLM，使用 FP8 和 MTP，并从 12 个 agent 起把 KV cache offload 到主机内存。GB300 NVL72 在 4 到 32 颗 GPU 上运行 Dynamo SGLang，使用 FP8 和 MTP，大多采用分离式部署。
+
+下图展示两套系统在 Qwen3.5-397B 上每 1 美元 TCO 的总 token 数，除 FP8 外也包含 GB300 NVL72 的 FP4 曲线：
+
+<HardwareChart
+  model="Qwen-3.5-397B-A17B"
+  a="tpuv7"
+  b="gb300"
+  metric="y_tokensPerDollarH"
+  precisions="fp8,fp4"
+/>
+
+可以看到，GB300 NVL72 的 FP8 前沿在 192 tok/s/user（180 个 agent）与 450 tok/s/user（44 个 agent）之间没有实测点，因此下表中它在 300 和 400 tok/s/user 处的数值是跨过这段空缺插值得到的。若直接在这两个点之间连直线，GB300 NVL72 在 300 tok/s/user 时约为 26,700 tok/s/GPU，TPU v7 在该点按外部成本计算的每美元领先幅度将是 1.81 倍，而不是 2.02 倍，按内部成本计算将是 2.12 倍，而不是 2.37 倍。
+
+数值为每 1 美元 TCO 的 M token 数，比值为 TPU v7 / GB300 NVL72 FP8（Dynamo SGLang）。
+
+| tok/s/user | TPU v7（外部 / 内部） |    GB300 | 每美元（外部 / 内部） |     每 MW |
+| ---------: | --------------------: | -------: | --------------------: | --------: |
+|        100 |         119.0 / 139.8 |    121.2 |         0.98x / 1.15x |     0.90x |
+|        150 |         110.9 / 130.3 |     88.6 |         1.25x / 1.47x |     1.15x |
+|    **200** |     **102.4 / 120.3** | **55.5** |     **1.85x / 2.17x** | **1.70x** |
+|        300 |           75.2 / 88.3 |     37.2 |         2.02x / 2.37x |     1.86x |
+|        400 |           60.1 / 70.6 |     26.8 |         2.24x / 2.63x |     2.06x |
+
+TPU v7 相对 GB300 NVL72 FP8 的最大比值出现在约 559 tok/s/user，即 TPU v7 曲线顶端的 4 个 agent 数据点：按外部成本计算，每美元 token 数为后者的 5.67 倍，按内部成本计算为 6.66 倍，每 MW token 数为 5.22 倍。在 450 tok/s/user 以上，GB300 NVL72 的 FP8 前沿从 44 个 agent 降到单个 agent 的数据点，分别位于 510 tok/s/user（4 颗 GPU）和 581 tok/s/user（8 颗 GPU），按外部成本计算的领先幅度也从 2.24 倍增至 5.67 倍。在约 559 tok/s/user 处，使用 Dynamo TensorRT-LLM 的 GB300 NVL72 FP4 每 1 美元 TCO 产出的 token 数按外部成本计算是 TPU v7 的 1.56 倍，按内部成本计算为 1.33 倍；其前沿在此处位于 402 tok/s/user（45 个 agent）与 571 tok/s/user（136 个 agent）两个数据点之间。
+
+峰值吞吐量方面，GB300 NVL72 FP8 采用 32 GPU 分离式配置，在 1,000 个 agent 下达到 101,367 tok/s/GPU，对应 68 tok/s/user，即每美元 158.0M token（两种口径相同）。TPU v7 的峰值为 40,363 tok/s/chip，对应 81 tok/s/user，由单台主机在 32 个 agent 下取得，按外部成本计算为每美元 120.1M token，按内部成本计算为每美元 141.1M token。TPU v7 的峰值每美元 token 数按外部成本计算为 GB300 NVL72 峰值的 0.76 倍，按内部成本计算为 0.89 倍，峰值单芯片吞吐量为其 0.40 倍，每 MW 为 0.70 倍。在 32 个 agent 时，TPU v7 服务端的前缀缓存命中率为 88.8%，理论值为 96.4%，HBM 中的 KV cache 占用率为 93%。在整条前沿上，TPU v7 的 p90 首 token 延迟（TTFT）保持在 0.35 s 到 0.59 s 之间。
+
+我们的 [TPU 推理外部化一文](/zh/blog/tpu-inferencex-full-steam)曾报告，在 8k/1k 工作负载上，三者均采用聚合式 FP8 部署、TPU 按外部 TCO 计算时，TPU v7 的每美元性能比 B200 和 B300 最高高出 50%。在 AgentX 这一不同的工作负载上，按外部成本计算，TPU v7 在 150 tok/s/user 时的每美元 token 数是 B200 Dynamo SGLang（该处每美元表现最好的 B200 或 B300 FP8 曲线）的 1.80 倍，在 200 时为 2.34 倍；按 Google 内部成本计算，分别为 2.12 倍和 2.75 倍。按单芯片计算，TPU v7 在 150 tok/s/user 时的吞吐量是 B300 SGLang 的 1.24 倍，在 200 时是 B300 Dynamo SGLang 的 1.62 倍，二者分别是该点最强的 B200 或 B300 FP8 曲线。
+
+### 对比 GB300 NVL72 FP4
+
+Ironwood 没有原生 FP4 计算能力。我们在 [LinkedIn 帖子](https://www.linkedin.com/posts/semianalysis_alert-nvidia-has-been-working-overtime-activity-7517993267301625856-mtxG)中评论 NVIDIA 首次作为回应提交的 GB300 FP4 结果时写道，它“对外部客户而言，在端到端性能曲线的大部分区间上，每美元性能比 TPUv7 差 1.64 倍”。该帖子的图表以端到端延迟为横轴。以本文采用的 p90 交互性为横轴，在 150 到 400 tok/s/user 区间，使用 Dynamo TensorRT-LLM 的 GB300 NVL72 FP4 每 1 美元 TCO 产出的 token 数按外部成本计算是 TPU v7 FP8 的 1.34 到 2.15 倍，按内部成本计算为 1.14 到 1.83 倍，每 MW token 数为 1.5 到 2.3 倍。按每 MW 计算，它在每个匹配点上都领先。
+
+GB300 NVL72 FP4 Dynamo TensorRT-LLM 曲线上吞吐量最高的点高于 100 tok/s/user，因此下表从 150 开始。数值为每 1 美元 TCO 的 M token 数，比值为 GB300 NVL72 FP4 / TPU v7 FP8。
+
+| tok/s/user | TPU v7（外部 / 内部） |     GB300 | GB300 / TPU 每美元（外部 / 内部） | GB300 / TPU 每 MW |
+| ---------: | --------------------: | --------: | --------------------------------: | ----------------: |
+|        150 |         110.9 / 130.3 |     217.2 |                     1.96x / 1.67x |             2.13x |
+|    **200** |     **102.4 / 120.3** | **188.1** |                 **1.84x / 1.56x** |         **2.00x** |
+|        300 |           75.2 / 88.3 |     137.0 |                     1.82x / 1.55x |             1.98x |
+|        400 |           60.1 / 70.6 |      84.3 |                     1.40x / 1.19x |             1.52x |
+
+与 GB300 NVL72 的 Dynamo SGLang FP4 曲线相比，按外部成本计算，TPU v7 FP8 在约 215 tok/s/user 以上的每美元 token 数更多，按 Google 内部成本计算则在约 160 以上更多，每 MW 吞吐量则在约 230 以上更多。
+
+端到端延迟包含首 token 延迟。以 p90 端到端延迟为横轴时，TPU v7 的 Qwen3.5 前沿覆盖 3.4 s 到 11.1 s。在这一范围内，GB300 NVL72 FP4 Dynamo TensorRT-LLM 前沿上的每个点，按外部成本计算每 1 美元 TCO 产出的 token 数都少于 TPU v7 某个延迟更低的点。TensorRT-LLM 曲线上吞吐量最高的两个点分别对应 565 和 704 个 agent，其 p90 首 token 延迟为 5.6 s 和 8.1 s，p90 端到端延迟为 11.9 s 和 21.6 s。在 p90 交互性横轴上，这两个点位于 253 和 119 tok/s/user，处在 TPU v7 的覆盖范围之内。
+
+## Kimi K3
+
+TPU v7 在 Kimi K3 上的最大比值是按 Google 内部成本计算的每美元 1.15 倍，出现在约 100 tok/s/user 处。GB300 NVL72 的前沿在此处位于两个 48 个 agent 的分离式配置之间（分别使用 24 颗和 32 颗 GPU），TPU v7 的前沿则位于其 32 个和 16 个 agent 的数据点之间。按内部成本计算，TPU v7 在约 230 到 290 tok/s/user 区间也领先，最多领先 4%，两条曲线在此区间都较稀疏；在其余匹配点上，按内部成本计算 GB300 NVL72 最多领先 1.34 倍。在整个匹配区间内，按外部成本计算，GB300 NVL72 的每美元 token 数是 TPU v7 的 1.03 到 1.58 倍，每 MW token 数则为其 1.1 到 1.7 倍。
+
+Kimi K3 总参数 2.8T、激活参数 104B，93 层中有 69 层采用 Kimi Delta Attention，其余各层采用 Gated MLA（[模型卡](https://huggingface.co/moonshotai/Kimi-K3/blob/main/README.md)；另见[模型页面](/zh/model/kimi-k3)）。它发布时即采用 MXFP4 权重和 MXFP8 激活，与两套系统运行记录中的 FP4 标签相符。TPU v7 在 32 颗芯片上运行 vLLM，包含一个 16 芯片 prefill worker 和一个 16 芯片 decode worker，KV offload 到主机内存，并使用 vLLM 的 router。GB300 NVL72 在 8 到 32 颗 GPU 上运行 Dynamo vLLM。
+
+下图展示两套系统在 Kimi K3 上每 1 美元 TCO 的总 token 数：
+
+<HardwareChart model="Kimi-K3" a="tpuv7" b="gb300" metric="y_tokensPerDollarH" />
+
+可以看到，GB300 NVL72 的前沿在 106 tok/s/user（48 个 agent）与 210 tok/s/user（4 个 agent）之间没有数据点，因此下表中它在 150 和 200 tok/s/user 处的数值是跨过这段空缺插值得到的。
+
+数值为每 1 美元 TCO 的 M token 数，比值为 TPU v7 / GB300 NVL72（Dynamo vLLM）。
+
+| tok/s/user | TPU v7（外部 / 内部） |     GB300 | 每美元（外部 / 内部） |     每 MW |
+| ---------: | --------------------: | --------: | --------------------: | --------: |
+|         30 |         19.49 / 22.90 |     30.25 |         0.64x / 0.76x |     0.59x |
+|         50 |         19.15 / 22.49 |     23.75 |         0.81x / 0.95x |     0.74x |
+|         80 |         16.22 / 19.05 |     17.06 |         0.95x / 1.12x |     0.87x |
+|    **100** |     **13.87 / 16.29** | **14.23** |     **0.97x / 1.15x** | **0.90x** |
+|        150 |           8.15 / 9.57 |      9.65 |         0.84x / 0.99x |     0.78x |
+|        200 |           4.65 / 5.46 |      6.82 |         0.68x / 0.80x |     0.63x |
+
+峰值吞吐量方面，GB300 NVL72 采用 8 GPU 聚合式配置，在 56 个 agent 下达到 20,143 tok/s/GPU，即每美元 31.4M token（两种口径相同）。TPU v7 在 72 个 agent 下为 6,567 tok/s/chip，按外部成本计算为每美元 19.5M token，按内部成本计算为每美元 23.0M token。TPU v7 的峰值每美元 token 数按外部成本计算为前者的 0.62 倍，按内部成本计算为 0.73 倍，峰值单芯片吞吐量为其 0.33 倍，每 MW 为 0.57 倍。在 32 到 72 个 agent 之间，TPU v7 的 p90 首 token 延迟为 4.7 s 到 6.3 s。其 72 个 agent 的数据点未启用 MTP，前沿上的其他数据点均启用 MTP。
+
+在 80 到 100 tok/s/user 区间，按外部自持成本计算，TPU v7 的每美元 token 数是 B200 和 B300 的 2.15 到 2.26 倍，是表现最好的 MI355X 曲线的 0.91 到 1.07 倍。按 Google 内部成本计算，TPU v7 相对 B200 和 B300 的比值为 2.5 到 2.7 倍，相对表现最好的 MI355X 曲线为 1.07 到 1.25 倍。
+
+## 几点说明
+
+第一，在 Qwen3.5 上，TPU v7 由单台聚合式 4 芯片主机提供服务，而 GB300 NVL72 最多使用 32 颗分离式部署的 GPU。第二，在 Kimi K3 上，以及在 Qwen3.5 的约 103 tok/s/user 以下，哪一方的每美元 token 数更多，会随外部自持成本和 Google 内部成本这两种口径而变化。第三，GB300 NVL72 在 Qwen3.5 FP8 上 192 到 450 tok/s/user 之间、在 Kimi K3 上 106 到 210 tok/s/user 之间都没有前沿数据点，落在这些空缺内的匹配值都是插值得到的。第四，AgentX 不评估模型回答质量，因此 FP4 与 FP8 之间的准确率差异不在这些结果的范围内。第五，每 MW 数值采用全口径功率的规划数值，没有使用这些运行中实测的功率。第六，推理引擎不同：TPU v7 运行基于 Google TPU 后端的 vLLM，GB300 NVL72 在 Qwen3.5 FP8 和 FP4 上运行 Dynamo SGLang，在 Qwen3.5 FP4 上运行 Dynamo TensorRT-LLM，在 Kimi K3 上运行 Dynamo vLLM。第七，仪表板将 TPU7x 结果标注为官方预览，随着验证和发布工作的推进，数据可能会调整。
+
+## 配置
+
+|                   | Qwen3.5-397B             | Kimi K3                                   |
+| ----------------- | ------------------------ | ----------------------------------------- |
+| 推理服务栈        | vLLM                     | vLLM，搭配 vLLM router                    |
+| 精度              | FP8                      | FP4（MXFP4 权重，MXFP8 激活）             |
+| 投机解码          | MTP                      | MTP（72 个 agent 的数据点除外）           |
+| Prefill 与 decode | 聚合式，4 颗芯片上 TP8   | 分离式，16 芯片 prefill 和 16 芯片 decode |
+| KV cache offload  | 主机内存，12 个 agent 起 | 主机内存                                  |
+| 每个配置的芯片数  | 4                        | 32                                        |
+
+## 下一步
+
+TPU v7 目前还没有 Qwen3.5 的多主机或分离式 AgentX 配置，其单主机曲线止于 32 个 agent。DeepSeek-V4-Pro、GLM-5.2 和 MiniMax-M3 目前还没有 TPU v7 的 AgentX 结果。TPU 8i 是 Google 首款专用于推理的 TPU，新增了 Ironwood 所没有的原生 FP4 支持。
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "在 agentic 推理上，TPU v7 Ironwood 与 GB300 NVL72 相比表现如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "根据 InferenceX AgentX 结果，在双方均使用 FP8 的 Qwen3.5-397B 上，按外部自持成本计算，TPU v7 在 100 tok/s/user 时每美元产出的总 token 数为 GB300 NVL72 的 0.98 倍，在 200 tok/s/user 时为 1.85 倍，按 Google 内部成本计算分别为 1.15 倍和 2.17 倍。按单芯片计算分别为 0.51 倍和 0.97 倍，按每 MW 计算分别为 0.90 倍和 1.70 倍。在 Kimi K3 上，按外部自持成本计算，GB300 NVL72 在每个匹配点上的每美元 token 数都领先，TPU v7 为其 0.63 到 0.98 倍，按峰值吞吐量比较为 0.62 倍。按 Google 内部成本计算，TPU v7 为其 0.74 到 1.15 倍，按峰值吞吐量比较为 0.73 倍。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么在 Qwen3.5 上，TPU v7 单芯片落后于 GB300 NVL72，但每美元却领先（按外部成本约 103 tok/s/user 起，按内部成本在每个匹配点上）？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "按外部口径，一颗 TPU v7 芯片每小时的自持成本为 $1.21，一颗 GB300 NVL72 GPU 为 $2.31，因此只要 TPU v7 的单芯片吞吐量超过 GB300 NVL72 的 0.52 倍，其每美元 token 数就会领先。这一转折发生在约 103 tok/s/user，因为从 100 到 200 tok/s/user，GB300 NVL72 的 FP8 吞吐量下降 54%，而 TPU v7 下降 14%。按 Google 每小时 $1.03 的内部成本计算，门槛为 0.45 倍，TPU v7 在每个匹配点上都超过了这一门槛。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "与运行 FP4 的 GB300 NVL72 相比，TPU v7 表现如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Ironwood 没有原生 FP4 计算能力。在 Qwen3.5 上按相同 p90 交互性比较，在 150 到 400 tok/s/user 之间，按外部自持成本计算，使用 Dynamo TensorRT-LLM 的 GB300 NVL72 FP4 每美元 token 数是 TPU v7 FP8 的 1.34 到 2.15 倍，按 Google 内部成本计算为 1.14 到 1.83 倍，每 MW 吞吐量则是其 1.5 到 2.3 倍。以 p90 端到端延迟为横轴时，在 3.4 s 到 11.1 s 之间，GB300 NVL72 FP4 Dynamo TensorRT-LLM 前沿上的每个点，按外部成本计算的每美元 token 数都少于 TPU v7 某个延迟更低的点。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TPU v7 每美元产出的 token 比 GB300 NVL72 更多吗？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 Qwen3.5 FP8、约 103 tok/s/user 及以上时，按外部自持成本计算是的，按 Google 内部成本计算则在每个匹配点上都是。在 150 到 450 tok/s/user 区间，TPU v7 的每美元 token 数按外部自持成本计算是 GB300 NVL72 的 1.25 到 2.24 倍，按 Google 内部成本计算是 1.47 到 2.63 倍，两种口径下更高交互性时差距都更大，在约 559 tok/s/user 处分别达到 5.67 倍和 6.66 倍，此时 GB300 NVL72 的 FP8 前沿只服务单个 agent。在 Kimi K3 上，按外部自持成本计算，GB300 NVL72 在每个匹配点上的每美元 token 数都更多，在约 53 到 149 tok/s/user 区间，TPU v7 的每美元 token 数比它少 2.5% 到 15%。按 Google 内部成本计算，TPU v7 在该区间的每美元 token 数更多（在 80 到 100 tok/s/user 处多 12% 到 15%），在约 230 到 290 tok/s/user 的窄区间也是如此。在其余区间，两种口径下都是 GB300 NVL72 的每美元 token 数更多。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "哪些内容目前尚未覆盖？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TPU v7 目前还没有 Qwen3.5 的多主机或分离式 AgentX 配置，也没有 DeepSeek-V4-Pro、GLM-5.2 和 MiniMax-M3 的 AgentX 结果。此外，每 MW 数值采用 SemiAnalysis Datacenter Industry Model 中的全口径规划功率。"
+      }
+    }
+  ]
+}`}</JsonLd>

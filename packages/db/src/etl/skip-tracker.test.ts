@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createSkipTracker } from './skip-tracker';
+import { DB_WRITE_KINDS, createSkipTracker } from './skip-tracker';
 
 describe('createSkipTracker', () => {
   it('initializes with zeroed counters', () => {
@@ -38,18 +38,65 @@ describe('createSkipTracker', () => {
 describe('recordDbError', () => {
   it('increments dbError counter', () => {
     const tracker = createSkipTracker();
-    tracker.recordDbError('test context', new Error('test error'));
+    tracker.recordDbError('benchmark', 'a.json', new Error('test error'));
     expect(tracker.skips.dbError).toBe(1);
-    tracker.recordDbError('test context 2', new Error('test error 2'));
+    tracker.recordDbError('benchmark', 'b.json', new Error('test error 2'));
     expect(tracker.skips.dbError).toBe(2);
   });
 
   it('continues counting after MAX_DB_ERRORS (10) without throwing', () => {
     const tracker = createSkipTracker();
     for (let i = 0; i < 15; i++) {
-      tracker.recordDbError(`context ${i}`, new Error(`error ${i}`));
+      tracker.recordDbError('benchmark', `context ${i}`, new Error(`error ${i}`));
     }
     expect(tracker.skips.dbError).toBe(15);
+    expect(tracker.dbWriteErrors).toHaveLength(15);
+  });
+
+  it('keeps kind, subject, message and SQLSTATE', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError(
+      'server_logs',
+      'qwen3.5_conc12288',
+      Object.assign(new Error('write CONNECTION_CLOSED'), { code: 'CONNECTION_CLOSED' }),
+    );
+    tracker.recordDbError(
+      'config',
+      'result.json',
+      Object.assign(new Error('duplicate key'), { code: '23505' }),
+    );
+    expect(tracker.dbWriteErrors).toEqual([
+      {
+        kind: 'server_logs',
+        subject: 'qwen3.5_conc12288',
+        message: 'write CONNECTION_CLOSED',
+        code: 'CONNECTION_CLOSED',
+      },
+      { kind: 'config', subject: 'result.json', message: 'duplicate key', code: '23505' },
+    ]);
+  });
+
+  it('omits code when the error has none, and reads it from the cause', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'glm5 conc 64', new Error('Authentication timed out'));
+    tracker.recordDbError(
+      'benchmark',
+      'b.json',
+      new Error('batch failed', { cause: Object.assign(new Error('x'), { code: '57014' }) }),
+    );
+    tracker.recordDbError('changelog', 'a..b', 'plain string failure');
+    expect(tracker.dbWriteErrors).toEqual([
+      { kind: 'trace_replay', subject: 'glm5 conc 64', message: 'Authentication timed out' },
+      { kind: 'benchmark', subject: 'b.json', message: 'batch failed', code: '57014' },
+      { kind: 'changelog', subject: 'a..b', message: 'plain string failure' },
+    ]);
+  });
+
+  it('bounds very long messages', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('benchmark', 'big.json', new Error('x'.repeat(10_000)));
+    expect(tracker.dbWriteErrors[0]!.message.length).toBeLessThan(2100);
+    expect(tracker.dbWriteErrors[0]!.message).toMatch(/\(truncated\)$/u);
   });
 });
 
@@ -93,7 +140,6 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Simulate processing more rows
     tracker.skips.unmappedModel += 3;
     tracker.skips.unmappedHw += 2;
     tracker.skips.noIslOsl += 1;
@@ -127,12 +173,59 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Add the same ones again — they should not appear as new
     tracker.unmappedModels.add('old');
     tracker.unmappedHws.add('old-hw');
 
     const d = tracker.diff(snap);
     expect(d.newModels).toEqual([]);
     expect(d.newHws).toEqual([]);
+  });
+});
+
+const jsonbLimit = () =>
+  Object.assign(
+    new Error('total size of jsonb array elements exceeds the maximum of 268435455 bytes'),
+    { code: '54000' },
+  );
+
+describe('database write warning rules', () => {
+  it('fails ingestion when trace storage still exceeds a Postgres size limit', () => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'dsv41flash conc 4096', jsonbLimit());
+    expect(tracker.skips.dbError).toBe(1);
+    expect(tracker.dbWriteWarnings).toEqual([]);
+    expect(tracker.dbWriteErrors).toEqual([
+      {
+        kind: 'trace_replay',
+        subject: 'dsv41flash conc 4096',
+        message: 'total size of jsonb array elements exceeds the maximum of 268435455 bytes',
+        code: '54000',
+      },
+    ]);
+  });
+
+  it.each(DB_WRITE_KINDS.filter((kind) => kind !== 'trace_replay'))(
+    'keeps 54000 on %s an error',
+    (kind) => {
+      const tracker = createSkipTracker();
+      tracker.recordDbError(kind, 'subject', jsonbLimit());
+      expect(tracker.skips.dbError).toBe(1);
+      expect(tracker.dbWriteErrors).toHaveLength(1);
+      expect(tracker.dbWriteWarnings).toEqual([]);
+    },
+  );
+
+  it.each([
+    [
+      'client code',
+      Object.assign(new Error('write CONNECTION_CLOSED'), { code: 'CONNECTION_CLOSED' }),
+    ],
+    ['no code', new Error('Authentication timed out')],
+    ['other SQLSTATE', Object.assign(new Error('statement timeout'), { code: '57014' })],
+  ])('keeps other trace_replay failures errors (%s)', (_label, err) => {
+    const tracker = createSkipTracker();
+    tracker.recordDbError('trace_replay', 'glm5 conc 64', err);
+    expect(tracker.skips.dbError).toBe(1);
+    expect(tracker.dbWriteWarnings).toEqual([]);
   });
 });

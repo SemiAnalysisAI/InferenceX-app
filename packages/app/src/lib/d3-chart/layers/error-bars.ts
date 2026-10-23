@@ -9,7 +9,6 @@ export interface ErrorBarConfig<T> {
   strokeWidth?: number;
 }
 
-/** Render vertical error bars (line + caps) with enter/update/exit. */
 export function renderErrorBars<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -18,7 +17,6 @@ export function renderErrorBars<T>(
   const selection = group.selectAll<SVGGElement, T>('.error-bar').data(data);
   const sw = config.strokeWidth ?? 1;
 
-  // Enter: create group + 3 lines
   const entered = selection.enter().append('g').attr('class', 'error-bar');
   entered
     .append('line')
@@ -40,7 +38,6 @@ export function renderErrorBars<T>(
 
   const merged = entered.merge(selection);
 
-  // Update all: positions + stroke
   merged
     .select('.eb-stem')
     .attr('x1', (d) => config.getCx(d))
@@ -68,7 +65,6 @@ export function renderErrorBars<T>(
   return merged;
 }
 
-/** Update error bar positions on zoom. */
 export function updateErrorBarsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   config: ErrorBarConfig<T>,

@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: GPL-3.0-only
+
+import { Provenance } from '../../../base';
+import {
+  OpticalScaleOutSwitch,
+  type OpticalScaleOutSwitchFields,
+  type OpticalSwitchSpec,
+} from './optical_switch';
+
+export const QM9700_BASELINE = new Provenance({
+  profile_id: 'qm9700-ndr-infiniband-switch',
+  version: '1',
+  source: 'User-specified QM9700 fabric; existing project Quantum power assumptions',
+  kind: 'estimated',
+  input_boundary: 'External switch AC power budget including switch-side optics; excludes PUE',
+  assumptions: [
+    'QM9700 NDR InfiniBand switch bandwidth is 25.6 Tbit/s, with 32 OSFP cages.',
+    'Reuses the project Quantum box budget of 600 W idle / 783 W active, excluding optics.',
+    'These state watts are a proxy, not QM9700 measurements or NVIDIA typical-load ratings.',
+    '32 always-powered 800G SR8 optics use the shared 15 W per-optic assumption.',
+    'Box power includes cooling and conversion; do not apply rack or HGX PSU models.',
+  ],
+});
+
+export class QM9700NDRInfiniBandSwitch extends OpticalScaleOutSwitch {
+  static override readonly typeName: string = 'QM9700NDRInfiniBandSwitch';
+  static override readonly spec: OpticalSwitchSpec = {
+    name: 'QM9700NDRInfiniBandSwitch',
+    bandwidth_tbps: 25.6,
+    idle_power_w: 600,
+    active_power_w: 783,
+    optics_count: 32,
+    box_name: 'QM9700 switch box',
+    protocol: 'NDR InfiniBand',
+    switch_provenance: QM9700_BASELINE,
+  };
+
+  constructor(fields: OpticalScaleOutSwitchFields = {}) {
+    super(QM9700NDRInfiniBandSwitch.spec, fields);
+  }
+}

@@ -11,7 +11,7 @@ Everything is driven by two sources of truth:
 
 | Artifact                                                         | Source of truth                                                                 |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Landing page, index card, sitemap, `llms.txt`, JSON-LD, metadata | one entry in `packages/app/src/lib/whitepapers.ts` (`WHITEPAPERS`)              |
+| Landing page, index card, sitemap, `llms.txt`, JSON-LD, metadata | one entry in `packages/app/src/lib/content/whitepapers.ts` (`WHITEPAPERS`)      |
 | PDF cover, pages, charts                                         | one spec JSON consumed by `pipeline/` (example: `examples/mi355x-kimi-k3.json`) |
 
 Both carry the same numbers, so compute the numbers once, write them to the spec, and copy them into the registry from there.
@@ -30,7 +30,7 @@ Ask for whichever of these are missing; do not invent them.
 
 Reproduce the number the estimator shows at `/profit-estimator-per-gigawatt`; the paper must match what a reader sees when they open the dashboard link.
 
-1. Pull the AgentX rows for the exact configuration with the `inferencex-data` skill (latest run per config, correct ISL/OSL/trace, P90 interactivity, tok/s/GPU, input/output split, cache hit rate, avg power).
+1. Pull the AgentX rows for the exact configuration with the `inferencex` skill (latest run per config, correct ISL/OSL/trace, P90 interactivity, tok/s/GPU, input/output split, cache hit rate, avg power).
 2. Interpolate the operating point on the upper-left Pareto frontier with the Steffen monotone cubic Hermite spline, never linear. Use `.claude/skills/write-inferencex-blog/iso_interactivity.py`; it is the Python port of `packages/app/src/components/calculator/profit-estimator.ts` and the chart code, and it refuses to extrapolate.
 3. Apply the estimator formulas (`profit-estimator.ts`):
    - GPU-hours per GW-year = 1,000,000 kW / all-in kW per GPU x 8,760 h (`gpuHoursPerGwYear`). All-in kW comes from the TCO model (2.09 kW for MI355X), not the board TDP.
@@ -74,7 +74,7 @@ NODE_PATH=$(npm root -g) node $SKILL/pipeline/render_pdf.js $OUT         # paper
 pdftoppm -r 60 -png $OUT/paper.pdf $OUT/pg                                # look at every page
 ```
 
-Dependencies: Python 3 with matplotlib, numpy, Pillow, scipy; Playwright (Chromium) on the global npm path; poppler for `pdftoppm`. DM Sans TTFs and the OFL notice are in `pipeline/fonts/`.
+Dependencies: Python 3 with matplotlib, numpy, Pillow, scipy; Playwright (Chromium) on the global npm path; poppler for `pdftoppm`. DM Sans TTFs are in `pipeline/fonts/`.
 
 Spec fields (`examples/mi355x-kimi-k3.json`):
 
@@ -116,7 +116,7 @@ Delete any asset a previous revision no longer references; `whitepapers.test.ts`
 
 ## Step 5: Register the paper
 
-Add one object to `WHITEPAPERS` in `packages/app/src/lib/whitepapers.ts`. The type doc comments describe every field; the important ones:
+Add one object to `WHITEPAPERS` in `packages/app/src/lib/content/whitepapers.ts`. The `Whitepaper` interface defines every field; the important ones:
 
 - `slug` (URL-safe, unique), `publishedDate`, `dataDate` (benchmark snapshot), `pageCount` (content pages, cover excluded), `tags`.
 - `pdfPath`, `coverImagePath` (also `heroImagePath`; used by the sitemap and JSON-LD image), `chipImagePath` with `chipImageWidth`/`chipImageHeight` from `cutout.py`.
@@ -139,13 +139,13 @@ Design rules for any change to these components: site tokens only (`--background
 
 Update or extend, never delete:
 
-- `packages/app/src/lib/whitepapers.test.ts`: unique slugs, asset paths exist, en/zh parity (same array lengths for findings, kpis, method, assumptions, sources, figures), headline numbers for the new paper, metadata and JSON-LD per locale.
+- `packages/app/src/lib/content/whitepapers.test.ts`: unique slugs, asset paths exist, en/zh parity (same array lengths for findings, kpis, method, assumptions, sources, figures), headline numbers for the new paper, metadata and JSON-LD per locale.
 - `packages/app/src/components/whitepaper/whitepaper-content.test.tsx`: KPI tiles, figure cards, sidebar, index card render from the registry.
-- `packages/app/src/app/sitemap.test.ts` and `src/lib/i18n.test.ts` if a route or mirrored path changes.
+- `packages/app/src/app/sitemap.test.ts` and `src/lib/i18n/i18n.test.ts` if a route or mirrored path changes.
 
 ```bash
 PATH=$HOME/.bun/bin:$PATH bun run lint && bun run check:typography && bunx oxfmt --check
-cd packages/app && bunx vitest run src/lib/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n.test.ts
+cd packages/app && bunx vitest run src/lib/content/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n/i18n.test.ts
 bunx tsc --noEmit -p tsconfig.json 2>&1 | rg -i whitepaper   # must print nothing
 ```
 

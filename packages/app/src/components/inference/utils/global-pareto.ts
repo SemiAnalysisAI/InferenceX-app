@@ -1,11 +1,9 @@
-export interface ParetoCoordinate {
-  x: number;
-  y: number;
-}
+import type { ParetoCoordinate } from '@/lib/charts/pareto-frontier';
+
+export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/charts/pareto-frontier';
 
 const coordinates = (point: ParetoCoordinate) => `${point.x},${point.y}`;
 
-/** Fill only beyond this boundary toward its own preferred (or worst) corner. */
 export function paretoHighlightArea(
   points: readonly ParetoCoordinate[],
   cornerX: number,
@@ -22,32 +20,6 @@ export function paretoHighlightArea(
   return `M${polygon.map(coordinates).join('L')}Z`;
 }
 
-/** Global, non-dominated observations. Never mutate the chart's bound data. */
-export function globalParetoFrontier<T extends ParetoCoordinate>(
-  points: readonly T[],
-  maximizeX: boolean,
-  maximizeY: boolean,
-): T[] {
-  const xSign = maximizeX ? -1 : 1;
-  const ySign = maximizeY ? -1 : 1;
-  const sorted = points
-    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
-    .toSorted((a, b) => xSign * (a.x - b.x) || ySign * (a.y - b.y));
-  let bestY = Infinity;
-  return sorted
-    .filter((point) => {
-      const score = ySign * point.y;
-      if (score >= bestY) return false;
-      bestY = score;
-      return true;
-    })
-    .toSorted((a, b) => a.x - b.x);
-}
-
-/**
- * Connect observed boundary points without extending to plot edges or filling
- * a region. Segments are linear in rendered coordinates, including log axes.
- */
 export function paretoHighlightGeometry(
   frontier: readonly ParetoCoordinate[],
   xScale: (value: number) => number,

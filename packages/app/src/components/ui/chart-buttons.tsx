@@ -1,59 +1,31 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { useChartExport } from '@/hooks/useChartExport';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 interface ChartButtonsProps {
-  /** Unique chart ID for export targeting */
   chartId: string;
-  /** Analytics event prefix (e.g., 'latency', 'interactivity', 'gpu_timeseries', 'reliability', 'evaluation') */
   analyticsPrefix: string;
-  /** Optional custom zoom reset event name (defaults to `${analyticsPrefix}_zoom_reset_${chartId}`) */
   zoomResetEvent?: string;
-  /** Optional setter to temporarily expand legend during export */
   setIsLegendExpanded?: (expanded: boolean) => void;
-  /** Omit the legend from PNG exports when series are labeled in the plot. */
   hideLegendOnExport?: boolean;
-  /** Hide the zoom reset button (e.g., for charts without zoom) */
   hideZoomReset?: boolean;
-  /** Hide the PNG image export button (e.g., for table views) */
   hideImageExport?: boolean;
-  /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
-  /** Optional callback to open the MP4 export preview (e.g., replay modal) */
   onExportMp4?: () => void;
-  /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
-  /**
-   * Optional controls rendered before export/reset buttons, such as a view toggle.
-   * They wrap with the actions and inherit this wrapper's no-export behavior.
-   */
   leadingControls?: ReactNode;
-  /** Optional container class override for positioning/layout variants. */
   className?: string;
-  /**
-   * Actions are visible at every width by default. An explicit opt-out remains for
-   * callers that supply an equivalent narrow-screen action surface elsewhere.
-   * The toolbar stays in normal flow so long captions are never covered.
-   */
   mobileVisible?: boolean;
 }
 
-/**
- * Reusable chart action buttons component that provides:
- * - Export to image button with analytics tracking (or dropdown with PNG/CSV when onExportCsv is provided)
- * - Reset zoom button with custom event dispatch
- *
- * Event pattern: `${analyticsPrefix}_zoom_reset_${chartId}`
- * This ensures each chart instance has its own zoom reset event.
- */
 export function ChartButtons({
   chartId,
   analyticsPrefix,
@@ -95,7 +67,6 @@ export function ChartButtons({
     exportFileName,
   });
   const [popoverOpen, setPopoverOpen] = useState(false);
-  // always include chartId in event name for consistency
   const resetEventName = zoomResetEvent || `${analyticsPrefix}_zoom_reset_${chartId}`;
 
   const handleExportPng = () => {

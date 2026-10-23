@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import type { InferenceData } from '@/components/inference/types';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   interpolateMetricAtInteractivity,
@@ -11,9 +11,10 @@ import {
   rowSupportsTrendMetric,
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
-
-// ─── Factory ───
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
+import interactivityCases from '../../../../../skills/test/fixtures/agentic-interactivity.json';
+import { agenticP90Interactivity } from '../../../../../skills/skills/inferencex-api/scripts/agentic-interactivity.mjs';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
 
 function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
@@ -71,6 +72,56 @@ function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToLightweightPoint', () => {
+  it('reads AgentX interactivity at P90 and fixed-sequence interactivity at the median', () => {
+    // The drifted artifact p90_intvty (99) must lose to 1/p90_itl, as on the AgentX charts.
+    const metrics = { tput_per_gpu: 400, median_intvty: 50, p90_intvty: 99, p90_itl: 0.05 };
+    const agentic = rowToLightweightPoint(
+      makeBenchmarkRow({ benchmark_type: 'agentic_traces', isl: null, osl: null, metrics }),
+      ['tpPerGpu'],
+    );
+    const fixed = rowToLightweightPoint(makeBenchmarkRow({ metrics }), ['tpPerGpu']);
+    expect(agentic?.x).toBeCloseTo(20);
+    expect(fixed?.x).toBe(50);
+  });
+
+  it.each(interactivityCases)('AgentX P90 parity: $name', (fixture) => {
+    const row = makeBenchmarkRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      metrics: {
+        tput_per_gpu: 400,
+        median_intvty: 70,
+        ...fixture.metrics,
+      } as unknown as BenchmarkRow['metrics'],
+    });
+    const point = rowToLightweightPoint(row, ['tpPerGpu']);
+    expect(point?.x ?? null).toBe(fixture.expected);
+    expect(agenticP90Interactivity(row.metrics)?.value ?? null).toBe(fixture.expected);
+    if (point) expect(point.x).toBe(rowToAggDataEntry(row).p90_intvty);
+  });
+
+  it.each([NaN, Infinity, -Infinity, Number.MIN_VALUE])(
+    'omits invalid AgentX P90 latency %s',
+    (latency) => {
+      expect(
+        rowToLightweightPoint(
+          makeBenchmarkRow({
+            benchmark_type: 'agentic_traces',
+            metrics: { tput_per_gpu: 400, p90_full_response_itl: latency, median_intvty: 70 },
+          }),
+          ['tpPerGpu'],
+        ),
+      ).toBeNull();
+    },
+  );
+
+  it('keeps single-turn median interactivity even when P90 fields disagree', () => {
+    const row = makeBenchmarkRow({
+      metrics: { tput_per_gpu: 400, median_intvty: 70, p90_itl: 0.025, p90_intvty: 999 },
+    });
+    expect(rowToLightweightPoint(row, ['tpPerGpu'])?.x).toBe(70);
+  });
   it('uses the selected TPU cost basis for historical cost and tokens per dollar', () => {
     const row = makeBenchmarkRow({ hardware: 'tpuv7', framework: 'vllm' });
     const metrics = ['costhOutput', 'outputTokensPerDollarH', 'tpPerMw'] as const;
@@ -226,8 +277,6 @@ describe('rowSupportsTrendMetric', () => {
   });
 });
 
-// ─── Tests ───
-
 describe('interpolateMetricAtInteractivity', () => {
   it('returns null for empty points', () => {
     expect(interpolateMetricAtInteractivity([], 100, 'tpPerGpu')).toBeNull();
@@ -306,8 +355,6 @@ describe('interpolateMetricAtInteractivity', () => {
       }),
     ];
 
-    // The total-throughput frontier drops x=40, while the output-throughput
-    // frontier keeps x=40 and drops x=20. The midpoint must follow the latter.
     expect(interpolateMetricAtInteractivity(points, 50, 'outputTokensPerDollarH')).toBeCloseTo(
       581_250,
       0,
@@ -364,7 +411,7 @@ describe('interpolateMetricAtInteractivity', () => {
   it('filters dominated points via Pareto front', () => {
     const points = [
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),
-      makePoint({ x: 30, tpPerGpu: { y: 300, roof: false } }), // dominated
+      makePoint({ x: 30, tpPerGpu: { y: 300, roof: false } }),
       makePoint({ x: 60, tpPerGpu: { y: 400, roof: false } }),
     ];
     const result = interpolateMetricAtInteractivity(points, 40, 'tpPerGpu');
@@ -449,9 +496,6 @@ describe('interpolateMetricAtInteractivity', () => {
       makePoint({ x: 20, tpPerGpu: { y: 800, roof: false } }),
       makePoint({ x: 40, tpPerGpu: { y: 600, roof: false } }),
     ];
-    // jOutput is not set on these points. Returning 0 would render a flat
-    // zero-line that looks like real data (the bug F4 fixed); return null
-    // so the trend chart can show a gap instead.
     const result = interpolateMetricAtInteractivity(points, 30, 'jOutput');
     expect(result).toBeNull();
   });

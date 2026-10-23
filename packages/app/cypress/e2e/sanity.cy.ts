@@ -1,15 +1,4 @@
-// Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
-// to reduce per-file Cypress startup overhead (~500ms per file)
-
 describe('Page Load & Navigation', () => {
-  before(() => {
-    cy.visit('/');
-  });
-
-  it('page loads with correct title', () => {
-    cy.title().should('contain', 'InferenceX');
-  });
-
   it('page renders without JavaScript errors', () => {
     const errors: string[] = [];
     const knownBrowserErrors = ['navigator.storage.persisted'];
@@ -19,20 +8,15 @@ describe('Page Load & Navigation', () => {
       if (!isKnown) {
         errors.push(err.message);
       }
-      return false; // prevent Cypress from failing the test
+      return false;
     });
 
-    // Re-visit to capture errors from a fresh load
     cy.visit('/');
     cy.get('[data-testid="header"]').should('exist');
     cy.get('[data-testid="footer"]').should('exist');
     cy.wrap(errors).should('have.length', 0);
-  });
 
-  it('page loads without 404 errors', () => {
-    cy.visit('/');
-    cy.get('[data-testid="header"]').should('exist');
-    cy.get('[data-testid="footer"]').should('exist');
+    cy.title().should('eq', 'AI Accelerator System Benchmark | AcceleratorX by SemiAnalysis');
   });
 
   it('navigates from the footer to the land acknowledgement page', () => {
@@ -66,6 +50,17 @@ describe('Page Load & Navigation', () => {
       },
     });
 
+    cy.get('[data-testid^="faq-copy-link-"]')
+      .should('have.length', 15)
+      .each(($button) => {
+        cy.wrap($button)
+          .should('be.visible')
+          .and('have.text', '')
+          .and('have.attr', 'title', 'Copy link')
+          .find('svg.lucide-link')
+          .should('be.visible');
+      });
+
     cy.get('#faq-normalized-interactivity')
       .should('be.visible')
       .within(() => {
@@ -92,26 +87,8 @@ describe('Page Load & Navigation', () => {
     );
     cy.location('hash').should('eq', '#faq-normalized-interactivity');
   });
-
-  it('shows a copy-link button for every FAQ question', () => {
-    cy.visit('/about');
-
-    cy.get('[data-testid^="faq-copy-link-"]')
-      .should('have.length', 15)
-      .each(($button) => {
-        cy.wrap($button)
-          .should('be.visible')
-          .and('have.text', '')
-          .and('have.attr', 'title', 'Copy link')
-          .find('svg.lucide-link')
-          .should('be.visible');
-      });
-  });
 });
 
-// Toggle visibility, click behavior, and aria-label are covered by
-// cypress/component/mode-toggle.cy.tsx. Only the reload-persistence test
-// requires a full page load (true e2e concern).
 describe('Splash text', () => {
   it('announces AgentX on the landing page in both light and dark mode', () => {
     cy.visit('/', {
@@ -123,8 +100,9 @@ describe('Splash text', () => {
     cy.get('html').should('not.have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
-    // Same splash after switching themes — it is no longer minecraft-only.
-    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -137,7 +115,9 @@ describe('Theme Toggle', () => {
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');
-    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

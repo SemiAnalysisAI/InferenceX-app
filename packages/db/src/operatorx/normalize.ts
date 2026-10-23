@@ -1,17 +1,9 @@
-/**
- * Raw OperatorX bundle -> the dataset the dashboard renders. Pure and source-agnostic:
- * the database and local-directory sources both hand this the same raw bundle.
- *
- * An unknown op type still produces rows (with generic labels) instead of failing the
- * run. Requested cases with no result row are reported as `missing`.
- */
 import { type OperatorXRawBundle, type OperatorXRunPlan, planFromManifest } from './bundle';
 import { opLabels, usefulFlops } from './describe';
 import { canonicalArgs } from './parallel';
 
 export type OperatorXStatus = 'ok' | 'unsupported' | 'error' | 'missing';
 
-/** Per-replay kernel timing structure from the profiler pass (timing runs only). */
 export interface OperatorXTimingShape {
   spanUs: number;
   busyUs: number;
@@ -20,19 +12,15 @@ export interface OperatorXTimingShape {
   streams: number;
 }
 
-/** A layer that runs a case: checkpoint id (`zai-org/GLM-5-FP8`) and module (`mlp`). */
 export interface OperatorXSource {
   model: string;
   role: string;
 }
 
-/** One requested (case, backend) and its outcome: the list-view row. Kept small. */
 export interface OperatorXResult {
-  /** Stable index within the dataset; the key for fetching the full detail. */
   index: number;
   testlist: string;
   opType: string;
-  /** Every layer that runs the case: its checkpoint and its role there. */
   sources: OperatorXSource[];
   backend: string;
   shard: string;
@@ -45,10 +33,8 @@ export interface OperatorXResult {
   latencyUs: number | null;
   tflops: number | null;
   cudaGraph: boolean | null;
-  /** The kernel implementation the backend reported choosing, when it did. */
   kernel: string | null;
   timing: OperatorXTimingShape | null;
-  /** Telemetry saw clock/power capping during the timed window. */
   capped: boolean | null;
 }
 
@@ -66,7 +52,6 @@ export interface OperatorXRunSummary {
   opTypes: string[];
   backends: string[];
   counts: Record<OperatorXStatus, number> & { requested: number };
-  /** Environment of the first result document: image, versions, host. */
   environment: Record<string, unknown> | null;
 }
 
@@ -75,7 +60,6 @@ export interface OperatorXDataset {
   results: OperatorXResult[];
 }
 
-/** Everything the sweep stored for one result, for the detail view. */
 export interface OperatorXResultDetail {
   result: OperatorXResult;
   metrics: Record<string, unknown>;
@@ -85,7 +69,6 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** Recursively key-sorted JSON, so equal args match regardless of key order. */
 export function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (isObj(value))
@@ -133,10 +116,6 @@ function timingShape(metrics: Obj): OperatorXTimingShape | null {
   };
 }
 
-/**
- * `sources` entries are `<org>/<model>/<role>`; checkpoint ids are `org/model` and roles
- * hold no `/`, so the role is what follows the last one.
- */
 function caseSources(sources: unknown): OperatorXSource[] {
   if (!Array.isArray(sources)) return [];
   return sources.flatMap((s) => {
@@ -164,7 +143,6 @@ function toStatus(v: unknown): OperatorXStatus {
 }
 
 interface Normalized extends OperatorXDataset {
-  /** Full per-result metrics, by result index (missing rows have none). */
   metrics: (Obj | null)[];
 }
 
@@ -235,7 +213,6 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
     }
   }
 
-  // requested (case, backend) pairs that produced no row
   const manifest = isObj(bundle.manifest) ? bundle.manifest : {};
   const cells = Array.isArray(manifest.include) ? manifest.include.filter(isObj) : [];
   const shardIds = new Set(bundle.shards.map((s) => s.id));

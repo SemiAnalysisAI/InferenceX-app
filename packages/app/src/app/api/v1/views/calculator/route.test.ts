@@ -25,8 +25,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
 
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
-vi.mock('@/lib/api-cache', () => ({
-  // Pass-through: the route's cachedQuery wrapper must not hide the query args.
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
@@ -34,9 +33,9 @@ vi.mock('@/lib/api-cache', () => ({
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import { buildGpuGroups } from '@/components/calculator/throughput-data';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { Percentile, Sequence } from '@/lib/catalog/data-mappings';
 
 import { GET } from './route';
 
@@ -82,7 +81,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** Two operating points bracketing the default 35 tok/s/user target. */
 const FIXTURE_ROWS: BenchmarkRow[] = [
   makeRow({ conc: 8 }),
   makeRow({
@@ -134,7 +132,7 @@ describe('GET /api/v1/views/calculator', () => {
     expect(body.params).toMatchObject({
       model: 'DeepSeek-V4-Pro',
       sequence: '1k/1k',
-      precisions: ['fp4'], // auto-resolved: only precision in the rows
+      precisions: ['fp4'],
       target: 35,
       mode: 'interactivity-to-throughput',
       costProvider: 'costh',
@@ -152,7 +150,6 @@ describe('GET /api/v1/views/calculator', () => {
     expect(entry.nearest.above).toMatchObject({ interactivity: 50, throughput: 900 });
     expect(entry.fleet).toBeUndefined();
 
-    // Parity: the exact pure pipeline the dashboard runs on these rows.
     const { grouped } = buildGpuGroups(toCalculatorBenchmarkRows(FIXTURE_ROWS, '1k/1k'), {
       sequence: Sequence.OneK_OneK,
       precisions: ['fp4'],
@@ -250,7 +247,6 @@ describe('GET /api/v1/views/calculator', () => {
     const [entry] = body.hardware;
     expect(entry.fleet).not.toBeNull();
     expect(entry.fleet.chips).toBeGreaterThan(0);
-    // The fleet streams the whole interpolated total rate.
     expect(entry.fleet.totalTokPerSec).toBeCloseTo(entry.fleet.chips * entry.value, 6);
     expect(entry.fleet.concurrentUsers).toBeGreaterThan(0);
   });
@@ -263,7 +259,6 @@ describe('GET /api/v1/views/calculator', () => {
     );
     const body = await response.json();
     const [entry] = body.hardware;
-    // 1200 tok/s/gpu sits between the 900 and 1500 measurements.
     expect(entry.value).toBeGreaterThan(30);
     expect(entry.value).toBeLessThan(50);
     expect(entry.clamped).toBe(false);
@@ -275,7 +270,6 @@ describe('GET /api/v1/views/calculator', () => {
     );
     const body = await response.json();
     expect(body.costCap).toHaveLength(1);
-    // A cap this loose never binds, so the config serves its full measured range.
     expect(body.costCap[0].maxInteractivity).toBe(50);
   });
 
