@@ -72,7 +72,7 @@ export const MODEL_PAGE_ZH = {
 } as const satisfies Record<string, ModelPageZhTranslation>;
 
 export function getLocalizedModelPage(slug: string, locale: Locale): ModelPage | null {
-  const page = getModelPage(slug);
+  const page = getModelPage(slug, locale);
   if (!page || locale === 'en') return page;
 
   const translation = MODEL_PAGE_ZH[slug as keyof typeof MODEL_PAGE_ZH];

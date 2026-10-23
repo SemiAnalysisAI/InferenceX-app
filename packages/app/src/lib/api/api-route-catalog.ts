@@ -46,6 +46,14 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/views/model-architectures/route.ts',
+    path: '/api/v1/views/model-architectures',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-model-architectures-view',
+    sourceSha256: 'f9bc4c6fd4f895f36695f969e2cdf3978a9751afcb3bdf55e3a64b2eb5ba6645',
+  },
+  {
     source: 'src/app/api/v1/views/cache-reuse/route.ts',
     path: '/api/v1/views/cache-reuse',
     method: 'GET',
@@ -1151,6 +1159,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/catalog/model-architectures.ts',
+    sourceSha256: '409e60f3bf44ec5461563634178aabdf85084e3b8c707fd648fde0abca74efda',
+    reviewArea: {
+      en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
+      zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',
+    },
+  },
+  {
     source: '../db/src/operatorx/visualization.ts',
     sourceSha256: '2b05d3af345fe795b4262e4408f587f2d3f125de0461b3c6c4ce6f3124409635',
     reviewArea: {
@@ -1463,7 +1479,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '291e1cc1bca965f658f31506ef0ab720fb8305e3cade52c8be6d83546fb81dc6',
+    sourceSha256: '00b11a56c38009ada23f4efbc7d378cdc6133377c7ede054230790acf2bf2742',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

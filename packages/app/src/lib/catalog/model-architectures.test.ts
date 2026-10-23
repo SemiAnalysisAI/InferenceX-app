@@ -361,7 +361,7 @@ describe('getModelArchitecture', () => {
     expect(expertRouterSummary(getModelArchitecture(Model.GptOss)!)).toBe('Top-4 of 128 routed');
   });
 
-  it('names K3’s FFN SiTU-GLU and leaves every other model on SwiGLU', () => {
+  it('distinguishes SiTU-GLU, modified SwiGLU and ordinary SwiGLU', () => {
     const k3 = getModelArchitecture(Model.Kimi_K3)!;
     expect(ffnVariantLabel(k3)).toBe('SiTU-GLU');
     expect(ffnGateActivationLabel(k3)).toBe('SiTU');
@@ -371,6 +371,10 @@ describe('getModelArchitecture', () => {
     expect(k3Ffn.leftPath[1]?.name).toBe('SiTU Activation');
     for (const arch of Object.values(MODEL_ARCHITECTURES)) {
       if (!arch || arch.model === Model.Kimi_K3) continue;
+      if (arch.ffnSwiGLUOAI) {
+        expect(ffnVariantLabel(arch)).toBe('SwiGLU-OAI');
+        continue;
+      }
       expect(ffnVariantLabel(arch), `ffn variant for ${arch.model}`).toBe('SwiGLU');
       expect(ffnGateActivationLabel(arch), `gate activation for ${arch.model}`).toBe('SiLU');
     }

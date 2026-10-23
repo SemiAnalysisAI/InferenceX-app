@@ -75,6 +75,14 @@ let container: HTMLDivElement;
 let root: Root;
 let observedWidth: number;
 let clientWidthSpy: { mockRestore: () => void };
+const resizeFrames = new Map<number, FrameRequestCallback>();
+let nextFrame = 0;
+
+function flushResizeFrames() {
+  const callbacks = [...resizeFrames.values()];
+  resizeFrames.clear();
+  act(() => callbacks.forEach((callback) => callback(0)));
+}
 
 function render(model: Model = Model.DeepSeek_R1) {
   act(() => root.render(<ModelArchitectureDiagram model={model} />));
@@ -95,6 +103,13 @@ beforeEach(() => {
   mocks.pathname.value = '/inference';
   ResizeObserverStub.instances = [];
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  resizeFrames.clear();
+  nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    resizeFrames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => resizeFrames.delete(id));
   clientWidthSpy = vi
     .spyOn(HTMLElement.prototype, 'clientWidth', 'get')
     .mockImplementation(() => observedWidth);
@@ -152,13 +167,37 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(ResizeObserverStub.instances).toHaveLength(1);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
 
     observedWidth = 460;
     act(() => ResizeObserverStub.instances[0].trigger());
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
 
     act(() => ResizeObserverStub.instances[0].trigger());
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces resize bursts outside observer delivery and cancels frames on unmount', () => {
+    render();
+    expand();
+    for (const width of [460, 440, 420]) {
+      observedWidth = width;
+      act(() => ResizeObserverStub.instances[0].trigger());
+    }
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(1);
+    expect(resizeFrames.size).toBe(1);
+    flushResizeFrames();
+    expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
+
+    observedWidth = 400;
+    act(() => ResizeObserverStub.instances[0].trigger());
+    act(() => root.render(null));
+    expect(resizeFrames.size).toBe(0);
+    flushResizeFrames();
     expect(mocks.renderDiagram).toHaveBeenCalledTimes(2);
   });
 
