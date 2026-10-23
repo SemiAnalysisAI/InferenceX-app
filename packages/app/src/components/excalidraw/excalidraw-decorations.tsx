@@ -3,16 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { useLocale } from '@/lib/i18n/use-locale';
-import {
-  bannerRect,
-  bannerUnderline,
-  docArrow,
-  docArrowHead,
-  docDiamond,
-  docEllipse,
-  docRect,
-  type SketchPath,
-} from './sketch-shapes';
+import { bannerRect, bannerUnderline, type SketchPath } from './sketch-shapes';
 
 function Sketch({ paths }: { paths: SketchPath[] }) {
   return paths.map((path, index) => (
@@ -77,19 +68,18 @@ export function ExcalidrawDecorations() {
 
   return (
     <div className="excalidraw-scene" data-testid="excalidraw-scene" aria-hidden="true">
-      <svg className="excalidraw-doodle excalidraw-doodle-rect" viewBox="0 0 140 80">
-        <Sketch paths={docRect} />
-      </svg>
-      <svg className="excalidraw-doodle excalidraw-doodle-arrow" viewBox="0 0 140 80">
-        <Sketch paths={docArrow} />
-        <Sketch paths={docArrowHead} />
-      </svg>
-      <svg className="excalidraw-doodle excalidraw-doodle-ellipse" viewBox="0 0 140 92">
-        <Sketch paths={docEllipse} />
-      </svg>
-      <svg className="excalidraw-doodle excalidraw-doodle-diamond" viewBox="0 0 120 104">
-        <Sketch paths={docDiamond} />
-      </svg>
+      <picture>
+        <source media="(max-width: 640px)" srcSet="/decorative/excalidraw/gpu-sketch-mobile.webp" />
+        <img
+          className="excalidraw-scene-image"
+          src="/decorative/excalidraw/gpu-sketch.webp"
+          alt=""
+          width={1536}
+          height={1024}
+          decoding="async"
+          draggable={false}
+        />
+      </picture>
     </div>
   );
 }

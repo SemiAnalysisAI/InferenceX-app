@@ -52,53 +52,24 @@
   background: rgba(105, 101, 219, 0.25);
 }
 
-/* Hand-drawn whiteboard doodles in the page margins (desktop only). */
+/* Full-page whiteboard sketch of GPU hardware, washed out behind the grid so content
+   stays readable. */
 .excalidraw-scene {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: -10;
   pointer-events: none;
   overflow: hidden;
 }
 
-.excalidraw-doodle {
+.excalidraw-scene-image {
   position: absolute;
-  display: none;
-  opacity: 0.55;
-}
-
-@media (min-width: 1600px) {
-  .excalidraw-doodle {
-    display: block;
-  }
-}
-
-.excalidraw-doodle-rect {
-  top: 22%;
-  left: 1.25rem;
-  width: 120px;
-  transform: rotate(-4deg);
-}
-
-.excalidraw-doodle-arrow {
-  top: calc(22% + 92px);
-  left: 3.5rem;
-  width: 96px;
-  transform: rotate(18deg);
-}
-
-.excalidraw-doodle-ellipse {
-  top: 58%;
-  right: 1.25rem;
-  width: 120px;
-  transform: rotate(6deg);
-}
-
-.excalidraw-doodle-diamond {
-  bottom: 8%;
-  left: 2rem;
-  width: 92px;
-  transform: rotate(-8deg);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.22;
 }
 
 /* Banner: a sketched frame around the wordmark, like a sticky title on the canvas. */
