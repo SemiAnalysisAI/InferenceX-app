@@ -502,6 +502,7 @@ describe('Completed architecture catalog', () => {
     ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
     ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
+    ['qwen-3-8-27b', 'Dense FFN'],
     ['glm-5-1', 'DSA: top-2048 tokens'],
     ['glm-5-3', 'IndexShare'],
     ['qwen-3-5', 'Gated DeltaNet'],
@@ -523,7 +524,12 @@ describe('Completed architecture catalog', () => {
     });
   }
 
-  for (const slug of ['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash']) {
+  for (const slug of [
+    'muse-spark-open',
+    'deepseek-v41-flash',
+    'minimax-m31-flash',
+    'qwen-3-8-27b',
+  ]) {
     it(`${slug} has a Chinese article and usable mobile diagram`, () => {
       cy.viewport(390, 844);
       cy.visit(`/zh/model/${slug}`, { onBeforeLoad: dismissStarModal });
@@ -556,6 +562,17 @@ describe('Completed architecture catalog', () => {
 });
 
 describe('Architecture arrow structure', () => {
+  it('keeps dense Qwen FFNs out of the MoE routing path', () => {
+    visitModelPage('qwen-3-8-27b');
+    cy.get('[data-testid="expand-altBlock0"]').click({ force: true });
+    cy.get('[data-testid="expand-altFFN0"]').click({ force: true });
+    cy.get('[data-testid="model-architecture-svg"]')
+      .should('contain.text', '17,408')
+      .and('contain.text', 'SiLU Activation')
+      .and('not.contain.text', 'MoE Router');
+    cy.get('[data-testid="expand-altExperts0"]').should('not.exist');
+  });
+
   for (const [locale, width] of [
     ['en', 390],
     ['zh', 390],
