@@ -455,3 +455,18 @@ is added: OperatorX remains a documented page-owned API.
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
 Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+
+### OperatorX compact reads
+
+OperatorX's page-owned comparison endpoint reads versioned per-run projections
+prepared atomically during ingestion. It returns the same cases, defaults,
+measurements, statuses, backend attribution, and revision-safe timeline references
+as the raw reader. Old or unbackfilled runs retain raw-reader fallback; partial
+storage reads are never cached. Profiling artifacts are fetched only for details.
+This changes storage and latency, not public selectors or numerical semantics;
+there is no additional public OpenAPI operation. See `docs/operatorx.md` for migration,
+read-role privileges, backfill, warming, and reproducible benchmark instructions.
+
+中文：OperatorX 的页面专属对比接口优先读取写入时生成的精简记录，保留原有用例、默认值、
+测量值、状态、backend 和时间线来源。旧运行可回退至原始读取路径；部分读取失败的响应
+不会缓存。此改动优化存储读取和延迟，不改变公开筛选条件或计算，也不新增公开 OpenAPI 接口。

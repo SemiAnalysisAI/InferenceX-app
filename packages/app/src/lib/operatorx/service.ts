@@ -1,9 +1,10 @@
+import {
+  buildRunComparison,
+  mergeRunComparisons,
+} from '@semianalysisai/inferencex-db/operatorx/comparison-cache';
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
-  buildComparison,
-  comparisonCaseKey,
   type Comparison,
-  type ComparisonInput,
   type ComparisonOp,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import {
@@ -48,6 +49,11 @@ async function normalized(runId: string): Promise<Normalized> {
   const runs = await listRuns();
   const run = runs.find((r) => r.run_id === runId);
   if (!run) throw new OperatorXSourceError('Run not found', 404);
+  return normalizedRun(run);
+}
+
+function normalizedRun(run: OperatorXRunRef): Promise<Normalized> {
+  const runId = run.run_id;
   const key = `${runId}:${revisionOf(run)}`;
   const hit = datasets.get(key);
   if (hit) {
@@ -95,47 +101,29 @@ function comparisonRuns(op: ComparisonOp, listed: OperatorXRunRef[]): OperatorXR
 }
 
 async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Comparison> {
-  const selected = new Map<
-    string,
-    { runner: string; run: Normalized['run']; result: Normalized['results'][number] }
-  >();
+  const comparisons: Comparison[] = [];
   let failedReads = 0;
   const source = getOperatorXSource();
   for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
     const batch = runs.slice(i, i + COMPARISON_READ_BATCH);
     const loaded = await Promise.allSettled(
-      batch.map((run) => source.getBundle(run.run_id).then(normalizeBundle)),
+      batch.map(async (run) => {
+        const compact = await source.getRunComparison?.(run.run_id, op);
+        if (compact) return compact;
+        // Legacy/local sources retain the same normalizer and source indices.
+        // Reuse revision-keyed normalization rather than loading raw artifacts twice.
+        const dataset = await normalizedRun(run);
+        return buildRunComparison(op, { runner: run.plan!.runner, dataset });
+      }),
     );
-    for (const [j, outcome] of loaded.entries()) {
-      if (outcome.status === 'rejected') {
-        failedReads++;
-        continue;
-      }
-      const { run: summary, results } = outcome.value;
-      const runner = batch[j].plan!.runner;
-      for (const result of results) {
-        const key = comparisonCaseKey(op, runner, result);
-        if (key === null) continue;
-        const previous = selected.get(key);
-        if (!previous || (previous.result.status === 'missing' && result.status !== 'missing')) {
-          selected.set(key, { runner, run: summary, result });
-        }
-      }
+    for (const outcome of loaded) {
+      if (outcome.status === 'rejected') failedReads++;
+      else comparisons.push(outcome.value);
     }
   }
-  if (selected.size === 0 && failedReads > 0)
+  const comparison = mergeRunComparisons(op, comparisons);
+  if (comparison.rows.length === 0 && failedReads > 0)
     throw new OperatorXSourceError('OperatorX run documents could not be read', 503);
-
-  const byRun = new Map<string, ComparisonInput>();
-  for (const { runner, run, result } of selected.values()) {
-    let input = byRun.get(run.runId);
-    if (!input) {
-      input = { runner, dataset: { run, results: [] } };
-      byRun.set(run.runId, input);
-    }
-    input.dataset.results.push(result);
-  }
-  const comparison = buildComparison(op, [...byRun.values()]);
   if (failedReads > 0) partial.add(comparison);
   return comparison;
 }

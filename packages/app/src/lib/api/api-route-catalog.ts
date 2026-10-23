@@ -1167,6 +1167,30 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/operatorx/service.ts',
+    sourceSha256: 'badad7d973aa82fb1997abf9657ece63cbbb43b91f5f7511ad3d2d41852d75c8',
+    reviewArea: {
+      en: 'OperatorX compact comparison reads, revision cache reuse, raw fallback and partial-read cache exclusion.',
+      zh: 'OperatorX 精简对比读取、revision 缓存复用、原始数据回退及部分读取失败时不缓存的规则。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/comparison-cache.ts',
+    sourceSha256: '44a287013f711bf90e1d8db39493aebc7042d5aa6f28e5f13cad37840dcfd345',
+    reviewArea: {
+      en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
+      zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',
+    },
+  },
+  {
+    source: '../db/src/queries/operatorx.ts',
+    sourceSha256: '8ea807bfd8031f3d7bb55064e218c8d3caf1e5e9dfb7d91ff654cbb11d610fb4',
+    reviewArea: {
+      en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
+      zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
+    },
+  },
+  {
     source: '../db/src/operatorx/hardware.ts',
     sourceSha256: 'acc8180f8e64c04c7a62072379e8262434764d5438796f2590704734d691aa1e',
     reviewArea: {

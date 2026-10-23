@@ -1,3 +1,5 @@
+import type { TransactionSql } from 'postgres';
+
 import type { DbClient } from '../connection.js';
 import type { Sql } from '../etl/db-utils';
 import {
@@ -6,6 +8,8 @@ import {
   planFromManifest,
 } from '../operatorx/bundle';
 import { normalizeBundle } from '../operatorx/normalize';
+import type { Comparison, ComparisonOp } from '../operatorx/compare';
+import { buildRunComparison, OPERATORX_COMPARISON_VERSION } from '../operatorx/comparison-cache';
 
 const DOCS_INSERT_CHUNK = 20;
 
@@ -59,17 +63,83 @@ export function runSummary(bundle: OperatorXRawBundle): OperatorXRunRef {
   return { ...bundle.run, plan: planFromManifest(bundle.manifest) ?? undefined };
 }
 
+/** Older databases and unbackfilled revisions continue through the raw reader. */
+export async function getOperatorXRunComparison(
+  sql: DbClient,
+  runKey: string,
+  op: ComparisonOp,
+): Promise<Comparison | null> {
+  try {
+    const rows = await sql`
+      SELECT c.comparison
+      FROM opx_runs r
+      JOIN opx_run_comparisons c ON c.run_id = r.id
+      WHERE r.run_key = ${runKey} AND c.op = ${op}
+        AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
+    `;
+    return rows.length > 0 ? (rows[0].comparison as Comparison) : null;
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01')
+      return null;
+    throw error;
+  }
+}
+
+async function writeRunComparisons(
+  tx: TransactionSql,
+  dataset: ReturnType<typeof normalizeBundle>,
+  runner: string,
+  revision: string,
+): Promise<void> {
+  dataset.run.revision = revision;
+  for (const op of ['gemm', 'moe'] as const) {
+    const comparison = buildRunComparison(op, { runner, dataset });
+    await tx`
+      INSERT INTO opx_run_comparisons (run_id, op, format_version, comparison)
+      VALUES (${revision}, ${op}, ${OPERATORX_COMPARISON_VERSION},
+              ${JSON.stringify(comparison)}::jsonb)
+      ON CONFLICT (run_id, op) DO UPDATE
+      SET format_version = EXCLUDED.format_version, comparison = EXCLUDED.comparison
+    `;
+  }
+}
+
+/** Backfill a captured revision without replacing its raw data or timeline identities. */
+export async function backfillOperatorXRunComparisons(
+  sql: Sql,
+  bundle: OperatorXRawBundle,
+): Promise<boolean> {
+  const revision = bundle.run.revision;
+  if (!revision) throw new Error('OperatorX comparison backfill requires a stored revision');
+  const dataset = normalizeBundle(bundle);
+  const plan = dataset.run.plan;
+  if (!plan) throw new Error(`Run ${bundle.run.run_id} has no manifest`);
+  return await sql.begin(async (tx) => {
+    // A concurrent re-ingest either wins before this lock (no match), or waits and
+    // cascades away this revision's projections when it replaces the raw run.
+    const current = await tx`
+      SELECT id FROM opx_runs
+      WHERE run_key = ${bundle.run.run_id} AND id = ${revision}
+      FOR UPDATE
+    `;
+    if (current.length === 0) return false;
+    await writeRunComparisons(tx, dataset, plan.runner, revision);
+    return true;
+  });
+}
+
 export async function saveOperatorXBundle(
   sql: Sql,
   bundle: OperatorXRawBundle,
 ): Promise<{ docs: number; results: number }> {
   const key = bundle.run.run_id;
   if (!RUN_KEY_RE.test(key)) throw new Error(`Invalid run key: ${key}`);
-  const { results } = normalizeBundle(bundle);
-  if (planFromManifest(bundle.manifest) === null) throw new Error(`Run ${key} has no manifest`);
+  const plan = planFromManifest(bundle.manifest);
+  if (plan === null) throw new Error(`Run ${key} has no manifest`);
   const summary = runSummary(bundle);
   const { run } = bundle;
   let docs = 0;
+  let results = 0;
   await sql.begin(async (tx) => {
     await tx`DELETE FROM opx_runs WHERE run_key = ${key}`;
     const [{ id }] = await tx`
@@ -90,6 +160,14 @@ export async function saveOperatorXBundle(
         docs += chunk.length;
       }
     }
+    // Use the authoritative reader's shard/doc order, timestamps and revision.
+    // Input artifact order can differ; projecting it would change tie winners and
+    // make resultIndex point at a different kernel timeline after persistence.
+    const stored = await getOperatorXBundle(tx as unknown as DbClient, key);
+    if (!stored) throw new Error(`Run ${key} disappeared during ingest`);
+    const dataset = normalizeBundle(stored);
+    results = dataset.results.length;
+    await writeRunComparisons(tx, dataset, plan.runner, String(id));
   });
-  return { docs, results: results.length };
+  return { docs, results };
 }
