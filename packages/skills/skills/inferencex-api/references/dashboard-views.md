@@ -152,7 +152,7 @@ which API selectors belong together.
 | View                            | Selection and calculation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare and powerFit panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                                           |
+| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare, powerFit and powerBreakdown panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                           |
 | `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                                                                                                                                                                                                                                                               |
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -310,8 +310,8 @@ TTFT/E2E use recorded means. Default is median; absent means are not replaced.
 AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
 `params.xstat` and `xAxis.statistic`, not the requested parameter alone.
 
-Equal-service and matched-concurrency analysis are API-only. The dashboard keeps role and
-power-fit panels, but has no service-comparison control, source selector, target input or
+Equal-service and matched-concurrency analysis are API-only. The dashboard keeps role,
+power-fit and power-breakdown panels, but has no service-comparison control, source selector, target input or
 matched-concurrency table. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
 `serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
 
@@ -358,12 +358,23 @@ n, x-range, registry `tdpWatts` and point identities. Fewer than three distinct
 rates return `fit: null`, `reason: "too-few-points"`. Call `P₀` an extrapolated
 intercept, not idle power, and do not read the line outside its x-range.
 
+`powerBreakdown=true` returns `powerBreakdowns`: per hardware line (`hwKey|precision`,
+the chart legend grouping), each point's All in Measured W/GPU split into `gpu`
+(measured board power), `measuredCpu` (Grace sockets, NVL72 only, when socket telemetry
+is valid), and the modeled `server` parts, `fansPsu` (fans + conversion loss), `network`
+(scale-out share) and `facility` (PUE overhead). Each part is the deployment share ÷
+allocated GPUs, so the parts sum to `totalWattsPerGpu`. Only `gpu` and `measuredCpu` are
+measured; call the rest modeled at the point's measured GPU power under `modelRevision`.
+`tdpWattsPerGpu` and `allInProvisionedWattsPerGpu` are rated references, not Pareto power
+metrics. Points without validated GPU telemetry or a supported system model are omitted.
+
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
-同并发表格或分享参数。角色分析和功耗拟合面板仍在仪表板中提供，分别对应 `roleShare` 和
-`powerFit`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
+同并发表格或分享参数。角色分析、功耗拟合和系统功耗构成面板仍在仪表板中提供，分别对应 `roleShare`、
+`powerFit` 和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
+按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 
 Concurrency is not an `xmode`: GPU count varies across configurations, so
 concurrency alone is not comparable between them. Each point still reports its

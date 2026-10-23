@@ -274,13 +274,25 @@ const parameters: readonly ApiParameter[] = [
     example: 'true',
   },
   {
+    name: 'powerBreakdown',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), modeled server parts, fans + PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
+      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时）、建模的服务器部件、风扇 + 电源损耗、Scale-out 网络分摊以及 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
     name: 'format',
     location: 'query',
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare and powerFit analytical results require JSON and return 400 with CSV.',
-      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare 和 powerFit 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit and powerBreakdown analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit 和 powerBreakdown 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -597,6 +609,45 @@ const responseSchema = objectSchema(
         ),
       }),
     ),
+    powerBreakdowns: arraySchema(
+      objectSchema({
+        key: { type: 'string', description: 'hwKey|precision.' },
+        hwKey: { type: 'string' },
+        precision: { type: 'string' },
+        label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
+        categories: arraySchema({
+          type: 'string',
+          enum: ['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility'],
+        }),
+        tdpWattsPerGpu: nullableNumber('Rated board TDP per GPU (reference, not a measurement).'),
+        allInProvisionedWattsPerGpu: nullableNumber(
+          'Registry all-in provisioned W/GPU, PUE included (reference, not a measurement).',
+        ),
+        modelRevision: { type: 'string', description: 'Pinned power_model commit.' },
+        points: arraySchema(
+          objectSchema({
+            concurrency: integerSchema,
+            configLabel: { type: 'string', description: 'Date, topology and recipe of the point.' },
+            wattsPerGpu: objectSchema({
+              gpu: numberSchema,
+              measuredCpu: numberSchema,
+              server: numberSchema,
+              fansPsu: numberSchema,
+              network: numberSchema,
+              facility: numberSchema,
+            }),
+            totalWattsPerGpu: { ...numberSchema, description: 'All in Measured W/GPU.' },
+            pue: numberSchema,
+            cpuBasis: {
+              type: ['string', 'null'],
+              description: '`measured` or `modeled` Grace sockets on NVL72 trays; null otherwise.',
+            },
+            chassisBasis: { type: 'string', enum: ['full', 'extrapolated'] },
+            point: identitySchema,
+          }),
+        ),
+      }),
+    ),
     pricing: { type: ['object', 'null'], additionalProperties: true },
     comparisons: arraySchema({
       type: 'object',
@@ -641,6 +692,7 @@ const responseExample = {
     serviceTarget: null,
     roleShare: false,
     powerFit: false,
+    powerBreakdown: false,
   },
   metric: {
     key: 'tpPerGpu',

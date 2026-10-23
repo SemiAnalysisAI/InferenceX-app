@@ -20,6 +20,7 @@ import {
   type MatchedConcurrencySide,
   type MatchedConcurrencyTable,
 } from '@/components/inference/utils/matched-concurrency';
+import { buildPowerBreakdowns } from '@/components/inference/utils/power-breakdown';
 import { buildPowerFits } from '@/components/inference/utils/power-fit';
 import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
@@ -39,6 +40,7 @@ import {
   PERCENTILE_OPTIONS,
   Sequence,
 } from '@/lib/catalog/data-mappings';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
@@ -347,6 +349,7 @@ export function GET(request: NextRequest) {
     const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
     const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
     const powerFit = parseBoolParam(search.get('powerFit'), 'powerFit', false);
+    const powerBreakdown = parseBoolParam(search.get('powerBreakdown'), 'powerBreakdown', false);
     const requestedServiceBaseline = search.get('serviceBaseline');
     const requestedServiceComparator = search.get('serviceComparator');
     const serviceTarget = search.has('serviceTarget')
@@ -354,10 +357,10 @@ export function GET(request: NextRequest) {
       : null;
     if (serviceTarget !== null && serviceTarget <= 0)
       throw new ViewsApiParamError('serviceTarget', 'serviceTarget must be positive');
-    if (format === 'csv' && (serviceCompare || roleShare || powerFit))
+    if (format === 'csv' && (serviceCompare || roleShare || powerFit || powerBreakdown))
       throw new ViewsApiParamError(
         'format',
-        'Equal-service, role-share and power-fit panels require format=json',
+        'Equal-service, role-share, power-fit and power-breakdown panels require format=json',
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
@@ -543,6 +546,18 @@ export function GET(request: NextRequest) {
           })),
         }
       : {};
+    const breakdownPanel = powerBreakdown
+      ? {
+          powerBreakdowns: buildPowerBreakdowns(observedPoints).map(({ points, ...series }) => ({
+            ...series,
+            modelRevision: SYSTEM_POWER_MODEL_REVISION,
+            points: points.map(({ point, configKey: _configKey, ...entry }) => ({
+              ...entry,
+              point: observedPointIdentity(point),
+            })),
+          })),
+        }
+      : {};
 
     const resolvedParams = {
       model: displayName,
@@ -578,6 +593,7 @@ export function GET(request: NextRequest) {
       serviceTarget: serviceCompare ? serviceTarget : null,
       roleShare,
       powerFit,
+      powerBreakdown,
     };
 
     if (format === 'csv') {
@@ -609,6 +625,7 @@ export function GET(request: NextRequest) {
       ...servicePanels,
       ...rolePanel,
       ...fitPanel,
+      ...breakdownPanel,
     });
   });
 }

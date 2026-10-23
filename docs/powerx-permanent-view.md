@@ -152,7 +152,17 @@ config is `display: 'timeline'`.
 
 ## Analysis panels
 
-The opt-in role and power-fit panels under the measured chart live in
-`ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerFits`) and the
+The opt-in role, power-fit and system power breakdown panels under the measured chart live in
+`ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerFits`,
+`powerBreakdowns`) and the
 API-only equal-service comparisons are described in the
 [dashboard views reference](../packages/skills/skills/inferencex-api/references/dashboard-views.md).
+
+The breakdown panel (`ui/PowerBreakdownPanel.tsx`, share parameters `i_powerbreakdown=1` and
+`i_pbview=bars|area`) draws one hardware line at a time, grouped and colored exactly like the
+scatter legend (`hwKey` + precision, vendor color). Each concurrency gets a stacked bar, or a
+point on a stacked area, of the point's All in Measured W/GPU split by
+`deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
+Parts step down in opacity of the hardware color, like the Profit Estimator's stacked bars, and
+facility overhead is hatched. Measured parts sit at the bottom. TDP and All in Provisioned are
+dashed reference lines, not stacked values.

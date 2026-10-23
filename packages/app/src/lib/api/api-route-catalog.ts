@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '8cf74590a89a4aa56a4e9dff001bc5e58d456492cc7b09d71e7b90690f1d7f34',
+    sourceSha256: 'd07ad8539419f69cb71b2ba7389303d0cfadd4f244768fe2c087d7641614bdef',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '97055c4a644c1c4da47de893afeeeb7a57121de15dd88244aeb5ba0bb67623f0',
+    sourceSha256: 'e19bddc4e9d3e4ab81eb52372048659201aeb73ed6037fa28577e31b885f341f',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -1256,6 +1256,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/inference/utils/power-breakdown.ts',
+    sourceSha256: 'bd05ef72f56957b6ac0b51d951f9fb178b7840f7c0957d88c14cd9b505c5d355',
+    reviewArea: {
+      en: 'Per-point system power breakdown: measured GPU and Grace parts, modeled server, fans/PSU loss, scale-out network and PUE overhead, summing to All in Measured W/GPU.',
+      zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分、建模的服务器部件、风扇/PSU 损耗、横向扩展网络与 PUE 开销，合计等于 All in Measured W/GPU。',
+    },
+  },
+  {
     source: 'src/components/inference/utils/role-energy.ts',
     sourceSha256: '48e9aff8084dc53b41028a7e7e293643f972c1d45f351c0604ff43c4578493f0',
     reviewArea: {
@@ -1439,7 +1447,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '291e1cc1bca965f658f31506ef0ab720fb8305e3cade52c8be6d83546fb81dc6',
+    sourceSha256: '91a12a0efb6be0891c194413e1a267db8137f44421258275981a0454f84fd4aa',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
