@@ -131,6 +131,8 @@ jobs:
           elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
             echo "::error::Migrating DATABASE_WRITE_URL requires the default branch ($DEFAULT_BRANCH)"
             exit 1
+          else
+            : "${WRITE_DATABASE_URL:?DATABASE_WRITE_URL secret is not set}"
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
@@ -201,6 +203,8 @@ jobs:
           elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
             echo "::error::Recomputing DATABASE_WRITE_URL requires the default branch ($DEFAULT_BRANCH)"
             exit 1
+          else
+            : "${WRITE_DATABASE_URL:?DATABASE_WRITE_URL secret is not set}"
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"

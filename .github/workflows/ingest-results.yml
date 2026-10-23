@@ -55,8 +55,8 @@ on:
         description: Neon project containing named child branches
         required: false
       SLACK_WEBHOOK_URL:
-        description: Optional failure and unmapped-entity notifications
-        required: false
+        description: Failure and unmapped-entity notifications
+        required: true
   workflow_dispatch:
     inputs:
       run-id:
@@ -116,6 +116,12 @@ jobs:
       REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target ||
         inputs.database-target || 'production' }}
     steps:
+      - name: Check required secrets
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+
       - name: Wait for source run to finish
         if: >-
           github.event_name == 'repository_dispatch' && (

@@ -149,7 +149,7 @@ bun --env-file=../../.env src/apply-overrides.ts --run-id "$RUN" --allow-unregis
 
 The ingest refreshes `latest_benchmarks` itself. The dashboard can keep serving cached responses until the cache is invalidated. From the repo root, choose the option for the approved target:
 
-- **Public dashboard:** Dispatch the Cache Refresh workflow, which targets the public deployment.
+- **Public dashboard:** Dispatch the Cache Refresh workflow, which invalidates and warms the site set in the `APP_URL` repository variable of the repository it runs in.
 
   ```bash
   gh workflow run cache-refresh.yml --repo SemiAnalysisAI/InferenceX-app --ref master

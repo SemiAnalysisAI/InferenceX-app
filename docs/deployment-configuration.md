@@ -33,17 +33,63 @@ stays incomplete and retries after a short cooldown. Runs from a repository othe
 `SemiAnalysisAI/InferenceX` record it as `source_repository` in the stored summary, and
 their links use it.
 
+### Variables outside the `.env.example` production list
+
+The production block of `.env.example` says all of its variables are required, but the
+deployed app also reads the variables below. Each one backs a single feature, which fails
+as described when the variable is unset.
+
+| Variable                           | Read by                                   | When unset                                                                                                                                                                               |
+| ---------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `INVALIDATE_SECRET`                | `POST /api/v1/invalidate`                 | Every request returns 401, except requests to the shared `staging` preview that carry `x-vercel-protection-bypass`. Set it to the value of the `VERCEL_INVALIDATE_SECRET` GitHub secret. |
+| `FEEDBACK_SECRET`                  | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                             |
+| `DATABASE_WRITE_URL`               | `POST /api/v1/feedback`                   | Submissions return 500 with code `E_CRYPTO`.                                                                                                                                             |
+| `DATABASE_COLLECTIVEX_WRITE_URL`   | `/api/v1/collectivex/*`                   | The routes read and lazily ingest through this primary connection, so they return errors.                                                                                                |
+| `COLLECTIVEX_ADMIN_SECRET`         | `DELETE /api/v1/collectivex/runs/[runId]` | Every request returns 401.                                                                                                                                                               |
+| `DATABASE_OPERATORX_READONLY_URL`  | `/api/v1/operatorx/*`                     | The routes return 503 with `The OperatorX database is not configured`.                                                                                                                   |
+| `DATABASE_PROXYTRACE_READONLY_URL` | `/api/v1/agentic-workload-explorer/*`     | The routes return 500.                                                                                                                                                                   |
+
+### Vercel project
+
+The Vercel project's Root Directory is `packages/app`. Vercel reads `vercel.json` only
+from the Root Directory, so the project configuration lives in `packages/app/vercel.json`,
+and the repository root `.vercelignore` assumes that layout.
+
+`NEXT_PUBLIC_*` values, such as `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`,
+are inlined into the client bundle at build time. After changing one in the Vercel
+project, redeploy for the new value to take effect.
+
 ## GitHub Actions
 
-| Name                              | Kind     | Required                             | Effect                                                                                                                                                                                                                      |
-| --------------------------------- | -------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_URL`                         | variable | yes, by every workflow that uses it  | Site targeted by cache invalidation and warmup, OperatorX invalidation, H3 media warmup, and PowerX verification on the `production` ingest target.                                                                         |
-| `BENCHMARK_REPO`                  | variable | yes, by every workflow that uses it  | Repository whose benchmark artifacts the ingest workflows download and that dispatches `stage-results`. When it is not `SemiAnalysisAI/InferenceX`, also list it in `INFERENCEX_SOURCE_REPOS` for the app's GitHub lookups. |
-| `STAGING_APP_URL`                 | variable | `staging` target and `stage-results` | Site invalidated by the `staging` ingest target and linked from staged chart comments.                                                                                                                                      |
-| `VERCEL_PROTECTION_BYPASS_SECRET` | secret   | optional                             | Deployment Protection bypass sent with production site requests and by the cache scripts.                                                                                                                                   |
+### Variables
 
-`INFX_MAIN_PAT` must be able to read Actions artifacts in `BENCHMARK_REPO`, and `PAT`
-must be able to send repository dispatch events to it.
+| Name              | Required                             | Effect                                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_URL`         | yes, by every workflow that uses it  | Site targeted by cache invalidation and warmup, OperatorX invalidation, H3 media warmup, and PowerX verification on the `production` ingest target.                                                                         |
+| `BENCHMARK_REPO`  | yes, by every workflow that uses it  | Repository whose benchmark artifacts the ingest workflows download and that dispatches `stage-results`. When it is not `SemiAnalysisAI/InferenceX`, also list it in `INFERENCEX_SOURCE_REPOS` for the app's GitHub lookups. |
+| `STAGING_APP_URL` | `staging` target and `stage-results` | Site invalidated by the `staging` ingest target and linked from staged chart comments.                                                                                                                                      |
+
+### Secrets
+
+`GITHUB_TOKEN` is provided by GitHub and is not listed. `SLACK_WEBHOOK_URL` is the
+failure alarm, so `ingest-results`, `ingest-operatorx`, and `stage-results` check it
+before doing any other work. `stage-results` also checks `PAT` up front, and
+`apply-run-overrides` and `recompute-agentic-metrics` check `DATABASE_WRITE_URL` before
+writing to the production database.
+
+| Secret                            | Required                                                 | Used for                                                                                                        | Workflows                                                                                                                                                                                            |
+| --------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLACK_WEBHOOK_URL`               | yes                                                      | Incoming webhook for ingest failure and unmapped-entity alerts.                                                 | `ingest-results`, `ingest-operatorx`, `stage-results` (passed to `ingest-results`)                                                                                                                   |
+| `DATABASE_WRITE_URL`              | yes, for writes to the production database               | Production database write connection.                                                                           | `apply-run-overrides`, `ingest-results` on the `production` target, `backfill-server-log-files` and `recompute-agentic-metrics` without `neon-branch`                                                |
+| `DATABASE_STAGING_WRITE_URL`      | yes, for the `staging` target                            | Write connection for the Neon `staging` branch.                                                                 | `ingest-results`, `stage-results`                                                                                                                                                                    |
+| `DATABASE_OPERATORX_WRITE_URL`    | yes, by `ingest-operatorx`                               | OperatorX database write connection for migrations and ingest.                                                  | `ingest-operatorx`                                                                                                                                                                                   |
+| `INFX_MAIN_PAT`                   | yes                                                      | Reads Actions runs and artifacts in `BENCHMARK_REPO`.                                                           | `ingest-results`, `ingest-operatorx`, `stage-results`, `backfill-server-log-files`, `recompute-agentic-metrics` with `restore-missing-trace`                                                         |
+| `PAT`                             | yes, by `stage-results`                                  | Sends the `stage-results-started` and `stage-results-completed` repository dispatch events to `BENCHMARK_REPO`. | `stage-results`                                                                                                                                                                                      |
+| `NEON_API_KEY`                    | yes, for Neon branch operations                          | Resolves named Neon child branches and restores or syncs the `staging` branch.                                  | `ingest-results` on the `neon-branch` target, `backfill-server-log-files` and `recompute-agentic-metrics` with `neon-branch`, `stage-results` with `reset-staging-database`, `sync-staging-database` |
+| `NEON_PROJECT_ID`                 | with `NEON_API_KEY`                                      | Neon project that holds those branches.                                                                         | Same as `NEON_API_KEY`                                                                                                                                                                               |
+| `VERCEL_INVALIDATE_SECRET`        | yes, for cache invalidation outside the `staging` target | Bearer token for `/api/v1/invalidate`. It must equal the app's runtime `INVALIDATE_SECRET`.                     | `apply-run-overrides`, `backfill-server-log-files`, `cache-refresh`, `ingest-operatorx`, `ingest-results`, `recompute-agentic-metrics`                                                               |
+| `VERCEL_PROTECTION_BYPASS_SECRET` | optional                                                 | Deployment Protection bypass sent with requests to `APP_URL` and by the cache scripts.                          | `apply-run-overrides`, `backfill-server-log-files`, `cache-refresh`, `h3-media`, `ingest-operatorx`, `ingest-results` on the `production` target, `recompute-agentic-metrics`                        |
+| `VERCEL_STAGING_BYPASS_SECRET`    | yes, for the `staging` and `neon-branch` targets         | Vercel automation bypass for the staging and preview deployments.                                               | `ingest-results`, `stage-results`, `sync-staging-database`                                                                                                                                           |
 
 Values reach scripts only through step `env:`, never by inline expression in a `run:`
 block.

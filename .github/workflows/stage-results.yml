@@ -69,7 +69,14 @@ jobs:
           RESET_STAGING_DATABASE: ${{ inputs.reset-staging-database || false }}
           BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           SOURCE_REPOSITORY: ${{ github.event.client_payload.source-repository || vars.BENCHMARK_REPO }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          PAT_PRESENT: ${{ secrets.PAT != '' }}
         run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+          if [ "$PAT_PRESENT" != true ]; then
+            echo "::error::PAT secret is not set"
+            exit 1
+          fi
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           if [[ ! "$RUN_ID" =~ ^[0-9]+$ ]]; then
             echo "::error::run-id must be numeric"

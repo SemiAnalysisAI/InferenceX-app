@@ -28,8 +28,10 @@ jobs:
         env:
           BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
           for _ in $(seq 60); do
             status=$(gh api "repos/$BENCHMARK_REPO/actions/runs/$RUN_ID" --jq .status)
