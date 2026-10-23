@@ -366,7 +366,9 @@ is valid), and the modeled `server` parts, `fansPsu` (fans + conversion loss), `
 allocated GPUs, so the parts sum to `totalWattsPerGpu`. Only `gpu` and `measuredCpu` are
 measured; call the rest modeled at the point's measured GPU power under `modelRevision`.
 `tdpWattsPerGpu` and `allInProvisionedWattsPerGpu` are rated references, not Pareto power
-metrics. Points without validated GPU telemetry or a supported system model are omitted.
+metrics. Points are sorted by `interactivity` on `interactivityField`: the chart's
+interactivity x-axis (AgentX P90/P75 included), otherwise `median_intvty`. Points without
+validated GPU telemetry, a supported system model or positive interactivity are omitted.
 
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
@@ -374,7 +376,8 @@ These analytical results require JSON; enabling any with CSV returns 400. CSV ex
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
 同并发表格或分享参数。角色分析、功耗拟合和系统功耗构成面板仍在仪表板中提供，分别对应 `roleShare`、
 `powerFit` 和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
-按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
+按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。各点按 `interactivityField` 上的
+`interactivity` 排序：图表 x 轴为交互性时（含 AgentX P90/P75）沿用该轴，否则使用 `median_intvty`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 
 Concurrency is not an `xmode`: GPU count varies across configurations, so
 concurrency alone is not comparable between them. Each point still reports its

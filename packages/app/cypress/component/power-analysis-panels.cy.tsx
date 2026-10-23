@@ -92,6 +92,8 @@ const breakdownLadder = [250, 380, 520, 640].map((watts, index) =>
   point({
     id: 40 + index,
     conc: 4 ** index,
+    // Interactivity falls as concurrency rises, as in a real sweep.
+    mean_tpot_intvty: [120, 80, 45, 20][index],
     physicalChips: 8,
     tp: 8,
     decode_tp: 8,
@@ -228,14 +230,24 @@ describe('PowerAnalysisPanels', () => {
         'have.length',
         4,
       );
-      cy.get('[data-testid="power-breakdown-total"]').should('have.length', 4);
+      // Bars sit on the chart's interactivity axis: lowest interactivity (c64) first.
+      cy.get('[data-testid$="power-breakdown-plot"]').should(
+        'contain.text',
+        'Interactivity (output tok/s/user)',
+      );
+      cy.get('[data-testid="power-breakdown-bar"][data-category="gpu"]').then(($bars) => {
+        const xs = [...$bars].map((bar) => Number(bar.getAttribute('x')));
+        expect(xs).to.deep.equal(xs.toSorted((a, b) => a - b));
+      });
+      cy.get('[data-testid="power-breakdown-total"]').should('have.length.at.least', 2);
       cy.get('[data-testid="power-breakdown-tdp-line"]').should('exist');
-      cy.get('[data-testid="power-breakdown-hit"]').eq(3).trigger('mouseenter', { force: true });
+      cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseenter', { force: true });
       cy.get('[data-testid="power-breakdown-tooltip"]')
         .should('contain.text', 'c64')
         .and('contain.text', '640')
+        .and('contain.text', 'Interactivity (output tok/s/user): 20.0')
         .and('contain.text', 'All in Measured');
-      cy.get('[data-testid="power-breakdown-hit"]').eq(3).trigger('mouseleave', { force: true });
+      cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseleave', { force: true });
 
       cy.get('[data-testid="power-breakdown-view-area"]').click();
       cy.get('[data-testid="power-breakdown-view-area"]').should(

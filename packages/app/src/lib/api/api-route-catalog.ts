@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'd07ad8539419f69cb71b2ba7389303d0cfadd4f244768fe2c087d7641614bdef',
+    sourceSha256: 'd981addce4180ffeb26a00b4e01bba9b3d82d015a881335beff05a8c50bdaa53',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1257,7 +1257,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'bd05ef72f56957b6ac0b51d951f9fb178b7840f7c0957d88c14cd9b505c5d355',
+    sourceSha256: 'ef17d347cd74d552d631f103d05a68b840b387a61020a4305124a57f8225a1f0',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, modeled server, fans/PSU loss, scale-out network and PUE overhead, summing to All in Measured W/GPU.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分、建模的服务器部件、风扇/PSU 损耗、横向扩展网络与 PUE 开销，合计等于 All in Measured W/GPU。',

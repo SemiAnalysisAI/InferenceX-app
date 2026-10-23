@@ -570,20 +570,28 @@ describe('GET /api/v1/views/inference', () => {
       precision: 'fp8',
       categories: ['gpu', 'server', 'fansPsu', 'network', 'facility'],
       tdpWattsPerGpu: 700,
+      interactivityField: 'median_intvty',
     });
     expect(series.modelRevision).toMatch(/^[0-9a-f]{40}$/u);
-    expect(series.points.map((point: { concurrency: number }) => point.concurrency)).toEqual([
-      1, 32,
+    // Points follow the interactivity axis, so the busier concurrency comes first.
+    expect(
+      series.points.map((point: { concurrency: number; interactivity: number }) => [
+        point.concurrency,
+        point.interactivity,
+      ]),
+    ).toEqual([
+      [32, 25],
+      [1, 100],
     ]);
     for (const [index, point] of series.points.entries()) {
       const parts = Object.values(point.wattsPerGpu as Record<string, number>);
       expect(parts.reduce((sum, value) => sum + value, 0)).toBeCloseTo(point.totalWattsPerGpu, 6);
-      expect(point.wattsPerGpu.gpu).toBeCloseTo([250, 600][index], 6);
+      expect(point.wattsPerGpu.gpu).toBeCloseTo([600, 250][index], 6);
       expect(point).not.toHaveProperty('configKey');
-      expect(point.point).toMatchObject({ id: [301, 300][index] });
+      expect(point.point).toMatchObject({ id: [300, 301][index] });
     }
     // Load moves the measured GPU part and fans/PSU loss; fixed server parts stay put.
-    const [low, high] = series.points;
+    const [high, low] = series.points;
     expect(high.wattsPerGpu.server).toBeCloseTo(low.wattsPerGpu.server, 6);
     expect(high.wattsPerGpu.fansPsu).toBeGreaterThan(low.wattsPerGpu.fansPsu);
 

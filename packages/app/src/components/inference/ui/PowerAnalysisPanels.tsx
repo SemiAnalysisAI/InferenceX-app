@@ -152,7 +152,13 @@ export default function PowerAnalysisPanels({
         />
       )}
       {powerBreakdown && (
-        <PowerBreakdownPanel chartId={chartId} data={data} contextLabel={contextLabel} />
+        <PowerBreakdownPanel
+          chartId={chartId}
+          data={data}
+          contextLabel={contextLabel}
+          xField={xField}
+          xLabel={xLabel}
+        />
       )}
     </div>
   );

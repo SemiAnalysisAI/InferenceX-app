@@ -160,9 +160,13 @@ API-only equal-service comparisons are described in the
 
 The breakdown panel (`ui/PowerBreakdownPanel.tsx`, share parameters `i_powerbreakdown=1` and
 `i_pbview=bars|area`) draws one hardware line at a time, grouped and colored exactly like the
-scatter legend (`hwKey` + precision, vendor color). Each concurrency gets a stacked bar, or a
-point on a stacked area, of the point's All in Measured W/GPU split by
+scatter legend (`hwKey` + precision, vendor color). The x-axis is the chart's own interactivity
+axis (including the AgentX P90/P75 trace-derived axes), or median interactivity when the chart
+plots something else, so a bar sits where its point sits in the scatter. Each point gets a
+stacked bar, or a point on a stacked area, of its All in Measured W/GPU split by
 `deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
 Parts step down in opacity of the hardware color, like the Profit Estimator's stacked bars, and
 facility overhead is hatched. Measured parts sit at the bottom. TDP and All in Provisioned are
-dashed reference lines, not stacked values.
+dashed reference lines, not stacked values. Bar width comes from the room to the neighboring
+points and carries no data; the concurrency label sits above each total and both are hidden
+when bars are too close to read.

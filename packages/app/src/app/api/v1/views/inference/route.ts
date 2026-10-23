@@ -20,7 +20,10 @@ import {
   type MatchedConcurrencySide,
   type MatchedConcurrencyTable,
 } from '@/components/inference/utils/matched-concurrency';
-import { buildPowerBreakdowns } from '@/components/inference/utils/power-breakdown';
+import {
+  buildPowerBreakdowns,
+  powerBreakdownInteractivity,
+} from '@/components/inference/utils/power-breakdown';
 import { buildPowerFits } from '@/components/inference/utils/power-fit';
 import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
@@ -546,16 +549,20 @@ export function GET(request: NextRequest) {
           })),
         }
       : {};
+    const breakdownInteractivity = powerBreakdownInteractivity(serviceOptions.xField);
     const breakdownPanel = powerBreakdown
       ? {
-          powerBreakdowns: buildPowerBreakdowns(observedPoints).map(({ points, ...series }) => ({
-            ...series,
-            modelRevision: SYSTEM_POWER_MODEL_REVISION,
-            points: points.map(({ point, configKey: _configKey, ...entry }) => ({
-              ...entry,
-              point: observedPointIdentity(point),
-            })),
-          })),
+          powerBreakdowns: buildPowerBreakdowns(observedPoints, 'en', breakdownInteractivity).map(
+            ({ points, ...series }) => ({
+              ...series,
+              interactivityField: breakdownInteractivity.field,
+              modelRevision: SYSTEM_POWER_MODEL_REVISION,
+              points: points.map(({ point, configKey: _configKey, ...entry }) => ({
+                ...entry,
+                point: observedPointIdentity(point),
+              })),
+            }),
+          ),
         }
       : {};
 

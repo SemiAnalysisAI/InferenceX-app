@@ -24,10 +24,11 @@ import { exportToCsv } from '@/lib/export/csv-export';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { escapeHtml } from '@/lib/shared/utils';
-import type { InferenceData } from '../types';
+import type { AggDataEntry, InferenceData } from '../types';
 import {
   buildPowerBreakdowns,
   MEASURED_POWER_CATEGORIES,
+  powerBreakdownInteractivity,
   powerBreakdownPointLabels,
   stackPowerBreakdown,
   type PowerBreakdownPoint,
@@ -46,7 +47,7 @@ const STRINGS = {
     view: 'Breakdown view',
     bars: 'Stacked bars',
     area: 'Stacked area',
-    xAxis: 'Concurrency (requests in flight)',
+    xAxis: 'Median Interactivity (tok/s/user)',
     yAxis: 'Power (W/GPU)',
     total: 'All in Measured',
     share: 'Share',
@@ -78,7 +79,7 @@ const STRINGS = {
     view: '构成视图',
     bars: '堆叠柱状图',
     area: '堆叠面积图',
-    xAxis: '并发数（在途请求）',
+    xAxis: '中位交互性（tok/s/user）',
     yAxis: '功耗（W/GPU）',
     total: 'All in Measured',
     share: '占比',
@@ -120,33 +121,48 @@ export const CATEGORY_OPACITY: Record<SystemPowerCategory, number> = {
 const HATCH_OPACITY = 0.18;
 const SEGMENT_LABEL_MIN_PX = 15;
 const SEGMENT_LABEL_MIN_BAND = 30;
-const TOTAL_LABEL_MIN_BAND = 22;
-const MAX_BAR_PX = 64;
-const MARGIN = { top: 26, right: 18, bottom: 56, left: 65 };
+const MAX_BAR_PX = 48;
+const MARGIN = { top: 40, right: 18, bottom: 56, left: 65 };
 
-const MIN_TICK_LABEL_PX = 36;
-
-const tickOffset = (node: SVGGElement) =>
-  Number(/translate\((?<x>[-\d.]+)/u.exec(node.getAttribute('transform') ?? '')?.groups?.x ?? 0);
-
-/** Keeps every n-th concurrency label so narrow screens never run labels together. */
-export function thinBandTicks(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
-  const ticks = axisGroup.selectAll<SVGGElement, unknown>('.tick').nodes();
-  if (ticks.length < 2) return;
-  const step = Math.abs(tickOffset(ticks[1]) - tickOffset(ticks[0]));
-  const stride = step > 0 ? Math.max(1, Math.ceil(MIN_TICK_LABEL_PX / step)) : 1;
-  axisGroup
-    .selectAll<SVGTextElement, unknown>('.tick text')
-    .attr('display', (_, index) => (index % stride === 0 ? null : 'none'));
-}
+/** Minimum free width around a column before its total label is drawn. */
+const TOTAL_LABEL_MIN_GAP_PX = 46;
+const MIN_BAR_PX = 6;
+const X_TICK_SPACING_PX = 70;
+const REFERENCE_LABEL_CHAR_PX = 6.5;
+const REFERENCE_LABEL_CLEARANCE_PX = 34;
+const BAR_GAP_FRACTION = 0.72;
 
 const watts = d3.format(',.0f');
 const percent = d3.format('.0%');
+const interactivityFormat = d3.format(',.1f');
 
 interface Column {
   key: string;
   label: string;
   entry: PowerBreakdownPoint;
+}
+
+/**
+ * Bars sit at each point's interactivity. A bar is as wide as the room to its
+ * nearest neighbor allows (capped), so a sweep's tight high-concurrency
+ * cluster stays separable while isolated low-concurrency bars stay readable;
+ * width carries no data. Each column's hover band runs to the midpoints.
+ */
+export function interactivityColumnLayout(positions: readonly number[], plotWidth: number) {
+  return positions.map((center, index) => {
+    const left = index === 0 ? 0 : (positions[index - 1] + center) / 2;
+    const right = index === positions.length - 1 ? plotWidth : (center + positions[index + 1]) / 2;
+    const room = Math.min(
+      index === 0 ? Infinity : center - positions[index - 1],
+      index === positions.length - 1 ? Infinity : positions[index + 1] - center,
+    );
+    const edge = 2 * Math.max(0, Math.min(center, plotWidth - center));
+    const barWidth = Math.max(
+      MIN_BAR_PX,
+      Math.min(MAX_BAR_PX, edge, (Number.isFinite(room) ? room : plotWidth) * BAR_GAP_FRACTION),
+    );
+    return { center, barWidth, hitX: left, hitWidth: Math.max(1, right - left), room };
+  });
 }
 
 function hatchId(sectionId: string) {
@@ -171,6 +187,7 @@ function tooltipHtml(
   series: PowerBreakdownSeries,
   column: Column,
   color: string,
+  xLabel: string,
   t: (typeof STRINGS)['en'],
 ) {
   const { entry } = column;
@@ -193,6 +210,7 @@ function tooltipHtml(
     .join('');
   return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md" data-testid="power-breakdown-tooltip">
     <div class="font-semibold">${escapeHtml(series.label)} · ${escapeHtml(column.label)}</div>
+    <div class="text-muted-foreground">${escapeHtml(xLabel)}: ${interactivityFormat(entry.interactivity)}</div>
     ${entry.configLabel ? `<div class="mb-1 max-w-72 text-muted-foreground">${escapeHtml(entry.configLabel)}</div>` : ''}
     <table><tbody>${rows}
       <tr class="border-t font-semibold"><td class="pr-2 pt-1">${t.total}</td><td></td><td class="pr-2 pt-1 text-right tabular-nums">${watts(entry.totalWattsPerGpu)} W</td><td></td></tr>
@@ -204,12 +222,14 @@ function BreakdownChart({
   series,
   color,
   view,
+  xLabel,
   t,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
   color: string;
   view: PowerBreakdownView;
+  xLabel: string;
   t: (typeof STRINGS)['en'];
 }) {
   const labels = powerBreakdownPointLabels(series.points);
@@ -218,7 +238,16 @@ function BreakdownChart({
     label: labels[index],
     entry,
   }));
-  const tickLabel = new Map(columns.map((column) => [column.key, column.label]));
+  const xValues = columns.map((column) => column.entry.interactivity);
+  const xMin = Math.min(...xValues);
+  const xMax = Math.max(...xValues);
+  const xPad = Math.max((xMax - xMin) * 0.06, xMax * 0.02);
+  const xDomain: [number, number] = [Math.max(0, xMin - xPad), xMax + xPad];
+  const layoutFor = (x: ContinuousScale, width: number) =>
+    interactivityColumnLayout(
+      columns.map((column) => x(column.entry.interactivity)),
+      width,
+    );
   const references = [
     series.tdpWattsPerGpu === null
       ? null
@@ -271,10 +300,31 @@ function BreakdownChart({
   };
 
   const drawStack: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
-    const x = ctx.xScale as d3.ScaleBand<string>;
+    const x = ctx.xScale as ContinuousScale;
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
-    const bandwidth = Math.min(x.bandwidth(), MAX_BAR_PX);
-    const center = (key: string) => (x(key) ?? 0) + x.bandwidth() / 2;
+    const layout = layoutFor(x, ctx.width);
+    const barWidth = (key: string) => layout[Number(key)].barWidth;
+    const center = (key: string) => layout[Number(key)].center;
+    const referenceBoxes = [...placeReferenceLabels(ctx).values()].map(({ box }) => box);
+    // Concurrency + total labels for a column, unless they would sit under a reference label.
+    const labelledColumns = columns.filter((column) => {
+      const { room } = layout[Number(column.key)];
+      if (room < TOTAL_LABEL_MIN_GAP_PX) return false;
+      const top = y(column.entry.totalWattsPerGpu);
+      const box = {
+        left: center(column.key) - TOTAL_LABEL_MIN_GAP_PX / 2,
+        right: center(column.key) + TOTAL_LABEL_MIN_GAP_PX / 2,
+        top: top - REFERENCE_LABEL_CLEARANCE_PX,
+        bottom: top,
+      };
+      return !referenceBoxes.some(
+        (other) =>
+          box.left < other.right &&
+          other.left < box.right &&
+          box.top < other.bottom &&
+          other.top < box.bottom,
+      );
+    });
     const segments = columns.flatMap((column) =>
       stackPowerBreakdown(column.entry, series.categories)
         .filter((segment) => segment.watts > 0)
@@ -288,8 +338,8 @@ function BreakdownChart({
       .attr('class', 'breakdown-bar')
       .attr('data-testid', 'power-breakdown-bar')
       .attr('data-category', (d) => d.key)
-      .attr('x', (d) => center(d.column.key) - bandwidth / 2)
-      .attr('width', bandwidth)
+      .attr('x', (d) => center(d.column.key) - barWidth(d.column.key) / 2)
+      .attr('width', (d) => barWidth(d.column.key))
       .attr('y', (d) => y(d.y1))
       .attr('height', (d) => Math.max(0, y(d.y0) - y(d.y1)))
       .attr('rx', 1)
@@ -350,8 +400,12 @@ function BreakdownChart({
       .attr('fill', color);
 
     const segmentLabels =
-      view === 'bars' && bandwidth >= SEGMENT_LABEL_MIN_BAND
-        ? segments.filter((segment) => y(segment.y0) - y(segment.y1) >= SEGMENT_LABEL_MIN_PX)
+      view === 'bars'
+        ? segments.filter(
+            (segment) =>
+              barWidth(segment.column.key) >= SEGMENT_LABEL_MIN_BAND &&
+              y(segment.y0) - y(segment.y1) >= SEGMENT_LABEL_MIN_PX,
+          )
         : [];
     group
       .selectAll<SVGTextElement, (typeof segments)[number]>('text.breakdown-segment-label')
@@ -373,7 +427,7 @@ function BreakdownChart({
 
     group
       .selectAll<SVGTextElement, Column>('text.breakdown-total-label')
-      .data(bandwidth >= TOTAL_LABEL_MIN_BAND ? columns : [], (d) => d.key)
+      .data(labelledColumns, (d) => d.key)
       .join('text')
       .attr('class', 'breakdown-total-label')
       .attr('data-testid', 'power-breakdown-total')
@@ -388,18 +442,88 @@ function BreakdownChart({
       .attr('paint-order', 'stroke')
       .attr('pointer-events', 'none')
       .text((d) => `${watts(d.entry.totalWattsPerGpu)} W`);
+
+    // Concurrency above the total, so a bar still reads as "c14" on an interactivity axis.
+    group
+      .selectAll<SVGTextElement, Column>('text.breakdown-concurrency-label')
+      .data(labelledColumns, (d) => d.key)
+      .join('text')
+      .attr('class', 'breakdown-concurrency-label')
+      .attr('data-testid', 'power-breakdown-concurrency')
+      .attr('x', (d) => center(d.key))
+      .attr('y', (d) => y(d.entry.totalWattsPerGpu) - 20)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', CHART_TYPE.annotation)
+      .attr('fill', 'var(--muted-foreground)')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .attr('pointer-events', 'none')
+      .text((d) => d.label);
   };
 
-  // Reference labels sit at the end of the line the stack does not reach, so they
-  // stay off the bars (load usually rises with concurrency, freeing the left).
-  const referenceLabelSide = (value: number): 'start' | 'end' => {
-    const first = columns[0]?.entry.totalWattsPerGpu ?? 0;
-    const last = columns.at(-1)?.entry.totalWattsPerGpu ?? 0;
-    return last >= value * 0.95 && first < last ? 'start' : 'end';
+  const referenceText = (reference: (typeof references)[number]) =>
+    `${reference.label} ${watts(reference.value)} W`;
+
+  // A reference label goes where no bar (or its concurrency/total labels)
+  // reaches up into it: the right end, else the left end, else the widest
+  // clear gap along the line.
+  const referenceLabelPlacement = (
+    ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1],
+    layout: ReturnType<typeof layoutFor>,
+    y: ContinuousScale,
+    value: number,
+    text: string,
+  ): { x: number; anchor: 'start' | 'end' } => {
+    const labelWidth = text.length * REFERENCE_LABEL_CHAR_PX + 6;
+    const lineY = y(value);
+    const blocked = (from: number, to: number) =>
+      columns.some((column) => {
+        const { center, barWidth, room } = layout[Number(column.key)];
+        if (center + barWidth / 2 < from || center - barWidth / 2 > to) return false;
+        const labelled = room >= TOTAL_LABEL_MIN_GAP_PX ? REFERENCE_LABEL_CLEARANCE_PX : 0;
+        return y(column.entry.totalWattsPerGpu) - labelled < lineY + 2;
+      });
+    if (!blocked(ctx.width - labelWidth, ctx.width)) {
+      return { x: ctx.width - 2, anchor: 'end' };
+    }
+    if (!blocked(0, labelWidth)) return { x: 2, anchor: 'start' };
+    const gap = layout
+      .slice(1)
+      .map((right, index) => {
+        const left = layout[index];
+        return {
+          from: left.center + left.barWidth / 2 + 4,
+          to: right.center - right.barWidth / 2 - 4,
+        };
+      })
+      .filter(({ from, to }) => to - from >= labelWidth && !blocked(from, to))
+      .toSorted((a, b) => b.to - b.from - (a.to - a.from))[0];
+    return gap ? { x: gap.to, anchor: 'end' } : { x: ctx.width - 2, anchor: 'end' };
+  };
+
+  /** Reference label positions plus their boxes, so column labels under them can yield. */
+  const placeReferenceLabels = (ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1]) => {
+    const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
+    return new Map(
+      references.map((reference) => {
+        const text = referenceText(reference);
+        const width = text.length * REFERENCE_LABEL_CHAR_PX + 6;
+        const { x, anchor } = referenceLabelPlacement(ctx, layout, y, reference.value, text);
+        const left = anchor === 'end' ? x - width : x;
+        const top = y(reference.value) - 4 - 12;
+        return [
+          reference.key,
+          { x, anchor, box: { left, right: left + width, top, bottom: top + 14 } },
+        ];
+      }),
+    );
   };
 
   const drawReferences: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const placement = placeReferenceLabels(ctx);
     group
       .selectAll<SVGLineElement, (typeof references)[number]>('line.breakdown-reference')
       .data(references, (d) => d.key)
@@ -419,28 +543,28 @@ function BreakdownChart({
       .data(references, (d) => d.key)
       .join('text')
       .attr('class', 'breakdown-reference-label')
-      .attr('x', (d) => (referenceLabelSide(d.value) === 'end' ? ctx.width - 2 : 2))
+      .attr('x', (d) => placement.get(d.key)!.x)
       .attr('y', (d) => y(d.value) - 4)
-      .attr('text-anchor', (d) => referenceLabelSide(d.value))
+      .attr('text-anchor', (d) => placement.get(d.key)!.anchor)
       .attr('font-size', CHART_TYPE.annotation)
       .attr('fill', 'var(--muted-foreground)')
       .attr('stroke', 'var(--background)')
       .attr('stroke-width', 3)
       .attr('paint-order', 'stroke')
       .attr('pointer-events', 'none')
-      .text((d) => `${d.label} ${watts(d.value)} W`);
+      .text(referenceText);
   };
 
   const drawHitAreas: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
-    const x = ctx.xScale as d3.ScaleBand<string>;
+    const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
     return group
       .selectAll<SVGRectElement, Column>('rect.breakdown-hit')
       .data(columns, (d) => d.key)
       .join('rect')
       .attr('class', 'breakdown-hit')
       .attr('data-testid', 'power-breakdown-hit')
-      .attr('x', (d) => (x(d.key) ?? 0) - (x.step() - x.bandwidth()) / 2)
-      .attr('width', x.step())
+      .attr('x', (d) => layout[Number(d.key)].hitX)
+      .attr('width', (d) => layout[Number(d.key)].hitWidth)
       .attr('y', 0)
       .attr('height', ctx.height)
       .attr('fill', 'var(--foreground)')
@@ -465,22 +589,22 @@ function BreakdownChart({
       grabCursor={false}
       instructions=""
       margin={MARGIN}
-      xScale={{
-        type: 'band',
-        domain: columns.map((column) => column.key),
-        padding: view === 'bars' ? 0.3 : 0,
-      }}
+      xScale={{ type: 'linear', domain: xDomain }}
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{
-        label: t.xAxis,
-        tickFormat: (value) => tickLabel.get(String(value)) ?? String(value),
-        customize: thinBandTicks,
+        label: xLabel,
+        // One tick per ~70px so phone widths never run interactivity labels together.
+        tickValues: (scale) => {
+          const linear = scale as d3.ScaleLinear<number, number>;
+          const [start, end] = linear.range();
+          return linear.ticks(Math.max(2, Math.floor(Math.abs(end - start) / X_TICK_SPACING_PX)));
+        },
       }}
       yAxis={{ label: t.yAxis, tickCount: 5 }}
       layers={layers}
       tooltip={{
         rulerType: 'none',
-        content: (column) => tooltipHtml(series, column, color, t),
+        content: (column) => tooltipHtml(series, column, color, xLabel, t),
         attachToLayer: 3,
         onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
         onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
@@ -493,13 +617,20 @@ export default function PowerBreakdownPanel({
   chartId,
   data,
   contextLabel,
+  xField,
+  xLabel,
 }: {
   chartId: string;
   data: InferenceData[];
   contextLabel?: string;
+  /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
+  xField?: keyof AggDataEntry;
+  xLabel?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
+  const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
   const [view, setView] = useState<PowerBreakdownView>(() =>
     getUrlParam('i_pbview') === 'area' ? 'area' : 'bars',
@@ -507,7 +638,10 @@ export default function PowerBreakdownPanel({
   useEffect(() => {
     setUrlParams({ i_pbview: view });
   }, [view, setUrlParams]);
-  const breakdowns = useMemo(() => buildPowerBreakdowns(data, locale), [data, locale]);
+  const breakdowns = useMemo(
+    () => buildPowerBreakdowns(data, locale, interactivity),
+    [data, locale, interactivity],
+  );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const series = breakdowns.find((entry) => entry.key === selectedKey) ?? breakdowns[0] ?? null;
   const sectionId = `${chartId}-power-breakdown`;
@@ -530,6 +664,7 @@ export default function PowerBreakdownPanel({
         'series',
         'configuration',
         'concurrency',
+        interactivity.field,
         'measured_gpu_w_per_gpu',
         'measured_grace_cpu_w_per_gpu',
         'server_parts_w_per_gpu',
@@ -547,6 +682,7 @@ export default function PowerBreakdownPanel({
           entry.label,
           point.configLabel,
           point.concurrency,
+          point.interactivity,
           ...keys.map((key) => point.wattsPerGpu[key]),
           point.totalWattsPerGpu,
           point.pue,
@@ -654,6 +790,7 @@ export default function PowerBreakdownPanel({
             series={series}
             color={color}
             view={view}
+            xLabel={interactivityLabel}
             t={t}
           />
           <p className="text-xs text-muted-foreground">

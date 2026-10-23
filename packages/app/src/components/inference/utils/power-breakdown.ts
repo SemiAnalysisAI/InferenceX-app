@@ -1,4 +1,4 @@
-import type { InferenceData } from '../types';
+import type { AggDataEntry, InferenceData } from '../types';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
 import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
@@ -45,6 +45,8 @@ export const MEASURED_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> = new S
 export interface PowerBreakdownPoint {
   point: InferenceData;
   concurrency: number;
+  /** x position: the point's interactivity (tok/s/user), see `powerBreakdownInteractivity`. */
+  interactivity: number;
   /** The equal-service configuration this point belongs to (date, topology, recipe...). */
   configKey: string;
   configLabel: string;
@@ -74,10 +76,46 @@ export interface PowerBreakdownSeries {
   allInProvisionedWattsPerGpu: number | null;
 }
 
+const DERIVED_INTERACTIVITY = /^p\d+_e2e_norm_intvty$/u;
+
+export interface PowerBreakdownInteractivity {
+  /** The interactivity field the x positions come from. */
+  field: string;
+  /** True when that is the main chart's own x-axis (so its axis label applies). */
+  fromChart: boolean;
+  value: (point: InferenceData) => number | null | undefined;
+}
+
+/**
+ * The breakdown is always drawn against interactivity. On an interactivity
+ * chart that is the chart's own x (including the trace-derived AgentX P90/P75
+ * axes, which live only on `point.x`), so a bar sits under its scatter point;
+ * on a latency chart it falls back to median interactivity.
+ */
+export function powerBreakdownInteractivity(
+  xField?: keyof AggDataEntry | string,
+): PowerBreakdownInteractivity {
+  const field = xField === undefined ? '' : String(xField);
+  if (DERIVED_INTERACTIVITY.test(field)) {
+    return { field, fromChart: true, value: (point) => point.x };
+  }
+  if (/(?:^|_)intvty$/u.test(field)) {
+    return {
+      field,
+      fromChart: true,
+      value: (point) => point[field as keyof InferenceData] as number | undefined,
+    };
+  }
+  return { field: 'median_intvty', fromChart: false, value: (point) => point.median_intvty };
+}
+
 export function powerBreakdownForPoint(
   point: InferenceData,
   config?: EqualServiceSource,
+  interactivity: PowerBreakdownInteractivity = powerBreakdownInteractivity(),
 ): PowerBreakdownPoint | null {
+  const x = interactivity.value(point);
+  if (!isPositive(x)) return null;
   const model = point.modeledSystemPower;
   if (model?.status !== 'supported') return null;
   const total = modeledFacilityWattsPerGpu(point);
@@ -93,6 +131,7 @@ export function powerBreakdownForPoint(
   return {
     point,
     concurrency: point.conc,
+    interactivity: x,
     configKey: config?.key ?? '',
     configLabel: config?.label ?? '',
     wattsPerGpu,
@@ -109,6 +148,7 @@ export const powerBreakdownSeriesKey = (point: Pick<InferenceData, 'hwKey' | 'pr
 export function buildPowerBreakdowns(
   points: readonly InferenceData[],
   locale: 'en' | 'zh' = 'en',
+  interactivity: PowerBreakdownInteractivity = powerBreakdownInteractivity(),
 ): PowerBreakdownSeries[] {
   const configs = new Map(
     getEqualServiceSources(points, locale).map((source) => [source.key, source]),
@@ -118,6 +158,7 @@ export function buildPowerBreakdowns(
     const breakdown = powerBreakdownForPoint(
       point,
       configs.get(equalServiceSourceKey(point)) ?? { key: equalServiceSourceKey(point), label: '' },
+      interactivity,
     );
     if (!breakdown) continue;
     const key = powerBreakdownSeriesKey(point);
@@ -127,6 +168,7 @@ export function buildPowerBreakdowns(
     .map(([key, entries]): PowerBreakdownSeries => {
       const sorted = entries.toSorted(
         (a, b) =>
+          a.interactivity - b.interactivity ||
           a.concurrency - b.concurrency ||
           a.configKey.localeCompare(b.configKey) ||
           (a.point.id ?? 0) - (b.point.id ?? 0),

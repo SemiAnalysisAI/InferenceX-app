@@ -6,6 +6,7 @@ import type { InferenceData } from '../types';
 import {
   buildPowerBreakdowns,
   POWER_BREAKDOWN_STACK_ORDER,
+  powerBreakdownInteractivity,
   powerBreakdownPointLabels,
   stackPowerBreakdown,
 } from './power-breakdown';
@@ -62,6 +63,7 @@ function point(
     id: nextId++,
     x: 100,
     y: gpuWatts,
+    median_intvty: 100,
     hwKey: 'b200_sglang',
     date: '2026-09-08',
     tp: 8,
@@ -124,14 +126,45 @@ describe('buildPowerBreakdowns', () => {
   });
 });
 
+describe('powerBreakdownInteractivity', () => {
+  it('places points on the chart interactivity axis, ordered by it, and drops points without one', () => {
+    const interactivity = powerBreakdownInteractivity('p90_intvty');
+    expect(interactivity).toMatchObject({ field: 'p90_intvty', fromChart: true });
+    const [series] = buildPowerBreakdowns(
+      [
+        point(600, { conc: 64, p90_intvty: 20 }),
+        point(250, { conc: 1, p90_intvty: 140 }),
+        point(400, { conc: 8, p90_intvty: 70 }),
+        point(450, { conc: 16 }),
+      ],
+      'en',
+      interactivity,
+    );
+    expect(series.points.map((entry) => [entry.concurrency, entry.interactivity])).toEqual([
+      [64, 20],
+      [8, 70],
+      [1, 140],
+    ]);
+  });
+
+  it('reads trace-derived AgentX axes from point.x and falls back to median on latency charts', () => {
+    const derived = powerBreakdownInteractivity('p90_e2e_norm_intvty');
+    expect(derived.fromChart).toBe(true);
+    expect(derived.value(point(300, { x: 31.5 }))).toBe(31.5);
+    const latency = powerBreakdownInteractivity('median_e2el');
+    expect(latency).toMatchObject({ field: 'median_intvty', fromChart: false });
+    expect(latency.value(point(300, { x: 9, median_intvty: 42 }))).toBe(42);
+  });
+});
+
 describe('powerBreakdownPointLabels', () => {
   it('numbers repeated concurrencies so every bar keeps a distinct tick', () => {
     const [series] = buildPowerBreakdowns([
-      point(250, { conc: 1 }),
-      point(400, { conc: 16, date: '2026-09-01' }),
-      point(420, { conc: 16, date: '2026-09-08' }),
+      point(250, { conc: 1, median_intvty: 120 }),
+      point(400, { conc: 16, date: '2026-09-01', median_intvty: 40 }),
+      point(420, { conc: 16, date: '2026-09-08', median_intvty: 38 }),
     ]);
-    expect(powerBreakdownPointLabels(series.points)).toEqual(['c1', 'c16 · 1', 'c16 · 2']);
+    expect(powerBreakdownPointLabels(series.points)).toEqual(['c16 · 1', 'c16 · 2', 'c1']);
   });
 });
 

@@ -624,9 +624,18 @@ const responseSchema = objectSchema(
           'Registry all-in provisioned W/GPU, PUE included (reference, not a measurement).',
         ),
         modelRevision: { type: 'string', description: 'Pinned power_model commit.' },
+        interactivityField: {
+          type: 'string',
+          description:
+            'Interactivity field the points are placed on: the chart x-axis when it is an interactivity axis, otherwise median_intvty.',
+        },
         points: arraySchema(
           objectSchema({
             concurrency: integerSchema,
+            interactivity: {
+              ...numberSchema,
+              description: 'tok/s/user on interactivityField; points are sorted by it.',
+            },
             configLabel: { type: 'string', description: 'Date, topology and recipe of the point.' },
             wattsPerGpu: objectSchema({
               gpu: numberSchema,
