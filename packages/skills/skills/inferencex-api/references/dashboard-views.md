@@ -589,3 +589,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `minimax-m31-flash`: read the model-specific architecture facts and source link with `model=minimax-m31-flash`.
 - `muse-spark-open`: read the model-specific architecture facts and source link with `model=muse-spark-open`.
 - `deepseek-v41-flash`: read the model-specific architecture facts and source link with `model=deepseek-v41-flash`.
+- `glm-5-1`: read the model-specific architecture facts and source link with `model=glm-5-1`.
