@@ -592,3 +592,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `glm-5-1`: read the model-specific architecture facts and source link with `model=glm-5-1`.
 - `glm-5-3`: read the model-specific architecture facts and source link with `model=glm-5-3`.
 - `qwen-3-5`: read the model-specific architecture facts and source link with `model=qwen-3-5`.
+- `qwen-3-8-flash-next`: read the model-specific architecture facts and source link with `model=qwen-3-8-flash-next`.
