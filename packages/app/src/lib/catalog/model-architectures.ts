@@ -10,12 +10,18 @@ export interface AlternatingLayerSpec {
   count: number;
   colorKey: 'attention' | 'ffn' | 'norm' | 'router' | 'expert';
   slidingWindow?: number;
+  attentionShape?: string;
 }
 
 export interface ModelArchitecture {
   model: Model;
   totalParams: number;
   activeParams: number;
+  /** When prefill and decode activate different parts of a CED backbone. */
+  activeParamsPrefill?: number;
+  /** Conditional-memory parameters outside the vendor's backbone count. */
+  conditionalMemoryParams?: number;
+  conditionalMemoryName?: string;
   architectureType: ArchitectureType;
   attentionType: AttentionType;
   numLayers?: number;
@@ -35,16 +41,32 @@ export interface ModelArchitecture {
   slidingWindow?: number;
   hyperConnections?: number;
   contextWindow?: number;
+  advertisedContextWindow?: number;
   features?: string[];
+  featuresZh?: string[];
   developer?: string;
   sourceUrl?: string;
   attentionExpandable?: boolean;
   alternatingAttentionExpandable?: boolean;
   sharedExperts?: number;
   alternatingNote?: string;
+  alternatingNoteZh?: string;
   denseLayerAttentionLabel?: string;
   ffnVariant?: string;
   ffnGateActivation?: string;
+  ffnSwiGLUOAI?: boolean;
+  ffnClamp?: number;
+  routedExpertHiddenSize?: number;
+  attentionLabel?: string;
+  residualType?: 'AttnRes' | 'gated';
+  /** Causal encoder followed by a decoder whose global KV comes from encoder output. */
+  encoderDecoder?: {
+    encoderLayers: number;
+    decoderLayers: number;
+    globalKVSource: 'final-encoder-hidden-states';
+    encoderSlidingOnlyLayers: number;
+    decoderAttention: 'joint-local-swa-and-shared-global-kv';
+  };
 }
 
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
@@ -383,6 +405,9 @@ export function formatParamCount(params: number): string {
 
 export function getArchitectureSummary(arch: ModelArchitecture): string {
   if (arch.architectureType === 'moe') {
+    if (arch.activeParamsPrefill !== undefined) {
+      return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParamsPrefill)} prefill / ${formatParamCount(arch.activeParams)} decode active)`;
+    }
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
   }
   return `Dense ${formatParamCount(arch.totalParams)}`;
@@ -398,6 +423,10 @@ export function ffnGateActivationLabel(arch: ModelArchitecture): string {
 
 export function denseLayerAttentionLabel(arch: ModelArchitecture): string {
   return arch.denseLayerAttentionLabel ?? getAttentionLabel(arch.attentionType);
+}
+
+export function architectureAttentionLabel(arch: ModelArchitecture): string {
+  return arch.attentionLabel ?? getAttentionLabel(arch.attentionType);
 }
 
 export function sharedExpertCount(arch: ModelArchitecture): number {
@@ -545,29 +574,39 @@ export function getFFNSubBlocks(
   options?: { useDenseFFNDim?: boolean },
 ): SubBlockFlow {
   const ffnDim = options?.useDenseFFNDim && arch.denseFFNDim ? arch.denseFFNDim : arch.ffnDim;
-  const hiddenSize = arch.hiddenSize;
+  const hiddenSize = options?.useDenseFFNDim
+    ? arch.hiddenSize
+    : (arch.routedExpertHiddenSize ?? arch.hiddenSize);
+
+  const gateBlocks: ArchSubBlock[] = [
+    {
+      name: 'Gate Projection',
+      detail: ffnDim ? `→ ${ffnDim.toLocaleString()}` : undefined,
+      type: 'projection',
+    },
+  ];
+  const upBlocks: ArchSubBlock[] = [
+    {
+      name: 'Up Projection',
+      detail: ffnDim ? `→ ${ffnDim.toLocaleString()}` : undefined,
+      type: 'projection',
+    },
+  ];
+  if (arch.ffnClamp !== undefined) {
+    gateBlocks.push({ name: 'Clamp', detail: `max = ${arch.ffnClamp}`, type: 'operation' });
+    upBlocks.push({ name: 'Clamp', detail: `±${arch.ffnClamp}`, type: 'operation' });
+  }
+  gateBlocks.push({
+    name: arch.ffnSwiGLUOAI ? 'Scaled SiLU' : `${ffnGateActivationLabel(arch)} Activation`,
+    detail: arch.ffnSwiGLUOAI ? 'α = 1.702' : 'Applied to gate output',
+    type: 'activation',
+  });
+  if (arch.ffnSwiGLUOAI) upBlocks.push({ name: '+1', type: 'operation' });
 
   return {
     layout: 'parallel',
-    leftPath: [
-      {
-        name: 'Gate Projection',
-        detail: ffnDim ? `\u2192 ${ffnDim.toLocaleString()}` : undefined,
-        type: 'projection',
-      },
-      {
-        name: `${ffnGateActivationLabel(arch)} Activation`,
-        detail: 'Applied to gate output',
-        type: 'activation',
-      },
-    ],
-    rightPath: [
-      {
-        name: 'Up Projection',
-        detail: ffnDim ? `\u2192 ${ffnDim.toLocaleString()}` : undefined,
-        type: 'projection',
-      },
-    ],
+    leftPath: gateBlocks,
+    rightPath: upBlocks,
     mergeBlocks: [
       {
         name: '\u2297',
