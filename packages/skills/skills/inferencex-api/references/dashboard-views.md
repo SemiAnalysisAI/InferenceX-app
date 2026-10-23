@@ -490,3 +490,32 @@ revision 不会缓存。配置、隔离和清除规则见 `docs/operatorx.md`。
 
 OperatorX presentation-only exclusions: deferred mounting and landing-link intent
 prefetch use existing APIs and preserve both locales' selectors and measurements.
+
+## Model architecture coverage
+
+`GET /api/v1/views/model-architectures` returns the same `MODEL_ARCHITECTURES`
+registry used by `/model/<slug>`, `/zh/model/<slug>`, and dashboard diagrams.
+Omit `model` for all entries, or pass an exact display name such as `Kimi-K3` or
+a canonical compare slug such as `kimi-k3`. Empty values, aliases, unknown
+parameters, and repeated parameters return 400. No `format` parameter is accepted.
+The response is JSON with `view`, `apiVersion`, resolved `params.model`, and
+`models: [{ slug, architecture }]`; `slug` is null for a registry model without
+a canonical compare slug. No authentication is required. Successful responses
+use `Cache-Control: public, max-age=0, s-maxage=300`.
+
+| Surface or control                                                                                     | Read-only coverage                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model architecture selection                                                                           | `model` selects one entry; omission returns all registry entries, including hidden models.                                                                    |
+| Parameter counts, dimensions, context, attention, FFN, expert routing, optional architectural features | `architecture` preserves registry values exactly; parameter counts are in billions, dimensions/context in exact counts. Missing optional fields stay omitted. |
+| Vendor provenance and model identity                                                                   | Preserve `architecture.sourceUrl`, `architecture.model`, and `slug`; related checkpoints can share a model identity.                                          |
+| English and Chinese model architecture pages                                                           | Both render the same facts; bilingual stage descriptions are included when supplied.                                                                          |
+| Diagram expansion, collapse, layout, tooltip visibility and navigation                                 | Presentation only; these controls do not change architecture facts.                                                                                           |
+| Model-page benchmark controls and unofficial overlays                                                  | Existing `inference` view; this architecture catalog does not read benchmark data or unofficial runs.                                                         |
+| Static model editorial prose                                                                           | Discover through the existing model pages and text feeds; no separate measurement calculation.                                                                |
+| Credentials, private artifacts, feedback and administration                                            | Excluded: sensitive data or mutation operations, unrelated to public architecture specifications.                                                             |
+
+Do not treat rounded vendor parameter totals as exact checkpoint tensor counts,
+and retain any advertised-context qualification alongside the configured length.
+For causal encoder-decoder models preserve separate prefill and decode active
+counts when supplied. Conditional-memory and auxiliary-module accounting is
+model-specific; retain the registry's accompanying features and source link.

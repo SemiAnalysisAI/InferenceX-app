@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import type { Locale } from '@/lib/i18n/i18n';
+import { renderArchitectureStages } from './model-architecture-stages';
 
 import {
   type ArchSubBlock,
@@ -8,7 +9,7 @@ import {
   formatContextWindow,
   formatParamCount,
   expertRouterSummary,
-  getAttentionLabel,
+  architectureAttentionLabel,
   getAttentionSubBlocks,
   getFFNSubBlocks,
   denseLayerAttentionLabel,
@@ -45,6 +46,11 @@ const ARCHITECTURE_TEXT_ZH: Record<string, string> = {
   'Compressed Sparse Attention': '压缩稀疏注意力',
   'Sliding Attention + Sink': '滑动窗口注意力 + Sink',
   'Causal Grouped Query Attention': '因果分组查询注意力',
+  'Causal GQA + Sink': '因果 GQA + Sink',
+  'MiniMax Sparse Attention (MSA)': 'MiniMax 稀疏注意力（MSA）',
+  Clamp: '截断',
+  'Scaled SiLU': '带缩放系数的 SiLU',
+  'gated MLA at layers 4, 8, …, 92, 93': '第 4、8、…、92、93 层使用 gated MLA',
   'Gated MLA': '门控 MLA',
   'Q Projection': 'Q 投影',
   'K Projection': 'K 投影',
@@ -303,6 +309,10 @@ export function renderDiagram(
   onBlockClick: (blockId: string) => void,
   locale: Locale = 'en',
 ) {
+  if (arch.diagramStages) {
+    renderArchitectureStages(svgEl, arch, isDark, locale);
+    return;
+  }
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
 
@@ -701,7 +711,7 @@ export function renderDiagram(
 
   function drawResidualBypass(branchY: number, mergeY: number) {
     const tapY = branchY - arrowH / 2;
-    const nodeHalfW = isHyperConn ? 25 : circleR;
+    const nodeHalfW = isHyperConn || arch.residualType ? 25 : circleR;
     bgG
       .append('path')
       .attr(
@@ -712,7 +722,7 @@ export function renderDiagram(
       .attr('stroke', mutedFg)
       .attr('stroke-width', 1.5)
       .attr('opacity', 0.6);
-    if (isHyperConn) {
+    if (isHyperConn || arch.residualType) {
       g.append('rect')
         .attr('x', cx - nodeHalfW)
         .attr('y', mergeY - circleR)
@@ -731,7 +741,7 @@ export function renderDiagram(
         .attr('font-size', '8.5px')
         .attr('font-weight', 700)
         .attr('font-family', 'inherit')
-        .text(`mHC ×${hcStreams}`);
+        .text(arch.residualType ?? `mHC ×${hcStreams}`);
     } else {
       g.append('circle')
         .attr('cx', cx)
@@ -1693,7 +1703,7 @@ export function renderDiagram(
     );
   }
 
-  const attnLabel = getAttentionLabel(arch.attentionType);
+  const attnLabel = architectureAttentionLabel(arch);
   const mainLayerCount = hasDenseLayers ? moeLayerCount : arch.numLayers;
   const layerSuffix = hasDenseLayers ? ' MoE layers' : ' layers';
   const layerLabel = mainLayerCount ? `\u00D7${mainLayerCount}${layerSuffix}` : 'Transformer Block';
@@ -1989,12 +1999,14 @@ export function renderDiagram(
         drawBlock(innerX, altNorm1Y[bi], innerW, smallH, 'norm', 'RMSNorm');
         drawArrow(altNorm1Y[bi] + smallH, altAttnY[bi]);
 
-        const headSub = [
-          arch.numHeads ? `${arch.numHeads} heads` : null,
-          arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
-        ]
-          .filter(Boolean)
-          .join('  \u00B7  ');
+        const headSub =
+          spec.attentionShape ??
+          [
+            arch.numHeads ? `${arch.numHeads} heads` : null,
+            arch.numKVHeads ? `${arch.numKVHeads} KV heads` : null,
+          ]
+            .filter(Boolean)
+            .join('  \u00B7  ');
         const specWindow = spec.slidingWindow;
         const attnSub = specWindow
           ? `${headSub}${headSub ? '  \u00B7  ' : ''}window=${specWindow}`

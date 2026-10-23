@@ -1,0 +1,350 @@
+{
+  "capturedOn": "2026-10-23",
+  "description": "Selected verbatim upstream config fields; parameter headlines come from the linked vendor model cards, not tensor metadata.",
+  "models": [
+    {
+      "model": "DeepSeek-R1-0528",
+      "sourceUrl": "https://huggingface.co/deepseek-ai/DeepSeek-R1-0528/raw/main/config.json",
+      "configSha256": "79ddea672a62e95d3f0be27be434375538e1988975971cffcf87c96c1de84a65",
+      "config": {
+        "num_hidden_layers": 61,
+        "hidden_size": 7168,
+        "num_attention_heads": 128,
+        "num_key_value_heads": 128,
+        "vocab_size": 129280,
+        "max_position_embeddings": 163840,
+        "moe_intermediate_size": 2048,
+        "intermediate_size": 18432,
+        "n_routed_experts": 256,
+        "num_experts_per_tok": 8,
+        "n_shared_experts": 1,
+        "first_k_dense_replace": 3,
+        "moe_layer_freq": 1,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "DeepSeek-V4-Pro",
+      "sourceUrl": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/raw/main/config.json",
+      "configSha256": "5fe4568daee51c208cb8a79538eaeda090ae011ade1dee2c386aa95f569c810e",
+      "config": {
+        "num_hidden_layers": 61,
+        "hidden_size": 7168,
+        "num_attention_heads": 128,
+        "num_key_value_heads": 1,
+        "head_dim": 512,
+        "vocab_size": 129280,
+        "max_position_embeddings": 1048576,
+        "moe_intermediate_size": 3072,
+        "n_routed_experts": 384,
+        "num_experts_per_tok": 6,
+        "n_shared_experts": 1,
+        "hidden_act": "silu",
+        "swiglu_limit": 10.0
+      }
+    },
+    {
+      "model": "Kimi-K2.5",
+      "sourceUrl": "https://huggingface.co/moonshotai/Kimi-K2.5/raw/main/config.json",
+      "configSha256": "acd5bb01a16f64b309599cd6ed196be056f613c99d6bc9300692b82cd10882f6",
+      "config": {
+        "num_hidden_layers": 61,
+        "hidden_size": 7168,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 64,
+        "vocab_size": 163840,
+        "max_position_embeddings": 262144,
+        "moe_intermediate_size": 2048,
+        "intermediate_size": 18432,
+        "n_routed_experts": 384,
+        "num_experts_per_tok": 8,
+        "n_shared_experts": 1,
+        "first_k_dense_replace": 1,
+        "moe_layer_freq": 1,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "Kimi-K3",
+      "sourceUrl": "https://huggingface.co/moonshotai/Kimi-K3/raw/main/config.json",
+      "configSha256": "9710e121a58d03ac92c8d6da287a19541994319afbbe6d6202af001ffd379213",
+      "config": {
+        "num_hidden_layers": 93,
+        "hidden_size": 7168,
+        "num_attention_heads": 96,
+        "num_key_value_heads": 96,
+        "vocab_size": 163840,
+        "max_position_embeddings": 1048576,
+        "moe_intermediate_size": 3072,
+        "intermediate_size": 33792,
+        "num_experts": 896,
+        "num_experts_per_token": 16,
+        "num_shared_experts": 2,
+        "first_k_dense_replace": 1,
+        "moe_layer_freq": 1,
+        "hidden_act": "situ",
+        "routed_expert_hidden_size": 3584
+      }
+    },
+    {
+      "model": "MiniMax-M2.5",
+      "sourceUrl": "https://huggingface.co/MiniMaxAI/MiniMax-M2.5/raw/main/config.json",
+      "configSha256": "3372a31ecbdba614b309cfa5b3dfec33ceea3c580cb9612ff35345d92ced8618",
+      "config": {
+        "num_hidden_layers": 62,
+        "hidden_size": 3072,
+        "num_attention_heads": 48,
+        "num_key_value_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 200064,
+        "max_position_embeddings": 196608,
+        "intermediate_size": 1536,
+        "num_local_experts": 256,
+        "num_experts_per_tok": 8,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "MiniMax-M3",
+      "sourceUrl": "https://huggingface.co/MiniMaxAI/MiniMax-M3/raw/main/config.json",
+      "configSha256": "c9c97ce1e4eece60012d5a10ea87717458bfb1f19c2c7a615a3dbff83d090c6b",
+      "config": {
+        "num_hidden_layers": 60,
+        "hidden_size": 6144,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 4,
+        "head_dim": 128,
+        "vocab_size": 200064,
+        "max_position_embeddings": 1048576,
+        "intermediate_size": 3072,
+        "dense_intermediate_size": 12288,
+        "num_local_experts": 128,
+        "num_experts_per_tok": 4,
+        "n_shared_experts": 1,
+        "moe_layer_freq": [
+          0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        ],
+        "hidden_act": "swigluoai",
+        "swiglu_alpha": 1.702,
+        "swiglu_limit": 7.0
+      }
+    },
+    {
+      "model": "MiniMax-M3.1-Flash",
+      "sourceUrl": "https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash/raw/main/config.json",
+      "configSha256": "df6a3668e2de5b8dc0e883e3767495ad17af7e4d69fabe9683088be015fda9ab",
+      "config": {
+        "num_hidden_layers": 60,
+        "hidden_size": 6144,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 4,
+        "head_dim": 128,
+        "vocab_size": 200064,
+        "max_position_embeddings": 1048576,
+        "intermediate_size": 3072,
+        "dense_intermediate_size": 12288,
+        "num_local_experts": 128,
+        "num_experts_per_tok": 4,
+        "n_shared_experts": 1,
+        "moe_layer_freq": [
+          0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+        ],
+        "hidden_act": "swigluoai",
+        "swiglu_alpha": 1.702,
+        "swiglu_limit": 7.0
+      }
+    },
+    {
+      "model": "gpt-oss-120b",
+      "sourceUrl": "https://huggingface.co/openai/gpt-oss-120b/raw/main/config.json",
+      "configSha256": "933aeb666a3fd851133ddd7686414f369bc564c4185fb5704416550879f10566",
+      "config": {
+        "num_hidden_layers": 36,
+        "hidden_size": 2880,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 8,
+        "head_dim": 64,
+        "vocab_size": 201088,
+        "max_position_embeddings": 131072,
+        "intermediate_size": 2880,
+        "num_local_experts": 128,
+        "num_experts_per_tok": 4,
+        "hidden_act": "silu",
+        "swiglu_limit": 7.0
+      }
+    },
+    {
+      "model": "GLM-5",
+      "sourceUrl": "https://huggingface.co/zai-org/GLM-5.1/raw/main/config.json",
+      "configSha256": "726e45e28d1be1636a5834048a4101a2cfe384819ad2ebe08d41f6fe04656526",
+      "config": {
+        "num_hidden_layers": 78,
+        "hidden_size": 6144,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 64,
+        "head_dim": 64,
+        "vocab_size": 154880,
+        "max_position_embeddings": 202752,
+        "moe_intermediate_size": 2048,
+        "intermediate_size": 12288,
+        "n_routed_experts": 256,
+        "num_experts_per_tok": 8,
+        "n_shared_experts": 1,
+        "first_k_dense_replace": 3,
+        "moe_layer_freq": 1,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "GLM-5.2",
+      "sourceUrl": "https://huggingface.co/zai-org/GLM-5.2/raw/main/config.json",
+      "configSha256": "185f93ee6d12548e16a847e279dc0c3c90b1524c970b0866b42fb545747d859a",
+      "config": {
+        "num_hidden_layers": 78,
+        "hidden_size": 6144,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 64,
+        "head_dim": 192,
+        "vocab_size": 154880,
+        "max_position_embeddings": 1048576,
+        "moe_intermediate_size": 2048,
+        "intermediate_size": 12288,
+        "n_routed_experts": 256,
+        "num_experts_per_tok": 8,
+        "n_shared_experts": 1,
+        "first_k_dense_replace": 3,
+        "moe_layer_freq": 1,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "Qwen-3.5-397B-A17B",
+      "sourceUrl": "https://huggingface.co/Qwen/Qwen3.5-397B-A17B/raw/main/config.json",
+      "configSha256": "3ae7fa89c2f7d1354096418ddaf1331e9e0898a8ca11e804fb6dbaa087efb7da",
+      "config": {
+        "num_hidden_layers": 60,
+        "hidden_size": 4096,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 2,
+        "head_dim": 256,
+        "vocab_size": 248320,
+        "max_position_embeddings": 262144,
+        "moe_intermediate_size": 1024,
+        "num_experts": 512,
+        "num_experts_per_tok": 10,
+        "hidden_act": "silu",
+        "shared_expert_intermediate_size": 1024
+      }
+    },
+    {
+      "model": "Qwen3.8-Flash-Next",
+      "sourceUrl": "https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8/raw/main/config.json",
+      "configSha256": "c22eb0a053eed62e18f0184d3ca62d3798f208c3e00b9feee939fc3dbacdc8ca",
+      "config": {
+        "num_hidden_layers": 48,
+        "hidden_size": 2560,
+        "num_attention_heads": 24,
+        "num_key_value_heads": 2,
+        "head_dim": 256,
+        "vocab_size": 248320,
+        "max_position_embeddings": 262144,
+        "moe_intermediate_size": 640,
+        "num_experts": 512,
+        "num_experts_per_tok": 10,
+        "hidden_act": "silu",
+        "shared_expert_intermediate_size": 640
+      }
+    },
+    {
+      "model": "Qwen3.8-27B",
+      "sourceUrl": "https://huggingface.co/Qwen/Qwen3.8-27B/raw/main/config.json",
+      "configSha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+      "config": {
+        "num_hidden_layers": 64,
+        "hidden_size": 5120,
+        "num_attention_heads": 24,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "vocab_size": 248320,
+        "max_position_embeddings": 262144,
+        "intermediate_size": 17408,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "Qwen3.8-27B-Eager",
+      "sourceUrl": "https://huggingface.co/Qwen/Qwen3.8-27B/raw/main/config.json",
+      "configSha256": "191e0af232104ed8b65258cf3fb2b842e288008baca7633c11b82a1ac7203aab",
+      "config": {
+        "num_hidden_layers": 64,
+        "hidden_size": 5120,
+        "num_attention_heads": 24,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "vocab_size": 248320,
+        "max_position_embeddings": 262144,
+        "intermediate_size": 17408,
+        "hidden_act": "silu"
+      }
+    },
+    {
+      "model": "DeepSeek-V4.1-Flash",
+      "sourceUrl": "https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/raw/main/config.json",
+      "configSha256": "8be45ce0476004a3f529fd896115a4a2e800a129ad2d3ec05b16050f52e21879",
+      "config": {
+        "num_hidden_layers": 40,
+        "hidden_size": 5120,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 1,
+        "head_dim": 512,
+        "vocab_size": 129280,
+        "max_position_embeddings": 1048576,
+        "moe_intermediate_size": 2304,
+        "n_routed_experts": 384,
+        "num_experts_per_tok": 6,
+        "n_shared_experts": 1,
+        "hidden_act": "silu",
+        "swiglu_limit": 10.0
+      }
+    },
+    {
+      "model": "Muse-Spark-Open",
+      "sourceUrl": "https://huggingface.co/amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4/raw/main/config.json",
+      "configSha256": "409933b99ebf25d3be05e7beb14712bce315f599e370752fa61995c50b26fcd2",
+      "config": {
+        "num_hidden_layers": 62,
+        "hidden_size": 8192,
+        "num_attention_heads": 128,
+        "num_key_value_heads": 16,
+        "head_dim": 64,
+        "vocab_size": 202048,
+        "max_position_embeddings": 1048576,
+        "moe_intermediate_size": 4096,
+        "intermediate_size": 16384,
+        "num_local_experts": 256,
+        "num_experts_per_tok": 8,
+        "num_shared_experts": 0,
+        "hidden_act": "silu",
+        "moe_hidden_size": 4096
+      }
+    },
+    {
+      "model": "Llama-3.3-70B-Instruct-FP8",
+      "sourceUrl": "https://huggingface.co/nvidia/Llama-3.3-70B-Instruct-FP8/raw/main/config.json",
+      "configSha256": "76bea1c34b224053cd5706a916d2fdc3c40f332d9f79bd8dd7965e436869c795",
+      "config": {
+        "num_hidden_layers": 80,
+        "hidden_size": 8192,
+        "num_attention_heads": 64,
+        "num_key_value_heads": 8,
+        "head_dim": 128,
+        "vocab_size": 128256,
+        "max_position_embeddings": 131072,
+        "intermediate_size": 28672,
+        "hidden_act": "silu"
+      }
+    }
+  ]
+}

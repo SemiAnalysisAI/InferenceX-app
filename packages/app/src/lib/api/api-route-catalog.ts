@@ -46,6 +46,14 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/views/model-architectures/route.ts',
+    path: '/api/v1/views/model-architectures',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-model-architectures-view',
+    sourceSha256: 'f9bc4c6fd4f895f36695f969e2cdf3978a9751afcb3bdf55e3a64b2eb5ba6645',
+  },
+  {
     source: 'src/app/api/v1/views/cache-reuse/route.ts',
     path: '/api/v1/views/cache-reuse',
     method: 'GET',
@@ -1151,6 +1159,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/catalog/model-architectures.ts',
+    sourceSha256: '50e3b6314f2ebe5644f2fa55c1492009e6a0cede1415894316a4a8bf3f35cb70',
+    reviewArea: {
+      en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
+      zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',
+    },
+  },
+  {
     source: '../db/src/operatorx/visualization.ts',
     sourceSha256: '2b05d3af345fe795b4262e4408f587f2d3f125de0461b3c6c4ce6f3124409635',
     reviewArea: {
@@ -1463,7 +1479,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '291e1cc1bca965f658f31506ef0ab720fb8305e3cade52c8be6d83546fb81dc6',
+    sourceSha256: '00b11a56c38009ada23f4efbc7d378cdc6133377c7ede054230790acf2bf2742',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1613,7 +1629,7 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): one new DB
     // key, `minimaxm31flash`, with its own display name and release date. The
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
-    sourceSha256: '63a8ca335fccef8db1e93205db10456d75f2f8d4f100f89b160e6c1c574d62d4',
+    sourceSha256: '9afbd7db9690502ea53977496f228c89dc184c41e4a81a13a248bbf6fd38afb9',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

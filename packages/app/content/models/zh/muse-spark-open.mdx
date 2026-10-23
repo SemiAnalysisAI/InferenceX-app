@@ -1,0 +1,25 @@
+---
+title: 'Muse Spark Open'
+developer: 'Meta'
+releaseDate: '2026 年 10 月 15 日'
+description: 'Meta 的多模态 MoE 模型，总参数量 816B、每个 token 激活 42B，采用 pooled experts 与门控残差，支持 1M token 上下文。'
+---
+
+## 概述
+
+Muse Spark Open 是 Meta 面向代码与智能体任务发布的开放权重模型，支持文本、图像、视频和音频输入，输出文本。Meta 公布的总参数量为 816B，每个 token 激活 42B，上下文为 1,048,576 token。这些数据专指 Muse Spark Open，不是对闭源 Muse Spark 服务架构的推测（[Meta 文档](https://dev.meta.ai/docs/muse-spark-open)、[发布公告](https://research.meta.ai/blog/muse-spark-open)）。
+
+## 架构
+
+- **文本主干：**62 层 Transformer，隐藏维度 8192，词表大小 202048。
+- **注意力：**128 个 query head、16 个 KV head，head 维度 64；使用 QK 归一化，以及注意力输出门控与归一化。
+- **层分布：**46 层滑动窗口注意力，窗口为 2048 token；另有 16 层全局注意力。全局注意力的索引为 1、5、…、61（从 0 开始计数）。滑动窗口层使用 RoPE，全局层使用 NoPE。
+- **Expert：**每层有 256 个路由 expert，每个 token 选取 top-8，没有共享 expert。Pooled MoE 在 4096 维潜在空间中计算，expert 中间维度也为 4096，不能直接套用完整隐藏维度的普通 expert FFN 示意图。
+- **残差：**采用可学习的残差门控，不能无说明地画成普通残差相加。
+- **感知输入：**图像与视频感知编码器、音频编码器的输出送入语言主干。
+
+上述层数与张量维度来自 [AMD 发布的 checkpoint 配置](https://huggingface.co/amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4/raw/main/config.json)与 [Transformers 实现文档](https://huggingface.co/docs/transformers/v5.20.0/en/model_doc/muse_spark)。Meta 的原始 checkpoint 配置需要申请访问权限，因此这里列出上述公开来源以说明数据出处，而不暗示该文件可以自由获取。
+
+## Checkpoint 与数据范围
+
+Meta 以 Muse Model License 发布 BF16 和 NVFP4 checkpoint，AMD 另行发布 MXFP4 checkpoint。816B 是厂商公布的标称参数量，与仓库中的张量统计值不同，引用时应保留其原本的统计口径。架构说明属于静态元数据；下方 InferenceX 图表展示实测的推理性能（[Meta 文档](https://dev.meta.ai/docs/muse-spark-open)）。

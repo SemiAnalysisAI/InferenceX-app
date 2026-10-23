@@ -1,0 +1,26 @@
+---
+title: 'Qwen3.8 27B (eager)'
+developer: 'Alibaba (Qwen)'
+releaseDate: 'August 5, 2026'
+description: "Qwen's dense 27B vision-language model with 48 Gated DeltaNet layers, 16 Gated Attention layers, and a 262K native context window."
+---
+
+## Overview
+
+Qwen3.8-27B is a dense vision-language model, distinct from the MoE Qwen3.8-Flash-Next. It accepts text, images and video and generates text. Qwen reports 27B parameters and a 262,144-token native context, extensible to 1M ([model card](https://huggingface.co/Qwen/Qwen3.8-27B)).
+
+## Architecture
+
+- **Backbone:** 64 layers, hidden size 5120, vocabulary 248320.
+- **Repeated group:** 16 repetitions of 3 Gated DeltaNet layers followed by 1 Gated Attention layer, for 48 linear-attention and 16 full-attention layers.
+- **Linear attention:** 48 value heads and 16 QK heads, head dimensions 128, convolution kernel width 4.
+- **Full attention:** 24 query heads and 4 KV heads, head dimension 256, with output gating and 64-dimensional rotary position embeddings.
+- **FFN:** dense SwiGLU with intermediate width 17408; no MoE router or expert selection.
+- **Speculation:** one configured MTP layer, trained for multi-step prediction.
+- **Precision and license:** BF16 reference checkpoint under Apache 2.0.
+
+Architecture dimensions and the complete layer order are available in the [published config](https://huggingface.co/Qwen/Qwen3.8-27B/raw/main/config.json).
+
+## InferenceX execution variants
+
+The standard and eager InferenceX entries use the same Qwen3.8-27B checkpoint architecture. Eager identifies an execution variant; it does not define another parameter count, attention pattern or model family. Results remain separate so the execution settings can be compared without mixing their identities.
