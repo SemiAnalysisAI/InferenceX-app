@@ -195,10 +195,6 @@ jobs:
         with:
           path: packages/app/.next/cache
           key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
-      - name: Diagnose port 3000 (temporary)
-        run: |
-          sudo ss -ltnp | grep -E ':3000\b' || echo "nothing listening on 3000"
-          curl -sv --max-time 5 http://localhost:3000/ -o /dev/null 2>&1 | tail -5 || true
       - name: Run integration tests
         uses: cypress-io/github-action@09090944bd8aaa2a517cefb6e38bf1aae336b42b # v7.4.3
         with:
