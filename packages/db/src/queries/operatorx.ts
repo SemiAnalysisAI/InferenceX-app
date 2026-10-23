@@ -69,18 +69,36 @@ export async function getOperatorXRunComparison(
   runKey: string,
   op: ComparisonOp,
 ): Promise<Comparison | null> {
+  const comparisons = await getOperatorXRunComparisons(sql, [{ run_id: runKey }], op);
+  return comparisons.get(runKey) ?? null;
+}
+
+/** Read the listed revisions in one query; absent/old projections use raw fallback. */
+export async function getOperatorXRunComparisons(
+  sql: DbClient,
+  runs: Pick<OperatorXRunRef, 'run_id' | 'revision'>[],
+  op: ComparisonOp,
+): Promise<Map<string, Comparison>> {
+  if (runs.length === 0) return new Map();
+  const requested = JSON.stringify(
+    runs.map((run) => ({
+      run_key: run.run_id,
+      revision: run.revision ?? null,
+    })),
+  );
   try {
     const rows = await sql`
-      SELECT c.comparison
-      FROM opx_runs r
+      SELECT r.run_key, c.comparison
+      FROM jsonb_to_recordset(${requested}::jsonb) AS requested(run_key text, revision text)
+      JOIN opx_runs r ON r.run_key = requested.run_key
+        AND (requested.revision IS NULL OR r.id::text = requested.revision)
       JOIN opx_run_comparisons c ON c.run_id = r.id
-      WHERE r.run_key = ${runKey} AND c.op = ${op}
-        AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
+      WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
     `;
-    return rows.length > 0 ? (rows[0].comparison as Comparison) : null;
+    return new Map(rows.map((row) => [String(row.run_key), row.comparison as Comparison]));
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01')
-      return null;
+      return new Map();
     throw error;
   }
 }

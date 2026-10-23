@@ -70,6 +70,10 @@ function bundle(
   };
 }
 
+function projection(raw: OperatorXRawBundle) {
+  return buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(raw) }]);
+}
+
 function source(bundles: OperatorXRawBundle[], failedIds = new Set<string>()) {
   const byId = new Map(bundles.map((item) => [item.run.run_id, item]));
   const getBundle = vi.fn((id: string) =>
@@ -257,6 +261,46 @@ describe('compact OperatorX comparison reads', () => {
     const updatedComparison = await getComparison('gemm');
     expect(updatedComparison.rows[0].revision).toBe('901');
     expect(getRunComparison).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+});
+
+describe('bulk OperatorX comparison reads', () => {
+  it.each([true, false])(
+    'uses one query, preserving merge order and fallback (complete=%s)',
+    async (complete) => {
+      const newest = bundle('9', ['vllm'], { status: 'error' });
+      const older = bundle('8', ['vllm', 'torch']);
+      const reads = source([newest, older]);
+      const compact = new Map(
+        (complete ? [older, newest] : [newest]).map((raw) => [raw.run.run_id, projection(raw)]),
+      );
+      const read = vi.fn().mockResolvedValue(compact);
+      reads.config.getRunComparisons = read;
+      reads.config.getRunComparison = vi
+        .fn()
+        .mockRejectedValue(new Error('unexpected per-run read'));
+      const { getComparison } = await import('./service');
+      const result = await getComparison('gemm');
+      expect(result.rows.map((row) => [row.runId, row.status])).toEqual([
+        ['9', 'error'],
+        ['8', 'ok'],
+      ]);
+      await getComparison('gemm');
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(read.mock.calls[0][0]).toMatchObject([{ run_id: '9' }, { run_id: '8' }]);
+      expect(reads.config.getRunComparison).not.toHaveBeenCalled();
+      expect(reads.getBundle).toHaveBeenCalledTimes(complete ? 0 : 1);
+    },
+  );
+
+  it('retries a failed bulk query without silently loading raw artifacts', async () => {
+    const reads = source([bundle('9', ['vllm'])]);
+    reads.config.getRunComparisons = vi.fn().mockRejectedValue(new Error('bulk read unavailable'));
+    const { getComparison } = await import('./service');
+    await expect(getComparison('gemm')).rejects.toThrow('bulk read unavailable');
+    await expect(getComparison('gemm')).rejects.toThrow('bulk read unavailable');
+    expect(reads.config.getRunComparisons).toHaveBeenCalledTimes(2);
     expect(reads.getBundle).not.toHaveBeenCalled();
   });
 });

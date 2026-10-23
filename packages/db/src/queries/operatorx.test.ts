@@ -12,6 +12,7 @@ import {
   backfillOperatorXRunComparisons,
   getOperatorXBundle,
   getOperatorXRunComparison,
+  getOperatorXRunComparisons,
   listOperatorXRuns,
   saveOperatorXBundle,
 } from './operatorx';
@@ -282,6 +283,7 @@ it('falls back before the projection migration is applied', async () => {
   try {
     await migrate(db, false);
     expect(await getOperatorXRunComparison(sqlFor(db), '123', 'gemm')).toBeNull();
+    expect(await getOperatorXRunComparisons(sqlFor(db), [bundle().run], 'gemm')).toEqual(new Map());
   } finally {
     await db.close();
   }
@@ -293,5 +295,45 @@ it.each(['42501', '08006', '57014'])(
     const failure = Object.assign(new Error('database failure'), { code });
     const sql = (() => Promise.reject(failure)) as unknown as DbClient;
     await expect(getOperatorXRunComparison(sql, '123', 'gemm')).rejects.toBe(failure);
+    await expect(getOperatorXRunComparisons(sql, [bundle().run], 'gemm')).rejects.toBe(failure);
   },
 );
+
+it('reads requested compact run revisions in one query with full single-read parity', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const first = bundle();
+    const second = bundle();
+    second.run.run_id = '124';
+    await saveOperatorXBundle(sql, first);
+    await saveOperatorXBundle(sql, second);
+    const runs = await listOperatorXRuns(sql);
+    let calls = 0;
+    const counted: DbClient = (strings, ...values) => {
+      calls++;
+      return sql(strings, ...values);
+    };
+    const result = await getOperatorXRunComparisons(counted, runs, 'gemm');
+    expect(calls).toBe(1);
+    expect(result.size).toBe(2);
+    for (const run of runs) {
+      const raw = await getOperatorXBundle(sql, run.run_id);
+      expect(result.get(run.run_id)).toEqual(expectedComparison(raw!));
+    }
+    expect(await getOperatorXRunComparisons(counted, [], 'gemm')).toEqual(new Map());
+    expect(calls).toBe(1);
+
+    const captured = runs.find((run) => run.run_id === '123')!;
+    await saveOperatorXBundle(sql, first);
+    expect(await getOperatorXRunComparisons(sql, [captured], 'gemm')).toEqual(new Map());
+    const current = await listOperatorXRuns(sql);
+    await db.exec("UPDATE opx_run_comparisons SET format_version = 999 WHERE op = 'gemm'");
+    expect(await getOperatorXRunComparisons(sql, current, 'gemm')).toEqual(new Map());
+    const missing = { ...captured, run_id: 'not-stored' };
+    expect(await getOperatorXRunComparisons(sql, [missing], 'gemm')).toEqual(new Map());
+  } finally {
+    await db.close();
+  }
+});

@@ -9,6 +9,11 @@ export interface OperatorXSource {
   listRuns: () => Promise<OperatorXRunRef[]>;
   /** Compact ingest-time comparison, or null for an unbackfilled run. */
   getRunComparison?: (runId: string, op: ComparisonOp) => Promise<Comparison | null>;
+  /** Bulk compact reads preserve the captured revisions; omitted runs use raw fallback. */
+  getRunComparisons?: (
+    runs: OperatorXRunRef[],
+    op: ComparisonOp,
+  ) => Promise<Map<string, Comparison>>;
   getBundle: (runId: string) => Promise<OperatorXRawBundle>;
 }
 

@@ -459,7 +459,8 @@ Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面
 ### OperatorX compact reads
 
 OperatorX's page-owned comparison endpoint reads versioned per-run projections
-prepared atomically during ingestion. It returns the same cases, defaults,
+prepared atomically during ingestion, fetched in one revision-aware SQL query.
+It returns the same cases, defaults,
 measurements, statuses, backend attribution, and revision-safe timeline references
 as the raw reader. Old or unbackfilled runs retain raw-reader fallback; partial
 storage reads are never cached. Profiling artifacts are fetched only for details.

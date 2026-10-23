@@ -799,7 +799,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // assumptions, cross-backend argument alignment (fastest successful backend per
 // hardware/case, with measurements[].backend provenance), and workload-resolved
 // chart defaults are documented in docs/operatorx.md. Ingest-time compact run
-// projections preserve the response and source identities; legacy fallback and
+// projections are fetched in one revision-aware bulk query, preserving response
+// and source identities; legacy fallback and
 // partial-read cache behavior are documented there as well.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
