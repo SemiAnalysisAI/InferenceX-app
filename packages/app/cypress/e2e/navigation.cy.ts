@@ -172,15 +172,15 @@ describe('First-load navigation', () => {
         .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 1);
-      for (const hidden of ['minimax-m3', 'kimi-k3', 'muse-spark-open', 'glm-5-3']) {
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
+      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
         cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
       }
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
         );
-        expect(slugs).to.deep.equal(['deepseek-v41-flash']);
+        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
       });
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
         'not.exist',

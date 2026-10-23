@@ -379,7 +379,6 @@ const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'qwen-3-5',
   'minimax-m3',
   'kimi-k3',
-  'muse-spark-open',
   'glm-5-3',
 ]);
 

@@ -28,11 +28,19 @@ describe('Muse Spark Open results', () => {
     });
   });
   for (const prefix of ['', '/zh']) {
-    it(`opens the canonical Muse dashboard under ${prefix || '/'}`, () => {
+    it(`opens the canonical Muse dashboard from ${prefix || '/'} with the mascot`, () => {
       cy.visit(prefix || '/');
-      cy.get('[data-testid="compare-agentx-primary"]').should('exist');
-      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should('not.exist');
-      cy.visit(`${prefix}/inference/muse-spark-open`);
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
+        .should('contain.text', prefix ? '查看结果' : 'View results')
+        .and('not.contain.text', prefix ? '预览' : 'Preview')
+        .find('img')
+        .should('have.attr', 'src', '/logos/muse-mascot.webp');
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should(
+        'have.attr',
+        'href',
+        `${prefix}/inference/muse-spark-open`,
+      );
+      cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
       cy.location('pathname', { timeout: 30000 }).should(
         'eq',
         `${prefix}/inference/muse-spark-open`,
@@ -102,12 +110,17 @@ describe('landing model curation', () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
-          expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq([
-            `${prefix}/inference/deepseek-v41-flash`,
-          ]);
+          expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
+            ['muse-spark-open', 'deepseek-v41-flash'].map((slug) => `${prefix}/inference/${slug}`),
+          );
         });
+        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
+          .should('contain.text', 'Muse Spark Open 816B')
+          .and('contain.text', prefix ? '查看结果' : 'View results')
+          .and('not.contain.text', prefix ? '结果待发布' : 'Results pending')
+          .find('img')
+          .should('have.attr', 'src', '/logos/muse-mascot.webp');
         cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should('not.exist');
-        cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-glm-5-3"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
@@ -122,7 +135,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('contain.text', prefix ? 'TPU Qwen3.5 提交结果' : 'TPU Qwen3.5 Submission')
           .and('contain.text', 'AgentX')
