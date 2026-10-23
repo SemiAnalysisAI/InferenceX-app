@@ -480,6 +480,43 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
 }
+.excalidraw {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #1e1e1e;
+  --card: #ffffff;
+  --card-foreground: #1e1e1e;
+  --popover: #ffffff;
+  --popover-foreground: #1e1e1e;
+  --primary: #6965db;
+  --primary-foreground: #ffffff;
+  --secondary: #1971c2;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --muted: #f1f0ff;
+  --muted-foreground: #5c5c5c;
+  --accent: #e0dfff;
+  --accent-foreground: #1e1e1e;
+  --destructive: #e03131;
+  --border: #1e1e1e;
+  --border-alt: #d6d6d6;
+  --input: #3d3d3d;
+  --ring: #6965db;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1e1e1e;
+  --sidebar-primary: #6965db;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0dfff;
+  --sidebar-accent-foreground: #1e1e1e;
+  --sidebar-border: #d6d6d6;
+  --sidebar-ring: #6965db;
+  --radius: 0.5rem;
+}
+.excalidraw .circuit-bg,
+.excalidraw .autumn-leaves {
+  display: none;
+}
+
 .minecraft .circuit-bg,
 .csgo .circuit-bg,
 .csgo .autumn-leaves,
