@@ -51,7 +51,7 @@ export const MODEL_PAGE_ZH = {
   },
   'minimax-m27': {
     description:
-      'MiniMax 的 MoE 模型系列，总参数量 229B、每个 token 激活约 10B，采用 GQA 和 FP8 分块量化，并支持 192K token 上下文。',
+      'MiniMax 的 MoE 模型系列，总参数量 229B、每个 token 激活约 10B，采用 GQA 和 FP8 分块量化；M2.5 支持 192K token 上下文，M2.7 支持 200K。',
     releaseDate: '2026 年 2 月 12 日（M2.5）；2026 年 3 月 18 日（M2.7）',
   },
   'minimax-m3': {

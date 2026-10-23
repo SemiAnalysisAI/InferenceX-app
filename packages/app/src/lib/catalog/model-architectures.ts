@@ -340,9 +340,17 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'RoPE',
       'Multi-Token Prediction (3 modules)',
       'FP8 Quantization',
+      'Context: M2.5 196608 / M2.7 204800 tokens',
+    ],
+    featuresZh: [
+      '带 QK 归一化的 GQA',
+      'RoPE',
+      '多 token 预测（3 个模块）',
+      'FP8 量化',
+      '上下文：M2.5 196608 / M2.7 204800 token',
     ],
     developer: 'MiniMax',
-    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
+    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2.5',
   },
   [Model.MiniMax_M3]: {
     model: Model.MiniMax_M3,
