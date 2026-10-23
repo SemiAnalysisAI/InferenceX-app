@@ -3,6 +3,12 @@
 import * as d3 from 'd3';
 import { useEffect, useMemo, useState } from 'react';
 
+import {
+  usePowerXCompareTarget,
+  usePowerXSurface,
+  useSetPowerXCompareTarget,
+} from './powerx-surface';
+
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
 import {
@@ -34,6 +40,8 @@ import {
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
   type SystemPowerCategory,
+  compareBreakdownsAt,
+  defaultComparisonInteractivity,
 } from '../utils/power-breakdown';
 
 export type PowerBreakdownView = 'bars' | 'area';
@@ -246,6 +254,9 @@ function BreakdownChart({
   view,
   xLabel,
   t,
+  evenSpacing = false,
+  markedIndex = null,
+  onColumnClick,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
@@ -253,6 +264,15 @@ function BreakdownChart({
   view: PowerBreakdownView;
   xLabel: string;
   t: (typeof STRINGS)['en'];
+  /**
+   * One evenly spaced slot per benchmark point, in interactivity order. A sweep's
+   * points bunch up at low interactivity, so true positions leave slivers there.
+   */
+  evenSpacing?: boolean;
+  /** Column the chip comparison above is reading; outlined so the two views line up. */
+  markedIndex?: number | null;
+  /** Clicking a column moves the chip comparison to that point's interactivity. */
+  onColumnClick?: (entry: PowerBreakdownPoint) => void;
 }) {
   const labels = powerBreakdownPointLabels(series.points);
   const columns: Column[] = series.points.map((entry, index) => ({
@@ -260,14 +280,18 @@ function BreakdownChart({
     label: labels[index],
     entry,
   }));
-  const xValues = columns.map((column) => column.entry.interactivity);
+  const positionOf = (column: Column) =>
+    evenSpacing ? Number(column.key) : column.entry.interactivity;
+  const xValues = columns.map(positionOf);
   const xMin = Math.min(...xValues);
   const xMax = Math.max(...xValues);
   const xPad = Math.max((xMax - xMin) * 0.06, xMax * 0.02);
-  const xDomain: [number, number] = [Math.max(0, xMin - xPad), xMax + xPad];
+  const xDomain: [number, number] = evenSpacing
+    ? [-0.6, columns.length - 0.4]
+    : [Math.max(0, xMin - xPad), xMax + xPad];
   const layoutFor = (x: ContinuousScale, width: number) =>
     interactivityColumnLayout(
-      columns.map((column) => x(column.entry.interactivity)),
+      columns.map((column) => x(positionOf(column))),
       width,
     );
   const references = [
@@ -594,13 +618,38 @@ function BreakdownChart({
       .attr('y', 0)
       .attr('height', ctx.height)
       .attr('fill', 'var(--foreground)')
-      .attr('fill-opacity', 0);
+      .attr('fill-opacity', 0)
+      .style('cursor', onColumnClick ? 'pointer' : 'default')
+      .on('click.compare', (_event, d) => onColumnClick?.(d.entry));
+  };
+
+  const drawMarker: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
+    const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
+    const y = ctx.yScale as ContinuousScale;
+    const marked = markedIndex === null ? [] : columns.filter((c) => Number(c.key) === markedIndex);
+    group
+      .selectAll<SVGRectElement, Column>('rect.breakdown-compared')
+      .data(marked, (d) => d.key)
+      .join('rect')
+      .attr('class', 'breakdown-compared')
+      .attr('data-testid', 'power-breakdown-compared')
+      .attr('x', (d) => layout[Number(d.key)].center - layout[Number(d.key)].barWidth / 2 - 4)
+      .attr('width', (d) => layout[Number(d.key)].barWidth + 8)
+      .attr('y', (d) => y(d.entry.totalWattsPerGpu) - 30)
+      .attr('height', (d) => Math.max(0, ctx.height - y(d.entry.totalWattsPerGpu) + 34))
+      .attr('rx', 4)
+      .attr('fill', 'none')
+      .attr('stroke', 'var(--foreground)')
+      .attr('stroke-opacity', 0.55)
+      .attr('stroke-dasharray', '4,3')
+      .attr('pointer-events', 'none');
   };
 
   const layers: LayerConfig<Column>[] = [
     { type: 'custom', key: 'defs', render: drawDefs },
     { type: 'custom', key: `stack-${view}`, render: drawStack },
     { type: 'custom', key: 'references', render: drawReferences },
+    { type: 'custom', key: 'marker', render: drawMarker },
     { type: 'custom', key: 'hit', render: drawHitAreas },
   ];
 
@@ -619,8 +668,18 @@ function BreakdownChart({
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{
         label: xLabel,
+        ...(evenSpacing && {
+          // Each slot is labelled with its point's interactivity; thin out on narrow plots.
+          tickFormat: (d: d3.AxisDomain) => watts(columns[Number(d)]?.entry.interactivity ?? 0),
+        }),
         // One tick per ~70px so phone widths never run interactivity labels together.
         tickValues: (scale) => {
+          if (evenSpacing) {
+            const [start, end] = (scale as d3.ScaleLinear<number, number>).range();
+            const room = Math.abs(end - start) / Math.max(1, columns.length);
+            const step = Math.max(1, Math.ceil(44 / Math.max(1, room)));
+            return columns.map((_, index) => index).filter((index) => index % step === 0);
+          }
           const linear = scale as d3.ScaleLinear<number, number>;
           const [start, end] = linear.range();
           return linear.ticks(Math.max(2, Math.floor(Math.abs(end - start) / X_TICK_SPACING_PX)));
@@ -631,7 +690,7 @@ function BreakdownChart({
       tooltip={{
         rulerType: 'none',
         content: (column) => tooltipHtml(series, column, color, xLabel, t),
-        attachToLayer: 3,
+        attachToLayer: 4,
         onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
         onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
       }}
@@ -663,6 +722,7 @@ export default function PowerBreakdownPanel({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const powerXSurface = usePowerXSurface();
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
@@ -683,6 +743,17 @@ export default function PowerBreakdownPanel({
     onSelectKey?.(key);
   };
   const series = breakdowns.find((entry) => entry.key === selectedKey) ?? breakdowns[0] ?? null;
+  // PowerX: outline the point the chip comparison reads, and let a click move it.
+  const compareTarget = usePowerXCompareTarget();
+  const setCompareTarget = useSetPowerXCompareTarget();
+  const comparedAt = setCompareTarget
+    ? (compareTarget ?? defaultComparisonInteractivity(breakdowns))
+    : null;
+  const comparedEntry =
+    series && comparedAt
+      ? (compareBreakdownsAt([series], comparedAt).rows[0]?.entry ?? null)
+      : null;
+  const markedIndex = series && comparedEntry ? series.points.indexOf(comparedEntry) : -1;
   const sectionId = `${chartId}-power-breakdown`;
   // The main chart's vendor color for each hardware line, so a bar here reads
   // as the same series as its line and legend chip above.
@@ -831,6 +902,11 @@ export default function PowerBreakdownPanel({
             view={view}
             xLabel={interactivityLabel}
             t={t}
+            evenSpacing={powerXSurface}
+            markedIndex={markedIndex >= 0 ? markedIndex : null}
+            onColumnClick={
+              setCompareTarget ? (entry) => setCompareTarget(entry.interactivity) : undefined
+            }
           />
           <p className="text-xs text-muted-foreground">
             {t.note(SYSTEM_POWER_MODEL_REVISION.slice(0, 7))}

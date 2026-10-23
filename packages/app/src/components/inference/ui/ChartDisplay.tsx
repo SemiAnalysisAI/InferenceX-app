@@ -126,6 +126,7 @@ import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
+import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 
 type InferenceViewMode = 'chart' | 'table';
 
@@ -880,6 +881,42 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedPercentile,
   ]);
 
+  // PowerX: only offer the prefill/decode split when the loaded results carry it.
+  // Reads the same visible rows the prefill/decode panel would plot.
+  const rolesHaveData = useMemo(() => {
+    const graph = renderableGraphs[0];
+    if (!powerXSurface || !graph || graph.data.length === 0) return undefined;
+    const overlay = selectUnofficialOverlayForMode(
+      selectedXAxisMode,
+      graph.chartDefinition.chartType,
+      overlayDataByChartType,
+    );
+    const isGpuComparison =
+      selectedGPUs.length > 0 &&
+      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
+    const { officialRows, overlayRows } = isGpuComparison
+      ? visibleDateComparisonRows(graph.data, overlay)
+      : visibleComparisonRows(graph.data, overlay);
+    return hasRoleTelemetry(
+      [...officialRows, ...overlayRows],
+      graph.chartDefinition.x_scale_field as keyof AggDataEntry,
+    );
+  }, [
+    powerXSurface,
+    renderableGraphs,
+    selectedXAxisMode,
+    overlayDataByChartType,
+    selectedGPUs.length,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+    selectedDates.length,
+    visibleDateComparisonRows,
+    visibleComparisonRows,
+  ]);
+  useEffect(() => {
+    if (rolesHaveData === false && powerCompare === 'roles') setPowerCompare('boundaries');
+  }, [rolesHaveData, powerCompare, setPowerCompare]);
+
   const displayGraphs =
     isFirstLoad || isDerivedXAxisLoading
       ? [
@@ -1425,6 +1462,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       compare={powerCompare}
                       onCompareChange={setPowerCompare}
                       layout="page"
+                      rolesHaveData={rolesHaveData}
                     />
                   )}
                   <ChartControls

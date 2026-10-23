@@ -76,6 +76,7 @@ const STRINGS = {
     boundaries: 'Boundary',
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
+    rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
     advanced: 'Advanced settings',
   },
   zh: {
@@ -126,6 +127,7 @@ const STRINGS = {
     boundaries: '功耗边界',
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
+    rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
     advanced: '高级设置',
   },
 } as const;
@@ -162,6 +164,7 @@ export function PowerXTabs({
   compare,
   onCompareChange,
   layout = 'inline',
+  rolesHaveData,
 }: {
   metric: string;
   onChange: (metric: string) => void;
@@ -169,6 +172,8 @@ export function PowerXTabs({
   onCompareChange: (mode: PowerCompare) => void;
   /** `page` renders the questions as the PowerX tab's primary sub-navigation. */
   layout?: 'inline' | 'page';
+  /** False when the loaded results carry no prefill/decode telemetry; undefined while unknown. */
+  rolesHaveData?: boolean;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -214,7 +219,9 @@ export function PowerXTabs({
         : ENERGY_PER_METRIC[next],
     );
   };
-  const rolesAvailable = powerCompareAvailable('y_measuredAvgPower', 'roles');
+  const rolesSupported = powerCompareAvailable('y_measuredAvgPower', 'roles');
+  const rolesAvailable = rolesSupported && rolesHaveData !== false;
+  const rolesReason = rolesSupported ? t.rolesNoData : t.rolesUnavailable;
 
   return (
     <div className="col-span-full flex min-w-0 flex-col gap-3" data-testid="powerx-tabs">
@@ -358,13 +365,13 @@ export function PowerXTabs({
                 value: 'roles',
                 label: t.roles,
                 disabled: !rolesAvailable,
-                title: rolesAvailable ? undefined : t.rolesUnavailable,
+                title: rolesAvailable ? undefined : rolesReason,
               },
             ]}
           />
           {!rolesAvailable && (
             <span className="text-xs text-muted-foreground" data-testid="powerx-roles-unavailable">
-              {t.roles}: {t.rolesUnavailable}
+              {t.roles}: {rolesReason}
             </span>
           )}
         </Field>

@@ -19,12 +19,13 @@ import {
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
+import { usePowerXCompareTarget, useSetPowerXCompareTarget } from './powerx-surface';
 
 const STRINGS = {
   en: {
     title: 'Compare chips at one interactivity',
     subtitle:
-      'Each bar is one chip’s benchmark point closest to the interactivity you pick, split into what the meter counts. Click a chip to see how its power builds up across load.',
+      'Each bar is one chip’s benchmark point closest to the interactivity you pick, split into what the meter counts. Drag the slider, click a bar below, or hover a point on the line chart to move it. Click a chip to see how its power builds up across load.',
     target: 'Interactivity',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -48,7 +49,7 @@ const STRINGS = {
   zh: {
     title: '在同一交互性下对比芯片',
     subtitle:
-      '每条横条为该芯片最接近所选交互性的基准测试点，并拆分为电表计量的各部分。点击芯片查看其功耗随负载的构成变化。',
+      '每条横条为该芯片最接近所选交互性的基准测试点，并拆分为电表计量的各部分。拖动滑块、点击下方柱条或悬停在折线图的点上即可移动。点击芯片查看其功耗随负载的构成变化。',
     target: '交互性',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -107,9 +108,14 @@ export default function PowerChipCompare({
     return xs.length > 0 ? [Math.min(...xs), Math.max(...xs)] : [1, 1];
   }, [series]);
   const fallback = useMemo(() => defaultComparisonInteractivity(series), [series]);
-  const [target, setTarget] = useState<number | null>(null);
+  // On PowerX the target is shared with the drill-down and the main chart.
+  const sharedTarget = usePowerXCompareTarget();
+  const setSharedTarget = useSetPowerXCompareTarget();
+  const [ownTarget, setOwnTarget] = useState<number | null>(null);
+  const target = setSharedTarget ? sharedTarget : ownTarget;
+  const setTarget = setSharedTarget ?? setOwnTarget;
   // A new model or scenario changes the range; return to the shared middle.
-  useEffect(() => setTarget(null), [lo, hi]);
+  useEffect(() => setTarget(null), [lo, hi, setTarget]);
   const value = target ?? fallback;
 
   const { rows, outOfRange } = useMemo(
