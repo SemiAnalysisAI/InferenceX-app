@@ -4,6 +4,7 @@ import type {
   ComparisonView,
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 
 import type { Model } from '@/lib/catalog/data-mappings';
 import {
@@ -1143,16 +1144,20 @@ export function modelLayers(
 /** A view narrowed to some of its cases, for the charts of one slot. */
 export function subView(view: ComparisonView, indices: number[]): ComparisonView {
   const pick = <T>(values: T[]) => indices.map((i) => values[i]);
+  const cases = pick(view.cases);
+  const measurements = Object.fromEntries(
+    Object.entries(view.measurements).map(([hw, col]) => [
+      hw,
+      Object.fromEntries(
+        Object.entries(col).map(([k, values]) => [k, pick(values as unknown[])]),
+      ) as unknown as ComparisonColumns,
+    ]),
+  );
+  // the whole view's chart defaults may name a slice or precision these cases lack
   return {
     ...view,
-    cases: pick(view.cases),
-    measurements: Object.fromEntries(
-      Object.entries(view.measurements).map(([hw, col]) => [
-        hw,
-        Object.fromEntries(
-          Object.entries(col).map(([k, values]) => [k, pick(values as unknown[])]),
-        ) as unknown as ComparisonColumns,
-      ]),
-    ),
+    cases,
+    measurements,
+    defaults: comparisonDefaults({ op: view.op, cases, measurements }),
   };
 }
