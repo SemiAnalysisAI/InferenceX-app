@@ -38,10 +38,10 @@ export async function blobSet(key: string, data: unknown): Promise<void> {
   }
 }
 
-/** Delete all cached blobs. Returns 0 when blob is not configured. */
-export async function blobPurge(): Promise<number> {
+/** Delete cached blobs, optionally within a key prefix. No-op when unconfigured. */
+export async function blobPurge(keyPrefix = ''): Promise<number> {
   if (!blobEnabled()) return 0;
-  const prefix = getPrefix();
+  const prefix = `${getPrefix()}${keyPrefix}`;
   let deleted = 0;
   let cursor: string | undefined;
 

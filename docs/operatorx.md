@@ -216,3 +216,19 @@ Timeline reads share one raw fetch per run, with at most four runs concurrent.
 Request order, revision checks, missing/null results, and error handling are preserved.
 
 中文：时间线按运行复用读取，最多四个运行并发；保留请求顺序、revision 校验、缺失结果和错误处理。
+
+## Shared merged-comparison cache
+
+`BLOB_CACHE_PREFIX` and `BLOB_READ_WRITE_TOKEN` enable shared database comparisons
+above Next's 2 MB limit. Keys include op, ordered revisions, format version, and
+namespace; distinct deployments need distinct namespaces or prefixes. Partial or
+replaced revisions remain uncached/no-store. Blob failures retain the source path.
+Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag; full
+purge covers the configured prefix. Warm process caches remain until revision or
+code/version changes. The run-list query remains; measure benefits in the deployment
+region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
+
+中文：配置上述 Blob 环境变量后，可共享超过 2 MB 的对比数据，按算子、revision、版本和
+namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
+不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
+覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。

@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
+const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX } = vi.hoisted(() => ({
   mockPurgeAll: vi.fn(),
   mockPurgeCollectiveX: vi.fn(),
+  mockPurgeOperatorX: vi.fn(),
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
@@ -10,7 +11,7 @@ vi.mock('@/lib/cache/api-cache', () => ({
   OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,
   purgeCollectiveX: mockPurgeCollectiveX,
-  purgeOperatorX: vi.fn(),
+  purgeOperatorX: mockPurgeOperatorX,
 }));
 
 import { POST } from './route';
@@ -151,6 +152,25 @@ describe('POST /api/v1/invalidate', () => {
     const body = await res.json();
     expect(body).toEqual({ invalidated: true, scope: 'collectivex' });
     expect(mockPurgeCollectiveX).toHaveBeenCalledOnce();
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('waits for the OperatorX shared cache purge before reporting success', async () => {
+    const purge = Promise.withResolvers<void>();
+    mockPurgeOperatorX.mockReturnValueOnce(purge.promise);
+    let completed = false;
+    const pending = POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx'),
+    ).then((response) => {
+      completed = true;
+      return response;
+    });
+    await Promise.resolve();
+    expect(mockPurgeOperatorX).toHaveBeenCalledOnce();
+    expect(completed).toBe(false);
+    purge.resolve();
+    const response = await pending;
+    expect(await response.json()).toEqual({ invalidated: true, scope: 'operatorx' });
     expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 

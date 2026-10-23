@@ -35,7 +35,8 @@ export const COLLECTIVEX_CACHE_CONTROL =
 
 /**
  * OperatorX reads its own database and has its own scope, like CollectiveX: its
- * responses carry this tag and stay cached until an OperatorX ingest purges it
+ * responses carry this tag; merged comparisons also use a revision-keyed Blob subtree.
+ * CDN responses stay cached until an OperatorX ingest purges it
  * (`/api/v1/invalidate?scope=operatorx`).
  */
 export const OPERATORX_CACHE_SCOPE = 'operatorx';
@@ -192,7 +193,7 @@ export function cachedDerivedData<T, Args extends unknown[]>(
   return cachedQuery(fn, `derived:${keyPrefix}`);
 }
 
-/** Purge both unstable_cache (via revalidateTag) and blob storage. */
+/** Purge all cache tags and the full configured Blob prefix, including OperatorX. */
 export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge();
   revalidateTag(cacheTag(), { expire: 0 });
@@ -200,7 +201,7 @@ export async function purgeAll(): Promise<number> {
   // a full purge must drop that tag explicitly — this line is the sole
   // mechanism that clears CollectiveX from the CDN.
   purgeCollectiveX();
-  purgeOperatorX();
+  revalidateTag(operatorXCacheTag(), { expire: 0 });
   return deleted;
 }
 
@@ -264,9 +265,16 @@ export function cachedJson<T>(
   });
 }
 
-/** Purge only the OperatorX cache scope: its CDN tag. */
-export function purgeOperatorX(): void {
+/** Isolated Blob key subtree for this deployment's OperatorX comparisons. */
+export function operatorXBlobPrefix(): string {
+  const namespace = createHash('sha256').update(cacheNamespace()).digest('hex');
+  return `operatorx/${namespace}/`;
+}
+
+/** Purge OperatorX's CDN tag and shared merged-comparison blobs. */
+export async function purgeOperatorX(): Promise<void> {
   revalidateTag(operatorXCacheTag(), { expire: 0 });
+  await blobPurge(operatorXBlobPrefix());
 }
 
 /** Serve existing gzip bytes with the same CDN contract, pulling only on demand. */

@@ -803,7 +803,9 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // and source identities; legacy fallback and
 // partial-read cache behavior are documented there as well. Timeline references
 // share one raw read per run, with at most four concurrent runs; reference order,
-// revision checks, null/known behavior and error contracts are preserved.
+// revision checks, null/known behavior and error contracts are preserved. Merged
+// comparisons may use a revision-keyed shared Blob cache; scope invalidation awaits
+// deletion and partial/concurrently replaced generations remain uncached.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,
