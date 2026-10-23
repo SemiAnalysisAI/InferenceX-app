@@ -16,10 +16,63 @@ run, so opening a profile still works after a newer comparison replaces that row
 Timeline references include the stored revision. Re-ingesting the same run replaces
 that revision, so a new comparison cannot open a cached timeline from the old data.
 
-TFLOPS is computed on read as useful FLOPs (`usefulFlops()` in
+TFLOPS is derived by the shared comparison transform as useful FLOPs (`usefulFlops()` in
 `packages/db/src/operatorx/describe.ts`, `2*M*N*K` for GEMM) divided by
 `latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
 Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
+
+## Compact comparison reads
+
+Ingestion normalizes each run once and stores versioned per-run GEMM and MoE
+comparisons in `opx_run_comparisons`, in the same transaction as the raw documents.
+These projections contain timing rows and source identities, without profiling
+payloads. `/api/v1/operatorx/compare` reads them directly and merges newest-first;
+it no longer fetches and normalizes raw artifacts for a backfilled run. The API
+response, selectors, calculations, missing/error handling, and timeline references
+are identical to the legacy reader. Raw artifacts still serve run details and
+kernel timelines on demand.
+
+The projection is keyed by the database run revision and operator. Re-ingesting
+replaces its raw documents and compact projections atomically; deletion cascades
+to projections. `OPERATORX_COMPARISON_VERSION` must be bumped when the persisted
+projection or its derivation changes. A missing table, missing projection, or old
+format uses the raw reader with revision-keyed in-process normalization reuse.
+Permission, network, and other storage errors remain failures; a partial comparison
+is not cached. Local-directory sources keep the raw path.
+
+### Rollout and backfill
+
+1. Apply the migration: `bun run admin:db:migrate:operatorx -- --yes`.
+2. Give the role used by `DATABASE_OPERATORX_READONLY_URL` SELECT access to
+   `opx_run_comparisons` if owner default privileges do not already cover new tables.
+3. Preview existing runs: `bun run admin:db:backfill:operatorx-comparisons -- --all`.
+4. Populate compact data: `bun run admin:db:backfill:operatorx-comparisons -- --all --yes`.
+5. Deploy the reader and purge `/api/v1/invalidate?scope=operatorx`; warm
+   `/api/v1/operatorx/compare?op=gemm` and `?op=moe` by consuming their full responses.
+
+The backfill requires `DATABASE_OPERATORX_WRITE_URL`; it loads one run at a time,
+preserves run revisions and source indices, and locks the captured revision before
+writing. A concurrent re-ingest causes stale work to be skipped. It is idempotent
+and exits nonzero if a run fails. Ingest workflows now warm both default comparisons
+after invalidating their cache. No administrator credentials or mutation endpoint
+are added to the public API.
+
+### Benchmarking
+
+The reproducible benchmark at `packages/app/scripts/benchmark-operatorx.ts`
+compares raw/normalized reconstruction, compact per-run projections, and a
+precomputed view snapshot, checking full response parity before timing. Run it with
+the input flags shown by `--help`; captured normalized inputs exclude raw SQL and
+normalization costs and must not be reported as an end-to-end production speedup.
+
+中文：写入流程在同一事务中保存原始产物和按运行版本生成的 GEMM、MoE 对比数据。
+对比接口优先读取不含 profiling 数据的精简记录，再按最新结果优先的规则合并，保留原有
+筛选条件、计算、失败状态和时间线来源。缺少表、缺少精简记录或格式版本过旧时，使用原始
+读取路径；权限、网络等错误不会被静默忽略，部分读取失败的响应也不会缓存。
+迁移后需确保只读角色能读取新表，再使用上述 backfill 命令补齐历史运行；backfill 保留
+原始 revision 和 result index，并在写入前锁定对应 revision，避免与重新写入的运行混用。
+写入流程在清除缓存后预热默认 GEMM 和 MoE 对比。基准测试会先校验响应完全一致；
+仅使用已归一化输入的本地结果不代表完整生产请求的性能。
 
 ## Ascend 950PR normalization
 
@@ -80,8 +133,9 @@ Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开
 
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
 documents: each run's manifest and every shard's operatorx results JSON, verbatim.
-The normalizer turns them into the dashboard's dataset at read time; it also runs once
-at ingest, so a run that cannot be read is never stored. Runs arrive by push:
+The normalizer runs once during ingest to prepare compact comparisons; detail and
+legacy reads still normalize raw documents on demand. A run that cannot be read is
+never stored. Runs arrive by push:
 
 - `bun run admin:db:ingest:operatorx -- --download <run-url-or-id>` stores a completed
   `operatorx-sweep.yml` run (any branch), downloading its manifest and shard artifacts.

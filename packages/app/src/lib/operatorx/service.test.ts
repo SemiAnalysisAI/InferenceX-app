@@ -1,10 +1,12 @@
+import type { OperatorXSource } from './source';
+import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   planFromManifest,
   type OperatorXRawBundle,
 } from '@semianalysisai/inferencex-db/operatorx/bundle';
-import { comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { caseRefs } from '@/components/operatorx/compare/model';
 
@@ -75,7 +77,7 @@ function source(bundles: OperatorXRawBundle[], failedIds = new Set<string>()) {
       ? Promise.reject(new Error('database unavailable'))
       : Promise.resolve(byId.get(id)!),
   );
-  sourceMock.mockReturnValue({
+  const config: OperatorXSource = {
     name: 'fixture',
     listRuns: () =>
       Promise.resolve(
@@ -85,8 +87,9 @@ function source(bundles: OperatorXRawBundle[], failedIds = new Set<string>()) {
         })),
       ),
     getBundle,
-  });
-  return { getBundle };
+  };
+  sourceMock.mockReturnValue(config);
+  return { getBundle, config };
 }
 
 beforeEach(() => {
@@ -174,4 +177,86 @@ it('uses the new stored revision after re-ingest instead of a cached old bundle'
     timelines: { '1:0:102': { names: ['new_kernel'] } },
   });
   expect(replaced).toEqual({ known: false, timelines: { '1:0:101': null } });
+});
+
+describe('compact OperatorX comparison reads', () => {
+  it('serves stored comparisons without reading artifacts, and reuses the revision cache', async () => {
+    const raw = bundle('9', ['vllm'], { revision: '900' });
+    const reads = source([raw]);
+    const compact = buildComparison('gemm', [
+      { runner: 'h200-dgxc', dataset: normalizeBundle(raw) },
+    ]);
+    const getRunComparison = vi.fn().mockResolvedValue(compact);
+    reads.config.getRunComparison = getRunComparison;
+    const { getComparison } = await import('./service');
+    expect(await getComparison('gemm')).toEqual(compact);
+    expect(await getComparison('gemm')).toEqual(compact);
+    expect(getRunComparison).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('mixes compact and legacy runs while filling only missing cases', async () => {
+    const newest = bundle('9', ['vllm', 'torch'], { noDocs: true });
+    const older = bundle('8', ['vllm', 'torch']);
+    const reads = source([newest, older]);
+    reads.config.getRunComparison = vi.fn((id: string) =>
+      Promise.resolve(
+        id === '9'
+          ? buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(newest) }])
+          : null,
+      ),
+    );
+    const { getComparison } = await import('./service');
+    const result = await getComparison('gemm');
+    expect(result.rows.map((r) => [r.runId, r.status, r.revision])).toEqual([
+      ['8', 'ok', '1'],
+      ['8', 'ok', '1'],
+    ]);
+    expect(reads.getBundle).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).toHaveBeenCalledWith('8');
+  });
+
+  it('does not cache a partial compact read or hide a storage error with artifact fallback', async () => {
+    const rows = [bundle('9', ['vllm']), bundle('8', ['vllm'])];
+    const reads = source(rows);
+    const getRunComparison = vi.fn((id: string) => {
+      if (id === '9') return Promise.reject(new Error('storage unavailable'));
+      return Promise.resolve(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(rows[1]) }]),
+      );
+    });
+    reads.config.getRunComparison = getRunComparison;
+    const { getComparison, isPartialComparison } = await import('./service');
+    const first = await getComparison('gemm');
+    expect(first.rows[0].runId).toBe('8');
+    expect(isPartialComparison(first)).toBe(true);
+    await getComparison('gemm');
+    expect(getRunComparison).toHaveBeenCalledTimes(4);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
+
+  it('refreshes compact results when the run revision changes', async () => {
+    const first = bundle('9', ['vllm'], { revision: '900' });
+    const firstReads = source([first]);
+    firstReads.config.getRunComparison = vi
+      .fn()
+      .mockResolvedValue(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(first) }]),
+      );
+    const { getComparison } = await import('./service');
+    const originalComparison = await getComparison('gemm');
+    expect(originalComparison.rows[0].revision).toBe('900');
+    const replaced = bundle('9', ['vllm'], { revision: '901' });
+    const reads = source([replaced]);
+    const getRunComparison = vi
+      .fn()
+      .mockResolvedValue(
+        buildComparison('gemm', [{ runner: 'h200-dgxc', dataset: normalizeBundle(replaced) }]),
+      );
+    reads.config.getRunComparison = getRunComparison;
+    const updatedComparison = await getComparison('gemm');
+    expect(updatedComparison.rows[0].revision).toBe('901');
+    expect(getRunComparison).toHaveBeenCalledTimes(1);
+    expect(reads.getBundle).not.toHaveBeenCalled();
+  });
 });
