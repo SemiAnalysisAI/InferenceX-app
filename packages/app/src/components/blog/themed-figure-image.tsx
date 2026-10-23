@@ -4,7 +4,8 @@ import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme, LIGHT_THEMES } from '@/lib/themes/themes';
 
-const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=${JSON.stringify(LIGHT_THEMES)}.some((c)=>document.documentElement.classList.contains(c)),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
+// Pre-hydration copy of LIGHT_THEMES; a static literal so no value is spliced into script source.
+const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=['light','excalidraw'].some((c)=>document.documentElement.classList.contains(c)),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
 
 const subscribeClient = () => () => {};
 const getClientSnapshot = () => true;
