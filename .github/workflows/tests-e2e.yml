@@ -201,7 +201,10 @@ jobs:
           working-directory: packages/app
           install: false
           start: bun run start
-          wait-on: 'http://localhost:3000'
+          # One address: with localhost (::1 and 127.0.0.1) a refused startup probe can
+          # surface as "Socket closed before the connection was established", which the
+          # action treats as fatal instead of retrying.
+          wait-on: 'http://127.0.0.1:3000'
           browser: ${{ matrix.browser }}
           publish-summary: false
         env:
