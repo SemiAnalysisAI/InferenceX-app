@@ -59,6 +59,8 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
+import { PowerXTabs, powerXTabFor } from '@/components/inference/ui/PowerXTabs';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -132,6 +134,9 @@ const STRINGS = {
     inferencePerformance: 'Inference Performance',
     inferencePerformanceDesc:
       'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
+    powerXTitle: 'PowerX',
+    powerXDesc:
+      'Measured chip power and energy per token for every benchmark point. GPU power is measured; the rest of the server and the facility are modeled.',
     chart: 'Chart',
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
@@ -148,6 +153,13 @@ const STRINGS = {
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
+    powerXMethod: {
+      gpu: 'GPU power from on-board telemetry, averaged per chip over the measured serving window.',
+      system: 'GPU power is measured; the rest of the server and the facility (PUE) are modeled.',
+    },
+    howWeMeasure: 'How we measure',
+    powerXMethodDetail:
+      'Each point is one benchmark configuration. Power is sampled per GPU throughout the run and averaged over the serving window that passed validation.',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU Level Provisioned (TDP) · Joules per output token = rated TDP per GPU from the hardware registry × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
@@ -163,6 +175,9 @@ const STRINGS = {
     inferencePerformance: '推理性能',
     inferencePerformanceDesc:
       '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
+    powerXTitle: 'PowerX 功耗',
+    powerXDesc:
+      '每个基准测试点的实测芯片功耗与每 Token 能耗。GPU 功耗为实测，服务器其他组件与数据中心为模型估算。',
     chart: '图表',
     table: '表格',
     sourceUnofficial: '来源：非官方',
@@ -177,6 +192,13 @@ const STRINGS = {
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
+    powerXMethod: {
+      gpu: '功耗来自 GPU 板载遥测，按芯片在实测服务窗口内取平均。',
+      system: 'GPU 功耗为实测；服务器其他组件与数据中心（PUE）为模型估算。',
+    },
+    howWeMeasure: '测量方法',
+    powerXMethodDetail:
+      '每个数据点代表一个基准测试配置。功耗在整个运行过程中按每颗 GPU 采样，并在通过验证的服务窗口内取平均。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 每输出 token 能耗 = 硬件注册表中每 GPU 的额定 TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
@@ -300,10 +322,26 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     powerCompare,
     tokenBasis,
   } = useInferenceDisplay();
-  const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
-    useInferenceActions();
+  const {
+    setSelectedDates,
+    setSelectedDatesFromRunExpansion,
+    setIsLegendExpanded,
+    setSelectedYAxisMetric,
+    setPowerCompare,
+  } = useInferenceActions();
+  const powerXSurface = usePowerXSurface();
+  // URL-driven metric state differs between server and client; render PowerX chrome after mount.
+  const [powerXMounted, setPowerXMounted] = useState(false);
+  useEffect(() => setPowerXMounted(true), []);
   const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
   const selectedPowerBasis = selectedMeasuredConfig?.basis;
+  // The PowerX tab always shows a power metric; land on measured W per chip.
+  useEffect(() => {
+    if (powerXSurface && !getMeasuredMetricConfig(selectedYAxisMetric)) {
+      setSelectedYAxisMetric('y_measuredAvgPower');
+    }
+  }, [powerXSurface, selectedYAxisMetric, setSelectedYAxisMetric]);
+  const powerXTab = powerXTabFor(selectedYAxisMetric, powerCompare);
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
@@ -1149,36 +1187,64 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}
-                          {selectedPowerBasis && selectedPowerBasis !== 'gpu-measured' && (
-                            <p
+                          {powerXSurface && selectedPowerBasis && powerXTab ? (
+                            <details
                               className="mb-2 text-xs text-muted-foreground"
-                              data-testid="power-basis-assumptions"
-                              data-power-basis={selectedPowerBasis}
+                              data-testid="powerx-method"
                             >
-                              {t.powerBasisAssumptions[selectedPowerBasis]}
-                            </p>
+                              <summary className="cursor-pointer select-none">
+                                {
+                                  t.powerXMethod[
+                                    selectedPowerBasis === 'gpu-measured' && powerCompare === 'none'
+                                      ? 'gpu'
+                                      : 'system'
+                                  ]
+                                }{' '}
+                                <span className="underline underline-offset-2">
+                                  {t.howWeMeasure}
+                                </span>
+                              </summary>
+                              <p className="mt-1">
+                                {t.powerXMethodDetail}{' '}
+                                {selectedPowerBasis !== 'gpu-measured' &&
+                                  t.powerBasisAssumptions[selectedPowerBasis]}{' '}
+                                {ALL_IN_MEASURED_NOTE[locale]}{' '}
+                                {isAgenticSequence && ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
+                              </p>
+                            </details>
+                          ) : (
+                            <>
+                              {/* One caption line for the power method: boundary, then the modeled-
+                              parts note when comparing, then the AgentX calibration caveat. */}
+                              {selectedPowerBasis &&
+                                (selectedPowerBasis !== 'gpu-measured' ||
+                                  powerCompare === 'boundaries') && (
+                                  <p className="mb-2 text-xs text-muted-foreground">
+                                    {selectedPowerBasis !== 'gpu-measured' && (
+                                      <span
+                                        data-testid="power-basis-assumptions"
+                                        data-power-basis={selectedPowerBasis}
+                                      >
+                                        {t.powerBasisAssumptions[selectedPowerBasis]}{' '}
+                                      </span>
+                                    )}
+                                    {powerCompare === 'boundaries' &&
+                                      selectedPowerBasis !== 'utility-modeled' && (
+                                        <span data-testid="power-compare-model-note">
+                                          {ALL_IN_MEASURED_NOTE[locale]}{' '}
+                                        </span>
+                                      )}
+                                    {isAgenticSequence &&
+                                      (selectedPowerBasis === 'utility-modeled' ||
+                                        powerCompare === 'boundaries') && (
+                                        <span data-testid="power-agentic-model-note">
+                                          {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
+                                        </span>
+                                      )}
+                                  </p>
+                                )}
+                            </>
                           )}
-                          {selectedPowerBasis &&
-                            powerCompare === 'boundaries' &&
-                            selectedPowerBasis !== 'utility-modeled' && (
-                              <p
-                                className="mb-2 text-xs text-muted-foreground"
-                                data-testid="power-compare-model-note"
-                              >
-                                {ALL_IN_MEASURED_NOTE[locale]}
-                              </p>
-                            )}
-                          {isAgenticSequence &&
-                            selectedPowerBasis &&
-                            (selectedPowerBasis === 'utility-modeled' ||
-                              powerCompare === 'boundaries') && (
-                              <p
-                                className="mb-2 text-xs text-muted-foreground"
-                                data-testid="power-agentic-model-note"
-                              >
-                                {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
-                              </p>
-                            )}
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1289,6 +1355,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     })()}
                     {selectedMeasuredConfig &&
                       !isPowerTimeline &&
+                      (!powerXSurface || powerXTab === 'where' || powerXTab === 'draw') &&
                       getViewMode(graphIndex) !== 'table' &&
                       (() => {
                         const overlay = selectUnofficialOverlayForMode(
@@ -1307,6 +1374,16 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             overlayData={overlayRows}
                             xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
                             xLabel={resolvedXLabel}
+                            initialBreakdown={powerXSurface}
+                            layout={
+                              powerXSurface ? (powerXTab === 'draw' ? 'draw' : 'where') : 'toggles'
+                            }
+                            showRoles={powerCompare === 'roles'}
+                            placement={
+                              powerXSurface && powerXTab === 'where' && powerCompare !== 'roles'
+                                ? 'before'
+                                : 'after'
+                            }
                           />
                         );
                       })()}
@@ -1337,10 +1414,19 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               {!embedded && (
                 <>
                   <DashboardSectionHeader
-                    title={t.inferencePerformance}
-                    description={t.inferencePerformanceDesc}
+                    title={powerXSurface ? t.powerXTitle : t.inferencePerformance}
+                    description={powerXSurface ? t.powerXDesc : t.inferencePerformanceDesc}
                     actions={<ShareButton />}
                   />
+                  {powerXMounted && powerXSurface && selectedMeasuredConfig && (
+                    <PowerXTabs
+                      metric={selectedYAxisMetric}
+                      onChange={setSelectedYAxisMetric}
+                      compare={powerCompare}
+                      onCompareChange={setPowerCompare}
+                      layout="page"
+                    />
+                  )}
                   <ChartControls
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}

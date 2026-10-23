@@ -234,3 +234,64 @@ export function stackPowerBreakdown(
     return segment;
   });
 }
+
+export interface PowerBreakdownComparisonRow {
+  series: PowerBreakdownSeries;
+  /** The series' benchmark point closest to the target interactivity (log distance). */
+  entry: PowerBreakdownPoint;
+}
+
+/**
+ * Interactivity every series can be compared at: the geometric middle of the
+ * range all series cover, or of the full range when they do not overlap.
+ */
+export function defaultComparisonInteractivity(
+  series: readonly PowerBreakdownSeries[],
+): number | null {
+  const ranges = series
+    .map((entry) => entry.points.map((point) => point.interactivity))
+    .filter((values) => values.length > 0)
+    .map((values) => [Math.min(...values), Math.max(...values)] as const);
+  if (ranges.length === 0) return null;
+  const lo = Math.max(...ranges.map(([min]) => min));
+  const hi = Math.min(...ranges.map(([, max]) => max));
+  const [a, b] =
+    lo <= hi
+      ? [lo, hi]
+      : [Math.min(...ranges.map(([min]) => min)), Math.max(...ranges.map(([, max]) => max))];
+  return Math.sqrt(a * b);
+}
+
+/**
+ * One row per series at its point nearest `target`. A series is left out when
+ * its closest point is more than `maxRatio`× away, so a chip is never compared
+ * at a load it was not benchmarked near.
+ */
+export function compareBreakdownsAt(
+  series: readonly PowerBreakdownSeries[],
+  target: number,
+  maxRatio = 1.5,
+): { rows: PowerBreakdownComparisonRow[]; outOfRange: PowerBreakdownSeries[] } {
+  const rows: PowerBreakdownComparisonRow[] = [];
+  const outOfRange: PowerBreakdownSeries[] = [];
+  if (!(target > 0)) return { rows, outOfRange: [...series] };
+  for (const entry of series) {
+    let best: PowerBreakdownPoint | null = null;
+    let bestDistance = Infinity;
+    for (const point of entry.points) {
+      const distance = Math.abs(Math.log(point.interactivity / target));
+      if (distance < bestDistance) {
+        best = point;
+        bestDistance = distance;
+      }
+    }
+    if (best && bestDistance <= Math.log(maxRatio)) rows.push({ series: entry, entry: best });
+    else outOfRange.push(entry);
+  }
+  rows.sort(
+    (a, b) =>
+      a.entry.totalWattsPerGpu - b.entry.totalWattsPerGpu ||
+      a.series.label.localeCompare(b.series.label),
+  );
+  return { rows, outOfRange };
+}

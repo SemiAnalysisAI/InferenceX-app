@@ -449,7 +449,7 @@ describe('Inference ChartControls grouped measured metrics', () => {
     cy.get('[data-testid="measured-energy-scope"]')
       .should('be.disabled')
       .and('contain.text', 'All GPUs');
-    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
+    cy.get('[data-testid="measured-energy-unit"]').should('not.exist');
   });
 
   it('switches successful-query J and Wh and restores J for token normalization', () => {
@@ -472,7 +472,7 @@ describe('Inference ChartControls grouped measured metrics', () => {
     selectMeasuredSetting('energy-unit', 'wattHours');
     selectMeasuredSetting('energy-denominator', 'input');
     cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredJPerInputToken');
-    cy.get('[data-testid="measured-energy-unit"]').should('be.disabled').and('contain.text', 'J');
+    cy.get('[data-testid="measured-energy-unit"]').should('not.exist');
     cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
   });
 

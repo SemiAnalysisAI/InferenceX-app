@@ -110,6 +110,14 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
   return VENDOR_LABEL[series.vendor] ?? series.vendor;
 }
 
+/** Reader-facing collector name; the raw producer id stays in the title attribute. */
+export function collectorDisplayName(producer: string): string {
+  if (/dcgm/iu.test(producer)) return 'NVIDIA DCGM';
+  if (/amd-smi|amdsmi|rocm-smi/iu.test(producer)) return 'AMD SMI';
+  if (/nvidia-smi|nvml/iu.test(producer)) return 'nvidia-smi';
+  return producer;
+}
+
 interface Props {
   id: number;
   enabled: boolean;
@@ -250,7 +258,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
         <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.vendor}</dt>
-            <dd className="font-medium">{collectorLabel(selectedSeries)}</dd>
+            <dd className="truncate font-medium" title={collectorLabel(selectedSeries)}>
+              {collectorDisplayName(collectorLabel(selectedSeries))}
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.samples}</dt>

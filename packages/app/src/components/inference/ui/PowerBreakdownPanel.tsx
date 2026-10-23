@@ -165,15 +165,37 @@ export function interactivityColumnLayout(positions: readonly number[], plotWidt
   });
 }
 
-function hatchId(sectionId: string) {
-  return `${sectionId}-facility-hatch`.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
+function hatchId(sectionId: string, category: SystemPowerCategory = 'facility') {
+  return `${sectionId}-${category}-hatch`.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
 }
 
-function swatchStyle(category: SystemPowerCategory, color: string): React.CSSProperties {
-  if (category === 'facility') {
+/** Modeled parts are hatched (estimates), measured parts solid. */
+const isHatched = (category: SystemPowerCategory) => !MEASURED_POWER_CATEGORIES.has(category);
+const hatchBgOpacity = (category: SystemPowerCategory) =>
+  category === 'facility' ? HATCH_OPACITY : CATEGORY_OPACITY[category];
+
+/**
+ * Each modeled part gets its own stripe angle, so neighbouring estimates stay
+ * distinguishable without relying on opacity alone. Degrees, SVG convention:
+ * the rotation applied to a vertical stripe (0 = vertical, 90 = horizontal).
+ */
+export const HATCH_ANGLE: Record<SystemPowerCategory, number> = {
+  gpu: 45,
+  measuredCpu: 45,
+  server: 45,
+  fansPsu: 135,
+  network: 0,
+  facility: 90,
+};
+
+/** CSS `repeating-linear-gradient` angle that draws the same stripes as the SVG pattern. */
+export const cssHatchAngle = (category: SystemPowerCategory) => (HATCH_ANGLE[category] + 90) % 360;
+
+export function swatchStyle(category: SystemPowerCategory, color: string): React.CSSProperties {
+  if (isHatched(category)) {
     return {
-      backgroundColor: `color-mix(in oklab, ${color} ${HATCH_OPACITY * 100}%, transparent)`,
-      backgroundImage: `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 6px)`,
+      backgroundColor: `color-mix(in oklab, ${color} ${hatchBgOpacity(category) * 100}%, transparent)`,
+      backgroundImage: `repeating-linear-gradient(${cssHatchAngle(category)}deg, ${color} 0 2px, transparent 2px 6px)`,
       border: `1px solid ${color}`,
     };
   }
@@ -198,7 +220,7 @@ function tooltipHtml(
       const [label] = t.categories[key];
       const suffix = key === 'facility' ? ` (${t.pue} ${entry.pue})` : '';
       const basis = MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled;
-      return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${key === 'facility' ? 'transparent' : color};opacity:${key === 'facility' ? 1 : CATEGORY_OPACITY[key]};border:1px ${key === 'facility' ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
+      return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${isHatched(key) ? 'transparent' : color};opacity:${isHatched(key) ? 1 : CATEGORY_OPACITY[key]};border:1px ${isHatched(key) ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
     })
     .join('');
   const notes = [
@@ -267,22 +289,22 @@ function BreakdownChart({
       ...references.map((reference) => reference.value),
     ) * 1.08;
   const fill = (category: SystemPowerCategory) =>
-    category === 'facility' ? `url(#${hatchId(sectionId)})` : color;
+    isHatched(category) ? `url(#${hatchId(sectionId, category)})` : color;
   const fillOpacity = (category: SystemPowerCategory) =>
-    category === 'facility' ? 1 : CATEGORY_OPACITY[category];
+    isHatched(category) ? 1 : CATEGORY_OPACITY[category];
+  const hatchedCategories = series.categories.filter(isHatched);
 
   const drawDefs: NonNullable<CustomLayerConfig['render']> = (group) => {
     const pattern = group
-      .selectAll<SVGPatternElement, number>('pattern.breakdown-hatch')
-      .data([0])
+      .selectAll<SVGPatternElement, SystemPowerCategory>('pattern.breakdown-hatch')
+      .data(hatchedCategories)
       .join((enter) => {
         const created = enter
           .append('pattern')
           .attr('class', 'breakdown-hatch')
           .attr('patternUnits', 'userSpaceOnUse')
           .attr('width', 6)
-          .attr('height', 6)
-          .attr('patternTransform', 'rotate(45)');
+          .attr('height', 6);
         created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
         created
           .append('line')
@@ -294,8 +316,12 @@ function BreakdownChart({
           .attr('stroke-width', 2);
         return created;
       })
-      .attr('id', hatchId(sectionId));
-    pattern.select('.hatch-bg').attr('fill', color).attr('fill-opacity', HATCH_OPACITY);
+      .attr('id', (category) => hatchId(sectionId, category))
+      .attr('patternTransform', (category) => `rotate(${HATCH_ANGLE[category]})`);
+    pattern
+      .select('.hatch-bg')
+      .attr('fill', color)
+      .attr('fill-opacity', (category) => hatchBgOpacity(category));
     pattern.select('.hatch-line').attr('stroke', color);
   };
 
@@ -619,10 +645,18 @@ export default function PowerBreakdownPanel({
   contextLabel,
   xField,
   xLabel,
+  selectedKey: controlledKey,
+  onSelectKey,
+  heading,
 }: {
   chartId: string;
   data: InferenceData[];
   contextLabel?: string;
+  /** Controlled hardware line (series key); the panel keeps its own choice when omitted. */
+  selectedKey?: string | null;
+  onSelectKey?: (key: string) => void;
+  /** Overrides the panel title and subtitle, e.g. as a drill-down under a comparison. */
+  heading?: { title: string; subtitle: string };
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
@@ -642,7 +676,12 @@ export default function PowerBreakdownPanel({
     () => buildPowerBreakdowns(data, locale, interactivity),
     [data, locale, interactivity],
   );
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [ownKey, setOwnKey] = useState<string | null>(null);
+  const selectedKey = controlledKey === undefined ? ownKey : controlledKey;
+  const setSelectedKey = (key: string) => {
+    setOwnKey(key);
+    onSelectKey?.(key);
+  };
   const series = breakdowns.find((entry) => entry.key === selectedKey) ?? breakdowns[0] ?? null;
   const sectionId = `${chartId}-power-breakdown`;
   // The main chart's vendor color for each hardware line, so a bar here reads
@@ -699,9 +738,9 @@ export default function PowerBreakdownPanel({
     <section id={sectionId} className="min-w-0 space-y-3" data-testid="power-breakdown-panel">
       <div className="space-y-1">
         <Heading as="h3" level="card">
-          {t.title}
+          {heading?.title ?? t.title}
         </Heading>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+        <p className="text-sm text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {series === null ? (

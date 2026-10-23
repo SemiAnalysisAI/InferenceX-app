@@ -49,12 +49,13 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
   });
 
-  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
+  it('puts PowerX and both profit estimators between Inference Performance and Accuracy Evals', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
     );
-    expect(primary.slice(0, 4)).toEqual([
+    expect(primary.slice(0, 5)).toEqual([
       'inference',
+      'powerx',
       'profit-estimator-per-gigawatt',
       'profit-estimator',
       'evaluation',

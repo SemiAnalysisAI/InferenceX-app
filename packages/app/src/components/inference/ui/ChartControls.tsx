@@ -60,6 +60,8 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
+import { PowerXTabs } from './PowerXTabs';
+import { usePowerXSurface } from './powerx-surface';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -241,6 +243,7 @@ export default function ChartControls({
     setScaleType,
     setPowerCompare,
   } = useInferenceActions();
+  const powerXSurface = usePowerXSurface();
 
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
@@ -491,6 +494,7 @@ export default function ChartControls({
               {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
+                hidden={powerXSurface}
               >
                 <div className="flex items-center justify-between gap-2">
                   <LabelWithTooltip
@@ -525,7 +529,19 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
+              {mounted &&
+                powerXSurface &&
+                !powerXSurface &&
+                getMeasuredMetricConfig(selectedYAxisMetric) && (
+                  <PowerXTabs
+                    metric={selectedYAxisMetric}
+                    onChange={handleYAxisMetricChange}
+                    compare={powerCompare}
+                    onCompareChange={setPowerCompare}
+                  />
+                )}
+
+              {mounted && !powerXSurface && getMeasuredMetricConfig(selectedYAxisMetric) && (
                 <MeasuredMetricControls
                   metric={selectedYAxisMetric}
                   onChange={handleYAxisMetricChange}

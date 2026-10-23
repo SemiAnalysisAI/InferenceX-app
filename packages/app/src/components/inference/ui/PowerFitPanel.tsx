@@ -24,8 +24,9 @@ const STRINGS = {
     rSquared: 'R²',
     points: 'Points',
     range: 'Fitted range (tok/s/GPU)',
-    tooFew: (count: number) =>
-      `Not fitted: needs ${MIN_FIT_POINTS} distinct output rates, has ${count}.`,
+    notFitted: (count: number) =>
+      `${count} ${count === 1 ? 'config' : 'configs'} not fitted (need ${MIN_FIT_POINTS}+ distinct output rates)`,
+    rates: (count: number) => `${count} ${count === 1 ? 'rate' : 'rates'}`,
     flat: 'Undefined: power did not vary',
     empty: 'No validated measured power with a known output rate is available for these filters.',
   },
@@ -40,8 +41,9 @@ const STRINGS = {
     rSquared: 'R²',
     points: '点数',
     range: '拟合范围（tok/s/GPU）',
-    tooFew: (count: number) =>
-      `未拟合：需要 ${MIN_FIT_POINTS} 个不同的输出速率，当前只有 ${count} 个。`,
+    notFitted: (count: number) =>
+      `${count} 个配置未拟合（需要至少 ${MIN_FIT_POINTS} 个不同的输出速率）`,
+    rates: (count: number) => `${count} 个速率`,
     flat: '无定义：功耗没有变化',
     empty: '当前筛选条件下没有同时具备有效实测功耗和已知输出速率的数据。',
   },
@@ -69,6 +71,8 @@ export default function PowerFitPanel({
   const t = STRINGS[locale];
   const fits = useMemo(() => buildPowerFits(data, locale), [data, locale]);
   const sectionId = `${chartId}-power-fit`;
+  const fitted = fits.flatMap((entry) => (entry.fit ? [{ ...entry, fit: entry.fit }] : []));
+  const unfitted = fits.filter((entry) => !entry.fit);
 
   const markers: PanelMarker[] = fits.flatMap(({ source, observations }) =>
     observations.map((observation) => ({
@@ -171,39 +175,49 @@ export default function PowerFitPanel({
                 </tr>
               </thead>
               <tbody>
-                {fits.map((entry) => {
+                {fitted.map((entry) => {
                   const { fit, source, tdpWatts } = entry;
                   return (
                     <tr key={source.key} className="border-t" data-testid="power-fit-row">
                       <th className="p-2 align-top font-normal">
                         <span style={{ color: colorOf(source.key) }}>● </span>
-                        <span className="break-all">{source.label}</span>
+                        <span className="break-words">{source.label}</span>
                       </th>
-                      {fit ? (
-                        <>
-                          <td className="p-2 align-top">{watts(fit.intercept)}</td>
-                          <td className="p-2 align-top">
-                            {tdpWatts
-                              ? `${share(fit.intercept / tdpWatts)} · ${watts(tdpWatts)} W`
-                              : '—'}
-                          </td>
-                          <td className="p-2 align-top">{joules(fit.slope)}</td>
-                          <td className="p-2 align-top">
-                            {fit.rSquared === null ? t.flat : rSquared(fit.rSquared)}
-                          </td>
-                          <td className="p-2 align-top">{fit.n}</td>
-                          <td className="p-2 align-top">
-                            {rate(fit.xMin)}–{rate(fit.xMax)}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="p-2 align-top text-muted-foreground" colSpan={6}>
-                          {t.tooFew(new Set(entry.observations.map((o) => o.x)).size)}
-                        </td>
-                      )}
+                      <td className="p-2 align-top tabular-nums">{watts(fit.intercept)}</td>
+                      <td className="p-2 align-top tabular-nums">
+                        {tdpWatts
+                          ? `${share(fit.intercept / tdpWatts)} · ${watts(tdpWatts)} W`
+                          : '—'}
+                      </td>
+                      <td className="p-2 align-top tabular-nums">{joules(fit.slope)}</td>
+                      <td className="p-2 align-top tabular-nums">
+                        {fit.rSquared === null ? t.flat : rSquared(fit.rSquared)}
+                      </td>
+                      <td className="p-2 align-top tabular-nums">{fit.n}</td>
+                      <td className="p-2 align-top tabular-nums">
+                        {rate(fit.xMin)}–{rate(fit.xMax)}
+                      </td>
                     </tr>
                   );
                 })}
+                {unfitted.length > 0 && (
+                  <tr className="border-t" data-testid="power-fit-unfitted">
+                    <td className="p-2 align-top text-muted-foreground" colSpan={7}>
+                      <details>
+                        <summary className="cursor-pointer">{t.notFitted(unfitted.length)}</summary>
+                        <ul className="mt-1 space-y-0.5 pl-4">
+                          {unfitted.map((entry) => (
+                            <li key={entry.source.key} data-testid="power-fit-row">
+                              <span style={{ color: colorOf(entry.source.key) }}>● </span>
+                              {entry.source.label} ·{' '}
+                              {t.rates(new Set(entry.observations.map((o) => o.x)).size)}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

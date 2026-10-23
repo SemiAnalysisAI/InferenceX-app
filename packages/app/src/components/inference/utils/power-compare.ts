@@ -97,7 +97,20 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
     : null;
 }
 
-export function powerCompareVariants(metric: string, mode: PowerCompare): PowerCompareSeries[] {
+/**
+ * The two boundaries the PowerX tab's "Count" control names (GPU only, Whole
+ * system). Its "Both" overlay draws just these, not the rated provisioned bounds.
+ */
+export const COUNT_COMPARE_BASES = [
+  'gpu-measured',
+  'utility-modeled',
+] as const satisfies readonly PowerBasis[];
+
+export function powerCompareVariants(
+  metric: string,
+  mode: PowerCompare,
+  bases: readonly PowerBasis[] = POWER_BASES,
+): PowerCompareSeries[] {
   const base = powerCompareBase(metric, mode);
   const config = getMeasuredMetricConfig(metric);
   if (!base || !config) return [];
@@ -105,7 +118,7 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
     const quantity = comparableQuantity(metric);
     if (!quantity) return [];
     return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
-      if (basis === base.id) return [];
+      if (basis === base.id || !bases.includes(basis)) return [];
       const field =
         basis === 'gpu-measured'
           ? quantity === 'watts'
@@ -130,8 +143,9 @@ export function expandPowerCompareSeries(
   points: readonly InferenceData[],
   metric: string,
   mode: PowerCompare,
+  bases?: readonly PowerBasis[],
 ): InferenceData[] {
-  const series = powerCompareVariants(metric, mode);
+  const series = powerCompareVariants(metric, mode, bases);
   if (series.length === 0) return [...points];
   const result: InferenceData[] = [...points];
   for (const { variant, field } of series) {
@@ -181,11 +195,10 @@ export function powerVariantLabel(variant: PowerVariant, locale: Locale): string
     : ROLE_LABELS[variant.id][locale];
 }
 
+// Same names as the Boundary control and legend; only the TDP boundary is abbreviated.
 const BASIS_SHORT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
-  'gpu-measured': { en: 'Measured', zh: '实测' },
+  ...POWER_BASIS_LABELS,
   'gpu-provisioned': { en: 'TDP', zh: 'TDP' },
-  'utility-provisioned': { en: 'All-in', zh: '全站' },
-  'utility-modeled': { en: 'PUE modeled', zh: 'PUE 建模' },
 };
 
 export function powerVariantShortLabel(variant: PowerVariant, locale: Locale): string {
