@@ -68,24 +68,6 @@ const STRINGS = {
       where:
         'Pick an interactivity, compare the stacks, then click a chip to see it across load. Solid is measured, hatched is modeled.',
     },
-    glossaryLabel: 'What do these terms mean?',
-    glossary: [
-      [
-        'Interactivity',
-        'Tokens per second each user sees. Higher feels faster; it drops as more users share the chips.',
-      ],
-      ['GPU only', 'Board power read from the GPU’s own telemetry during the benchmark. Measured.'],
-      [
-        'Whole system',
-        'GPU power plus a modeled share of the rest of the server, fans and power-supply loss, the network and facility overhead (PUE). Shown as All in Measured.',
-      ],
-      ['TDP', 'The chip’s rated power limit. % of TDP shows how hard the chip is pushed.'],
-      ['J per token', 'Energy divided by tokens served. Lower is more efficient.'],
-      [
-        'TP8 / DEP8',
-        'How the model is split across the chips at that point (tensor or data + expert parallel).',
-      ],
-    ],
     systemOutputOnly: 'Whole system is modeled per output token only',
     unitLabel: 'Show as',
     watts: 'W per chip',
@@ -136,18 +118,6 @@ const STRINGS = {
       where:
         '先选交互性，比较各芯片的堆叠，再点击某款芯片查看其随负载的变化。实心为实测，斜线为模型估算。',
     },
-    glossaryLabel: '这些术语是什么意思？',
-    glossary: [
-      ['交互性', '每个用户看到的每秒 Token 数。越高越快；用户越多，交互性越低。'],
-      ['仅 GPU', '基准测试期间从 GPU 自身遥测读取的板卡功耗，为实测值。'],
-      [
-        '整体系统',
-        'GPU 功耗加上按模型估算的服务器其他组件、风扇与电源损耗、网络和数据中心开销（PUE）分摊，图中显示为「整体实测功耗」。',
-      ],
-      ['TDP', '芯片的额定功耗上限。TDP 占比表示芯片被压到多满。'],
-      ['每 Token 焦耳数', '能耗除以服务的 Token 数，越低越高效。'],
-      ['TP8 / DEP8', '该数据点上模型在芯片间的切分方式（张量并行，或数据加专家并行）。'],
-    ],
     systemOutputOnly: '整体系统仅按输出 Token 建模',
     unitLabel: '显示为',
     watts: '每芯片 W',
@@ -303,19 +273,6 @@ export function PowerXTabs({
         <p className="text-xs text-muted-foreground" data-testid="powerx-read">
           {t.read[tab]}
         </p>
-        <details className="group min-w-0 text-xs" data-testid="powerx-glossary">
-          <summary className="w-fit cursor-pointer select-none text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground">
-            {t.glossaryLabel}
-          </summary>
-          <dl className="mt-2 grid max-w-3xl grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-[max-content_1fr]">
-            {t.glossary.map(([term, definition]) => (
-              <div key={term} className="contents">
-                <dt className="font-medium text-foreground">{term}</dt>
-                <dd className="text-muted-foreground">{definition}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
       </div>
 
       {(tab === 'draw' || tab === 'energy') && (
