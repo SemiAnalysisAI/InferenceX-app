@@ -1,4 +1,4 @@
-export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo'];
+export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo', 'pokemon'];
 
 export function nextTheme(theme: string | undefined): string {
   return APP_THEMES[(APP_THEMES.indexOf(theme ?? '') + 1) % APP_THEMES.length];
@@ -13,6 +13,7 @@ export function isDarkTheme(theme: string | undefined): boolean {
 }
 
 export function chartPaletteTheme(theme: string): string {
+  if (theme === 'pokemon') return 'light';
   return DARK_CHART_ALIASES.has(theme) ? 'dark' : theme;
 }
 

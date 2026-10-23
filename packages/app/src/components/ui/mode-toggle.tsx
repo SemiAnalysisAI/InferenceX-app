@@ -1,7 +1,17 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
+import {
+  Car,
+  CircleDot,
+  Crosshair,
+  Moon,
+  Pickaxe,
+  Shield,
+  Skull,
+  Sun,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -17,6 +27,7 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   gta: Car,
   doom: Skull,
   halo: Shield,
+  pokemon: CircleDot,
 };
 
 function PendingIcon() {
