@@ -1,0 +1,26 @@
+---
+title: 'DeepSeek V4.1 Flash'
+developer: 'DeepSeek'
+releaseDate: '2026 年 9 月 10 日'
+description: 'DeepSeek 的因果编码器—解码器模型，主干参数 552B，prefill 激活 8B、decode 激活 16B，采用 CSA2，另含 196B Engram 条件记忆。'
+---
+
+## 概述
+
+DeepSeek-V4.1-Flash 是原生支持图像与文本输入的 MoE 模型，采用因果编码器—解码器（Causal Encoder-Decoder，CED）主干，与 DeepSeek V4 Pro 是不同架构。DeepSeek 公布的主干参数为 552B，prefill 时激活 8B、decode 时激活 16B；另有不计入主干总量的 196B Engram 条件记忆表（[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)）。
+
+## 架构
+
+- **CED：**40 层 Transformer，由 20 层因果编码器和 20 层解码器组成。解码器的全局 KV 从编码器最终状态投影得到，不是分别从每个解码层独立生成并保存。
+- **注意力：**压缩稀疏注意力 2（CSA2）使用 Full、Reindex、Reuse 三种模式，结合解码器分层索引器与 128-token 滑动窗口注意力（SWA）。
+- **维度：**隐藏维度 5120；64 个 query head、1 个 KV head，head 维度 512；词表大小 129280。
+- **MoE：**384 个路由 expert 和 1 个共享 expert；每个 token 选取 6 个路由 expert，expert 中间维度 2304。
+- **条件记忆：**Engram 根据 token 查表，其 196B 参数不计入 552B 主干；这与 Qwen3.8-Flash-Next 的参数统计口径不同。
+- **残差与投机解码：**使用 4 路流的单次计算 mHC，以及 DSpark 投机解码。
+- **上下文与模态：**位置上限为 1,048,576；支持图像与文本输入、文本输出。视觉编码器与 projector 提供视觉嵌入。
+
+上述维度以及 3 层 next-token prediction 配置均可在[公开配置](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/raw/main/config.json)中核对。[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)解释了 prefill 与 decode 激活参数量不同的原因，不能用单一数值代替。
+
+## 推理数据范围
+
+模型以 MIT 许可证发布。厂商报告的 FP4 KV cache 占用和有界 SWA replay 属于架构特性；InferenceX 的实测性能取决于实际 checkpoint、推理引擎及运行配置，不能只根据参数量推导速度提升（[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)）。

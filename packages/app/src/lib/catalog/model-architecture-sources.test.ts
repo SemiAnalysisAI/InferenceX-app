@@ -37,6 +37,34 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
+  it('keeps prefill, decode and conditional memory separate for the CED model', () => {
+    const arch = getModelArchitecture(Model.DeepSeek_V4_1_Flash)!;
+    expect(arch).toMatchObject({
+      totalParams: 552,
+      activeParamsPrefill: 8,
+      activeParams: 16,
+      conditionalMemoryParams: 196,
+    });
+    expect(arch.encoderDecoder).toEqual({
+      encoderLayers: 20,
+      decoderLayers: 20,
+      globalKVSource: 'final-encoder-hidden-states',
+      encoderSlidingOnlyLayers: 2,
+      decoderAttention: 'joint-local-swa-and-shared-global-kv',
+    });
+    expect(arch.encoderDecoder!.encoderLayers + arch.encoderDecoder!.decoderLayers).toBe(
+      arch.numLayers,
+    );
+    const source = fixtures.models.find(({ model }) => model === arch.model)!.config;
+    expect(arch.encoderDecoder!.encoderSlidingOnlyLayers).toBe(
+      ('compress_ratios' in source ? (source.compress_ratios as number[]) : [])
+        .slice(0, arch.encoderDecoder!.encoderLayers)
+        .filter((ratio) => ratio === 0).length,
+    );
+    expect(arch.attentionLabel).toBe('CSA2');
+    expect(arch.conditionalMemoryName).toBe('Engram');
+  });
+
   it('does not project a K3 routed expert directly to the residual hidden size', () => {
     const arch = getModelArchitecture(Model.Kimi_K3)!;
     const routed = getFFNSubBlocks(arch);
@@ -66,7 +94,7 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
-  it.each([Model.DeepSeek_V4_Pro])(
+  it.each([Model.DeepSeek_V4_Pro, Model.DeepSeek_V4_1_Flash])(
     '%s clamps both projections before ordinary SiLU without the gpt-oss offset',
     (model) => {
       const flow = getFFNSubBlocks(getModelArchitecture(model)!);
@@ -82,7 +110,7 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
-  it.each(['muse-spark-open', 'minimax-m31-flash'])(
+  it.each(['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash'])(
     '%s has an actual Chinese article with the same technical numbers and sources',
     (slug) => {
       const en = getModelPage(slug)!;
@@ -90,6 +118,7 @@ describe('architecture parity with published checkpoint configs', () => {
       expect(zh.contentLocale).toBe('zh');
       const protectedFacts: Record<string, string[]> = {
         'muse-spark-open': ['816B', '42B', '62', '8192', '202048', '4096'],
+        'deepseek-v41-flash': ['552B', '196B', '8B', '16B', '5120', '2304'],
         'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
       };
       for (const fact of protectedFacts[slug]) {

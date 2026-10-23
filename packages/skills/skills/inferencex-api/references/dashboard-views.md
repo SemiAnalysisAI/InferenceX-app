@@ -536,6 +536,19 @@ as this catalog. `alternatingLayers` groups repeated layer types; use
 interpreting the categories as contiguous blocks. Expanding a Transformer or FFN
 block is presentation only and does not change the returned data.
 
+DeepSeek V4.1 Flash returns `encoderDecoder` with `encoderLayers: 20`,
+`decoderLayers: 20`, `encoderSlidingOnlyLayers: 2`,
+`globalKVSource: "final-encoder-hidden-states"`, and
+`decoderAttention: "joint-local-swa-and-shared-global-kv"`.
+`attentionLabel: "CSA2"` names the mechanism, and
+`conditionalMemoryName: "Engram"` identifies the separate memory table.
+The encoder is causal. Decoder attention combines shared encoder-derived global
+KV with each layer's local sliding-window KV in one sparse-attention operation;
+there is no separate T5-style cross-attention block. Prefill/decode active counts
+remain separate, and conditional-memory parameters remain outside the backbone
+count. Component-summary `diagramStages` cards are replaced by these structured
+fields and expandable arrow diagrams.
+
 `GET /api/v1/views/model-architectures` returns the same `MODEL_ARCHITECTURES`
 registry used by `/model/<slug>`, `/zh/model/<slug>`, and dashboard diagrams.
 Omit `model` for all entries, or pass an exact display name such as `Kimi-K3` or
@@ -575,3 +588,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `minimax-m3`: read the model-specific architecture facts and source link with `model=minimax-m3`.
 - `minimax-m31-flash`: read the model-specific architecture facts and source link with `model=minimax-m31-flash`.
 - `muse-spark-open`: read the model-specific architecture facts and source link with `model=muse-spark-open`.
+- `deepseek-v41-flash`: read the model-specific architecture facts and source link with `model=deepseek-v41-flash`.
