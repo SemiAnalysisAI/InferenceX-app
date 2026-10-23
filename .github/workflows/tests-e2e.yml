@@ -196,16 +196,12 @@ jobs:
           path: packages/app/.next/cache
           key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
       - name: Run integration tests
-        uses: cypress-io/github-action@09090944bd8aaa2a517cefb6e38bf1aae336b42b # v7.4.3
+        uses: cypress-io/github-action@c541a95ea92d9239347a2355f2e895cd4b3f8060 # v7.4.6
         with:
           working-directory: packages/app
           install: false
           start: bun run start
-          # The action's URL probe retries only a fixed list of error codes, and the
-          # runner's Node reports a refused startup connection as "Socket closed before
-          # the connection was established", which fails the step immediately. curl
-          # retries every error for up to 60 seconds instead.
-          wait-on: curl --silent --fail --output /dev/null --retry 60 --retry-delay 1 --retry-all-errors --retry-max-time 60 http://127.0.0.1:3000
+          wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
           publish-summary: false
         env:
