@@ -421,3 +421,15 @@ flags do not make public data sensitive.
 ### Cache-reuse recipe selection
 
 Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.
+
+### Landing-page Huawei link
+
+The English and Chinese landing pages link Huawei Ascend 950PR results to
+`/operatorx` and `/zh/operatorx`, respectively. The logo and result button are
+presentation-only navigation to the existing OperatorX view: they add no data
+selectors, defaults, calculations, or API contracts. Existing OperatorX API
+coverage applies; no additional endpoint or OpenAPI change is needed.
+
+中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
+`/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
+API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
