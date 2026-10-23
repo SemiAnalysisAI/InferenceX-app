@@ -12,6 +12,7 @@ import type { Comparison, ComparisonOp } from '../operatorx/compare';
 import { buildRunComparison, OPERATORX_COMPARISON_VERSION } from '../operatorx/comparison-cache';
 
 const DOCS_INSERT_CHUNK = 20;
+const DOCS_READ_BATCH = 8;
 
 export const RUN_KEY_RE = /^[\w.-]{1,128}$/u;
 
@@ -27,23 +28,38 @@ export async function getOperatorXBundle(
   const rows = await sql`
     SELECT r.id, r.run_key, r.run_attempt,
       to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS generated_at,
-      r.source_sha, r.source_branch, r.conclusion, r.manifest,
-      COALESCE(d.shards, '[]'::jsonb) AS shards
+      r.source_sha, r.source_branch, r.conclusion, r.manifest
     FROM opx_runs r
-    LEFT JOIN LATERAL (
-      SELECT jsonb_agg(jsonb_build_object('id', shard, 'attempt', run_attempt, 'docs', docs)
-                       ORDER BY shard) AS shards
-      FROM (
-        SELECT shard, run_attempt, jsonb_agg(doc ORDER BY id) AS docs
-        FROM opx_run_docs
-        WHERE run_id = r.id
-        GROUP BY shard, run_attempt
-      ) s
-    ) d ON true
     WHERE r.run_key = ${runKey}
   `;
   if (rows.length === 0) return null;
   const r = rows[0];
+  const shards: OperatorXRawBundle['shards'] = [];
+  let lastShard = '';
+  let lastId = '0';
+  for (;;) {
+    const docs = await sql`
+      SELECT id, shard, run_attempt, doc FROM opx_run_docs
+      WHERE run_id = ${r.id}
+        AND (shard > ${lastShard} OR (shard = ${lastShard} AND id > ${lastId}))
+      ORDER BY shard, id LIMIT ${DOCS_READ_BATCH}
+    `;
+    for (const doc of docs) {
+      const shardId = String(doc.shard);
+      const attempt = Number(doc.run_attempt);
+      const prior = shards.at(-1);
+      if (prior?.id === shardId && prior.attempt === attempt) prior.docs.push(doc.doc);
+      else shards.push({ id: shardId, attempt, docs: [doc.doc] });
+      lastShard = shardId;
+      lastId = String(doc.id);
+    }
+    if (docs.length < DOCS_READ_BATCH) break;
+  }
+  // A concurrent re-ingest replaces the revision and its documents atomically.
+  // Do not return a partially read bundle from the replaced revision.
+  const current = await sql`SELECT id FROM opx_runs WHERE run_key = ${runKey}`;
+  if (current.length !== 1 || String(current[0].id) !== String(r.id))
+    throw new Error(`Run ${runKey} changed during document read`);
   return {
     run: {
       run_id: String(r.run_key),
@@ -55,7 +71,7 @@ export async function getOperatorXBundle(
       conclusion: (r.conclusion as string | null) ?? null,
     },
     manifest: r.manifest,
-    shards: r.shards as OperatorXRawBundle['shards'],
+    shards,
   };
 }
 
@@ -149,6 +165,7 @@ export async function backfillOperatorXRunComparisons(
 export async function saveOperatorXBundle(
   sql: Sql,
   bundle: OperatorXRawBundle,
+  replaceRunKey?: string,
 ): Promise<{ docs: number; results: number }> {
   const key = bundle.run.run_id;
   if (!RUN_KEY_RE.test(key)) throw new Error(`Invalid run key: ${key}`);
@@ -159,6 +176,21 @@ export async function saveOperatorXBundle(
   let docs = 0;
   let results = 0;
   await sql.begin(async (tx) => {
+    if (replaceRunKey && replaceRunKey !== key) {
+      if (!RUN_KEY_RE.test(replaceRunKey))
+        throw new Error(`Invalid replacement run key: ${replaceRunKey}`);
+      const old = await tx`
+        SELECT summary FROM opx_runs WHERE run_key = ${replaceRunKey} FOR UPDATE
+      `;
+      if (
+        old.length !== 1 ||
+        !String((old[0].summary as OperatorXRunRef).plan?.runner ?? '').startsWith('ascend950pr')
+      )
+        throw new Error(`Replacement target is not an Ascend 950PR run: ${replaceRunKey}`);
+      if (!plan.runner.startsWith('ascend950pr'))
+        throw new Error(`Replacement bundle is not an Ascend 950PR run: ${key}`);
+      await tx`DELETE FROM opx_runs WHERE run_key = ${replaceRunKey}`;
+    }
     await tx`DELETE FROM opx_runs WHERE run_key = ${key}`;
     const [{ id }] = await tx`
       INSERT INTO opx_runs

@@ -200,6 +200,62 @@ it('keeps raw documents and compact comparisons intact when a re-ingest fails', 
   }
 });
 
+it('replaces an older Ascend run atomically while preserving other hardware', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const old = bundle();
+    old.run.run_id = 'old-ascend';
+    (old.manifest as { include: { runner: string }[] }).include[0].runner = 'ascend950pr-external';
+    await saveOperatorXBundle(sql, old);
+    await saveOperatorXBundle(sql, bundle());
+
+    const replacement = structuredClone(old);
+    replacement.run.run_id = 'new-ascend';
+    replacement.shards[0].docs[0] = {
+      run: { cluster: 'ascend950pr' },
+      rows: [{ ...row(1, 7), op: { ...row(1, 7).op, backend: 'vllm' } }],
+    };
+    await expect(saveOperatorXBundle(sql, replacement, '123')).rejects.toThrow(
+      'Replacement target is not an Ascend 950PR run',
+    );
+    expect(await getOperatorXBundle(sql, 'old-ascend')).not.toBeNull();
+    expect(await getOperatorXBundle(sql, 'new-ascend')).toBeNull();
+
+    await saveOperatorXBundle(sql, replacement, 'old-ascend');
+    expect(await getOperatorXBundle(sql, 'old-ascend')).toBeNull();
+    expect(await getOperatorXBundle(sql, '123')).not.toBeNull();
+    expect(await getOperatorXBundle(sql, 'new-ascend')).not.toBeNull();
+    const comparison = await getOperatorXRunComparison(sql, 'new-ascend', 'gemm');
+    expect(comparison?.rows[0]).toMatchObject({
+      latencyUs: 7,
+      runId: 'new-ascend',
+    });
+  } finally {
+    await db.close();
+  }
+});
+
+it('reads large runs in bounded document batches without changing shard order', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const input = bundle();
+    input.shards = [
+      { id: 'a', attempt: 1, docs: Array.from({ length: 11 }, (_, n) => ({ n })) },
+      { id: 'b', attempt: 2, docs: Array.from({ length: 9 }, (_, n) => ({ n })) },
+    ];
+    await saveOperatorXBundle(sql, input);
+    const stored = await getOperatorXBundle(sql, '123');
+    expect(stored?.shards).toEqual(input.shards);
+    expect(stored?.run.revision).toMatch(/^\d+$/u);
+  } finally {
+    await db.close();
+  }
+});
+
 const row = (m: number, latency: number) => ({
   testlist: 'gemm',
   op: {
