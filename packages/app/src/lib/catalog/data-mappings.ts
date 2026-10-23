@@ -116,6 +116,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'MiniMax M3.1 Flash 428B',
     prefix: 'minimaxm31flash',
     category: 'default',
+    openRouterModelId: 'minimax/minimax-m3.1-flash',
     logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
