@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
-    purgeOperatorX();
+    await purgeOperatorX();
     return NextResponse.json({ invalidated: true, scope });
   }
 

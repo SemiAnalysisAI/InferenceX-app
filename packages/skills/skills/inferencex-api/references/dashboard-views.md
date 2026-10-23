@@ -478,3 +478,12 @@ Timeline reads share one raw fetch per run, with at most four runs concurrent.
 Request order, revision checks, missing/null results, and error handling are preserved.
 
 中文：时间线按运行复用读取，最多四个运行并发；保留请求顺序、revision 校验、缺失结果和错误处理。
+
+### Shared merged-comparison cache
+
+Optional revision-keyed Blob caching reuses merged comparisons without changing
+selectors or results. Partial/replaced revisions stay uncached. Configuration,
+isolation, invalidation, and remaining run-list cost: `docs/operatorx.md`.
+
+中文：可选的 Blob 缓存按 revision 复用合并结果，不改变筛选条件或数值；部分失败及已替换
+revision 不会缓存。配置、隔离和清除规则见 `docs/operatorx.md`。

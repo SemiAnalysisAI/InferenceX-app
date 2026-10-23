@@ -170,6 +170,15 @@ describe('blobSet', () => {
 });
 
 describe('blobPurge', () => {
+  it('restricts scoped purges to their exact key subtree', async () => {
+    mockList.mockResolvedValue({ blobs: [], hasMore: false, cursor: '' } as any);
+    expect(await blobPurge('operatorx/deployment/')).toBe(0);
+    expect(mockList).toHaveBeenCalledWith({
+      prefix: 'test-cache/operatorx/deployment/',
+      cursor: undefined,
+    });
+  });
+
   it('deletes all blobs in a single page and returns count', async () => {
     mockList.mockResolvedValue({
       blobs: [

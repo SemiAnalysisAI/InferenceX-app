@@ -1,6 +1,7 @@
 import {
   buildRunComparison,
   mergeRunComparisons,
+  OPERATORX_COMPARISON_VERSION,
 } from '@semianalysisai/inferencex-db/operatorx/comparison-cache';
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
@@ -16,6 +17,8 @@ import {
   compactTimeline,
   type OperatorXTimeline,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
+
+import { cachedQuery, operatorXBlobPrefix } from '@/lib/cache/api-cache';
 
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
@@ -132,12 +135,53 @@ async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Com
   return comparison;
 }
 
+// Throw before cache persistence; carry the partial response back to the caller.
+class UncacheableComparisonError extends Error {
+  readonly comparison: Comparison;
+
+  constructor(comparison: Comparison) {
+    super('OperatorX comparison is incomplete or its revision changed during the read');
+    this.name = 'UncacheableComparisonError';
+    this.comparison = comparison;
+  }
+}
+
+async function sharedComparison(
+  op: ComparisonOp,
+  runs: OperatorXRunRef[],
+  revisions: string,
+): Promise<Comparison> {
+  if (getOperatorXSource().name !== 'database') return compareOp(op, runs);
+  const read = cachedQuery(
+    async (_revisions: string) => {
+      const comparison = await compareOp(op, runs);
+      const expected = new Map(runs.map((run) => [run.run_id, revisionOf(run)]));
+      if (
+        partial.has(comparison) ||
+        comparison.rows.some((row) => expected.get(row.runId) !== row.revision)
+      ) {
+        partial.add(comparison);
+        throw new UncacheableComparisonError(comparison);
+      }
+      return comparison;
+    },
+    `${operatorXBlobPrefix()}comparison:v${OPERATORX_COMPARISON_VERSION}:${op}`,
+    { blobOnly: true },
+  );
+  try {
+    return await read(revisions);
+  } catch (error) {
+    if (error instanceof UncacheableComparisonError) return error.comparison;
+    throw error;
+  }
+}
+
 export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   const runs = comparisonRuns(op, await listRuns());
   const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
   const hit = compared.get(op);
   if (hit?.revisions === revisions) return hit.value;
-  const value = compareOp(op, runs);
+  const value = sharedComparison(op, runs, revisions);
   compared.set(op, { revisions, value });
   const drop = () => {
     if (compared.get(op)?.value === value) compared.delete(op);
