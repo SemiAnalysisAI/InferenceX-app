@@ -203,6 +203,7 @@ const escapeHtml = (s: string): string =>
 const SYSTEM_POWER_STRINGS = {
   en: {
     heading: 'InferenceX Power Model (beta)',
+    details: 'Deployment & model details',
     measuredGpu: 'Measured GPU power',
     itPerGpu: 'Modeled IT power per GPU',
     deploymentIt: 'Modeled deployment IT power',
@@ -270,6 +271,7 @@ const SYSTEM_POWER_STRINGS = {
   },
   zh: {
     heading: 'InferenceX 功耗模型（Beta）',
+    details: '部署与模型详情',
     measuredGpu: 'GPU 实测功耗',
     itPerGpu: '每 GPU 分摊的 IT 功耗估算',
     deploymentIt: '整个部署的 IT 功耗估算',
@@ -329,6 +331,20 @@ const SYSTEM_POWER_STRINGS = {
   },
 } as const;
 
+/** Power readings: whole watts with grouping — sub-watt digits are model noise. */
+const fmtWatts = (value: number): string => Math.round(value).toLocaleString('en-US');
+
+/** Y-axis metrics whose values are watts, shown rounded to whole watts. */
+const WATT_METRICS = new Set([
+  'y_measuredAvgPower',
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_utilityModeledWatts',
+]);
+
+const fmtY = (value: number, metric: string): string =>
+  WATT_METRICS.has(metric) && Number.isFinite(value) ? fmtWatts(value) : fmt(value);
+
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
@@ -351,17 +367,20 @@ const modeledSystemPowerHTML = (
   const u = t.units[estimate.unit];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
-    ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
-    ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
+    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU`)}
     ${
       isPinned
         ? `
+      <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
+      <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
       ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
-      ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
-      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
+      ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
+      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
+      </details>
     `
         : ''
     }
@@ -792,7 +811,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
@@ -850,7 +869,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.branch, `${branch}`)}
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
@@ -901,7 +920,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `

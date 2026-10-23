@@ -284,12 +284,12 @@ export function MeasuredMetricControls({
             </Select>
           </div>
         </>
-      ) : (
+      ) : config.denominator === 'query' ? (
+        // Only per-request energy has a unit choice; a locked single-option control is noise.
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip htmlFor="measured-energy-unit" label={t.unit} tooltip={t.unitHelp} />
           <Select
             value={config.unit}
-            disabled={config.denominator !== 'query'}
             onValueChange={(unit) => change({ unit: unit as typeof config.unit })}
           >
             <SelectTrigger
@@ -309,7 +309,7 @@ export function MeasuredMetricControls({
             </SelectContent>
           </Select>
         </div>
-      )}
+      ) : null}
       {onCompareChange && (
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip

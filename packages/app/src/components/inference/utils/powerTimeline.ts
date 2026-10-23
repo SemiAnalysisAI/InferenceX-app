@@ -127,6 +127,7 @@ export function parsePowerTimelineParams(params: {
   i_ptfocus?: string;
   i_ptutility?: string;
   i_ptconc?: string;
+  i_ptraw?: string;
 }) {
   return {
     axis: (['wall', 'elapsed', 'serving'].includes(params.i_ptaxis ?? '')
@@ -139,6 +140,7 @@ export function parsePowerTimelineParams(params: {
     focus:
       params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
     utility: params.i_ptutility === '1',
+    raw: params.i_ptraw === '1',
     concurrency: /^[1-9]\d{0,5}$/u.test(params.i_ptconc ?? '') ? Number(params.i_ptconc) : null,
   };
 }
@@ -296,6 +298,86 @@ export function referenceLabelSlots(lines: readonly { watts: number }[]): number
   });
 }
 
+/** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
+export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
+
+/**
+ * Centered rolling mean over `window` samples. Nulls are skipped inside a window and stay null
+ * in the output, so gaps in telemetry are never bridged with invented values.
+ */
+export function rollingMean(values: readonly (number | null)[], window: number): (number | null)[] {
+  const span = Math.max(1, Math.round(window));
+  if (span <= 1) return [...values];
+  const half = Math.floor(span / 2);
+  const sums = [0];
+  const counts = [0];
+  for (const value of values) {
+    const valid = value !== null && Number.isFinite(value);
+    sums.push(sums.at(-1)! + (valid ? value : 0));
+    counts.push(counts.at(-1)! + (valid ? 1 : 0));
+  }
+  return values.map((value, index) => {
+    if (value === null || !Number.isFinite(value)) return null;
+    const lo = Math.max(0, index - half);
+    const hi = Math.min(values.length, index - half + span);
+    const count = counts[hi] - counts[lo];
+    return count > 0 ? (sums[hi] - sums[lo]) / count : null;
+  });
+}
+
+/**
+ * Moves label centers apart so no two are closer than `rowHeight`, keeping their order and
+ * staying inside [min, max]. Labels are shifted symmetrically around their wanted position
+ * instead of only downwards, so a cluster stays centered on the lines it names.
+ */
+export function spreadLabelYs(
+  wanted: readonly number[],
+  rowHeight: number,
+  min: number,
+  max: number,
+): number[] {
+  const order = wanted.map((_, index) => index).toSorted((a, b) => wanted[a] - wanted[b]);
+  interface Block {
+    start: number;
+    members: number[];
+    center: number;
+  }
+  const blocks: Block[] = [];
+  for (const index of order) {
+    let block: Block = { start: wanted[index], members: [index], center: wanted[index] };
+    while (blocks.length > 0) {
+      const previous = blocks.at(-1)!;
+      if (previous.start + previous.members.length * rowHeight <= block.start) break;
+      blocks.pop();
+      const members = [...previous.members, ...block.members];
+      const center = members.reduce((sum, member) => sum + wanted[member], 0) / members.length;
+      block = { members, center, start: center - ((members.length - 1) * rowHeight) / 2 };
+    }
+    blocks.push(block);
+  }
+  const ys = [...wanted];
+  const total = order.length * rowHeight;
+  const room = Math.max(0, max - min);
+  // Clamp the whole layout into range; when it cannot fit, compress the row height evenly.
+  const row = total - rowHeight > room && order.length > 1 ? room / (order.length - 1) : rowHeight;
+  let cursor = min;
+  for (const block of blocks) {
+    let y = Math.max(block.start, cursor);
+    for (const member of block.members) {
+      ys[member] = y;
+      y += row;
+    }
+    cursor = y;
+  }
+  // Pull back from the bottom edge, preserving spacing.
+  let ceiling = max;
+  for (const index of order.toReversed()) {
+    if (ys[index] > ceiling) ys[index] = ceiling;
+    ceiling = ys[index] - row;
+  }
+  return ys;
+}
+
 export function stackTraceLabels(
   labels: readonly { left: number; right: number; y: number }[],
   rowHeight: number,
@@ -374,4 +456,29 @@ export function consumePowerTraceFocus(): string | null {
   const key = pendingFocus;
   pendingFocus = null;
   return key;
+}
+
+/**
+ * Concurrency shared by the most hardware configs (ties go to the higher level),
+ * so a first look at the timeline compares chips at one load instead of every sweep point.
+ */
+export function mostCoveredConcurrency(
+  points: readonly { conc: number; hwKey: string }[],
+): number | null {
+  const coverage = new Map<number, Set<string>>();
+  for (const { conc, hwKey } of points) {
+    if (!Number.isSafeInteger(conc) || conc <= 0) continue;
+    let keys = coverage.get(conc);
+    if (!keys) coverage.set(conc, (keys = new Set()));
+    keys.add(hwKey);
+  }
+  let best: number | null = null;
+  let bestCount = 0;
+  for (const [conc, keys] of coverage) {
+    if (keys.size > bestCount || (keys.size === bestCount && best !== null && conc > best)) {
+      best = conc;
+      bestCount = keys.size;
+    }
+  }
+  return best;
 }

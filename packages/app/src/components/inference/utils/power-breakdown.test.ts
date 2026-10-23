@@ -5,6 +5,10 @@ import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { InferenceData } from '../types';
 import {
   buildPowerBreakdowns,
+  compareBreakdownsAt,
+  defaultComparisonInteractivity,
+  type PowerBreakdownPoint,
+  type PowerBreakdownSeries,
   POWER_BREAKDOWN_STACK_ORDER,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
@@ -177,5 +181,66 @@ describe('stackPowerBreakdown', () => {
       expect(segments[index].y0).toBe(segments[index - 1].y1);
     }
     expect(segments.at(-1)!.y1).toBeCloseTo(series.points[0].totalWattsPerGpu, 9);
+  });
+});
+
+function fakeSeries(label: string, points: [interactivity: number, total: number][]) {
+  return {
+    key: label,
+    hwKey: label,
+    precision: 'fp8',
+    label,
+    categories: ['gpu'],
+    tdpWattsPerGpu: null,
+    allInProvisionedWattsPerGpu: null,
+    points: points.map(
+      ([interactivity, total]) =>
+        ({ interactivity, totalWattsPerGpu: total }) as unknown as PowerBreakdownPoint,
+    ),
+  } as PowerBreakdownSeries;
+}
+
+describe('cross-chip comparison', () => {
+  const a = fakeSeries('A', [
+    [10, 1500],
+    [40, 1200],
+    [160, 900],
+  ]);
+  const b = fakeSeries('B', [
+    [20, 1300],
+    [80, 1000],
+  ]);
+
+  it('defaults to the geometric middle of the range every chip covers', () => {
+    expect(defaultComparisonInteractivity([a, b])).toBeCloseTo(40, 9);
+    expect(defaultComparisonInteractivity([])).toBeNull();
+  });
+
+  it('falls back to the full range when chips do not overlap', () => {
+    const low = fakeSeries('L', [
+      [5, 1],
+      [10, 1],
+    ]);
+    const high = fakeSeries('H', [
+      [100, 1],
+      [200, 1],
+    ]);
+    expect(defaultComparisonInteractivity([low, high])).toBeCloseTo(Math.sqrt(5 * 200), 9);
+  });
+
+  it("picks each chip's nearest point on a log scale and sorts by total", () => {
+    const { rows, outOfRange } = compareBreakdownsAt([a, b], 56);
+    expect(outOfRange).toEqual([]);
+    expect(rows.map((r) => [r.series.label, r.entry.interactivity])).toEqual([
+      ['B', 80],
+      ['A', 40],
+    ]);
+  });
+
+  it('leaves out chips with no point near the target', () => {
+    const { rows, outOfRange } = compareBreakdownsAt([a, b], 160);
+    expect(rows.map((r) => r.series.label)).toEqual(['A']);
+    expect(outOfRange.map((s) => s.label)).toEqual(['B']);
+    expect(compareBreakdownsAt([a], 0).outOfRange).toHaveLength(1);
   });
 });

@@ -47,7 +47,7 @@ describe('Measured power on unofficial-run overlay', () => {
     cy.get('[data-slot="select-content"]').should('not.exist');
     cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Output token');
     cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
-    cy.get('[data-testid="measured-energy-unit"]').should('contain.text', 'J');
+    cy.get('[data-testid="measured-energy-unit"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
       'Measured Joules per Output Token',

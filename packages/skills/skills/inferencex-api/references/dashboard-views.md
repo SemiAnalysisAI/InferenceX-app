@@ -370,6 +370,16 @@ metrics. Points are sorted by `interactivity` on `interactivityField`: the chart
 interactivity x-axis (AgentX P90/P75 included), otherwise `median_intvty`. Points without
 validated GPU telemetry, a supported system model or positive interactivity are omitted.
 
+The PowerX dashboard tab (`/powerx`, `/zh/powerx`) is a presentation of the
+`inference` view and adds no selectors. Its Power draw, Energy per token, Over time and
+Where the power goes tabs select existing `metric` values; the chip comparison and
+per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). Chips with measured
+GPU power but no supported system model are named as not shown, not dropped silently.
+On that tab, comparing GPU only with Whole system draws `gpu-measured` and
+`utility-modeled` only; the provisioned bounds stay on Inference Performance.
+PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
+芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
+
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、

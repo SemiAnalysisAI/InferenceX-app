@@ -1257,7 +1257,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-breakdown.ts',
-    sourceSha256: 'ef17d347cd74d552d631f103d05a68b840b387a61020a4305124a57f8225a1f0',
+    sourceSha256: '1093ba4d06c27b9996a14f9928018eb9d97b87d47af980b78ee1bc10cb3a18cb',
     reviewArea: {
       en: 'Per-point system power breakdown: measured GPU and Grace parts, modeled server, fans/PSU loss, scale-out network and PUE overhead, summing to All in Measured W/GPU.',
       zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分、建模的服务器部件、风扇/PSU 损耗、横向扩展网络与 PUE 开销，合计等于 All in Measured W/GPU。',
@@ -1447,7 +1447,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '91a12a0efb6be0891c194413e1a267db8137f44421258275981a0454f84fd4aa',
+    sourceSha256: 'fdce22f030ab45c47443b608de914346fd4755416518c44ed1782cfb9619d62f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

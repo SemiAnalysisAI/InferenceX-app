@@ -1363,7 +1363,11 @@ const ScatterGraph = React.memo(
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
 
+      // Bounded metrics (% TDP) read against their full 0-to-limit range, with headroom
+      // so the dashed limit line stays visible.
       const ceiling = metricAxisCeiling(selectedYAxisMetric);
+      if (ceiling !== undefined && !useLog) yMin = 0;
+      // % TDP stops at 100%; values above the rating keep the plain 5% headroom.
       const yMax =
         ceiling !== undefined && ext[1] <= ceiling
           ? Math.min(ext[1] * 1.05, ceiling)
@@ -1661,6 +1665,14 @@ const ScatterGraph = React.memo(
           name: legendId,
           hw: legendId,
           label: powerVariantLabel(variant, locale),
+          section:
+            variant.kind === 'basis'
+              ? locale === 'zh'
+                ? '功耗边界'
+                : 'Boundary'
+              : locale === 'zh'
+                ? 'GPU 角色'
+                : 'GPU role',
           color: 'var(--foreground)',
           lineDasharray: isBase ? '1 0' : powerVariantDash(variant) || '1 0',
           isActive: !hiddenPowerVariants.has(isBase ? '' : id),
@@ -2283,6 +2295,18 @@ const ScatterGraph = React.memo(
               : null,
         });
 
+      // Comparison lines carry no label pill (the legend's line styles name them) unless they
+      // are flat references whose value is the point of the pill, e.g. "TDP 1 kW".
+      const showsLinePill = (hw: string, points: readonly InferenceData[]) => {
+        const identity = lineLabelIdentity(hw, points);
+        if (identity.isBase) return true;
+        return (
+          wattsAxis &&
+          identity.variant?.kind === 'basis' &&
+          flatSeriesValue(points.map((point) => point.y)) !== null
+        );
+      };
+
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
@@ -2530,26 +2554,26 @@ const ScatterGraph = React.memo(
               }
             }
 
-            const officialSeries: LineLabelSeries<InferenceData>[] = [
-              ...officialByGroup.values(),
-            ].map((entry) => {
-              const identity = lineLabelIdentity(entry.hw, entry.points);
-              const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
-              return {
-                key: entry.key,
-                seriesId: identity.seriesId,
-                label: `${lineLabelText(
-                  entry.hw,
-                  entry.precision,
-                  multiPrecision,
-                  modelLabel,
-                  entry.points,
-                )}${suffix}`,
-                color: ir.getCssColor(ir.resolveColor(entry.hw)),
-                points: entry.points,
-              };
-            });
+            const officialSeries: LineLabelSeries<InferenceData>[] = [...officialByGroup.values()]
+              .filter((entry) => showsLinePill(entry.hw, entry.points))
+              .map((entry) => {
+                const identity = lineLabelIdentity(entry.hw, entry.points);
+                const suffix = lineLabelSuffix(identity, entry.points);
+                lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
+                return {
+                  key: entry.key,
+                  seriesId: identity.seriesId,
+                  label: `${lineLabelText(
+                    entry.hw,
+                    entry.precision,
+                    multiPrecision,
+                    modelLabel,
+                    entry.points,
+                  )}${suffix}`,
+                  color: ir.getCssColor(ir.resolveColor(entry.hw)),
+                  points: entry.points,
+                };
+              });
             const overlayRunsByHw = new Map<string, Set<number>>();
             for (const group of Object.values(displayedOverlayRooflines)) {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
@@ -2560,6 +2584,7 @@ const ScatterGraph = React.memo(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
+              if (!showsLinePill(group.hwKey, group.points)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
               const hardwareLabel = lineLabelText(
@@ -3333,9 +3358,59 @@ const ScatterGraph = React.memo(
           ),
       };
 
+      const axisCeiling = metricAxisCeiling(selectedYAxisMetric);
+      const drawCeiling = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        // Only mark the rating when the axis reaches it.
+        const y = axisCeiling === undefined || axisCeiling > domainTop ? null : yScale(axisCeiling);
+        const g = zoomGroup
+          .selectAll<SVGGElement, number>('g.metric-ceiling')
+          .data(y === null || !Number.isFinite(y) ? [] : [y])
+          .join('g')
+          .attr('class', 'metric-ceiling')
+          .attr('pointer-events', 'none');
+        g.selectAll('line')
+          .data((d) => [d])
+          .join('line')
+          .attr('x1', 0)
+          .attr('x2', width)
+          .attr('y1', (d) => d)
+          .attr('y2', (d) => d)
+          .attr('stroke', 'var(--muted-foreground)')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '5,4');
+        g.selectAll('text')
+          .data((d) => [d])
+          .join('text')
+          .attr('x', width - 4)
+          .attr('y', (d) => d - 4)
+          .attr('text-anchor', 'end')
+          .attr('font-size', 11)
+          .attr('fill', 'var(--muted-foreground)')
+          .text('100% TDP');
+      };
+      const ceilingLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'metric-ceiling',
+        render: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale, ctx.width),
+        onZoom: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
+      };
+
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, paretoHighlightLayer, perfRulerLayer, knownIssueLayer);
+      result.push(
+        overflowContinuationLayer,
+        paretoHighlightLayer,
+        perfRulerLayer,
+        knownIssueLayer,
+        ceilingLayer,
+      );
       return result;
     }, [
       displayedRooflines,
