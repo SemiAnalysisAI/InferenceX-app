@@ -591,3 +591,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `deepseek-v41-flash`: read the model-specific architecture facts and source link with `model=deepseek-v41-flash`.
 - `glm-5-1`: read the model-specific architecture facts and source link with `model=glm-5-1`.
 - `glm-5-3`: read the model-specific architecture facts and source link with `model=glm-5-3`.
+- `qwen-3-5`: read the model-specific architecture facts and source link with `model=qwen-3-5`.

@@ -504,6 +504,7 @@ describe('Completed architecture catalog', () => {
     ['minimax-m31-flash', 'NVFP4 Experts'],
     ['glm-5-1', 'DSA: top-2048 tokens'],
     ['glm-5-3', 'IndexShare'],
+    ['qwen-3-5', 'Gated DeltaNet'],
   ]) {
     it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
       visitModelPage(slug);
