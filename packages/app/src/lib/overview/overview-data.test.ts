@@ -1323,6 +1323,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
       `${Model.Kimi_K3}/agentx`,
       `${Model.MiniMax_M3}/agentx`,
+      `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,

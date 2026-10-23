@@ -1581,7 +1581,10 @@ export const apiContractSourceDigests = [
     // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
     // data, no parameter or OverviewPageData shape change, so the docs stand.
     // Muse uses the existing AgentX scenario and response shape.
-    sourceSha256: '5cd3d652bc845bf5f1e51aa29f2f4295bb1d229218d6c1f6542d5b2c4d0b60c1',
+    // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): the model
+    // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
+    // shape change, so the docs stand.
+    sourceSha256: 'b722464d1738566c5b71eb44975539028eca4d0a68342362dceff041c5b43a97',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1607,7 +1610,10 @@ export const apiContractSourceDigests = [
     // mapped to the existing GLM-5.2 display name (as glm5.1 -> GLM-5). No
     // published parameter enum or endpoint changes, so the docs stand.
     // Muse-Spark-Open / musespark added; API docs and AgentX cookbook updated.
-    sourceSha256: '3bf6725fa92e48d225e097d41431018e52732a355548d7cfb14d15f4dc9ac329',
+    // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): one new DB
+    // key, `minimaxm31flash`, with its own display name and release date. The
+    // AgentX cookbook documents the model; no endpoint or parameter shape changes.
+    sourceSha256: '63a8ca335fccef8db1e93205db10456d75f2f8d4f100f89b160e6c1c574d62d4',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
