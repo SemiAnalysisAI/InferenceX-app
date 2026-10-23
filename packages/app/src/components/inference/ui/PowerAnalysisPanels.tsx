@@ -14,6 +14,7 @@ import {
   getEqualServiceSources,
   observedPoints,
 } from '../utils/equal-service-comparison';
+import PowerBreakdownPanel from './PowerBreakdownPanel';
 import PowerFitPanel from './PowerFitPanel';
 import PowerRoleGroup from './PowerRoleGroup';
 
@@ -21,10 +22,12 @@ const STRINGS = {
   en: {
     roles: 'Prefill / decode roles',
     fit: 'Power vs output-rate fit',
+    breakdown: 'System power breakdown',
   },
   zh: {
     roles: '预填充 / 解码角色',
     fit: '功耗与输出速率拟合',
+    breakdown: '系统功耗构成',
   },
 };
 
@@ -78,13 +81,17 @@ export default function PowerAnalysisPanels({
   const { runIndexByUrl } = useUnofficialRun();
   const [roleShare, setRoleShare] = useState(() => getUrlParam('i_roleshare') === '1');
   const [powerFit, setPowerFit] = useState(() => getUrlParam('i_powerfit') === '1');
+  const [powerBreakdown, setPowerBreakdown] = useState(
+    () => getUrlParam('i_powerbreakdown') === '1',
+  );
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   useEffect(() => {
     setUrlParams({
       i_roleshare: roleShare ? '1' : '0',
       i_powerfit: powerFit ? '1' : '0',
+      i_powerbreakdown: powerBreakdown ? '1' : '0',
     });
-  }, [roleShare, powerFit, setUrlParams]);
+  }, [roleShare, powerFit, powerBreakdown, setUrlParams]);
   const { resolveColor } = useThemeColors({
     highContrast: true,
     identifiers: sources.map((s) => s.key),
@@ -117,6 +124,13 @@ export default function PowerAnalysisPanels({
           testId="power-fit-toggle"
           event="inference_power_fit_toggled"
         />
+        <PanelToggle
+          checked={powerBreakdown}
+          onChange={setPowerBreakdown}
+          label={t.breakdown}
+          testId="power-breakdown-toggle"
+          event="inference_power_breakdown_toggled"
+        />
       </div>
       {roleShare && (
         <PowerRoleGroup
@@ -135,6 +149,15 @@ export default function PowerAnalysisPanels({
           data={data}
           contextLabel={contextLabel}
           colorOf={colorOf}
+        />
+      )}
+      {powerBreakdown && (
+        <PowerBreakdownPanel
+          chartId={chartId}
+          data={data}
+          contextLabel={contextLabel}
+          xField={xField}
+          xLabel={xLabel}
         />
       )}
     </div>

@@ -534,6 +534,78 @@ describe('GET /api/v1/views/inference', () => {
     });
   });
 
+  it('splits each measured point into power parts that sum to All in Measured W/GPU', async () => {
+    const sweep = [
+      { conc: 32, interactivity: 25, watts: 600 },
+      { conc: 1, interactivity: 100, watts: 250 },
+    ];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      sweep.map(({ conc, interactivity, watts }, index) =>
+        makeRow({
+          id: 300 + index,
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: interactivity,
+            avg_power_w: watts,
+            avg_total_gpu_power_w: watts * 8,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      ),
+    );
+
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&powerBreakdown=true',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.powerBreakdown).toBe(true);
+    expect(body.powerBreakdowns).toHaveLength(1);
+    const [series] = body.powerBreakdowns;
+    expect(series).toMatchObject({
+      precision: 'fp8',
+      categories: ['gpu', 'server', 'fansPsu', 'network', 'facility'],
+      tdpWattsPerGpu: 700,
+      interactivityField: 'median_intvty',
+    });
+    expect(series.modelRevision).toMatch(/^[0-9a-f]{40}$/u);
+    // Points follow the interactivity axis, so the busier concurrency comes first.
+    expect(
+      series.points.map((point: { concurrency: number; interactivity: number }) => [
+        point.concurrency,
+        point.interactivity,
+      ]),
+    ).toEqual([
+      [32, 25],
+      [1, 100],
+    ]);
+    for (const [index, point] of series.points.entries()) {
+      const parts = Object.values(point.wattsPerGpu as Record<string, number>);
+      expect(parts.reduce((sum, value) => sum + value, 0)).toBeCloseTo(point.totalWattsPerGpu, 6);
+      expect(point.wattsPerGpu.gpu).toBeCloseTo([600, 250][index], 6);
+      expect(point).not.toHaveProperty('configKey');
+      expect(point.point).toMatchObject({ id: [300, 301][index] });
+    }
+    // Load moves the measured GPU part and fans/PSU loss; fixed server parts stay put.
+    const [high, low] = series.points;
+    expect(high.wattsPerGpu.server).toBeCloseTo(low.wattsPerGpu.server, 6);
+    expect(high.wattsPerGpu.fansPsu).toBeGreaterThan(low.wattsPerGpu.fansPsu);
+
+    const offResponse = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower'),
+    );
+    const off = await offResponse.json();
+    expect(off).not.toHaveProperty('powerBreakdowns');
+    const csv = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&powerBreakdown=true&format=csv'),
+    );
+    expect(csv.status).toBe(400);
+  });
+
   it('canonicalizes list params and applies quick filters', async () => {
     const res = await GET(
       request(

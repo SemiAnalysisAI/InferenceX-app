@@ -55,6 +55,19 @@ original GPU measurements or require a per-run database backfill.
    gap is resolved. A new benchmark's power must not be attached to an older
    benchmark's throughput.
 
+## Per-point breakdown
+
+A supported estimate also carries `deploymentBreakdownWatts`, the same deployment watts split
+into the boxes PowerX Figure 1 draws. `breakdownPowerEstimate` in `system-power-model.ts` sums
+the pinned model's leaf components: `GPUs` is `gpu` (measured), `Grace socket (measured)` is
+`measuredCpu`, any fan or loss component is `fansPsu`, everything under `Scale-out networking`
+is `network`, and every other leaf (CPUs, DRAM, NICs, NVSwitch, drives, retimers, shelf
+controller) is `server`. `facility` is the model's PUE overhead. Extrapolated chassis attribute
+each part by the same measured-GPU share as `deploymentFacilityWatts`, so the six parts always
+sum to it, and divided by allocated GPUs they sum to All in Measured W/GPU. The leaf names are
+the pinned port's; a renamed upstream component falls into `server` and fails
+`system-power-model.test.ts`.
+
 ## Boundary and assumptions
 
 The input is measured mean GPU power during a validated serving window. Modeled

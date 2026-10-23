@@ -177,6 +177,7 @@ export const VIEW_QUERY_PARAMS = {
     'serviceTarget',
     'roleShare',
     'powerFit',
+    'powerBreakdown',
   ],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],

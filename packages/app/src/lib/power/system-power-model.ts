@@ -1,5 +1,6 @@
 import manifest from './power-model.manifest.json';
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
+import type { PowerComponentBreakdown as PowerComponent } from './power_model/base';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
 import type { RackScaleSystem } from './power_model/models/advanced/systems/rack_scale/rack_scale';
 
@@ -38,10 +39,75 @@ export interface SystemPowerOperatingState {
   scaleOut: boolean;
 }
 
+/**
+ * Where a modeled unit's watts go, in the boxes PowerX Figure 1 draws: measured
+ * GPU boards, measured Grace sockets (NVL72 rows with same-window CPU telemetry),
+ * the rest of the server, fans plus power-conversion losses, the scale-out
+ * network share, and the facility overhead PUE adds. The six parts sum to
+ * `facilityWatts`; every part but `facility` sums to `itWatts`.
+ */
+export const SYSTEM_POWER_CATEGORIES = [
+  'gpu',
+  'measuredCpu',
+  'server',
+  'fansPsu',
+  'network',
+  'facility',
+] as const;
+export type SystemPowerCategory = (typeof SYSTEM_POWER_CATEGORIES)[number];
+export type SystemPowerBreakdown = Record<SystemPowerCategory, number>;
+
+export const emptySystemPowerBreakdown = (): SystemPowerBreakdown => ({
+  gpu: 0,
+  measuredCpu: 0,
+  server: 0,
+  fansPsu: 0,
+  network: 0,
+  facility: 0,
+});
+
+export const scaleSystemPowerBreakdown = (
+  breakdown: SystemPowerBreakdown,
+  factor: number,
+): SystemPowerBreakdown => {
+  const scaled = emptySystemPowerBreakdown();
+  for (const key of SYSTEM_POWER_CATEGORIES) scaled[key] = breakdown[key] * factor;
+  return scaled;
+};
+
+const SCALE_OUT_GROUP = 'Scale-out networking';
+const MEASURED_GPU_LEAF = 'GPUs';
+const MEASURED_GRACE_LEAF = 'Grace socket (measured)';
+const FAN_OR_LOSS = /\bfan|loss/iu;
+
+function leafCategory(top: PowerComponent, leaf: PowerComponent): SystemPowerCategory {
+  if (top.name === SCALE_OUT_GROUP) return 'network';
+  if (leaf.name === MEASURED_GPU_LEAF) return 'gpu';
+  if (leaf.name === MEASURED_GRACE_LEAF) return 'measuredCpu';
+  if (FAN_OR_LOSS.test(leaf.name)) return 'fansPsu';
+  return 'server';
+}
+
+/** Sums the pinned model's leaf components into {@link SystemPowerBreakdown} categories. */
+export function breakdownPowerEstimate(estimate: PowerEstimate): SystemPowerBreakdown {
+  const breakdown = emptySystemPowerBreakdown();
+  const visit = (top: PowerComponent, component: PowerComponent) => {
+    if (component.children.length === 0) {
+      breakdown[leafCategory(top, component)] += component.power_w;
+      return;
+    }
+    for (const child of component.children) visit(top, child);
+  };
+  for (const top of estimate.components) visit(top, top);
+  breakdown.facility = estimate.facility_overhead_w;
+  return breakdown;
+}
+
 export interface SystemUnitPower {
   itWatts: number;
   facilityWatts: number;
   pue: number;
+  breakdown: SystemPowerBreakdown;
 }
 
 function estimateSystem(
@@ -68,6 +134,7 @@ function estimateSystem(
     itWatts: estimate.it_power_w,
     facilityWatts: estimate.facility_power_w,
     pue: estimate.pue,
+    breakdown: breakdownPowerEstimate(estimate),
   };
 }
 

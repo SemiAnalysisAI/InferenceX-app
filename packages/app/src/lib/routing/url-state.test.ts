@@ -94,12 +94,19 @@ describe('PARAM_DEFAULTS', () => {
 
   it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
     setupWindow(
-      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
+      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1&i_powerbreakdown=1&i_pbview=area',
     );
     const { readUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
     const params = readUrlParams();
     const shared = new URL(buildShareUrl()).searchParams;
-    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
+    expect(params).toMatchObject({
+      i_roleshare: '1',
+      i_powerfit: '1',
+      i_powerbreakdown: '1',
+      i_pbview: 'area',
+    });
+    expect(shared.get('i_powerbreakdown')).toBe('1');
+    expect(shared.get('i_pbview')).toBe('area');
     expect(shared.get('i_roleshare')).toBe('1');
     expect(shared.get('i_powerfit')).toBe('1');
     for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {

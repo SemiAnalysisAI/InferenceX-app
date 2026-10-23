@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { writeUrlParams } from '@/lib/routing/url-state';
 
 import { createMockInferenceData } from '../support/mock-data';
@@ -48,6 +50,56 @@ const fitLadder = [20, 60, 120, 260].map((rate, index) =>
     output_tput_per_gpu: rate,
     measuredAvgPower: metric(250 + 0.5 * rate),
     measuredJPerOutputToken: metric((250 + 0.5 * rate) / rate),
+  }),
+);
+
+const breakdownRow = (gpuWatts: number) =>
+  ({
+    model: 'qwen3.5',
+    hardware: 'b200',
+    framework: 'sglang',
+    precision: 'fp8',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 0,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 0,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    benchmark_type: 'single_turn',
+    isl: 8192,
+    osl: 1024,
+    conc: 1,
+    offload_mode: 'off',
+    image: 'lmsysorg/sglang:v0.5.19-cu130',
+    date: '2026-09-23',
+    run_url: 'https://example.invalid/runs/900000001',
+    metrics: {
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: gpuWatts,
+      avg_total_gpu_power_w: gpuWatts * 8,
+      median_intvty: 100,
+    },
+  }) as unknown as BenchmarkRow;
+const breakdownLadder = [250, 380, 520, 640].map((watts, index) =>
+  point({
+    id: 40 + index,
+    conc: 4 ** index,
+    // Interactivity falls as concurrency rises, as in a real sweep.
+    mean_tpot_intvty: [120, 80, 45, 20][index],
+    physicalChips: 8,
+    tp: 8,
+    decode_tp: 8,
+    measuredAvgPower: metric(watts),
+    utilityModeledWatts: metric(1),
+    modeledSystemPower: modelSystemPower(breakdownRow(watts)),
   }),
 );
 
@@ -157,6 +209,57 @@ describe('PowerAnalysisPanels', () => {
       cy.get(
         '[data-testid="power-analysis-test-role-power-plot"] circle.point[fill="var(--overlay-run-0)"]',
       ).should('have.length', 2);
+    });
+  }
+
+  for (const width of [1280, 393]) {
+    it(`stacks every measured point's system power at ${width}px and switches to the area view`, () => {
+      cy.viewport(width, 900);
+      writeUrlParams({ i_powerbreakdown: '0', i_pbview: 'bars' });
+      mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
+      cy.get('[data-testid="power-breakdown-panel"]').should('not.exist');
+      cy.get('[data-testid="power-breakdown-toggle"]').check();
+      cy.get('[data-testid="power-breakdown-panel"]').should('be.visible');
+      cy.get('[data-testid="power-breakdown-legend"]')
+        .should('contain.text', 'Measured GPU')
+        .and('contain.text', 'Facility overhead')
+        .and('not.contain.text', 'Grace');
+      // One stacked column per concurrency, each with a measured GPU base and a facility top.
+      cy.get('[data-testid="power-breakdown-bar"][data-category="gpu"]').should('have.length', 4);
+      cy.get('[data-testid="power-breakdown-bar"][data-category="facility"]').should(
+        'have.length',
+        4,
+      );
+      // Bars sit on the chart's interactivity axis: lowest interactivity (c64) first.
+      cy.get('[data-testid$="power-breakdown-plot"]').should(
+        'contain.text',
+        'Interactivity (output tok/s/user)',
+      );
+      cy.get('[data-testid="power-breakdown-bar"][data-category="gpu"]').then(($bars) => {
+        const xs = [...$bars].map((bar) => Number(bar.getAttribute('x')));
+        expect(xs).to.deep.equal(xs.toSorted((a, b) => a - b));
+      });
+      cy.get('[data-testid="power-breakdown-total"]').should('have.length.at.least', 2);
+      cy.get('[data-testid="power-breakdown-tdp-line"]').should('exist');
+      cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseenter', { force: true });
+      cy.get('[data-testid="power-breakdown-tooltip"]')
+        .should('contain.text', 'c64')
+        .and('contain.text', '640')
+        .and('contain.text', 'Interactivity (output tok/s/user): 20.0')
+        .and('contain.text', 'All in Measured');
+      cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseleave', { force: true });
+
+      cy.get('[data-testid="power-breakdown-view-area"]').click();
+      cy.get('[data-testid="power-breakdown-view-area"]').should(
+        'have.attr',
+        'aria-pressed',
+        'true',
+      );
+      cy.get('[data-testid="power-breakdown-bar"]').should('not.exist');
+      cy.get('[data-testid="power-breakdown-area"]').should('have.length.at.least', 5);
+      cy.get('[data-testid="power-breakdown-panel"]').then(($panel) => {
+        expect($panel[0].scrollWidth).to.be.at.most($panel[0].clientWidth + 1);
+      });
     });
   }
 });
