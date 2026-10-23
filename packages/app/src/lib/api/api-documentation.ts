@@ -796,7 +796,9 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 
 // OperatorX remains a page-bff, recorded in api-route-catalog.ts rather than
 // published OpenAPI. Its hardware[].reference normalization basis, bandwidth
-// assumptions and workload-resolved chart defaults are documented in docs/operatorx.md.
+// assumptions, cross-backend argument alignment (fastest successful backend per
+// hardware/case, with measurements[].backend provenance), and workload-resolved
+// chart defaults are documented in docs/operatorx.md.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,

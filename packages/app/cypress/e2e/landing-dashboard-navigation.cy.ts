@@ -126,8 +126,11 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
-        cy.get('[data-testid="landing-tpu-results-link"]')
+        cy.get('[data-testid="landing-huawei-results-link"]')
           .should('match', ':first-child')
+          .and('have.attr', 'href', `${prefix}/operatorx`)
+          .next()
+          .should('have.attr', 'data-testid', 'landing-tpu-results-link')
           .parent()
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
@@ -430,4 +433,28 @@ describe('landing → full dashboard navigation', () => {
     cy.go('forward');
     cy.location('pathname').should('eq', TARGET);
   });
+});
+
+describe('Huawei OperatorX landing navigation', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`links Huawei results to the localized OperatorX page from ${prefix || '/'}`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-huawei-results-link"]')
+        .should('have.attr', 'href', `${prefix}/operatorx`)
+        .and('contain.text', prefix ? '华为 Ascend 950PR' : 'Huawei Ascend 950PR')
+        .and('contain.text', 'OperatorX');
+      cy.get('[data-testid="landing-huawei-huawei-logo"] path').should(
+        'have.attr',
+        'fill',
+        '#FF0000',
+      );
+      cy.get('[data-testid="landing-huawei-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/operatorx`);
+      cy.get('[data-testid="operatorx-page"]').should('contain.text', 'OperatorX');
+      cy.get('[data-testid="tab-trigger-operatorx"]')
+        .should('be.visible')
+        .and('have.attr', 'href', `${prefix}/operatorx`);
+      cy.get('[data-testid="tab-hidden-popover"]').should('not.exist');
+    });
+  }
 });
