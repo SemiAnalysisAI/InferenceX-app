@@ -30,6 +30,7 @@ describe('FRAMEWORK_LABELS', () => {
 describe('MODEL_SPEC_METHOD_LABELS', () => {
   it('maps MiniMax-M3 mtp to "M3 EAGLE"', () => {
     expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3']?.mtp).toBe('M3 EAGLE');
+    expect(MODEL_SPEC_METHOD_LABELS['MiniMax-M3.1-Flash']?.mtp).toBe('DSpark');
   });
 
   it('maps Kimi-K3 mtp to "DSpark"', () => {

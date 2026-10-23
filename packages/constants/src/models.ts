@@ -30,6 +30,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   'minimaxm2.5': 'MiniMax-M2.5',
   'minimaxm2.7': 'MiniMax-M2.5',
   minimaxm3: 'MiniMax-M3',
+  // M3.1-Flash keeps M3's 428B/23B MoE but ships NVFP4 experts, a QAT NVFP4 KV
+  // cache and a built-in DSpark drafter, so it gets its own display bucket.
+  minimaxm31flash: 'MiniMax-M3.1-Flash',
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5',
   'glm5.2': 'GLM-5.2',
@@ -132,6 +135,10 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // vLLM bring-up image is tagged `deepseekv41-flash-0909`, a day earlier, but
   // that is the image build date, not the weights date. sweep: 2026-09-10 — day zero.
   'DeepSeek-V4.1-Flash': '2026-09-10',
+  // Weights published at MiniMaxAI/MiniMax-M3.1-Flash on 2026-10-23 UTC (HF
+  // "Init" commit 03:37Z), the same day as the vLLM day-0 blog post.
+  // sweep: 2026-10-23 — day zero.
+  'MiniMax-M3.1-Flash': '2026-10-23',
   // Weights published on Hugging Face 2026-07-27 under the Kimi K3 License,
   // eleven days after the 2026-07-16 product launch; the gap was to let vLLM,
   // NVIDIA and AMD prepare day-zero support. sweep: 2026-07-27 — day zero.

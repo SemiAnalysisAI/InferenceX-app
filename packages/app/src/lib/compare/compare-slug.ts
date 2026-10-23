@@ -75,6 +75,13 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'MiniMax M3',
   },
   {
+    slug: 'minimax-m31-flash',
+    displayName: 'MiniMax-M3.1-Flash',
+    dbKeys: ['minimaxm31flash'],
+    label: 'MiniMax M3.1 Flash 428B',
+    seoName: 'MiniMax M3.1 Flash',
+  },
+  {
     slug: 'minimax-m27',
     displayName: 'MiniMax-M2.5',
     dbKeys: ['minimaxm2.7', 'minimaxm2.5'],

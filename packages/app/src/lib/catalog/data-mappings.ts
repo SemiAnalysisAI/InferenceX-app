@@ -15,6 +15,7 @@ export enum Model {
   Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
+  MiniMax_M3_1_Flash = 'MiniMax-M3.1-Flash',
   GLM_5 = 'GLM-5',
   GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
@@ -109,6 +110,12 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'minimaxm3',
     category: 'default',
     openRouterModelId: 'minimax/minimax-m3',
+    logo: 'minimax-color.svg',
+  },
+  [Model.MiniMax_M3_1_Flash]: {
+    label: 'MiniMax M3.1 Flash 428B',
+    prefix: 'minimaxm31flash',
+    category: 'default',
     logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
