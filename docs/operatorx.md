@@ -1,7 +1,7 @@
 # OperatorX
 
-OperatorX is a feature-gated dashboard alongside CollectiveX in **Hidden**. The
-existing ↑↑↓↓ unlock exposes both tabs. `/operatorx` and `/zh/operatorx` share the
+OperatorX is available directly in primary dashboard navigation without an unlock.
+CollectiveX remains in **Hidden**. `/operatorx` and `/zh/operatorx` share the
 same reader, chart, filters, and coverage.
 
 The view compares single-GPU GEMM and routed MoE operator timings on NVIDIA and AMD. The

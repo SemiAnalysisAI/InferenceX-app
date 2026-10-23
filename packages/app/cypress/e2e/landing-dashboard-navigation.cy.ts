@@ -126,8 +126,11 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
-        cy.get('[data-testid="landing-tpu-results-link"]')
+        cy.get('[data-testid="landing-huawei-results-link"]')
           .should('match', ':first-child')
+          .and('have.attr', 'href', `${prefix}/operatorx`)
+          .next()
+          .should('have.attr', 'data-testid', 'landing-tpu-results-link')
           .parent()
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
@@ -448,6 +451,10 @@ describe('Huawei OperatorX landing navigation', () => {
       cy.get('[data-testid="landing-huawei-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/operatorx`);
       cy.get('[data-testid="operatorx-page"]').should('contain.text', 'OperatorX');
+      cy.get('[data-testid="tab-trigger-operatorx"]')
+        .should('be.visible')
+        .and('have.attr', 'href', `${prefix}/operatorx`);
+      cy.get('[data-testid="tab-hidden-popover"]').should('not.exist');
     });
   }
 });

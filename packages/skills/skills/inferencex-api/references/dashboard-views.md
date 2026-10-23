@@ -212,7 +212,7 @@ The current table uses the latest benchmark snapshot, whereas history uses
 successful image-bearing submission events. The chart's hover and keyboard
 inspection are presentation-only and introduce no extra selectors.
 
-OperatorX is feature-gated in navigation and has no published
+OperatorX is available in primary navigation without an unlock and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
