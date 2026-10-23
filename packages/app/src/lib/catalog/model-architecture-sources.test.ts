@@ -35,6 +35,18 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
+  it('does not project a K3 routed expert directly to the residual hidden size', () => {
+    const arch = getModelArchitecture(Model.Kimi_K3)!;
+    const routed = getFFNSubBlocks(arch);
+    const dense = getFFNSubBlocks(arch, { useDenseFFNDim: true });
+    expect(routed.layout).toBe('parallel');
+    expect(dense.layout).toBe('parallel');
+    if (routed.layout !== 'parallel' || dense.layout !== 'parallel')
+      throw new Error('Expected FFN paths');
+    expect(routed.mergeBlocks.at(-1)?.detail).toBe('→ 3,584');
+    expect(dense.mergeBlocks.at(-1)?.detail).toBe('→ 7,168');
+  });
+
   it.each([Model.GptOss])(
     '%s shows clipping, scaled gating and the linear bias in modified SwiGLU',
     (model) => {

@@ -1160,7 +1160,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/lib/catalog/model-architectures.ts',
-    sourceSha256: '766956f074c76f00f29bf45e909ed2e5d9a14bf196c6d1b64432093c1b425cda',
+    sourceSha256: 'a1490628d880afcbe58e3e26c528c1a088573f8d5240d01d283967b301271e0c',
     reviewArea: {
       en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
       zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',

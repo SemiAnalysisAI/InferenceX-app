@@ -51,6 +51,8 @@ const ARCHITECTURE_STRINGS = {
     releasedOn: ' on',
     contextNote: (advertised: number, configured: number) =>
       `Advertised context: ${advertised.toLocaleString('en-US')} tokens; checkpoint position limit: ${configured.toLocaleString('en-US')} tokens.`,
+    latentNote:
+      'Routed experts operate in a 3,584-dimensional latent space; their combined output is projected back to 7,168 dimensions. Shared experts operate at the full hidden size. AttnRes aggregates representations across depth; the diagram groups layers by attention type and does not draw every dependency.',
     pooledNote: (latent: number, hidden: number) =>
       `Pooled experts operate in ${latent.toLocaleString('en-US')} dimensions. Pool/unpool projections connect this latent space to the ${hidden.toLocaleString('en-US')}-dimensional residual stream; the expanded FFN shows one routed expert.`,
     hybrid:
@@ -66,6 +68,8 @@ const ARCHITECTURE_STRINGS = {
     releasedOn: '，发布于',
     contextNote: (advertised: number, configured: number) =>
       `标称上下文为 ${advertised.toLocaleString('en-US')} token；checkpoint 配置的位置上限为 ${configured.toLocaleString('en-US')} token。`,
+    latentNote:
+      '路由 expert 在 3,584 维潜在空间中计算，合并后的输出再投影回 7,168 维；共享 expert 使用完整隐藏维度。AttnRes 聚合不同深度的表示；图中按注意力类型归类各层，未逐一绘出所有依赖关系。',
     pooledNote: (latent: number, hidden: number) =>
       `Pooled expert 在 ${latent.toLocaleString('en-US')} 维潜在空间中计算，通过 pool/unpool 投影连接 ${hidden.toLocaleString('en-US')} 维残差流；展开的 FFN 展示单个路由 expert。`,
     hybrid:
@@ -162,6 +166,9 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
           <p className="mt-2 text-xs text-muted-foreground">
             {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
           </p>
+        )}
+        {arch.residualType === 'AttnRes' && (
+          <p className="mt-2 text-xs text-muted-foreground">{t.latentNote}</p>
         )}
         {arch.routedExpertHiddenSize && arch.hiddenSize && arch.residualType !== 'AttnRes' && (
           <p className="mt-2 text-xs text-muted-foreground">
