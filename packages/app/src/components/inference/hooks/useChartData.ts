@@ -37,11 +37,7 @@ import type {
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
-import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
-import {
-  COUNT_COMPARE_BASES,
-  expandPowerCompareSeries,
-} from '@/components/inference/utils/power-compare';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import {
   computeAvailableQuickFilters,
@@ -140,8 +136,6 @@ export function useChartData(
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
   tokenBasis: TokenBasis = 'total',
 ) {
-  // The PowerX tab's "Both" overlay names two boundaries; draw only those.
-  const compareBases = usePowerXSurface() ? COUNT_COMPARE_BASES : undefined;
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
     : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
@@ -526,7 +520,6 @@ export function useChartData(
               metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField)),
               selectedYAxisMetric,
               powerCompare,
-              compareBases,
             )
           : [];
 
@@ -551,7 +544,6 @@ export function useChartData(
                   allInMeasuredTableData(filteredData, metricKey, xAxisField),
                   selectedYAxisMetric,
                   powerCompare,
-                  compareBases,
                 ),
               }
             : {}),
@@ -575,7 +567,6 @@ export function useChartData(
     selectedPercentile,
     quickFilters,
     powerCompare,
-    compareBases,
   ]);
 
   const selectionPoints = useMemo(

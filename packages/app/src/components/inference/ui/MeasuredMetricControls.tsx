@@ -55,7 +55,8 @@ const STRINGS = {
     compareHelp:
       'Compare power boundaries or prefill and decode on the same benchmark points. Role energy uses a common output-token denominator. Available for average W/chip and J per output token.',
     compareNone: 'Off',
-    compareBoundaries: 'All boundaries',
+    compareBoundaries: 'GPU only + Whole system',
+    compareAll: 'All four boundaries (incl. rated)',
     compareRoles: 'Prefill vs decode',
   },
   zh: {
@@ -90,7 +91,8 @@ const STRINGS = {
     compareHelp:
       '在同一批基准测试数据点上对比不同功耗边界，或预填充与解码。各角色的能耗统一按输出 token 归一化。支持平均 W/芯片和每输出 token 能耗。',
     compareNone: '关闭',
-    compareBoundaries: '全部边界',
+    compareBoundaries: '仅 GPU + 整机',
+    compareAll: '全部四个边界（含额定）',
     compareRoles: '预填充 vs 解码',
   },
 } as const;
@@ -113,6 +115,7 @@ export function MeasuredMetricControls({
   const compareLabels: Record<PowerCompare, string> = {
     none: t.compareNone,
     boundaries: t.compareBoundaries,
+    all: t.compareAll,
     roles: t.compareRoles,
   };
   const change = (next: MeasuredMetricConfigChange) =>

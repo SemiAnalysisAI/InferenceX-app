@@ -224,7 +224,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
 
-export type PowerCompare = 'none' | 'boundaries' | 'roles';
+/** `boundaries`: GPU only and Whole system. `all`: also the two rated provisioned bounds. */
+export type PowerCompare = 'none' | 'boundaries' | 'all' | 'roles';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 

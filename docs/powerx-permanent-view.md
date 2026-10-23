@@ -72,13 +72,15 @@ the selection has no measured GPU power (`noMeasuredDataHint`) instead of the ge
 
 ## Article figure → share link
 
-Base: `/inference?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
-selection. Append:
+Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
+selection. Old `/inference` links that carry a measured `i_metric` are redirected to `/powerx`
+with the same query by `src/proxy.ts` (`lib/routing/powerx-redirect.ts`); Inference Performance
+no longer offers power metrics. Append:
 
 | Figure | Content                                       | Parameters                                                                                                                                                                                                   |
 | ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2      | H200 W/GPU, measured boundaries + rated lines | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` draws GPU Level Measured and All in Measured; the rated lines are on the timeline (`&i_metric=y_measuredPowerTimeline`, all-in switch `&i_ptutility=1`) |
-| 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                                                           |
+| 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=all` (single boundary: the matching `…JPerOutputToken` key)                                                                                                  |
 | 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                                                     |
 | 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                                                              |
 | 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                                                                |
@@ -95,8 +97,9 @@ resolves their run/audit provenance automatically.
 
 ## Comparison series (`i_pcompare`)
 
-`i_pcompare=boundaries|roles` (default `''`, "Off") overlays sibling series on the selected
-metric without changing it. `utils/power-compare.ts` is the single source: `useChartData` and
+`i_pcompare=boundaries|all|roles` (default `''`, "Off") overlays sibling series on the selected
+metric without changing it. `boundaries` pairs GPU Level Measured with All in Measured; `all`
+adds the two provisioned bounds. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
 `x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points
@@ -152,14 +155,12 @@ config is `display: 'timeline'`.
 
 ## Analysis panels
 
-The opt-in role, power-fit and system power breakdown panels under the measured chart live in
-`ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerFits`,
-`powerBreakdowns`) and the
-API-only equal-service comparisons are described in the
+The role and system power breakdown panels on the PowerX tab's Where the power goes view live in
+`ui/PowerAnalysisPanels.tsx`. Their read-only API fields (`rolePoints`, `powerBreakdowns`), the
+API-only power fit (`powerFits`) and the API-only equal-service comparisons are described in the
 [dashboard views reference](../packages/skills/skills/inferencex-api/references/dashboard-views.md).
 
-The breakdown panel (`ui/PowerBreakdownPanel.tsx`, share parameters `i_powerbreakdown=1` and
-`i_pbview=bars|area`) draws one hardware line at a time, grouped and colored exactly like the
+The breakdown panel (`ui/PowerBreakdownPanel.tsx`, share parameter `i_pbview=bars|area`) draws one hardware line at a time, grouped and colored exactly like the
 scatter legend (`hwKey` + precision, vendor color). The x-axis is the chart's own interactivity
 axis (including the AgentX P90/P75 trace-derived axes), or median interactivity when the chart
 plots something else, so a bar sits where its point sits in the scatter. Each point gets a

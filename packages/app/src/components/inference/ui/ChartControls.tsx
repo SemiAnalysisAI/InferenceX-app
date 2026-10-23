@@ -60,7 +60,6 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
-import { PowerXTabs } from './PowerXTabs';
 import { usePowerXSurface } from './powerx-surface';
 import {
   changeMeasuredMetricConfig,
@@ -72,7 +71,7 @@ import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { defaultYAxisMetric } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 const STRINGS = {
   en: {
@@ -201,14 +200,8 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const {
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedGPUs,
-    selectedDateRange,
-    quickFilters,
-  } = useInferenceFilters();
+  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
+    useInferenceFilters();
   const {
     graphs,
     availableGPUs,
@@ -307,10 +300,25 @@ export default function ChartControls({
       .filter((g) => g.options.length > 0);
   }, [visibleGroups, locale, carriedTier]);
 
+  // Measured power and energy live on PowerX; only Historical Trends keeps them here.
+  const showsMeasuredMetrics = tcoSource === 'historical';
+  const pickerYAxisOptions = useMemo(
+    () =>
+      showsMeasuredMetrics
+        ? searchableYAxisOptions
+        : searchableYAxisOptions
+            .map((group) => ({
+              ...group,
+              options: group.options.filter((option) => !getMeasuredMetricConfig(option.value)),
+            }))
+            .filter((group) => group.options.length > 0),
+    [searchableYAxisOptions, showsMeasuredMetrics],
+  );
+
   const groupedYAxisOptions = useMemo(() => {
     const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
     const seen = new Set<MeasuredMetricFamily>();
-    return searchableYAxisOptions.map((group) => ({
+    return pickerYAxisOptions.map((group) => ({
       ...group,
       groupLabel: group.options.some((option) => getMeasuredMetricConfig(option.value))
         ? t.measuredGroup
@@ -335,7 +343,7 @@ export default function ChartControls({
         ];
       }),
     }));
-  }, [searchableYAxisOptions, selectedYAxisMetric, t]);
+  }, [pickerYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -419,7 +427,7 @@ export default function ChartControls({
   };
 
   const secondaryCount =
-    (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
+    (selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
     (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
@@ -519,7 +527,7 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: [
                       ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
-                      ...searchableYAxisOptions[index].options,
+                      ...pickerYAxisOptions[index].options,
                     ],
                   }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
@@ -529,19 +537,7 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted &&
-                powerXSurface &&
-                !powerXSurface &&
-                getMeasuredMetricConfig(selectedYAxisMetric) && (
-                  <PowerXTabs
-                    metric={selectedYAxisMetric}
-                    onChange={handleYAxisMetricChange}
-                    compare={powerCompare}
-                    onCompareChange={setPowerCompare}
-                  />
-                )}
-
-              {mounted && !powerXSurface && getMeasuredMetricConfig(selectedYAxisMetric) && (
+              {mounted && showsMeasuredMetrics && getMeasuredMetricConfig(selectedYAxisMetric) && (
                 <MeasuredMetricControls
                   metric={selectedYAxisMetric}
                   onChange={handleYAxisMetricChange}

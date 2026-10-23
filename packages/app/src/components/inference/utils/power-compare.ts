@@ -12,11 +12,12 @@ import type { InferenceData, PowerCompare, PowerRole, PowerVariant } from '../ty
 export const POWER_COMPARE_MODES = [
   'none',
   'boundaries',
+  'all',
   'roles',
 ] as const satisfies readonly PowerCompare[];
 
 export function parsePowerCompare(value: string | null | undefined): PowerCompare {
-  return value === 'boundaries' || value === 'roles' ? value : 'none';
+  return value === 'boundaries' || value === 'all' || value === 'roles' ? value : 'none';
 }
 
 export type PowerSeriesField = keyof Pick<
@@ -83,7 +84,7 @@ function comparableQuantity(metric: string): 'watts' | 'energy' | null {
 export function powerCompareBase(metric: string, mode: PowerCompare): PowerVariant | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config || mode === 'none') return null;
-  if (mode === 'boundaries') {
+  if (mode === 'boundaries' || mode === 'all') {
     return comparableQuantity(metric) ? { kind: 'basis', id: config.basis } : null;
   }
   if (config.basis !== 'gpu-measured') return null;
@@ -99,7 +100,7 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
 
 /**
  * The two boundaries the PowerX tab's "Count" control names (GPU only, Whole
- * system). Its "Both" overlay draws just these, not the rated provisioned bounds.
+ * system). `boundaries` draws just these; `all` adds the rated provisioned bounds.
  */
 export const COUNT_COMPARE_BASES = [
   'gpu-measured',
@@ -109,7 +110,7 @@ export const COUNT_COMPARE_BASES = [
 export function powerCompareVariants(
   metric: string,
   mode: PowerCompare,
-  bases: readonly PowerBasis[] = POWER_BASES,
+  bases: readonly PowerBasis[] = mode === 'all' ? POWER_BASES : COUNT_COMPARE_BASES,
 ): PowerCompareSeries[] {
   const base = powerCompareBase(metric, mode);
   const config = getMeasuredMetricConfig(metric);

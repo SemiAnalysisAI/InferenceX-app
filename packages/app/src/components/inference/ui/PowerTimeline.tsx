@@ -787,8 +787,12 @@ export default function PowerTimeline({
     [measuredData, overlayPoints],
   );
   // PowerX tab: first view compares chips at one shared load rather than every concurrency.
+  // A shared or requested focus keeps every load so the focused trace stays drawn.
   const autoConcurrencyRef = useRef(
-    !powerXSurface || initialView.concurrency !== null || Boolean(requestedFocusRef.current),
+    !powerXSurface ||
+      initialView.concurrency !== null ||
+      Boolean(initialView.focus) ||
+      Boolean(requestedFocusRef.current),
   );
   useEffect(() => {
     if (autoConcurrencyRef.current || measuredData.length === 0) return;

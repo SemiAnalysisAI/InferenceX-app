@@ -143,7 +143,7 @@ function interceptOverlay() {
 
 function visitChart(extraParams: string) {
   interceptRows();
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+  cy.visit(`/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       win.localStorage.setItem('inferencex-feature-gate', '1');
