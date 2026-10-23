@@ -14,7 +14,7 @@ const wrappers = new Set([
 ]);
 const engine = /^(?:three|@react-three\/[^/]+|@dimforge\/rapier[^/]*)(?:\/|$)/;
 const optionalAsset = new RegExp(
-  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
+  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|Excalifont-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
   'i',
 );
 

@@ -1,0 +1,210 @@
+/* Excalidraw whiteboard theme. Loaded only while the `excalidraw` theme is active.
+   Palette and type follow excalidraw.com: white canvas, #1e1e1e strokes, #6965db
+   accent, Excalifont hand-drawn lettering. Only styling changes; layout and
+   behavior are untouched. */
+
+@font-face {
+  font-family: 'Excalifont';
+  src: url('../../app/fonts/Excalifont-Regular.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Excalifont';
+  src: url('../../app/fonts/Excalifont-Regular-latin-ext.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+/* The body's next/font class defines --font-dm-sans; this selector outranks it so every
+   sans-serif surface (including D3 chart labels) picks up the hand-drawn face. Code stays
+   monospace for legibility. */
+.excalidraw body {
+  --font-dm-sans:
+    'Excalifont', 'Segoe Print', 'Comic Sans MS', var(--font-dm-sans-base, sans-serif);
+  --excalidraw-ink: #1e1e1e;
+  --excalidraw-violet: #6965db;
+  --excalidraw-violet-dark: #5b57d1;
+  --excalidraw-violet-light: #e0dfff;
+  --excalidraw-sketch-radius: 28px 10px 32px 8px / 8px 32px 10px 28px;
+  --excalidraw-island-shadow:
+    0 0 0.9310142993927002px 0 rgba(0, 0, 0, 0.17), 0 0 3.1270833015441895px 0 rgba(0, 0, 0, 0.08),
+    0 7px 14px 0 rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(to right, #f1f1f1 1px, transparent 1px),
+    linear-gradient(to bottom, #f1f1f1 1px, transparent 1px);
+  background-size: 20px 20px;
+  letter-spacing: 0.01em;
+}
+
+.excalidraw ::selection {
+  background: rgba(105, 101, 219, 0.25);
+}
+
+/* Hand-drawn whiteboard doodles in the page margins (desktop only). */
+.excalidraw-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.excalidraw-doodle {
+  position: absolute;
+  display: none;
+  opacity: 0.55;
+}
+
+@media (min-width: 1600px) {
+  .excalidraw-doodle {
+    display: block;
+  }
+}
+
+.excalidraw-doodle-rect {
+  top: 22%;
+  left: 1.25rem;
+  width: 120px;
+  transform: rotate(-4deg);
+}
+
+.excalidraw-doodle-arrow {
+  top: calc(22% + 92px);
+  left: 3.5rem;
+  width: 96px;
+  transform: rotate(18deg);
+}
+
+.excalidraw-doodle-ellipse {
+  top: 58%;
+  right: 1.25rem;
+  width: 120px;
+  transform: rotate(6deg);
+}
+
+.excalidraw-doodle-diamond {
+  bottom: 8%;
+  left: 2rem;
+  width: 92px;
+  transform: rotate(-8deg);
+}
+
+/* Banner: a sketched frame around the wordmark, like a sticky title on the canvas. */
+.excalidraw-theme-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.excalidraw-banner-mark {
+  position: relative;
+  display: grid;
+  width: 240px;
+  height: 56px;
+  place-items: center;
+}
+
+.excalidraw-banner-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.excalidraw-wordmark {
+  position: relative;
+  margin: 0;
+  color: var(--excalidraw-ink);
+  font-family: 'Excalifont', 'Segoe Print', 'Comic Sans MS', sans-serif;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.excalidraw-tagline {
+  margin: 0;
+  color: #5c5c5c;
+  font-size: 1.05rem;
+}
+
+/* Header: an Excalidraw "island" — white panel, soft shadow, no hard rule. */
+.excalidraw header {
+  background-color: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--excalidraw-island-shadow);
+}
+
+/* Cards: ink outline with a wobbly, hand-drawn corner profile. */
+.excalidraw [data-slot='card'] {
+  border-color: var(--excalidraw-ink);
+  border-width: 1.5px;
+  border-radius: var(--excalidraw-sketch-radius);
+  background-color: rgba(255, 255, 255, 0.94);
+  backdrop-filter: none;
+}
+
+/* Outlined controls keep their existing border and get the sketched outline treatment. */
+.excalidraw
+  :is(
+    [data-slot='button'][class*='border'],
+    [role='combobox'],
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea
+  ) {
+  border-color: var(--excalidraw-ink);
+  border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px;
+}
+
+.excalidraw [data-slot='button'][class*='bg-primary'] {
+  border-radius: 12px 4px 10px 5px / 5px 10px 4px 12px;
+}
+
+.excalidraw [data-slot='button'][class*='bg-primary']:hover {
+  background-color: var(--excalidraw-violet-dark);
+}
+
+/* Popovers, menus and tooltips float like Excalidraw's tool islands. */
+.excalidraw
+  :is(
+    [data-slot='popover-content'],
+    [data-slot='select-content'],
+    [data-slot='dialog-content'],
+    [role='dialog'],
+    [role='listbox'],
+    [role='menu'],
+    [role='tooltip']
+  ) {
+  border-color: #d6d6d6;
+  box-shadow: var(--excalidraw-island-shadow);
+}
+
+.excalidraw :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
+  outline: 2px solid var(--excalidraw-violet);
+  outline-offset: 2px;
+}
+
+.excalidraw a:not([data-slot='button']):hover {
+  text-decoration-color: var(--excalidraw-violet);
+}
+
+/* Code keeps the monospace face but sits on Excalidraw's light gray panel. */
+.excalidraw :is(pre, code) {
+  font-family: var(--font-mono);
+}
+
+html[data-inferencex-embed] [data-testid='excalidraw-theme-banner'] {
+  display: none;
+}
