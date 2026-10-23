@@ -172,7 +172,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.numKVHeads).toBe(8);
     expect(arch?.ffnDim).toBe(28672);
     expect(arch?.vocabSize).toBe(128256);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(131072);
     expect(arch?.developer).toBe('Meta');
   });
 
