@@ -592,6 +592,7 @@ export function AgentXCompareHero({
                       key={result.id}
                       data-testid={`landing-${result.id}-results-link`}
                       href={`${prefix}${result.href}`}
+                      prefetchOperatorX={result.id === 'huawei'}
                       analyticsEvent={result.analyticsEvent}
                       analyticsTarget={result.model}
                       analyticsSurface={surface}

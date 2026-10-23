@@ -232,3 +232,11 @@ region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
 namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
 不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
 覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
+
+### Progressive rendering and intent prefetch
+
+The first chart mounts eagerly; others mount within 300px of the viewport or on
+focus, then retain their controls. Without IntersectionObserver all charts render.
+Landing-link hover/focus prefetches the localized route and default GEMM query,
+sharing the destination's five-minute cache. These are presentation-only controls;
+API selectors, results, and click analytics are unaffected.

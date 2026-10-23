@@ -487,3 +487,6 @@ isolation, invalidation, and remaining run-list cost: `docs/operatorx.md`.
 
 中文：可选的 Blob 缓存按 revision 复用合并结果，不改变筛选条件或数值；部分失败及已替换
 revision 不会缓存。配置、隔离和清除规则见 `docs/operatorx.md`。
+
+OperatorX presentation-only exclusions: deferred mounting and landing-link intent
+prefetch use existing APIs and preserve both locales' selectors and measurements.

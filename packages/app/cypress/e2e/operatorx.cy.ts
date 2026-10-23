@@ -100,14 +100,16 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     'contain.text',
     'bf16',
   );
-  cy.get('[data-testid="operatorx-viz-roofline"]').within(() => {
-    cy.contains('[role="tab"]', 'bf16').should('have.attr', 'aria-selected', 'true');
-    cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
-    cy.contains('[role="tab"]', 'fp8').click().should('have.attr', 'aria-selected', 'true');
-    cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
-    cy.contains('[role="tab"]', 'bf16').click().should('have.attr', 'aria-selected', 'true');
-    cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
-  });
+  cy.get('[data-testid="operatorx-viz-roofline"]')
+    .scrollIntoView()
+    .within(() => {
+      cy.contains('[role="tab"]', 'bf16').should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+      cy.contains('[role="tab"]', 'fp8').click().should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').click().should('have.attr', 'aria-checked', 'false');
+      cy.contains('[role="tab"]', 'bf16').click().should('have.attr', 'aria-selected', 'true');
+      cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'false');
+    });
 });
 
 for (const prefix of ['', '/zh']) {
@@ -125,10 +127,67 @@ for (const prefix of ['', '/zh']) {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('crossBackend');
     cy.visit(`${prefix}/operatorx`);
     cy.wait('@crossBackend');
-    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]').within(() => {
-      cy.contains('No case was measured on both.').should('not.exist');
-      cy.contains('of 2').should('be.visible');
-      cy.get('svg').should('exist');
-    });
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]')
+      .scrollIntoView()
+      .within(() => {
+        cy.contains('No case was measured on both.').should('not.exist');
+        cy.contains('of 2').should('be.visible');
+        cy.get('svg').should('exist');
+      });
   });
 }
+
+describe('OperatorX progressive rendering', { testIsolation: true }, () => {
+  for (const prefix of ['', '/zh']) {
+    it(`mounts lower charts near the viewport and preserves their controls at ${prefix || '/'}`, () => {
+      cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+      cy.visit(`${prefix}/operatorx`);
+      cy.wait('@comparison');
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
+      const lower = '[data-testid="operatorx-viz-pairwise-scatter"]';
+      cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
+      cy.get(lower).scrollIntoView();
+      cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
+      cy.get('[data-testid="operatorx-viz-distribution"]').scrollIntoView();
+      cy.get('#opx-dist-common').click().should('have.attr', 'aria-checked', 'false');
+      cy.scrollTo('top');
+      cy.get('[data-testid="operatorx-viz-distribution"]').scrollIntoView();
+      cy.get('#opx-dist-common').should('have.attr', 'aria-checked', 'false');
+    });
+
+    for (const intent of ['focus', 'hover']) {
+      it(`prefetches only default GEMM on ${intent} and reuses it after ${prefix || '/'} navigation`, () => {
+        cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
+        cy.visit(prefix || '/');
+        const link = '[data-testid="landing-huawei-results-link"]';
+        cy.get(link).should('have.attr', 'data-prefetch-ready', 'true');
+        cy.get('@operatorxIntent.all').should('have.length', 0);
+        if (intent === 'focus') cy.get(link).focus();
+        else cy.get(link).trigger('mouseover');
+        cy.wait('@operatorxIntent')
+          .its('request.url')
+          .should('match', /\/compare\?op=gemm$/);
+        cy.location('pathname').should('eq', prefix || '/');
+        cy.get(link).trigger('mouseover').focus().click();
+        cy.location('pathname').should('eq', `${prefix}/operatorx`);
+        cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
+        cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
+        cy.get('@operatorxIntent.all').should('have.length', 1);
+      });
+    }
+  }
+
+  it('renders every chart when viewport observation is unavailable', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/operatorx', {
+      onBeforeLoad(win) {
+        Object.defineProperty(win, 'IntersectionObserver', { value: undefined });
+      },
+    });
+    cy.wait('@comparison');
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]')
+      .should('have.attr', 'aria-busy', 'false')
+      .find('svg')
+      .should('exist');
+  });
+});
