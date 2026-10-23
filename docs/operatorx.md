@@ -140,6 +140,49 @@ Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开
 
 ## Persistence and deployment
 
+### Queued Ascend 950PR replacement
+
+`packages/db/scripts/prepare-ascend950pr-bundle.py` converts the 23 October 2026
+queued-timing SQLite journal to an external OperatorX bundle. It checks the
+SQLite hash against `data-bf16.json`, every Ascend plot latency against the raw
+upper-median timing samples, before/after correctness, the 3,936 plotted BF16-input
+cases, 32 additional BF16/FP32-input cases, and the eight-hardware counts in
+`audit-bf16.json`. The bundle retains each completed raw record, including its ten
+event samples and correctness evidence. The other GPU points remain in their
+original OperatorX runs; the plot snapshot records their run URLs and is used for
+validation, not duplicate ingestion.
+
+The queued bundle is about 81 MB. Raw drilldowns read its documents in batches of
+eight so Neon never has to return the whole bundle as one JSON aggregate (its
+single-response limit is 64 MB). The compact comparison continues to read the
+stored projection, without loading those raw records.
+
+Generate the bundle with the four positional arguments `latest.sqlite3`,
+`data-bf16.json`, `audit-bf16.json`, and an output JSON path. After reviewing its
+manifest and counts, the holder of `DATABASE_OPERATORX_WRITE_URL` can atomically
+replace the old external run:
+
+```sh
+bun run admin:db:ingest:operatorx -- --bundle /path/to/external-ascend950pr-20261023-queued-v1.json \
+  --replace-run external-ascend950pr-20261002-linear
+```
+
+Invalidate `scope=operatorx` and warm both comparisons after the write, as in the
+ingest workflow. Replacement is one database transaction: if the new documents or
+projections fail, the previous run remains. The runner and old target are both
+checked as Ascend 950PR runs. The public GPU graph, launch-shield, cache, and
+throttle policies differ from queued NPU timing; the source qualification is kept
+in the manifest. Do not infer an identical protocol from the combined plots.
+
+中文：上述脚本从 2026 年 10 月 23 日的 SQLite 原始记录生成 OperatorX bundle，并核对
+文件哈希、每条延迟与十次 event timing 样本、计时前后的正确性检查，以及 BF16 图表的
+3,936 条记录和额外 32 条 BF16/FP32 输入记录。其他 GPU 的数据沿用原有 run，不重复导入。
+`--replace-run` 在同一事务中替换旧 950PR run；写入失败时旧数据仍保留。NPU queued
+timing 与公开 GPU 结果的 graph、launch-shield、cache 和 throttle 策略不同，
+比较时应保留这一限定。
+原始记录约 81 MB；详情接口按每批八份文档读取，避免触发 Neon 单次响应 64 MB 的限制。
+对比图仍读取精简数据，不加载这些原始记录。
+
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
 documents: each run's manifest and every shard's operatorx results JSON, verbatim.
 The normalizer runs once during ingest to prepare compact comparisons; detail and
