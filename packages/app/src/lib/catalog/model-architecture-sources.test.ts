@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { Model } from './data-mappings';
+import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { Model, MODEL_OPTIONS } from './data-mappings';
 import fixtures from './fixtures/model-architecture-configs.json';
 import { getModelArchitecture, getFFNSubBlocks } from './model-architectures';
-import { getModelPage } from './model-pages';
+import { getModelPage, getModelPageSlugs } from './model-pages';
 const links = (raw: string) => (raw.match(/https?:\/\/[^\s)]+/gu) ?? []).sort();
 
 describe('architecture parity with published checkpoint configs', () => {
+  it('covers every public model in the upstream evidence and every canonical model page', () => {
+    expect(fixtures.models.map(({ model }) => model).sort()).toEqual([...MODEL_OPTIONS].sort());
+    expect(getModelPageSlugs().sort()).toEqual(COMPARE_MODEL_SLUGS.map(({ slug }) => slug).sort());
+    for (const model of Object.values(Model))
+      expect(getModelArchitecture(model), model).toBeDefined();
+  });
+
   it.each(fixtures.models)(
     '$model matches its sourced checkpoint dimensions',
     ({ model, config }) => {
@@ -110,23 +118,43 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
-  it.each(['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash', 'qwen-3-8-27b'])(
-    '%s has an actual Chinese article with the same technical numbers and sources',
-    (slug) => {
-      const en = getModelPage(slug)!;
-      const zh = getModelPage(slug, 'zh')!;
-      expect(zh.contentLocale).toBe('zh');
-      const protectedFacts: Record<string, string[]> = {
-        'muse-spark-open': ['816B', '42B', '62', '8192', '202048', '4096'],
-        'deepseek-v41-flash': ['552B', '196B', '8B', '16B', '5120', '2304'],
-        'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
-        'qwen-3-8-27b': ['27B', '5120', '248320', '17408', '262,144'],
-      };
-      for (const fact of protectedFacts[slug]) {
-        expect(en.raw).toContain(fact);
-        expect(zh.raw).toContain(fact);
-      }
-      expect(links(zh.raw)).toEqual(links(en.raw));
-    },
-  );
+  it('does not treat the eager execution variant as a different checkpoint architecture', () => {
+    const {
+      model: _standard,
+      features: _standardFeatures,
+      featuresZh: _standardFeaturesZh,
+      ...standard
+    } = getModelArchitecture(Model.Qwen3_8_27B)!;
+    const {
+      model: _eager,
+      features: _eagerFeatures,
+      featuresZh: _eagerFeaturesZh,
+      ...eager
+    } = getModelArchitecture(Model.Qwen3_8_27B_Eager)!;
+    expect(eager).toEqual(standard);
+  });
+
+  it.each([
+    'muse-spark-open',
+    'deepseek-v41-flash',
+    'minimax-m31-flash',
+    'qwen-3-8-27b',
+    'qwen-3-8-27b-eager',
+  ])('%s has an actual Chinese article with the same technical numbers and sources', (slug) => {
+    const en = getModelPage(slug)!;
+    const zh = getModelPage(slug, 'zh')!;
+    expect(zh.contentLocale).toBe('zh');
+    const protectedFacts: Record<string, string[]> = {
+      'muse-spark-open': ['816B', '42B', '62', '8192', '202048', '4096'],
+      'deepseek-v41-flash': ['552B', '196B', '8B', '16B', '5120', '2304'],
+      'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
+      'qwen-3-8-27b': ['27B', '5120', '248320', '17408', '262,144'],
+      'qwen-3-8-27b-eager': ['27B', '5120', '248320', '17408', '262,144'],
+    };
+    for (const fact of protectedFacts[slug]) {
+      expect(en.raw).toContain(fact);
+      expect(zh.raw).toContain(fact);
+    }
+    expect(links(zh.raw)).toEqual(links(en.raw));
+  });
 });

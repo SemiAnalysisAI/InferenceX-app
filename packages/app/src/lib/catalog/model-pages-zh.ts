@@ -28,6 +28,11 @@ export const MODEL_PAGE_ZH = {
       'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。',
     releaseDate: '2026 年 8 月 5 日',
   },
+  'qwen-3-8-27b-eager': {
+    description:
+      'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。',
+    releaseDate: '2026 年 8 月 5 日',
+  },
   'deepseek-r1': {
     description:
       'DeepSeek 的 MoE 推理模型，总参数量 671B、每个 token 激活 37B，采用多头潜在注意力（MLA），并以 MIT 许可证发布。',
