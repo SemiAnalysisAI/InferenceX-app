@@ -498,7 +498,10 @@ describe('Model Architecture Diagram', () => {
 });
 
 describe('Completed architecture catalog', () => {
-  for (const [slug, fact] of [['minimax-m31-flash', 'NVFP4 Experts']]) {
+  for (const [slug, fact] of [
+    ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
+    ['minimax-m31-flash', 'NVFP4 Experts'],
+  ]) {
     it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
       visitModelPage(slug);
       cy.get('[data-testid="model-architecture-inline"]').should('contain.text', fact);
@@ -515,7 +518,7 @@ describe('Completed architecture catalog', () => {
     });
   }
 
-  for (const slug of ['minimax-m31-flash']) {
+  for (const slug of ['muse-spark-open', 'minimax-m31-flash']) {
     it(`${slug} has a Chinese article and usable mobile diagram`, () => {
       cy.viewport(390, 844);
       cy.visit(`/zh/model/${slug}`, { onBeforeLoad: dismissStarModal });

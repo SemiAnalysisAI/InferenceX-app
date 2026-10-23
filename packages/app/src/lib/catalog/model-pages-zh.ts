@@ -8,6 +8,11 @@ export interface ModelPageZhTranslation {
 }
 
 export const MODEL_PAGE_ZH = {
+  'muse-spark-open': {
+    description:
+      'Meta 的多模态 MoE 模型，总参数量 816B、每个 token 激活 42B，采用 pooled experts 与门控残差，支持 1M token 上下文。',
+    releaseDate: '2026 年 10 月 15 日',
+  },
   'minimax-m31-flash': {
     description:
       'MiniMax 的多模态 MoE 模型，总参数量 428B、每个 token 激活 23B，60 层均采用稀疏注意力，前 3 层使用稠密 FFN，并内置 DSpark 投机解码。',

@@ -22,9 +22,9 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced date for every model except Muse, whose release date is unverified', () => {
+  it('has a sourced release date for every supported model', () => {
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
-    expect(missing).toEqual([Model.Muse_Spark_Open]);
+    expect(missing).toEqual([]);
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {

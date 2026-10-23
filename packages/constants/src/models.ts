@@ -126,6 +126,9 @@ export function rowToSequence(row: {
  * earliest date they actually have data for.
  */
 export const MODEL_RELEASE_DATES: Record<string, string> = {
+  // Meta's open-weight launch announcement (not the earlier closed Muse Spark service):
+  // https://research.meta.ai/blog/muse-spark-open — October 15, 2026.
+  'Muse-Spark-Open': '2026-10-15',
   // Newest first. `sweep:` is the model's "Date added" from MODELS.md — the first
   // InferenceX benchmark — recorded so the "cannot predate its own weights"
   // invariant above is checkable by eye at review time.

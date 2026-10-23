@@ -82,13 +82,14 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
-  it.each(['minimax-m31-flash'])(
+  it.each(['muse-spark-open', 'minimax-m31-flash'])(
     '%s has an actual Chinese article with the same technical numbers and sources',
     (slug) => {
       const en = getModelPage(slug)!;
       const zh = getModelPage(slug, 'zh')!;
       expect(zh.contentLocale).toBe('zh');
       const protectedFacts: Record<string, string[]> = {
+        'muse-spark-open': ['816B', '42B', '62', '8192', '202048', '4096'],
         'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
       };
       for (const fact of protectedFacts[slug]) {
