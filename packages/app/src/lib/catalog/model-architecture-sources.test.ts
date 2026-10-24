@@ -110,7 +110,7 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
-  it.each(['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash'])(
+  it.each(['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash', 'qwen-3-8-27b'])(
     '%s has an actual Chinese article with the same technical numbers and sources',
     (slug) => {
       const en = getModelPage(slug)!;
@@ -120,6 +120,7 @@ describe('architecture parity with published checkpoint configs', () => {
         'muse-spark-open': ['816B', '42B', '62', '8192', '202048', '4096'],
         'deepseek-v41-flash': ['552B', '196B', '8B', '16B', '5120', '2304'],
         'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
+        'qwen-3-8-27b': ['27B', '5120', '248320', '17408', '262,144'],
       };
       for (const fact of protectedFacts[slug]) {
         expect(en.raw).toContain(fact);
