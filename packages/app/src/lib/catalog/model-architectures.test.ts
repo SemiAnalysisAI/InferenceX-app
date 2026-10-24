@@ -416,7 +416,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.contextWindow).toBe(196608);
     expect(arch?.vocabSize).toBe(200064);
     expect(arch?.developer).toBe('MiniMax');
-    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2');
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2.5');
   });
 
   it('MiniMax M2.5 has no dense initial layers', () => {
