@@ -931,3 +931,12 @@ function getAllBlocks(flow: SubBlockFlow) {
     ];
   return [...flow.leftPath, ...flow.rightPath, ...flow.mergeBlocks];
 }
+
+describe('Llama 3.1 checkpoint context regression', () => {
+  it('uses the checkpoint position limit and explicit head dimension', () => {
+    expect(getModelArchitecture(Model.Llama3_1_70B)).toMatchObject({
+      contextWindow: 131072,
+      headDim: 128,
+    });
+  });
+});
