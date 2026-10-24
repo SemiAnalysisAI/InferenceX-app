@@ -208,7 +208,8 @@ describe('getModelArchitecture', () => {
     expect(arch?.hasSharedExpert).toBe(true);
     expect(arch?.denseFFNLayers).toBe(3);
     expect(arch?.denseFFNDim).toBe(18432);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(163840);
+    expect(arch?.advertisedContextWindow).toBe(128000);
     expect(arch?.developer).toBe('DeepSeek');
     expect(arch?.vocabSize).toBe(129280);
   });

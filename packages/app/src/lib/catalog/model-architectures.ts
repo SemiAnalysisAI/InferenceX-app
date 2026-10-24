@@ -86,7 +86,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hasSharedExpert: true,
     denseFFNLayers: 3,
     denseFFNDim: 18432,
-    contextWindow: 128000,
+    contextWindow: 163840,
+    advertisedContextWindow: 128000,
     features: [
       'Multi-head Latent Attention',
       'Auxiliary-loss-free Load Balancing',

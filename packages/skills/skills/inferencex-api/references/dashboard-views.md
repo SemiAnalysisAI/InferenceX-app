@@ -562,3 +562,7 @@ and retain any advertised-context qualification alongside the configured length.
 For causal encoder-decoder models preserve separate prefill and decode active
 counts when supplied. Conditional-memory and auxiliary-module accounting is
 model-specific; retain the registry's accompanying features and source link.
+
+### Model-specific architecture coverage
+
+- `deepseek-r1`: read the model-specific architecture facts and source link with `model=deepseek-r1`.
