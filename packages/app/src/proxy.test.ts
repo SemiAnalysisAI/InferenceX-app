@@ -51,3 +51,17 @@ it('preserves embed headers and CSP and sends no event for pages', () => {
   }
   expect(send).not.toHaveBeenCalled();
 });
+
+it('sends an old Inference Performance power link to PowerX with its filters', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(307);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+  );
+});

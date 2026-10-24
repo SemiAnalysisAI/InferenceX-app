@@ -310,9 +310,9 @@ TTFT/E2E use recorded means. Default is median; absent means are not replaced.
 AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
 `params.xstat` and `xAxis.statistic`, not the requested parameter alone.
 
-Equal-service and matched-concurrency analysis are API-only. The dashboard keeps role,
-power-fit and power-breakdown panels, but has no service-comparison control, source selector, target input or
-matched-concurrency table. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
+Equal-service and matched-concurrency analysis and the power fit (`powerFit`) are API-only.
+The PowerX tab keeps the role and power-breakdown panels, but has no service-comparison control,
+source selector, target input, matched-concurrency table or power-fit view. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
 `serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
 
 `serviceCompare=true` returns exact opaque `serviceSources` keys, an
@@ -376,16 +376,21 @@ Where the power goes tabs select existing `metric` values; the chip comparison a
 per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). Chips with measured
 GPU power but no supported system model are named as not shown, not dropped silently.
 On that tab, comparing GPU only with Whole system draws `gpu-measured` and
-`utility-modeled` only; the provisioned bounds stay on Inference Performance.
+`utility-modeled` only; Advanced settings → Compare → All four boundaries adds the two
+provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
+measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` with the same
+filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
 芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
+“仅 GPU + 整机”对比只绘制 `gpu-measured` 与 `utility-modeled`；高级设置 → 对比 → 全部四个边界会加入两个额定边界。
+Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
-同并发表格或分享参数。角色分析、功耗拟合和系统功耗构成面板仍在仪表板中提供，分别对应 `roleShare`、
-`powerFit` 和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
+同并发表格或分享参数。功耗拟合（`powerFit`）同样仅通过 API 提供；PowerX 标签页保留角色分析与系统功耗构成面板，分别对应 `roleShare`
+和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
 按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。各点按 `interactivityField` 上的
 `interactivity` 排序：图表 x 轴为交互性时（含 AgentX P90/P75）沿用该轴，否则使用 `median_intvty`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 

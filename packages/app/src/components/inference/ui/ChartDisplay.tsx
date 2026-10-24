@@ -14,6 +14,7 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import {
   AIR_COOLED_SYSTEM_PUE,
   LIQUID_COOLED_RACK_PUE,
@@ -342,6 +343,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       setSelectedYAxisMetric('y_measuredAvgPower');
     }
   }, [powerXSurface, selectedYAxisMetric, setSelectedYAxisMetric]);
+  // Power metrics live on the PowerX tab only; old Inference Performance links are
+  // redirected there by the request proxy. Anything else falls back to the default metric.
+  useEffect(() => {
+    if (powerXSurface || embedded || minimalChrome || !getMeasuredMetricConfig(selectedYAxisMetric))
+      return;
+    setSelectedYAxisMetric(DEFAULT_Y_AXIS_METRIC);
+  }, [powerXSurface, embedded, minimalChrome, selectedYAxisMetric, setSelectedYAxisMetric]);
+
   const powerXTab = powerXTabFor(selectedYAxisMetric, powerCompare);
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
@@ -1255,7 +1264,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               parts note when comparing, then the AgentX calibration caveat. */}
                               {selectedPowerBasis &&
                                 (selectedPowerBasis !== 'gpu-measured' ||
-                                  powerCompare === 'boundaries') && (
+                                  powerCompare === 'boundaries' ||
+                                  powerCompare === 'all') && (
                                   <p className="mb-2 text-xs text-muted-foreground">
                                     {selectedPowerBasis !== 'gpu-measured' && (
                                       <span
@@ -1265,7 +1275,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                         {t.powerBasisAssumptions[selectedPowerBasis]}{' '}
                                       </span>
                                     )}
-                                    {powerCompare === 'boundaries' &&
+                                    {(powerCompare === 'boundaries' || powerCompare === 'all') &&
                                       selectedPowerBasis !== 'utility-modeled' && (
                                         <span data-testid="power-compare-model-note">
                                           {ALL_IN_MEASURED_NOTE[locale]}{' '}
@@ -1273,7 +1283,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                       )}
                                     {isAgenticSequence &&
                                       (selectedPowerBasis === 'utility-modeled' ||
-                                        powerCompare === 'boundaries') && (
+                                        powerCompare === 'boundaries' ||
+                                        powerCompare === 'all') && (
                                         <span data-testid="power-agentic-model-note">
                                           {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
                                         </span>
@@ -1390,9 +1401,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
-                    {selectedMeasuredConfig &&
-                      !isPowerTimeline &&
-                      (!powerXSurface || powerXTab === 'where' || powerXTab === 'draw') &&
+                    {powerXSurface &&
+                      powerXTab === 'where' &&
                       getViewMode(graphIndex) !== 'table' &&
                       (() => {
                         const overlay = selectUnofficialOverlayForMode(
@@ -1411,16 +1421,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             overlayData={overlayRows}
                             xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
                             xLabel={resolvedXLabel}
-                            initialBreakdown={powerXSurface}
-                            layout={
-                              powerXSurface ? (powerXTab === 'draw' ? 'draw' : 'where') : 'toggles'
-                            }
                             showRoles={powerCompare === 'roles'}
-                            placement={
-                              powerXSurface && powerXTab === 'where' && powerCompare !== 'roles'
-                                ? 'before'
-                                : 'after'
-                            }
+                            placement={powerCompare === 'roles' ? 'after' : 'before'}
                           />
                         );
                       })()}

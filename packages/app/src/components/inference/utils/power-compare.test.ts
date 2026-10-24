@@ -1,17 +1,21 @@
 import { describe, expect, it } from 'vitest';
 
-import { COUNT_COMPARE_BASES, powerCompareVariants } from './power-compare';
+import { powerCompareVariants } from './power-compare';
 
-const basisIds = (metric: string, bases?: readonly string[]) =>
-  powerCompareVariants(metric, 'boundaries', bases as never).map((series) => series.variant.id);
+const ids = (metric: string, mode: 'boundaries' | 'all') =>
+  powerCompareVariants(metric, mode).map((series) => series.variant.id);
 
 describe('powerCompareVariants boundaries', () => {
-  it('overlays every other boundary by default', () => {
-    expect(basisIds('y_measuredJPerOutputToken').length).toBeGreaterThan(1);
+  it('pairs GPU only with Whole system for the boundary compare', () => {
+    expect(ids('y_measuredJPerOutputToken', 'boundaries')).toEqual(['utility-modeled']);
+    expect(ids('y_measuredAvgPower', 'boundaries')).toEqual(['utility-modeled']);
   });
 
-  it('limits the PowerX "Both" overlay to the whole-system boundary', () => {
-    expect(basisIds('y_measuredJPerOutputToken', COUNT_COMPARE_BASES)).toEqual(['utility-modeled']);
-    expect(basisIds('y_measuredAvgPower', COUNT_COMPARE_BASES)).toEqual(['utility-modeled']);
+  it('adds the rated provisioned bounds when comparing all boundaries', () => {
+    const all = ids('y_measuredJPerOutputToken', 'all');
+    expect(all).toEqual(
+      expect.arrayContaining(['utility-modeled', 'gpu-provisioned', 'utility-provisioned']),
+    );
+    expect(all.length).toBeGreaterThan(ids('y_measuredJPerOutputToken', 'boundaries').length);
   });
 });

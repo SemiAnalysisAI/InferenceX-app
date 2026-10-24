@@ -143,7 +143,8 @@ export function powerXTabFor(metric: string, compare: PowerCompare): PowerXTab |
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   // Overlaying both boundaries of an energy metric stays on the Energy tab.
-  if (compare === 'boundaries' && config.family === 'energy') return 'energy';
+  if ((compare === 'boundaries' || compare === 'all') && config.family === 'energy')
+    return 'energy';
   if (compare !== 'none') return 'where';
   if (config.family === 'energy') return 'energy';
   return config.display === 'timeline' ? 'time' : 'draw';
@@ -195,7 +196,7 @@ export function PowerXTabs({
     onCompareChange(next === 'where' ? 'boundaries' : 'none');
   };
   const energyPer = energyPerFor(metric);
-  const count: EnergyCount = compare === 'boundaries' ? 'both' : boundary;
+  const count: EnergyCount = compare === 'boundaries' || compare === 'all' ? 'both' : boundary;
   const selectBoundary = (next: EnergyCount) => {
     track('inference_powerx_boundary_selected', { boundary: next });
     if (next === 'both') {

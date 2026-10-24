@@ -108,11 +108,13 @@ function PanelsHarness({
   added = [],
   overlay = overlayPoints,
   xField = 'mean_tpot_intvty',
+  showRoles = false,
 }: {
   initial: InferenceData[];
   added?: InferenceData[];
   overlay?: InferenceData[];
   xField?: keyof AggDataEntry;
+  showRoles?: boolean;
 }) {
   const [extra, setExtra] = useState<InferenceData[]>([]);
   return (
@@ -129,6 +131,7 @@ function PanelsHarness({
           xField={xField}
           xLabel="Interactivity (output tok/s/user)"
           chartId="power-analysis-test"
+          showRoles={showRoles}
         />
       </div>
     </PathnameContext.Provider>
@@ -145,37 +148,16 @@ describe('PowerAnalysisPanels', () => {
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
     });
-    writeUrlParams({ i_roleshare: '0', i_powerfit: '0' });
   });
 
-  it('keeps official and overlay power fits without the retired comparison controls', () => {
-    mountWithProviders(<PanelsHarness initial={[...fitLadder, ...overlayPoints]} />, providers);
+  it('leads with the chip comparison and has no retired comparison or fit controls', () => {
+    mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
     cy.get('[data-testid="power-analysis-panels"]').should('be.visible');
-    cy.get('[data-testid="power-fit-toggle"]').check();
-    cy.get(
-      '[data-testid="power-analysis-test-power-fit-plot"] circle.point[fill="var(--overlay-run-0)"]',
-    ).should('have.length', 2);
-    cy.get('[data-testid="power-analysis-test-power-fit-plot"] circle.point')
-      .not('[fill="var(--overlay-run-0)"]')
-      .should('have.length', 4);
-    cy.get('[data-testid="power-fit-row"]').should('have.length', 2);
+    cy.get('[data-testid="power-breakdown-panel"]').should('be.visible');
+    cy.get('[data-testid="power-fit-panel"]').should('not.exist');
+    cy.get('[data-testid$="-toggle"]').should('not.exist');
     cy.get('[data-testid^="equal-service-"]').should('not.exist');
     cy.get('[data-testid^="matched-concurrency"]').should('not.exist');
-  });
-
-  it('adds late official observations to an enabled fit without losing the overlay', () => {
-    mountWithProviders(<PanelsHarness initial={overlayPoints} added={fitLadder} />, providers);
-    cy.get('[data-testid="power-fit-toggle"]').check();
-    cy.get('[data-testid="power-fit-row"]').should('have.length', 1);
-    cy.get('[data-testid="add-source"]').click();
-    cy.get('[data-testid="power-fit-row"]').should('have.length', 2);
-    cy.get('[data-testid="power-analysis-test-power-fit-plot"] circle.point').should(
-      'have.length',
-      6,
-    );
-    cy.get(
-      '[data-testid="power-analysis-test-power-fit-plot"] circle.point[fill="var(--overlay-run-0)"]',
-    ).should('have.length', 2);
   });
 
   for (const percentile of ['p75', 'p90']) {
@@ -198,10 +180,10 @@ describe('PowerAnalysisPanels', () => {
           initial={rolePoints}
           overlay={[rolePoints[2]]}
           xField={`${percentile}_e2e_norm_intvty` as keyof AggDataEntry}
+          showRoles
         />,
         providers,
       );
-      cy.get('[data-testid="role-share-toggle"]').check();
       cy.get('[data-testid="power-analysis-test-role-power-plot"] circle.point').should(
         'have.length',
         6,
@@ -215,10 +197,8 @@ describe('PowerAnalysisPanels', () => {
   for (const width of [1280, 393]) {
     it(`stacks every measured point's system power at ${width}px and switches to the area view`, () => {
       cy.viewport(width, 900);
-      writeUrlParams({ i_powerbreakdown: '0', i_pbview: 'bars' });
+      writeUrlParams({ i_pbview: 'bars' });
       mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
-      cy.get('[data-testid="power-breakdown-panel"]').should('not.exist');
-      cy.get('[data-testid="power-breakdown-toggle"]').check();
       cy.get('[data-testid="power-breakdown-panel"]').should('be.visible');
       cy.get('[data-testid="power-breakdown-legend"]')
         .should('contain.text', 'Measured GPU')
