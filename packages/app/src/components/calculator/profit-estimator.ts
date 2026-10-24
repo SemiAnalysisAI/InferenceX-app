@@ -61,7 +61,11 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. Kimi K3 opens on 45 tok/s/user and Moonshot's list
+ * Per-model defaults. The four newest models open at the lowest 5-tok/s/user
+ * target that shows the most priced AgentX SKUs in the 2026-10-24 snapshot:
+ * Muse Spark Open 85, MiniMax M3.1 Flash 125, Qwen3.5 115, and Qwen3.8 Flash
+ * Next 90. These are editable P90 operating-point assumptions, not claims
+ * about the models' hosted API speeds. Kimi K3 opens on 45 tok/s/user and Moonshot's list
  * price ($3.00 / $0.30 cached / $15.00 per M tok, flat at any context length)
  * because third-party hosts undercut it on OpenRouter, where the catalog
  * aggregate sits near $1.80 / $9.00. GLM 5.2/5.3 opens on Z.ai's list price
@@ -93,6 +97,26 @@ export interface ProfitModelDefaults {
  * tok/s/user list as not priced rather than extrapolated.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.Muse_Spark_Open]: {
+    interactivity: 85,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.MiniMax_M3_1_Flash]: {
+    interactivity: 125,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.Qwen3_5]: {
+    interactivity: 115,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.Qwen3_8_Flash_Next]: {
+    interactivity: 90,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 35,
     labCutPct: 0,

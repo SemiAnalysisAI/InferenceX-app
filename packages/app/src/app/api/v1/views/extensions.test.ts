@@ -321,6 +321,55 @@ describe('new dashboard projections', () => {
     },
   );
   it.each([
+    [Model.Muse_Spark_Open, 'musespark', 85],
+    [Model.MiniMax_M3_1_Flash, 'minimaxm31flash', 125],
+    [Model.Qwen3_5, 'qwen3.5', 115],
+    [Model.Qwen3_8_Flash_Next, 'qwen3.8next', 90],
+  ] as const)(
+    'prices new agentic model %s at its default through both public profit views',
+    async (model, dbKey, target) => {
+      const baseRow = agenticRow({ model: dbKey });
+      const firstRow = agenticRow({
+        model: dbKey,
+        metrics: { ...baseRow.metrics, p90_itl: 1 / 140 },
+      });
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          firstRow,
+          agenticRow({
+            id: 2,
+            model: dbKey,
+            conc: 32,
+            metrics: {
+              ...firstRow.metrics,
+              p90_itl: 1 / 20,
+              tput_per_gpu: 9000,
+              input_tput_per_gpu: 8100,
+              output_tput_per_gpu: 900,
+            },
+          }),
+        ]),
+      );
+      for (const [view, handler] of [
+        ['profit-estimator', profit],
+        ['profit-estimator-per-gigawatt', gw],
+      ] as const) {
+        const query = `model=${encodeURIComponent(model)}&priceSource=custom`;
+        const response = await handler(req(view, query));
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.params).toMatchObject({ model, sequence: 'agentic-traces', target });
+        expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+        expect(body.data.rows[0].profit).toBeTypeOf('number');
+
+        const overridden = await handler(req(view, `${query}&target=35`));
+        expect(overridden.status).toBe(200);
+        const overriddenBody = await overridden.json();
+        expect(overriddenBody.params.target).toBe(35);
+      }
+    },
+  );
+  it.each([
     ['profit-estimator', profit],
     ['profit-estimator-per-gigawatt', gw],
   ] as const)(
