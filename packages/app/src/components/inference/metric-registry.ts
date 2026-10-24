@@ -1,6 +1,7 @@
 import type { ChartDefinition } from './types';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
+import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
@@ -389,12 +390,28 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
     polarity: 'lower',
   },
+  gpuProvisionedJPerTotalToken: {
+    field: 'gpuProvisionedJPerTotalToken.y',
+    label: 'GPU Level Provisioned J per Total Token (TDP, J/tok)',
+    labelZh: '每总 token GPU 额定能耗（TDP，J/tok）',
+    title: 'GPU Level Provisioned Joules per Total Token (TDP)',
+    titleZh: '每总 token GPU 额定焦耳能耗（TDP）',
+    polarity: 'lower',
+  },
   utilityProvisionedJPerOutputToken: {
     field: 'utilityProvisionedJPerOutputToken.y',
     label: 'All in Provisioned J per Output Token, all GPUs (J/tok)',
     labelZh: '每输出 token 整体预配能耗，按全部 GPU 归一（J/tok）',
     title: 'All in Provisioned Joules per Output Token, all GPUs',
     titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
+    polarity: 'lower',
+  },
+  utilityProvisionedJPerTotalToken: {
+    field: 'utilityProvisionedJPerTotalToken.y',
+    label: 'All in Provisioned J per Total Token (J/tok)',
+    labelZh: '每总 token 整体预配能耗（J/tok）',
+    title: 'All in Provisioned Joules per Total Token',
+    titleZh: '每总 token 整体预配焦耳能耗',
     polarity: 'lower',
   },
   utilityModeledWatts: {
@@ -411,6 +428,14 @@ export const METRIC_REGISTRY = {
     labelZh: '每输出 token 整体实测能耗（J/tok）',
     title: 'All in Measured Joules per Output Token',
     titleZh: '每输出 token 整体实测焦耳能耗',
+    polarity: 'lower',
+  },
+  utilityModeledJPerTotalToken: {
+    field: 'utilityModeledJPerTotalToken.y',
+    label: 'All in Measured J per Total Token (J/tok)',
+    labelZh: '每总 token 整体实测能耗（J/tok）',
+    title: 'All in Measured Joules per Total Token',
+    titleZh: '每总 token 整体实测焦耳能耗',
     polarity: 'lower',
   },
 } as const satisfies Record<string, MetricDefinition>;
@@ -659,9 +684,12 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
 
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
   'y_gpuProvisionedJPerOutputToken',
+  'y_gpuProvisionedJPerTotalToken',
   'y_utilityProvisionedJPerOutputToken',
+  'y_utilityProvisionedJPerTotalToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',
+  'y_utilityModeledJPerTotalToken',
 ] as const satisfies readonly MetricConfigKey[];
 
 const POWER_BASIS_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
@@ -672,8 +700,12 @@ export function isPowerBasisConfigKey(configKey: string): boolean {
   return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
+const ALL_IN_MEASURED_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  Object.values(POWER_BASIS_FIELDS['utility-modeled']).map((field) => `y_${field}`),
+);
+
 export function isAllInMeasuredConfigKey(configKey: string): boolean {
-  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
+  return ALL_IN_MEASURED_CONFIG_KEY_SET.has(configKey);
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [

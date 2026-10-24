@@ -1,4 +1,9 @@
-import type { AggDataEntry, InferenceData, YAxisMetricKey } from '@/components/inference/types';
+import type {
+  AggDataEntry,
+  InferenceData,
+  PowerBasisFieldKey,
+  YAxisMetricKey,
+} from '@/components/inference/types';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
 import type { Locale } from '@/lib/i18n/i18n';
 import type { SystemPowerUnsupportedReason } from '@/lib/power/modeled-system-power';
@@ -26,6 +31,11 @@ export function inferenceTableYValue(point: InferenceData, yPath?: string): numb
 
 type UnavailableReason = SystemPowerUnsupportedReason | 'energy' | 'model-unavailable';
 
+const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set<PowerBasisFieldKey>([
+  'utilityModeledJPerOutputToken',
+  'utilityModeledJPerTotalToken',
+]);
+
 export function allInMeasuredUnavailableReason(
   point: InferenceData,
   metricKey: string,
@@ -34,7 +44,7 @@ export function allInMeasuredUnavailableReason(
   if (point.modeledSystemPower?.status === 'unsupported') return point.modeledSystemPower.reason;
   if (
     point.modeledSystemPower?.status === 'supported' &&
-    metricKey === 'utilityModeledJPerOutputToken'
+    ALL_IN_MEASURED_ENERGY_FIELDS.has(metricKey)
   )
     return 'energy';
   return 'model-unavailable';

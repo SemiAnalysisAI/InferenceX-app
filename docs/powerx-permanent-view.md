@@ -7,7 +7,8 @@ sit in the existing ↑↑↓↓-gated **Measured Energy** metric group.
 ## Purpose
 
 The article compares one deployment's power at four boundaries, from the GPU board to the
-utility meter, both as W per GPU and as J per output token. The dashboard already had
+utility meter, as W per GPU, as J per output token and as J per total (input + output)
+token. The dashboard already had
 GPU-measured telemetry (`measured*` metrics) and an ungated all-in provisioned energy
 (`jOutput`). This view adds the other boundaries as ordinary y-axis metrics so every chart
 feature (zoom, tooltip, Perf Ruler, Optimal Only, Table, CSV, PNG, `?unofficialrun=` overlay,
@@ -40,9 +41,13 @@ control change to the nearest registered key. Consequences:
 - One share link per figure, and `i_metric` already round-trips through every existing
   surface (share button, Historical Trends hand-off, Table, CSV header).
 - Existing links are byte-identical: all `measured*` keys carry `basis: 'gpu-measured'`.
-- Choosing a derived boundary snaps to its canonical combination (whole deployment, average
-  watts, joules per output token). Changing any telemetry-only setting while on a derived
-  boundary returns to GPU measured, so no control ever points at a key that does not exist.
+- A derived boundary publishes the `POWER_BASIS_FIELDS` quantities for the whole deployment:
+  joules per output token and joules per total token, plus average watts on All in Measured.
+  Per moves between output and total tokens on it, and choosing it keeps the current
+  combination when it publishes that combination (GPU measured J per total token goes to the
+  boundary's J per total token); otherwise the choice snaps to its first combination (average
+  watts or joules per output token). Changing any other setting while on a derived boundary
+  returns to GPU measured, so no control ever points at a key that does not exist.
 - A gated metric selected through a shared URL keeps its Measured controls, as the
   `measured*` siblings already do.
 - The Y-axis dropdown's collapsed "Measured Power" / "Measured Energy" option for the other
@@ -79,6 +84,7 @@ selection. Append:
 | ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2      | H200 W/GPU, measured boundaries + rated lines | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` draws GPU Level Measured and All in Measured; the rated lines are on the timeline (`&i_metric=y_measuredPowerTimeline`, all-in switch `&i_ptutility=1`) |
 | 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                                                           |
+| 3b     | H200 J/total token, all four boundaries       | `&i_metric=y_measuredJPerTotalToken&i_pcompare=boundaries` (single boundary: the matching `…JPerTotalToken` key)                                                                                             |
 | 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                                                     |
 | 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                                                              |
 | 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                                                                |

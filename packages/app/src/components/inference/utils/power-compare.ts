@@ -3,7 +3,10 @@ import {
   POWER_BASES,
   POWER_BASIS_FIELDS,
   POWER_BASIS_LABELS,
+  POWER_QUANTITIES,
   type PowerBasis,
+  type PowerBasisField,
+  type PowerQuantity,
 } from '@/lib/power/power-basis';
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
@@ -21,16 +24,11 @@ export function parsePowerCompare(value: string | null | undefined): PowerCompar
 
 export type PowerSeriesField = keyof Pick<
   InferenceData,
-  | 'measuredAvgPower'
+  | PowerBasisField
   | 'measuredPrefillAvgPower'
   | 'measuredDecodeAvgPower'
-  | 'measuredJPerOutputToken'
   | 'measuredDecodeJPerOutputToken'
   | 'reconstructedPrefillJPerOutputToken'
-  | 'gpuProvisionedJPerOutputToken'
-  | 'utilityProvisionedJPerOutputToken'
-  | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken'
 >;
 
 export interface PowerCompareSeries {
@@ -67,24 +65,20 @@ const VARIANT_DASH: Record<string, string> = {
   decode: '2 3',
 };
 
-function comparableQuantity(metric: string): 'watts' | 'energy' | null {
-  const config = getMeasuredMetricConfig(metric);
-  if (!config) return null;
-  if (config.family === 'power') {
-    return config.scope === 'all' && config.statistic === 'average' && config.display === 'watts'
-      ? 'watts'
-      : null;
-  }
-  return config.scope === 'all' && config.denominator === 'output' && config.unit === 'joules'
-    ? 'energy'
-    : null;
+function boundaryQuantity(metric: string, basis: PowerBasis): PowerQuantity | null {
+  return (
+    POWER_QUANTITIES.find((quantity) => {
+      const field = POWER_BASIS_FIELDS[basis][quantity];
+      return field !== undefined && metric === `y_${field}`;
+    }) ?? null
+  );
 }
 
 export function powerCompareBase(metric: string, mode: PowerCompare): PowerVariant | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config || mode === 'none') return null;
   if (mode === 'boundaries') {
-    return comparableQuantity(metric) ? { kind: 'basis', id: config.basis } : null;
+    return boundaryQuantity(metric, config.basis) ? { kind: 'basis', id: config.basis } : null;
   }
   if (config.basis !== 'gpu-measured') return null;
   if (config.family === 'power') {
@@ -102,16 +96,11 @@ export function powerCompareVariants(metric: string, mode: PowerCompare): PowerC
   const config = getMeasuredMetricConfig(metric);
   if (!base || !config) return [];
   if (base.kind === 'basis') {
-    const quantity = comparableQuantity(metric);
+    const quantity = boundaryQuantity(metric, base.id);
     if (!quantity) return [];
     return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
       if (basis === base.id) return [];
-      const field =
-        basis === 'gpu-measured'
-          ? quantity === 'watts'
-            ? 'measuredAvgPower'
-            : 'measuredJPerOutputToken'
-          : POWER_BASIS_FIELDS[basis][quantity];
+      const field = POWER_BASIS_FIELDS[basis][quantity];
       return field ? [{ variant: { kind: 'basis', id: basis }, field }] : [];
     });
   }
