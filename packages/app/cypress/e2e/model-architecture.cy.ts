@@ -503,6 +503,7 @@ describe('Completed architecture catalog', () => {
     ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
     ['qwen-3-8-27b', 'Dense FFN'],
+    ['qwen-3-8-27b-eager', 'Same model, eager execution'],
     ['glm-5-1', 'DSA: top-2048 tokens'],
     ['glm-5-3', 'IndexShare'],
     ['qwen-3-5', 'Gated DeltaNet'],
@@ -529,6 +530,7 @@ describe('Completed architecture catalog', () => {
     'deepseek-v41-flash',
     'minimax-m31-flash',
     'qwen-3-8-27b',
+    'qwen-3-8-27b-eager',
   ]) {
     it(`${slug} has a Chinese article and usable mobile diagram`, () => {
       cy.viewport(390, 844);
