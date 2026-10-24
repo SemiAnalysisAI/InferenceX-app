@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Model } from './data-mappings';
 import fixtures from './fixtures/model-architecture-configs.json';
 import { getModelArchitecture, getFFNSubBlocks } from './model-architectures';
+import { getModelPage } from './model-pages';
+const links = (raw: string) => (raw.match(/https?:\/\/[^\s)]+/gu) ?? []).sort();
 
 describe('architecture parity with published checkpoint configs', () => {
   it.each(fixtures.models)(
@@ -47,7 +49,7 @@ describe('architecture parity with published checkpoint configs', () => {
     expect(dense.mergeBlocks.at(-1)?.detail).toBe('→ 7,168');
   });
 
-  it.each([Model.GptOss, Model.MiniMax_M3])(
+  it.each([Model.GptOss, Model.MiniMax_M3, Model.MiniMax_M3_1_Flash])(
     '%s shows clipping, scaled gating and the linear bias in modified SwiGLU',
     (model) => {
       const flow = getFFNSubBlocks(getModelArchitecture(model)!);
@@ -77,6 +79,23 @@ describe('architecture parity with published checkpoint configs', () => {
       expect(flow.leftPath[1].detail).toBe('max = 10');
       expect(flow.rightPath.map(({ name }) => name)).toEqual(['Up Projection', 'Clamp']);
       expect(flow.rightPath[1].detail).toBe('±10');
+    },
+  );
+
+  it.each(['minimax-m31-flash'])(
+    '%s has an actual Chinese article with the same technical numbers and sources',
+    (slug) => {
+      const en = getModelPage(slug)!;
+      const zh = getModelPage(slug, 'zh')!;
+      expect(zh.contentLocale).toBe('zh');
+      const protectedFacts: Record<string, string[]> = {
+        'minimax-m31-flash': ['428B', '23B', '6144', '12288', '3072', '1.702'],
+      };
+      for (const fact of protectedFacts[slug]) {
+        expect(en.raw).toContain(fact);
+        expect(zh.raw).toContain(fact);
+      }
+      expect(links(zh.raw)).toEqual(links(en.raw));
     },
   );
 });

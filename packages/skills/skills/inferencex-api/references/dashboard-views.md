@@ -573,3 +573,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `kimi-k3`: read the model-specific architecture facts and source link with `model=kimi-k3`.
 - `minimax-m27`: read the model-specific architecture facts and source link with `model=minimax-m27`.
 - `minimax-m3`: read the model-specific architecture facts and source link with `model=minimax-m3`.
+- `minimax-m31-flash`: read the model-specific architecture facts and source link with `model=minimax-m31-flash`.

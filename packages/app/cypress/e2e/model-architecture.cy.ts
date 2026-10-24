@@ -498,6 +498,43 @@ describe('Model Architecture Diagram', () => {
 });
 
 describe('Completed architecture catalog', () => {
+  for (const [slug, fact] of [['minimax-m31-flash', 'NVFP4 Experts']]) {
+    it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
+      visitModelPage(slug);
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', fact);
+      cy.get('[data-testid="model-architecture-svg"] [marker-end]').should('exist');
+      cy.get('[data-testid="model-architecture-inline"]')
+        .contains('a', 'Source')
+        .should('have.attr', 'href')
+        .and('match', /^https:\/\/huggingface\.co\//u);
+      cy.request(`/api/v1/views/model-architectures?model=${slug}`).then(({ body }) => {
+        expect(body.models).to.have.length(1);
+        expect(body.models[0].slug).to.eq(slug);
+      });
+      expectNoPageOverflow();
+    });
+  }
+
+  for (const slug of ['minimax-m31-flash']) {
+    it(`${slug} has a Chinese article and usable mobile diagram`, () => {
+      cy.viewport(390, 844);
+      cy.visit(`/zh/model/${slug}`, { onBeforeLoad: dismissStarModal });
+      cy.get('[data-testid="model-page-article"]')
+        .should('have.attr', 'lang', 'zh')
+        .and('contain.text', '架构');
+      cy.get('[data-testid="model-english-article-notice"]').should('not.exist');
+      cy.get('[data-testid="model-architecture-inline"]').should('contain.text', '模型架构');
+      if (slug === 'minimax-m31-flash') {
+        cy.get('[data-testid="model-architecture-inline"]')
+          .should('contain.text', '原生支持文本、图像和视频输入')
+          .and('contain.text', '内置 DSpark draft')
+          .and('not.contain.text', 'Built-in DSpark Draft');
+      }
+      cy.get('[data-testid="model-architecture-svg"]').should('be.visible');
+      expectNoPageOverflow();
+    });
+  }
+
   it('separates MiniMax M3 dense prefix FFNs from the remaining MoE layers', () => {
     visitModelPage('minimax-m3');
     cy.get('[data-testid="expand-denseTransformer"]').should('exist');
