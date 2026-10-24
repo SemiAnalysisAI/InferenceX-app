@@ -20,6 +20,7 @@ interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link>
     | 'compare_agentx_dashboard_clicked'
     | 'compare_agentx_model_clicked'
     | 'landing_huawei_results_clicked'
+    | 'landing_minimax_m31_flash_results_clicked'
     | 'landing_tpu_results_clicked'
     | 'landing_rubin_results_clicked'
     | 'landing_jalapeno_results_clicked';

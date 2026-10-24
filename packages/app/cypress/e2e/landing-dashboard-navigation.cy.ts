@@ -130,22 +130,25 @@ describe('landing model curation', () => {
           .should('match', ':first-child')
           .and('have.attr', 'href', `${prefix}/operatorx`)
           .next()
-          .should('have.attr', 'data-testid', 'landing-tpu-results-link')
+          .should('have.attr', 'data-testid', 'landing-minimax-m31-flash-results-link')
           .parent()
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
           .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
-        cy.get('[data-testid="landing-tpu-results-link"]')
-          .should('contain.text', prefix ? 'TPU Qwen3.5 提交结果' : 'TPU Qwen3.5 Submission')
+        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
+          .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
-          .and('not.contain.text', 'Qwen3.5 · AgentX')
-          .and('have.attr', 'href', `${prefix}${TPU_RESULTS_HREF}`);
-        cy.get('[data-new-badge="landing-tpu"]')
+          .and('have.attr', 'href', `${prefix}/inference/minimax-m31-flash`);
+        cy.get('[data-new-badge="landing-minimax-m31-flash"]')
           .should('contain.text', prefix ? '新' : 'NEW')
           .and('have.class', 'new-badge-flash');
-        cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
-        cy.get('[data-testid="landing-tpu-results-link"]')
+        cy.get('[data-testid="landing-minimax-m31-flash-minimax-logo"]').should(
+          'have.attr',
+          'src',
+          '/logos/minimax-color.svg',
+        );
+        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
           .and('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
@@ -204,7 +207,7 @@ describe('landing model curation', () => {
 
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
@@ -220,16 +223,26 @@ describe('landing model curation', () => {
       });
     });
 
-    it(`opens the Qwen3.5 AgentX TPU view from ${prefix || '/'} and retains it on reload`, () => {
-      interceptTpuLaunchData();
+    it(`opens MiniMax M3.1 Flash AgentX results from ${prefix || '/'} and retains them on reload`, () => {
       cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/minimax-m31-flash`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3.1 Flash');
+      cy.get('[data-testid="scenario-selector"]')
+        .invoke('text')
+        .should('match', /Agentic|智能体/u);
+      cy.reload();
+      cy.location('pathname').should('eq', `${prefix}/inference/minimax-m31-flash`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3.1 Flash');
+    });
+
+    it(`keeps the Qwen3.5 AgentX TPU deep link working on ${prefix || '/'}`, () => {
+      interceptTpuLaunchData();
+      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
       cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
       assertTpuView();
       cy.reload();
       assertTpuView();
-      cy.go('back');
-      cy.location('pathname').should('eq', prefix || '/');
     });
 
     it(`opens Kimi K3 AgentX TPU results from ${prefix || '/'} and retains them on reload`, () => {
@@ -318,7 +331,7 @@ describe('landing model curation', () => {
       interceptMinimaxM3RubinData(rubinRows);
       interceptTpuLaunchData();
       cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
       assertTpuView();
       cy.go('back');
       cy.location('pathname').should('eq', prefix || '/');
