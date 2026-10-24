@@ -165,7 +165,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       description:
         'One utility gigawatt of AMD MI355X capacity running Kimi K3 2.8T on vLLM generates up to $32.6B of token revenue per year at 45 tok/s/user and 60% utilization, measured by InferenceX AgentX. Two-page executive summary with method, assumptions, and a downloadable PDF.',
       abstract:
-        "One utility gigawatt of MI355X capacity running Kimi K3 2.8T on vLLM generates up to $32.6 billion of token revenue per year at the 45 tok/s/user operating point InferenceX uses for agentic workloads. The figure comes from measured AgentX trace replays on an 8-GPU MI355X node (FP4 weights, MTP speculative decoding, TP8), priced at Kimi K3's OpenRouter rates ($3.00 input, $0.30 cached input, $15.00 output per million tokens) and sold at 60% utilization. Two cost profiles bracket the operator's outcome. Owning the fleet at hyperscaler volume costs $1.50 per GPU-hour all-in and leaves $16.5 billion of profit after a 30% model license fee, a 50.7% margin. Renting the same fleet at $3.00 per GPU-hour, the August 2026 price for a 3-year MI355X contract, leaves $10.3 billion, a 31.5% margin.",
+        "One utility gigawatt of MI355X capacity running Kimi K3 2.8T on vLLM generates up to $32.6 billion of token revenue per year at the whitepaper's P90 45 tok/s/user interactivity operating point. The figure comes from measured AgentX trace replays on an 8-GPU MI355X node (FP4 weights, MTP speculative decoding, TP8), priced at Kimi K3's OpenRouter rates ($3.00 input, $0.30 cached input, $15.00 output per million tokens) and sold at 60% utilization. Two cost profiles bracket the operator's outcome. Owning the fleet at hyperscaler volume costs $1.50 per GPU-hour all-in and leaves $16.5 billion of profit after a 30% model license fee, a 50.7% margin. Renting the same fleet at $3.00 per GPU-hour, the August 2026 price for a 3-year MI355X contract, leaves $10.3 billion, a 31.5% margin.",
       keyFindings: [
         '$32.6B of revenue per GW-year. 478,469 MI355X GPUs fit in one all-in utility gigawatt at 2.09 kW per GPU (chip plus its share of node, network, and cooling). Each GPU produces 6,115 tok/s at the P90 45 tok/s/user point, which prices at $12.97 per GPU-hour gross and $7.78 after the 60% utilization haircut.',
         'Compute is the smaller cost. At $1.50/GPU/hr the fleet costs $6.3B per year, less than the $9.8B paid to the model lab as a 30% license fee. Doubling the compute cost to $3.00/GPU/hr adds $6.3B of expense and cuts profit from $16.5B to $10.3B; the operator still keeps 31.5% of revenue.',
@@ -253,7 +253,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX profit estimator per gigawatt',
-          href: 'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt',
+          href: 'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX dashboard',
@@ -295,7 +295,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       description:
         '据 InferenceX AgentX 实测，1 GW 电网供电的 AMD MI355X 算力在 vLLM 上运行 Kimi K3 2.8T，在 45 tok/s/user、60% 利用率下每年最高可产生 326 亿美元 token 收入。两页执行摘要，包含方法、假设与 PDF 下载。',
       abstract:
-        '在 InferenceX 用于智能体工作负载的 45 tok/s/user 运行点上，1 GW 电网供电的 MI355X 算力在 vLLM 上运行 Kimi K3 2.8T，每年最高可产生 326 亿美元的 token 收入。该数字来自单个 8 GPU MI355X 节点（FP4 权重、MTP 投机解码、TP8）上的 AgentX trace 回放实测，按 Kimi K3 在 OpenRouter 的价格计费（每百万 token 输入 $3.00、缓存输入 $0.30、输出 $15.00），并按 60% 利用率售出。两种成本情形界定了运营方的结果区间：以超大规模云厂商的采购规模自建集群，全口径成本为每 GPU 小时 $1.50，扣除 30% 模型授权费后剩余 165 亿美元利润，利润率 50.7%；以每 GPU 小时 $3.00（2026 年 8 月 MI355X 3 年期租约价格）租用同等规模集群，则剩余 103 亿美元，利润率 31.5%。',
+        '按本白皮书采用的 P90 交互性 45 tok/s/user 运行点估算，1 GW 电网供电的 MI355X 算力在 vLLM 上运行 Kimi K3 2.8T，每年最高可产生 326 亿美元的 token 收入。该数字来自单个 8 GPU MI355X 节点（FP4 权重、MTP 投机解码、TP8）上的 AgentX trace 回放实测，按 Kimi K3 在 OpenRouter 的价格计费（每百万 token 输入 $3.00、缓存输入 $0.30、输出 $15.00），并按 60% 利用率售出。两种成本情形界定了运营方的结果区间：以超大规模云厂商的采购规模自建集群，全口径成本为每 GPU 小时 $1.50，扣除 30% 模型授权费后剩余 165 亿美元利润，利润率 50.7%；以每 GPU 小时 $3.00（2026 年 8 月 MI355X 3 年期租约价格）租用同等规模集群，则剩余 103 亿美元，利润率 31.5%。',
       keyFindings: [
         '每 GW·年 326 亿美元收入。按每 GPU 2.09 kW 的全口径功耗计算（芯片本身加上节点、网络和散热的分摊），1 GW 电网供电可容纳 478,469 张 MI355X GPU。在 P90 45 tok/s/user 运行点，每张 GPU 产生 6,115 tok/s，折合每 GPU 小时 $12.97 的毛收入，按 60% 利用率折减后为 $7.78。',
         '算力不是最大的成本项。按 $1.50/GPU/hr 计算，集群每年成本 63 亿美元，低于以 30% 授权费支付给模型厂商的 98 亿美元。算力成本翻倍到 $3.00/GPU/hr 会增加 63 亿美元支出，利润从 165 亿美元降至 103 亿美元，运营方仍能保留 31.5% 的收入。',
@@ -376,7 +376,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       sources: [
         {
           label: 'InferenceX 每 GW 利润估算器',
-          href: 'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt',
+          href: 'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
         },
         {
           label: 'InferenceX AgentX 仪表板',

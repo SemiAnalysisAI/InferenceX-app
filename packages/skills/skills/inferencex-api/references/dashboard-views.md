@@ -81,15 +81,6 @@ unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
 links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
 `params.cacheHitMode` alongside the pricing assumptions.
 
-Both profit views default DeepSeek V4 Pro to `target=35` tok/s/user when
-`target` is omitted, matching the English and Chinese dashboards. Explicit
-targets still override the default; list pricing and the 0% model license fee
-are unchanged. The 2026-10-13 choice uses the early-October
-[OpenRouter snapshot](https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers)
-as context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values).
-Treat 35 as an editable operating assumption, not a traffic-weighted mean or
-an OpenRouter P90-equivalent measurement.
-
 The four newly supported models use separate defaults on both views. They are
 the lowest multiples of 5 tok/s/user that reached each model's maximum priced
 official SKU count in a 5–150 sweep of the public view API on 2026-10-24:
@@ -103,6 +94,22 @@ official SKU count in a 5–150 sweep of the public view API on 2026-10-24:
 
 These are editable P90 operating-point assumptions. Always report the resolved
 `params.target`; newly ingested runs can change SKU coverage.
+
+The other five models use the same rule in a 5–300 sweep on 2026-10-25:
+
+| Model               | Previous `target` | Default `target` | Priced rows before → default |
+| ------------------- | ----------------: | ---------------: | ---------------------------: |
+| Kimi K3             |                45 |               60 |                        6 → 8 |
+| GLM-5.2/5.3         |               100 |              135 |                       8 → 10 |
+| MiniMax M3          |                83 |              115 |                       7 → 10 |
+| DeepSeek V4 Pro     |                35 |              170 |                       6 → 16 |
+| DeepSeek V4.1 Flash |               125 |              150 |                      17 → 18 |
+
+Both profit views returned the same counts. DeepSeek V4 Pro reaches 16 rows
+only at 170 in this sweep; the adjacent steps return 15. The defaults favor
+measured SKU coverage, not hosted API speed. Explicit targets override them;
+list pricing and model-license assumptions remain unchanged. The Kimi K3
+MI355X whitepaper retains its historical 45 tok/s/user target in its links.
 
 ## Staged-run Pareto links
 

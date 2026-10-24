@@ -143,8 +143,16 @@ describe('whitepaper registry', () => {
     expect(paper?.chipImageHeight).toBe(1073);
     expect(paper?.chart.tcoSourceHref).toBe('https://semianalysis.com/ai-cloud-tco-model/');
     expect(paper?.en.abstract).toContain('$32.6 billion');
+    expect(paper?.en.abstract).toContain("whitepaper's P90 45 tok/s/user");
     expect(paper?.zh.abstract).toContain('326 亿美元');
+    expect(paper?.zh.abstract).toContain('本白皮书采用的 P90 交互性 45 tok/s/user');
     expect(paper?.en.assumptions.find((row) => row.item === 'Data date')?.value).toBe('2026-09-04');
+    expect(paper?.en.sources[0]?.href).toBe(
+      'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
+    );
+    expect(paper?.zh.sources[0]?.href).toBe(
+      'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+    );
     expect(getWhitepaper('missing-paper')).toBeUndefined();
   });
 
