@@ -1,10 +1,16 @@
 name: Warm After Deploy
 
-# Every production deployment starts with an empty CDN cache. OperatorX's
-# first uncached responses take seconds (cold function, database connection,
-# merged comparison), so request them once here instead of on a visitor's load.
+# Vercel's CDN cache key includes the deployment, so every production promotion
+# starts with an empty cache. OperatorX's first uncached responses take seconds
+# (cold function, database connection, merged comparison), so request them once
+# here instead of on a visitor's load. `vercel.deployment.promoted` fires once
+# the production domain serves the new deployment, for automatic deploys,
+# manual promotions, and rollbacks. The cache is also per region: this fills the
+# region nearest the runner and leaves a warm function for the others.
 on:
-  deployment_status:
+  repository_dispatch:
+    types: [vercel.deployment.promoted]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -15,7 +21,7 @@ concurrency:
 jobs:
   warm:
     name: Warm OperatorX
-    if: github.event.deployment.environment == 'Production' && github.event.deployment_status.state == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
