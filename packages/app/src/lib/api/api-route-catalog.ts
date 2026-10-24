@@ -46,6 +46,14 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/views/model-architectures/route.ts',
+    path: '/api/v1/views/model-architectures',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-model-architectures-view',
+    sourceSha256: 'f9bc4c6fd4f895f36695f969e2cdf3978a9751afcb3bdf55e3a64b2eb5ba6645',
+  },
+  {
     source: 'src/app/api/v1/views/cache-reuse/route.ts',
     path: '/api/v1/views/cache-reuse',
     method: 'GET',
@@ -559,10 +567,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'OperatorX page backend; its cross-hardware comparison includes hardware reference values and workload-resolved chart defaults; its shape follows the page.',
-      zh: 'OperatorX 页面后端；跨硬件对比包含归一化参考值及按工作负载确定的图表默认值，结构随页面变化。',
+      en: 'OperatorX page backend; cross-hardware comparisons include hardware references, workload-resolved defaults, and optional distribution quantiles with resolved normalization controls.',
+      zh: 'OperatorX 页面后端；跨硬件对比包含硬件参考值、按工作负载确定的默认值，以及可选的分布分位数和归一化参数。',
     },
-    sourceSha256: 'd8a039d1cb4ee2b120d7fcf266fb155e664254a5e68b42d38e8782fdbebad66c',
+    sourceSha256: 'f3bceefa715bcd13d3b89b9d52470ff7ca5300aea1c35394a6c0a3b72fb892a5',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -823,7 +831,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: '1f5c275f59fadb665deadf817a7a5c07a6fa9d692df8d5ef21e15c9e51d77949',
+    sourceSha256: '7af0a58cf22643e4eb2ea7006b431c46c458440bd24c2a46026330fefdc5f9e5',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1159,6 +1167,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/catalog/model-architectures.ts',
+    sourceSha256: '409e60f3bf44ec5461563634178aabdf85084e3b8c707fd648fde0abca74efda',
+    reviewArea: {
+      en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
+      zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',
+    },
+  },
+  {
     source: '../db/src/operatorx/visualization.ts',
     sourceSha256: '49d265692f796cd00de1a24f2d8316bd0d12edf280e53faf02765765118a0ad2',
     reviewArea: {
@@ -1175,6 +1191,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/operatorx/distribution-view.ts',
+    sourceSha256: 'de9f2203e99753f955922170aead6906fd6df7c389e96baf249ab6b0d8dda8aa',
+    reviewArea: {
+      en: 'OperatorX distribution metric, normalization, matching, hardware filters, and quantiles shared by UI and page-owned API.',
+      zh: 'OperatorX 分布图的指标、归一化、匹配用例、硬件筛选和分位数，由 UI 与页面专属 API 共用。',
+    },
+  },
+  {
     source: 'src/lib/operatorx/service.ts',
     sourceSha256: '8be8dbf750d00e5cf9ffc92bc6c58c80fc8e94c43744162f450a9d7cfb780840',
     reviewArea: {
@@ -1184,7 +1208,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: 'e80ff9fac85c7925cc5d5cb4ba24cdaae7af9f3680cbc1dafe644efdef0624b5',
+    sourceSha256: 'a43bf0cb027f8b32a8cdda4a9c84fc3d2e1ada7f49c59bf7039c22f45a07e6c3',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',
@@ -1192,7 +1216,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: 'be539b1b76e33b5fd88ea897989b67f469e03ea76de28020bb3314f1d29d8958',
+    sourceSha256: '10fa17540b17e49996417e2b2339efa085daff66d42ddb2f8d9af40fb8427977',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1471,7 +1495,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '2b768ce56a5cadfcc7004c163df5ee641fb6e7a7832869f7505fdd296923173c',
+    sourceSha256: '2c6c8ee9dbb026eae01436b8d9d7b5c9e2f1461f42a9a80ef3234be0aab3ac6b',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1505,7 +1529,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'a7b7a9186dfca07c41274734eb305a0812ec638905daf8b585d86293f6bf8f26',
+    sourceSha256: '0591b6e7f886d8a0381943b3e3a605225bdc9aee480ab15a14a1bd20ab92fc97',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1513,7 +1537,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: 'a10dc456a928df993188fbf82fb4edd723c98c08f62f93d69e9f67ec84913205',
+    sourceSha256: '81d0f0a1fabfbe89b44a12ca560a45086a02740c839fc1df30ca95d187d59d5c',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',

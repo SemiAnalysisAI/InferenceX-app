@@ -178,6 +178,7 @@ export const VIEW_QUERY_PARAMS = {
     'roleShare',
     'powerFit',
   ],
+  'model-architectures': ['model'],
   operatorx: ['format', 'hardware', 'model', 'op', 'page', 'parallel', 'status', 'workload'],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],

@@ -235,6 +235,30 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
+Distribution per GPU uses the page-owned comparison API's optional
+`distributionMetric` (`latency`, `tflops`, `bandwidth`, `computeUtil`, or
+`bandwidthUtil`), `distributionNormalized` (`true`/`false`),
+`distributionMatchedOnly` (`true`/`false`), and `distributionHardware` (comma-separated
+hardware keys). Any of these returns a `distribution` projection with resolved
+parameters, per-hardware p5/p25/p50/p75/p95, counts, and `caseIndices` into the
+response's source-preserving `measurements` columns. Defaults are `tflops`,
+unnormalized, matched only, and all available hardware. Normalized TFLOPS uses
+each case's precision-specific peak TFLOPS; normalized bandwidth uses peak TB/s.
+The ratios use 1 for 100% and retain values above 1; the chart displays
+percentages. Missing
+measurements and cases without documented peaks are excluded, and matched cases
+are recalculated after normalization. Latency cannot be normalized and resolves
+`distributionNormalized` to false, as do metrics already expressed as peak shares.
+This is page-owned data, not a published
+OpenAPI operation. `op` and `workload` keep the comparison route's usual semantics.
+
+中文：Distribution per GPU 的页面专属接口可通过 `distributionMetric`、
+`distributionNormalized`、`distributionMatchedOnly` 和 `distributionHardware`
+读取与图表一致的箱线图统计。归一化时，TFLOPS 按对应精度的计算峰值计算，带宽按
+TB/s 峰值计算；接口以 1 表示 100%，保留超过 1 的比值，图表显示百分数。缺失测量值或峰值的用例不参与
+统计，匹配用例集合按归一化后的有效测量值重算。延迟不支持峰值归一化，返回的
+`distributionNormalized` 为 false；已经表示峰值占比的指标也是如此。原始测量列仍保留状态和 run/result 来源。
+
 The explorer's session-list version filter uses the same parser as its other
 pages: absent, `all`, invalid, or out-of-range versions mean no version filter.
 The Agentic Workload Explorer is also feature-gated and has no published
@@ -493,3 +517,38 @@ revision 不会缓存。配置、隔离和清除规则见 `docs/operatorx.md`。
 
 OperatorX presentation-only exclusions: deferred mounting and landing-link intent
 prefetch use existing APIs and preserve both locales' selectors and measurements.
+
+## Model architecture coverage
+
+Arrow diagrams expose the same attention-layer categories and exact layer counts
+as this catalog. `alternatingLayers` groups repeated layer types; use
+`alternatingNote` / `alternatingNoteZh` for their interleaving, rather than
+interpreting the categories as contiguous blocks. Expanding a Transformer or FFN
+block is presentation only and does not change the returned data.
+
+`GET /api/v1/views/model-architectures` returns the same `MODEL_ARCHITECTURES`
+registry used by `/model/<slug>`, `/zh/model/<slug>`, and dashboard diagrams.
+Omit `model` for all entries, or pass an exact display name such as `Kimi-K3` or
+a canonical compare slug such as `kimi-k3`. Empty values, aliases, unknown
+parameters, and repeated parameters return 400. No `format` parameter is accepted.
+The response is JSON with `view`, `apiVersion`, resolved `params.model`, and
+`models: [{ slug, architecture }]`; `slug` is null for a registry model without
+a canonical compare slug. No authentication is required. Successful responses
+use `Cache-Control: public, max-age=0, s-maxage=300`.
+
+| Surface or control                                                                                     | Read-only coverage                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model architecture selection                                                                           | `model` selects one entry; omission returns all registry entries, including hidden models.                                                                    |
+| Parameter counts, dimensions, context, attention, FFN, expert routing, optional architectural features | `architecture` preserves registry values exactly; parameter counts are in billions, dimensions/context in exact counts. Missing optional fields stay omitted. |
+| Vendor provenance and model identity                                                                   | Preserve `architecture.sourceUrl`, `architecture.model`, and `slug`; related checkpoints can share a model identity.                                          |
+| English and Chinese model architecture pages                                                           | Both render the same facts; bilingual pattern notes are included when supplied.                                                                               |
+| Diagram expansion, collapse, layout, tooltip visibility and navigation                                 | Presentation only; these controls do not change architecture facts.                                                                                           |
+| Model-page benchmark controls and unofficial overlays                                                  | Existing `inference` view; this architecture catalog does not read benchmark data or unofficial runs.                                                         |
+| Static model editorial prose                                                                           | Discover through the existing model pages and text feeds; no separate measurement calculation.                                                                |
+| Credentials, private artifacts, feedback and administration                                            | Excluded: sensitive data or mutation operations, unrelated to public architecture specifications.                                                             |
+
+Do not treat rounded vendor parameter totals as exact checkpoint tensor counts,
+and retain any advertised-context qualification alongside the configured length.
+For causal encoder-decoder models preserve separate prefill and decode active
+counts when supplied. Conditional-memory and auxiliary-module accounting is
+model-specific; retain the registry's accompanying features and source link.

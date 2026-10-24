@@ -21,6 +21,48 @@ TFLOPS is derived by the shared comparison transform as useful FLOPs (`usefulFlo
 `latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
 Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
 
+### Distribution normalization
+
+The Distribution per GPU chart can show raw TFLOPS or TB/s, or normalize those
+values by the documented peak for each hardware and case precision. Normalized
+throughput is achieved TFLOPS divided by peak TFLOPS; normalized bandwidth is
+achieved TB/s divided by peak TB/s. The axis and box tooltips show percentages.
+Cases without a peak for their precision are excluded from normalized boxes;
+values above 100% are retained. Matched only is recalculated after normalization
+so every displayed box uses the same eligible case set. Latency has no peak
+percentage, and already normalized metric choices keep their existing units.
+The Normalized switch is offered for raw throughput and bandwidth metrics.
+Ascend 950PR bandwidth normalization uses the documented, assumed 1.6 TB/s basis.
+
+The page-owned `GET /api/v1/operatorx/compare` route accepts optional
+`distributionMetric`, `distributionNormalized`, `distributionMatchedOnly`, and
+`distributionHardware` query parameters. If any is present, it returns a
+`distribution` projection with resolved controls, per-GPU quantiles, counts, and
+case indices. The same pure helper produces the chart boxes and API projection;
+the existing comparison response is unchanged when those parameters are absent.
+The response's measurement columns retain statuses and source run/result identities.
+OperatorX remains a page-owned API outside the published OpenAPI document.
+
+| Distribution control | API parameter             | Returned data effect                                   |
+| -------------------- | ------------------------- | ------------------------------------------------------ |
+| GEMM/MoE tab         | `op`                      | Selects the operation                                  |
+| Workload             | `workload`                | Selects cases before distribution                      |
+| Metric               | `distributionMetric`      | Selects the value and peak basis                       |
+| GPUs                 | `distributionHardware`    | Selects distribution columns and matched cohort        |
+| Matched only         | `distributionMatchedOnly` | Uses cases eligible on every selected GPU              |
+| Normalized           | `distributionNormalized`  | Divides throughput or bandwidth by the applicable peak |
+
+Box hover and expansion change presentation only; they retain these results.
+
+中文：Distribution per GPU 可将实测 TFLOPS 除以对应硬件和精度的计算峰值，或将实测
+TB/s 除以带宽峰值；纵轴与箱线图提示均显示峰值占比。缺少对应精度峰值的用例不计入归一化
+统计，超过 100% 的实测值不会截断。“仅显示匹配用例”会按归一化后的有效数据重新
+选取共同用例。归一化开关仅用于原始吞吐量和带宽指标；延迟没有对应的峰值百分比，
+已是峰值占比的指标保持原有单位。
+950PR 的带宽归一化使用文档中假定的 1.6 TB/s 参考值。
+页面专属 `/api/v1/operatorx/compare` 接口通过上述四个 `distribution*` 参数返回
+筛选后的分布统计，并保留原始测量状态和 run/result 来源；未传这些参数时，响应保持不变。
+
 ## Compact comparison reads
 
 Ingestion normalizes each run once and stores versioned per-run GEMM and MoE
@@ -193,6 +235,49 @@ OpenAPI 文档中。每个用例与 GPU 返回一行，取该 GPU 最新存储�
 
 ## Persistence and deployment
 
+### Queued Ascend 950PR replacement
+
+`packages/db/scripts/prepare-ascend950pr-bundle.py` converts the 23 October 2026
+queued-timing SQLite journal to an external OperatorX bundle. It checks the
+SQLite hash against `data-bf16.json`, every Ascend plot latency against the raw
+upper-median timing samples, before/after correctness, the 3,936 plotted BF16-input
+cases, 32 additional BF16/FP32-input cases, and the eight-hardware counts in
+`audit-bf16.json`. The bundle retains each completed raw record, including its ten
+event samples and correctness evidence. The other GPU points remain in their
+original OperatorX runs; the plot snapshot records their run URLs and is used for
+validation, not duplicate ingestion.
+
+The queued bundle is about 81 MB. Raw drilldowns read its documents in batches of
+eight so Neon never has to return the whole bundle as one JSON aggregate (its
+single-response limit is 64 MB). The compact comparison continues to read the
+stored projection, without loading those raw records.
+
+Generate the bundle with the four positional arguments `latest.sqlite3`,
+`data-bf16.json`, `audit-bf16.json`, and an output JSON path. After reviewing its
+manifest and counts, the holder of `DATABASE_OPERATORX_WRITE_URL` can atomically
+replace the old external run:
+
+```sh
+bun run admin:db:ingest:operatorx -- --bundle /path/to/external-ascend950pr-20261023-queued-v1.json \
+  --replace-run external-ascend950pr-20261002-linear
+```
+
+Invalidate `scope=operatorx` and warm both comparisons after the write, as in the
+ingest workflow. Replacement is one database transaction: if the new documents or
+projections fail, the previous run remains. The runner and old target are both
+checked as Ascend 950PR runs. The public GPU graph, launch-shield, cache, and
+throttle policies differ from queued NPU timing; the source qualification is kept
+in the manifest. Do not infer an identical protocol from the combined plots.
+
+中文：上述脚本从 2026 年 10 月 23 日的 SQLite 原始记录生成 OperatorX bundle，并核对
+文件哈希、每条延迟与十次 event timing 样本、计时前后的正确性检查，以及 BF16 图表的
+3,936 条记录和额外 32 条 BF16/FP32 输入记录。其他 GPU 的数据沿用原有 run，不重复导入。
+`--replace-run` 在同一事务中替换旧 950PR run；写入失败时旧数据仍保留。NPU queued
+timing 与公开 GPU 结果的 graph、launch-shield、cache 和 throttle 策略不同，
+比较时应保留这一限定。
+原始记录约 81 MB；详情接口按每批八份文档读取，避免触发 Neon 单次响应 64 MB 的限制。
+对比图仍读取精简数据，不加载这些原始记录。
+
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
 documents: each run's manifest and every shard's operatorx results JSON, verbatim.
 The normalizer runs once during ingest to prepare compact comparisons; detail and
@@ -276,15 +361,26 @@ Request order, revision checks, missing/null results, and error handling are pre
 above Next's 2 MB limit. Keys include op, ordered revisions, format version, and
 namespace; distinct deployments need distinct namespaces or prefixes. Partial or
 replaced revisions remain uncached/no-store. Blob failures retain the source path.
-Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag; full
-purge covers the configured prefix. Warm process caches remain until revision or
-code/version changes. The run-list query remains; measure benefits in the deployment
+Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag. A full
+purge, which every results ingest triggers, keeps OperatorX's CDN tag and Blob
+subtree, so only an OperatorX ingest makes its cached responses cold.
+Vercel's CDN cache key includes the deployment, so each production promotion
+starts cold. The `Warm After Deploy` workflow runs on Vercel's
+`vercel.deployment.promoted` dispatch (automatic deploys, manual promotions, and
+rollbacks) and fetches both OperatorX pages, `/runs`, and the GEMM and MoE
+comparisons in full. The CDN cache is per region, so this fills the runner's
+region and leaves a warm function for the others. Warm process caches remain until
+revision or code/version changes. The run-list query remains; measure benefits in the deployment
 region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
 
 中文：配置上述 Blob 环境变量后，可共享超过 2 MB 的对比数据，按算子、revision、版本和
 namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
-不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
-覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
+不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签。每次结果数据
+写入都会触发完整清除，但完整清除不影响 OperatorX 的 CDN 标签和 Blob 子目录，因此只有
+OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包含部署本身，因此生产环境每次切换到新部署后
+缓存都为空。`Warm After Deploy` 工作流由 Vercel 的 `vercel.deployment.promoted` 事件触发（涵盖自动部署、
+手动 promote 和回滚），完整拉取两个 OperatorX 页面、`/runs` 以及 GEMM 和 MoE 对比数据。CDN 缓存按区域
+划分，因此该流程只填充 runner 所在区域的缓存，其他区域则可复用已预热的函数实例。内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
 
 ### Progressive rendering and intent prefetch
 

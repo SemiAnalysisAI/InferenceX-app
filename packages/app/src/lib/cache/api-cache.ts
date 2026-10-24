@@ -193,15 +193,18 @@ export function cachedDerivedData<T, Args extends unknown[]>(
   return cachedQuery(fn, `derived:${keyPrefix}`);
 }
 
-/** Purge all cache tags and the full configured Blob prefix, including OperatorX. */
+/**
+ * Purge the dashboard and CollectiveX caches and the configured Blob prefix.
+ * OperatorX is excluded: its data is independent of results ingests, and only
+ * its own ingest (`purgeOperatorX`) can make its cached responses stale.
+ */
 export async function purgeAll(): Promise<number> {
-  const deleted = await blobPurge();
+  const deleted = await blobPurge('', [`${OPERATORX_CACHE_SCOPE}/`]);
   revalidateTag(cacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly — this line is the sole
   // mechanism that clears CollectiveX from the CDN.
   purgeCollectiveX();
-  revalidateTag(operatorXCacheTag(), { expire: 0 });
   return deleted;
 }
 
@@ -272,7 +275,7 @@ export function cachedJson<T>(
 /** Isolated Blob key subtree for this deployment's OperatorX comparisons. */
 export function operatorXBlobPrefix(): string {
   const namespace = createHash('sha256').update(cacheNamespace()).digest('hex');
-  return `operatorx/${namespace}/`;
+  return `${OPERATORX_CACHE_SCOPE}/${namespace}/`;
 }
 
 /** Purge OperatorX's CDN tag and shared merged-comparison blobs. */
