@@ -570,3 +570,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `llama-3-3-70b`: read the model-specific architecture facts and source link with `model=llama-3-3-70b`.
 - Hidden Llama 3.1 70B: use exact display name `Llama-3.1-70B-Instruct-FP8-KV`; its catalog slug is null.
 - `gptoss-120b`: read the model-specific architecture facts and source link with `model=gptoss-120b`.
+- `kimi-k3`: read the model-specific architecture facts and source link with `model=kimi-k3`.

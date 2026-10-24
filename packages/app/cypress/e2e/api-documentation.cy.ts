@@ -16,6 +16,7 @@ describe('API documentation', () => {
         hiddenSize: 7168,
         numExperts: 898,
         activeExperts: 16,
+        routedExpertHiddenSize: 3584,
       });
       cy.request(`${endpoint}?model=Kimi-K3`).its('body').should('deep.equal', body);
     });

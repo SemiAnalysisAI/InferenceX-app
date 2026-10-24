@@ -334,7 +334,7 @@ describe('getModelArchitecture', () => {
     for (const spec of arch!.alternatingLayers!) {
       expect(spec.slidingWindow).toBeUndefined();
     }
-    expect(arch?.alternatingNote).toBe('gated MLA every 4th layer');
+    expect(arch?.alternatingNote).toBe('gated MLA at layers 4, 8, …, 92, 93');
     expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingNote).toBeUndefined();
   });
 

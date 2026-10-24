@@ -243,7 +243,7 @@ describe('Model Architecture Diagram', () => {
       cy.get('[data-testid="alternating-indicator"]').should('exist');
       cy.get('[data-testid="model-architecture-svg"]').contains('KDA').should('exist');
       cy.get('[data-testid="model-architecture-svg"]')
-        .contains('gated MLA every 4th layer')
+        .contains('gated MLA at layers 4, 8, …, 92, 93')
         .should('exist');
       cy.get('[data-testid="model-architecture-svg"]')
         .contains('alternating every layer')
