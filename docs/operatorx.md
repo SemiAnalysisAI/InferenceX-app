@@ -308,15 +308,26 @@ Request order, revision checks, missing/null results, and error handling are pre
 above Next's 2 MB limit. Keys include op, ordered revisions, format version, and
 namespace; distinct deployments need distinct namespaces or prefixes. Partial or
 replaced revisions remain uncached/no-store. Blob failures retain the source path.
-Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag; full
-purge covers the configured prefix. Warm process caches remain until revision or
-code/version changes. The run-list query remains; measure benefits in the deployment
+Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag. A full
+purge, which every results ingest triggers, keeps OperatorX's CDN tag and Blob
+subtree, so only an OperatorX ingest makes its cached responses cold.
+Vercel's CDN cache key includes the deployment, so each production promotion
+starts cold. The `Warm After Deploy` workflow runs on Vercel's
+`vercel.deployment.promoted` dispatch (automatic deploys, manual promotions, and
+rollbacks) and fetches both OperatorX pages, `/runs`, and the GEMM and MoE
+comparisons in full. The CDN cache is per region, so this fills the runner's
+region and leaves a warm function for the others. Warm process caches remain until
+revision or code/version changes. The run-list query remains; measure benefits in the deployment
 region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
 
 中文：配置上述 Blob 环境变量后，可共享超过 2 MB 的对比数据，按算子、revision、版本和
 namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
-不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
-覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
+不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签。每次结果数据
+写入都会触发完整清除，但完整清除不影响 OperatorX 的 CDN 标签和 Blob 子目录，因此只有
+OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包含部署本身，因此生产环境每次切换到新部署后
+缓存都为空。`Warm After Deploy` 工作流由 Vercel 的 `vercel.deployment.promoted` 事件触发（涵盖自动部署、
+手动 promote 和回滚），完整拉取两个 OperatorX 页面、`/runs` 以及 GEMM 和 MoE 对比数据。CDN 缓存按区域
+划分，因此该流程只填充 runner 所在区域的缓存，其他区域则可复用已预热的函数实例。内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
 
 ### Progressive rendering and intent prefetch
 
