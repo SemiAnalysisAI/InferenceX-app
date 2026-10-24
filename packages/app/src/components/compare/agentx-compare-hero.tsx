@@ -394,17 +394,6 @@ const LANDING_HARDWARE_RESULTS = [
     analyticsEvent: 'landing_huawei_results_clicked',
   },
   {
-    id: 'minimax-m31-flash',
-    vendor: 'MiniMax',
-    title: 'MiniMax M3.1 Flash',
-    titleZh: 'MiniMax M3.1 Flash',
-    subtitle: 'AgentX',
-    href: '/inference/minimax-m31-flash',
-    model: 'minimax-m31-flash',
-    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
-    isNew: true,
-  },
-  {
     id: 'tpu-kimi-k3',
     vendor: 'Google',
     title: 'TPU Kimi K3 Submission',
@@ -447,6 +436,17 @@ const LANDING_HARDWARE_RESULTS = [
     href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
+  },
+  {
+    id: 'minimax-m31-flash',
+    vendor: 'MiniMax',
+    title: 'MiniMax M3.1 Flash',
+    titleZh: 'MiniMax M3.1 Flash',
+    subtitle: 'AgentX',
+    href: '/inference/minimax-m31-flash',
+    model: 'minimax-m31-flash',
+    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
+    isNew: true,
   },
 ] as const;
 

@@ -130,7 +130,7 @@ describe('landing model curation', () => {
           .should('match', ':first-child')
           .and('have.attr', 'href', `${prefix}/operatorx`)
           .next()
-          .should('have.attr', 'data-testid', 'landing-minimax-m31-flash-results-link')
+          .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
           .parent()
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
@@ -148,10 +148,8 @@ describe('landing model curation', () => {
           'src',
           '/logos/minimax-color.svg',
         );
-        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
-          .next()
-          .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
-          .and('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
+        cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
+          .should('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
           .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 Submission')
           .and('contain.text', prefix ? '2.8 万亿参数 AgentX' : '2.8 Trillion parameters AgentX');
         cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
@@ -203,6 +201,15 @@ describe('landing model curation', () => {
           'fill',
           'currentColor',
         );
+        cy.get('[data-testid="landing-jalapeno-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-minimax-m31-flash-results-link');
+        cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
+          .parent()
+          .next('nav')
+          .find('[data-testid^="compare-agentx-model-"]')
+          .first()
+          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
       });
 
       cy.visit(`${prefix}/compare`);
