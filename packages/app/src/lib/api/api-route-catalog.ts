@@ -982,7 +982,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-workflow-info',
-    sourceSha256: 'f18a38f7484cbd3bf4f1fac96a3ebd9fdd4451bc2b0bcffc7eccb1afe8b1f440',
+    sourceSha256: '0f83003cc9fedd47fcfed5c19bd2579a762c8f8f2ed701db13a0f4317981f6aa',
   },
 ] as const satisfies readonly ApiRouteCatalogEntry[];
 

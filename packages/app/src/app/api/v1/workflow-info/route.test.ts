@@ -106,18 +106,19 @@ describe('GET /api/v1/workflow-info', () => {
     );
   });
 
-  it('accepts empty date param (returns all)', async () => {
-    mockGetWorkflowRunsByDate.mockResolvedValueOnce([]);
-    mockGetChangelogByDate.mockResolvedValueOnce([]);
-    mockGetDateConfigs.mockResolvedValueOnce([]);
-    mockGetRunConfigsByDate.mockResolvedValueOnce([]);
-
-    const res = await GET(req('/api/v1/workflow-info'));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual({ runs: [], changelogs: [], configs: [], runConfigs: [] });
-    expect(mockGetWorkflowRunsByDate).toHaveBeenCalledWith('mock-sql', '');
-  });
+  it.each(['/api/v1/workflow-info', '/api/v1/workflow-info?date='])(
+    'returns 400 without querying when date is missing (%s)',
+    async (url) => {
+      const res = await GET(req(url));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe('Invalid date format (YYYY-MM-DD required)');
+      expect(mockGetWorkflowRunsByDate).not.toHaveBeenCalled();
+      expect(mockGetChangelogByDate).not.toHaveBeenCalled();
+      expect(mockGetDateConfigs).not.toHaveBeenCalled();
+      expect(mockGetRunConfigsByDate).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns 500 when any query throws', async () => {
     mockGetWorkflowRunsByDate.mockRejectedValueOnce(new Error('Timeout'));
