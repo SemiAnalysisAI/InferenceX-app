@@ -457,6 +457,16 @@ does each chip earn today, and who keeps it? The two tabs differ only in the den
 (`ProfitBasis`), either one GPU-hour (`chip-hour`) or the GPU-hours one all-in utility
 gigawatt-year buys for that SKU (`gw-year`).
 
+Both tabs offer the same model list. A model needs AgentX (`agentic_traces`)
+measurements with an interpolable operating point and a token price source.
+The page intersects its supported routes with live AgentX availability, so a
+model without current trace data disappears from the selector. Muse Spark Open,
+Qwen3.5, Qwen3.8 Flash Next, and MiniMax M3.1 Flash use OpenRouter pricing by
+default; users can supply custom prices. GLM-5 currently has too little trace
+data to interpolate a profit row.
+The public profit view APIs accept any known model and may return empty rows;
+their `model` parameter is not restricted to the dashboard's list.
+
 ### Decisions worth knowing
 
 - **Utilization scales revenue only.** 60% means the fleet bills 60% of the tokens

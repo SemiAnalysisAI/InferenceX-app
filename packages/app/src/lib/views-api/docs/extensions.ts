@@ -374,10 +374,16 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
           'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
           '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
         ] as const)
-      : (PARAMETER_NOTES[name] ?? [
-          `${name} selector for ${view}; resolved value is returned in params.`,
-          `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
-        ]);
+      : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
+          name === 'model'
+        ? ([
+            'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
+            '模型显示名称或比较页 slug。仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。',
+          ] as const)
+        : (PARAMETER_NOTES[name] ?? [
+            `${name} selector for ${view}; resolved value is returned in params.`,
+            `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
+          ]);
   return {
     name,
     location: 'query',

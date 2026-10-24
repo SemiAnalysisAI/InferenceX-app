@@ -14,6 +14,10 @@ import {
 const OPENROUTER_MODELS = {
   data: [
     {
+      id: 'meta/muse-spark-open',
+      pricing: { prompt: '0.00000125', completion: '0.00000425', input_cache_read: '0.00000015' },
+    },
+    {
       id: 'moonshotai/kimi-k3',
       pricing: { prompt: '0.0000006', completion: '0.0000025', input_cache_read: '0.0000001' },
     },
@@ -32,6 +36,18 @@ const OPENROUTER_MODELS = {
     {
       id: 'deepseek/deepseek-v4.1-flash',
       pricing: { prompt: '0.00000015', completion: '0.0000006', input_cache_read: '0.000000003' },
+    },
+    {
+      id: 'minimax/minimax-m3.1-flash',
+      pricing: { prompt: '0.00000015', completion: '0.0000006', input_cache_read: '0.00000003' },
+    },
+    {
+      id: 'qwen/qwen3.5-397b-a17b',
+      pricing: { prompt: '0.0000005', completion: '0.0000036', input_cache_read: '0.00000005' },
+    },
+    {
+      id: 'qwen/qwen3.8-flash',
+      pricing: { prompt: '0.00000015', completion: '0.00000047', input_cache_read: '0.00000002' },
     },
   ],
 };
@@ -54,6 +70,26 @@ function unlockPowerGate(win: Cypress.AUTWindow): void {
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
+
+describe('New agentic models on profit estimators', () => {
+  for (const [slug, label] of [
+    ['muse-spark-open', 'Muse Spark Open'],
+    ['minimax-m31-flash', 'MiniMax M3.1 Flash'],
+    ['qwen-3-5', 'Qwen3.5'],
+    ['qwen-3-8-flash-next', 'Qwen3.8 Flash Next'],
+  ] as const) {
+    for (const basis of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
+      it(`prices ${label} on ${basis}`, () => {
+        stubOpenRouter();
+        cy.visit(`/${basis}/${slug}`, { onBeforeLoad: suppressNudges });
+        cy.location('pathname').should('eq', `/${basis}/${slug}`);
+        cy.get('[data-testid="profit-model-selector"]').should('contain.text', label);
+        cy.get('button#profit-price-source').should('contain.text', 'OpenRouter');
+        chart().find('text.revenue-label').should('have.length.greaterThan', 0);
+      });
+    }
+  }
+});
 
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
@@ -561,12 +597,16 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-precision-selector"]').should('not.exist');
     cy.get('[data-testid="profit-model-selector"]').should('contain.text', 'Kimi K3').click();
     cy.get('[role="option"]')
-      .should('have.length', 5)
+      .should('have.length', 9)
+      .and('contain.text', 'Muse Spark Open')
       .and('contain.text', 'Kimi K3')
       .and('contain.text', 'GLM5.2/GLM5.3')
       .and('contain.text', 'MiniMax M3')
       .and('contain.text', 'DeepSeek V4 Pro')
-      .and('contain.text', 'DeepSeek V4.1 Flash');
+      .and('contain.text', 'DeepSeek V4.1 Flash')
+      .and('contain.text', 'MiniMax M3.1 Flash')
+      .and('contain.text', 'Qwen3.5')
+      .and('contain.text', 'Qwen3.8 Flash Next');
     cy.get('body').type('{esc}');
     cy.get('button#profit-price-source').click();
     cy.get('[role="option"]')
@@ -1053,12 +1093,9 @@ describe('Profit Estimator per GW — per-model route', () => {
         cy.get('[data-testid="profit-scenario-selector"]').should('not.exist');
         cy.get('[data-testid="profit-fixed-workload-note"]').should('not.exist');
       });
-      cy.request({
-        url: `${prefix}/profit-estimator-per-gigawatt/qwen-3-5`,
-        failOnStatusCode: false,
-      })
+      cy.request(`${prefix}/profit-estimator-per-gigawatt/qwen-3-5`)
         .its('status')
-        .should('eq', 404);
+        .should('eq', 200);
     });
   }
 });

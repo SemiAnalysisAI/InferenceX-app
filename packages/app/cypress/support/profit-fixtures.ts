@@ -6,11 +6,15 @@ export const PROFIT_MINIMAX_DB_KEY = 'minimaxm3';
 export const PROFIT_DEEPSEEK_DB_KEY = 'dsv4';
 export const PROFIT_DEEPSEEK_FLASH_DB_KEY = 'dsv41flash';
 const PROFIT_DB_KEY_BY_DISPLAY_MODEL: Record<string, string> = {
+  'Muse-Spark-Open': 'musespark',
   'Kimi-K3': PROFIT_MODEL_DB_KEY,
   'GLM-5.2': PROFIT_GLM_DB_KEY,
   'MiniMax-M3': PROFIT_MINIMAX_DB_KEY,
   'DeepSeek-V4-Pro': PROFIT_DEEPSEEK_DB_KEY,
   'DeepSeek-V4.1-Flash': PROFIT_DEEPSEEK_FLASH_DB_KEY,
+  'MiniMax-M3.1-Flash': 'minimaxm31flash',
+  'Qwen-3.5-397B-A17B': 'qwen3.5',
+  'Qwen3.8-Flash-Next': 'qwen3.8next',
 };
 const PROFIT_DB_KEYS = Object.values(PROFIT_DB_KEY_BY_DISPLAY_MODEL);
 export const PROFIT_DATE = '2026-08-31';
