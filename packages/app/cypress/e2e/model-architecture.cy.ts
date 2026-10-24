@@ -503,6 +503,7 @@ describe('Completed architecture catalog', () => {
     ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
     ['glm-5-1', 'DSA: top-2048 tokens'],
+    ['glm-5-3', 'IndexShare'],
   ]) {
     it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
       visitModelPage(slug);
