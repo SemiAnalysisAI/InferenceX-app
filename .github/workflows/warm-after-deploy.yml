@@ -1,0 +1,38 @@
+name: Warm After Deploy
+
+# Every production deployment starts with an empty CDN cache. OperatorX's
+# first uncached responses take seconds (cold function, database connection,
+# merged comparison), so request them once here instead of on a visitor's load.
+on:
+  deployment_status:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    name: Warm OperatorX
+    if: github.event.deployment.environment == 'Production' && github.event.deployment_status.state == 'success'
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm OperatorX pages and API
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          headers=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          # Consume each full response: a streamed body that is cut off is not cached.
+          for path in /operatorx /zh/operatorx /api/v1/operatorx/runs \
+            '/api/v1/operatorx/compare?op=gemm' '/api/v1/operatorx/compare?op=moe'; do
+            curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
+              -o /dev/null -w "%{http_code} %{time_total}s $path\n" \
+              "${APP_URL%/}$path" "${headers[@]}"
+          done

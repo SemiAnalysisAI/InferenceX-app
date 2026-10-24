@@ -823,7 +823,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: '1f5c275f59fadb665deadf817a7a5c07a6fa9d692df8d5ef21e15c9e51d77949',
+    sourceSha256: '7af0a58cf22643e4eb2ea7006b431c46c458440bd24c2a46026330fefdc5f9e5',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1521,7 +1521,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '94ba220592420f16b060e8b7148c01869d031478d4e49e44d9bb695bba1072a6',
+    sourceSha256: 'a96667af1379f6d9281da92923455d194e22da84ef8d31e1690436a23e7c2eb9',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1529,7 +1529,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: 'a10dc456a928df993188fbf82fb4edd723c98c08f62f93d69e9f67ec84913205',
+    sourceSha256: '81d0f0a1fabfbe89b44a12ca560a45086a02740c839fc1df30ca95d187d59d5c',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
