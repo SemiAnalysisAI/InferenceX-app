@@ -72,8 +72,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Muse Spark Open 85, MiniMax M3.1 Flash 125, Qwen3.5 115, Qwen3.8 Flash Next 90, and DeepSeek V4 Pro 35 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable assumptions, not OpenRouter P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Muse Spark Open 为 85、MiniMax M3.1 Flash 为 125、Qwen3.5 为 115、Qwen3.8 Flash Next 为 90、DeepSeek V4 Pro 为 35 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是可修改的假设，并非与 OpenRouter P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',

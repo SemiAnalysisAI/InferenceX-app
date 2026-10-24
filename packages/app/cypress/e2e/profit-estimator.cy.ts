@@ -72,20 +72,37 @@ const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
 describe('New agentic models on profit estimators', () => {
-  for (const [slug, label] of [
-    ['muse-spark-open', 'Muse Spark Open'],
-    ['minimax-m31-flash', 'MiniMax M3.1 Flash'],
-    ['qwen-3-5', 'Qwen3.5'],
-    ['qwen-3-8-flash-next', 'Qwen3.8 Flash Next'],
+  for (const [slug, label, dbKey, target] of [
+    ['muse-spark-open', 'Muse Spark Open', 'musespark', 85],
+    ['minimax-m31-flash', 'MiniMax M3.1 Flash', 'minimaxm31flash', 125],
+    ['qwen-3-5', 'Qwen3.5', 'qwen3.5', 115],
+    ['qwen-3-8-flash-next', 'Qwen3.8 Flash Next', 'qwen3.8next', 90],
   ] as const) {
     for (const basis of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
-      it(`prices ${label} on ${basis}`, () => {
+      it(`opens ${label} on ${basis} with more measured SKUs than target 45`, () => {
         stubOpenRouter();
+        cy.intercept('GET', '/api/v1/benchmarks*', {
+          body: profitBenchmarkRows(dbKey).map((row) => {
+            if (row.hardware === 'gb300' || row.hardware === 'h200') return row;
+            const previousInteractivity = 1 / row.metrics.p90_itl;
+            return {
+              ...row,
+              metrics: {
+                ...row.metrics,
+                p90_itl: 1 / (target + (previousInteractivity - 70) / 10),
+              },
+            };
+          }),
+        });
         cy.visit(`/${basis}/${slug}`, { onBeforeLoad: suppressNudges });
         cy.location('pathname').should('eq', `/${basis}/${slug}`);
         cy.get('[data-testid="profit-model-selector"]').should('contain.text', label);
         cy.get('button#profit-price-source').should('contain.text', 'OpenRouter');
-        chart().find('text.revenue-label').should('have.length.greaterThan', 0);
+        cy.get('[data-testid="profit-target-input"]').should('have.value', String(target));
+        chart().find('text.revenue-label').should('have.length', 4);
+
+        cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
+        chart().find('text.revenue-label').should('have.length', 1);
       });
     }
   }
