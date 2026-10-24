@@ -234,13 +234,17 @@ describe('landing model curation', () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-minimax-m31-flash-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m31-flash`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3.1 Flash');
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
       cy.get('[data-testid="scenario-selector"]')
         .invoke('text')
         .should('match', /Agentic|智能体/u);
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m31-flash`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax M3.1 Flash');
+      cy.get('[data-testid="model-selector"]')
+        .invoke('text')
+        .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
     });
 
     it(`keeps the Qwen3.5 AgentX TPU deep link working on ${prefix || '/'}`, () => {
