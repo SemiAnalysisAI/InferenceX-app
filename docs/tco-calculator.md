@@ -484,6 +484,25 @@ Both per-chip-hour and per-GW-year views returned the same row counts at these
 targets. New benchmark runs can change the coverage. The target remains an
 editable operating-point assumption, not a hosted API speed claim.
 
+The five earlier models now follow the same rule. A 2026-10-25 public API sweep
+at every 5 tok/s/user from 5 to 300 found these lowest targets that maximize
+priced official SKU rows in that range, again using custom token prices to
+isolate curve coverage:
+
+| Model               | Previous target | Rows before | New default target | Rows at default |
+| ------------------- | --------------: | ----------: | -----------------: | --------------: |
+| Kimi K3             |              45 |           6 |                 60 |               8 |
+| GLM-5.2/5.3         |             100 |           8 |                135 |              10 |
+| MiniMax M3          |              83 |           7 |                115 |              10 |
+| DeepSeek V4 Pro     |              35 |           6 |                170 |              16 |
+| DeepSeek V4.1 Flash |             125 |          17 |                150 |              18 |
+
+Both profit views returned the same counts. DeepSeek V4 Pro reaches 16 rows
+only at 170 in this sweep; its immediately adjacent steps return 15, so that
+default is especially sensitive to new measurements. The Kimi K3 MI355X
+whitepaper still uses 45 tok/s/user; its estimator links explicitly retain
+that historical target.
+
 ### Decisions worth knowing
 
 - **Utilization scales revenue only.** 60% means the fleet bills 60% of the tokens
@@ -495,7 +514,7 @@ editable operating-point assumption, not a hosted API speed claim.
   revenue. The UI calls it "Model License Fee (%)"; code and test ids keep the older
   `labCut` name.
 - **Out-of-range reads are excluded, not clamped.** A config the target
-  interactivity falls outside of (H200 on Kimi K3 at 45 tok/s/user, say) is not
+  interactivity falls outside of (H200 on Kimi K3 at 60 tok/s/user, say) is not
   drawn and not offered in the legend. This matches the fleet page, which drops
   those points rather than showing an edge value that was never measured.
 
