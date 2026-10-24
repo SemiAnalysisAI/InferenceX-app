@@ -35,6 +35,23 @@ describe('architecture parity with published checkpoint configs', () => {
     },
   );
 
+  it.each([Model.GptOss])(
+    '%s shows clipping, scaled gating and the linear bias in modified SwiGLU',
+    (model) => {
+      const flow = getFFNSubBlocks(getModelArchitecture(model)!);
+      if (flow.layout !== 'parallel') throw new Error('Expected parallel paths');
+      expect(flow.leftPath.map(({ name }) => name)).toEqual([
+        'Gate Projection',
+        'Clamp',
+        'Scaled SiLU',
+      ]);
+      expect(flow.leftPath[1].detail).toBe('max = 7');
+      expect(flow.leftPath[2].detail).toBe('α = 1.702');
+      expect(flow.rightPath.map(({ name }) => name)).toEqual(['Up Projection', 'Clamp', '+1']);
+      expect(flow.rightPath[1].detail).toBe('±7');
+    },
+  );
+
   it.each([Model.DeepSeek_V4_Pro])(
     '%s clamps both projections before ordinary SiLU without the gpt-oss offset',
     (model) => {

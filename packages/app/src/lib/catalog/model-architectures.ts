@@ -192,8 +192,11 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
   [Model.GptOss]: {
     model: Model.GptOss,
-    totalParams: 120,
-    activeParams: 5,
+    totalParams: 116.83,
+    activeParams: 5.13,
+    ffnVariant: 'SwiGLU-OAI',
+    ffnSwiGLUOAI: true,
+    ffnClamp: 7,
     architectureType: 'moe',
     attentionType: 'AlternatingSinkGQA',
     numLayers: 36,
@@ -209,14 +212,14 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     alternatingLayers: [
       {
         label: 'Sliding Attention + Sink',
-        description: 'GQA with 128-token sliding window and learnable attention sink tokens',
+        description: 'GQA with 128-token sliding window and a learned per-head attention sink bias',
         count: 18,
         colorKey: 'attention',
         slidingWindow: 128,
       },
       {
-        label: 'Causal Grouped Query Attention',
-        description: 'Standard GQA with full causal masking over entire context',
+        label: 'Causal GQA + Sink',
+        description: 'Full causal GQA with a learned per-head softmax sink bias',
         count: 18,
         colorKey: 'norm',
       },
@@ -225,9 +228,15 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 131072,
     features: [
       'Alternating Sliding/Full Attention',
-      'Attention Sink Tokens',
+      'Learned per-head softmax sink',
       'YaRN RoPE (factor=32)',
       'MXFP4 Quantization',
+    ],
+    featuresZh: [
+      '交替使用滑动窗口与全局注意力',
+      '每个 head 的可学习 softmax sink',
+      'YaRN RoPE（factor=32）',
+      'MXFP4 量化',
     ],
     developer: 'OpenAI',
     sourceUrl: 'https://huggingface.co/openai/gpt-oss-120b',

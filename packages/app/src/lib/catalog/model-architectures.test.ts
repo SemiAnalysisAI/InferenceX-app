@@ -451,8 +451,8 @@ describe('getModelArchitecture', () => {
   it('returns architecture for gpt-oss 120B with MoE, alternating attention, and sink tokens', () => {
     const arch = getModelArchitecture(Model.GptOss);
     expect(arch).toBeDefined();
-    expect(arch?.totalParams).toBe(120);
-    expect(arch?.activeParams).toBe(5);
+    expect(arch?.totalParams).toBe(116.83);
+    expect(arch?.activeParams).toBe(5.13);
     expect(arch?.architectureType).toBe('moe');
     expect(arch?.attentionType).toBe('AlternatingSinkGQA');
     expect(arch?.numLayers).toBe(36);
@@ -483,9 +483,10 @@ describe('getModelArchitecture', () => {
     expect(sliding.description).toContain('attention sink');
     expect(sliding.slidingWindow).toBe(128);
 
-    expect(full.label).toBe('Causal Grouped Query Attention');
+    expect(full.label).toBe('Causal GQA + Sink');
     expect(full.count).toBe(18);
-    expect(full.description).toContain('full causal masking');
+    expect(full.description).toContain('Full causal GQA');
+    expect(full.description).toContain('softmax sink');
     expect(full.slidingWindow).toBeUndefined();
   });
 
@@ -545,7 +546,7 @@ describe('getArchitectureSummary', () => {
 
   it('returns MoE summary for gpt-oss 120B', () => {
     const arch = getModelArchitecture(Model.GptOss);
-    expect(getArchitectureSummary(arch!)).toBe('MoE 120B (5B active)');
+    expect(getArchitectureSummary(arch!)).toBe('MoE 116.83B (5.13B active)');
   });
 
   it('returns MoE summary for Kimi K2.5 with trillion-scale params', () => {
