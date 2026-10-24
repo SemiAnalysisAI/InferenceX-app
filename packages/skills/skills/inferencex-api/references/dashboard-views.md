@@ -376,13 +376,15 @@ Where the power goes tabs select existing `metric` values; the chip comparison a
 per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). Chips with measured
 GPU power but no supported system model are named as not shown, not dropped silently.
 On that tab, comparing GPU only with Whole system draws `gpu-measured` and
-`utility-modeled` only; Advanced settings → Compare → All four boundaries adds the two
-provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
+`utility-modeled` only, and the legend, line labels, tooltips and table call those two
+boundaries GPU only and Whole system; the page has no further control layer. Scope and
+Power statistic stay on the Power draw and Energy per token tabs. A share link with
+`i_pcompare=all` adds the two provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
 measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` with the same
 filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
 芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
-“仅 GPU + 整机”对比只绘制 `gpu-measured` 与 `utility-modeled`；高级设置 → 对比 → 全部四个边界会加入两个额定边界。
+“仅 GPU + 整体系统”对比只绘制 `gpu-measured` 与 `utility-modeled`，图例、曲线标签、提示框与表格也沿用“仅 GPU / 整体系统”这一叫法；页面不再有第二层控件。统计范围与功耗统计量保留在“功耗”和“每 Token 能耗”标签页。分享链接带 `i_pcompare=all` 时会加入两个额定边界。
 Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.

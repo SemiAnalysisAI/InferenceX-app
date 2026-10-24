@@ -11,6 +11,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS, type PowerBasis } from '@/lib/power/power-basis';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -97,21 +98,37 @@ const STRINGS = {
   },
 } as const;
 
+/** The controls this component can render; `fields` picks a subset (PowerX shows Scope and Power statistic). */
+export type MeasuredMetricField =
+  | 'basis'
+  | 'denominator'
+  | 'scope'
+  | 'statistic'
+  | 'display'
+  | 'unit'
+  | 'compare';
+
 export function MeasuredMetricControls({
   metric,
   onChange,
   compare = 'none',
   onCompareChange,
+  fields,
+  className,
 }: {
   metric: string;
   onChange: (metric: string) => void;
   compare?: PowerCompare;
   onCompareChange?: (mode: PowerCompare) => void;
+  /** Controls to render; all of them when omitted. */
+  fields?: readonly MeasuredMetricField[];
+  className?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
+  const show = (field: MeasuredMetricField) => fields === undefined || fields.includes(field);
   const compareLabels: Record<PowerCompare, string> = {
     none: t.compareNone,
     boundaries: t.compareBoundaries,
@@ -133,40 +150,45 @@ export function MeasuredMetricControls({
 
   return (
     <div
-      className="col-span-full grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3"
+      className={cn(
+        'col-span-full grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3',
+        className,
+      )}
       data-testid="measured-metric-controls"
     >
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <LabelWithTooltip
-          htmlFor={basisId}
-          label={t.basis}
-          tooltip={config.family === 'power' ? t.basisHelpPower : t.basisHelp}
-        />
-        <SearchableSelect
-          value={config.basis}
-          triggerId={basisId}
-          triggerTestId={basisId}
-          placeholder={t.basis}
-          searchable={false}
-          onValueChange={(value) => {
-            const basis = value as PowerBasis;
-            track('inference_power_basis_changed', { basis, family: config.family });
-            change({ basis });
-          }}
-          groups={[
-            {
-              label: '',
-              options: measuredMetricBases(config.family).map((basis) => ({
-                value: basis,
-                label: POWER_BASIS_LABELS[basis][locale],
-                help:
-                  basis === 'utility-modeled' ? <p>{ALL_IN_MEASURED_NOTE[locale]}</p> : undefined,
-              })),
-            },
-          ]}
-        />
-      </div>
-      {config.family === 'energy' && (
+      {show('basis') && (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor={basisId}
+            label={t.basis}
+            tooltip={config.family === 'power' ? t.basisHelpPower : t.basisHelp}
+          />
+          <SearchableSelect
+            value={config.basis}
+            triggerId={basisId}
+            triggerTestId={basisId}
+            placeholder={t.basis}
+            searchable={false}
+            onValueChange={(value) => {
+              const basis = value as PowerBasis;
+              track('inference_power_basis_changed', { basis, family: config.family });
+              change({ basis });
+            }}
+            groups={[
+              {
+                label: '',
+                options: measuredMetricBases(config.family).map((basis) => ({
+                  value: basis,
+                  label: POWER_BASIS_LABELS[basis][locale],
+                  help:
+                    basis === 'utility-modeled' ? <p>{ALL_IN_MEASURED_NOTE[locale]}</p> : undefined,
+                })),
+              },
+            ]}
+          />
+        </div>
+      )}
+      {config.family === 'energy' && show('denominator') && (
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip
             htmlFor="measured-energy-denominator"
@@ -196,98 +218,104 @@ export function MeasuredMetricControls({
           </Select>
         </div>
       )}
-      <div className="flex min-w-0 flex-col gap-1.5">
-        <LabelWithTooltip htmlFor={scopeId} label={t.scope} tooltip={t.scopeHelp} />
-        <Select
-          value={config.scope}
-          disabled={config.family === 'energy' && !roleScope}
-          onValueChange={(scope) => change({ scope: scope as typeof config.scope })}
-        >
-          <SelectTrigger id={scopeId} data-testid={scopeId} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent portalled={false}>
-            <SelectItem value="all" data-value="all">
-              {t.all}
-            </SelectItem>
-            {(config.family === 'power' || roleScope === 'prefill') && (
-              <SelectItem value="prefill" data-value="prefill">
-                {t.prefill}
+      {show('scope') && (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <LabelWithTooltip htmlFor={scopeId} label={t.scope} tooltip={t.scopeHelp} />
+          <Select
+            value={config.scope}
+            disabled={config.family === 'energy' && !roleScope}
+            onValueChange={(scope) => change({ scope: scope as typeof config.scope })}
+          >
+            <SelectTrigger id={scopeId} data-testid={scopeId} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalled={false}>
+              <SelectItem value="all" data-value="all">
+                {t.all}
               </SelectItem>
-            )}
-            {(config.family === 'power' || roleScope === 'decode') && (
-              <SelectItem value="decode" data-value="decode">
-                {t.decode}
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
-      </div>
+              {(config.family === 'power' || roleScope === 'prefill') && (
+                <SelectItem value="prefill" data-value="prefill">
+                  {t.prefill}
+                </SelectItem>
+              )}
+              {(config.family === 'power' || roleScope === 'decode') && (
+                <SelectItem value="decode" data-value="decode">
+                  {t.decode}
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {config.family === 'power' ? (
         <>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <LabelWithTooltip label={t.statistic} tooltip={t.statisticHelp} />
-            <SegmentedToggle
-              role="group"
-              size="default"
-              className="w-full"
-              buttonClassName="min-w-max flex-auto justify-center"
-              ariaLabel={t.statistic}
-              value={config.statistic}
-              onValueChange={(statistic) => change({ statistic })}
-              options={(
-                [
-                  { value: 'average', label: t.average },
-                  { value: 'p75', label: 'P75' },
-                  { value: 'p90', label: 'P90' },
-                ] as const
-              ).map((option) => ({
-                ...option,
-                testId: `measured-power-statistic-${option.value}`,
-                disabled: config.scope !== 'all' && option.value !== 'average',
-              }))}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <LabelWithTooltip
-              htmlFor="measured-power-display"
-              label={t.display}
-              tooltip={t.displayHelp}
-            />
-            <Select
-              value={config.display}
-              onValueChange={(display) => change({ display: display as typeof config.display })}
-            >
-              <SelectTrigger
-                id="measured-power-display"
-                data-testid="measured-power-display"
+          {show('statistic') && (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <LabelWithTooltip label={t.statistic} tooltip={t.statisticHelp} />
+              <SegmentedToggle
+                role="group"
+                size="default"
                 className="w-full"
+                buttonClassName="min-w-max flex-auto justify-center"
+                ariaLabel={t.statistic}
+                value={config.statistic}
+                onValueChange={(statistic) => change({ statistic })}
+                options={(
+                  [
+                    { value: 'average', label: t.average },
+                    { value: 'p75', label: 'P75' },
+                    { value: 'p90', label: 'P90' },
+                  ] as const
+                ).map((option) => ({
+                  ...option,
+                  testId: `measured-power-statistic-${option.value}`,
+                  disabled: config.scope !== 'all' && option.value !== 'average',
+                }))}
+              />
+            </div>
+          )}
+          {show('display') && (
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <LabelWithTooltip
+                htmlFor="measured-power-display"
+                label={t.display}
+                tooltip={t.displayHelp}
+              />
+              <Select
+                value={config.display}
+                onValueChange={(display) => change({ display: display as typeof config.display })}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent portalled={false}>
-                <SelectItem value="watts" data-value="watts">
-                  W/chip
-                </SelectItem>
-                <SelectItem
-                  value="tdp"
-                  data-value="tdp"
-                  disabled={config.scope !== 'all' || config.statistic !== 'average'}
+                <SelectTrigger
+                  id="measured-power-display"
+                  data-testid="measured-power-display"
+                  className="w-full"
                 >
-                  % TDP
-                </SelectItem>
-                <SelectItem
-                  value="timeline"
-                  data-value="timeline"
-                  disabled={config.scope !== 'all' || config.statistic !== 'average'}
-                >
-                  {t.timeline}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent portalled={false}>
+                  <SelectItem value="watts" data-value="watts">
+                    W/chip
+                  </SelectItem>
+                  <SelectItem
+                    value="tdp"
+                    data-value="tdp"
+                    disabled={config.scope !== 'all' || config.statistic !== 'average'}
+                  >
+                    % TDP
+                  </SelectItem>
+                  <SelectItem
+                    value="timeline"
+                    data-value="timeline"
+                    disabled={config.scope !== 'all' || config.statistic !== 'average'}
+                  >
+                    {t.timeline}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </>
-      ) : config.denominator === 'query' ? (
+      ) : config.denominator === 'query' && show('unit') ? (
         // Only per-request energy has a unit choice; a locked single-option control is noise.
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip htmlFor="measured-energy-unit" label={t.unit} tooltip={t.unitHelp} />
@@ -313,7 +341,7 @@ export function MeasuredMetricControls({
           </Select>
         </div>
       ) : null}
-      {onCompareChange && (
+      {onCompareChange && show('compare') && (
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip
             htmlFor="measured-power-compare"

@@ -24,8 +24,7 @@ import { usePowerXCompareTarget, useSetPowerXCompareTarget } from './powerx-surf
 const STRINGS = {
   en: {
     title: 'Compare chips at one interactivity',
-    subtitle:
-      'Each bar is one chip’s benchmark point closest to the interactivity you pick, split into what the meter counts. Drag the slider, click a bar below, or hover a point on the line chart to move it. Click a chip to see how its power builds up across load.',
+    subtitle: 'Each bar is one chip’s point nearest the chosen interactivity.',
     target: 'Interactivity',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -48,8 +47,7 @@ const STRINGS = {
   },
   zh: {
     title: '在同一交互性下对比芯片',
-    subtitle:
-      '每条横条为该芯片最接近所选交互性的基准测试点，并拆分为电表计量的各部分。拖动滑块、点击下方柱条或悬停在折线图的点上即可移动。点击芯片查看其功耗随负载的构成变化。',
+    subtitle: '每条横条为该芯片最接近所选交互性的基准测试点。',
     target: '交互性',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -227,7 +225,7 @@ export default function PowerChipCompare({
                           <span
                             key={key}
                             title={`${t.categories[key]}: ${watts(w)} W`}
-                            className="flex h-full items-center justify-center border-r border-background/70 text-[11px] font-medium tabular-nums text-foreground last:border-r-0"
+                            className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
                               ...swatchStyle(key, color),

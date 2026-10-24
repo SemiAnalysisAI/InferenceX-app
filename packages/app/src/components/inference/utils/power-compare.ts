@@ -2,8 +2,9 @@ import type { Locale } from '@/lib/i18n/i18n';
 import {
   POWER_BASES,
   POWER_BASIS_FIELDS,
-  POWER_BASIS_LABELS,
+  powerBasisLabel,
   type PowerBasis,
+  type PowerBasisLabelStyle,
 } from '@/lib/power/power-basis';
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
@@ -190,22 +191,24 @@ export function powerVariantDash(variant: PowerVariant | null | undefined): stri
   return variant ? VARIANT_DASH[variant.id] : '';
 }
 
-export function powerVariantLabel(variant: PowerVariant, locale: Locale): string {
+export function powerVariantLabel(
+  variant: PowerVariant,
+  locale: Locale,
+  style: PowerBasisLabelStyle = 'basis',
+): string {
   return variant.kind === 'basis'
-    ? POWER_BASIS_LABELS[variant.id][locale]
+    ? powerBasisLabel(variant.id, locale, style)
     : ROLE_LABELS[variant.id][locale];
 }
 
-// Same names as the Boundary control and legend; only the TDP boundary is abbreviated.
-const BASIS_SHORT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
-  ...POWER_BASIS_LABELS,
-  'gpu-provisioned': { en: 'TDP', zh: 'TDP' },
-};
-
-export function powerVariantShortLabel(variant: PowerVariant, locale: Locale): string {
-  return variant.kind === 'basis'
-    ? BASIS_SHORT_LABELS[variant.id][locale]
-    : ROLE_LABELS[variant.id][locale];
+// Same names as the boundary control and legend; only the TDP boundary is abbreviated.
+export function powerVariantShortLabel(
+  variant: PowerVariant,
+  locale: Locale,
+  style: PowerBasisLabelStyle = 'basis',
+): string {
+  if (variant.kind === 'basis' && variant.id === 'gpu-provisioned') return 'TDP';
+  return powerVariantLabel(variant, locale, style);
 }
 
 export function formatWatts(watts: number): string {
@@ -227,6 +230,7 @@ export interface PowerLineLabelOptions {
   isBase: boolean;
   locale: Locale;
   flatWatts?: number | null;
+  labelStyle?: PowerBasisLabelStyle;
 }
 
 const LINE_LABEL_SUFFIX_SEPARATOR = ' · ';
@@ -240,7 +244,7 @@ export function powerLineLabelSuffix(
     typeof opts.flatWatts === 'number' && Number.isFinite(opts.flatWatts)
       ? ` ${formatWatts(opts.flatWatts)}`
       : '';
-  return `${LINE_LABEL_SUFFIX_SEPARATOR}${powerVariantShortLabel(variant, opts.locale)}${watts}`;
+  return `${LINE_LABEL_SUFFIX_SEPARATOR}${powerVariantShortLabel(variant, opts.locale, opts.labelStyle)}${watts}`;
 }
 
 const LINE_LABEL_SERIES_DELIMITER = '::';
@@ -268,7 +272,8 @@ export function powerSeriesLabel(
   metric: string,
   mode: PowerCompare,
   locale: Locale,
+  style: PowerBasisLabelStyle = 'basis',
 ): string {
   const variant = point.powerVariant ?? powerCompareBase(metric, mode);
-  return variant ? powerVariantLabel(variant, locale) : '';
+  return variant ? powerVariantLabel(variant, locale, style) : '';
 }

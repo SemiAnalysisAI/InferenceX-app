@@ -137,8 +137,7 @@ const STRINGS = {
     inferencePerformanceDesc:
       'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
     powerXTitle: 'PowerX',
-    powerXDesc:
-      'Measured chip power and energy per token for every benchmark point. GPU power is measured; the rest of the server and the facility are modeled.',
+    powerXDesc: 'Measured chip power and energy per token for every benchmark point.',
     chart: 'Chart',
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
@@ -178,8 +177,7 @@ const STRINGS = {
     inferencePerformanceDesc:
       '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
     powerXTitle: 'PowerX 功耗',
-    powerXDesc:
-      '每个基准测试点的实测芯片功耗与每 Token 能耗。GPU 功耗为实测，服务器其他组件与数据中心为模型估算。',
+    powerXDesc: '每个基准测试点的实测芯片功耗与每 Token 能耗。',
     chart: '图表',
     table: '表格',
     sourceUnofficial: '来源：非官方',
@@ -1463,7 +1461,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       onChange={setSelectedYAxisMetric}
                       compare={powerCompare}
                       onCompareChange={setPowerCompare}
-                      layout="page"
                       rolesHaveData={rolesHaveData}
                     />
                   )}

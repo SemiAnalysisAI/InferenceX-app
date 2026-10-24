@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
-
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { POWER_COUNT_LABELS } from '@/lib/power/power-basis';
 import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { PowerCompare } from '../types';
 import { powerCompareAvailable } from '../utils/power-compare';
-import { MeasuredMetricControls } from './MeasuredMetricControls';
+import { MeasuredMetricControls, type MeasuredMetricField } from './MeasuredMetricControls';
 
 /** The four questions PowerX answers; each maps onto existing metric + compare state. */
 export type PowerXTab = 'draw' | 'energy' | 'time' | 'where';
+const TABS = ['draw', 'energy', 'time', 'where'] as const satisfies readonly PowerXTab[];
 type Boundary = 'gpu' | 'system';
 type EnergyCount = Boundary | 'both';
 /** What one unit of energy is charged to on the Energy tab. */
@@ -41,12 +41,6 @@ const STRINGS = {
       time: 'Over time',
       where: 'Where the power goes',
     },
-    questions: {
-      draw: 'How many watts does each chip draw at a given interactivity?',
-      energy: 'How much energy does each token or query cost?',
-      time: 'How does chip power move during a benchmark run?',
-      where: 'How much do the GPU, the rest of the server and the facility each add?',
-    },
     hints: {
       draw: 'Watts per chip vs interactivity',
       energy: 'Joules per token, Wh per query',
@@ -54,20 +48,11 @@ const STRINGS = {
       where: 'GPU, server and facility',
     },
     boundaryLabel: 'Count',
-    gpu: 'GPU only',
-    system: 'Whole system',
     systemHelp: 'GPU measured, rest of server and PUE modeled',
     both: 'Both',
     bothHelp: 'GPU only and whole system on one chart',
     perLabel: 'Per',
     per: { output: 'Output token', input: 'Input token', total: 'All tokens', query: 'Query' },
-    read: {
-      draw: 'Each line is one chip. Right means faster for each user; lower means less power.',
-      energy: 'Lower is better: less energy for the same work. Right means faster for each user.',
-      time: 'One line per chip through a run at one concurrency. Pick a chip under Highlight to fade the others; the table below gives the validated averages.',
-      where:
-        'Pick an interactivity, compare the stacks, then click a chip to see it across load. Solid is measured, hatched is modeled.',
-    },
     systemOutputOnly: 'Whole system is modeled per output token only',
     unitLabel: 'Show as',
     watts: 'W per chip',
@@ -77,7 +62,6 @@ const STRINGS = {
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
-    advanced: 'Advanced settings',
   },
   zh: {
     tabsLabel: 'PowerX 问题',
@@ -87,12 +71,6 @@ const STRINGS = {
       time: '随时间变化',
       where: '功耗去向',
     },
-    questions: {
-      draw: '在给定交互性下，每颗芯片消耗多少瓦？',
-      energy: '每个 Token 或每次查询消耗多少能量？',
-      time: '基准测试运行期间芯片功耗如何变化？',
-      where: 'GPU、服务器其他组件和数据中心各自增加多少功耗？',
-    },
     hints: {
       draw: '每芯片瓦数 vs 交互性',
       energy: '每 Token 焦耳数，每次查询 Wh',
@@ -100,8 +78,6 @@ const STRINGS = {
       where: 'GPU、服务器与数据中心',
     },
     boundaryLabel: '统计范围',
-    gpu: '仅 GPU',
-    system: '整体系统',
     systemHelp: 'GPU 为实测，服务器其他组件与 PUE 为模型估算',
     both: '两者对比',
     bothHelp: '在同一图中对比仅 GPU 与整体系统',
@@ -112,13 +88,6 @@ const STRINGS = {
       total: '全部 Token',
       query: '每次查询',
     },
-    read: {
-      draw: '每条线代表一款芯片。越靠右，每个用户越快；越靠下，功耗越低。',
-      energy: '越低越好：完成同样工作消耗的能量更少。越靠右，每个用户越快。',
-      time: '每款芯片一条线，显示某个并发下整个运行期间的功耗。在“突出显示”中选择芯片可淡化其他曲线；下方表格给出验证窗口内的平均值。',
-      where:
-        '先选交互性，比较各芯片的堆叠，再点击某款芯片查看其随负载的变化。实心为实测，斜线为模型估算。',
-    },
     systemOutputOnly: '整体系统仅按输出 Token 建模',
     unitLabel: '显示为',
     watts: '每芯片 W',
@@ -128,7 +97,6 @@ const STRINGS = {
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
-    advanced: '高级设置',
   },
 } as const;
 
@@ -150,6 +118,29 @@ export function powerXTabFor(metric: string, compare: PowerCompare): PowerXTab |
   return config.display === 'timeline' ? 'time' : 'draw';
 }
 
+/**
+ * Which of the legacy measured-metric controls still mean something on a tab:
+ * Scope (All / Prefill / Decode GPUs) for GPU-only power and for per-token
+ * energy, plus the Power statistic (Average / P75 / P90) for power. Timelines,
+ * comparisons and the modeled whole system are defined for the all-GPU average only.
+ */
+export function powerXMetricFields(
+  metric: string,
+  compare: PowerCompare,
+): readonly MeasuredMetricField[] {
+  const config = getMeasuredMetricConfig(metric);
+  const tab = powerXTabFor(metric, compare);
+  if (!config || !tab || compare !== 'none' || config.basis !== 'gpu-measured') return [];
+  if (tab === 'draw') return ['scope', 'statistic'];
+  if (
+    config.family === 'energy' &&
+    tab === 'energy' &&
+    (config.denominator === 'input' || config.denominator === 'output')
+  )
+    return ['scope'];
+  return [];
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col items-start gap-1.5">
@@ -164,15 +155,12 @@ export function PowerXTabs({
   onChange,
   compare,
   onCompareChange,
-  layout = 'inline',
   rolesHaveData,
 }: {
   metric: string;
   onChange: (metric: string) => void;
   compare: PowerCompare;
   onCompareChange: (mode: PowerCompare) => void;
-  /** `page` renders the questions as the PowerX tab's primary sub-navigation. */
-  layout?: 'inline' | 'page';
   /** False when the loaded results carry no prefill/decode telemetry; undefined while unknown. */
   rolesHaveData?: boolean;
 }) {
@@ -180,7 +168,6 @@ export function PowerXTabs({
   const t = STRINGS[locale];
   const config = getMeasuredMetricConfig(metric);
   const tab = powerXTabFor(metric, compare);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   if (!config || !tab) return null;
 
   const boundary: Boundary = config.basis === 'gpu-measured' ? 'gpu' : 'system';
@@ -223,65 +210,26 @@ export function PowerXTabs({
   const rolesSupported = powerCompareAvailable('y_measuredAvgPower', 'roles');
   const rolesAvailable = rolesSupported && rolesHaveData !== false;
   const rolesReason = rolesSupported ? t.rolesNoData : t.rolesUnavailable;
+  const metricFields = powerXMetricFields(metric, compare);
 
   return (
     <div className="col-span-full flex min-w-0 flex-col gap-3" data-testid="powerx-tabs">
-      {layout === 'page' ? (
-        <div
-          role="tablist"
-          aria-label={t.tabsLabel}
-          className="grid grid-cols-2 gap-2 sm:grid-cols-4"
-        >
-          {(['draw', 'energy', 'time', 'where'] as const).map((value) => {
-            const active = value === tab;
-            return (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                data-testid={`powerx-tab-${value}`}
-                onClick={() => selectTab(value)}
-                className={`flex min-w-0 flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                  active
-                    ? 'border-secondary bg-secondary/10 dark:border-primary dark:bg-primary/10'
-                    : 'border-border hover:border-muted-foreground/40 hover:bg-muted/40'
-                }`}
-              >
-                <span
-                  className={`text-sm font-semibold ${active ? 'text-secondary dark:text-primary' : 'text-foreground'}`}
-                >
-                  {t.tabs[value]}
-                </span>
-                <span className="text-xs text-muted-foreground">{t.hints[value]}</span>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <SegmentedToggle<PowerXTab>
-          value={tab}
-          onValueChange={selectTab}
-          ariaLabel={t.tabsLabel}
-          size="default"
-          className="w-full overflow-x-auto"
-          buttonClassName="flex-1 justify-center whitespace-nowrap px-3"
-          activeButtonClassName="bg-background text-foreground shadow-sm"
-          options={(['draw', 'energy', 'time', 'where'] as const).map((value) => ({
-            value,
-            label: t.tabs[value],
-            testId: `powerx-tab-${value}`,
-          }))}
-        />
-      )}
-      <div className="flex min-w-0 flex-col gap-1">
-        <p className="text-sm font-medium text-foreground" data-testid="powerx-question">
-          {t.questions[tab]}
-        </p>
-        <p className="text-xs text-muted-foreground" data-testid="powerx-read">
-          {t.read[tab]}
-        </p>
-      </div>
+      <SegmentedToggle<PowerXTab>
+        value={tab}
+        onValueChange={selectTab}
+        ariaLabel={t.tabsLabel}
+        size="default"
+        className="w-full"
+        // Two per row on phones, one row from sm up; the hint lives in the title.
+        buttonClassName="flex-1 basis-[calc(50%-0.125rem)] justify-center whitespace-nowrap px-3 sm:basis-auto"
+        activeButtonClassName="bg-background text-foreground shadow-sm"
+        options={TABS.map((value) => ({
+          value,
+          label: t.tabs[value],
+          title: t.hints[value],
+          testId: `powerx-tab-${value}`,
+        }))}
+      />
 
       {(tab === 'draw' || tab === 'energy') && (
         <div className="flex flex-wrap items-end gap-4">
@@ -293,10 +241,10 @@ export function PowerXTabs({
               role="group"
               testId="powerx-boundary"
               options={[
-                { value: 'gpu', label: t.gpu },
+                { value: 'gpu', label: POWER_COUNT_LABELS['gpu-measured'][locale] },
                 {
                   value: 'system',
-                  label: t.system,
+                  label: POWER_COUNT_LABELS['utility-modeled'][locale],
                   title:
                     tab === 'energy' && energyPer !== 'output' ? t.systemOutputOnly : t.systemHelp,
                   disabled: tab === 'energy' && energyPer !== 'output',
@@ -378,26 +326,18 @@ export function PowerXTabs({
         </Field>
       )}
 
-      <details
-        className="group min-w-0"
-        open={advancedOpen}
-        onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
-        data-testid="powerx-advanced"
-      >
-        <summary className="cursor-pointer select-none text-sm text-muted-foreground hover:text-foreground">
-          {t.advanced}
-        </summary>
-        {advancedOpen && (
-          <div className="mt-3">
-            <MeasuredMetricControls
-              metric={metric}
-              onChange={onChange}
-              compare={compare}
-              onCompareChange={onCompareChange}
-            />
-          </div>
-        )}
-      </details>
+      {metricFields.length > 0 && (
+        <MeasuredMetricControls
+          metric={metric}
+          onChange={onChange}
+          fields={metricFields}
+          className={
+            metricFields.length > 1
+              ? 'max-w-xl grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))]'
+              : 'max-w-xs'
+          }
+        />
+      )}
     </div>
   );
 }

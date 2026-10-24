@@ -49,8 +49,7 @@ export type PowerBreakdownView = 'bars' | 'area';
 const STRINGS = {
   en: {
     title: 'System power breakdown per GPU',
-    subtitle:
-      'Each point’s All in Measured W/GPU split into what the meter counts. Measured parts come from telemetry; the rest is modeled at that point’s measured GPU power.',
+    subtitle: 'Each point’s whole-system power per GPU, split by what the meter counts.',
     source: 'Hardware',
     view: 'Breakdown view',
     bars: 'Stacked bars',
@@ -81,8 +80,7 @@ const STRINGS = {
   },
   zh: {
     title: '每 GPU 系统功耗构成',
-    subtitle:
-      '将每个点的 All in Measured W/GPU 拆分为电表实际计量的各部分。实测部分来自遥测数据，其余部分按该点实测 GPU 功耗建模。',
+    subtitle: '每个点按每 GPU 计的整体系统功耗，拆分为电表计量的各部分。',
     source: '硬件',
     view: '构成视图',
     bars: '堆叠柱状图',
@@ -231,9 +229,12 @@ function tooltipHtml(
       return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${isHatched(key) ? 'transparent' : color};opacity:${isHatched(key) ? 1 : CATEGORY_OPACITY[key]};border:1px ${isHatched(key) ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
     })
     .join('');
+  // The model revision and the rated-reference caveat live here rather than
+  // under the chart, so the panel reads as data first.
   const notes = [
     entry.chassisBasis === 'extrapolated' ? t.extrapolated : null,
     entry.cpuBasis === 'modeled' ? t.graceModeled : null,
+    t.note(SYSTEM_POWER_MODEL_REVISION.slice(0, 7)),
   ]
     .filter(Boolean)
     .map((note) => `<div class="mt-1 max-w-64 text-muted-foreground">${escapeHtml(note!)}</div>`)
@@ -908,9 +909,6 @@ export default function PowerBreakdownPanel({
               setCompareTarget ? (entry) => setCompareTarget(entry.interactivity) : undefined
             }
           />
-          <p className="text-xs text-muted-foreground">
-            {t.note(SYSTEM_POWER_MODEL_REVISION.slice(0, 7))}
-          </p>
           <div className="max-h-0 overflow-hidden">
             <div id={`${sectionId}-export`} className="p-4" />
           </div>

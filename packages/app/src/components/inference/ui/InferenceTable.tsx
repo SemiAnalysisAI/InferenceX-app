@@ -17,6 +17,7 @@ import { getDisplayLabel } from '@/lib/shared/utils';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 
 interface InferenceTableProps {
   data: InferenceData[];
@@ -61,6 +62,8 @@ export default function InferenceTable({
   selectedYAxisMetric,
 }: InferenceTableProps) {
   const locale = useLocale();
+  // PowerX names the measured boundaries the way its Count control does.
+  const seriesLabelStyle = usePowerXSurface() ? 'count' : 'basis';
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const showAllInMeasured = isAllInMeasuredConfigKey(selectedYAxisMetric);
   const headers = useMemo(
@@ -98,9 +101,9 @@ export default function InferenceTable({
             {
               header: headers.series,
               cell: (row: InferenceData) =>
-                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale, seriesLabelStyle),
               sortValue: (row: InferenceData) =>
-                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale, seriesLabelStyle),
               className: 'whitespace-nowrap',
               importance: 'key' as const,
             },
@@ -182,7 +185,15 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers, showAllInMeasured, powerCompare, selectedYAxisMetric, locale],
+    [
+      yPath,
+      headers,
+      showAllInMeasured,
+      powerCompare,
+      selectedYAxisMetric,
+      locale,
+      seriesLabelStyle,
+    ],
   );
 
   return (

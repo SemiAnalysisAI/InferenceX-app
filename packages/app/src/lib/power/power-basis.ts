@@ -16,6 +16,28 @@ export const POWER_BASIS_LABELS: Record<PowerBasis, { en: string; zh: string }> 
   'utility-modeled': { en: 'All in Measured', zh: '整体实测功耗' },
 };
 
+/**
+ * What the PowerX Count control calls the two measured boundaries. The PowerX
+ * legend, line labels, tooltips and table reuse these so one screen names a
+ * boundary one way; the rated bounds keep their registry names.
+ */
+export const POWER_COUNT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
+  ...POWER_BASIS_LABELS,
+  'gpu-measured': { en: 'GPU only', zh: '仅 GPU' },
+  'utility-modeled': { en: 'Whole system', zh: '整体系统' },
+};
+
+/** `basis` is the registry vocabulary; `count` is the PowerX Count vocabulary. */
+export type PowerBasisLabelStyle = 'basis' | 'count';
+
+export function powerBasisLabel(
+  basis: PowerBasis,
+  locale: 'en' | 'zh',
+  style: PowerBasisLabelStyle = 'basis',
+): string {
+  return (style === 'count' ? POWER_COUNT_LABELS : POWER_BASIS_LABELS)[basis][locale];
+}
+
 export const ALL_IN_MEASURED_NOTE = {
   en: 'GPU power is measured; unmeasured components are modeled, with PUE included.',
   zh: 'GPU 功耗来自实测；未实测的组件功耗由模型估算，并计入数据中心 PUE。',
