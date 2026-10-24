@@ -1239,8 +1239,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/workflow-info',
     summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
-      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
+      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage for one date. date is required.',
+      '返回指定日期的工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。date 为必填参数。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1248,10 +1248,10 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'date',
         'query',
-        false,
+        true,
         'date',
-        'Optional YYYY-MM-DD filter.',
-        '可选的 YYYY-MM-DD 筛选条件。',
+        'Required YYYY-MM-DD date.',
+        '必填的 YYYY-MM-DD 日期。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1291,8 +1291,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'date is not YYYY-MM-DD.',
-        'date 不是 YYYY-MM-DD。',
+        'date is missing or not YYYY-MM-DD.',
+        '缺少 date，或 date 不是 YYYY-MM-DD。',
         PUBLIC_API_ERRORS.invalidDate,
       ),
       errorResponse(
