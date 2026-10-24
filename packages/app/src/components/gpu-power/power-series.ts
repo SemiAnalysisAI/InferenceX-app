@@ -3,8 +3,20 @@ import type { GpuPowerSeries } from '@semianalysisai/inferencex-db/power-series/
 import type { GpuPowerRunInfo } from './types';
 
 // The bucketing transform lives in the db package so ingest can precompute the
-// same series the app serves from live artifacts.
-export * from '@semianalysisai/inferencex-db/power-series/power-series';
+// same series the app serves from live artifacts. Named re-exports: Next.js
+// rejects `export *` in client modules.
+
+export {
+  bucketPowerFiles,
+  bucketPowerSeries,
+  bucketTimeMs,
+  meanPowerAt,
+  parseTelemetryTimestampUtc,
+  sumPowerAt,
+  type GpuPowerDevice,
+  type GpuPowerRole,
+  type GpuPowerSeries,
+} from '@semianalysisai/inferencex-db/power-series/power-series';
 
 export interface GpuPowerSeriesResponse {
   source?: 'database' | 'github';
