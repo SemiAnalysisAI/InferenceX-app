@@ -458,6 +458,19 @@ coverage applies; no additional endpoint or OpenAPI change is needed.
 `/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
 API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
 
+### Landing-page MiniMax M3.1 Flash link
+
+The English and Chinese landing pages link MiniMax M3.1 Flash to
+`/inference/minimax-m31-flash` and `/zh/inference/minimax-m31-flash`. This
+featured row is presentation-only navigation to an existing AgentX model view.
+It changes no data selectors, defaults, calculations, or API contracts; use the
+existing inference view API for its results.
+
+中文：英文和中文首页的 MiniMax M3.1 Flash 入口分别链接至
+`/inference/minimax-m31-flash` 和 `/zh/inference/minimax-m31-flash`。这条推荐入口仅用于
+导航至现有 AgentX 模型页面，不改变数据筛选条件、默认值、计算逻辑或 API 契约；结果仍由
+现有推理视图 API 提供。
+
 ### Cross-backend case alignment
 
 The comparison API and all charts align cases by the full serialized operation
