@@ -12,6 +12,7 @@
     "./migrate": "./src/migrate.ts",
     "./queries/*": "./src/queries/*.ts",
     "./operatorx/*": "./src/operatorx/*.ts",
+    "./power-series/*": "./src/power-series/*.ts",
     "./proxytrace/*": "./src/proxytrace/*.ts"
   },
   "scripts": {
@@ -29,6 +30,7 @@
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",
     "db:backfill-dataset-stats": "bun --env-file=../../.env src/backfill-dataset-stats.ts",
     "db:backfill-gpu-metrics": "bun --env-file=../../.env src/backfill-gpu-metrics.ts",
+    "db:backfill-power-series": "bun --env-file=../../.env src/backfill-power-series.ts",
     "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
     "db:backfill-request-timeline": "bun --env-file=../../.env src/backfill-request-timeline.ts",
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",

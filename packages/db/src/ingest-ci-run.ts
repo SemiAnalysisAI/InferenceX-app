@@ -22,6 +22,7 @@ import {
 } from './lib/github-artifacts';
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
+import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
   isRunAttemptPurged,
@@ -879,6 +880,19 @@ async function main(): Promise<void> {
       console.log(
         `  Trace replay: ${totalTraceReplayLinked} rows linked, ${tracker.skips.traceReplayMissing} agentic point(s) missing sibling artifact`,
       );
+    }
+
+    // After the point links exist: the series embed the linked points' power audits.
+    // Not fatal: without a current row the route buckets the samples per request.
+    try {
+      const powerSeries = await materializePowerSeriesForRun(sql, workflowRunId);
+      if (powerSeries.written.length + powerSeries.incomplete.length > 0) {
+        console.log(
+          `  PowerX series: ${powerSeries.written.length} artifact(s) precomputed, ${powerSeries.unchanged.length} unchanged, ${powerSeries.incomplete.length} incomplete`,
+        );
+      }
+    } catch (error) {
+      console.warn(`  PowerX series: precompute failed; readers fall back to samples:`, error);
     }
 
     if (availRows.length > 0) {

@@ -139,7 +139,8 @@ config is `display: 'timeline'`.
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
   downloaded. `/api/gpu-metrics?series=power` first uses persisted telemetry and returns one-second per-GPU buckets
   (`components/gpu-power/power-series.ts`, ~1 MB for a 25-config run instead of ~27 MB of
-  raw rows). Missing stored telemetry falls back to artifacts; database failures are explicit errors.
+  raw rows). Ingest precomputes those buckets per artifact (`gpu_power_series`), so stored runs
+  skip reading samples. Missing stored telemetry falls back to artifacts; database failures are explicit errors.
   See [PowerX telemetry storage](./data-pipeline.md#powerx-telemetry-storage-gpu_metric_-migration-016)
   for cache freshness, coverage and targeted repair.
   Runner timestamps are UTC wall clock and are parsed as such
