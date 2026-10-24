@@ -502,6 +502,7 @@ describe('Completed architecture catalog', () => {
     ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
     ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
+    ['glm-5-1', 'DSA: top-2048 tokens'],
   ]) {
     it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
       visitModelPage(slug);
