@@ -7,6 +7,9 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }
 vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: readStored,
 }));
+vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+  getPrecomputedPowerSeries: () => Promise.resolve(null),
+}));
 
 import { GET } from './route';
 

@@ -107,7 +107,8 @@ export interface GpuMetricsRunSelection {
 // 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
 export const SAMPLE_PAGE_SIZE = 50_000;
 
-interface RawSeriesRow {
+/** @internal Shared with `gpu-power-series.ts`. */
+export interface RawSeriesRow {
   id: number | string;
   artifact_name: string;
   file_name: string;
@@ -153,10 +154,12 @@ export class TelemetrySnapshotChangedError extends Error {
 
 const MAX_SNAPSHOT_ATTEMPTS = 3;
 
-const seriesVersionKey = (row: RawSeriesVersionRow): string =>
+/** @internal Changes whenever `upsertGpuMetricSeries` replaces the series. */
+export const seriesVersionKey = (row: RawSeriesVersionRow): string =>
   `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
 
-async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
+/** @internal */
+export async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await read();
@@ -189,8 +192,8 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   };
 }
 
-/** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
-async function readSeriesRows(
+/** @internal Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
+export async function readSeriesRows(
   sql: DbClient,
   scope:
     | {
@@ -238,7 +241,8 @@ async function readSeriesRows(
   `) as unknown as RawSeriesRow[];
 }
 
-async function loadSeriesDetails(
+/** @internal */
+export async function loadSeriesDetails(
   sql: DbClient,
   seriesRows: readonly RawSeriesRow[],
 ): Promise<GpuMetricSeries[]> {
@@ -329,26 +333,9 @@ async function loadSeriesDetails(
   });
 }
 
-/**
- * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
- * before reading samples. View selection also returns the full artifact-name inventory.
- * Returns null when the run is unknown or has no stored series, so callers can
- * fall back to the live GitHub artifacts for in-flight runs.
- */
-export function getGpuMetricsForRun(
-  sql: DbClient,
-  githubRunId: number,
-  selection: GpuMetricsRunSelection = {},
-): Promise<GpuMetricsRunPayload | null> {
-  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId, selection));
-}
-
-async function readGpuMetricsForRun(
-  sql: DbClient,
-  githubRunId: number,
-  selection: GpuMetricsRunSelection,
-): Promise<GpuMetricsRunPayload | null> {
-  const runRows = (await sql`
+/** @internal Latest attempt of a GitHub run, with whether it stores any telemetry. */
+export async function readLatestRun(sql: DbClient, githubRunId: number) {
+  const rows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
       conclusion, status, created_at,
       exists (select 1 from gpu_metric_series s where s.workflow_run_id = workflow_runs.id)
@@ -371,7 +358,48 @@ async function readGpuMetricsForRun(
     created_at: string | Date | null;
     has_series: boolean;
   }[];
-  const run = runRows[0];
+  return rows[0];
+}
+
+/** @internal */
+export function toWorkflowRun(
+  run: NonNullable<Awaited<ReturnType<typeof readLatestRun>>>,
+): GpuMetricsRunPayload['workflowRun'] {
+  return {
+    id: Number(run.id),
+    githubRunId: Number(run.github_run_id),
+    runAttempt: Number(run.run_attempt),
+    name: run.name,
+    date: isoString(run.date).slice(0, 10),
+    htmlUrl: run.html_url,
+    headBranch: run.head_branch,
+    headSha: run.head_sha,
+    conclusion: run.conclusion,
+    status: run.status,
+    createdAt: run.created_at ? isoString(run.created_at) : null,
+  };
+}
+
+/**
+ * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
+ * before reading samples. View selection also returns the full artifact-name inventory.
+ * Returns null when the run is unknown or has no stored series, so callers can
+ * fall back to the live GitHub artifacts for in-flight runs.
+ */
+export function getGpuMetricsForRun(
+  sql: DbClient,
+  githubRunId: number,
+  selection: GpuMetricsRunSelection = {},
+): Promise<GpuMetricsRunPayload | null> {
+  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId, selection));
+}
+
+async function readGpuMetricsForRun(
+  sql: DbClient,
+  githubRunId: number,
+  selection: GpuMetricsRunSelection,
+): Promise<GpuMetricsRunPayload | null> {
+  const run = await readLatestRun(sql, githubRunId);
   if (!run?.has_series) return null;
 
   const coverageRows = (await sql`
@@ -424,19 +452,7 @@ async function readGpuMetricsForRun(
   }
 
   return {
-    workflowRun: {
-      id: Number(run.id),
-      githubRunId: Number(run.github_run_id),
-      runAttempt: Number(run.run_attempt),
-      name: run.name,
-      date: isoString(run.date).slice(0, 10),
-      htmlUrl: run.html_url,
-      headBranch: run.head_branch,
-      headSha: run.head_sha,
-      conclusion: run.conclusion,
-      status: run.status,
-      createdAt: run.created_at ? isoString(run.created_at) : null,
-    },
+    workflowRun: toWorkflowRun(run),
     series,
     coverage: gpuMetricsRunCoverage(coverageRows),
     ...(artifactNames === undefined ? {} : { artifactNames }),
