@@ -5,6 +5,7 @@ import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import type { Locale } from '@/lib/i18n/i18n';
+import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
 import type {
@@ -50,6 +51,8 @@ export interface TooltipConfig {
   hasLog?: boolean;
   showPowerTelemetry?: boolean;
   locale?: Locale;
+  /** PowerX names boundaries the way its Count control does (GPU only, Whole system). */
+  powerLabelStyle?: PowerBasisLabelStyle;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -167,11 +170,12 @@ const powerVariantHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
   locale: Locale,
+  labelStyle?: PowerBasisLabelStyle,
 ): string => {
   const variant = d.powerVariant;
   if (!variant) return '';
   const t = TOOLTIP_STRINGS[locale];
-  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale, labelStyle));
   if (
     variant.kind === 'role' &&
     variant.id !== 'all' &&
@@ -825,7 +829,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -871,7 +875,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -934,7 +938,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}

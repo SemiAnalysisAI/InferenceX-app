@@ -144,7 +144,7 @@ import {
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
-import { ALL_IN_MEASURED_EMPTY } from '@/lib/power/power-basis';
+import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -192,7 +192,10 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
-import { useSetPowerXCompareTarget } from '@/components/inference/ui/powerx-surface';
+import {
+  usePowerXSurface,
+  useSetPowerXCompareTarget,
+} from '@/components/inference/ui/powerx-surface';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -514,6 +517,10 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    plotHeight,
+    legendControls,
+    legendFooter,
+    legendMobileLabel,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -593,6 +600,8 @@ const ScatterGraph = React.memo(
       [showPowerEnvelope, paretoDirection, selectedYAxisMetric],
     );
     const locale = useLocale();
+    // PowerX names the measured boundaries the way its Count control does.
+    const powerLabelStyle: PowerBasisLabelStyle = usePowerXSurface() ? 'count' : 'basis';
     const featureGateUnlocked = useFeatureGate();
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
@@ -1666,7 +1675,7 @@ const ScatterGraph = React.memo(
         return {
           name: legendId,
           hw: legendId,
-          label: powerVariantLabel(variant, locale),
+          label: powerVariantLabel(variant, locale, powerLabelStyle),
           section:
             variant.kind === 'basis'
               ? locale === 'zh'
@@ -1700,6 +1709,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       powerCompareBaseId,
       locale,
+      powerLabelStyle,
       hiddenPowerVariants,
     ]);
 
@@ -2208,6 +2218,7 @@ const ScatterGraph = React.memo(
               ? (interactionRef.current.logAvailability?.[d.id] ?? false)
               : false,
             locale,
+            powerLabelStyle,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -2282,7 +2293,15 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       }),
-      [attachPowerTraceAction, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, locale],
+      [
+        attachPowerTraceAction,
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        locale,
+        powerLabelStyle,
+      ],
     );
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
@@ -2300,6 +2319,7 @@ const ScatterGraph = React.memo(
         powerLineLabelSuffix(identity.variant, {
           isBase: identity.isBase,
           locale,
+          labelStyle: powerLabelStyle,
           flatWatts:
             !identity.isBase && wattsAxis && identity.variant?.kind === 'basis'
               ? flatSeriesValue(points.map((point) => point.y))
@@ -3120,6 +3140,7 @@ const ScatterGraph = React.memo(
                     hardwareConfig: overlayData.hardwareConfig,
                     overlayData,
                     locale,
+                    powerLabelStyle,
                   }),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
@@ -3454,6 +3475,7 @@ const ScatterGraph = React.memo(
       powerCompareBaseId,
       chartDefinition,
       locale,
+      powerLabelStyle,
       drawPerfRuler,
       attachPowerTraceAction,
     ]);
@@ -3804,6 +3826,7 @@ const ScatterGraph = React.memo(
           ref={chartRef}
           instructions={minimalChrome ? '' : undefined}
           chartId={chartId}
+          height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
@@ -3834,6 +3857,9 @@ const ScatterGraph = React.memo(
           legendElement={
             <ChartLegend
               variant="sidebar"
+              controls={legendControls}
+              footer={legendFooter}
+              mobileLabel={legendMobileLabel}
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
               onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}

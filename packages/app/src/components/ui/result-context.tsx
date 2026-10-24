@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { cn } from '@/lib/shared/utils';
 import type { Locale } from '@/lib/i18n/i18n';
 
 export const captionControlTriggerClassName =
@@ -26,6 +27,7 @@ export interface ResultContextProps {
   source?: string;
   costBasis?: string;
   costBasisTestId?: string;
+  className?: string;
 }
 
 function CaptionField({
@@ -85,6 +87,7 @@ export function ResultContext({
   source,
   costBasis,
   costBasisTestId,
+  className,
 }: ResultContextProps) {
   const labels =
     locale === 'zh'
@@ -130,7 +133,10 @@ export function ResultContext({
   return (
     <dl
       data-testid="result-context"
-      className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+      className={cn(
+        'mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground',
+        className,
+      )}
     >
       {model && (
         <div>

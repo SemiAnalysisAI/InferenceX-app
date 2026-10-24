@@ -24,8 +24,7 @@ import { usePowerXCompareTarget, useSetPowerXCompareTarget } from './powerx-surf
 const STRINGS = {
   en: {
     title: 'Compare chips at one interactivity',
-    subtitle:
-      'Each bar is one chip’s benchmark point closest to the interactivity you pick, split into what the meter counts. Drag the slider, click a bar below, or hover a point on the line chart to move it. Click a chip to see how its power builds up across load.',
+    subtitle: 'Each bar is one chip’s point nearest the chosen interactivity.',
     target: 'Interactivity',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -48,8 +47,7 @@ const STRINGS = {
   },
   zh: {
     title: '在同一交互性下对比芯片',
-    subtitle:
-      '每条横条为该芯片最接近所选交互性的基准测试点，并拆分为电表计量的各部分。拖动滑块、点击下方柱条或悬停在折线图的点上即可移动。点击芯片查看其功耗随负载的构成变化。',
+    subtitle: '每条横条为该芯片最接近所选交互性的基准测试点。',
     target: '交互性',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -82,11 +80,19 @@ export default function PowerChipCompare({
   xField,
   selectedKey,
   onSelectKey,
+  compact = false,
+  expandedKey = null,
+  renderExpanded,
 }: {
   data: InferenceData[];
   xField?: keyof AggDataEntry;
   selectedKey: string | null;
   onSelectKey: (key: string) => void;
+  /** PowerX v2: no heading, the view tab names the chart; the slider is the first row. */
+  compact?: boolean;
+  /** Series whose drill-down renders inline under its bar (PowerX v2). */
+  expandedKey?: string | null;
+  renderExpanded?: (key: string) => React.ReactNode;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -126,7 +132,22 @@ export default function PowerChipCompare({
   const categories = POWER_BREAKDOWN_STACK_ORDER.filter((key) =>
     rows.some((row) => row.entry.wattsPerGpu[key] > 0),
   );
-  if (series.length === 0 || value === null) return null;
+  // No chip in this selection has a whole-system model: say so instead of leaving a gap.
+  if (series.length === 0 || value === null) {
+    return (
+      <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
+        <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
+        {unmodeled.length > 0 && (
+          <p
+            className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
+            data-testid="power-chip-compare-unmodeled"
+          >
+            {t.noModel(unmodeled.join(', '))}
+          </p>
+        )}
+      </section>
+    );
+  }
 
   const toStep = (x: number) =>
     hi > lo ? Math.round((Math.log(x / lo) / Math.log(hi / lo)) * SLIDER_STEPS) : 0;
@@ -134,12 +155,14 @@ export default function PowerChipCompare({
 
   return (
     <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
-      <div className="space-y-1">
-        <Heading as="h3" level="card">
-          {t.title}
-        </Heading>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-      </div>
+      {!compact && (
+        <div className="space-y-1">
+          <Heading as="h3" level="card">
+            {t.title}
+          </Heading>
+          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+        </div>
+      )}
 
       <div className="no-export flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex min-w-0 flex-1 basis-72 items-center gap-3 text-sm">
@@ -186,6 +209,7 @@ export default function PowerChipCompare({
           {rows.map(({ series: entry, entry: point }) => {
             const color = resolveColor(entry.hwKey);
             const active = entry.key === selectedKey;
+            const expanded = renderExpanded !== undefined && entry.key === expandedKey;
             const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
             return (
               <li key={entry.key}>
@@ -196,6 +220,7 @@ export default function PowerChipCompare({
                     track('inference_power_compare_chip_selected');
                   }}
                   aria-pressed={active}
+                  aria-expanded={renderExpanded ? expanded : undefined}
                   data-testid="power-chip-compare-row"
                   className={`grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem] ${
                     active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40'
@@ -227,7 +252,7 @@ export default function PowerChipCompare({
                           <span
                             key={key}
                             title={`${t.categories[key]}: ${watts(w)} W`}
-                            className="flex h-full items-center justify-center border-r border-background/70 text-[11px] font-medium tabular-nums text-foreground last:border-r-0"
+                            className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
                               ...swatchStyle(key, color),
@@ -248,6 +273,14 @@ export default function PowerChipCompare({
                     </span>
                   </span>
                 </button>
+                {expanded && (
+                  <div
+                    className="mt-1.5 mb-3 rounded-md border border-border/60 p-3"
+                    data-testid="power-chip-compare-drilldown"
+                  >
+                    {renderExpanded(entry.key)}
+                  </div>
+                )}
               </li>
             );
           })}

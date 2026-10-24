@@ -528,8 +528,6 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
   });
 });
 
-const openPowerXAdvanced = () => cy.get('[data-testid="powerx-advanced"] summary').click();
-
 it('opens an old Inference power link on PowerX with the same metric', () => {
   cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
@@ -548,8 +546,10 @@ it('opens an old Inference power link on PowerX with the same metric', () => {
     'aria-pressed',
     'true',
   );
-  openPowerXAdvanced();
-  cy.get('[data-testid="measured-power-display"]').should('contain', 'TDP');
+  // Scope and Power statistic sit in the legend rail's More views expander; no second control layer.
+  cy.get('[data-testid="powerx-advanced"]').should('not.exist');
+  cy.get('[data-testid="measured-power-display"]').should('not.exist');
+  cy.get('[data-testid="powerx-more-views-toggle"]').click();
   cy.get('[data-testid="measured-power-statistic-average"]').should(
     'have.attr',
     'aria-pressed',
@@ -569,7 +569,7 @@ it('replots measured settings for official and unofficial data and preserves ove
   cy.get('#scatter-hide-non-optimal').then(($toggle) => {
     if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
   });
-  openPowerXAdvanced();
+  cy.get('[data-testid="powerx-more-views-toggle"]').click();
   cy.get('[data-testid="measured-power-statistic-p75"]').click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
   assertMeasuredValues('.dot-group', [500, 510, 520, 530]);

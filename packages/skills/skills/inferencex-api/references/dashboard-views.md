@@ -376,13 +376,18 @@ Where the power goes tabs select existing `metric` values; the chip comparison a
 per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). Chips with measured
 GPU power but no supported system model are named as not shown, not dropped silently.
 On that tab, comparing GPU only with Whole system draws `gpu-measured` and
-`utility-modeled` only; Advanced settings → Compare → All four boundaries adds the two
-provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
+`utility-modeled` only, and the legend, line labels, tooltips and table call those two
+boundaries GPU only and Whole system; the page has no further control layer. The four
+views are tabs above the plot; Count, Per and Show as sit in the legend rail, and Scope,
+Power statistic, Compare boundaries and Split by sit in its collapsed More views expander.
+On Where the power goes the chip comparison opens a per-chip drill-down inline and the
+boundary line chart is a collapsed section below it. None of this adds API selectors. A share link with
+`i_pcompare=all` adds the two provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
 measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` with the same
 filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
 芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
-“仅 GPU + 整机”对比只绘制 `gpu-measured` 与 `utility-modeled`；高级设置 → 对比 → 全部四个边界会加入两个额定边界。
+“仅 GPU + 整体系统”对比只绘制 `gpu-measured` 与 `utility-modeled`，图例、曲线标签、提示框与表格也沿用“仅 GPU / 整体系统”这一叫法；页面不再有第二层控件。四个视图为图表上方的标签页；统计范围、计量单位与显示方式位于图例栏，统计范围、功耗统计量、对比功耗边界与拆分方式收在图例栏折叠的“更多视图”中。“功耗去向”中点击芯片横条会在其下方内联展开该芯片的下钻图，功耗边界曲线图为其下方的折叠区块。这些都不新增 API 选择项。分享链接带 `i_pcompare=all` 时会加入两个额定边界。
 Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
 These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
