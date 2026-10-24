@@ -496,3 +496,16 @@ describe('Model Architecture Diagram', () => {
     });
   });
 });
+
+describe('Completed architecture catalog', () => {
+  it('separates MiniMax M3 dense prefix FFNs from the remaining MoE layers', () => {
+    visitModelPage('minimax-m3');
+    cy.get('[data-testid="expand-denseTransformer"]').should('exist');
+    cy.get('[data-testid="expand-transformer"]').click({ force: true });
+    cy.get('[data-testid="model-architecture-svg"]').should('contain.text', '57');
+    cy.get('[data-testid="expand-experts"]').click({ force: true });
+    cy.get('[data-testid="model-architecture-svg"]')
+      .should('contain.text', 'Scaled SiLU')
+      .and('contain.text', '+1');
+  });
+});

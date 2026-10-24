@@ -572,3 +572,4 @@ model-specific; retain the registry's accompanying features and source link.
 - `gptoss-120b`: read the model-specific architecture facts and source link with `model=gptoss-120b`.
 - `kimi-k3`: read the model-specific architecture facts and source link with `model=kimi-k3`.
 - `minimax-m27`: read the model-specific architecture facts and source link with `model=minimax-m27`.
+- `minimax-m3`: read the model-specific architecture facts and source link with `model=minimax-m3`.

@@ -47,7 +47,7 @@ describe('architecture parity with published checkpoint configs', () => {
     expect(dense.mergeBlocks.at(-1)?.detail).toBe('→ 7,168');
   });
 
-  it.each([Model.GptOss])(
+  it.each([Model.GptOss, Model.MiniMax_M3])(
     '%s shows clipping, scaled gating and the linear bias in modified SwiGLU',
     (model) => {
       const flow = getFFNSubBlocks(getModelArchitecture(model)!);
