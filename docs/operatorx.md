@@ -21,6 +21,48 @@ TFLOPS is derived by the shared comparison transform as useful FLOPs (`usefulFlo
 `latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
 Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
 
+### Distribution normalization
+
+The Distribution per GPU chart can show raw TFLOPS or TB/s, or normalize those
+values by the documented peak for each hardware and case precision. Normalized
+throughput is achieved TFLOPS divided by peak TFLOPS; normalized bandwidth is
+achieved TB/s divided by peak TB/s. The axis and box tooltips show percentages.
+Cases without a peak for their precision are excluded from normalized boxes;
+values above 100% are retained. Matched only is recalculated after normalization
+so every displayed box uses the same eligible case set. Latency has no peak
+percentage, and already normalized metric choices keep their existing units.
+The Normalized switch is offered for raw throughput and bandwidth metrics.
+Ascend 950PR bandwidth normalization uses the documented, assumed 1.6 TB/s basis.
+
+The page-owned `GET /api/v1/operatorx/compare` route accepts optional
+`distributionMetric`, `distributionNormalized`, `distributionMatchedOnly`, and
+`distributionHardware` query parameters. If any is present, it returns a
+`distribution` projection with resolved controls, per-GPU quantiles, counts, and
+case indices. The same pure helper produces the chart boxes and API projection;
+the existing comparison response is unchanged when those parameters are absent.
+The response's measurement columns retain statuses and source run/result identities.
+OperatorX remains a page-owned API outside the published OpenAPI document.
+
+| Distribution control | API parameter             | Returned data effect                                   |
+| -------------------- | ------------------------- | ------------------------------------------------------ |
+| GEMM/MoE tab         | `op`                      | Selects the operation                                  |
+| Workload             | `workload`                | Selects cases before distribution                      |
+| Metric               | `distributionMetric`      | Selects the value and peak basis                       |
+| GPUs                 | `distributionHardware`    | Selects distribution columns and matched cohort        |
+| Matched only         | `distributionMatchedOnly` | Uses cases eligible on every selected GPU              |
+| Normalized           | `distributionNormalized`  | Divides throughput or bandwidth by the applicable peak |
+
+Box hover and expansion change presentation only; they retain these results.
+
+中文：Distribution per GPU 可将实测 TFLOPS 除以对应硬件和精度的计算峰值，或将实测
+TB/s 除以带宽峰值；纵轴与箱线图提示均显示峰值占比。缺少对应精度峰值的用例不计入归一化
+统计，超过 100% 的实测值不会截断。“仅显示匹配用例”会按归一化后的有效数据重新
+选取共同用例。归一化开关仅用于原始吞吐量和带宽指标；延迟没有对应的峰值百分比，
+已是峰值占比的指标保持原有单位。
+950PR 的带宽归一化使用文档中假定的 1.6 TB/s 参考值。
+页面专属 `/api/v1/operatorx/compare` 接口通过上述四个 `distribution*` 参数返回
+筛选后的分布统计，并保留原始测量状态和 run/result 来源；未传这些参数时，响应保持不变。
+
 ## Compact comparison reads
 
 Ingestion normalizes each run once and stores versioned per-run GEMM and MoE
