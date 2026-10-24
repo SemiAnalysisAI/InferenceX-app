@@ -559,10 +559,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'OperatorX page backend; its cross-hardware comparison includes hardware reference values and workload-resolved chart defaults; its shape follows the page.',
-      zh: 'OperatorX 页面后端；跨硬件对比包含归一化参考值及按工作负载确定的图表默认值，结构随页面变化。',
+      en: 'OperatorX page backend; cross-hardware comparisons include hardware references, workload-resolved defaults, and optional distribution quantiles with resolved normalization controls.',
+      zh: 'OperatorX 页面后端；跨硬件对比包含硬件参考值、按工作负载确定的默认值，以及可选的分布分位数和归一化参数。',
     },
-    sourceSha256: 'e7ade13f67a40e408371dece3fd676c547fcd2022d474ec5ca112e8cdb47131c',
+    sourceSha256: 'b8ffa1026ed6a3ba99394e274557e88f502470b8c82f2fdead1feb9ea57b7955',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -1180,6 +1180,14 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
+    },
+  },
+  {
+    source: 'src/lib/operatorx/distribution-view.ts',
+    sourceSha256: 'de9f2203e99753f955922170aead6906fd6df7c389e96baf249ab6b0d8dda8aa',
+    reviewArea: {
+      en: 'OperatorX distribution metric, normalization, matching, hardware filters, and quantiles shared by UI and page-owned API.',
+      zh: 'OperatorX 分布图的指标、归一化、匹配用例、硬件筛选和分位数，由 UI 与页面专属 API 共用。',
     },
   },
   {

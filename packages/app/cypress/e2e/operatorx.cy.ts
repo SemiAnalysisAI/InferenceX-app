@@ -113,6 +113,28 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
 });
 
 for (const prefix of ['', '/zh']) {
+  it(`normalizes distribution throughput by each GPU's peak at ${prefix || '/'}`, () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@gemm');
+    cy.get('[data-testid="operatorx-viz-distribution"]')
+      .scrollIntoView()
+      .within(() => {
+        cy.get('.y-axis-label').should('have.text', 'Throughput (TFLOPS)');
+        cy.get('.box').should('have.length', 2);
+        cy.get('#opx-dist-normalized').click().should('have.attr', 'aria-checked', 'true');
+        cy.get('.y-axis-label').should(
+          'have.text',
+          prefix ? '计算峰值占比（%）' : 'Share of peak compute (%)',
+        );
+        cy.get('.box').should('have.length', 2);
+        cy.get('#opx-dist-normalized').click().should('have.attr', 'aria-checked', 'false');
+        cy.get('.y-axis-label').should('have.text', 'Throughput (TFLOPS)');
+      });
+  });
+}
+
+for (const prefix of ['', '/zh']) {
   it(`plots head-to-head measurements across vendor backends at ${prefix || '/'}`, () => {
     const ascend = normalizeBundle(run('105', 'ascend950pr-external', [64, 128]));
     ascend.results = ascend.results.map((r) => ({ ...r, backend: 'torch_npu_linear' }));

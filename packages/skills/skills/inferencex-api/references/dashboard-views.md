@@ -232,6 +232,30 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
+Distribution per GPU uses the page-owned comparison API's optional
+`distributionMetric` (`latency`, `tflops`, `bandwidth`, `computeUtil`, or
+`bandwidthUtil`), `distributionNormalized` (`true`/`false`),
+`distributionMatchedOnly` (`true`/`false`), and `distributionHardware` (comma-separated
+hardware keys). Any of these returns a `distribution` projection with resolved
+parameters, per-hardware p5/p25/p50/p75/p95, counts, and `caseIndices` into the
+response's source-preserving `measurements` columns. Defaults are `tflops`,
+unnormalized, matched only, and all available hardware. Normalized TFLOPS uses
+each case's precision-specific peak TFLOPS; normalized bandwidth uses peak TB/s.
+The ratios use 1 for 100% and retain values above 1; the chart displays
+percentages. Missing
+measurements and cases without documented peaks are excluded, and matched cases
+are recalculated after normalization. Latency cannot be normalized and resolves
+`distributionNormalized` to false, as do metrics already expressed as peak shares.
+This is page-owned data, not a published
+OpenAPI operation. `op` and `workload` keep the comparison route's usual semantics.
+
+中文：Distribution per GPU 的页面专属接口可通过 `distributionMetric`、
+`distributionNormalized`、`distributionMatchedOnly` 和 `distributionHardware`
+读取与图表一致的箱线图统计。归一化时，TFLOPS 按对应精度的计算峰值计算，带宽按
+TB/s 峰值计算；接口以 1 表示 100%，保留超过 1 的比值，图表显示百分数。缺失测量值或峰值的用例不参与
+统计，匹配用例集合按归一化后的有效测量值重算。延迟不支持峰值归一化，返回的
+`distributionNormalized` 为 false；已经表示峰值占比的指标也是如此。原始测量列仍保留状态和 run/result 来源。
+
 The explorer's session-list version filter uses the same parser as its other
 pages: absent, `all`, invalid, or out-of-range versions mean no version filter.
 The Agentic Workload Explorer is also feature-gated and has no published
