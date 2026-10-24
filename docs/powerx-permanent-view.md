@@ -70,6 +70,31 @@ not promise more.
 When no point in the selection reports the selected telemetry axis, the chart's empty state says
 the selection has no measured GPU power (`noMeasuredDataHint`) instead of the generic hint.
 
+## PowerX v2 layout (experimental)
+
+`/powerx` and `/zh/powerx` render the shared `ChartDisplay` data pipeline through the
+PowerX frame in `src/components/inference/powerx/` instead of the Inference Performance
+control stack. Nothing in the data layer changes: the frame writes the same `i_metric` and
+`i_pcompare` state, so share links, `?unofficialrun=` overlays and the views API are untouched.
+
+- `PowerXFrame`: section header, then the four views as compact tabs (Energy per token,
+  Power draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a
+  metric + compare pair, see `selectPowerXView`), the Chart/Table toggle and export menu on
+  the right of the strip, then one caption row (model dropdown, scenario and precision
+  toggles only when there is a choice, the compact run chip with the changelog), then the plot.
+- The legend rail carries the PowerX toggles (`PowerXLegendControls`: Count, Per, Show as)
+  above the chart switches, and a collapsed **More views** expander (`PowerXMoreViews`) with
+  Scope, Power statistic, Compare boundaries (Off | All four), Split by and a shortcut to
+  the Over time view. On phones the rail folds into a "Chips & options" row under the plot
+  and the plot height is capped at 55 % of the viewport.
+- Where the power goes: the chip comparison is the visual; clicking a bar opens that chip's
+  drill-down inline under it (`PowerAnalysisPanels` `layout="inline"`); the boundary line
+  chart sits in a collapsed **Compare on the curve** section below.
+- A pinned point's "View power trace" action opens the Over time view focused on that trace.
+- One muted provenance line under the chart (`powerXProvenanceText`: measured points,
+  validated windows, power model revision, PUE) is the summary of the collapsed
+  "How we measure" details.
+
 ## Article figure → share link
 
 Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend

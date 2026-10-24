@@ -517,6 +517,10 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    plotHeight,
+    legendControls,
+    legendFooter,
+    legendMobileLabel,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -3822,6 +3826,7 @@ const ScatterGraph = React.memo(
           ref={chartRef}
           instructions={minimalChrome ? '' : undefined}
           chartId={chartId}
+          height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
@@ -3852,6 +3857,9 @@ const ScatterGraph = React.memo(
           legendElement={
             <ChartLegend
               variant="sidebar"
+              controls={legendControls}
+              footer={legendFooter}
+              mobileLabel={legendMobileLabel}
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
               onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}

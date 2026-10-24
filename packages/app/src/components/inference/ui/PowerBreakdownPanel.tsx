@@ -52,6 +52,7 @@ const STRINGS = {
     subtitle: 'Each point’s whole-system power per GPU, split by what the meter counts.',
     source: 'Hardware',
     view: 'Breakdown view',
+    collapse: 'Collapse',
     bars: 'Stacked bars',
     area: 'Stacked area',
     xAxis: 'Median Interactivity (tok/s/user)',
@@ -83,6 +84,7 @@ const STRINGS = {
     subtitle: '每个点按每 GPU 计的整体系统功耗，拆分为电表计量的各部分。',
     source: '硬件',
     view: '构成视图',
+    collapse: '收起',
     bars: '堆叠柱状图',
     area: '堆叠面积图',
     xAxis: '中位交互性（tok/s/user）',
@@ -708,10 +710,19 @@ export default function PowerBreakdownPanel({
   selectedKey: controlledKey,
   onSelectKey,
   heading,
+  compact = false,
+  onCollapse,
 }: {
   chartId: string;
   data: InferenceData[];
   contextLabel?: string;
+  /**
+   * Inline drill-down under a chip-compare bar (PowerX v2): the bar already names the
+   * series and the compare legend already explains the stack, so the Source select,
+   * the subtitle and the legend list are dropped; a Collapse button closes it.
+   */
+  compact?: boolean;
+  onCollapse?: () => void;
   /** Controlled hardware line (series key); the panel keeps its own choice when omitted. */
   selectedKey?: string | null;
   onSelectKey?: (key: string) => void;
@@ -808,11 +819,23 @@ export default function PowerBreakdownPanel({
 
   return (
     <section id={sectionId} className="min-w-0 space-y-3" data-testid="power-breakdown-panel">
-      <div className="space-y-1">
+      <div className={compact ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : 'space-y-1'}>
         <Heading as="h3" level="card">
           {heading?.title ?? t.title}
         </Heading>
-        <p className="text-sm text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
+        <p className={compact ? 'text-xs text-muted-foreground' : 'text-sm text-muted-foreground'}>
+          {heading?.subtitle ?? t.subtitle}
+        </p>
+        {compact && onCollapse && (
+          <button
+            type="button"
+            onClick={onCollapse}
+            data-testid="power-breakdown-collapse"
+            className="ml-auto min-h-11 rounded-md border border-border/60 px-3 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-8"
+          >
+            {t.collapse}
+          </button>
+        )}
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {series === null ? (
@@ -820,43 +843,45 @@ export default function PowerBreakdownPanel({
       ) : (
         <>
           <div className="no-export flex min-w-0 flex-wrap items-end gap-3">
-            <div className="min-w-0 flex-1 basis-64 space-y-1">
-              <label
-                htmlFor={`${sectionId}-source`}
-                className="text-xs font-medium text-muted-foreground"
-              >
-                {t.source}
-              </label>
-              <Select
-                value={series.key}
-                onValueChange={(value) => {
-                  setSelectedKey(value);
-                  track('inference_power_breakdown_source_selected');
-                }}
-              >
-                <SelectTrigger
-                  id={`${sectionId}-source`}
-                  data-testid="power-breakdown-source"
-                  className="w-full min-w-0"
+            {!compact && (
+              <div className="min-w-0 flex-1 basis-64 space-y-1">
+                <label
+                  htmlFor={`${sectionId}-source`}
+                  className="text-xs font-medium text-muted-foreground"
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent portalled={false}>
-                  {breakdowns.map((entry) => (
-                    <SelectItem key={entry.key} value={entry.key}>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          aria-hidden
-                          className="size-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: colorOf(entry) }}
-                        />
-                        <span className="truncate">{entry.label}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  {t.source}
+                </label>
+                <Select
+                  value={series.key}
+                  onValueChange={(value) => {
+                    setSelectedKey(value);
+                    track('inference_power_breakdown_source_selected');
+                  }}
+                >
+                  <SelectTrigger
+                    id={`${sectionId}-source`}
+                    data-testid="power-breakdown-source"
+                    className="w-full min-w-0"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent portalled={false}>
+                    {breakdowns.map((entry) => (
+                      <SelectItem key={entry.key} value={entry.key}>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            aria-hidden
+                            className="size-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: colorOf(entry) }}
+                          />
+                          <span className="truncate">{entry.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <SegmentedToggle<PowerBreakdownView>
               value={view}
               ariaLabel={t.view}
@@ -872,29 +897,31 @@ export default function PowerBreakdownPanel({
               ]}
             />
           </div>
-          <ul
-            className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs"
-            data-testid="power-breakdown-legend"
-          >
-            {series.categories.toReversed().map((key) => {
-              const [label, description] = t.categories[key];
-              const detail =
-                key === 'facility' ? `${description} ${series.points[0].pue}` : description;
-              return (
-                <li key={key} className="flex min-w-0 items-baseline gap-1.5">
-                  <span
-                    aria-hidden
-                    className="inline-block size-3 shrink-0 translate-y-0.5 rounded-[2px]"
-                    style={swatchStyle(key, color)}
-                  />
-                  <span className="shrink-0 font-medium whitespace-nowrap">{label}</span>
-                  <span className="min-w-0 text-muted-foreground">
-                    {detail} · {MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+          {!compact && (
+            <ul
+              className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs"
+              data-testid="power-breakdown-legend"
+            >
+              {series.categories.toReversed().map((key) => {
+                const [label, description] = t.categories[key];
+                const detail =
+                  key === 'facility' ? `${description} ${series.points[0].pue}` : description;
+                return (
+                  <li key={key} className="flex min-w-0 items-baseline gap-1.5">
+                    <span
+                      aria-hidden
+                      className="inline-block size-3 shrink-0 translate-y-0.5 rounded-[2px]"
+                      style={swatchStyle(key, color)}
+                    />
+                    <span className="shrink-0 font-medium whitespace-nowrap">{label}</span>
+                    <span className="min-w-0 text-muted-foreground">
+                      {detail} · {MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
           <BreakdownChart
             key={`${series.key}-${view}`}
             sectionId={sectionId}

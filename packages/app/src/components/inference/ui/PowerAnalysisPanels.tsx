@@ -48,6 +48,7 @@ export default function PowerAnalysisPanels({
   contextLabel,
   showRoles = false,
   placement = 'after',
+  layout = 'stacked',
 }: {
   data: InferenceData[];
   overlayData?: readonly InferenceData[];
@@ -62,6 +63,11 @@ export default function PowerAnalysisPanels({
    * and the boundary line chart follows as supporting detail.
    */
   placement?: 'before' | 'after';
+  /**
+   * `inline` (PowerX v2): the chip comparison is the only visual; clicking a bar opens
+   * that chip's drill-down under it instead of a second panel below the list.
+   */
+  layout?: 'stacked' | 'inline';
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -103,6 +109,8 @@ export default function PowerAnalysisPanels({
     [overlaySourceKeys, runIndexByUrl, resolveColor, sourceShade],
   );
   const [compareKey, setCompareKey] = useState<string | null>(null);
+  // Inline layout: the bar clicked last is open; clicking it again closes it.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const breakdownSeries = useMemo(
     () => buildPowerBreakdowns(data, locale, powerBreakdownInteractivity(xField)),
     [data, locale, xField],
@@ -129,6 +137,38 @@ export default function PowerAnalysisPanels({
           contextLabel={contextLabel}
           sources={sources}
           colorOf={colorOf}
+        />
+      ) : layout === 'inline' ? (
+        <PowerChipCompare
+          data={data}
+          xField={xField}
+          compact
+          selectedKey={drillSeries?.key ?? null}
+          expandedKey={expandedKey}
+          onSelectKey={(key) => {
+            setCompareKey(key);
+            setExpandedKey((current) => (current === key ? null : key));
+          }}
+          renderExpanded={(key) => {
+            const series = breakdownSeries.find((entry) => entry.key === key);
+            return (
+              <PowerBreakdownPanel
+                chartId={chartId}
+                data={data}
+                contextLabel={contextLabel}
+                xField={xField}
+                xLabel={xLabel}
+                selectedKey={key}
+                compact
+                onCollapse={() => setExpandedKey(null)}
+                heading={
+                  series
+                    ? { title: t.drillTitle(series.label), subtitle: t.drillSubtitle }
+                    : undefined
+                }
+              />
+            );
+          }}
         />
       ) : (
         <>
