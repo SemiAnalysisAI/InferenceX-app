@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import type { Locale } from '@/lib/i18n/i18n';
+import { renderCausalEncoderDecoder } from './model-architecture-ced';
 
 import {
   type ArchSubBlock,
@@ -312,6 +313,10 @@ export function renderDiagram(
   onBlockClick: (blockId: string) => void,
   locale: Locale = 'en',
 ) {
+  if (arch.encoderDecoder) {
+    renderCausalEncoderDecoder(svgEl, arch, isDark, expandedBlocks, onBlockClick, locale);
+    return;
+  }
   const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
 

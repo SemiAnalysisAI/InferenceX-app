@@ -500,6 +500,7 @@ describe('Model Architecture Diagram', () => {
 describe('Completed architecture catalog', () => {
   for (const [slug, fact] of [
     ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
+    ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
   ]) {
     it(`${slug} exposes the sourced architecture and canonical model identity`, () => {
@@ -518,7 +519,7 @@ describe('Completed architecture catalog', () => {
     });
   }
 
-  for (const slug of ['muse-spark-open', 'minimax-m31-flash']) {
+  for (const slug of ['muse-spark-open', 'deepseek-v41-flash', 'minimax-m31-flash']) {
     it(`${slug} has a Chinese article and usable mobile diagram`, () => {
       cy.viewport(390, 844);
       cy.visit(`/zh/model/${slug}`, { onBeforeLoad: dismissStarModal });
@@ -548,4 +549,60 @@ describe('Completed architecture catalog', () => {
       .should('contain.text', 'Scaled SiLU')
       .and('contain.text', '+1');
   });
+});
+
+describe('Architecture arrow structure', () => {
+  for (const [locale, width] of [
+    ['en', 390],
+    ['zh', 390],
+    ['en', 1280],
+    ['zh', 1280],
+  ] as const) {
+    it(`shows the causal encoder/decoder and shared-KV arrows (${locale}, ${width}px)`, () => {
+      cy.viewport(width, 844);
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/model/deepseek-v41-flash`, {
+        onBeforeLoad: dismissStarModal,
+      });
+      cy.get('[data-testid="expand-cedEncoder"]').click({ force: true });
+      cy.get('[data-testid="expand-cedDecoder"]').click({ force: true });
+      cy.get('[data-testid="ced-global-kv"]')
+        .should('have.attr', 'aria-label')
+        .and('include', locale === 'zh' ? '编码器最终隐藏状态' : 'final encoder states');
+      cy.get('[data-testid="ced-decoder-attention"]')
+        .should('have.attr', 'aria-label')
+        .and(
+          'include',
+          locale === 'zh' ? '局部 SWA 与共享全局 KV' : 'local SWA + shared global KV',
+        );
+      cy.get('[data-edge="encoder-to-decoder"]').should('have.attr', 'marker-end');
+      cy.get('[data-edge="encoder-to-global-kv"]').should('have.attr', 'marker-end');
+      cy.get('[data-edge="global-kv-to-decoder-attention"]').should('have.attr', 'marker-end');
+      cy.get('[data-testid="model-architecture-svg"]')
+        .should('contain.text', '8B')
+        .and('contain.text', '16B')
+        .and('not.contain.text', 'Cross-Attention');
+      cy.request('/api/v1/views/model-architectures?model=deepseek-v41-flash')
+        .its('body.models.0.architecture.encoderDecoder')
+        .should('deep.equal', {
+          encoderLayers: 20,
+          decoderLayers: 20,
+          globalKVSource: 'final-encoder-hidden-states',
+          encoderSlidingOnlyLayers: 2,
+          decoderAttention: 'joint-local-swa-and-shared-global-kv',
+        });
+      expectNoPageOverflow();
+      cy.get('[data-testid="model-architecture-svg"]')
+        .find<SVGTextElement>('text')
+        .each(($text) => {
+          const text = $text[0] as unknown as SVGTextElement;
+          const box = text.getBBox();
+          const viewBox = text.ownerSVGElement!.viewBox.baseVal;
+          expect(box.x).to.be.at.least(0);
+          expect(box.x + box.width).to.be.at.most(viewBox.width);
+        });
+      cy.get('[data-testid="model-architecture-inline"]').screenshot(
+        `ced-expanded-${locale}-${width}`,
+      );
+    });
+  }
 });

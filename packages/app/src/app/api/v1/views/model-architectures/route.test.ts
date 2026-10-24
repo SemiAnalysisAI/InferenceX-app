@@ -52,6 +52,21 @@ describe('GET /api/v1/views/model-architectures', () => {
     ]);
   });
 
+  it('preserves the causal encoder/decoder split and the encoder-derived global KV source', async () => {
+    const response = await GET(request('?model=deepseek-v41-flash'));
+    const body = await response.json();
+    expect(body.models[0].architecture).toMatchObject({
+      numLayers: 40,
+      activeParamsPrefill: 8,
+      activeParams: 16,
+      encoderDecoder: {
+        encoderLayers: 20,
+        decoderLayers: 20,
+        globalKVSource: 'final-encoder-hidden-states',
+      },
+    });
+  });
+
   it.each([
     ['?model=missing', 'model'],
     ['?model=', 'model'],
