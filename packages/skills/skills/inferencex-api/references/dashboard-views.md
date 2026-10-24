@@ -166,6 +166,7 @@ which API selectors belong together.
 | `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `operatorx`                     | Op family (gemm, moe, attention), workload or model, device split (`1` = one device, `tp8`, `dp8·ep8`), GPUs, status and zero-based 100-row page. One row per case and GPU with per-GPU FLOPs/bytes, latency, TFLOPS, TB/s and share of roofline. JSON or CSV.                                                                                                                                                                                                                                                                                   |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                                                                                                                                                                                                                                                      |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                                                                                                                                                                                                                                                           |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families, `asOf` for image age/release status, and `includeHistory` for daily age history.                                                                                                                                                                                                                                                                                                                                                                               |
@@ -212,9 +213,11 @@ The current table uses the latest benchmark snapshot, whereas history uses
 successful image-bearing submission events. The chart's hover and keyboard
 inspection are presentation-only and introduce no extra selectors.
 
-OperatorX is available in primary navigation without an unlock and has no published
-`/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
-the page and are not part of this skill's read-only view API. The page-owned
+OperatorX is available in primary navigation without an unlock. Its read-only view
+is `/api/v1/views/operatorx`; OperatorX `flops` and `bytes` are useful work per GPU,
+so `tflops` compares across device splits; pick one `parallel` split per comparison.
+Its other `/api/v1/operatorx/*` routes belong to the page and are not part of this
+skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
 optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
 `peakTflops.bf16=378`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
@@ -470,8 +473,8 @@ measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
 points and timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
-precision or quantization arguments remain separate. No public OpenAPI operation
-is added: OperatorX remains a documented page-owned API.
+precision or quantization arguments remain separate. This adds no OpenAPI
+operation; the compare route stays page-owned.
 
 中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
 不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为

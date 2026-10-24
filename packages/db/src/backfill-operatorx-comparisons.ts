@@ -1,7 +1,10 @@
 import { hasNoSslFlag, hasYesFlag } from './cli-utils';
 import type { DbClient } from './connection';
 import { createAdminSql } from './etl/db-utils';
-import { OPERATORX_COMPARISON_VERSION } from './operatorx/comparison-cache';
+import {
+  OPERATORX_COMPARISON_OPS,
+  OPERATORX_COMPARISON_VERSION,
+} from './operatorx/comparison-cache';
 import { backfillOperatorXRunComparisons, getOperatorXBundle } from './queries/operatorx';
 
 const sql = createAdminSql({
@@ -18,7 +21,7 @@ async function main(): Promise<void> {
   const runs = await sql<{ run_key: string }[]>`
     SELECT r.run_key FROM opx_runs r
     WHERE (SELECT count(*) FROM opx_run_comparisons c
-           WHERE c.run_id = r.id AND c.format_version = ${OPERATORX_COMPARISON_VERSION}) < 2
+           WHERE c.run_id = r.id AND c.format_version = ${OPERATORX_COMPARISON_VERSION}) < ${OPERATORX_COMPARISON_OPS.length}
     ORDER BY r.generated_at DESC, r.id DESC
   `;
   console.log(

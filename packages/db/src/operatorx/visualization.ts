@@ -2,6 +2,9 @@ import type { ComparisonCase, ComparisonOp, ComparisonView, ComputePrecision } f
 
 export function sliceKey(op: ComparisonOp, c: ComparisonCase): string {
   if (op === 'gemm') return `N=${c.dims.n} K=${c.dims.k} · ${c.precision}`;
+  // attention: the same module, query length and context at every request count
+  if (op === 'attention')
+    return `${c.shape.replaceAll(/(?<lead>^|· |\+ )\d+×/gu, '$<lead>')} · ${c.precision}`;
   return `${c.shape.replace(/^T=\d+ /u, '')} · ${c.precision}`;
 }
 

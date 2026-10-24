@@ -46,7 +46,7 @@ export function CompareIndexTrackedLink({
   const prefetch = () => {
     if (!prefetchOperatorX || typeof props.href !== 'string') return;
     router.prefetch(props.href);
-    void queryClient.prefetchQuery(operatorXComparisonQuery('gemm', null));
+    void queryClient.prefetchQuery(operatorXComparisonQuery('gemm', null, null));
   };
 
   return (

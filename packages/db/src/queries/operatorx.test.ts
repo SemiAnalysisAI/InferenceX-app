@@ -6,6 +6,7 @@ import { expect, it } from 'vitest';
 import type { DbClient } from '../connection';
 import type { Sql } from '../etl/db-utils';
 import type { OperatorXRawBundle } from '../operatorx/bundle';
+import { OPERATORX_COMPARISON_OPS } from '../operatorx/comparison-cache';
 import { buildComparison } from '../operatorx/compare';
 import { normalizeBundle } from '../operatorx/normalize';
 import {
@@ -89,7 +90,10 @@ function sqlFor(db: PGlite): Sql & DbClient {
 }
 
 async function migrate(db: PGlite, compact = true): Promise<void> {
-  for (const name of ['001_initial_schema.sql', ...(compact ? ['002_comparison_cache.sql'] : [])]) {
+  for (const name of [
+    '001_initial_schema.sql',
+    ...(compact ? ['002_comparison_cache.sql', '003_comparison_attention.sql'] : []),
+  ]) {
     await db.exec(
       await readFile(new URL(`../../migrations-operatorx/${name}`, import.meta.url), 'utf8'),
     );
@@ -162,7 +166,7 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
       revision: replacementRevision,
     });
     const persisted = await db.query<{ run_id: number }>('SELECT run_id FROM opx_run_comparisons');
-    expect(persisted.rows).toHaveLength(2);
+    expect(persisted.rows).toHaveLength(OPERATORX_COMPARISON_OPS.length);
     expect(persisted.rows.every((row) => String(row.run_id) === replacementRevision)).toBe(true);
     expect(await getOperatorXRunComparison(sql, '999', 'gemm')).toBeNull();
     expect(await getOperatorXBundle(sql, '999')).toBeNull();
@@ -313,7 +317,7 @@ it('backfills idempotently and refuses a revision replaced after the raw read', 
       expectedComparison(captured),
     );
     const persisted = await db.query('SELECT * FROM opx_run_comparisons');
-    expect(persisted.rows).toHaveLength(2);
+    expect(persisted.rows).toHaveLength(OPERATORX_COMPARISON_OPS.length);
 
     await db.exec('UPDATE opx_run_comparisons SET format_version = 999');
     expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toBeNull();
