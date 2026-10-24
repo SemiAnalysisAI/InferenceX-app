@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { Model } from './data-mappings';
+import { Model } from './data-mappings';
 import fixtures from './fixtures/model-architecture-configs.json';
-import { getModelArchitecture } from './model-architectures';
+import { getModelArchitecture, getFFNSubBlocks } from './model-architectures';
 
 describe('architecture parity with published checkpoint configs', () => {
   it.each(fixtures.models)(
@@ -32,6 +32,22 @@ describe('architecture parity with published checkpoint configs', () => {
           : (source.first_k_dense_replace ?? 0);
         expect(arch.denseFFNLayers ?? 0).toBe(dense);
       }
+    },
+  );
+
+  it.each([Model.DeepSeek_V4_Pro])(
+    '%s clamps both projections before ordinary SiLU without the gpt-oss offset',
+    (model) => {
+      const flow = getFFNSubBlocks(getModelArchitecture(model)!);
+      if (flow.layout !== 'parallel') throw new Error('Expected parallel paths');
+      expect(flow.leftPath.map(({ name }) => name)).toEqual([
+        'Gate Projection',
+        'Clamp',
+        'SiLU Activation',
+      ]);
+      expect(flow.leftPath[1].detail).toBe('max = 10');
+      expect(flow.rightPath.map(({ name }) => name)).toEqual(['Up Projection', 'Clamp']);
+      expect(flow.rightPath[1].detail).toBe('±10');
     },
   );
 });

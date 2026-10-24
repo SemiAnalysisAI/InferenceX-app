@@ -566,3 +566,4 @@ model-specific; retain the registry's accompanying features and source link.
 ### Model-specific architecture coverage
 
 - `deepseek-r1`: read the model-specific architecture facts and source link with `model=deepseek-r1`.
+- `deepseek-v4`: read the model-specific architecture facts and source link with `model=deepseek-v4`.

@@ -110,6 +110,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     headDim: 512,
     vocabSize: 129280,
     ffnDim: 3072,
+    ffnClamp: 10,
     numExperts: 385,
     activeExperts: 6,
     hasSharedExpert: true,
