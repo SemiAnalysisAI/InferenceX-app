@@ -663,7 +663,7 @@ run wrote, unlike `admin:db:verify`, which prints whole-database totals. Rows ar
 trace_replay blob) and `power` (gpu_metrics series; `unmapped` counts power result rows the mapper
 could not place). Columns are `new`, `duplicate`, `skipped` (failed-run rows, rows held by per-job
 files, purged points, missing siblings, telemetry not collected), `unmapped` and `failed` (database
-write or telemetry errors). The workflow retains it as the `ingest-report-<source run>` artifact. For
+write or telemetry errors). For
 dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_REPO`, whose
 `ingest-results-callback` workflow comments the counts on the merged PR.
 

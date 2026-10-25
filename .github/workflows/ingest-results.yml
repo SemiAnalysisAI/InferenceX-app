@@ -330,14 +330,6 @@ jobs:
           path: power-publication.json*
           if-no-files-found: warn
 
-      - name: Retain ingest report
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: ingest-report-${{ steps.artifacts.outputs.source-run-id || github.run_id }}
-          path: ingest-report.json
-          if-no-files-found: warn
-
       - name: Check for unmapped entities
         if: always()
         id: unmapped
