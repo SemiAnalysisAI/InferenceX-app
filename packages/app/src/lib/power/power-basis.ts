@@ -4,6 +4,7 @@ export const POWER_BASES = [
   'gpu-measured',
   'gpu-provisioned',
   'utility-provisioned',
+  'it-modeled',
   'utility-modeled',
 ] as const;
 export type PowerBasis = (typeof POWER_BASES)[number];
@@ -13,19 +14,69 @@ export const POWER_BASIS_LABELS: Record<PowerBasis, { en: string; zh: string }> 
   'gpu-measured': { en: 'GPU Level Measured', zh: 'GPU 实测功耗' },
   'gpu-provisioned': { en: 'GPU Level Provisioned (TDP)', zh: 'GPU 额定功耗（TDP）' },
   'utility-provisioned': { en: 'All in Provisioned', zh: '整体预配功耗' },
+  'it-modeled': { en: 'All in Measured IT (no PUE)', zh: '整体实测 IT 功耗（不含 PUE）' },
   'utility-modeled': { en: 'All in Measured', zh: '整体实测功耗' },
 };
 
 /**
- * What the PowerX Count control calls the two measured boundaries. The PowerX
- * legend, line labels, tooltips and table reuse these so one screen names a
- * boundary one way; the rated bounds keep their registry names.
+ * What the PowerX Count control calls the three measured boundaries (GPU only,
+ * IT without PUE, facility). The PowerX legend, line labels, tooltips, table and
+ * CSV reuse these so one screen names a boundary one way; the rated bounds keep
+ * their registry names.
  */
 export const POWER_COUNT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
   ...POWER_BASIS_LABELS,
   'gpu-measured': { en: 'GPU only', zh: '仅 GPU' },
-  'utility-modeled': { en: 'Whole system', zh: '整体系统' },
+  'it-modeled': { en: 'IT (no PUE)', zh: 'IT（不含 PUE）' },
+  'utility-modeled': { en: 'Facility', zh: '数据中心（含 PUE）' },
 };
+
+/**
+ * The basis tag every PowerX number carries: GPU board power (measured), IT
+ * power (GPU plus the modeled rest of the server and the network share, no
+ * PUE) or facility power (IT × PUE). Rated bounds tag the boundary they rate.
+ */
+export const POWER_BASIS_TAGS = ['gpu', 'it', 'facility'] as const;
+export type PowerBasisTag = (typeof POWER_BASIS_TAGS)[number];
+
+export const POWER_BASIS_TAG_OF: Record<PowerBasis, PowerBasisTag> = {
+  'gpu-measured': 'gpu',
+  'gpu-provisioned': 'gpu',
+  'utility-provisioned': 'facility',
+  'it-modeled': 'it',
+  'utility-modeled': 'facility',
+};
+
+export const POWER_BASIS_TAG_LABELS: Record<PowerBasisTag, { en: string; zh: string }> = {
+  gpu: { en: 'GPU', zh: 'GPU' },
+  it: { en: 'IT', zh: 'IT' },
+  facility: { en: 'Facility', zh: '数据中心' },
+};
+
+export const POWER_BASIS_TAG_TITLES: Record<PowerBasisTag, { en: string; zh: string }> = {
+  gpu: {
+    en: 'GPU board power, measured by DCGM every second and averaged over the validated serving window.',
+    zh: 'GPU 板卡功耗：DCGM 每秒采样并在通过验证的服务窗口内取平均。',
+  },
+  it: {
+    en: 'IT power: measured GPU plus modeled CPU, server parts, fans and PSU loss, and the network share. No PUE. Storage and out-of-rack network are not modeled.',
+    zh: 'IT 功耗：实测 GPU 加上建模的 CPU、服务器部件、风扇与电源损耗以及网络分摊。不含 PUE。存储和机架外网络未建模。',
+  },
+  facility: {
+    en: 'Facility power: IT × PUE, what the building draws for that IT load.',
+    zh: '数据中心功耗：IT × PUE，即该 IT 负载对应的建筑总用电。',
+  },
+};
+
+export const IT_NOT_MODELED_NOTE = {
+  en: 'Storage and out-of-rack network are not modeled.',
+  zh: '存储和机架外网络未建模。',
+};
+
+/** GPUs one megawatt of IT power supports at this point's IT W per GPU. */
+export function gpusPerMegawatt(itWattsPerGpu: number | null | undefined): number | null {
+  return isPositive(itWattsPerGpu) ? 1e6 / itWattsPerGpu : null;
+}
 
 /** `basis` is the registry vocabulary; `count` is the PowerX Count vocabulary. */
 export type PowerBasisLabelStyle = 'basis' | 'count';
@@ -59,6 +110,10 @@ export const POWER_BASIS_FIELDS: Record<
 > = {
   'gpu-provisioned': { energy: 'gpuProvisionedJPerOutputToken' },
   'utility-provisioned': { energy: 'utilityProvisionedJPerOutputToken' },
+  'it-modeled': {
+    watts: 'itModeledWatts',
+    energy: 'itModeledJPerOutputToken',
+  },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
     energy: 'utilityModeledJPerOutputToken',
@@ -72,6 +127,8 @@ export interface PowerBasisInput {
   totalOutputTokPerSec: number | null;
   measuredWatts: number | null;
   measuredJPerOutputToken: number | null;
+  /** Modeled IT W per GPU (no PUE); the facility figure minus the PUE overhead. */
+  modeledItWattsPerGpu: number | null;
   modeledFacilityWattsPerGpu: number | null;
 }
 
@@ -93,6 +150,10 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
     measuredWatts !== null && isPositive(input.modeledFacilityWattsPerGpu)
       ? input.modeledFacilityWattsPerGpu
       : null;
+  const modeledIt =
+    measuredWatts !== null && isPositive(input.modeledItWattsPerGpu)
+      ? input.modeledItWattsPerGpu
+      : null;
 
   const gpuSecondsPerOutputToken =
     isPositive(input.allocatedGpus) && isPositive(input.totalOutputTokPerSec)
@@ -103,16 +164,19 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       ? orNull(watts * gpuSecondsPerOutputToken)
       : null;
 
-  const modeledEnergy =
-    modeled !== null && measuredWatts !== null && measuredJ !== null
-      ? orNull((measuredJ * modeled) / measuredWatts)
+  // Modeled energies scale the measured J/token by the modeled-to-measured watt ratio.
+  const modeledEnergy = (watts: number | null) =>
+    watts !== null && measuredWatts !== null && measuredJ !== null
+      ? orNull((measuredJ * watts) / measuredWatts)
       : null;
 
   return {
     gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
     utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
+    itModeledWatts: modeledIt,
+    itModeledJPerOutputToken: modeledEnergy(modeledIt),
     utilityModeledWatts: modeled,
-    utilityModeledJPerOutputToken: modeledEnergy,
+    utilityModeledJPerOutputToken: modeledEnergy(modeled),
   };
 }
 
@@ -154,6 +218,20 @@ export function modeledFacilityWattsPerGpu(
   return orNull(model.deploymentFacilityWatts / model.gpuCount);
 }
 
+/**
+ * Modeled IT W per GPU: the deployment's IT watts (every breakdown part but the
+ * PUE facility overhead) over the same measured GPU count the facility figure
+ * uses, so IT + facility overhead per GPU equals the facility W per GPU exactly.
+ */
+export function modeledItWattsPerGpu(
+  entry: Pick<PowerBasisEntry, 'modeledSystemPower'>,
+): number | null {
+  const model = entry.modeledSystemPower;
+  if (model?.status !== 'supported') return null;
+  if (!isPositive(model.deploymentItWatts) || !count(model.gpuCount)) return null;
+  return orNull(model.deploymentItWatts / model.gpuCount);
+}
+
 export type PowerBasisChartFields = Partial<Pick<InferenceData, PowerBasisFieldKey>>;
 
 export function buildPowerBasisChartFields(
@@ -166,6 +244,7 @@ export function buildPowerBasisChartFields(
     ...powerBasisNormalization(entry),
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,
+    modeledItWattsPerGpu: modeledItWattsPerGpu(entry),
     modeledFacilityWattsPerGpu: modeledFacilityWattsPerGpu(entry),
   });
   const fields: PowerBasisChartFields = {};

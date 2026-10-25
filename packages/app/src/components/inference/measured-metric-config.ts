@@ -96,6 +96,16 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
   [
+    'y_itModeledWatts',
+    {
+      family: 'power',
+      basis: 'it-modeled',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
+  [
     'y_utilityModeledWatts',
     {
       family: 'power',
@@ -109,6 +119,7 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     [
       ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken'],
       ['utility-provisioned', 'y_utilityProvisionedJPerOutputToken'],
+      ['it-modeled', 'y_itModeledJPerOutputToken'],
       ['utility-modeled', 'y_utilityModeledJPerOutputToken'],
     ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey])[]
   ).map(([basis, energy]): readonly [MetricConfigKey, MeasuredMetricConfig] => [

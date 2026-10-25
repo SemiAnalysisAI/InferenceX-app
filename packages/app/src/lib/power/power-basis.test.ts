@@ -127,6 +127,37 @@ describe('power boundaries through the derived-field builder', () => {
     },
   );
 
+  it('derives the IT (no PUE) boundary as the facility figure minus the PUE overhead', () => {
+    const { entry, fields } = derive(row());
+    expect(entry.modeledSystemPower?.status).toBe('supported');
+    if (entry.modeledSystemPower?.status !== 'supported') return;
+    const model = entry.modeledSystemPower;
+    const itWatts = fields.itModeledWatts?.y;
+    const facility = fields.utilityModeledWatts?.y;
+    expect(itWatts).toBeGreaterThan(row().metrics.avg_power_w);
+    expect(itWatts).toBeLessThan(facility!);
+    // IT = deployment IT watts over the measured GPU count = the stacked parts minus facility.
+    expect(itWatts).toBeCloseTo(model.deploymentItWatts / model.gpuCount, 9);
+    const parts = model.deploymentBreakdownWatts;
+    const stackedIt =
+      (parts.gpu + parts.measuredCpu + parts.server + parts.fansPsu + parts.network) /
+      model.gpuCount;
+    expect(itWatts).toBeCloseTo(stackedIt, 6);
+    expect(facility).toBeCloseTo(itWatts! + parts.facility / model.gpuCount, 6);
+    // Both modeled energies scale measured J/token by their watt ratio.
+    expect(fields.itModeledJPerOutputToken?.y).toBeCloseTo(
+      (row().metrics.joules_per_output_token * itWatts!) / row().metrics.avg_power_w,
+      9,
+    );
+    expect(fields.itModeledJPerOutputToken?.y).toBeLessThan(
+      fields.utilityModeledJPerOutputToken!.y,
+    );
+    expect(POWER_BASIS_FIELDS['it-modeled']).toEqual({
+      watts: 'itModeledWatts',
+      energy: 'itModeledJPerOutputToken',
+    });
+  });
+
   it.each(['single_turn', 'agentic_traces'] as const)(
     'keeps %s GPU boundaries when an NVL72 row is not whole compute trays',
     (benchmark_type) => {
@@ -137,6 +168,8 @@ describe('power boundaries through the derived-field builder', () => {
       expect(fields.utilityProvisionedJPerOutputToken).toBeDefined();
       expect(fields.utilityModeledWatts).toBeUndefined();
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
+      expect(fields.itModeledWatts).toBeUndefined();
+      expect(fields.itModeledJPerOutputToken).toBeUndefined();
     },
   );
 

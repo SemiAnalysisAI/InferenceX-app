@@ -4,6 +4,8 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { InferenceData } from '../types';
 import {
+  breakdownItWattsPerGpu,
+  breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
@@ -181,6 +183,31 @@ describe('stackPowerBreakdown', () => {
       expect(segments[index].y0).toBe(segments[index - 1].y1);
     }
     expect(segments.at(-1)!.y1).toBeCloseTo(series.points[0].totalWattsPerGpu, 9);
+  });
+});
+
+describe('breakdownSeriesAtBoundary', () => {
+  it('counts IT only by dropping the facility part from categories and totals', () => {
+    const [series] = buildPowerBreakdowns([point(500)]);
+    const entry = series.points[0];
+    expect(series.categories).toContain('facility');
+    expect(entry.wattsPerGpu.facility).toBeGreaterThan(0);
+    const itSeries = breakdownSeriesAtBoundary(series, false);
+    expect(itSeries.categories).not.toContain('facility');
+    expect(itSeries.categories).toEqual(series.categories.filter((key) => key !== 'facility'));
+    expect(itSeries.points[0].wattsPerGpu.facility).toBe(0);
+    expect(itSeries.points[0].totalWattsPerGpu).toBeCloseTo(
+      entry.totalWattsPerGpu - entry.wattsPerGpu.facility,
+      9,
+    );
+    expect(itSeries.points[0].totalWattsPerGpu).toBeCloseTo(breakdownItWattsPerGpu(entry), 9);
+    // The IT stack still sums to its total exactly.
+    const segments = stackPowerBreakdown(itSeries.points[0], itSeries.categories);
+    expect(segments.at(-1)!.y1).toBeCloseTo(itSeries.points[0].totalWattsPerGpu, 9);
+    // Facility × PUE identity: IT × PUE = facility total.
+    expect(itSeries.points[0].totalWattsPerGpu * entry.pue).toBeCloseTo(entry.totalWattsPerGpu, 6);
+    // Including the facility returns the series untouched.
+    expect(breakdownSeriesAtBoundary(series, true)).toBe(series);
   });
 });
 

@@ -13,9 +13,16 @@ const ids = (metric: string, mode: 'boundaries' | 'all') =>
   powerCompareVariants(metric, mode).map((series) => series.variant.id);
 
 describe('powerCompareVariants boundaries', () => {
-  it('pairs GPU only with Whole system for the boundary compare', () => {
-    expect(ids('y_measuredJPerOutputToken', 'boundaries')).toEqual(['utility-modeled']);
-    expect(ids('y_measuredAvgPower', 'boundaries')).toEqual(['utility-modeled']);
+  it('draws GPU only, IT (no PUE) and Facility for the boundary compare', () => {
+    expect(ids('y_measuredJPerOutputToken', 'boundaries')).toEqual([
+      'it-modeled',
+      'utility-modeled',
+    ]);
+    expect(ids('y_measuredAvgPower', 'boundaries')).toEqual(['it-modeled', 'utility-modeled']);
+    expect(ids('y_itModeledWatts', 'boundaries')).toEqual(['gpu-measured', 'utility-modeled']);
+    expect(
+      powerCompareVariants('y_measuredAvgPower', 'boundaries').map((series) => series.field),
+    ).toEqual(['itModeledWatts', 'utilityModeledWatts']);
   });
 
   it('adds the rated provisioned bounds when comparing all boundaries', () => {
@@ -30,6 +37,7 @@ describe('powerCompareVariants boundaries', () => {
 describe('power variant labels on PowerX', () => {
   const gpu = { kind: 'basis', id: 'gpu-measured' } as const;
   const system = { kind: 'basis', id: 'utility-modeled' } as const;
+  const itBasis = { kind: 'basis', id: 'it-modeled' } as const;
   const tdp = { kind: 'basis', id: 'gpu-provisioned' } as const;
   const decode = { kind: 'role', id: 'decode' } as const;
 
@@ -37,13 +45,17 @@ describe('power variant labels on PowerX', () => {
     expect(powerVariantLabel(gpu, 'en')).toBe('GPU Level Measured');
     expect(powerVariantLabel(system, 'en')).toBe('All in Measured');
     expect(powerVariantLabel(system, 'zh')).toBe('整体实测功耗');
+    expect(powerVariantLabel(itBasis, 'en')).toBe('All in Measured IT (no PUE)');
+    expect(powerVariantLabel(itBasis, 'zh')).toBe('整体实测 IT 功耗（不含 PUE）');
   });
 
-  it('uses the Count vocabulary for the two measured boundaries only', () => {
+  it('uses the Count vocabulary for the three measured boundaries only', () => {
     expect(powerVariantLabel(gpu, 'en', 'count')).toBe('GPU only');
-    expect(powerVariantLabel(system, 'en', 'count')).toBe('Whole system');
+    expect(powerVariantLabel(itBasis, 'en', 'count')).toBe('IT (no PUE)');
+    expect(powerVariantLabel(system, 'en', 'count')).toBe('Facility');
     expect(powerVariantLabel(gpu, 'zh', 'count')).toBe('仅 GPU');
-    expect(powerVariantLabel(system, 'zh', 'count')).toBe('整体系统');
+    expect(powerVariantLabel(itBasis, 'zh', 'count')).toBe('IT（不含 PUE）');
+    expect(powerVariantLabel(system, 'zh', 'count')).toBe('数据中心（含 PUE）');
     expect(powerVariantLabel(tdp, 'en', 'count')).toBe('GPU Level Provisioned (TDP)');
     expect(powerVariantLabel(decode, 'en', 'count')).toBe('Decode GPUs');
   });
@@ -51,10 +63,13 @@ describe('power variant labels on PowerX', () => {
   it('abbreviates TDP in line labels in either vocabulary', () => {
     expect(powerVariantShortLabel(tdp, 'en')).toBe('TDP');
     expect(powerVariantShortLabel(tdp, 'en', 'count')).toBe('TDP');
-    expect(powerVariantShortLabel(system, 'en', 'count')).toBe('Whole system');
+    expect(powerVariantShortLabel(system, 'en', 'count')).toBe('Facility');
     expect(powerLineLabelSuffix(system, { isBase: false, locale: 'en', labelStyle: 'count' })).toBe(
-      ' · Whole system',
+      ' · Facility',
     );
+    expect(
+      powerLineLabelSuffix(itBasis, { isBase: false, locale: 'en', labelStyle: 'count' }),
+    ).toBe(' · IT (no PUE)');
     expect(powerLineLabelSuffix(system, { isBase: false, locale: 'en' })).toBe(
       ' · All in Measured',
     );
@@ -64,7 +79,14 @@ describe('power variant labels on PowerX', () => {
     const point = { powerVariant: system } as Pick<InferenceData, 'powerVariant'>;
     const base = {} as Pick<InferenceData, 'powerVariant'>;
     expect(powerSeriesLabel(point, 'y_measuredAvgPower', 'boundaries', 'en', 'count')).toBe(
-      'Whole system',
+      'Facility',
+    );
+    const itPoint = { powerVariant: itBasis } as Pick<InferenceData, 'powerVariant'>;
+    expect(powerSeriesLabel(itPoint, 'y_measuredAvgPower', 'boundaries', 'en', 'count')).toBe(
+      'IT (no PUE)',
+    );
+    expect(powerSeriesLabel(itPoint, 'y_measuredAvgPower', 'boundaries', 'en')).toBe(
+      'All in Measured IT (no PUE)',
     );
     expect(powerSeriesLabel(base, 'y_measuredAvgPower', 'boundaries', 'en', 'count')).toBe(
       'GPU only',

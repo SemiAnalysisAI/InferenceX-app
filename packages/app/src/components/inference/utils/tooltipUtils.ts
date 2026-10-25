@@ -18,6 +18,7 @@ import {
 } from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
@@ -209,7 +210,8 @@ const SYSTEM_POWER_STRINGS = {
     heading: 'InferenceX Power Model (beta)',
     details: 'Deployment & model details',
     measuredGpu: 'Measured GPU power',
-    itPerGpu: 'Modeled IT power per GPU',
+    itPerGpu: 'Modeled IT power per GPU (no PUE)',
+    facilityPerGpu: 'Modeled facility power per GPU',
     deploymentIt: 'Modeled deployment IT power',
     facility: 'Modeled facility power',
     state: 'Operating state',
@@ -277,7 +279,8 @@ const SYSTEM_POWER_STRINGS = {
     heading: 'InferenceX 功耗模型（Beta）',
     details: '部署与模型详情',
     measuredGpu: 'GPU 实测功耗',
-    itPerGpu: '每 GPU 分摊的 IT 功耗估算',
+    itPerGpu: '每 GPU 分摊的 IT 功耗估算（不含 PUE）',
+    facilityPerGpu: '每 GPU 分摊的数据中心功耗估算',
     deploymentIt: '整个部署的 IT 功耗估算',
     facility: '数据中心功耗估算',
     state: '运行状态',
@@ -343,6 +346,7 @@ const WATT_METRICS = new Set([
   'y_measuredAvgPower',
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
+  'y_itModeledWatts',
   'y_utilityModeledWatts',
 ]);
 
@@ -371,9 +375,10 @@ const modeledSystemPowerHTML = (
   const u = t.units[estimate.unit];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
-    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU${powerBasisPillHtml('gpu', locale)}`)}
     ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
-    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU${powerBasisPillHtml('it', locale)}`)}
+    ${tooltipLine(t.facilityPerGpu, `${fmtWatts(estimate.deploymentFacilityWatts / estimate.gpuCount)} W/GPU${powerBasisPillHtml('facility', locale)}`)}
     ${
       isPinned
         ? `

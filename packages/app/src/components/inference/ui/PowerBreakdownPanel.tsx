@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
   usePowerXCompareTarget,
+  usePowerXIncludeFacility,
   usePowerXSurface,
   useSetPowerXCompareTarget,
 } from './powerx-surface';
@@ -32,6 +33,7 @@ import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
+  breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
   MEASURED_POWER_CATEGORIES,
   powerBreakdownInteractivity,
@@ -58,6 +60,7 @@ const STRINGS = {
     xAxis: 'Median Interactivity (tok/s/user)',
     yAxis: 'Power (W/GPU)',
     total: 'All in Measured',
+    totalIt: 'IT (no PUE)',
     share: 'Share',
     measured: 'Measured',
     modeled: 'Modeled',
@@ -90,6 +93,7 @@ const STRINGS = {
     xAxis: '中位交互性（tok/s/user）',
     yAxis: '功耗（W/GPU）',
     total: 'All in Measured',
+    totalIt: 'IT（不含 PUE）',
     share: '占比',
     measured: '实测',
     modeled: '建模',
@@ -219,6 +223,7 @@ function tooltipHtml(
   color: string,
   xLabel: string,
   t: (typeof STRINGS)['en'],
+  totalLabel: string = t.total,
 ) {
   const { entry } = column;
   const rows = series.categories
@@ -246,7 +251,7 @@ function tooltipHtml(
     <div class="text-muted-foreground">${escapeHtml(xLabel)}: ${interactivityFormat(entry.interactivity)}</div>
     ${entry.configLabel ? `<div class="mb-1 max-w-72 text-muted-foreground">${escapeHtml(entry.configLabel)}</div>` : ''}
     <table><tbody>${rows}
-      <tr class="border-t font-semibold"><td class="pr-2 pt-1">${t.total}</td><td></td><td class="pr-2 pt-1 text-right tabular-nums">${watts(entry.totalWattsPerGpu)} W</td><td></td></tr>
+      <tr class="border-t font-semibold"><td class="pr-2 pt-1">${escapeHtml(totalLabel)}</td><td></td><td class="pr-2 pt-1 text-right tabular-nums">${watts(entry.totalWattsPerGpu)} W</td><td></td></tr>
     </tbody></table>${notes}</div>`;
 }
 
@@ -260,6 +265,7 @@ function BreakdownChart({
   evenSpacing = false,
   markedIndex = null,
   onColumnClick,
+  totalLabel,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
@@ -267,6 +273,8 @@ function BreakdownChart({
   view: PowerBreakdownView;
   xLabel: string;
   t: (typeof STRINGS)['en'];
+  /** What the stack total is called in the tooltip (All in Measured, or IT without PUE). */
+  totalLabel?: string;
   /**
    * One evenly spaced slot per benchmark point, in interactivity order. A sweep's
    * points bunch up at low interactivity, so true positions leave slivers there.
@@ -692,7 +700,7 @@ function BreakdownChart({
       layers={layers}
       tooltip={{
         rulerType: 'none',
-        content: (column) => tooltipHtml(series, column, color, xLabel, t),
+        content: (column) => tooltipHtml(series, column, color, xLabel, t, totalLabel),
         attachToLayer: 4,
         onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
         onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
@@ -744,9 +752,14 @@ export default function PowerBreakdownPanel({
   useEffect(() => {
     setUrlParams({ i_pbview: view });
   }, [view, setUrlParams]);
+  // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
+  const includeFacility = usePowerXIncludeFacility();
   const breakdowns = useMemo(
-    () => buildPowerBreakdowns(data, locale, interactivity),
-    [data, locale, interactivity],
+    () =>
+      buildPowerBreakdowns(data, locale, interactivity).map((entry) =>
+        breakdownSeriesAtBoundary(entry, includeFacility),
+      ),
+    [data, locale, interactivity, includeFacility],
   );
   const [ownKey, setOwnKey] = useState<string | null>(null);
   const selectedKey = controlledKey === undefined ? ownKey : controlledKey;
@@ -931,6 +944,7 @@ export default function PowerBreakdownPanel({
             xLabel={interactivityLabel}
             t={t}
             evenSpacing={powerXSurface}
+            totalLabel={includeFacility ? t.total : t.totalIt}
             markedIndex={markedIndex >= 0 ? markedIndex : null}
             onColumnClick={
               setCompareTarget ? (entry) => setCompareTarget(entry.interactivity) : undefined

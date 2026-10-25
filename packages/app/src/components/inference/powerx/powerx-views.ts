@@ -10,15 +10,21 @@ export const POWERX_VIEWS = [
   'where',
   'time',
 ] as const satisfies readonly PowerXView[];
-export type PowerXBoundary = 'gpu' | 'system';
-/** Count on the Energy view: one boundary, or both on one chart. */
+/** The three measured boundaries the Count toggle names: GPU only, IT (no PUE), Facility. */
+export type PowerXBoundary = 'gpu' | 'it' | 'system';
+export const POWERX_BOUNDARIES = [
+  'gpu',
+  'it',
+  'system',
+] as const satisfies readonly PowerXBoundary[];
+/** Count on the Energy view: one boundary, or all three on one chart. */
 export type PowerXCount = PowerXBoundary | 'both';
 /** What one unit of energy is charged to on the Energy view. */
 export type EnergyPer = 'output' | 'input' | 'total' | 'query';
 
 export const POWERX_DEFAULT_METRIC = 'y_measuredJPerOutputToken';
 
-/** GPU-measured metric behind each Energy unit. Only output tokens have a whole-system basis. */
+/** GPU-measured metric behind each Energy unit. Only output tokens have an IT or facility basis. */
 export const ENERGY_PER_METRIC: Record<EnergyPer, string> = {
   output: 'y_measuredJPerOutputToken',
   input: 'y_measuredJPerInputToken',
@@ -28,9 +34,13 @@ export const ENERGY_PER_METRIC: Record<EnergyPer, string> = {
 
 /** Metric keys behind each view/boundary pair. */
 export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, Record<PowerXBoundary, string>> = {
-  draw: { gpu: 'y_measuredAvgPower', system: 'y_utilityModeledWatts' },
-  energy: { gpu: 'y_measuredJPerOutputToken', system: 'y_utilityModeledJPerOutputToken' },
-  where: { gpu: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
+  draw: { gpu: 'y_measuredAvgPower', it: 'y_itModeledWatts', system: 'y_utilityModeledWatts' },
+  energy: {
+    gpu: 'y_measuredJPerOutputToken',
+    it: 'y_itModeledJPerOutputToken',
+    system: 'y_utilityModeledJPerOutputToken',
+  },
+  where: { gpu: 'y_measuredAvgPower', it: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
 };
 
 export const POWER_TIMELINE_METRIC = 'y_measuredPowerTimeline';
@@ -55,7 +65,9 @@ export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView
 }
 
 export function powerXBoundaryFor(metric: string): PowerXBoundary {
-  return getMeasuredMetricConfig(metric)?.basis === 'gpu-measured' ? 'gpu' : 'system';
+  const basis = getMeasuredMetricConfig(metric)?.basis;
+  if (basis === 'gpu-measured') return 'gpu';
+  return basis === 'it-modeled' ? 'it' : 'system';
 }
 
 export interface PowerXSelection {
@@ -77,27 +89,27 @@ export function powerXCountFor(metric: string, compare: PowerCompare): PowerXCou
   return compare === 'boundaries' || compare === 'all' ? 'both' : powerXBoundaryFor(metric);
 }
 
-/** The Count toggle (GPU only | Whole system | Both) on the Energy and Power draw views. */
+/** The Count toggle (GPU only | IT (no PUE) | Facility | All) on the Energy and Power draw views. */
 export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): PowerXSelection {
   const view = powerXViewFor(current.metric, current.compare);
   if (next === 'both') return { metric: ENERGY_PER_METRIC.output, compare: 'boundaries' };
   if (view === 'draw') return { metric: VIEW_METRICS.draw[next], compare: 'none' };
   const per = energyPerFor(current.metric);
   return {
-    metric: next === 'system' ? VIEW_METRICS.energy.system : ENERGY_PER_METRIC[per],
+    metric: next === 'gpu' ? ENERGY_PER_METRIC[per] : VIEW_METRICS.energy[next],
     compare: 'none',
   };
 }
 
-/** The Per toggle on the Energy view; only output tokens keep a whole-system basis. */
+/** The Per toggle on the Energy view; only output tokens keep an IT or facility basis. */
 export function selectPowerXPer(next: EnergyPer, current: PowerXSelection): PowerXSelection {
   if (next === energyPerFor(current.metric)) return current;
   const boundary = powerXBoundaryFor(current.metric);
   const compare = next !== 'output' && current.compare !== 'none' ? 'none' : current.compare;
   return {
     metric:
-      next === 'output' && boundary === 'system'
-        ? VIEW_METRICS.energy.system
+      next === 'output' && boundary !== 'gpu'
+        ? VIEW_METRICS.energy[boundary]
         : ENERGY_PER_METRIC[next],
     compare,
   };
@@ -110,16 +122,22 @@ export function powerXShowAsFor(metric: string): PowerXShowAs {
   return config?.family === 'power' && config.display === 'tdp' ? 'tdp' : 'watts';
 }
 
-/** The Show as toggle on the Power draw view. */
+/** The Show as toggle on the Power draw view; % of TDP is a GPU-only reading. */
 export function selectPowerXShowAs(next: PowerXShowAs): string {
   return next === 'tdp' ? POWER_PERCENT_TDP_METRIC : VIEW_METRICS.draw.gpu;
+}
+
+/** True on the Power draw view shown as % of TDP, where the headroom shading and table apply. */
+export function powerXShowsHeadroom(metric: string, compare: PowerCompare): boolean {
+  return metric === POWER_PERCENT_TDP_METRIC && compare === 'none';
 }
 
 /**
  * Which of the measured-metric controls still mean something on a view:
  * Scope (All / Prefill / Decode GPUs) for GPU-only power and for per-token
  * energy, plus the Power statistic (Average / P75 / P90) for power. Timelines,
- * comparisons and the modeled whole system are defined for the all-GPU average only.
+ * comparisons and the modeled IT and facility boundaries are defined for the
+ * all-GPU average only.
  */
 export function powerXMetricFields(
   metric: string,

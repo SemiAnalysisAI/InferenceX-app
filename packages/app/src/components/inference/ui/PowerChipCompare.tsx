@@ -10,6 +10,8 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { AggDataEntry, InferenceData } from '../types';
 import { swatchStyle } from './PowerBreakdownPanel';
 import {
+  breakdownItWattsPerGpu,
+  breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
@@ -19,7 +21,13 @@ import {
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
-import { usePowerXCompareTarget, useSetPowerXCompareTarget } from './powerx-surface';
+import { PowerBasisPill } from '../powerx/PowerBasisPill';
+import { IT_NOT_MODELED_NOTE } from '@/lib/power/power-basis';
+import {
+  usePowerXCompareTarget,
+  usePowerXIncludeFacility,
+  useSetPowerXCompareTarget,
+} from './powerx-surface';
 
 const STRINGS = {
   en: {
@@ -33,6 +41,8 @@ const STRINGS = {
     measured: 'Measured',
     modeled: 'Modeled (hatched)',
     perGpu: 'W per GPU, all-in',
+    perGpuIt: 'W per GPU, IT (no PUE)',
+    itSubtotal: (watts: string) => `IT ${watts} W`,
     empty: 'No chip has a benchmark point near this interactivity.',
     noModel: (labels: string) =>
       `Not shown: ${labels}. Its GPU power is measured, but there is no whole-system model for this setup yet.`,
@@ -56,6 +66,8 @@ const STRINGS = {
     measured: '实测',
     modeled: '建模（斜线）',
     perGpu: '每 GPU 整体功耗（W）',
+    perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
+    itSubtotal: (watts: string) => `IT ${watts} W`,
     empty: '没有芯片在该交互性附近有基准测试点。',
     noModel: (labels: string) => `未显示：${labels}。其 GPU 功耗为实测，但该配置暂无整机功耗模型。`,
     categories: {
@@ -97,9 +109,14 @@ export default function PowerChipCompare({
   const locale = useLocale();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
+  // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
+  const includeFacility = usePowerXIncludeFacility();
   const series = useMemo(
-    () => buildPowerBreakdowns(data, locale, interactivity),
-    [data, locale, interactivity],
+    () =>
+      buildPowerBreakdowns(data, locale, interactivity).map((entry) =>
+        breakdownSeriesAtBoundary(entry, includeFacility),
+      ),
+    [data, locale, interactivity, includeFacility],
   );
   const unmodeled = useMemo(() => chipsWithoutSystemModel(data, series), [data, series]);
   const hwKeys = useMemo(() => [...new Set(series.map((entry) => entry.hwKey))], [series]);
@@ -267,8 +284,12 @@ export default function PowerChipCompare({
                   <span className="flex flex-col text-right sm:items-end">
                     <span className="text-sm font-semibold tabular-nums">
                       {watts(point.totalWattsPerGpu)} W
+                      <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
                     </span>
                     <span className="text-xs text-muted-foreground">
+                      {includeFacility
+                        ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
+                        : ''}
                       {t.gpuShare(pct(gpuShare))}
                     </span>
                   </span>
@@ -287,9 +308,12 @@ export default function PowerChipCompare({
         </ol>
       )}
       <p className="text-xs text-muted-foreground">
-        {t.perGpu}
+        {includeFacility ? t.perGpu : t.perGpuIt}
         {outOfRange.length > 0 &&
           ` · ${t.outOfRange(outOfRange.map((entry) => entry.label).join(', '))}`}
+      </p>
+      <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-not-modeled">
+        {IT_NOT_MODELED_NOTE[locale]}
       </p>
       {unmodeled.length > 0 && (
         <p

@@ -31,6 +31,8 @@ export type PowerSeriesField = keyof Pick<
   | 'reconstructedPrefillJPerOutputToken'
   | 'gpuProvisionedJPerOutputToken'
   | 'utilityProvisionedJPerOutputToken'
+  | 'itModeledWatts'
+  | 'itModeledJPerOutputToken'
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken'
 >;
@@ -63,6 +65,7 @@ const VARIANT_DASH: Record<string, string> = {
   'gpu-measured': '',
   'gpu-provisioned': '8 4',
   'utility-provisioned': '3 3',
+  'it-modeled': '6 3',
   'utility-modeled': '10 3 2 3',
   all: '',
   prefill: '7 3',
@@ -100,11 +103,13 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
 }
 
 /**
- * The two boundaries the PowerX tab's "Count" control names (GPU only, Whole
- * system). `boundaries` draws just these; `all` adds the rated provisioned bounds.
+ * The three measured boundaries the PowerX tab's "Count" control names (GPU
+ * only, IT without PUE, Facility). `boundaries` draws just these; `all` adds the
+ * rated provisioned bounds.
  */
 export const COUNT_COMPARE_BASES = [
   'gpu-measured',
+  'it-modeled',
   'utility-modeled',
 ] as const satisfies readonly PowerBasis[];
 

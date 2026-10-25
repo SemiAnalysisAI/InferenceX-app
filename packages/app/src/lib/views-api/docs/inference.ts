@@ -286,13 +286,25 @@ const parameters: readonly ApiParameter[] = [
     example: 'true',
   },
   {
+    name: 'headroom',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include headroom: the PowerX measured-vs-TDP table. Per hardware line (hwKey + precision), measured average and P90 W per chip, P90 as % of registry TDP and headroom = 100 − that, read at 25 / 50 / 100 / 300 tok/s/user on interactivityField by the chart’s own interpolation (throughput Pareto front, monotone Steffen spline). A cell outside a line’s measured range is null, never extrapolated; lines without P90 power, throughput, a registry TDP or two points are omitted. GPU board power only. JSON only.',
+      '返回 headroom：PowerX 的实测功耗 vs TDP 余量表。按硬件曲线（hwKey + 精度）给出每芯片实测平均与 P90 功耗、P90 占注册表 TDP 的百分比以及余量 = 100 − 该百分比，在 interactivityField 上的 25 / 50 / 100 / 300 tok/s/user 处用图表自身的插值（吞吐 Pareto 前沿、单调 Steffen 样条）读取。超出曲线实测范围的单元为 null，不做外推；缺少 P90 功耗、吞吐、注册表 TDP 或不足两个点的曲线会被省略。仅 GPU 板卡功耗。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
     name: 'format',
     location: 'query',
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit and powerBreakdown analytical results require JSON and return 400 with CSV.',
-      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit 和 powerBreakdown 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit, powerBreakdown and headroom analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit、powerBreakdown 和 headroom 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -657,6 +669,43 @@ const responseSchema = objectSchema(
         ),
       }),
     ),
+    headroom: objectSchema({
+      interactivities: arraySchema(numberSchema),
+      interactivityField: {
+        type: 'string',
+        description:
+          'Interactivity field the cells are read on: the chart x-axis when it is an interactivity axis, otherwise median_intvty.',
+      },
+      rows: arraySchema(
+        objectSchema({
+          key: { type: 'string', description: 'hwKey|precision.' },
+          hwKey: { type: 'string' },
+          precision: { type: 'string' },
+          label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
+          tdpWatts: { ...numberSchema, description: 'Rated board TDP per GPU from the registry.' },
+          interactivityMin: numberSchema,
+          interactivityMax: numberSchema,
+          cells: arraySchema({
+            oneOf: [
+              objectSchema({
+                interactivity: numberSchema,
+                avgWatts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured average W per chip.',
+                },
+                p90Watts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured P90 fleet W per chip.',
+                },
+                percentTdpP90: { ...numberSchema, description: 'P90 ÷ TDP × 100.' },
+                headroomPercent: { ...numberSchema, description: '100 − percentTdpP90.' },
+              }),
+              { type: 'null' },
+            ],
+          }),
+        }),
+      ),
+    }),
     pricing: { type: ['object', 'null'], additionalProperties: true },
     comparisons: arraySchema({
       type: 'object',
@@ -702,6 +751,7 @@ const responseExample = {
     roleShare: false,
     powerFit: false,
     powerBreakdown: false,
+    headroom: false,
   },
   metric: {
     key: 'tpPerGpu',

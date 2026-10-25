@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   energyPerFor,
   POWERX_DEFAULT_METRIC,
+  powerXBoundaryFor,
   powerXCountFor,
   powerXMetricFields,
   powerXProvenanceText,
   powerXShowAsFor,
+  powerXShowsHeadroom,
   powerXViewFor,
   selectPowerXCount,
   selectPowerXPer,
@@ -72,11 +74,45 @@ describe('selectPowerXView', () => {
 describe('Count, Per and Show as', () => {
   it('reads Count from the metric basis and the compare mode', () => {
     expect(powerXCountFor('y_measuredJPerOutputToken', 'none')).toBe('gpu');
+    expect(powerXCountFor('y_itModeledWatts', 'none')).toBe('it');
+    expect(powerXCountFor('y_itModeledJPerOutputToken', 'none')).toBe('it');
     expect(powerXCountFor('y_utilityModeledWatts', 'none')).toBe('system');
     expect(powerXCountFor('y_measuredJPerOutputToken', 'boundaries')).toBe('both');
+    expect(powerXBoundaryFor('y_gpuProvisionedJPerOutputToken')).toBe('system');
   });
 
-  it('switches boundary on the current view and overlays both on output-token energy', () => {
+  it('maps the IT (no PUE) Count onto the IT metrics of each view', () => {
+    const draw = { metric: 'y_measuredAvgPower', compare: 'none' as const };
+    expect(selectPowerXCount('it', draw)).toEqual({ metric: 'y_itModeledWatts', compare: 'none' });
+    const energy = { metric: 'y_measuredJPerOutputToken', compare: 'none' as const };
+    expect(selectPowerXCount('it', energy)).toEqual({
+      metric: 'y_itModeledJPerOutputToken',
+      compare: 'none',
+    });
+    // Per keeps the IT boundary on output tokens and returns to GPU for other units.
+    const itEnergy = { metric: 'y_itModeledJPerOutputToken', compare: 'none' as const };
+    expect(selectPowerXPer('input', itEnergy)).toEqual({
+      metric: 'y_measuredJPerInputToken',
+      compare: 'none',
+    });
+    expect(
+      selectPowerXPer('output', { metric: 'y_measuredJPerInputToken', compare: 'none' }),
+    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'none' });
+    expect(powerXViewFor('y_itModeledWatts', 'none')).toBe('draw');
+    expect(powerXViewFor('y_itModeledJPerOutputToken', 'none')).toBe('energy');
+    expect(selectPowerXView('energy', { metric: 'y_itModeledWatts', compare: 'none' })).toEqual({
+      metric: 'y_itModeledJPerOutputToken',
+      compare: 'none',
+    });
+  });
+
+  it('shows headroom only on Power draw as % of TDP without a comparison', () => {
+    expect(powerXShowsHeadroom('y_measuredPowerPercentTdp', 'none')).toBe(true);
+    expect(powerXShowsHeadroom('y_measuredPowerPercentTdp', 'boundaries')).toBe(false);
+    expect(powerXShowsHeadroom('y_measuredAvgPower', 'none')).toBe(false);
+  });
+
+  it('switches boundary on the current view and overlays all three on output-token energy', () => {
     const energy = { metric: 'y_measuredJPerInputToken', compare: 'none' as const };
     expect(selectPowerXCount('system', energy)).toEqual({
       metric: 'y_utilityModeledJPerOutputToken',

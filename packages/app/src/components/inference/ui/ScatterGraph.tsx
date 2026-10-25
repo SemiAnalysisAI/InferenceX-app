@@ -194,8 +194,11 @@ import { legendChangelogsByHardware } from '@/components/inference/utils/legend-
 import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
 import {
   usePowerXSurface,
+  useSetPowerXActivePoint,
   useSetPowerXCompareTarget,
+  type PowerXActivePointUpdate,
 } from '@/components/inference/ui/powerx-surface';
+import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -272,6 +275,7 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
       ['basis', 'gpu-measured'],
       ['basis', 'gpu-provisioned'],
       ['basis', 'utility-provisioned'],
+      ['basis', 'it-modeled'],
       ['basis', 'utility-modeled'],
       ['role', 'all'],
       ['role', 'prefill'],
@@ -601,7 +605,10 @@ const ScatterGraph = React.memo(
     );
     const locale = useLocale();
     // PowerX names the measured boundaries the way its Count control does.
-    const powerLabelStyle: PowerBasisLabelStyle = usePowerXSurface() ? 'count' : 'basis';
+    const powerXSurface = usePowerXSurface();
+    const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
+    // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
+    const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
@@ -1883,6 +1890,10 @@ const ScatterGraph = React.memo(
     );
 
     const setCompareTarget = useSetPowerXCompareTarget();
+    // PowerX: the readout row under the caption follows the hovered or pinned point.
+    const setActivePoint = useSetPowerXActivePoint();
+    const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
+    activePointRef.current = setActivePoint;
     const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
     compareFollowsHoverRef.current =
       setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
@@ -2225,17 +2236,21 @@ const ScatterGraph = React.memo(
         onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
           // PowerX: the chip comparison follows the hovered point's interactivity.
           if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
+          activePointRef.current?.({ point: d, source: 'hover' });
           applyHoverState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
           );
         },
-        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          activePointRef.current?.(null);
           applyNormalState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
+          );
+        },
         onPointClick: (d: InferenceData) => {
+          activePointRef.current?.({ point: d, source: 'pinned' });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
@@ -3434,7 +3449,107 @@ const ScatterGraph = React.memo(
           drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
       };
 
-      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
+      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP.
+      const headroomSeries = headroomShading
+        ? Object.entries(groupedData).flatMap(([key, points]) => {
+            if (points[0]?.powerVariant) return [];
+            const hwKey = points[0]?.hwKey;
+            if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
+            const band = points
+              .filter(
+                (p) =>
+                  selectedPrecisions.includes(p.precision) &&
+                  (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(p))) &&
+                  Number.isFinite(p.measuredP90Power?.y) &&
+                  Number.isFinite(p.measuredAvgPower?.y) &&
+                  (p.measuredAvgPower?.y ?? 0) > 0 &&
+                  Number.isFinite(p.measuredPowerPercentTdp?.y),
+              )
+              .map((p) => ({
+                x: p.x,
+                // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
+                y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
+              }))
+              .toSorted((a, b) => a.x - b.x);
+            return band.length >= 2 ? [{ key, color: getCssColor(resolveColor(hwKey)), band }] : [];
+          })
+        : [];
+      const drawHeadroom = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        const topY = yScale(Math.min(100, domainTop));
+        const area = d3
+          .area<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y0(() => topY)
+          .y1((d) => yScale(d.y));
+        const line = d3
+          .line<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y((d) => yScale(d.y));
+        const g = zoomGroup
+          .selectAll<SVGGElement, (typeof headroomSeries)[number]>('g.headroom-band')
+          .data(headroomSeries, (d) => d.key)
+          .join('g')
+          .attr('class', 'headroom-band')
+          .attr('data-testid', 'headroom-band')
+          .attr('pointer-events', 'none');
+        g.selectAll('path.headroom-area')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-area')
+          .attr('fill', (d) => d.color)
+          .attr('fill-opacity', 0.09)
+          .attr('stroke', 'none')
+          .attr('d', (d) => area(d.band));
+        g.selectAll('path.headroom-p90')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-p90')
+          .attr('fill', 'none')
+          .attr('stroke', (d) => d.color)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '2,3')
+          .attr('d', (d) => line(d.band));
+        zoomGroup
+          .selectAll('text.headroom-key')
+          .data(headroomSeries.length > 0 ? [topY] : [])
+          .join('text')
+          .attr('class', 'headroom-key')
+          .attr('x', 4)
+          .attr('y', (y) => y + 12)
+          .attr('font-size', 10)
+          .attr('fill', 'var(--muted-foreground)')
+          .attr('pointer-events', 'none')
+          .text('Shaded: headroom from P90 draw (dotted) to TDP');
+        void width;
+      };
+      const headroomLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-headroom',
+        render: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+          ),
+      };
+
+      const result: LayerConfig<InferenceData>[] = headroomShading
+        ? [headroomLayer, rooflineLayer, scatterLayer]
+        : [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
       result.push(
         overflowContinuationLayer,
@@ -3473,6 +3588,14 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
+      headroomShading,
+      groupedData,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      optimalPointKeys,
+      getCssColor,
+      resolveColor,
       chartDefinition,
       locale,
       powerLabelStyle,

@@ -606,6 +606,71 @@ describe('GET /api/v1/views/inference', () => {
     expect(csv.status).toBe(400);
   });
 
+  it('reads the headroom table along each chip frontier and blanks cells outside the range', async () => {
+    // B200 from 20 to 320 tok/s/user, H200 only between 40 and 120.
+    const sweep = [
+      { hardware: 'b200', conc: 256, interactivity: 20, tput: 4000, avg: 900, p90: 960 },
+      { hardware: 'b200', conc: 64, interactivity: 60, tput: 2400, avg: 800, p90: 880 },
+      { hardware: 'b200', conc: 16, interactivity: 150, tput: 1200, avg: 650, p90: 720 },
+      { hardware: 'b200', conc: 4, interactivity: 320, tput: 500, avg: 500, p90: 560 },
+      { hardware: 'h200', conc: 32, interactivity: 40, tput: 1500, avg: 600, p90: 650 },
+      { hardware: 'h200', conc: 8, interactivity: 120, tput: 700, avg: 450, p90: 520 },
+    ];
+    mockGetLatestBenchmarks.mockResolvedValue(
+      sweep.map(({ hardware, conc, interactivity, tput, avg, p90 }, index) =>
+        makeRow({
+          id: 400 + index,
+          hardware,
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: interactivity,
+            tput_per_gpu: tput,
+            avg_power_w: avg,
+            p90_power_w: p90,
+            avg_total_gpu_power_w: avg * 8,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      ),
+    );
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredPowerPercentTdp&headroom=true',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.headroom).toBe(true);
+    expect(body.headroom.interactivities).toEqual([25, 50, 100, 300]);
+    expect(body.headroom.interactivityField).toBe('median_intvty');
+    expect(body.headroom.rows).toHaveLength(2);
+    const [b200, h200] = body.headroom.rows;
+    expect(b200).toMatchObject({ hwKey: 'b200_trt', precision: 'fp8', tdpWatts: 1000 });
+    expect(b200.cells.map((cell: unknown) => cell !== null)).toEqual([true, true, true, true]);
+    expect(h200).toMatchObject({ tdpWatts: 700, interactivityMin: 40, interactivityMax: 120 });
+    expect(h200.cells.map((cell: unknown) => cell !== null)).toEqual([false, true, true, false]);
+    for (const cell of b200.cells) {
+      expect(cell.percentTdpP90).toBeCloseTo((cell.p90Watts / 1000) * 100, 6);
+      expect(cell.headroomPercent).toBeCloseTo(100 - cell.percentTdpP90, 6);
+      expect(cell.avgWatts).toBeLessThan(cell.p90Watts);
+    }
+    // The spline is monotone: faster per-user serving draws less per chip in this sweep.
+    const p90s = b200.cells.map((cell: { p90Watts: number }) => cell.p90Watts);
+    expect(p90s).toEqual([...p90s].toSorted((a: number, c: number) => c - a));
+    const offResponse = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu'),
+    );
+    const off = await offResponse.json();
+    expect(off).not.toHaveProperty('headroom');
+    expect(off.params.headroom).toBe(false);
+    const csv = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&headroom=true&format=csv'),
+    );
+    expect(csv.status).toBe(400);
+  });
+
   it('canonicalizes list params and applies quick filters', async () => {
     const res = await GET(
       request(

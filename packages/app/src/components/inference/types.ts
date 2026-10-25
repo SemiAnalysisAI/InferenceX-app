@@ -220,11 +220,13 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
 
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  itModeledWatts?: { y: number; roof: boolean };
+  itModeledJPerOutputToken?: { y: number; roof: boolean };
   utilityModeledWatts?: { y: number; roof: boolean };
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
 
-/** `boundaries`: GPU only and Whole system. `all`: also the two rated provisioned bounds. */
+/** `boundaries`: GPU only, IT (no PUE) and Facility. `all`: also the two rated provisioned bounds. */
 export type PowerCompare = 'none' | 'boundaries' | 'all' | 'roles';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
@@ -232,6 +234,8 @@ export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; i
 export type PowerBasisFieldKey =
   | 'gpuProvisionedJPerOutputToken'
   | 'utilityProvisionedJPerOutputToken'
+  | 'itModeledWatts'
+  | 'itModeledJPerOutputToken'
   | 'utilityModeledWatts'
   | 'utilityModeledJPerOutputToken';
 

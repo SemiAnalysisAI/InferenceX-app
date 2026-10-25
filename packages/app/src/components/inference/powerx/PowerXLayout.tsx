@@ -30,10 +30,28 @@ import {
   type Sequence,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { POWER_COUNT_LABELS } from '@/lib/power/power-basis';
+import {
+  gpusPerMegawatt,
+  IT_NOT_MODELED_NOTE,
+  modeledFacilityWattsPerGpu,
+  modeledItWattsPerGpu,
+  POWER_BASIS_TAG_TITLES,
+  POWER_BASIS_TAGS,
+  POWER_COUNT_LABELS,
+} from '@/lib/power/power-basis';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { Switch } from '@/components/ui/switch';
+import type { InferenceData } from '@/components/inference/types';
+import {
+  usePowerXActivePoint,
+  usePowerXIncludeFacility,
+  useSetPowerXIncludeFacility,
+} from '@/components/inference/ui/powerx-surface';
+
+import { PowerBasisPill } from './PowerBasisPill';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
 import { inferenceModelRouteForSelection } from '@/lib/routing/inference-model-slug';
-import { cn } from '@/lib/shared/utils';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   ENERGY_PER_METRIC,
@@ -81,10 +99,33 @@ const STRINGS = {
     scenario: 'Scenario',
     precision: 'Precision',
     count: 'Count',
-    systemHelp: 'GPU measured, rest of server and PUE modeled',
-    both: 'Both',
-    bothHelp: 'GPU only and whole system on one chart',
-    systemOutputOnly: 'Whole system is modeled per output token only',
+    itHelp: 'GPU measured; CPU, server parts, fans/PSU and network share modeled. No PUE.',
+    systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
+    both: 'All',
+    bothHelp: 'GPU only, IT and facility on one chart',
+    systemOutputOnly: 'IT and facility are modeled per output token only',
+    whatIs: 'What is PowerX?',
+    whatIsBody:
+      'Measured GPU power from InferenceX benchmark runs, plus a modeled IT and facility breakdown. Not the energy team’s grid power model.',
+    readout: {
+      it: 'IT',
+      wPerGpu: 'W/GPU',
+      gpusPerMw: 'GPUs per MW (IT)',
+      facility: 'Facility',
+      atPue: (pue: string) => `W/GPU at PUE ${pue}`,
+      gpu: 'GPU',
+      measured: 'W measured',
+      noModel: 'No IT model for this setup yet',
+      pinned: 'Pinned point',
+      hovered: 'Hovered point',
+      nearest: (x: string) => `Near ${x} tok/s/user · hover a point to change`,
+      at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
+    },
+    includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
+    includeFacilityHelp: 'Appends the PUE overhead after the IT stack; off by default on PowerX.',
+    basisKey: 'Every power number carries one of three tags:',
+    utilization:
+      'Utilization means three different things, and PowerX reports only the third: serving efficiency (how busy the deployment is while it serves), demand (what share of capacity customers use over a day), and power draw vs TDP (measured watts as a share of the chip’s rated power).',
     per: 'Per',
     perOptions: {
       output: 'Output token',
@@ -100,7 +141,7 @@ const STRINGS = {
     moreViewsHint: 'prefill vs decode · P75/P90 · rated boundaries · power over time',
     compareBoundaries: 'Compare boundaries',
     compareOff: 'Off',
-    compareAll: 'All four',
+    compareAll: 'All five',
     compareAllHelp: 'Adds the rated GPU TDP and all-in provisioned boundaries',
     compareUnavailable: 'Available for average W per chip and J per output token',
     splitBy: 'Split by',
@@ -110,7 +151,7 @@ const STRINGS = {
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
     openTimeline: 'Open power over time',
     curve: 'Compare on the curve',
-    curveHint: 'GPU only (solid) vs whole system (dashed) across interactivity',
+    curveHint: 'GPU only (solid) vs IT and facility (dashed) across interactivity',
     howWeMeasure: 'How we measure',
     legendMobile: 'Chips & options',
   },
@@ -137,10 +178,33 @@ const STRINGS = {
     scenario: '场景',
     precision: '精度',
     count: '统计范围',
-    systemHelp: 'GPU 为实测，服务器其他组件与 PUE 为模型估算',
-    both: '两者对比',
-    bothHelp: '在同一图中对比仅 GPU 与整体系统',
-    systemOutputOnly: '整体系统仅按输出 Token 建模',
+    itHelp: 'GPU 为实测；CPU、服务器部件、风扇/电源与网络分摊为模型估算。不含 PUE。',
+    systemHelp: 'IT × PUE：GPU 为实测，服务器其他组件与数据中心开销为模型估算',
+    both: '全部',
+    bothHelp: '在同一图中对比仅 GPU、IT 与数据中心',
+    systemOutputOnly: 'IT 与数据中心仅按输出 Token 建模',
+    whatIs: '什么是 PowerX？',
+    whatIsBody:
+      '来自 InferenceX 基准测试运行的实测 GPU 功耗，加上模型估算的 IT 与数据中心功耗构成。它不是能源团队的电网功耗模型。',
+    readout: {
+      it: 'IT',
+      wPerGpu: 'W/GPU',
+      gpusPerMw: '每 MW 可支持的 GPU 数（IT）',
+      facility: '数据中心',
+      atPue: (pue: string) => `W/GPU（PUE ${pue}）`,
+      gpu: 'GPU',
+      measured: 'W 实测',
+      noModel: '该配置暂无 IT 功耗模型',
+      pinned: '已固定的数据点',
+      hovered: '悬停的数据点',
+      nearest: (x: string) => `接近 ${x} tok/s/user · 悬停数据点可切换`,
+      at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
+    },
+    includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
+    includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；PowerX 默认关闭。',
+    basisKey: '每个功耗数值都带有以下三种标签之一：',
+    utilization:
+      '“利用率”有三种不同含义，PowerX 只报告第三种：服务效率（部署在服务期间的繁忙程度）、需求（客户一天内使用的容量占比），以及功耗占 TDP 的比例（实测瓦数占芯片额定功耗的份额）。',
     per: '计量单位',
     perOptions: {
       output: '输出 Token',
@@ -156,7 +220,7 @@ const STRINGS = {
     moreViewsHint: '预填充 vs 解码 · P75/P90 · 额定边界 · 功耗随时间变化',
     compareBoundaries: '对比功耗边界',
     compareOff: '关闭',
-    compareAll: '全部四个',
+    compareAll: '全部五个',
     compareAllHelp: '加入额定 GPU TDP 与整体预配两个边界',
     compareUnavailable: '仅支持平均每芯片 W 与每输出 token 能耗',
     splitBy: '拆分方式',
@@ -166,7 +230,7 @@ const STRINGS = {
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
     openTimeline: '打开功耗随时间变化',
     curve: '在曲线上对比',
-    curveHint: '仅 GPU（实线）与整体系统（虚线）随交互性的变化',
+    curveHint: '仅 GPU（实线）与 IT、数据中心（虚线）随交互性的变化',
     howWeMeasure: '测量方法',
     legendMobile: '芯片与选项',
   },
@@ -426,6 +490,12 @@ export function PowerXLegendControls({
           options={[
             { value: 'gpu', label: POWER_COUNT_LABELS['gpu-measured'][locale] },
             {
+              value: 'it',
+              label: POWER_COUNT_LABELS['it-modeled'][locale],
+              title: view === 'energy' && energyPer !== 'output' ? t.systemOutputOnly : t.itHelp,
+              disabled: view === 'energy' && energyPer !== 'output',
+            },
+            {
               value: 'system',
               label: POWER_COUNT_LABELS['utility-modeled'][locale],
               title:
@@ -476,12 +546,12 @@ export function PowerXLegendControls({
             }
             options={[
               { value: 'watts', label: t.watts },
-              // % TDP is a GPU-only reading; TDP does not bound whole-system power.
+              // % TDP is a GPU-only reading; TDP does not bound IT or facility power.
               {
                 value: 'tdp',
                 label: t.tdp,
-                disabled: boundary === 'system',
-                title: boundary === 'system' ? t.tdpSystemHelp : undefined,
+                disabled: boundary !== 'gpu',
+                title: boundary === 'gpu' ? undefined : t.tdpSystemHelp,
               },
             ]}
           />
@@ -697,7 +767,164 @@ export function PowerXProvenance({
       <p className="mt-1">
         {summary} {children}
       </p>
+      <p className="mt-2">{t.basisKey}</p>
+      <dl
+        className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1"
+        data-testid="powerx-basis-key"
+      >
+        {POWER_BASIS_TAGS.map((tag) => (
+          <div key={tag} className="contents">
+            <dt>
+              <PowerBasisPill tag={tag} className="ml-0" />
+            </dt>
+            <dd>{POWER_BASIS_TAG_TITLES[tag][locale]}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2" data-testid="powerx-utilization-note">
+        {t.utilization}
+      </p>
     </details>
+  );
+}
+
+/** The one-line "What is PowerX?" disclosure under the page description. */
+export function PowerXWhatIs() {
+  const t = usePowerXStrings();
+  return (
+    <details className="-mt-2 text-xs text-muted-foreground" data-testid="powerx-what-is">
+      <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 select-none md:min-h-0">
+        <ChevronRight size={12} className="shrink-0 [details[open]_&]:rotate-90" aria-hidden />
+        <span className="underline underline-offset-2">{t.whatIs}</span>
+      </summary>
+      <p className="mt-1 max-w-prose">{t.whatIsBody}</p>
+    </details>
+  );
+}
+
+const rate = (value: number) =>
+  value >= 100 ? Math.round(value).toLocaleString('en-US') : value.toFixed(1);
+const watts = (value: number) => Math.round(value).toLocaleString('en-US');
+/** Where the readout lands before anyone hovers: a mid-range interactivity. */
+export const READOUT_INTERACTIVITY = 80;
+
+/** The chart point the readout describes when nothing is hovered or pinned. */
+export function defaultReadoutPoint(points: readonly InferenceData[]): InferenceData | null {
+  const candidates = points.filter((point) => !point.powerVariant);
+  const modeled = candidates.filter(
+    (point) => point.itModeledWatts !== undefined || modeledItWattsPerGpu(point) !== null,
+  );
+  const pool = modeled.length > 0 ? modeled : candidates;
+  let best: InferenceData | null = null;
+  let distance = Infinity;
+  for (const point of pool) {
+    if (!(point.x > 0)) continue;
+    const d = Math.abs(Math.log(point.x / READOUT_INTERACTIVITY));
+    if (d < distance) {
+      distance = d;
+      best = point;
+    }
+  }
+  return best;
+}
+
+/**
+ * The readout row under the caption: IT W per GPU, GPUs per MW and the facility
+ * figure for the hovered or pinned point (or the point nearest 80 tok/s/user).
+ */
+export function PowerXReadout({ points }: { points: readonly InferenceData[] }) {
+  const locale = useLocale();
+  const t = STRINGS[locale].readout;
+  const active = usePowerXActivePoint();
+  const point = active?.point ?? defaultReadoutPoint(points);
+  if (!point) return null;
+  const it = point.itModeledWatts?.y ?? modeledItWattsPerGpu(point);
+  const facility = point.utilityModeledWatts?.y ?? modeledFacilityWattsPerGpu(point);
+  const pue =
+    point.modeledSystemPower?.status === 'supported' ? point.modeledSystemPower.pue : null;
+  const gpu = point.measuredAvgPower?.y ?? null;
+  const perMw = gpusPerMegawatt(it);
+  const source =
+    active?.source === 'pinned'
+      ? t.pinned
+      : active?.source === 'hover'
+        ? t.hovered
+        : t.nearest(String(READOUT_INTERACTIVITY));
+  const label = getDisplayLabel(getHardwareConfig(point.hwKey, point.model));
+  return (
+    <div
+      className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground"
+      data-testid="powerx-readout"
+      aria-live="polite"
+    >
+      <span className="min-w-0 truncate font-medium text-foreground">
+        {label}{' '}
+        <span className="font-normal text-muted-foreground">{t.at(point.conc, rate(point.x))}</span>
+      </span>
+      {it === null ? (
+        <span data-testid="powerx-readout-no-model">{t.noModel}</span>
+      ) : (
+        <>
+          <span className="whitespace-nowrap" data-testid="powerx-readout-it">
+            {t.it} <b className="text-foreground tabular-nums">{watts(it)}</b> {t.wPerGpu}
+            <PowerBasisPill tag="it" />
+          </span>
+          {perMw !== null && (
+            <span className="whitespace-nowrap" data-testid="powerx-readout-gpus-per-mw">
+              <b className="text-foreground tabular-nums">{watts(perMw)}</b> {t.gpusPerMw}
+              <PowerBasisPill tag="it" />
+            </span>
+          )}
+          {facility !== null && pue !== null && (
+            <span className="whitespace-nowrap" data-testid="powerx-readout-facility">
+              {t.facility} <b className="text-foreground tabular-nums">{watts(facility)}</b>{' '}
+              {t.atPue(String(pue))}
+              <PowerBasisPill tag="facility" />
+            </span>
+          )}
+        </>
+      )}
+      {gpu !== null && (
+        <span className="whitespace-nowrap" data-testid="powerx-readout-gpu">
+          {t.gpu} <b className="text-foreground tabular-nums">{watts(gpu)}</b> {t.measured}
+          <PowerBasisPill tag="gpu" />
+        </span>
+      )}
+      <span className="ml-auto text-2xs" data-testid="powerx-readout-source">
+        {source}
+      </span>
+    </div>
+  );
+}
+
+/** The Where view's Include facility switch; the stack is IT-only until it is on. */
+export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const includeFacility = usePowerXIncludeFacility();
+  const setIncludeFacility = useSetPowerXIncludeFacility();
+  const id = useId();
+  if (!setIncludeFacility) return null;
+  return (
+    <div className="mt-2 flex min-w-0 flex-col gap-1" data-testid="powerx-facility-switch">
+      <label htmlFor={id} className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
+        <Switch
+          id={id}
+          checked={includeFacility}
+          onCheckedChange={(checked) => {
+            setIncludeFacility(checked);
+            track('inference_powerx_facility_toggled', { enabled: checked });
+          }}
+          title={t.includeFacilityHelp}
+        />
+        <span className="font-medium text-foreground">
+          {t.includeFacility(pue === null ? '—' : String(pue))}
+        </span>
+      </label>
+      <span className="text-xs text-muted-foreground" data-testid="powerx-not-modeled-note">
+        {IT_NOT_MODELED_NOTE[locale]}
+      </span>
+    </div>
   );
 }
 
@@ -730,6 +957,7 @@ export function PowerXFrame({
           description={t.description}
           actions={<ShareButton />}
         />
+        <PowerXWhatIs />
         <PowerXViewTabs
           selection={selection}
           onSelectionChange={onSelectionChange}

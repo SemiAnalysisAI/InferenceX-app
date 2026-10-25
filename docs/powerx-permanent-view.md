@@ -93,7 +93,47 @@ control stack. Nothing in the data layer changes: the frame writes the same `i_m
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - One muted provenance line under the chart (`powerXProvenanceText`: measured points,
   validated windows, power model revision, PUE) is the summary of the collapsed
-  "How we measure" details.
+  "How we measure" details, which also carries the GPU / IT / Facility tag key and the
+  three-meanings-of-utilization note.
+
+### P0 additions (IT basis, headroom, load swings, labels)
+
+- **IT-only basis** (`lib/power/power-basis.ts` `it-modeled`): `deploymentItWatts ÷ gpuCount`
+  from the same `modeledSystemPower` estimate B4 uses, i.e. the breakdown stack minus its
+  `facility` part, never a new formula; `utilityModeledWatts = itModeledWatts × PUE` at every
+  point. Metric keys `y_itModeledWatts` / `y_itModeledJPerOutputToken` carry the boundary
+  through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
+  `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
+  on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
+  "All in Measured IT (no PUE)". `COUNT_COMPARE_BASES` draws all three for
+  `i_pcompare=boundaries`; `all` adds the two rated bounds (five lines).
+- **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw): IT W/GPU,
+  GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
+  pinned point (`PowerXSurfaceProvider` active-point context, fed by `ScatterGraph`), or the
+  point nearest 80 tok/s/user.
+- **Where the power goes** stacks IT only by default; the Include facility switch
+  (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
+  gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
+  comparison, the drill-down and the tooltips agree; the note "Storage and out-of-rack
+  network are not modeled" stays under the bars.
+- **Headroom** (Power draw shown as % of TDP, no comparison): `ScatterGraph` adds a
+  `powerx-headroom` layer that shades between each chip's P90 line (P90 W × the point's own
+  % TDP ÷ avg W) and 100 %; `PowerXHeadroomTable` lists avg W, P90 W, % TDP (P90) and
+  headroom = 1 − P90/TDP at 25 / 50 / 100 / 300 tok/s/user via
+  `lib/power/headroom.ts` (`interpolateMetricAtInteractivity`, so the numbers match the
+  chart's iso-interactivity readings; outside the measured range is "—"), with a CSV button
+  and one example sentence. The views API serves the same rows with `headroom=true`.
+- **Load swings** (Over time, PowerX only): `PowerLoadSwings` computes
+  `lib/power/load-swing-stats.ts` per visible trace (peak, min, idle floor = P5 before the
+  window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
+  std ÷ mean; telemetry gaps are counted, never bridged), a × 72 per NVL72 rack switch, and
+  per-point CSV / JSON links to `GET /api/v1/gpu-metrics-point/stats?id=N[&format=csv|json]
+[&scale=gpu|nvl72]`, which runs the same function over the same stored buckets
+  (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
+  single node · inference only · sub-second swings not captured".
+- **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown
+  totals and the tooltip's power-model block; the collapsed "What is PowerX?" line under the
+  description separates PowerX from the energy team's grid power model.
 
 ## Article figure → share link
 
@@ -123,8 +163,8 @@ resolves their run/audit provenance automatically.
 ## Comparison series (`i_pcompare`)
 
 `i_pcompare=boundaries|all|roles` (default `''`, "Off") overlays sibling series on the selected
-metric without changing it. `boundaries` pairs GPU Level Measured with All in Measured; `all`
-adds the two provisioned bounds. `utils/power-compare.ts` is the single source: `useChartData` and
+metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
+and All in Measured; `all` adds the two provisioned bounds. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
 `x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points

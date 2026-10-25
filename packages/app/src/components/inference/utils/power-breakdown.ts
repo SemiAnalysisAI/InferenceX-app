@@ -215,6 +215,36 @@ export function powerBreakdownPointLabels(points: readonly PowerBreakdownPoint[]
   });
 }
 
+/**
+ * The same series counted at the IT boundary: the facility (PUE) part is
+ * dropped from the categories and from every point's total, so a stack, a
+ * total label and a comparison bar all read IT W/GPU. The source series is
+ * returned unchanged when the facility is included.
+ */
+export function breakdownSeriesAtBoundary(
+  series: PowerBreakdownSeries,
+  includeFacility: boolean,
+): PowerBreakdownSeries {
+  if (includeFacility) return series;
+  return {
+    ...series,
+    categories: series.categories.filter((category) => category !== 'facility'),
+    points: series.points.map((entry) => ({
+      ...entry,
+      wattsPerGpu: { ...entry.wattsPerGpu, facility: 0 },
+      totalWattsPerGpu: entry.totalWattsPerGpu - entry.wattsPerGpu.facility,
+    })),
+  };
+}
+
+/** IT W/GPU of a breakdown point: every part but the facility overhead. */
+export function breakdownItWattsPerGpu(entry: Pick<PowerBreakdownPoint, 'wattsPerGpu'>): number {
+  return SYSTEM_POWER_CATEGORIES.reduce(
+    (sum, category) => (category === 'facility' ? sum : sum + entry.wattsPerGpu[category]),
+    0,
+  );
+}
+
 export interface StackedSegment {
   key: SystemPowerCategory;
   y0: number;
