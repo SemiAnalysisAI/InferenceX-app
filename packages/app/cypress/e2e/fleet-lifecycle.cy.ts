@@ -887,7 +887,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
   it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
     for (const [option, label] of [
       ['租赁 - 3 年承诺', '租赁设备 · 3 年承诺'],
-      ['自有 - 超大规模云大批量', '自有设备 · 超大规模云大批量'],
+      ['自有 · 超大规模云厂商批量采购', '自有设备 · 超大规模云厂商批量采购'],
     ]) {
       cy.get('[data-testid="fleet-cost-selector"]').click();
       cy.contains('[role="option"]', option).click();

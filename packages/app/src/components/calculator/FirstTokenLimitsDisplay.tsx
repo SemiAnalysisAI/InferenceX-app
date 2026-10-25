@@ -90,7 +90,7 @@ const COST_PROVIDER_OPTIONS: {
   {
     value: 'costh',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有 - 超大规模云大批量',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
   { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];

@@ -364,7 +364,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', '自有 - 超大规模云大批量')
+      .should('contain.text', '自有 · 超大规模云厂商批量采购')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(

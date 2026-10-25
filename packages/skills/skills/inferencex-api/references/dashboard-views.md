@@ -628,3 +628,14 @@ model-specific; retain the registry's accompanying features and source link.
 - `qwen-3-8-flash-next`: read the model-specific architecture facts and source link with `model=qwen-3-8-flash-next`.
 - `qwen-3-8-27b`: read the model-specific architecture facts and source link with `model=qwen-3-8-27b`.
 - `qwen-3-8-27b-eager`: read the model-specific architecture facts and source link with `model=qwen-3-8-27b-eager`.
+
+### GPU specification networking
+
+`GET /api/v1/views/gpu-specs` shares its hardware source with `/gpu-specs` and the
+English/Chinese chip pages. GB200 NVL72 includes ConnectX-7 400G InfiniBand NDR per
+GPU; GB300 NVL72 includes ConnectX-8 800G InfiniBand XDR per GPU. Their inter-rack
+switch/topology fields remain null (unspecified), not their NICs. The
+`metric=scaleOutBandwidth` ranking includes 400 and 800 Gbit/s respectively, in JSON
+and CSV. MI355X's scale-up technology is fourth-generation Infinity Fabric.
+Chinese ownership-tier wording denotes owning hardware at hyperscaler purchase
+volume, not a rental quote; the wording does not change the underlying TCO rates.

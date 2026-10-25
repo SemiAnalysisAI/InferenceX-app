@@ -140,10 +140,10 @@ describe('ResultContext', () => {
     const container = document.createElement('div');
     act(() => {
       createRoot(container).render(
-        <ResultContext locale="zh" costTier="自有（超大规模云大批量）" date="2026-09-01" />,
+        <ResultContext locale="zh" costTier="自有 · 超大规模云厂商批量采购" date="2026-09-01" />,
       );
     });
-    expect(container.textContent).toContain('成本层级: 自有（超大规模云大批量）');
+    expect(container.textContent).toContain('成本层级: 自有 · 超大规模云厂商批量采购');
     expect(container.textContent).not.toContain('模型:');
   });
 
