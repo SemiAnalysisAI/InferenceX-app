@@ -166,7 +166,7 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   if (locale === 'zh') {
     switch (provider) {
       case 'costh': {
-        return '自有设备 · 超大规模云大批量';
+        return '自有设备 · 超大规模云厂商批量采购';
       }
       case 'costr': {
         return '租赁设备 · 3 年承诺';

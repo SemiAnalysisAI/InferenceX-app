@@ -159,7 +159,7 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
     expect(metricRowLabel('tokensPerDollarH', 'zh')).toBe(
-      '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模云大批量）',
+      '每 1 美元 TCO 对应的总 token 数（自有 · 超大规模云厂商批量采购）',
     );
   });
 });

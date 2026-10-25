@@ -1159,6 +1159,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/catalog/gpu-specs.ts',
+    sourceSha256: 'fb9dc719f347fb5b73ea73cf35a19d12c640b34a284f31cd70a8b9b2df76b4fd',
+    reviewArea: {
+      en: 'GPU specifications shared by chip pages, GPU charts and the public GPU specs view; review NIC rates, unknown topology, ranking values and units.',
+      zh: '芯片页、GPU 图表及公开 GPU 规格视图共用的数据；审核网卡速率、未指定的拓扑、排名数值及单位。',
+    },
+  },
+  {
     source: 'src/lib/catalog/model-architectures.ts',
     sourceSha256: 'b70020f3ca528f3ef01f3e55421801fdf059fd08033c9cf79eac79831b8bfebb',
     reviewArea: {
