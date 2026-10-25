@@ -224,7 +224,7 @@ export const QUOTES: Quote[] = [
   {
     text: "InferenceX™ ensembles precisely that — open, reproducible benchmarks that are continuously updated as xPU accelerators (GPUs/TPUs/LPUs), memory, storage, and software stacks evolve. I'm excited to see the InferenceX benchmarking roadmap include agentic coding workloads that stress CPU KV Cache offloading & soon NVMe KV Cache offloading from xPUs. As WEKA helps scale the Memory Wall by building the KV Cache infrastructure that feeds these xPUs, having this level of visibility into inference performance helps the entire ecosystem make smarter decisions about where to invest.",
     textZh:
-      'InferenceX™ 恰好体现了这一点——开放、可复现的基准测试，随着 xPU 加速器（GPU/TPU/LPU）、内存、存储和软件栈的演进而持续更新。我很高兴看到 InferenceX 基准测试路线图纳入了会给 CPU KV Cache 卸载乃至即将支持的 NVMe KV Cache 卸载带来压力的智能体编程工作负载。WEKA 通过构建为这些 xPU 供给的 KV Cache 基础设施来帮助突破内存墙，拥有这种对推理性能的深度可见性有助于整个生态做出更明智的投资决策。',
+      'InferenceX™ 恰好体现了这一点——开放、可复现的基准测试，随着 xPU 加速器（GPU/TPU/LPU）、内存、存储和软件栈的演进而持续更新。我很高兴看到 InferenceX 基准测试路线图纳入了会给 CPU KV Cache 卸载带来压力、并很快也会给 NVMe KV Cache 卸载带来压力的智能体编程工作负载。WEKA 通过构建为这些 xPU 供给的 KV Cache 基础设施来帮助突破内存墙，拥有这种对推理性能的深度可见性有助于整个生态做出更明智的投资决策。',
     name: 'Val Bercovici',
     title: 'Chief AI Officer, WEKA',
     titleZh: 'WEKA 首席 AI 官',
