@@ -25,10 +25,6 @@ export function DoomThemeBanner() {
   );
 }
 
-/**
- * Follow the root class, like the other optional themes, because this mounts
- * outside ThemeProvider. No image requests until Doom is selected.
- */
 export function DoomDecorations() {
   const [active, setActive] = useState(false);
 

@@ -78,8 +78,6 @@ describe('OverviewPageContent failure states', () => {
       window.history.replaceState({}, '', locale === 'zh' ? '/zh/overview' : '/overview');
       renderPage(locale);
 
-      // The tier control is a slider, not a link, so the failed navigation is
-      // driven through the engine scope link instead.
       const scopeLink = container.querySelector<HTMLAnchorElement>(
         'a[data-overview-engine-scope="all"]',
       );

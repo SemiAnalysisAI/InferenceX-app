@@ -1,157 +1,74 @@
 import { Model } from '@/lib/catalog/data-mappings';
 
-/**
- * Model architecture types
- */
 export type ArchitectureType = 'dense' | 'moe';
 
-/**
- * Attention mechanism types used in modern LLMs
- */
 export type AttentionType = 'MHA' | 'GQA' | 'MLA' | 'Linear' | 'Hybrid' | 'AlternatingSinkGQA';
 
-/**
- * Describes one category of alternating transformer layers.
- * Used when a model interleaves different layer types (e.g., sliding vs full attention).
- */
 export interface AlternatingLayerSpec {
-  /** Short label for this layer type (e.g., "Sliding Attention + Sink") */
   label: string;
-  /** Longer description shown in the diagram */
   description: string;
-  /** Number of layers of this type */
   count: number;
-  /** Color key for visual distinction */
   colorKey: 'attention' | 'ffn' | 'norm' | 'router' | 'expert';
-  /**
-   * Sliding-window size (in tokens) for this layer type, when it includes a
-   * local sliding-window attention branch. Rendered as `window=N` in the
-   * diagram. Omit for layer types that use full / non-windowed attention.
-   */
   slidingWindow?: number;
+  attentionShape?: string;
 }
 
-/**
- * Model architecture specification
- */
 export interface ModelArchitecture {
-  /** Model enum value */
   model: Model;
-  /** Total parameter count (in billions) */
   totalParams: number;
-  /** Active parameters per forward pass (in billions, same as total for dense models) */
   activeParams: number;
-  /** Architecture type: dense or mixture-of-experts */
+  /** When prefill and decode activate different parts of a CED backbone. */
+  activeParamsPrefill?: number;
+  /** Conditional-memory parameters outside the vendor's backbone count. */
+  conditionalMemoryParams?: number;
+  conditionalMemoryName?: string;
   architectureType: ArchitectureType;
-  /** Attention mechanism used */
   attentionType: AttentionType;
-  /** Number of transformer layers */
   numLayers?: number;
-  /** Hidden dimension size */
   hiddenSize?: number;
-  /** Number of attention heads */
   numHeads?: number;
-  /** Number of KV heads (for GQA/MQA) */
   numKVHeads?: number;
-  /** Per-head dimension. If not provided, inferred from hiddenSize/numHeads */
   headDim?: number;
-  /** Vocabulary size */
   vocabSize?: number;
-  /** FFN intermediate dimension (for dense models or expert FFN for MoE) */
   ffnDim?: number;
-  /** Number of experts (for MoE models) */
   numExperts?: number;
-  /** Number of active experts per token (for MoE models) */
   activeExperts?: number;
-  /** Whether the model uses a shared expert (DeepSeek-style) */
   hasSharedExpert?: boolean;
-  /** Number of initial transformer layers that use dense FFN instead of MoE (for MoE models) */
   denseFFNLayers?: number;
-  /** Intermediate dimension of the dense FFN layers (differs from MoE expert FFN dim) */
   denseFFNDim?: number;
-  /**
-   * Number of leading MoE layers that use hash routing (token-id → fixed experts)
-   * instead of the learned gate. Rendered as a separate stacked prefix block.
-   */
   hashRoutedLayers?: number;
-  /**
-   * Alternating layer type pattern (e.g., gpt-oss uses sliding_attention/full_attention).
-   * Each entry describes one category of layer and how many of that type exist.
-   */
   alternatingLayers?: AlternatingLayerSpec[];
-  /** Sliding window size in tokens (for models using sliding/local attention) */
   slidingWindow?: number;
-  /**
-   * Number of parallel residual streams for hyper-connections (mHC). When > 1,
-   * residual merges render as "mHC ×N" mixer nodes instead of a plain "+" add.
-   */
   hyperConnections?: number;
-  /** Context window size (in tokens) */
   contextWindow?: number;
-  /** Special architectural features */
+  advertisedContextWindow?: number;
   features?: string[];
-  // No `releaseDate` here, deliberately. A model's release date is the same fact
-  // the Fleet Lifecycle time axis anchors on, so it lives once in
-  // `MODEL_RELEASE_DATES` (`@semianalysisai/inferencex-constants`) and is read
-  // through `getModelReleaseDate(arch.model)`. While this file kept its own copy
-  // the two disagreed: DeepSeek-V4-Pro was listed here as releasing six weeks
-  // after its own first benchmark run, and both values were rendered to users.
-  /** Developer/Organization */
+  featuresZh?: string[];
   developer?: string;
-  /** Link to model card or paper */
   sourceUrl?: string;
-  /** Override whether the attention block is expandable in diagrams. If not set, determined by attentionType. */
   attentionExpandable?: boolean;
-  /**
-   * Override whether the attention block *inside each alternating layer block*
-   * drills down to the hybrid local/compressed flow (`getHybridAttentionSubBlocks`).
-   * Defaults to expandable for `Hybrid` attention. Independent of
-   * `attentionExpandable`, which governs the single non-alternating block:
-   * DeepSeek V4 disables that one but keeps this one. Set false for hybrids
-   * that aren't CSA/HCA-shaped (Kimi K3's KDA + gated MLA stack).
-   */
   alternatingAttentionExpandable?: boolean;
-  /**
-   * Number of shared experts included in `numExperts`. Defaults to 1 when
-   * `hasSharedExpert` is set — the DeepSeek-style single shared expert every
-   * other MoE model here uses. Kimi K3's LatentMoE has 2.
-   */
   sharedExperts?: number;
-  /**
-   * Override the caption on the arrow between the two alternating blocks.
-   * Defaults to "alternating every layer", which is only true for an even 1:1
-   * interleave (gpt-oss, DeepSeek V4). Set it when the split is uneven.
-   */
   alternatingNote?: string;
-  /**
-   * Attention label for the dense-FFN prefix block, when that layer's mechanism
-   * differs from the model-wide `attentionType`. Only matters for hybrids whose
-   * dense layer belongs to one specific category — Kimi K3's dense layer is a
-   * KDA layer, so the model-wide "Hybrid Attention" label would misdescribe it.
-   */
+  alternatingNoteZh?: string;
   denseLayerAttentionLabel?: string;
-  /** GLU variant of the FFN / expert blocks. Defaults to `SwiGLU`. */
   ffnVariant?: string;
-  /** Elementwise activation applied to the gate projection. Defaults to `SiLU`. */
   ffnGateActivation?: string;
+  ffnSwiGLUOAI?: boolean;
+  ffnClamp?: number;
+  routedExpertHiddenSize?: number;
+  attentionLabel?: string;
+  residualType?: 'AttnRes' | 'gated';
+  /** Causal encoder followed by a decoder whose global KV comes from encoder output. */
+  encoderDecoder?: {
+    encoderLayers: number;
+    decoderLayers: number;
+    globalKVSource: 'final-encoder-hidden-states';
+    encoderSlidingOnlyLayers: number;
+    decoderAttention: 'joint-local-swa-and-shared-global-kv';
+  };
 }
 
-/**
- * Model architecture specifications for supported models.
- *
- * Sources:
- * - https://github.com/meta-llama/llama3/blob/main/llama/model.py
- * - https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct
- * - https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct
- * - https://huggingface.co/deepseek-ai/DeepSeek-R1-0528
- * - https://github.com/deepseek-ai/DeepSeek-V3
- * - https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro (config.json, inference/model.py, DeepSeek_V4.pdf)
- * - https://huggingface.co/moonshotai/Kimi-K2.5/blob/main/config.json
- * - https://huggingface.co/moonshotai/Kimi-K3/blob/main/config.json (+ model card)
- * - https://huggingface.co/openai/gpt-oss-120b/blob/main/config.json
- * - https://huggingface.co/MiniMaxAI/MiniMax-M2/blob/main/config.json
- * - https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/config.json
- */
 export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   [Model.DeepSeek_R1]: {
     model: Model.DeepSeek_R1,
@@ -169,7 +86,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hasSharedExpert: true,
     denseFFNLayers: 3,
     denseFFNDim: 18432,
-    contextWindow: 128000,
+    contextWindow: 163840,
+    advertisedContextWindow: 128000,
     features: [
       'Multi-head Latent Attention',
       'Auxiliary-loss-free Load Balancing',
@@ -180,29 +98,22 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
   [Model.DeepSeek_V4_Pro]: {
     model: Model.DeepSeek_V4_Pro,
-    totalParams: 1600, // 1.6T
+    totalParams: 1600,
     activeParams: 49,
     architectureType: 'moe',
     attentionType: 'Hybrid',
-    // Hybrid CSA/HCA is a bespoke compressed-attention stack, not the standard
-    // Q/K/V GQA layout — render it as static blocks, not the GQA drill-down.
     attentionExpandable: false,
     numLayers: 61,
     hiddenSize: 7168,
     numHeads: 128,
-    // Shared single-latent KV (MLA-lineage MQA): num_key_value_heads = 1.
     numKVHeads: 1,
     headDim: 512,
     vocabSize: 129280,
-    ffnDim: 3072, // moe_intermediate_size
-    numExperts: 385, // 384 routed + 1 shared
+    ffnDim: 3072,
+    ffnClamp: 10,
+    numExperts: 385,
     activeExperts: 6,
     hasSharedExpert: true,
-    // First 3 layers use hash-routed MoE (shown as a separate prefix block); the
-    // remaining 58 learned-router layers interleave two compressed-attention
-    // variants. Every layer also carries a 128-token sliding-window branch plus a
-    // learnable attention sink. Counts below are the learned-router layers:
-    // 29 HCA + 29 CSA + 3 hash-routed = 61 (the extra MTP block is SWA-only).
     hashRoutedLayers: 3,
     alternatingLayers: [
       {
@@ -223,8 +134,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       },
     ],
     slidingWindow: 128,
-    hyperConnections: 4, // mHC: 4 parallel residual streams (hc_mult)
-    contextWindow: 1048576, // 1M
+    hyperConnections: 4,
+    contextWindow: 1048576,
     features: [
       'Hybrid CSA + HCA Attention',
       'Sliding window (128 tokens)',
@@ -253,9 +164,10 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hiddenSize: 8192,
     numHeads: 64,
     numKVHeads: 8,
+    headDim: 128,
     vocabSize: 128256,
     ffnDim: 28672,
-    contextWindow: 128000,
+    contextWindow: 131072,
     features: ['Grouped Query Attention', 'RoPE'],
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct',
@@ -270,17 +182,21 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hiddenSize: 8192,
     numHeads: 64,
     numKVHeads: 8,
+    headDim: 128,
     vocabSize: 128256,
     ffnDim: 28672,
-    contextWindow: 128000,
+    contextWindow: 131072,
     features: ['Grouped Query Attention', 'RoPE'],
     developer: 'Meta',
     sourceUrl: 'https://huggingface.co/meta-llama/Llama-3.1-70B-Instruct',
   },
   [Model.GptOss]: {
     model: Model.GptOss,
-    totalParams: 120,
-    activeParams: 5,
+    totalParams: 116.83,
+    activeParams: 5.13,
+    ffnVariant: 'SwiGLU-OAI',
+    ffnSwiGLUOAI: true,
+    ffnClamp: 7,
     architectureType: 'moe',
     attentionType: 'AlternatingSinkGQA',
     numLayers: 36,
@@ -296,14 +212,14 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     alternatingLayers: [
       {
         label: 'Sliding Attention + Sink',
-        description: 'GQA with 128-token sliding window and learnable attention sink tokens',
+        description: 'GQA with 128-token sliding window and a learned per-head attention sink bias',
         count: 18,
         colorKey: 'attention',
         slidingWindow: 128,
       },
       {
-        label: 'Causal Grouped Query Attention',
-        description: 'Standard GQA with full causal masking over entire context',
+        label: 'Causal GQA + Sink',
+        description: 'Full causal GQA with a learned per-head softmax sink bias',
         count: 18,
         colorKey: 'norm',
       },
@@ -312,9 +228,15 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     contextWindow: 131072,
     features: [
       'Alternating Sliding/Full Attention',
-      'Attention Sink Tokens',
+      'Learned per-head softmax sink',
       'YaRN RoPE (factor=32)',
       'MXFP4 Quantization',
+    ],
+    featuresZh: [
+      '交替使用滑动窗口与全局注意力',
+      '每个 head 的可学习 softmax sink',
+      'YaRN RoPE（factor=32）',
+      'MXFP4 量化',
     ],
     developer: 'OpenAI',
     sourceUrl: 'https://huggingface.co/openai/gpt-oss-120b',
@@ -342,13 +264,9 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
   },
   [Model.Kimi_K3]: {
     model: Model.Kimi_K3,
-    totalParams: 2800, // 2.8T
+    totalParams: 2800,
     activeParams: 104,
     architectureType: 'moe',
-    // 69 Kimi Delta Attention (linear) layers interleaved with 24 gated-MLA
-    // layers. Neither the GQA drill-down nor the DeepSeek V4 CSA/HCA hybrid
-    // drill-down describes this stack, so both layer categories render as
-    // static attention blocks.
     attentionType: 'Hybrid',
     attentionExpandable: false,
     alternatingAttentionExpandable: false,
@@ -356,18 +274,13 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hiddenSize: 7168,
     numHeads: 96,
     vocabSize: 163840,
-    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
-    numExperts: 898, // 896 routed + 2 shared
+    ffnDim: 3072,
+    numExperts: 898,
     sharedExperts: 2,
     activeExperts: 16,
     hasSharedExpert: true,
-    denseFFNLayers: 1, // first_k_dense_replace
-    denseFFNDim: 33792, // intermediate_size (dense layer FFN)
-    // The dense-FFN layer (layer 1) is a KDA layer, and the diagram stacks the
-    // dense prefix block above both alternating blocks — so it is carved out of
-    // the KDA count here (68 + 24 + 1 dense = 93), the same partition DeepSeek
-    // V4 uses for its hash-routed prefix. Full layer composition is 69 KDA + 24
-    // gated MLA.
+    denseFFNLayers: 1,
+    denseFFNDim: 33792,
     alternatingLayers: [
       {
         label: 'Kimi Delta Attention (KDA)',
@@ -379,25 +292,21 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       {
         label: 'Gated MLA',
         description:
-          'Multi-head Latent Attention (512-dim compressed KV latent, NoPE) with an output gate, placed every fourth layer to carry full-context recall.',
+          'Multi-head Latent Attention (512-dim compressed KV latent, NoPE) with an output gate, placed at layers 4, 8, …, 92 and 93 to carry full-context recall.',
         count: 24,
         colorKey: 'norm',
       },
     ],
-    // Not a 1:1 interleave — full attention lands on layers 4, 8, … 92 plus the
-    // final layer 93.
-    alternatingNote: 'gated MLA every 4th layer',
-    // The dense-FFN prefix is layer 1, which config.json lists under
-    // `kda_layers` — the model-wide "Hybrid Attention" label would be wrong for
-    // that single block.
+    alternatingNote: 'gated MLA at layers 4, 8, …, 92, 93',
     denseLayerAttentionLabel: 'Kimi Delta Attention (KDA)',
-    // hidden_act = "situ"; the model card calls the FFN SiTU-GLU.
     ffnVariant: 'SiTU-GLU',
     ffnGateActivation: 'SiTU',
-    contextWindow: 1048576, // 1M
+    routedExpertHiddenSize: 3584,
+    residualType: 'AttnRes',
+    contextWindow: 1048576,
     features: [
       'Kimi Delta Attention (KDA linear attention)',
-      'Gated MLA (every 4th layer, NoPE)',
+      'Gated MLA (layers 4, 8, …, 92, 93; NoPE)',
       'Attention Residuals (AttnRes)',
       'Stable LatentMoE (3584-dim latent)',
       'MoE (896 routed + 2 shared experts, 16 active)',
@@ -431,20 +340,25 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       'RoPE',
       'Multi-Token Prediction (3 modules)',
       'FP8 Quantization',
+      'Context: M2.5 196608 / M2.7 204800 tokens',
+    ],
+    featuresZh: [
+      '带 QK 归一化的 GQA',
+      'RoPE',
+      '多 token 预测（3 个模块）',
+      'FP8 量化',
+      '上下文：M2.5 196608 / M2.7 204800 token',
     ],
     developer: 'MiniMax',
-    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2',
+    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M2.5',
   },
   [Model.MiniMax_M3]: {
     model: Model.MiniMax_M3,
     totalParams: 428,
     activeParams: 23,
     architectureType: 'moe',
-    // MiniMax Sparse Attention (MSA) is built on a GQA projection layout
-    // (64 Q / 4 KV heads) with sparse KV selection layered on top. Render it as
-    // a static attention block, not the standard GQA Q/K/V drill-down — same
-    // treatment as the M2.5 entry.
     attentionType: 'GQA',
+    attentionLabel: 'MiniMax Sparse Attention (MSA)',
     attentionExpandable: false,
     numLayers: 60,
     hiddenSize: 6144,
@@ -452,34 +366,397 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     numKVHeads: 4,
     headDim: 128,
     vocabSize: 200064,
-    ffnDim: 3072, // moe_intermediate_size (per-expert FFN)
-    numExperts: 129, // 128 routed + 1 shared
+    ffnDim: 3072,
+    numExperts: 129,
     activeExperts: 4,
     hasSharedExpert: true,
-    contextWindow: 1048576, // 1M
+    denseFFNLayers: 3,
+    denseFFNDim: 12288,
+    denseLayerAttentionLabel: 'Grouped Query Attention',
+    ffnVariant: 'SwiGLU-OAI',
+    ffnSwiGLUOAI: true,
+    ffnClamp: 7,
+    contextWindow: 1048576,
     features: [
       'MiniMax Sparse Attention (MSA)',
       'GQA with QK Norm',
       'Partial RoPE (rotary factor 0.5)',
-      'SwiGLU FFN',
+      'SwiGLU-OAI FFN',
       'Native Multimodality (text/image/video)',
       'MoE (128 routed + 1 shared experts, 4 active)',
     ],
     developer: 'MiniMax',
     sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M3',
   },
+  [Model.MiniMax_M3_1_Flash]: {
+    model: Model.MiniMax_M3_1_Flash,
+    totalParams: 428,
+    activeParams: 23,
+    architectureType: 'moe',
+    attentionType: 'GQA',
+    attentionLabel: 'MiniMax Sparse Attention (MSA)',
+    attentionExpandable: false,
+    numLayers: 60,
+    hiddenSize: 6144,
+    numHeads: 64,
+    numKVHeads: 4,
+    headDim: 128,
+    vocabSize: 200064,
+    ffnDim: 3072,
+    numExperts: 129,
+    activeExperts: 4,
+    hasSharedExpert: true,
+    denseFFNLayers: 3,
+    denseFFNDim: 12288,
+    denseLayerAttentionLabel: 'MiniMax Sparse Attention (MSA)',
+    ffnVariant: 'SwiGLU-OAI',
+    ffnSwiGLUOAI: true,
+    ffnClamp: 7,
+    contextWindow: 1048576,
+    features: [
+      'MiniMax Sparse Attention (MSA)',
+      'GQA with QK Norm',
+      'Partial RoPE (rotary factor 0.5)',
+      'SwiGLU-OAI FFN',
+      'Native Multimodality (text/image/video)',
+      'MoE (128 routed + 1 shared experts, 4 active)',
+      'NVFP4 Experts, MXFP8 Dense Layers',
+      'Built-in DSpark Draft',
+    ],
+    featuresZh: [
+      'MiniMax 稀疏注意力（MSA）',
+      '带 QK 归一化的 GQA',
+      '部分 RoPE（旋转比例 0.5）',
+      'SwiGLU-OAI FFN',
+      '原生支持文本、图像和视频输入',
+      'MoE（128 路由专家 + 1 共享专家，top-4）',
+      '专家层 NVFP4，稠密层 MXFP8',
+      '内置 DSpark draft',
+    ],
+    developer: 'MiniMax',
+    sourceUrl: 'https://huggingface.co/MiniMaxAI/MiniMax-M3.1-Flash',
+  },
+  [Model.Muse_Spark_Open]: {
+    model: Model.Muse_Spark_Open,
+    totalParams: 816,
+    activeParams: 42,
+    architectureType: 'moe',
+    attentionType: 'GQA',
+    numLayers: 62,
+    hiddenSize: 8192,
+    numHeads: 128,
+    numKVHeads: 16,
+    headDim: 64,
+    vocabSize: 202048,
+    ffnDim: 4096,
+    numExperts: 256,
+    activeExperts: 8,
+    hasSharedExpert: false,
+    routedExpertHiddenSize: 4096,
+    contextWindow: 1048576,
+    slidingWindow: 2048,
+    residualType: 'gated',
+    developer: 'Meta',
+    sourceUrl: 'https://huggingface.co/meta-models/Muse-Spark-Open-816B-A42B',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    alternatingLayers: [
+      {
+        label: 'Sliding GQA',
+        description: '46 local attention layers; 2048-token sliding window.',
+        count: 46,
+        colorKey: 'attention',
+        slidingWindow: 2048,
+      },
+      {
+        label: 'Full GQA (NoPE)',
+        description: 'Full attention at zero-based layer indices 1, 5, …, 61.',
+        count: 16,
+        colorKey: 'norm',
+      },
+    ],
+    alternatingNote: 'full GQA: layers 1, 5, …, 61 (0-based)',
+    alternatingNoteZh: '全局 GQA：第 1、5、…、61 层（从 0 计数）',
+    features: [
+      'Pooled MoE (4096-dim latent)',
+      'Learned residual gates',
+      'Native text/image/video/audio input',
+    ],
+    featuresZh: [
+      'Pooled MoE（潜在维度 4096）',
+      '可学习残差门控',
+      '原生支持文本、图像、视频和音频输入',
+    ],
+  },
+  [Model.DeepSeek_V4_1_Flash]: {
+    model: Model.DeepSeek_V4_1_Flash,
+    totalParams: 552,
+    activeParams: 16,
+    activeParamsPrefill: 8,
+    conditionalMemoryParams: 196,
+    conditionalMemoryName: 'Engram',
+    architectureType: 'moe',
+    attentionType: 'Hybrid',
+    attentionLabel: 'CSA2',
+    numLayers: 40,
+    hiddenSize: 5120,
+    numHeads: 64,
+    numKVHeads: 1,
+    headDim: 512,
+    vocabSize: 129280,
+    ffnDim: 2304,
+    ffnClamp: 10,
+    numExperts: 385,
+    activeExperts: 6,
+    hasSharedExpert: true,
+    contextWindow: 1048576,
+    hyperConnections: 4,
+    slidingWindow: 128,
+    developer: 'DeepSeek',
+    sourceUrl: 'https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash',
+    encoderDecoder: {
+      encoderLayers: 20,
+      decoderLayers: 20,
+      globalKVSource: 'final-encoder-hidden-states',
+      encoderSlidingOnlyLayers: 2,
+      decoderAttention: 'joint-local-swa-and-shared-global-kv',
+    },
+  },
+  [Model.GLM_5]: {
+    model: Model.GLM_5,
+    totalParams: 744,
+    activeParams: 40,
+    architectureType: 'moe',
+    attentionType: 'MLA',
+    attentionLabel: 'DeepSeek Sparse Attention (DSA)',
+    attentionExpandable: false,
+    numLayers: 78,
+    hiddenSize: 6144,
+    numHeads: 64,
+    headDim: 256,
+    vocabSize: 154880,
+    ffnDim: 2048,
+    numExperts: 257,
+    activeExperts: 8,
+    hasSharedExpert: true,
+    denseFFNLayers: 3,
+    denseFFNDim: 12288,
+    contextWindow: 202752,
+    developer: 'Z.ai',
+    sourceUrl: 'https://huggingface.co/zai-org/GLM-5.1',
+    features: ['DSA: top-2048 tokens', '512-dim KV latent'],
+    featuresZh: ['DSA：选取 top-2048 token', 'KV 潜在维度 512'],
+  },
+  [Model.GLM_5_2]: {
+    model: Model.GLM_5_2,
+    totalParams: 744,
+    activeParams: 40,
+    architectureType: 'moe',
+    attentionType: 'MLA',
+    attentionLabel: 'DeepSeek Sparse Attention (DSA)',
+    attentionExpandable: false,
+    numLayers: 78,
+    hiddenSize: 6144,
+    numHeads: 64,
+    headDim: 256,
+    vocabSize: 154880,
+    ffnDim: 2048,
+    numExperts: 257,
+    activeExperts: 8,
+    hasSharedExpert: true,
+    denseFFNLayers: 3,
+    denseFFNDim: 12288,
+    contextWindow: 1048576,
+    developer: 'Z.ai',
+    sourceUrl: 'https://huggingface.co/zai-org/GLM-5.2',
+    features: [
+      'DSA: top-2048 tokens',
+      '512-dim KV latent',
+      'IndexShare: 3 full, then shared/shared/shared/full',
+    ],
+    featuresZh: [
+      'DSA：选取 top-2048 token',
+      'KV 潜在维度 512',
+      'IndexShare：前 3 层独立，之后按共享、共享、共享、独立排列',
+    ],
+  },
+  [Model.Qwen3_5]: {
+    model: Model.Qwen3_5,
+    totalParams: 397,
+    activeParams: 17,
+    architectureType: 'moe',
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 60,
+    hiddenSize: 4096,
+    numHeads: 32,
+    numKVHeads: 2,
+    headDim: 256,
+    vocabSize: 248320,
+    ffnDim: 1024,
+    contextWindow: 262144,
+    developer: 'Alibaba (Qwen)',
+    sourceUrl: 'https://huggingface.co/Qwen/Qwen3.5-397B-A17B',
+    numExperts: 513,
+    activeExperts: 10,
+    hasSharedExpert: true,
+    alternatingLayers: [
+      {
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 45,
+        colorKey: 'attention',
+        attentionShape: '64 V / 16 QK heads · 128d',
+      },
+      {
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 15,
+        colorKey: 'norm',
+        attentionShape: '32 Q / 2 KV heads · 256d',
+      },
+    ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input'],
+    featuresZh: ['原生支持图像和视频输入'],
+  },
+  [Model.Qwen3_8_Flash_Next]: {
+    model: Model.Qwen3_8_Flash_Next,
+    totalParams: 176,
+    activeParams: 6,
+    architectureType: 'moe',
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 48,
+    hiddenSize: 2560,
+    numHeads: 24,
+    numKVHeads: 2,
+    headDim: 256,
+    vocabSize: 248320,
+    ffnDim: 640,
+    contextWindow: 262144,
+    developer: 'Alibaba (Qwen)',
+    sourceUrl: 'https://huggingface.co/Qwen/Qwen3.8-Flash-Next-FP8',
+    numExperts: 513,
+    activeExperts: 10,
+    hasSharedExpert: true,
+    alternatingLayers: [
+      {
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 36,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
+      },
+      {
+        label: 'Qwen Sparse Attention (QSA)',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 12,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 2 KV heads · 256d',
+      },
+    ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: [
+      'Native image/video input',
+      'N-gram embedding + gated residual',
+      '125B main + 51B n-gram; separate 4B MTP',
+    ],
+    featuresZh: [
+      '原生支持图像和视频输入',
+      'N-gram 嵌入与门控残差',
+      '主模型 125B 加 n-gram 表 51B；另有 4B MTP',
+    ],
+    residualType: 'gated',
+  },
+  [Model.Qwen3_8_27B]: {
+    model: Model.Qwen3_8_27B,
+    totalParams: 27,
+    activeParams: 27,
+    architectureType: 'dense',
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 64,
+    hiddenSize: 5120,
+    numHeads: 24,
+    numKVHeads: 4,
+    headDim: 256,
+    vocabSize: 248320,
+    ffnDim: 17408,
+    contextWindow: 262144,
+    developer: 'Alibaba (Qwen)',
+    sourceUrl: 'https://huggingface.co/Qwen/Qwen3.8-27B',
+    alternatingLayers: [
+      {
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 48,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
+      },
+      {
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 16,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 4 KV heads · 256d',
+      },
+    ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input'],
+    featuresZh: ['原生支持图像和视频输入'],
+  },
+  [Model.Qwen3_8_27B_Eager]: {
+    model: Model.Qwen3_8_27B_Eager,
+    totalParams: 27,
+    activeParams: 27,
+    architectureType: 'dense',
+    attentionType: 'Hybrid',
+    attentionExpandable: false,
+    alternatingAttentionExpandable: false,
+    numLayers: 64,
+    hiddenSize: 5120,
+    numHeads: 24,
+    numKVHeads: 4,
+    headDim: 256,
+    vocabSize: 248320,
+    ffnDim: 17408,
+    contextWindow: 262144,
+    developer: 'Alibaba (Qwen)',
+    sourceUrl: 'https://huggingface.co/Qwen/Qwen3.8-27B',
+    alternatingLayers: [
+      {
+        label: 'Gated DeltaNet',
+        description: 'Three linear-attention layers in each four-layer group.',
+        count: 48,
+        colorKey: 'attention',
+        attentionShape: '48 V / 16 QK heads · 128d',
+      },
+      {
+        label: 'Gated Attention',
+        description: 'One global-attention layer in each four-layer group.',
+        count: 16,
+        colorKey: 'norm',
+        attentionShape: '24 Q / 4 KV heads · 256d',
+      },
+    ],
+    alternatingNote: '3 DeltaNet → 1 global attention',
+    alternatingNoteZh: '3 层 DeltaNet → 1 层全局注意力',
+    features: ['Native image/video input', 'Same model, eager execution'],
+    featuresZh: ['原生支持图像和视频输入', '相同模型，采用 eager 执行'],
+  },
 };
 
-/**
- * Get architecture specification for a model
- */
 export function getModelArchitecture(model: Model): ModelArchitecture | undefined {
   return MODEL_ARCHITECTURES[model];
 }
 
-/**
- * Format parameter count for display (e.g., "671B" or "70B")
- */
 export function formatParamCount(params: number): string {
   if (params >= 1000) {
     return `${(params / 1000).toFixed(1)}T`;
@@ -487,47 +764,37 @@ export function formatParamCount(params: number): string {
   return `${params}B`;
 }
 
-/**
- * Get a human-readable architecture summary
- */
 export function getArchitectureSummary(arch: ModelArchitecture): string {
   if (arch.architectureType === 'moe') {
+    if (arch.activeParamsPrefill !== undefined) {
+      return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParamsPrefill)} prefill / ${formatParamCount(arch.activeParams)} decode active)`;
+    }
     return `MoE ${formatParamCount(arch.totalParams)} (${formatParamCount(arch.activeParams)} active)`;
   }
   return `Dense ${formatParamCount(arch.totalParams)}`;
 }
 
-/** GLU variant of the FFN / expert blocks, e.g. `SwiGLU` or K3's `SiTU-GLU`. */
 export function ffnVariantLabel(arch: ModelArchitecture): string {
   return arch.ffnVariant ?? 'SwiGLU';
 }
 
-/** Elementwise activation on the gate projection, e.g. `SiLU` or K3's `SiTU`. */
 export function ffnGateActivationLabel(arch: ModelArchitecture): string {
   return arch.ffnGateActivation ?? 'SiLU';
 }
 
-/**
- * Attention label for the dense-FFN prefix block. Falls back to the model-wide
- * attention type, which is right for every uniform-attention model; hybrids
- * whose dense layer is one specific category override it.
- */
 export function denseLayerAttentionLabel(arch: ModelArchitecture): string {
   return arch.denseLayerAttentionLabel ?? getAttentionLabel(arch.attentionType);
 }
 
-/** Shared experts counted inside `numExperts`. Zero when the model has none. */
+export function architectureAttentionLabel(arch: ModelArchitecture): string {
+  return arch.attentionLabel ?? getAttentionLabel(arch.attentionType);
+}
+
 export function sharedExpertCount(arch: ModelArchitecture): number {
   if (!arch.hasSharedExpert) return 0;
   return arch.sharedExperts ?? 1;
 }
 
-/**
- * Router sub-label for a MoE expert grid, e.g. `Top-8 of 384 routed + 1 shared`.
- * `numExperts` counts routed *and* shared experts, so the shared ones are
- * subtracted out of the routed figure — with the model's own shared count, not
- * an assumed 1 (Kimi K3 has 2).
- */
 export function expertRouterSummary(arch: ModelArchitecture): string {
   const shared = sharedExpertCount(arch);
   const routed = (arch.numExperts ?? 0) - shared;
@@ -535,9 +802,6 @@ export function expertRouterSummary(arch: ModelArchitecture): string {
   return `Top-${arch.activeExperts} of ${routed} routed${sharedSuffix}`;
 }
 
-/**
- * Get attention type label with description
- */
 export function getAttentionLabel(type: AttentionType): string {
   switch (type) {
     case 'MHA': {
@@ -564,9 +828,6 @@ export function getAttentionLabel(type: AttentionType): string {
   }
 }
 
-/**
- * Format context window for display (e.g., "128K" or "1M")
- */
 export function formatContextWindow(tokens: number): string {
   if (tokens >= 1000000) {
     return `${(tokens / 1000000).toFixed(0)}M`;
@@ -574,27 +835,13 @@ export function formatContextWindow(tokens: number): string {
   return `${(tokens / 1000).toFixed(0)}K`;
 }
 
-/**
- * Sub-block component of an architecture module (attention or FFN).
- * Used to render expanded drill-down views in architecture diagrams.
- */
 export interface ArchSubBlock {
-  /** Display name of the sub-component */
   name: string;
-  /** Technical detail (dimensions, ratios, etc.) */
   detail?: string;
-  /** Component type for color coding */
   type: 'projection' | 'activation' | 'operation' | 'attention';
-  /** When set, render as a circle with this symbol instead of a rectangular block (e.g., '\u00D7' for multiply, '+' for add) */
   circleSymbol?: string;
 }
 
-/**
- * Flow layout for sub-blocks, supporting both sequential and parallel rendering.
- * Sequential: all blocks rendered top-to-bottom with arrows.
- * Parallel: two independent paths (left/right) that converge into merge blocks.
- * ThreeWay: three independent paths that converge in two stages.
- */
 export type SubBlockFlow =
   | { layout: 'sequential'; blocks: ArchSubBlock[] }
   | {
@@ -610,25 +857,14 @@ export type SubBlockFlow =
       leftPath: ArchSubBlock[];
       middlePath: ArchSubBlock[];
       rightPath: ArchSubBlock[];
-      /** Where left + middle converge (e.g., RoPE for Q & K only) */
       intermediateMergeBlocks: ArchSubBlock[];
-      /** Where intermediate result + right converge (e.g., Grouped Attention) */
       finalMergeBlocks: ArchSubBlock[];
       leftLabel?: string;
       middleLabel?: string;
       rightLabel?: string;
     };
 
-/**
- * Generate attention mechanism sub-blocks based on model architecture.
- * Shows internal components like projections, RoPE, and attention computation.
- * GQA uses a three-way layout with independent Q, K, V paths.
- * Only Q and K go through RoPE; V bypasses directly to attention.
- * Ref: https://github.com/meta-llama/llama3/blob/main/llama/model.py
- */
 export function getAttentionSubBlocks(arch: ModelArchitecture): SubBlockFlow {
-  // Grouped Query Attention — Q, K, V are 3 INDEPENDENT parallel projections from hidden state
-  // Only Q and K go through RoPE; V bypasses RoPE and goes directly to attention
   const hd =
     arch.headDim ||
     (arch.hiddenSize && arch.numHeads ? Math.round(arch.hiddenSize / arch.numHeads) : undefined);
@@ -694,40 +930,44 @@ export function getAttentionSubBlocks(arch: ModelArchitecture): SubBlockFlow {
   };
 }
 
-/**
- * Generate FFN/Expert sub-blocks based on model architecture.
- * Shows the SwiGLU feedforward structure used in modern LLMs.
- * Gate and Up projections are parallel paths — SiLU is applied only to gate,
- * then element-wise multiplied with the up projection output.
- */
 export function getFFNSubBlocks(
   arch: ModelArchitecture,
   options?: { useDenseFFNDim?: boolean },
 ): SubBlockFlow {
   const ffnDim = options?.useDenseFFNDim && arch.denseFFNDim ? arch.denseFFNDim : arch.ffnDim;
-  const hiddenSize = arch.hiddenSize;
+  const hiddenSize = options?.useDenseFFNDim
+    ? arch.hiddenSize
+    : (arch.routedExpertHiddenSize ?? arch.hiddenSize);
+
+  const gateBlocks: ArchSubBlock[] = [
+    {
+      name: 'Gate Projection',
+      detail: ffnDim ? `→ ${ffnDim.toLocaleString()}` : undefined,
+      type: 'projection',
+    },
+  ];
+  const upBlocks: ArchSubBlock[] = [
+    {
+      name: 'Up Projection',
+      detail: ffnDim ? `→ ${ffnDim.toLocaleString()}` : undefined,
+      type: 'projection',
+    },
+  ];
+  if (arch.ffnClamp !== undefined) {
+    gateBlocks.push({ name: 'Clamp', detail: `max = ${arch.ffnClamp}`, type: 'operation' });
+    upBlocks.push({ name: 'Clamp', detail: `±${arch.ffnClamp}`, type: 'operation' });
+  }
+  gateBlocks.push({
+    name: arch.ffnSwiGLUOAI ? 'Scaled SiLU' : `${ffnGateActivationLabel(arch)} Activation`,
+    detail: arch.ffnSwiGLUOAI ? 'α = 1.702' : 'Applied to gate output',
+    type: 'activation',
+  });
+  if (arch.ffnSwiGLUOAI) upBlocks.push({ name: '+1', type: 'operation' });
 
   return {
     layout: 'parallel',
-    leftPath: [
-      {
-        name: 'Gate Projection',
-        detail: ffnDim ? `\u2192 ${ffnDim.toLocaleString()}` : undefined,
-        type: 'projection',
-      },
-      {
-        name: `${ffnGateActivationLabel(arch)} Activation`,
-        detail: 'Applied to gate output',
-        type: 'activation',
-      },
-    ],
-    rightPath: [
-      {
-        name: 'Up Projection',
-        detail: ffnDim ? `\u2192 ${ffnDim.toLocaleString()}` : undefined,
-        type: 'projection',
-      },
-    ],
+    leftPath: gateBlocks,
+    rightPath: upBlocks,
     mergeBlocks: [
       {
         name: '\u2297',
@@ -743,18 +983,6 @@ export function getFFNSubBlocks(
   };
 }
 
-/**
- * Hybrid attention sub-blocks (DeepSeek V4-style CSA / HCA layers).
- *
- * Unlike a standard GQA layer, every hybrid attention layer fuses two KV
- * sources for each query: a local sliding-window branch (recent uncompressed
- * tokens) and a compressed-KV branch, combined by a shared-KV MQA with a
- * learnable attention sink. The compressed branch depends on the layer type —
- * CSA runs a lightning indexer (sparse top-k) over lightly compressed KV, while
- * HCA attends densely over heavily compressed KV. Rendering this as a flow makes
- * the sliding-window attention an explicit, visible block rather than a one-line
- * `window=N` annotation.
- */
 export function getHybridAttentionSubBlocks(
   arch: ModelArchitecture,
   spec: AlternatingLayerSpec,
@@ -762,12 +990,6 @@ export function getHybridAttentionSubBlocks(
   const win = spec.slidingWindow ?? arch.slidingWindow;
   const isSparse = /sparse/iu.test(spec.label);
 
-  // Both branches are KV *sources* whose selected indices are unioned and fed to
-  // a single shared-KV MQA softmax — they are not two attentions merged after
-  // the fact. The local branch contributes the recent sliding-window tokens; the
-  // compressed branch contributes selected long-range tokens. CSA lightly
-  // compresses (1/4) then sparsely selects via the learned lightning indexer;
-  // HCA compresses heavily (1/128) and keeps the few resulting entries.
   const localPath: ArchSubBlock[] = [
     {
       name: 'Sliding Window',
@@ -789,9 +1011,6 @@ export function getHybridAttentionSubBlocks(
     rightLabel: 'Compressed',
     leftPath: localPath,
     rightPath: compressedPath,
-    // The union of both branches' indices is consumed by one MQA softmax that
-    // carries a per-head learnable attention sink (a softmax-denominator bias,
-    // not literal sink tokens) — hence the sink lives on the MQA block here.
     mergeBlocks: [
       {
         name: 'Shared-KV MQA + Sink',

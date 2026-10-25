@@ -34,14 +34,7 @@ const STRINGS = {
   },
 } as const;
 
-// Sub-agent palette: each invocation gets its own hue spread evenly around the
-// wheel so 20+ parallel sub-agents stay visually distinguishable. The main
-// agent stays on the foreground color so it adapts to dark mode and reads as
-// the spine of the chart.
 function subagentColor(index: number, total: number): string {
-  // Stagger across two lightness tiers so adjacent hues don't blur into each
-  // other when total is large. Saturated mid-luminosity colors stay legible
-  // on both light and dark surfaces.
   const hue = (index * 360) / Math.max(total, 1);
   const lightness = index % 2 === 0 ? 48 : 58;
   return `hsl(${hue.toFixed(1)} 72% ${lightness}%)`;
@@ -64,8 +57,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
-  // Unique clipPath ID per component instance — two charts on the same page
-  // would otherwise share clipping bounds and collide on the first render.
   const clipId = useId().replaceAll(':', '');
 
   useEffect(() => {
@@ -82,9 +73,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
   const innerH = HEIGHT - MARGIN.top - MARGIN.bottom;
 
   const xFull = trajectories.maxElapsed || 1;
-  // Brush window controls the visible x-range. Y autoscales to the points
-  // (main + sub-agent) inside the window so a deep zoom isn't dominated by
-  // brushed-out tall turns.
   const brush = useBrush({ fullStart: 0, fullEnd: xFull });
   const xSpan = Math.max(1, brush.end - brush.start);
 
@@ -104,17 +92,12 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
 
   const mainPath = useMemo(
     () => buildLinePath(trajectories.main, xOf, yOf),
-    // Recompute when any scale dependency changes (innerW/innerH/brush/yDomain).
     [trajectories.main, innerW, innerH, brush.start, brush.end, yDomain],
   );
 
   const subPaths = useMemo(
     () =>
       trajectories.subagents.map((traj, i) => ({
-        // Sub-agent traces include vertical risers from the baseline at start
-        // AND end so a single high-context call (the common case for one-shot
-        // sub-agents) renders as a clearly visible vertical bar instead of
-        // a single barely-perceptible point near the top of the chart.
         line: buildLinePath(traj.points, xOf, yOf, { withBaselineRisers: innerH }),
         fill: buildFillPath(traj.points, xOf, yOf, innerH),
         label: traj.label ?? t.subagentFallback,
@@ -160,8 +143,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
 
     const considerSeries = (points: TrajectoryPoint[], label: string, color: string) => {
       for (const p of points) {
-        // Skip points outside the brushed window — they're clipped visually
-        // and shouldn't appear as hover targets.
         if (p.elapsedMs < brush.start || p.elapsedMs > brush.end) continue;
         const dx = Math.abs(xOf(p.elapsedMs) - localX);
         if (dx < bestDx) {
@@ -259,7 +240,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
             </clipPath>
           </defs>
           <g transform={`translate(${MARGIN.left} ${MARGIN.top})`}>
-            {/* Y-axis gridlines + labels */}
             {yTicks.map((tick, i) => {
               const y = yOf(tick);
               return (
@@ -285,8 +265,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
               );
             })}
 
-            {/* Data layer — clipped to the plot rect so brushed-out segments
-                don't leak past the y-axis or into the x-axis label band. */}
             <g clipPath={`url(#clip-${clipId})`}>
               {subPaths.map((p) => (
                 <path key={`sub-fill-${p.key}`} d={p.fill} fill={p.color} fillOpacity={0.14} />
@@ -321,7 +299,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
               )}
             </g>
 
-            {/* X-axis baseline */}
             <line
               x1={0}
               x2={innerW}
@@ -331,7 +308,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
               strokeOpacity={0.2}
             />
 
-            {/* X-axis ticks + labels */}
             {xTicks.map((tick, i) => {
               const x = xOf(tick);
               return (
@@ -358,9 +334,6 @@ export function ContextTrajectoriesChart({ trajectories }: { trajectories: Conte
           </g>
         </svg>
 
-        {/* Brush bar — drag the handles to narrow the visible window, or grab
-            the selection body to pan. Same range-selector pattern as the
-            tokens-over-time chart so the two views feel uniform. */}
         <div className="mt-2">
           <BrushBar
             width={width - 32}
@@ -393,10 +366,6 @@ function buildLinePath(
       .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xOf(p.elapsedMs)} ${yOf(p.total)}`)
       .join(' ');
   }
-  // Start from the baseline directly under the first point, rise vertically to
-  // the first point, trace through the rest, then drop vertically back to the
-  // baseline under the last point. Makes a sub-agent invocation look like a
-  // closed visual unit even when it has only one or two points.
   const first = points.at(0)!;
   const last = points.at(-1)!;
   const cmds: string[] = [`M ${xOf(first.elapsedMs)} ${baseline}`];

@@ -38,16 +38,10 @@ export const OVERVIEW_SEARCH_ORDER: readonly OverviewSearchKey[] = [
   'present',
 ];
 
-/** Params the client resolves without asking the server. `ref` only picks which
- *  column the percentages are measured against, and `present` only records the
- *  requested layout. Neither changes the Overview payload or its cache key. */
 export const OVERVIEW_CLIENT_ONLY_KEYS = ['ref', 'present'] as const;
 
 export type OverviewClientOnlySearchKey = (typeof OVERVIEW_CLIENT_ONLY_KEYS)[number];
 
-/** Apply one control's destination to the latest pending overview URL.
- * This prevents a second, fast selection from rebuilding from stale server
- * props while the first App Router transition is still in flight. */
 export function mergeOverviewControlHref(
   currentHref: string,
   targetHref: string,
@@ -74,8 +68,6 @@ export function mergeOverviewControlHref(
   }
 
   const search = ordered.toString();
-  // A control href never carries a fragment, so an absent one means "keep the
-  // one already on the page" rather than "clear it".
   const hash = target.hash === '' ? current.hash : target.hash;
   return `${current.pathname}${search === '' ? '' : `?${search}`}${hash}`;
 }
@@ -85,27 +77,15 @@ function overviewSequence(model: OverviewModelSummary): '8k/1k' | 'agentic-trace
   return model.scenario === 'agentx' ? 'agentic-traces' : '8k/1k';
 }
 
-/** The `/inference` route base for a locale — shared by every overview link. */
 function inferenceRoute(locale: 'en' | 'zh'): string {
   return locale === 'zh' ? '/zh/inference' : '/inference';
 }
 
-/**
- * Maps a raw DB `spec_method` to the dashboard's `SpecMode` filter bucket
- * (mirrors `pointSpecMode` in quickFilters.ts, minus its hwKey suffix check —
- * overview `specMethod` comes straight from `spec_method`).
- */
 function dashboardSpecMode(specMethod: string): 'mtp' | 'stp' | undefined {
   if (specMethod === 'mixed') return undefined;
   return specMethod === 'none' || specMethod === '' ? 'stp' : 'mtp';
 }
 
-/**
- * The one run backing a configuration, or null when it has none, has several,
- * or its single source URL names no run (a run list rather than a run). Both
- * helpers below read this one predicate, so the `g_runid` pin and the source-run
- * link can never disagree about whether a single run backs the configuration.
- */
 function soleSourceRun(config: OverviewConfigView): { url: string; id: string } | null {
   if (config.sourceRunUrls.length !== 1) return null;
   const url = config.sourceRunUrls[0];
@@ -113,16 +93,6 @@ function soleSourceRun(config: OverviewConfigView): { url: string; id: string } 
   return id === null ? null : { url, id };
 }
 
-/**
- * Inference-dashboard link narrowed to the configuration the overview ranked:
- * its model, run date, workload, precision, hardware/framework/spec key and
- * deployment mode. The run is pinned only when a single run produced the
- * configuration — pinning one of several would hide the rest of its frontier.
- *
- * This is a filtered view, not a proof of topology: `i_gpus` selects a
- * hardware/framework/spec key, which can still hold more than one parallelism
- * or GPU-count topology.
- */
 export function buildOverviewDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
@@ -153,11 +123,6 @@ function uniqueValues(values: readonly string[]): string {
   return [...new Set(values)].join(',');
 }
 
-/**
- * Dashboard view for one Overview 30-day cell. The two independently ranked
- * serving envelopes are carried explicitly so the chart can show exactly the
- * curves behind the percentage even when engine, precision, or topology changed.
- */
 export function buildOverviewHistoryDashboardHref(
   locale: 'en' | 'zh',
   model: OverviewModelSummary,
@@ -192,10 +157,6 @@ export function buildOverviewHistoryDashboardHref(
   return `${inferenceRoute(locale)}?${query}`;
 }
 
-/**
- * Model-level dashboard view: precision-neutral, because the two headline pairs
- * may select different precisions. Result-level evidence links narrow further.
- */
 export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): string {
   const query = new URLSearchParams({
     g_model: model.model,
@@ -206,7 +167,6 @@ export function detailHref(locale: 'en' | 'zh', model: OverviewModelSummary): st
   return `${inferenceRoute(locale)}?${query}`;
 }
 
-/** Canonical overview URL. Defaults are omitted and params always use this order. */
 export function overviewHref(
   locale: 'en' | 'zh',
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -226,22 +186,14 @@ export function overviewHref(
   }
   if (comparisonMode !== 'hardware') query.set('compare', comparisonMode);
   if (modelScope !== OVERVIEW_DEFAULT_MODEL_SCOPE) query.set('models', modelScope);
-  // Each mode filters rows on its own terms and carries its own key. Both are
-  // written whenever they are set, including the one whose mode is off screen:
-  // that dormant key is the only record of the other tab's answer, and a URL
-  // rebuilt from page data — on first load, on refresh, or from a shared link —
-  // has nothing else to restore it from.
   if (rowScope !== OVERVIEW_DEFAULT_ROW_SCOPE) query.set('rows', rowScope);
   if (hardwareRowScope !== OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE) {
     query.set('hwrows', hardwareRowScope);
   }
-  // `rows=changed` and `hwrows=priced` are the only values ever emitted; `all`
-  // is the default and stays out of the URL so the canonical link is unchanged.
   const search = query.toString();
   return search === '' ? base : `${base}?${search}`;
 }
 
-/** Tier switch preserving the active engine scope. */
 export function overviewTierHref(
   locale: 'en' | 'zh',
   tier: OverviewTier,
@@ -264,7 +216,6 @@ export function overviewTierHref(
   );
 }
 
-/** Engine-scope switch preserving the active service tier. */
 export function overviewEngineScopeHref(
   locale: 'en' | 'zh',
   engineScope: OverviewEngineScope,

@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 const here = import.meta.dirname;
 
-/** Static (non-type) import specifiers in a module; dynamic `import()` is excluded. */
 function staticImports(file: string): string[] {
   const text = readFileSync(path.join(here, file), 'utf8');
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -16,8 +15,6 @@ function staticImports(file: string): string[] {
 }
 
 describe('site search bundle isolation', () => {
-  // Every page ships the header. The index, crawler and dialog must stay in a
-  // lazily loaded chunk so search costs nothing until a user opens it.
   it('keeps the dialog and search engine out of the header bundle', () => {
     for (const file of ['header.tsx', 'site-search-button.tsx']) {
       const specifiers = staticImports(file);

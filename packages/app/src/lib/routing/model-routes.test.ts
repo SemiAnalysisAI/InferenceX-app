@@ -32,9 +32,6 @@ describe('MODEL_ROUTES registry', () => {
   });
 
   it('keeps the default route model in lockstep with the g_model URL default', () => {
-    // The pathname rewrite treats a bare /calculator or /historical as
-    // DEFAULT_ROUTE_MODEL; if the app-wide default drifted, plain page loads
-    // would rewrite the URL.
     expect(PARAM_DEFAULTS.g_model).toBe(DEFAULT_ROUTE_MODEL);
   });
 
@@ -47,9 +44,6 @@ describe('MODEL_ROUTES registry', () => {
     ]);
     expect(defaultRouteModel('calculator')).toBe(DEFAULT_ROUTE_MODEL);
     expect(defaultRouteModel('historical')).toBe(DEFAULT_ROUTE_MODEL);
-    // The estimator only plots agentic traces, and Kimi K3 is the model with
-    // the widest agentic hardware coverage; the page seeds its provider from
-    // this same helper.
     expect(defaultRouteModel('profit-estimator')).toBe(Model.Kimi_K3);
     expect(defaultRouteModel('profit-estimator-per-gigawatt')).toBe(Model.Kimi_K3);
     for (const tab of MODEL_ROUTE_TABS) {
@@ -147,8 +141,6 @@ describe('modelRoutePathnameRewrite', () => {
   it('rewrites bare paths only for non-default models', () => {
     expect(modelRoutePathnameRewrite('/calculator', DEFAULT_ROUTE_MODEL)).toBeNull();
     expect(modelRoutePathnameRewrite('/calculator', Model.Kimi_K3)).toBe('/calculator/kimi-k3');
-    // Per-tab default: the profit estimator's bare path means Kimi K3, so the
-    // app-wide default model is the one that gets a slug there.
     expect(modelRoutePathnameRewrite('/profit-estimator', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/zh/profit-estimator', Model.Kimi_K3)).toBeNull();
     expect(modelRoutePathnameRewrite('/profit-estimator', DEFAULT_ROUTE_MODEL)).toBe(
@@ -183,17 +175,23 @@ describe('modelRoutePathnameRewrite', () => {
 });
 
 describe('modelRoutesForTab', () => {
-  it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
+  it('serves agentic models with priced interpolation on both profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
-      // `MODEL_ROUTES` order (the dashboard selector's), not allow-list order.
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
+        Model.Muse_Spark_Open,
         Model.DeepSeek_V4_Pro,
         Model.DeepSeek_V4_1_Flash,
         Model.Kimi_K3,
         Model.MiniMax_M3,
+        Model.MiniMax_M3_1_Flash,
         Model.GLM_5_2,
+        Model.Qwen3_5,
+        Model.Qwen3_8_Flash_Next,
       ]);
-      expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(false);
+      expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(true);
+      expect(modelRouteAvailableForTab(tab, Model.Qwen3_8_Flash_Next)).toBe(true);
+      expect(modelRouteAvailableForTab(tab, Model.MiniMax_M3_1_Flash)).toBe(true);
+      expect(modelRouteAvailableForTab(tab, Model.Muse_Spark_Open)).toBe(true);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
       expect(modelRouteAvailableForTab(tab, Model.MiniMax_M3)).toBe(true);
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.MiniMax_M3)?.slug).toBe(
@@ -203,14 +201,10 @@ describe('modelRoutesForTab', () => {
       expect(
         modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_Pro)?.slug,
       ).toBe('deepseek-v4');
-      // V4.1 Flash is its own architecture and DB bucket, so it gets its own
-      // slug rather than joining the V4 Pro page.
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_1_Flash)).toBe(true);
       expect(
         modelRoutesForTab(tab).find((route) => route.model === Model.DeepSeek_V4_1_Flash)?.slug,
       ).toBe('deepseek-v41-flash');
-      // GLM 5.2 and 5.3 share one data bucket; the slug follows the current
-      // release, as on the rest of the site, and `glm-5-2` 308s to it.
       expect(modelRoutesForTab(tab).find((route) => route.model === Model.GLM_5_2)?.slug).toBe(
         'glm-5-3',
       );
@@ -220,8 +214,6 @@ describe('modelRoutesForTab', () => {
           route: expect.objectContaining({ slug: 'glm-5-3' }),
         }),
       );
-      // DeepSeek V4 Pro is the app-wide default but not the estimators'; its
-      // slugged page stays indexable there instead of folding into the bare path.
       expect(defaultRouteModel(tab)).toBe(Model.Kimi_K3);
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_R1)).toBe(false);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);

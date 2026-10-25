@@ -1,7 +1,3 @@
-// San Fierro world data: real San Francisco and South Bay geography from
-// OpenStreetMap (ODbL) and Mapzen Terrarium elevation tiles, decoded at runtime.
-// Coordinates are metres: x east, z south, origin at Union Square.
-
 export interface Point {
   x: number;
   z: number;
@@ -32,7 +28,6 @@ export const TRAFFIC_MODELS = [
 ] as const;
 export type TrafficModel = (typeof TRAFFIC_MODELS)[number] | 'bus';
 
-/** Ground classes stored in ground.png. */
 export const GROUND = {
   urban: 0,
   grass: 1,
@@ -46,7 +41,6 @@ export const GROUND = {
   sidewalk: 9,
 } as const;
 
-/** Road classes from the build script. */
 export const ROAD = {
   motorway: 0,
   trunk: 1,
@@ -114,7 +108,6 @@ export interface Place extends Point {
   zh: string;
 }
 
-/** Places with real coordinates. Parody city names follow the Los Santos convention. */
 export const CITY_NAME = { en: 'San Fierro', zh: '圣菲耶罗' };
 export const SOUTH_BAY_NAME = { en: 'San Jovano', zh: '圣霍瓦诺' };
 
@@ -190,7 +183,6 @@ export class World {
   readonly landmarks: Record<string, Point>;
   readonly freeway: Point[];
   readonly places: Place[];
-  /** Drivable lanes (roads split at intersections) for traffic and police. */
   readonly lanes: number[] = [];
   readonly nodes = new Map<string, { road: number; end: 0 | 1 }[]>();
   private readonly hash = new Map<number, number[]>();
@@ -257,7 +249,7 @@ export class World {
       i += 8 + n * 2;
     }
     this.buildings.forEach((bd, index) => {
-      if (bd.minHeight > 2.5) return; // Bridges and overhangs do not block the street.
+      if (bd.minHeight > 2.5) return;
       this.cells(bd.minX, bd.minZ, bd.maxX, bd.maxZ, (key) => {
         const list = this.hash.get(key);
         if (list) list.push(index);
@@ -288,8 +280,6 @@ export class World {
       });
       i += 5 + n * 3;
     }
-    // Fictional connector across the gap introduced by compressing the South Bay.
-    // Both ends meet existing road geometry; the corridor avoids building footprints.
     for (const [name, points] of [
       ['San Jovano Connector', [203.1, 6190, 605.1, 6174.9]],
       ['Santa Clara Connector', [211.1, 4735.2, 211.1, 4660, -473.1, 4660, -473.1, 4679.9]],
@@ -366,7 +356,6 @@ export class World {
   }
 
   private splitLanes() {
-    // Split drivable roads at shared vertices so traffic can turn at every junction.
     const count = new Map<string, number>();
     for (const road of this.roads) {
       if (road.cls > ROAD.service || road.bridge || road.cls === ROAD.motorway) continue;
@@ -411,10 +400,8 @@ export class World {
         }
       }
     }
-    // Lane copies carry cls + 100 so renderers can skip them.
   }
 
-  /** Lanes whose start lies within roughly r metres of (x, z). */
   lanesNear(x: number, z: number, r: number) {
     const out: number[] = [];
     const i0 = Math.floor((x - r - this.x0) / LANE_CELL),
@@ -433,7 +420,6 @@ export class World {
     return `${Math.round(x * 2)},${Math.round(z * 2)}`;
   }
 
-  /** Bilinear terrain height in metres. */
   height(x: number, z: number) {
     const fx = (x - this.x0) / this.tRes - 0.5,
       fz = (z - this.z0) / this.tRes - 0.5;
@@ -456,7 +442,6 @@ export class World {
     );
   }
 
-  /** Height of the drivable surface (terrain, or pier decks above the water line). */
   surface(x: number, z: number) {
     return Math.max(this.height(x, z), this.ground(x, z) === GROUND.pier ? 2.6 : -50);
   }
@@ -512,12 +497,10 @@ export class World {
     return -1;
   }
 
-  /** True when a circle at p cannot occupy the world (buildings, open water, edges). */
   blocked(p: Point, radius = 1.2) {
     if (p.x < this.x0 + 40 || p.x > this.x1 - 40 || p.z < this.z0 + 40 || p.z > this.z1 - 40)
       return true;
     if (this.ground(p.x, p.z) === GROUND.water) return true;
-    // Check neighbouring cells when the circle crosses a cell boundary.
     const seen = new Set<number>();
     for (const [ox, oz] of [
       [0, 0],
@@ -547,7 +530,6 @@ export class World {
     return false;
   }
 
-  /** Nearest named street within 30 m. */
   street(x: number, z: number) {
     const list = this.roadHash.get(
       Math.floor((z - this.z0) / CELL) * 4096 + Math.floor((x - this.x0) / CELL),
@@ -593,7 +575,6 @@ export class World {
     return p.z > 4300;
   }
 
-  /** Point on a lane at distance s from its start, offset to the right-hand side. */
   lanePoint(road: Road, s: number, offset: number) {
     const p = road.pts;
     let acc = 0;
@@ -619,7 +600,6 @@ export class World {
 
 export const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
 
-/** Decode a Terrarium RGB image (R*256 + G + B/256 - 32768) into metres. */
 export function decodeTerrarium(rgba: Uint8ClampedArray, width: number, height: number): Raster {
   const data = new Float32Array(width * height);
   for (let i = 0; i < data.length; i++)

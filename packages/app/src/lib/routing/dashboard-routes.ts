@@ -9,15 +9,12 @@ export interface DashboardProviderCapabilities {
 export interface DashboardShellCapabilities {
   readonly providers: DashboardProviderCapabilities;
   readonly dashboardNudge: boolean;
-  /** Whether the InferenceX dashboard tab strip renders above the page. */
   readonly tabNav: boolean;
 }
 
 interface DashboardRouteDefinition {
   readonly key: string;
-  /** Route used for dashboard navigation. */
   readonly path: `/${string}`;
-  /** SEO canonical and sitemap route. The inference dashboard canonicalizes to `/`. */
   readonly canonicalPath: '/' | `/${string}`;
   readonly navGroup: DashboardNavGroup;
   readonly indexable: boolean;
@@ -46,11 +43,6 @@ interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
   readonly includeChildren: boolean;
 }
 
-/**
- * Shell-only route overrides. These live beside the dashboard registry so
- * provider and nudge decisions are data-driven rather than inferred in the
- * React shell. Locale-prefixed paths are normalized by the resolver.
- */
 export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   {
     path: '/video',
@@ -74,8 +66,6 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     tabNav: true,
   },
   {
-    // The explorer has its own section nav; the dashboard tab strip would
-    // stack a second, unrelated navigation bar above it.
     path: '/agentic-workload-explorer',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
@@ -84,13 +74,6 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
 
-/**
- * Canonical, data-only registry for every dashboard route.
- *
- * Localized labels and metadata prose deliberately live in `tab-meta*.ts` and
- * `tab-nav.tsx`; this module can be consumed by server and client code without
- * importing React or locale content.
- */
 export const DASHBOARD_ROUTES = [
   {
     key: 'video',
@@ -112,9 +95,6 @@ export const DASHBOARD_ROUTES = [
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
-  // The two profit views sit between Inference Performance and Accuracy
-  // Evals; the TCO calculator and fleet lifecycle moved to the footer's
-  // "More" column.
   {
     key: 'profit-estimator-per-gigawatt',
     path: '/profit-estimator-per-gigawatt',
@@ -145,9 +125,6 @@ export const DASHBOARD_ROUTES = [
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'e_'],
   },
-  // Historical Trends moved to the footer as well: almost nobody opened the
-  // view, and people compare curves across dates on the inference dashboard
-  // instead. The route, canonical, /zh mirror, and sitemap entry stay.
   {
     key: 'historical',
     path: '/historical',
@@ -232,7 +209,7 @@ export const DASHBOARD_ROUTES = [
     key: 'operatorx',
     path: '/operatorx',
     canonicalPath: '/operatorx',
-    navGroup: 'feature-gated',
+    navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
@@ -249,8 +226,6 @@ export const DASHBOARD_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
-  // Agentic Workload Explorer: a frozen, anonymized ProxyTrace snapshot read
-  // from its own database (DATABASE_PROXYTRACE_READONLY_URL).
   {
     key: 'agentic-workload-explorer',
     path: '/agentic-workload-explorer',
@@ -308,7 +283,6 @@ export function getDashboardRoute(key: DashboardRouteKey): DashboardRoute {
   return DASHBOARD_ROUTES.find((route) => route.key === key)!;
 }
 
-/** Resolve a dashboard route from an English or `/zh` pathname, including child routes. */
 export function dashboardRouteForPathname(pathname: string): DashboardRoute | undefined {
   const barePath = pathname.split(/[?#]/u, 1)[0] || '/';
   const enPath = barePath === '/zh' ? '/' : barePath.replace(/^\/zh(?=\/)/u, '');
@@ -326,7 +300,6 @@ const DEFAULT_DASHBOARD_SHELL_CAPABILITIES: DashboardShellCapabilities = {
   tabNav: true,
 };
 
-/** Resolve providers and dashboard nudges for an English or Chinese pathname. */
 export function dashboardShellCapabilitiesForPathname(
   pathname: string,
 ): DashboardShellCapabilities {
@@ -348,9 +321,6 @@ export function dashboardShellCapabilitiesForPathname(
   if (!dashboardRoute) return DEFAULT_DASHBOARD_SHELL_CAPABILITIES;
   return {
     providers: dashboardRoute.providers,
-    // Provider ownership and nudge ownership are independent. Production
-    // mounted dashboard nudges on standalone tabs too; only explicit shell
-    // overrides suppress them.
     dashboardNudge: true,
     tabNav: true,
   };

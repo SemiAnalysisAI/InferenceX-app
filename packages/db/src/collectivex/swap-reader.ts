@@ -1,6 +1,5 @@
 import type { CollectiveXPercentiles, CollectiveXSwapPoint, CollectiveXSwapResult } from './types';
 
-/** The standalone harness writes an execution matrix without EP case metadata. */
 export function isSwapMatrix(value: unknown): boolean {
   const matrix = value as {
     version?: unknown;
@@ -32,7 +31,6 @@ function percentiles(value: unknown): value is CollectiveXPercentiles {
   );
 }
 
-/** Validate measured values before any chart/summary can call a result successful. */
 export function readSwapResults(
   matrix: unknown,
   docs: unknown[],
@@ -75,7 +73,6 @@ export function readSwapResults(
     ) {
       throw new TypeError('invalid swap_blocks artifact or provenance');
     }
-    // Legacy single-pool artifacts did not record SKU; multi-pool runs must identify it.
     const sku = raw.runtime.sku ?? (skus.length === 1 ? skus[0] : undefined);
     if (!sku || !skus.includes(sku)) throw new TypeError('invalid swap_blocks GPU pool');
     const points = raw.cases.map((row): CollectiveXSwapPoint => {
@@ -104,7 +101,6 @@ export function readSwapResults(
       }
       seen.add(key);
       const p = row.latency.percentiles_us;
-      // Count copied payload once, including d2d; this is host-observed goodput.
       const rate = (us: number) => row.payload_bytes / us / 1000;
       return {
         direction: row.direction,

@@ -1,15 +1,63 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
-// The website advertises the verified public release, which can lag the source candidate.
 import PUBLISHED_SKILL from '../../src/lib/api/published-inferencex-skills.json';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  it('publishes exact model architecture facts and rejects unsupported selection controls', () => {
+    const endpoint = '/api/v1/views/model-architectures';
+    cy.request(`${endpoint}?model=kimi-k3`).then(({ body, status }) => {
+      expect(status).to.equal(200);
+      expect(body.params).to.deep.equal({ model: 'Kimi-K3' });
+      expect(body.models).to.have.length(1);
+      expect(body.models[0].slug).to.equal('kimi-k3');
+      expect(body.models[0].architecture).to.include({
+        numLayers: 93,
+        hiddenSize: 7168,
+        numExperts: 898,
+        activeExperts: 16,
+        routedExpertHiddenSize: 3584,
+      });
+      cy.request(`${endpoint}?model=Kimi-K3`).its('body').should('deep.equal', body);
+    });
+    cy.request(endpoint).then(({ body }) => {
+      expect(body.params.model).to.equal(null);
+      expect(
+        body.models.find((entry: { slug: string }) => entry.slug === 'muse-spark-open'),
+      ).to.have.nested.property('architecture.totalParams', 816);
+    });
+    for (const suffix of [
+      '?model=missing',
+      '?model=',
+      '?model=kimi-k3&model=Kimi-K3',
+      '?runId=123',
+    ]) {
+      cy.request({ url: `${endpoint}${suffix}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 400);
+    }
+    cy.request('/api/openapi.json').then(({ body }) => {
+      const operation = body.paths[endpoint].get;
+      expect(operation.parameters.map((item: { name: string }) => item.name)).to.deep.equal([
+        'model',
+      ]);
+      expect(
+        body.components.schemas.ModelArchitecturesView.properties.models.items.properties,
+      ).to.have.keys('slug', 'architecture');
+    });
+    for (const locale of ['/api', '/zh/api']) {
+      cy.visit(locale);
+      cy.get('[data-testid="api-endpoint-get-model-architectures-view"] summary').click();
+      cy.get('[data-testid="api-endpoint-get-model-architectures-view"]').should(
+        'contain.text',
+        endpoint,
+      );
+    }
+  });
+
   it('exposes Pareto boundaries without promoting legacy fixtures or chart share params', () => {
     const query =
       '/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max';
-    // Local fixtures omit benchmark_type. The endpoint must keep that as an empty
-    // selection rather than inventing a single_turn workload for dominance math.
     cy.request<BenchmarkRow[]>('/api/v1/benchmarks?model=DeepSeek-R1-0528').then(
       ({ body: rows }) => {
         expect(rows.length).to.be.greaterThan(0);
@@ -97,7 +145,6 @@ describe('API documentation', () => {
           cy.stub(win.navigator.clipboard, 'writeText').as('copyAgentExample').resolves();
         },
       });
-      // The reference is server-rendered; wait for the shell's client mount before copying.
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
         .and('contain', 'currently');

@@ -1,5 +1,3 @@
-/** Pairing rules for the historical gpu_metrics backfill. */
-
 import {
   expectedTelemetryArtifactNames,
   gpuMetricsArtifactSuffix,
@@ -15,16 +13,10 @@ import {
 } from './github-artifacts.js';
 
 export interface GpuMetricsArtifactPair {
-  /** `gpu_metrics_<suffix>`, or the `power_audit_<suffix>` bundle when a multinode job uploaded no other. */
   gpuMetrics: ArtifactMeta;
   benchmarks: ArtifactMeta;
 }
 
-/**
- * Pair every unexpired telemetry artifact with its exact bmk sibling, matching
- * CI ingest. A `power_audit_` bundle pairs only when its suffix has no unexpired
- * `gpu_metrics_` upload, the same preference `discoverGpuMetricsArtifacts` applies.
- */
 export function pairGpuMetricsArtifacts(
   artifacts: readonly ArtifactMeta[],
 ): GpuMetricsArtifactPair[] {
@@ -40,7 +32,6 @@ export function pairGpuMetricsArtifacts(
   }).map(({ artifact, benchmarks }) => ({ gpuMetrics: artifact, benchmarks }));
 }
 
-/** A corrupt unrelated benchmark sibling must not prevent valid pairs from being repaired. */
 export async function collectMissingTelemetryExpectations(
   artifacts: readonly ArtifactMeta[],
   pairs: readonly GpuMetricsArtifactPair[],

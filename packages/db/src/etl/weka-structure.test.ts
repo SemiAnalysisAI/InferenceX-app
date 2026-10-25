@@ -16,7 +16,6 @@ import {
 describe('countSeenPrefixBlocks', () => {
   it('counts only the contiguous leading run already seen', () => {
     const seen = new Set([1, 2, 3, 9]);
-    // 1,2,3 seen contiguously; 4 breaks the run even though 9 is seen later.
     expect(countSeenPrefixBlocks([1, 2, 3, 4, 9], seen)).toBe(3);
   });
 
@@ -39,9 +38,7 @@ describe('buildConversationStructure', () => {
       id: 'c1',
       block_size: 64,
       requests: [
-        // Turn 0: nothing seen yet → all uncached.
         { type: 'n', model: 'm', in: 128, out: 10, hash_ids: [1, 2] },
-        // Turn 1: blocks 1,2 already seen, 3 is new → 2 blocks cached.
         { type: 'n', model: 'm', in: 192, out: 20, hash_ids: [1, 2, 3] },
       ],
     };
@@ -49,8 +46,8 @@ describe('buildConversationStructure', () => {
     const t0 = s.nodes[0] as TurnNode;
     const t1 = s.nodes[1] as TurnNode;
     expect(t0).toMatchObject({ kind: 'turn', in: 128, cached: 0, uncached: 128, out: 10 });
-    expect(t1.cached).toBe(128); // 2 blocks × 64
-    expect(t1.uncached).toBe(64); // 192 - 128
+    expect(t1.cached).toBe(128);
+    expect(t1.uncached).toBe(64);
     expect(s.totals).toMatchObject({
       in: 320,
       out: 30,
@@ -80,8 +77,8 @@ describe('buildConversationStructure', () => {
       id: 'c2',
       block_size: 64,
       requests: [
-        { type: 'n', in: 100, out: 0, hash_ids: [1, 2] }, // 2 blocks but in=100 (partial)
-        { type: 'n', in: 100, out: 0, hash_ids: [1, 2] }, // both seen → cached clamped to 100
+        { type: 'n', in: 100, out: 0, hash_ids: [1, 2] },
+        { type: 'n', in: 100, out: 0, hash_ids: [1, 2] },
       ],
     };
     const s = buildConversationStructure(conv);
@@ -112,19 +109,15 @@ describe('buildConversationStructure', () => {
           t: 12.5,
           duration_ms: 1234,
           requests: [
-            // sees parent block 1 (snapshot at spawn) → 1 block cached
             { type: 'n', model: 'sub', t: 12.5, in: 128, out: 7, hash_ids: [1, 5] },
-            // now block 5 is also seen within the subagent → 2 cached
             { type: 'n', model: 'sub', t: 13.1, in: 128, out: 3, hash_ids: [1, 5] },
           ],
         },
-        // Parent turn after subagent: block 5 must NOT be cached (subagent
-        // context not folded back); only block 1 is in the parent seen set.
         { type: 'n', model: 'main', in: 128, out: 1, hash_ids: [1, 5] },
       ],
     };
     const s = buildConversationStructure(conv);
-    expect(s.totals.numTurns).toBe(2); // two top-level normal turns
+    expect(s.totals.numTurns).toBe(2);
     expect(s.totals.numSubagentGroups).toBe(1);
 
     const sub = s.nodes[1] as SubagentNode;
@@ -146,13 +139,13 @@ describe('buildConversationStructure', () => {
       [1, 0],
       [1, 1],
     ]);
-    expect(sub.children[0].cached).toBe(64); // block 1 from parent snapshot
-    expect(sub.children[1].cached).toBe(128); // blocks 1 & 5 now seen in child
+    expect(sub.children[0].cached).toBe(64);
+    expect(sub.children[1].cached).toBe(128);
     expect(sub.in).toBe(256);
     expect(sub.out).toBe(10);
 
     const afterSub = s.nodes[2] as TurnNode;
-    expect(afterSub.cached).toBe(64); // only block 1; block 5 not folded back
+    expect(afterSub.cached).toBe(64);
     expect((s.nodes[0] as TurnNode).endS).toBe(1);
   });
 

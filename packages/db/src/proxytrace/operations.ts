@@ -13,13 +13,6 @@ import { analyzeToolSequences } from './sequence-insights';
 import { NOW, TODAY_UTC_START } from './as-of';
 const LONG_CONTEXT_MODEL_NAMES = Object.keys(LONG_CONTEXT_PRICING_MODELS);
 
-// ── Visibility filter helpers ──
-
-/**
- * SQL condition for requests table. Admin sees every privacy mode; non-admins
- * only see anonymized rows. Optionally pins to a single `trace_version` for
- * the dashboard's global version selector (`null` ⇒ all versions).
- */
 export function requestsVisFilter(
   v: string[] | null,
   alias = 'requests',
@@ -30,13 +23,6 @@ export function requestsVisFilter(
   return sql`${vis} AND ${sql.raw(alias)}.trace_version = ${traceVersion}`;
 }
 
-/**
- * SQL condition for sessions table. A non-admin may see a session only if it
- * has at least one anonymized request. When `traceVersion` is set, also
- * requires at least one request at that pipeline version — so the sessions
- * list and any sessions-only aggregate naturally narrows with the global
- * version selector.
- */
 export function sessionsVisFilter(v: string[] | null, traceVersion: number | null = null) {
   if (v === null && traceVersion === null) return sql`TRUE`;
   const vis = v === null ? sql`TRUE` : sql`r_vis.privacy_mode = 'anon'`;
@@ -49,38 +35,20 @@ export function sessionsVisFilter(v: string[] | null, traceVersion: number | nul
   )`;
 }
 
-/**
- * SQL condition to filter requests by model name.
- * @param model - null = no filter (all models), string = specific model
- */
 export function modelFilter(model: string | null) {
   if (!model) return sql`TRUE`;
   return sql`requests.model = ${model}`;
 }
 
-/**
- * SQL condition to filter requests by stamped trace_version. Used by the
- * dashboard's global version selector so analytics only mix rows from a
- * single pipeline generation. `null` ⇒ no filter (return every version).
- *
- * @param traceVersion - null = all versions, number = exact match
- * @param alias - table alias for the requests row (defaults to `requests`)
- */
 export function traceVersionFilter(traceVersion: number | null, alias = 'requests') {
   if (traceVersion === null) return sql`TRUE`;
   return sql`${sql.raw(alias)}.trace_version = ${traceVersion}`;
 }
 
-/** Restricts a scan to the given sessions; `null` leaves it unrestricted. */
 function sessionIdFilter(sessionIds: readonly string[] | null, column: string) {
   return sessionIds === null ? sql`TRUE` : sql`${sql.ref(column)} = ANY(${sessionIds}::text[])`;
 }
 
-/**
- * Joins `request_stats` as `rs`. For a session sample the planner overestimates
- * the matching requests and seq-scans all of request_stats; the OFFSET 0
- * lateral keeps it to one index lookup per request.
- */
 function requestStatsJoin(requestId: string, sessionIds: readonly string[] | null) {
   return sessionIds === null
     ? sql`JOIN request_stats rs ON rs.request_id = ${sql.ref(requestId)}`
@@ -101,7 +69,6 @@ export async function getDistinctModels(visibleClientIds: string[] | null = null
   return result.rows.map((r) => String(r.model));
 }
 
-/** SQL mirror of `harnessFromUserAgent` in `./shared/harness`. */
 export const SESSION_HARNESS_SQL = sql<Harness>`CASE
   WHEN sessions.metadata ->> 'userAgent' LIKE 'claude-cli/%' THEN 'claude-code'
   WHEN sessions.metadata ->> 'userAgent' ~* '^codex' THEN 'codex'
@@ -110,26 +77,16 @@ export const SESSION_HARNESS_SQL = sql<Harness>`CASE
   ELSE 'other'
 END`;
 
-/**
- * SQL conditions that mirror the chip filters on /sessions. Shared by
- * `getRecentSessions` and `getSessionStats` so the stat cards always agree
- * with the visible list.
- */
 function sessionFilterConditions(
   traceVersion: number | null,
   privacyMode: PrivacyMode | null,
   harnessFilter: Harness | null,
 ) {
-  // ALL-rows semantics: a session matches the version filter iff every one of
-  // its visible requests is at the chosen trace_version (and it has at least
-  // one — guaranteed by the session_summary join).
   let versionCondition = sql`TRUE`;
   if (traceVersion !== null) {
     versionCondition = sql`ss.min_trace_version = ${traceVersion} AND ss.max_trace_version = ${traceVersion}`;
   }
 
-  // Privacy mode filter: when specified, filter sessions by their privacy_mode.
-  // Only admins can filter by privacy_mode (enforced at API level).
   let privacyCondition = sql`TRUE`;
   if (privacyMode !== null) {
     privacyCondition = sql`sessions.privacy_mode = ${privacyMode}`;
@@ -141,14 +98,6 @@ function sessionFilterConditions(
   return { versionCondition, privacyCondition, harnessCondition };
 }
 
-/**
- * Session list for the read-only deployment. Per-session request totals come
- * from the `session_summary` materialized view (anonymized requests only,
- * grouped by session; see README) instead of aggregating `requests` per call.
- * The data is a static snapshot and every viewer is non-admin, so
- * `_visibleClientIds` is always the anon marker; a session is visible iff it
- * has a session_summary row.
- */
 export const SESSION_SORT_KEYS = [
   'active',
   'started',
@@ -164,15 +113,8 @@ export interface SessionSort {
   dir: 'asc' | 'desc';
 }
 
-// Mirrors parseUserAgent's CLI_VERSION_RE (Postgres uses \m for a word start).
 const UA_VERSION_RE = String.raw`\m(?:claude-cli|codex[\w-]*|Codex Desktop|omp|pi)/(\S+)`;
 
-/**
- * ORDER BY for the sessions list, applied over every matching session so the
- * first page of a sort is the true first page. Versions order like
- * compareVersions: numeric dot parts, then a release after its prerelease,
- * with versionless sessions last in both directions.
- */
 function sessionOrderBy(sort: SessionSort | null) {
   const d = sort?.dir === 'asc' ? sql`ASC` : sql`DESC`;
   switch (sort?.key) {
@@ -228,8 +170,6 @@ export async function getRecentSessions(
     harnessFilter,
   );
 
-  // `> minReqs` (strict) mirrors the chip labels (> 20 Reqs, > 100 Reqs).
-  // minReqs=0 disables the threshold.
   const minReqsFilter = minReqs > 0 ? sql`ss.request_count > ${minReqs}` : sql`TRUE`;
 
   const result = await sql<{
@@ -342,9 +282,6 @@ export async function getSessionById(sessionId: string, visibleClientIds: string
   return { ...sessionResult.rows[0], usage, minTraceVersion, maxTraceVersion };
 }
 
-// Every requests column except hash_ids, plus its block count. hash_ids is
-// ~90% of a request's payload (about 95 KB each) and most session views only
-// show the count; the full list is fetched per request via getRequestHashIds.
 const REQUEST_COLUMNS_WITHOUT_HASH_IDS = sql.raw(
   `${[
     'id',
@@ -399,8 +336,6 @@ export async function getRequestsBySession(
   const orderDir = sort === 'desc' ? sql`DESC` : sql`ASC`;
   const columns = includeHashIds ? sql`*` : REQUEST_COLUMNS_WITHOUT_HASH_IDS;
 
-  // The total comes from the session_summary view (visible = anonymized
-  // requests; see getRecentSessions) instead of counting requests per call.
   const [totalResult, rowsResult] = await Promise.all([
     sql<{ count: number }>`
       SELECT coalesce((
@@ -441,8 +376,6 @@ interface SessionHashChainPageRow extends SessionHashChainRow {
   timestampCursor: string;
 }
 
-/** Read only scalar metadata so block-size inference never transfers a hash array. */
-/** One request's hash_ids, for views that load them on demand. */
 export async function getRequestHashIds(
   requestId: string,
   visibleClientIds: string[] | null = null,
@@ -452,15 +385,9 @@ export async function getRequestHashIds(
     SELECT hash_ids FROM requests
     WHERE id = ${requestId} AND ${requestsVisFilter(visibleClientIds)}
   `.execute(db);
-  // undefined: no such (visible) request; null: request without hashes.
   return result.rows.length === 0 ? undefined : result.rows[0].hash_ids;
 }
 
-/**
- * Precomputed hash-prefix cache totals for one session, from the
- * `session_hash_stats` table (built once from the static snapshot; see README).
- * Returns null when the session (or the table) is missing, so callers can compute it live.
- */
 export async function getPrecomputedSessionHashStats(
   sessionId: string,
 ): Promise<{ hashCached: number; hashTotal: number } | null> {
@@ -472,7 +399,6 @@ export async function getPrecomputedSessionHashStats(
     `.execute(db);
     rows = result.rows;
   } catch (error) {
-    // Table not created yet: fall back to live computation.
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01') {
       return null;
     }
@@ -516,11 +442,6 @@ export async function getSessionHashBlockMetadata(
   };
 }
 
-/**
- * Iterate one session's hash chains in stable chronological pages. Keeping
- * each Neon response bounded avoids its 64 MiB HTTP response ceiling while
- * preserving the exact all-request trie calculation.
- */
 export async function* iterateSessionHashChainPages(
   sessionId: string,
   visibleClientIds: string[] | null = null,
@@ -653,7 +574,6 @@ export async function getClientStats() {
   };
 }
 
-/** Header counters for the session list; same filters and source as getRecentSessions. */
 export async function getSessionStats(
   _visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -701,7 +621,6 @@ export async function getOverviewStats(
 ) {
   const db = getDb();
 
-  // Parallel: combined stats + median turns + median gap
   const [statsResult, medianResult, medianGapResult] = await Promise.all([
     sql<{
       client_count: number;
@@ -918,18 +837,6 @@ export async function getTokensByModel(
   }));
 }
 
-/**
- * Just the paired CPU (gap between turns) and GPU (e2e duration) signal,
- * restricted to a specific `(model, fastMode)`. Used by the /graphs pie
- * cards that compare fast-mode vs regular Opus inference. The `LAG`
- * partition runs AFTER the model+fastMode filter, so "gap" is the time
- * between two consecutive matching requests in the session — any
- * interleaved haiku / subagent traffic counts toward CPU.
- *
- * Filters out the first request per session (no prior timestamp → NULL gap)
- * and any rows with non-positive duration / gap, so the result is always
- * paired and usable directly by the pie.
- */
 export async function getCpuGpuPairedDistribution(
   visibleClientIds: string[] | null,
   model: string,
@@ -1231,15 +1138,6 @@ export async function getDailyUsageCounts(
   }));
 }
 
-/**
- * Weekly count of sessions broken down by harness, restricted to sessions with
- * more than `minReqs` requests, all at `traceVersion` (the /sessions list's
- * ALL-rows version semantics). Used by the /graphs stacked bar chart. Buckets
- * by ISO week of `sessions.started_at` (Postgres `date_trunc('week', ...)`
- * starts weeks on Monday). Like `getRecentSessions`, reads the anon-only
- * `session_summary` rather than grouping `requests`: the frozen graphs cache
- * predates this dataset, so it is computed on every request.
- */
 export async function getWeeklySessionsByHarness(
   _visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -1305,8 +1203,6 @@ export async function getGlobalSessionAggregates(
     turn_count: Number(r.turn_count),
   }));
 }
-
-// ── Cost analytics ──
 
 export async function getCostSummary(
   visibleClientIds: string[] | null = null,
@@ -1457,12 +1353,6 @@ export interface PricingCoverage {
   by_model: PricingCoverageModel[];
 }
 
-/**
- * Pricing completeness over a bounded recent window. Requests without any
- * token usage are excluded: a failed/no-usage response with no cost is not
- * evidence that its model lacks pricing. This runs only in the cached Costs
- * refresh path and returns one compact row per observed model.
- */
 export async function getPricingCoverage(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -1629,8 +1519,6 @@ export async function getCostByClient(
   }));
 }
 
-// ── Model analytics ──
-
 export async function getModelTimeSeries(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -1665,8 +1553,6 @@ export async function getModelTimeSeries(
   }));
 }
 
-// ── Error analytics ──
-
 export const ERROR_REACH_WINDOW_DAYS = 30;
 
 export interface ErrorReachCohort {
@@ -1694,12 +1580,6 @@ export interface ErrorReach {
   by_client: ErrorReachCohort[];
 }
 
-/**
- * Distinguish broad error reach from concentrated retry storms. One bounded
- * row per recent session is reduced to overall/client aggregates; request
- * rows never cross the cache boundary. A repeat-error session has 2+ failed
- * requests in the window.
- */
 export async function getErrorReach(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -1949,8 +1829,6 @@ export async function getErrorStats(
   };
 }
 
-// ── Latency analytics ──
-
 export async function getLatencyStats(
   visibleClientIds: string[] | null = null,
   model: string | null = null,
@@ -2033,20 +1911,6 @@ export async function getLatencyDistribution(
   }));
 }
 
-/**
- * Per-session subagent stats: number of distinct runs and the peak
- * number active concurrently over the trailing `SUBAGENT_STATS_WINDOW_DAYS`.
- * The same eligible-session threshold (> `minReqs` visible requests inside
- * the window at `traceVersion`) gates both the count and run interval population.
- *
- * A subagent run = one `(session, x-claude-code-agent-id)` group, with the
- * less reliable `subagent_label` as a fallback for sessions that predate
- * Claude Code 2.1.139's stable agent-id header. A run's interval is
- * `[min(timestamp), max(timestamp + duration_ms)]`; concurrency is the max
- * of a sweep-line over those intervals per session. Sessions with zero
- * subagents are included (count=0, max=0) so the histogram reflects the
- * rolling population shape without an unbounded request_headers scan.
- */
 export async function getSubagentStatsPerSessionDistribution(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -2121,15 +1985,6 @@ export async function getSubagentStatsPerSessionDistribution(
   }));
 }
 
-/**
- * Per-session wall-clock duration in minutes (last_active_at − started_at),
- * restricted to sessions with more than `minReqs` visible requests at the
- * given `traceVersion`. Skips sessions where last_active_at == started_at
- * (single-tick / aborted) so the zero-bucket doesn't dominate the histogram.
- * Same eligibility as `getWeeklySessionsByHarness` (which reads it from
- * `session_summary`) so the two /graphs charts agree on what "a real session"
- * means.
- */
 export async function getSessionDurationDistribution(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -2394,9 +2249,6 @@ export async function getTPOTStats(
   };
 }
 
-// ── Combined distribution + stats (single scan) ──
-// Used by /api/latency to avoid scanning the same rows twice.
-
 export async function getTTFTDistributionAndStats(
   visibleClientIds: string[] | null = null,
   model: string | null = null,
@@ -2404,7 +2256,6 @@ export async function getTTFTDistributionAndStats(
   dbOverride?: Kysely<Database>,
 ) {
   const db = dbOverride ?? getDb();
-  // CTE scans once; stats query and distribution query both read from it
   const [distResult, statsResult] = await Promise.all([
     sql<{ ttft_ms: number }>`
       SELECT ttft_ms FROM requests
@@ -2974,8 +2825,6 @@ export async function getCacheHeatmapByOutput(
   }));
 }
 
-// ── Cache analytics ──
-
 export async function getCacheStats(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -3114,12 +2963,6 @@ export async function getCacheByClient(
   }));
 }
 
-/**
- * Per-client daily cache-read vs input tokens for the cache heatmap. Reads the
- * `daily_client_usage` materialized view (requests pre-summed per client, UTC
- * day, privacy mode and trace version; see README) instead of summing
- * requests. The window starts at the first full UTC day `days` ago.
- */
 export async function getDailyCacheEfficiencyByClient(
   visibleClientIds: string[] | null = null,
   days = 90,
@@ -3154,8 +2997,6 @@ export async function getDailyCacheEfficiencyByClient(
     inputTokens: Number(r.input_tokens),
   }));
 }
-
-// ── Traffic analytics ──
 
 export async function getTrafficStats(
   visibleClientIds: string[] | null = null,
@@ -3251,12 +3092,6 @@ export async function getHourlyHeatmap(
   }));
 }
 
-/**
- * Bucketed request counts over a recent window for the RPS timeseries chart.
- * Returns one row per bucket whether or not it had any requests (gaps are
- * filled with zeros). `bucketMinutes` and `rangeHours` are inlined as raw
- * SQL — callers must pass validated server-side constants, not user input.
- */
 export async function getRpsTimeseries(
   rangeHours: number,
   bucketMinutes: number,
@@ -3332,8 +3167,6 @@ export async function getStreamingBreakdown(
     non_streaming_count: Number(r.non_streaming_count),
   }));
 }
-
-// ── Session insights ──
 
 export async function getSessionInsights(
   visibleClientIds: string[] | null = null,
@@ -3421,8 +3254,6 @@ export async function getSessionInsights(
     })),
   };
 }
-
-// ── Streaming analytics ──
 
 export async function getStreamingStats(
   visibleClientIds: string[] | null = null,
@@ -3551,8 +3382,6 @@ export async function getStreamingByModel(
   }));
 }
 
-// ── Platform analytics ──
-
 export async function getPlatformStats(
   visibleClientIds: string[] | null = null,
   traceVersion: number | null = null,
@@ -3618,8 +3447,6 @@ export async function getPlatformTimeSeries(
     session_count: Number(r.session_count),
   }));
 }
-
-// ── Web search analytics ──
 
 export async function getWebSearchStats(
   visibleClientIds: string[] | null = null,
@@ -3752,10 +3579,6 @@ export interface ToolErrorRateProviderBreakdown {
   supports_explicit_errors: boolean;
 }
 
-// First "(<os>; <arch>)" group of a Codex-style user-agent, e.g.
-// "Codex Desktop/0.130.0 (Ubuntu 24.4.0; x86_64) unknown (…)". Passed to
-// regexp_match() as a bind parameter. Shared by tool outcomes and timings so
-// both views attribute historical sessions to the same OS.
 const UA_PLATFORM_PATTERN = String.raw`\(([^;()]+); *([^)]+)\)`;
 
 function sqlOsAliasMatch(
@@ -3768,11 +3591,6 @@ function sqlOsAliasMatch(
   );
 }
 
-/**
- * Keep database-side aggregation aligned with normalizePlatformOs(). The SQL
- * operates on millions of rows, so importing the canonical alias lists is the
- * practical shared boundary; unrecognized platforms deliberately remain null.
- */
 function normalizedSessionOsSql(): RawBuilder<string | null> {
   const explicitValue = sql<string | null>`lower(nullif(trim(s.metadata ->> 'os'), ''))`;
   const explicit = sql<string | null>`
@@ -3790,8 +3608,6 @@ function normalizedSessionOsSql(): RawBuilder<string | null> {
       WHEN (${sqlOsAliasMatch(userAgentValue, PLATFORM_OS_ALIASES.Linux)}) THEN 'Linux'
     END
   `;
-  // A present explicit label is authoritative even when it is unrecognized.
-  // Only missing/blank metadata may be backfilled from the user agent.
   return sql<string | null>`
     CASE
       WHEN ${explicitValue} IS NOT NULL THEN ${explicit}
@@ -3800,16 +3616,6 @@ function normalizedSessionOsSql(): RawBuilder<string | null> {
   `;
 }
 
-/**
- * Compute tool analytics entirely inside Postgres. The previous implementation
- * returned every tool_use and every (often repeated) tool_result to Node, then
- * cloned and sorted those arrays several times. At production scale that could
- * exhaust the Vercel function's heap before the cache write ran.
- *
- * The MATERIALIZED CTEs keep the event-sized work in Postgres, where it can
- * spill to disk, and return only aggregates plus one compact metric row per
- * tool-using session.
- */
 async function getToolAnalyticsFromDb(
   visibleClientIds: string[] | null,
   db: Kysely<Database>,
@@ -4289,7 +4095,6 @@ export async function getToolSequences(
   `.execute(db);
   return result.rows.map((r) => {
     const seq = r.tool_sequence;
-    // Neon returns Postgres arrays as JS arrays, but handle string fallback
     const toolSequence: string[] = Array.isArray(seq)
       ? seq
       : typeof seq === 'string'
@@ -4299,17 +4104,10 @@ export async function getToolSequences(
   });
 }
 
-// ── Tool wall-time distributions ──
-
-// Upper edges (ms) of the log-ish histogram bins. width_bucket() maps a gap
-// into 0..TIMING_BIN_EDGES_MS.length; the UI labels must stay in sync
-// (TIMING_BIN_LABELS on the tool-analytics page).
 export const TIMING_BIN_EDGES_MS = [
   500, 1000, 2000, 5000, 10_000, 30_000, 60_000, 120_000, 300_000,
 ] as const;
 
-// Gaps longer than this are treated as the user walking away (permission
-// prompts, abandoned sessions), not tool execution.
 const TIMING_IDLE_CUTOFF_MS = 30 * 60 * 1000;
 
 export interface ToolTimingStat {
@@ -4352,7 +4150,6 @@ export interface ToolTimings {
   by_os: {
     per_tool: OsToolTimingStat[];
     per_platform: PlatformToolTimingStat[];
-    /** Log-spaced bins, 8 per decade: bin b covers gaps around 10^(b/8) ms. */
     fine_histogram: { os: string; arch: string; tool_name: string; bin: number; count: number }[];
   };
 }
@@ -4369,16 +4166,6 @@ interface ToolTimingsSqlRow {
   by_os: ToolTimings['by_os'];
 }
 
-/**
- * Wall-time a tool took, derived from the client-side gap between turns: the
- * proxy never sees tool execution, but within one session lane (main loop or
- * a single subagent) the time between a tool_use response ending
- * (timestamp + duration_ms) and the next request arriving is exactly the
- * client-side spend — tool execution plus harness overhead. Turns with one
- * tool_use attribute the gap cleanly to that tool; turns with several are
- * lumped under '(parallel batch)'. The next request must actually carry the
- * matching tool_result so gaps into fresh user prompts don't count.
- */
 export async function getToolTimings(
   visibleClientIds: string[] | null = null,
   dbOverride?: Kysely<Database>,
@@ -4389,9 +4176,6 @@ export async function getToolTimings(
   const binEdges = sql.raw(`ARRAY[${TIMING_BIN_EDGES_MS.join(', ')}]::float8[]`);
   const percentiles = sql.raw(`ARRAY[0.25, 0.5, 0.75, 0.9, 0.99]::float8[]`);
 
-  // One statement materializes the expensive lane ordering and bounded gap
-  // set once. Previously five independent statements rebuilt the same window
-  // sort, while two more scans separately expanded Bash tool uses.
   const result = await sql<ToolTimingsSqlRow>`
     WITH
     base_turn AS MATERIALIZED (
@@ -4725,9 +4509,6 @@ export async function getToolTimings(
 
   const row = result.rows[0];
   if (!row) throw new Error('tool timings query returned no row');
-  // Old anon rows cannot be re-extracted because their raw command was
-  // intentionally discarded. Apply the current ingestion precision gate to
-  // aggregates as a final defense against legacy parser artifacts.
   row.bash_by_binary = row.bash_by_binary.filter(({ binary }) =>
     isPlausibleCommandBinaryName(binary),
   );
@@ -4737,19 +4518,6 @@ export async function getToolTimings(
   row.bash_binary_total = row.bash_binary_counts.reduce((total, { count }) => total + count, 0);
   return row;
 }
-
-// ── User idle time + wall-clock composition ──
-
-// A lane's wall clock splits three ways: the model generating (duration_ms),
-// the client running tools (the gap the tool-timings query attributes), and
-// the human reading/typing (the gap after a turn that ended WITHOUT a
-// tool_use — nothing but a person can restart the lane there). This function
-// computes all three from one lane sort so the graphs page can chart idle
-// distribution and the composition over time.
-//
-// Blind spot worth labeling in the UI: a user message sent mid-turn arrives
-// packaged with the next tool_result, so the assistant turn never ends and
-// that wait is counted as tool time. Idle here is a floor, not the total.
 
 export interface WallClockDay {
   day: string;
@@ -4761,9 +4529,7 @@ export interface WallClockDay {
 }
 
 export interface WallClockBreakdown {
-  /** Bounded user-idle gaps, ms, one per assistant turn that ended. */
   idle_gaps_ms: number[];
-  /** Idle gaps at/beyond the cutoff — excluded from `idle_gaps_ms` and sums. */
   walked_away: number;
   daily: WallClockDay[];
 }
@@ -4774,14 +4540,6 @@ interface WallClockSqlRow {
   daily: WallClockDay[];
 }
 
-/**
- * Wall-clock split per lane: LLM time, tool/CPU time, and user idle time.
- *
- * The model selector is applied when classifying turns, NOT when building the
- * lane, so `lead()` still sees the real next request. Filtering the lane
- * itself would silently stretch gaps across the removed turns — the flaw in
- * the older session-only `gap_seconds` metric.
- */
 export async function getWallClockBreakdown(
   visibleClientIds: string[] | null = null,
   model: string | null = null,
@@ -4873,9 +4631,6 @@ export async function getWallClockBreakdown(
       ), '[]'::jsonb) AS daily
     `.execute(db);
 
-  // A single-row aggregate: an empty result means an empty (or unreachable)
-  // corpus, which the cards render as "no data" rather than failing the whole
-  // graphs payload this dataset shares a response with.
   const row = result.rows[0];
   if (!row) return { idle_gaps_ms: [], walked_away: 0, daily: [] };
   return {
@@ -4892,16 +4647,6 @@ export async function getWallClockBreakdown(
   };
 }
 
-// ── Per-harness tool-analytics sample ──
-
-/**
- * Request budget for a single-harness view of /tool-analytics. The cache only
- * holds the all-harness payload and the snapshot is read-only, so a harness
- * view runs the same queries live over whole sessions picked in md5(id)
- * order until the budget is reached (the session that crosses it is kept).
- * ~20k requests read in ~4 s cold; a full pass over a large harness takes
- * 30 s or more.
- */
 export const HARNESS_TOOL_SAMPLE_REQUESTS = 20_000;
 
 export interface HarnessToolSample {
@@ -4951,10 +4696,6 @@ export async function getHarnessToolSample(
   };
 }
 
-// ── Tool-analytics cache ──
-
-// Bump when the payload shape changes so stale-shape cache rows are never
-// served to a newer frontend.
 const TOOL_ANALYTICS_CACHE_SCHEMA = 10;
 
 export type ToolAnalyticsCacheKind = 'analytics' | 'sequences';
@@ -4968,12 +4709,6 @@ export function toolAnalyticsCacheKey(
   return `ta:${TOOL_ANALYTICS_CACHE_SCHEMA}:${kind}:${scope}:${traceVersion ?? 'all'}`;
 }
 
-/**
- * `'missing-table'` means migration 028 hasn't been applied to this database
- * yet (e.g. a deployment whose code shipped before the migrate workflow ran).
- * Callers should surface that as a setup problem, not a cache miss — cache
- * writes would fail the same way, so scheduling a warm is pointless.
- */
 export async function readToolAnalyticsCache(
   key: string,
   dbOverride?: Kysely<Database>,
@@ -4988,8 +4723,6 @@ export async function readToolAnalyticsCache(
     if (!row) return null;
     return { data: row.data, cachedAt: new Date(row.cached_at) };
   } catch (error) {
-    // 42P01 = undefined_table; both pg and the Neon HTTP driver expose it
-    // as `code` on the thrown error.
     if ((error as { code?: string }).code === '42P01') return 'missing-table';
     throw error;
   }
@@ -5000,27 +4733,11 @@ export interface ToolAnalyticsCacheEntry {
   data: unknown;
 }
 
-/**
- * Upsert cache entries in ONE multi-row statement. `now()` is
- * statement-stable in Postgres, so every row lands with the same
- * `cached_at` — callers that batch all hot combos here get a cache that
- * reads as a single synchronized snapshot regardless of which combo a
- * given user requests.
- */
 export async function writeToolAnalyticsCacheEntries(
   _db: Kysely<Database>,
   _entries: ToolAnalyticsCacheEntry[],
-): Promise<void> {
-  // Read-only deployment: never write the cache. The main ProxyTrace
-  // deployment's crons keep tool_analytics_cache fresh.
-}
+): Promise<void> {}
 
-/**
- * Compute one combo's payload without writing it. Callers must pass a
- * pooled-pg `db` (createDirectDb) — the full-history analytics use
- * MATERIALIZED CTEs that may spill to disk and are not suitable for the Neon
- * HTTP driver's request/response model.
- */
 export async function computeToolAnalyticsCacheEntry(
   db: Kysely<Database>,
   kind: ToolAnalyticsCacheKind,
@@ -5029,8 +4746,6 @@ export async function computeToolAnalyticsCacheEntry(
 ): Promise<ToolAnalyticsCacheEntry> {
   const key = toolAnalyticsCacheKey(kind, visibleClientIds, traceVersion);
   if (kind === 'analytics') {
-    // These are both full-history scans. Running them sequentially avoids
-    // competing window sorts and keeps peak database/function memory bounded.
     const analytics = await getToolAnalytics(visibleClientIds, db, traceVersion);
     const toolTimings = await getToolTimings(visibleClientIds, db, traceVersion);
     return { key, data: { ...analytics, toolTimings } };

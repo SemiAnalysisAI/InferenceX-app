@@ -11,14 +11,6 @@ import {
   listParam,
 } from '@/lib/api/api-documentation-helpers';
 
-/**
- * Docs fragment for GET /api/v1/views/inference.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const X_MODE_ENUM = ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'] as const;
@@ -82,10 +74,10 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
+      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
     ),
-    schema: { type: 'string', enum: X_MODE_ENUM, default: 'interactivity' },
+    schema: { type: 'string', enum: X_MODE_ENUM },
     example: 'e2e',
   },
   {
@@ -155,8 +147,8 @@ const parameters: readonly ApiParameter[] = [
   listParam(
     'gpus',
     text(
-      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey).',
-      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。',
+      'Comma-separated hardware keys or bare GPU names to include (e.g. h200 or a full hwKey). When omitted, Qwen3.5 excludes MI300X, MI325X, H100, and H200. An explicit list overrides this default; gpus= includes all hardware.',
+      '逗号分隔的硬件键或 GPU 名称（如 h200 或完整 hwKey）。省略时，Qwen3.5 排除 MI300X、MI325X、H100 和 H200。显式列表覆盖此默认值；gpus= 包含所有硬件。',
     ),
     'h200,mi355x',
   ),
@@ -203,8 +195,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Defaults to true: rank all candidate frameworks per SKU using the current axes and shared measured range. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
-      '默认为 true：按当前坐标轴和共同实测区间，对每个 SKU 的所有候选框架进行排名。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
+      'Defaults to true: rank candidate frameworks per SKU within the selected precisions, using the current axes and shared measured range. An unselected precision cannot displace a visible configuration. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：仅在选定精度内，按当前坐标轴和共同实测区间对每个 SKU 的候选框架进行排名。未选中的精度不会挤掉当前可见的配置。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
     schema: { type: 'boolean', default: true },
     example: 'true',
@@ -216,7 +208,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'boolean',
     description: text(
       'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. No corresponding dashboard control or panel. JSON only.',
-      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选范围内、尚未经前沿和 best 筛选的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',

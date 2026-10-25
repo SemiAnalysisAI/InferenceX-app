@@ -1,8 +1,5 @@
 import { assertShareLinkParams } from '../support/share-link';
 
-// Deterministic intercepted rows exercise the validated/historical power UI:
-// one row has power_valid=1 and one has no validation verdict.
-
 const POWER_MODEL = 'dsv4';
 const POWER_DATE = '2026-08-20';
 
@@ -35,9 +32,7 @@ const powerMetrics = (conc: number): Record<string, number> => {
 };
 
 const powerConfigs = [
-  // Legacy telemetry: measured watts without a producer verdict.
   { hardware: 'b200', framework: 'vllm', power: { avg_power_w: 560 } },
-  // Certified telemetry: explicit power_valid=1 verdict.
   { hardware: 'mi300x', framework: 'sglang', power: { power_valid: 1, avg_power_w: 685.5 } },
 ];
 
@@ -88,7 +83,6 @@ function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks
   cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
       win.localStorage.setItem('inferencex-feature-gate', '1');
     },
   });
@@ -111,11 +105,7 @@ const visiblePowerPoints = () =>
 
 describe('Validated vs historical measured power', () => {
   beforeEach(() => {
-    // Firefox can defer resize notifications while the Radix metric menu
-    // changes layout. Keep the chart assertions active; ignore only this
-    // browser-generated delivery notification, not application exceptions.
     cy.on('uncaught:exception', (error) => {
-      // Cypress wraps the original error in the second paragraph.
       if (
         error.message.split('\n\n')[1]?.trim() ===
         '> ResizeObserver loop completed with undelivered notifications.'
@@ -167,9 +157,6 @@ describe('Validated vs historical measured power', () => {
   });
 
   it('restores a shared i_power=certified link with the toggle pre-selected', () => {
-    // Note: filter writes live in the in-memory share-link store (the address
-    // bar is deliberately stripped after load — see url-state.ts), so the
-    // durable observable behavior is the restore direction tested here.
     visitCertifiedPowerChart('&i_metric=y_measuredAvgPower&i_power=certified');
 
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
@@ -218,7 +205,6 @@ describe('Validated vs historical measured power', () => {
   });
 
   it('uses Optimal Only for measured markers while preserving the power boundary', () => {
-    // Each chip has two boundary vertices and one lower-power interior point.
     const curveBenchmarks = powerBenchmarks.map((row) => ({
       ...row,
       metrics: {
@@ -231,7 +217,6 @@ describe('Validated vs historical measured power', () => {
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     visiblePowerPoints().should('have.length', 4);
 
-    // Let the initial ResizeObserver update reach the SVG before saving geometry.
     cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
       const svg = $svg[0];
       expect(svg.getBoundingClientRect().width, 'chart matches its container width').to.equal(

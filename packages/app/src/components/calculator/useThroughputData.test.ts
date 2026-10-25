@@ -39,10 +39,6 @@ function interpolateWithPython(request: Record<string, unknown>): number | null 
   return (JSON.parse(result.stdout) as { value: number | null }).value;
 }
 
-// ---------------------------------------------------------------------------
-// Test fixtures
-// ---------------------------------------------------------------------------
-
 function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
   return {
     hwKey: 'h100',
@@ -65,10 +61,6 @@ function makePoint(overrides: Partial<GPUDataPoint> = {}): GPUDataPoint {
     ...overrides,
   };
 }
-
-// =========================================================================
-// sign()
-// =========================================================================
 
 describe('sign', () => {
   it('returns -1 for negative numbers', () => {
@@ -108,10 +100,6 @@ describe('snapshot token-metric capabilities', () => {
   });
 });
 
-// =========================================================================
-// getCostField()
-// =========================================================================
-
 describe('getCostField', () => {
   const p = makePoint({
     costh: 1.5,
@@ -138,10 +126,6 @@ describe('getCostField', () => {
   });
 });
 
-// =========================================================================
-// paretoFrontUpperLeft()
-// =========================================================================
-
 const getParetoX = (p: GPUDataPoint) => p.interactivity;
 const getParetoY = (p: GPUDataPoint) => p.throughput;
 
@@ -158,8 +142,6 @@ describe('paretoFrontUpperLeft', () => {
   });
 
   it('filters dominated points from a set of 4 points', () => {
-    // Points: (10, 800), (20, 600), (30, 400), (40, 200)
-    // All on the frontier (decreasing y as x increases)
     const points = [
       makePoint({ interactivity: 10, throughput: 800 }),
       makePoint({ interactivity: 20, throughput: 600 }),
@@ -171,21 +153,13 @@ describe('paretoFrontUpperLeft', () => {
   });
 
   it('removes dominated points that lie below the frontier', () => {
-    // (10, 800) dominates (20, 700) which dominates (30, 300)
-    // But (15, 100) is dominated by (10, 800)
     const points = [
       makePoint({ interactivity: 10, throughput: 800 }),
-      makePoint({ interactivity: 15, throughput: 100 }), // dominated
+      makePoint({ interactivity: 15, throughput: 100 }),
       makePoint({ interactivity: 20, throughput: 700 }),
       makePoint({ interactivity: 30, throughput: 300 }),
     ];
     const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
-    // The frontier should be: (10, 800), (20, 700), (30, 300)
-    // (15, 100) is below 800, so it's dominated; but (20, 700) < 800 so it stays
-    // Actually the algorithm is upper-left: for increasing x, y must decrease
-    // (10,800) -> (20,700) y decreased, ok. (20,700) -> (30,300) y decreased, ok.
-    // (15,100): x=15, y=100. After (10,800), y=100 < 800, so it gets pushed.
-    // But then (20,700): y=700 >= 100, so it pops (15,100) and pushes (20,700).
     const xs = result.map(getParetoX);
     const ys = result.map(getParetoY);
     expect(xs).toEqual([10, 20, 30]);
@@ -199,7 +173,6 @@ describe('paretoFrontUpperLeft', () => {
       makePoint({ interactivity: 20, throughput: 400 }),
     ];
     const result = paretoFrontUpperLeft(points, getParetoX, getParetoY);
-    // At x=10, should keep y=800
     expect(result[0].throughput).toBe(800);
   });
 
@@ -228,7 +201,7 @@ describe('paretoFrontUpperLeft', () => {
     const points = [
       { x: 10, y: 800, label: 'a' },
       { x: 20, y: 600, label: 'b' },
-      { x: 15, y: 100, label: 'c' }, // dominated
+      { x: 15, y: 100, label: 'c' },
       { x: 30, y: 400, label: 'd' },
     ];
     const result = paretoFrontUpperLeft(
@@ -240,10 +213,6 @@ describe('paretoFrontUpperLeft', () => {
     expect(result.map((p) => p.label)).toEqual(['a', 'b', 'd']);
   });
 });
-
-// =========================================================================
-// monotoneSlopes()
-// =========================================================================
 
 describe('monotoneSlopes', () => {
   it('returns array of zeros for empty input', () => {
@@ -257,9 +226,6 @@ describe('monotoneSlopes', () => {
   it('returns correct slopes for two points using Steffen endpoint formula', () => {
     const slopes = monotoneSlopes([0, 10], [0, 100]);
     expect(slopes).toHaveLength(2);
-    // For 2 points: s[0] = 100/10 = 10, no interior points
-    // m[0] = (3*s[0] - m[1])/2 = (30 - 0)/2 = 15 (m[1] still 0 at this point)
-    // m[1] = (3*s[0] - m[0])/2 = (30 - 15)/2 = 7.5
     expect(slopes[0]).toBeCloseTo(15, 5);
     expect(slopes[1]).toBeCloseTo(7.5, 5);
   });
@@ -267,14 +233,10 @@ describe('monotoneSlopes', () => {
   it('returns correct slopes for three evenly-spaced points', () => {
     const slopes = monotoneSlopes([0, 1, 2], [0, 1, 4]);
     expect(slopes).toHaveLength(3);
-    // s0 = 1, s1 = 3, h0 = h1 = 1
-    // Interior: p = (1*1 + 3*1)/2 = 2, m[1] = (sign(1)+sign(3))*min(1,3,1) = 2*1 = 2
-    // Hmm actually: (sign(s0)+sign(s1)) * min(|s0|,|s1|,0.5*|p|) = (1+1)*min(1,3,1) = 2
     expect(slopes[1]).toBeCloseTo(2, 5);
   });
 
   it('produces zero interior slope when adjacent segments have opposite signs', () => {
-    // s0 = +1, s1 = -1 → sign sum = 0 → m = 0
     const slopes = monotoneSlopes([0, 1, 2], [0, 1, 0]);
     expect(slopes[1]).toBe(0);
   });
@@ -287,10 +249,6 @@ describe('monotoneSlopes', () => {
   });
 });
 
-// =========================================================================
-// hermiteInterpolate()
-// =========================================================================
-
 describe('hermiteInterpolate', () => {
   it('returns 0 for empty arrays', () => {
     expect(hermiteInterpolate([], [], [], 5)).toBe(0);
@@ -298,7 +256,6 @@ describe('hermiteInterpolate', () => {
 
   it('returns the single y value for single-point arrays', () => {
     expect(hermiteInterpolate([5], [42], [0], 5)).toBe(42);
-    // Also returns same value regardless of targetParetoX for single point
     expect(hermiteInterpolate([5], [42], [0], 100)).toBe(42);
   });
 
@@ -330,7 +287,6 @@ describe('hermiteInterpolate', () => {
     const xs = [0, 10, 20, 30];
     const ys = [0, 100, 200, 300];
     const m = monotoneSlopes(xs, ys);
-    // For perfectly linear data, interpolation should give ~linear results
     const mid = hermiteInterpolate(xs, ys, m, 15);
     expect(mid).toBeCloseTo(150, 0);
   });
@@ -340,7 +296,6 @@ describe('hermiteInterpolate', () => {
     const ys = [0, 50, 120, 200, 350];
     const m = monotoneSlopes(xs, ys);
 
-    // Sample at intermediate points and verify monotonicity
     let prev = hermiteInterpolate(xs, ys, m, 0);
     for (let x = 1; x <= 40; x++) {
       const current = hermiteInterpolate(xs, ys, m, x);
@@ -350,19 +305,13 @@ describe('hermiteInterpolate', () => {
   });
 
   it('handles zero-width segment gracefully', () => {
-    // Two identical x values shouldn't crash
     const xs = [10, 10, 20];
     const ys = [100, 100, 200];
     const m = monotoneSlopes(xs, ys);
-    // Should not throw and should return a reasonable value
     const result = hermiteInterpolate(xs, ys, m, 10);
     expect(result).toBe(100);
   });
 });
-
-// =========================================================================
-// interpolateForGPU()
-// =========================================================================
 
 describe('interpolateForGPU', () => {
   it('returns null for empty points array', () => {
@@ -410,8 +359,6 @@ describe('interpolateForGPU', () => {
   });
 
   describe('cached-input fraction', () => {
-    // 300 → 500 tok/s across the range so the frontier is well formed; the cache
-    // rate is what these assertions are about.
     const withCache = (rates: (number | undefined)[]) =>
       rates.map((cacheHitRate, i) =>
         makePoint({
@@ -429,8 +376,6 @@ describe('interpolateForGPU', () => {
         'interactivity_to_throughput',
         'costh',
       );
-      // Halfway along the frontier, so between the two measured rates and
-      // strictly inside them — not pinned to either end.
       expect(result!.cacheHitRate).toBeGreaterThan(0.4);
       expect(result!.cacheHitRate).toBeLessThan(0.8);
     });
@@ -457,9 +402,6 @@ describe('interpolateForGPU', () => {
     });
 
     it('opts the whole frontier out when only some points carry a rate', () => {
-      // Splining a 0 in for the unmeasured point would invent a dip in the
-      // cached fraction and overstate the billable rate there. Opting out bills
-      // every input token at full price instead, without inventing a cache rate.
       const result = interpolateForGPU(
         withCache([0.9, undefined]),
         30,
@@ -494,13 +436,10 @@ describe('interpolateForGPU', () => {
     const result = interpolateForGPU(points, 25, 'interactivity_to_throughput', 'costh');
     expect(result).not.toBeNull();
     expect(result!.hwKey).toBe('h100');
-    // Total should be between 400 and 600 (interpolated)
     expect(result!.value).toBeGreaterThan(350);
     expect(result!.value).toBeLessThan(650);
-    // Output should be between 360 and 540
     expect(result!.outputTputValue).toBeGreaterThan(300);
     expect(result!.outputTputValue).toBeLessThan(600);
-    // Input should be between 40 and 60
     expect(result!.inputTputValue).toBeGreaterThan(30);
     expect(result!.inputTputValue).toBeLessThan(70);
   });
@@ -514,7 +453,6 @@ describe('interpolateForGPU', () => {
     ];
     const result = interpolateForGPU(points, 25, 'throughput_to_interactivity', 'costh');
     expect(result).not.toBeNull();
-    // Should be between 400 and 600
     expect(result!.value).toBeGreaterThan(350);
     expect(result!.value).toBeLessThan(650);
   });
@@ -530,12 +468,10 @@ describe('interpolateForGPU', () => {
     expect(resultH).not.toBeNull();
     expect(resultR).not.toBeNull();
 
-    // Rental cost should be higher than hyperscaler-volume ownership
     expect(resultR!.cost).toBeGreaterThan(resultH!.cost);
   });
 
   it('clamps interpolated values to non-negative', () => {
-    // Even if spline overshoots into negative territory, result should be >= 0
     const points = [
       makePoint({ interactivity: 10, throughput: 100, costh: 0.1 }),
       makePoint({ interactivity: 20, throughput: 50, costh: 0.05 }),
@@ -559,23 +495,19 @@ describe('interpolateForGPU', () => {
     const result = interpolateForGPU(points, 15, 'interactivity_to_throughput', 'costh');
     expect(result).not.toBeNull();
     expect(result!.nearestPoints).toHaveLength(2);
-    // Should bracket the target: one at x=10 and one at x=20
     const nearX = result!.nearestPoints.map((p) => p.interactivity);
     expect(nearX).toContain(10);
     expect(nearX).toContain(20);
   });
 
   it('filters dominated points via Pareto front', () => {
-    // Create a dominated point that should be excluded from the frontier
     const points = [
       makePoint({ interactivity: 10, throughput: 800 }),
-      makePoint({ interactivity: 15, throughput: 300 }), // dominated
+      makePoint({ interactivity: 15, throughput: 300 }),
       makePoint({ interactivity: 30, throughput: 400 }),
     ];
     const result = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh');
     expect(result).not.toBeNull();
-    // The result should be based on frontier points (10,800) and (30,400),
-    // not the dominated point (15,300)
     expect(result!.value).toBeGreaterThan(400);
     expect(result!.value).toBeLessThan(800);
   });
@@ -591,10 +523,6 @@ describe('interpolateForGPU', () => {
   });
 });
 
-// =========================================================================
-// getCostField — all 9 combinations with zero and varying values
-// =========================================================================
-
 describe('getCostField — exhaustive provider × token type matrix', () => {
   it('returns all 9 correct fields for distinct cost values', () => {
     const p = makePoint({
@@ -606,15 +534,12 @@ describe('getCostField — exhaustive provider × token type matrix', () => {
       costrOutput: 9.9,
     });
 
-    // Total
     expect(getCostField(p, 'costh', 'total')).toBeCloseTo(1.1);
     expect(getCostField(p, 'costr', 'total')).toBeCloseTo(3.3);
 
-    // Input
     expect(getCostField(p, 'costh', 'input')).toBeCloseTo(4.4);
     expect(getCostField(p, 'costr', 'input')).toBeCloseTo(6.6);
 
-    // Output
     expect(getCostField(p, 'costh', 'output')).toBeCloseTo(7.7);
     expect(getCostField(p, 'costr', 'output')).toBeCloseTo(9.9);
   });
@@ -645,13 +570,8 @@ describe('getCostField — exhaustive provider × token type matrix', () => {
   });
 });
 
-// =========================================================================
-// Multi-precision grouping key format
-// =========================================================================
-
 describe('multi-precision grouping key format', () => {
   it('uses hwKey__precision format with double underscore separator', () => {
-    // Verify the convention: composite key is hwKey + "__" + precision
     const hwKey = 'gb200-nvl72-sglang';
     const precision = 'fp4';
     const compositeKey = `${hwKey}__${precision}`;
@@ -685,7 +605,6 @@ describe('multi-precision grouping key format', () => {
   });
 
   it('hwKey containing hyphens does not conflict with __ separator', () => {
-    // hwKeys use single hyphens; the separator is double underscore
     const compositeKey = 'gb300-nvl72-dynamo-trt-mtp__fp4';
     const parts = compositeKey.split('__');
     expect(parts).toHaveLength(2);
@@ -694,17 +613,12 @@ describe('multi-precision grouping key format', () => {
   });
 });
 
-// =========================================================================
-// monotoneSlopes — monotonicity preservation
-// =========================================================================
-
 describe('monotoneSlopes — monotonicity preservation', () => {
   it('produces slopes that maintain monotone interpolation for increasing data', () => {
     const xs = [0, 5, 15, 30, 50];
     const ys = [10, 40, 80, 150, 300];
     const slopes = monotoneSlopes(xs, ys);
 
-    // All slopes should be non-negative for strictly increasing data
     for (const slope of slopes) {
       expect(slope).toBeGreaterThanOrEqual(0);
     }
@@ -715,29 +629,24 @@ describe('monotoneSlopes — monotonicity preservation', () => {
     const ys = [1000, 700, 400, 200, 50];
     const slopes = monotoneSlopes(xs, ys);
 
-    // All slopes should be non-positive for strictly decreasing data
     for (const slope of slopes) {
       expect(slope).toBeLessThanOrEqual(0);
     }
   });
 
   it('produces zero slope at a local extremum (peak)', () => {
-    // Data rises then falls — interior peak at x=2
     const xs = [0, 1, 2, 3, 4];
     const ys = [10, 50, 100, 50, 10];
     const slopes = monotoneSlopes(xs, ys);
 
-    // At the peak (index 2), secant slopes change sign → slope should be 0
     expect(slopes[2]).toBe(0);
   });
 
   it('produces zero slope at a local extremum (valley)', () => {
-    // Data falls then rises — interior valley at x=2
     const xs = [0, 1, 2, 3, 4];
     const ys = [100, 50, 10, 50, 100];
     const slopes = monotoneSlopes(xs, ys);
 
-    // At the valley (index 2), secant slopes change sign → slope should be 0
     expect(slopes[2]).toBe(0);
   });
 
@@ -747,7 +656,6 @@ describe('monotoneSlopes — monotonicity preservation', () => {
     const slopes = monotoneSlopes(xs, ys);
 
     expect(slopes).toHaveLength(5);
-    // All slopes should be non-negative (data is increasing)
     for (const s of slopes) {
       expect(s).toBeGreaterThanOrEqual(0);
     }
@@ -758,27 +666,19 @@ describe('monotoneSlopes — monotonicity preservation', () => {
     const ys = [50, 50, 50, 50];
     const slopes = monotoneSlopes(xs, ys);
 
-    // All slopes should be zero for flat data
     for (const s of slopes) {
       expect(s).toBeCloseTo(0, 10);
     }
   });
 });
 
-// =========================================================================
-// hermiteInterpolate — mid-range accuracy and boundary behavior
-// =========================================================================
-
 describe('hermiteInterpolate — mid-range and boundary behavior', () => {
   it('interpolates accurately for a quadratic-like curve', () => {
-    // y = x^2 sampled at x = 0, 5, 10, 15, 20
     const xs = [0, 5, 10, 15, 20];
-    const ys = xs.map((x) => x * x); // [0, 25, 100, 225, 400]
+    const ys = xs.map((x) => x * x);
     const slopes = monotoneSlopes(xs, ys);
 
-    // At x=7.5, true y = 56.25
     const result = hermiteInterpolate(xs, ys, slopes, 7.5);
-    // Cubic Hermite should be reasonably close to the true quadratic value
     expect(result).toBeGreaterThan(40);
     expect(result).toBeLessThan(75);
   });
@@ -787,7 +687,6 @@ describe('hermiteInterpolate — mid-range and boundary behavior', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const slopes = monotoneSlopes(xs, ys);
-    // targetParetoX <= xs[0] → clamps to ys[0]
     expect(hermiteInterpolate(xs, ys, slopes, 10)).toBe(100);
   });
 
@@ -795,7 +694,6 @@ describe('hermiteInterpolate — mid-range and boundary behavior', () => {
     const xs = [10, 20, 30];
     const ys = [100, 200, 300];
     const slopes = monotoneSlopes(xs, ys);
-    // targetParetoX >= xs[n-1] → clamps to ys[n-1]
     expect(hermiteInterpolate(xs, ys, slopes, 30)).toBe(300);
   });
 
@@ -816,8 +714,6 @@ describe('hermiteInterpolate — mid-range and boundary behavior', () => {
     const slopes = monotoneSlopes(xs, ys);
 
     const mid = hermiteInterpolate(xs, ys, slopes, 50);
-    // For 2 points, Hermite with Steffen slopes should give a value near midpoint
-    // but may not be exactly 500 due to endpoint slope formula
     expect(mid).toBeGreaterThan(300);
     expect(mid).toBeLessThan(700);
   });
@@ -827,22 +723,16 @@ describe('hermiteInterpolate — mid-range and boundary behavior', () => {
     const ys = [0, 15, 50, 120, 250, 400];
     const slopes = monotoneSlopes(xs, ys);
 
-    // Sample many points and verify no overshoot below min or above max
     for (let x = 0; x <= 50; x += 0.5) {
       const result = hermiteInterpolate(xs, ys, slopes, x);
-      expect(result).toBeGreaterThanOrEqual(-1e-10); // allow tiny floating point error
+      expect(result).toBeGreaterThanOrEqual(-1e-10);
       expect(result).toBeLessThanOrEqual(400 + 1e-10);
     }
   });
 });
 
-// =========================================================================
-// interpolateForGPU — cost provider consistency across all 3 providers
-// =========================================================================
-
 describe('interpolateForGPU — cost provider consistency', () => {
   it('interpolates distinct cost values for each provider', () => {
-    // Create points where each cost provider has clearly different values
     const points = [
       makePoint({
         interactivity: 10,
@@ -869,15 +759,12 @@ describe('interpolateForGPU — cost provider consistency', () => {
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh')!;
     const resultR = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costr')!;
 
-    // Same throughput value regardless of cost provider (cost doesn't affect throughput)
     expect(resultH.value).toBeCloseTo(resultR.value, 5);
 
-    // But costs should differ across providers
     expect(resultH.cost).not.toBeCloseTo(resultR.cost, 1);
     expect(resultH.costInput).not.toBeCloseTo(resultR.costInput, 1);
     expect(resultH.costOutput).not.toBeCloseTo(resultR.costOutput, 1);
 
-    // Rental costs are lower than hyperscaler-volume ownership in this test data
     expect(resultR.cost).toBeLessThan(resultH.cost);
     expect(resultR.costInput).toBeLessThan(resultH.costInput);
     expect(resultR.costOutput).toBeLessThan(resultH.costOutput);
@@ -904,21 +791,14 @@ describe('interpolateForGPU — cost provider consistency', () => {
     const resultH = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costh')!;
     const resultR = interpolateForGPU(points, 20, 'interactivity_to_throughput', 'costr')!;
 
-    // tpPerMw should be identical regardless of cost provider
     expect(resultH.tpPerMw).toBeCloseTo(resultR.tpPerMw, 5);
     expect(resultH.inputTpPerMw).toBeCloseTo(resultR.inputTpPerMw, 5);
     expect(resultH.outputTpPerMw).toBeCloseTo(resultR.outputTpPerMw, 5);
   });
 });
 
-// =========================================================================
-// paretoFrontUpperLeft — additional edge cases
-// =========================================================================
-
 describe('paretoFrontUpperLeft — additional edge cases', () => {
   it('handles a strictly increasing y with increasing x (all dominated except last)', () => {
-    // If y increases with x, each subsequent point dominates prior ones
-    // upper-left: we want decreasing y for increasing x
     const points = [
       { x: 10, y: 100 },
       { x: 20, y: 200 },
@@ -930,7 +810,6 @@ describe('paretoFrontUpperLeft — additional edge cases', () => {
       (p) => p.x,
       (p) => p.y,
     );
-    // Only the last point survives — each subsequent point has higher y, popping the previous
     expect(result).toHaveLength(1);
     expect(result[0].y).toBe(400);
   });
@@ -951,7 +830,6 @@ describe('paretoFrontUpperLeft — additional edge cases', () => {
   });
 
   it('handles large input without performance issues', () => {
-    // 1000 random-ish points
     const points = Array.from({ length: 1000 }, (_, i) => ({
       x: i,
       y: 1000 - i + Math.sin(i) * 50,
@@ -961,9 +839,7 @@ describe('paretoFrontUpperLeft — additional edge cases', () => {
       (p) => p.x,
       (p) => p.y,
     );
-    // Should return at least 1 point and complete quickly
     expect(result.length).toBeGreaterThanOrEqual(1);
-    // Frontier should be valid: y decreasing for increasing x
     for (let i = 1; i < result.length; i++) {
       expect(result[i].x).toBeGreaterThan(result[i - 1].x);
       expect(result[i].y).toBeLessThan(result[i - 1].y);
@@ -971,13 +847,7 @@ describe('paretoFrontUpperLeft — additional edge cases', () => {
   });
 });
 
-// =========================================================================
-// maxInteractivityAtCost()
-// =========================================================================
-
 describe('maxInteractivityAtCost', () => {
-  // Strictly decreasing throughput as interactivity rises — every point is on
-  // the frontier — with total-token hyperscaler cost rising alongside.
   const monotonePoints = [
     makePoint({ interactivity: 10, throughput: 1000, costh: 0.2, costr: 0.4, costhi: 1 }),
     makePoint({ interactivity: 20, throughput: 800, costh: 0.4, costr: 0.8, costhi: 0.5 }),
@@ -1010,7 +880,6 @@ describe('maxInteractivityAtCost', () => {
   });
 
   it('finds the crossing interactivity on a monotone cost curve', () => {
-    // Cost hits 0.4 exactly at the iv=20 knot; anything above costs more.
     const iv = maxInteractivityAtCost(monotonePoints, 0.4, 'costh', 'total');
     expect(iv).not.toBeNull();
     expect(iv!).toBeCloseTo(20, 1);
@@ -1030,7 +899,6 @@ describe('maxInteractivityAtCost', () => {
     const at = interpolateForGPU(monotonePoints, iv!, 'interactivity_to_throughput', 'costh');
     expect(at).not.toBeNull();
     expect(at!.cost).toBeLessThanOrEqual(target + 1e-6);
-    // A point just above the returned iv should exceed the budget.
     const above = interpolateForGPU(
       monotonePoints,
       iv! + 0.5,
@@ -1041,7 +909,6 @@ describe('maxInteractivityAtCost', () => {
   });
 
   it('respects the cost provider', () => {
-    // Rental is pricier across the board in this fixture, so the affordable iv is lower.
     const ivH = maxInteractivityAtCost(monotonePoints, 0.8, 'costh', 'total');
     const ivR = maxInteractivityAtCost(monotonePoints, 0.8, 'costr', 'total');
     expect(ivH).not.toBeNull();
@@ -1050,13 +917,8 @@ describe('maxInteractivityAtCost', () => {
   });
 
   it('handles non-monotone cost curves (input-token cost) by returning the highest affordable iv', () => {
-    // costhi dips at iv=20 (0.5) then spikes at iv=30 (1.5) and eases at iv=40 (0.9).
-    // With a 0.95 budget the frontier max (iv=40, cost 0.9) is affordable.
     expect(maxInteractivityAtCost(monotonePoints, 0.95, 'costh', 'input')).toBe(40);
 
-    // With a 0.6 budget, iv=40 (0.9) is out, and the crossing sits above the
-    // iv=20 dip — the result must land in (20, 30), not fall back to the dip's
-    // left edge.
     const iv = maxInteractivityAtCost(monotonePoints, 0.6, 'costh', 'input');
     expect(iv).not.toBeNull();
     expect(iv!).toBeGreaterThanOrEqual(20);
@@ -1066,19 +928,11 @@ describe('maxInteractivityAtCost', () => {
   it('only considers frontier points (dominated points are ignored)', () => {
     const withDominated = [
       ...monotonePoints,
-      // Dominated: lower throughput than the iv=10 point at lower interactivity
-      // — would make the curve look cheaper at iv=15 if it were included.
       makePoint({ interactivity: 15, throughput: 700, costh: 0.05 }),
     ];
-    // Even though the dominated point is dirt cheap, it is off the frontier,
-    // so a 0.1 budget still fits nothing.
     expect(maxInteractivityAtCost(withDominated, 0.1, 'costh', 'total')).toBeNull();
   });
 });
-
-// =========================================================================
-// buildGpuGroups() — shared by the official and unofficial-run overlay paths
-// =========================================================================
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
@@ -1118,7 +972,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** The official path's classifier: one group per hwKey (per precision when multi). */
 const singlePrecisionClassify = (hwKey: string) => ({ key: hwKey, meta: { hwKey } });
 
 describe('buildGpuGroups', () => {
@@ -1144,7 +997,6 @@ describe('buildGpuGroups', () => {
     expect(first.interactivity).toBe(50);
     expect(first.throughput).toBe(900);
     expect(first.concurrency).toBe(8);
-    // Cost per million tokens is derived, not passed through.
     expect(first.costh).toBeGreaterThan(0);
     expect(first.tpPerMw).toBeGreaterThan(0);
   });
@@ -1195,7 +1047,6 @@ describe('buildGpuGroups', () => {
     });
 
     it('is absent, not zero, when the row reported no first-token time', () => {
-      // A zero would clear every first-token cap; absence is filtered out.
       expect(only(makeRow()).ttft).toBeUndefined();
       expect('ttft' in only(makeRow())).toBe(false);
     });
@@ -1221,25 +1072,17 @@ describe('buildGpuGroups', () => {
     };
 
     it('is absent when the row records no cache metric — every fixed-sequence row', () => {
-      // Not zero: absent. Zero would mean "measured, and nothing was cached",
-      // which is a claim the data does not make.
       expect(only(makeRow()).cacheHitRate).toBeUndefined();
     });
 
     it('sums the GPU and external hit rates', () => {
-      // Disjoint in the measured data: across production rows carrying both, the
-      // sum never exceeds 1 nor the theoretical ceiling.
       expect(
         only(withMetrics({ server_gpu_cache_hit_rate: 0.66, server_external_cache_hit_rate: 0.25 }))
           .cacheHitRate,
       ).toBeCloseTo(0.91, 10);
     });
 
-    // The three tiers do not all stack. These three cases are the shapes the
-    // production data actually comes in; see `measuredCacheHitRate` for the counts.
     it('ignores the CPU tier when an external rate is reported — external already counts it', () => {
-      // The shape of 106 of 132 production rows with a non-zero CPU rate. Adding
-      // CPU here is what breached `theoretical_cache_hit_rate` on 56 of them.
       expect(
         only(
           withMetrics({
@@ -1252,9 +1095,6 @@ describe('buildGpuGroups', () => {
     });
 
     it('adds the CPU tier when no external rate is reported', () => {
-      // The shape of the 26 offload-on rows with no external figure, where
-      // `gpu + cpu` breaches the ceiling 0 times. Dropping CPU understated the
-      // cached share by ~5.5pp on these, which overstates revenue.
       expect(
         only(withMetrics({ server_gpu_cache_hit_rate: 0.771, server_cpu_cache_hit_rate: 0.055 }))
           .cacheHitRate,
@@ -1266,11 +1106,6 @@ describe('buildGpuGroups', () => {
         0.5,
         10,
       );
-      // A reported zero is a measurement, not an absence: the router saw no
-      // external hits, and it is still the figure that accounts for the offload
-      // tier. Reading 0.5 here would double-count. No production row has this
-      // shape today, so this pins a deliberate choice about unobserved data —
-      // it is not a regression test for something measured.
       expect(
         only(withMetrics({ server_external_cache_hit_rate: 0, server_cpu_cache_hit_rate: 0.5 }))
           .cacheHitRate,
@@ -1301,8 +1136,6 @@ describe('buildGpuGroups', () => {
     };
 
     it('takes the share from the rates when they agree with the total', () => {
-      // Self-consistent (700 + 300 = 1000), so the measured split is the split —
-      // even where it disagrees with the sequence shape.
       const point = only(
         makeRow({
           metrics: {
@@ -1317,11 +1150,6 @@ describe('buildGpuGroups', () => {
     });
 
     it('falls back to ISL:OSL when the rates are on a different denominator', () => {
-      // The disaggregated shape, with the real arithmetic: 16 prefill + 8 decode
-      // chips serving 8192:1024. Input is per prefill chip (6400/16 = 400),
-      // output per decode chip (800/8 = 100), total per chip overall
-      // (7200/24 = 300). The rates sum to 1.667x the total, and the split they
-      // imply — 0.8 — is not the split the workload has, which is 8192/9216.
       const point = only(
         makeRow({
           disagg: true,
@@ -1335,14 +1163,11 @@ describe('buildGpuGroups', () => {
           },
         }),
       );
-      // 1k/1k here, because that is the sequence this describe block selects.
       expect(point.inputTokenShare).toBeCloseTo(0.5, 9);
       expect(point.inputTokenShare).not.toBeCloseTo(0.8, 2);
     });
 
     it('falls back to the run token counts when there is no fixed sequence', () => {
-      // Agentic traces have no ISL/OSL to fall back to, so the run's own
-      // prompt:generation counts pin the mix instead.
       const { grouped } = buildGpuGroups(
         [
           makeRow({
@@ -1392,9 +1217,6 @@ describe('buildGpuGroups', () => {
         },
       );
 
-      // 400 / (400 + 100) is a ratio of per-pool rates, not a fleet-wide
-      // token share. Leaving it absent makes lifecycle revenue charge no input
-      // tokens instead of inventing an 80% input mix.
       expect(Object.values(grouped)[0][0].inputTokenShare).toBeUndefined();
     });
 
@@ -1531,7 +1353,6 @@ describe('buildGpuGroups', () => {
     const keys = Object.keys(grouped).toSorted();
     expect(keys).toHaveLength(2);
     expect(keys.map((k) => groupMeta[k].runIndex).toSorted()).toEqual([0, 1]);
-    // Each run keeps its own points — no cross-run mixing into one frontier.
     expect(grouped[keys[0]]).toHaveLength(1);
     expect(grouped[keys[1]]).toHaveLength(1);
   });
@@ -1551,7 +1372,6 @@ describe('buildGpuGroups', () => {
 
     const officialHw = Object.values(official.groupMeta)[0].hwKey;
     const overlayHw = Object.values(overlay.groupMeta)[0].hwKey;
-    // Legend visibility is keyed on hwKey, so the two must agree.
     expect(overlayHw).toBe(officialHw);
   });
 
@@ -1561,8 +1381,6 @@ describe('buildGpuGroups', () => {
       p75_ttlt: 12,
       p90_itl: 0.05,
       p90_ttlt: 20,
-      // Deliberately wrong artifact values: rowToAggDataEntry must derive
-      // interactivity as 1 / ITL for official and overlay parity.
       p75_intvty: 999,
       p90_intvty: 999,
       tput_per_gpu: 900,
@@ -1602,12 +1420,6 @@ describe('buildGpuGroups', () => {
   });
 
   it('keeps an e2e-dominated agentic point, because grouping no longer gates on the e2e frontier', () => {
-    // Until #736 this dropped every point that lost on E2E normalized
-    // interactivity, so grouping matched the chart's canonical frontier. That
-    // gating was removed deliberately: a frontier is now computed from the axes
-    // the reader actually selected, so grouping keeps every measured point and
-    // eligibility is decided downstream. Concurrency 2 is dominated on e2e by
-    // concurrency 1 and must survive anyway.
     const agenticRow = (
       conc: number,
       interactivity: number,
@@ -1634,7 +1446,7 @@ describe('buildGpuGroups', () => {
     const { grouped } = buildGpuGroups(
       [
         agenticRow(1, 100, 20, 900),
-        agenticRow(2, 80, 30, 800), // e2e-dominated by concurrency 1
+        agenticRow(2, 80, 30, 800),
         agenticRow(4, 60, 40, 1200),
         agenticRow(8, 40, 50, 700, '2026-07-20'),
       ],
@@ -1685,10 +1497,6 @@ describe('buildGpuGroups', () => {
   });
 });
 
-// =========================================================================
-// interpolateForGPU() — clamped reporting
-// =========================================================================
-
 describe('interpolateForGPU clamped flag', () => {
   const points = [
     makePoint({ interactivity: 20, throughput: 900 }),
@@ -1703,8 +1511,6 @@ describe('interpolateForGPU clamped flag', () => {
 
   it('is set for a target above every measured point', () => {
     const result = interpolateForGPU(points, 200, 'interactivity_to_throughput', 'costh');
-    // Still returns a value (the calculator never drops a bar), but the caller
-    // can now tell the user it is the nearest edge point, not a measurement.
     expect(result?.value).toBeGreaterThan(0);
     expect(result?.clamped).toBe(true);
   });
@@ -1725,10 +1531,6 @@ describe('interpolateForGPU clamped flag', () => {
   });
 });
 
-// =========================================================================
-// Reciprocal metrics — cost is derived from throughput, not splined
-// =========================================================================
-
 describe('recoverReciprocalNumerator', () => {
   it('recovers the constant when every point agrees', () => {
     expect(recoverReciprocalNumerator([1, 2, 4], [400, 200, 100])).toBe(400);
@@ -1742,19 +1544,13 @@ describe('recoverReciprocalNumerator', () => {
   });
 
   it('returns null when the points disagree — the numerator is not constant', () => {
-    // This is the safety rail: a metric whose numerator varies per point (e.g.
-    // measured power) must not have its values rewritten from one point's ratio.
     expect(recoverReciprocalNumerator([1, 2], [400, 300])).toBeNull();
   });
 
   it('accepts costs rounded for publication but rejects a percent-level drift', () => {
-    // The tolerance is 0.1%. Blog tables are hand-assembled from costs written
-    // to a few decimals, and iso_interactivity.py must not silently fall back on
-    // them; a numerator that genuinely varies moves far more than this.
     expect(
       recoverReciprocalNumerator([0.0964, 0.2892, 0.6427, 1.928], [6000, 2000, 900, 300]),
     ).not.toBeNull();
-    // 1% apart — rejected.
     expect(recoverReciprocalNumerator([1, 2.02], [400, 200])).toBeNull();
   });
 
@@ -1770,8 +1566,7 @@ describe('recoverReciprocalNumerator', () => {
 });
 
 describe('interpolateForGPU cost derivation', () => {
-  /** Points obeying the real identity: cost = rate / throughput. */
-  const RATE = 578.4; // $/GPU-hr x 1e6 / 3600
+  const RATE = 578.4;
   const consistent = (interactivity: number, throughput: number) =>
     makePoint({
       interactivity,
@@ -1791,8 +1586,6 @@ describe('interpolateForGPU cost derivation', () => {
   ];
 
   it('keeps cost x throughput equal to the provider rate between measured points', () => {
-    // The identity /inference's per-point values obey by construction. Splining
-    // cost independently breaks it by up to 25x on sparse frontiers.
     for (const target of [15, 20, 42, 60, 75]) {
       const r = interpolateForGPU(frontier, target, 'interactivity_to_throughput', 'costh')!;
       expect(r.cost * r.value).toBeCloseTo(RATE, 6);
@@ -1907,13 +1700,6 @@ describe('interpolateForGPU cost derivation', () => {
   });
 
   it('reads below the old splined value on a two-knot bracket, near (1+r)^2/(4r)', () => {
-    // The mechanism: splining cost averages reciprocals (arithmetic mean) while
-    // deriving takes the reciprocal of an average (harmonic mean), and
-    // AM/HM = (1+r)^2/(4r) for throughputs differing by r. Steffen slopes make
-    // even a two-knot spline a slight cubic rather than a chord, so the match is
-    // close but not exact. Beyond two knots the cubic can undershoot the chord,
-    // so the direction is usual but not universal — measured at 73.6% high over
-    // real frontiers, min 0.95. See docs/tco-calculator.md.
     const t1 = 6000;
     const t2 = 300;
     const xs = [10, 80];
@@ -1921,21 +1707,17 @@ describe('interpolateForGPU cost derivation', () => {
     const mid = (xs[0]! + xs[1]!) / 2;
 
     const derived = interpolateForGPU(pair, mid, 'interactivity_to_throughput', 'costh')!.cost;
-    // Reconstruct the previous behaviour: spline the cost values themselves.
     const costs = [RATE / t1, RATE / t2];
     const splined = hermiteInterpolate(xs, costs, monotoneSlopes(xs, costs), mid);
 
     expect(derived).toBeLessThan(splined);
     const r = t1 / t2;
     expect(splined / derived).toBeCloseTo((1 + r) ** 2 / (4 * r), 0);
-    // and the derived value still satisfies the identity, which splining does not
     const at = interpolateForGPU(pair, mid, 'interactivity_to_throughput', 'costh')!;
     expect(at.cost * at.value).toBeCloseTo(RATE, 6);
   });
 
   it('falls back to splining when the points do not obey the identity', () => {
-    // Synthetic points whose cost is unrelated to throughput keep the old
-    // behaviour rather than being silently rewritten.
     const inconsistent = [
       makePoint({ interactivity: 10, throughput: 1000, costh: 0.2 }),
       makePoint({ interactivity: 40, throughput: 200, costh: 2 }),
@@ -1943,13 +1725,11 @@ describe('interpolateForGPU cost derivation', () => {
     const r = interpolateForGPU(inconsistent, 25, 'interactivity_to_throughput', 'costh')!;
     expect(r.cost).toBeGreaterThan(0.2);
     expect(r.cost).toBeLessThan(2);
-    // Not the derived value, which would have been 200/interpolated-throughput.
     expect(r.cost * r.value).not.toBeCloseTo(200, 3);
   });
 
   it('derives cost from the target axis in throughput_to_interactivity mode', () => {
     const r = interpolateForGPU(frontier, 1500, 'throughput_to_interactivity', 'costh')!;
-    // In reverse mode the target IS total throughput, so cost follows from it.
     expect(r.cost).toBeCloseTo(RATE / 1500, 9);
   });
 

@@ -4,9 +4,10 @@ import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
@@ -17,20 +18,17 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, sortHardware } from './compare/hardware';
+import { hardwareLabel, operatorXColors, sortHardware } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
-/** Baseline select value for "no baseline". */
 const NO_BASELINE = 'none';
 
-/** Visible cards with their width: a half card left alone in its row takes the whole row. */
 function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
   const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
   let run: typeof out = [];
@@ -72,25 +70,57 @@ function VizCard({
   model,
   viz,
   wide,
+  eager,
 }: {
   model: ComparisonModel;
   viz: VizDefinition;
   wide: boolean;
+  eager: boolean;
 }) {
+  const [mounted, setMounted] = useState(eager);
+  const card = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mounted) return;
+    if (eager || typeof IntersectionObserver === 'undefined') {
+      setMounted(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setMounted(true);
+        }
+      },
+      { rootMargin: '300px' },
+    );
+    if (card.current) observer.observe(card.current);
+    return () => observer.disconnect();
+  }, [eager, mounted]);
   return (
     <Card
+      ref={card}
       data-testid={`operatorx-viz-${viz.id}`}
+      aria-busy={!mounted}
+      aria-labelledby={`operatorx-title-${viz.id}`}
+      tabIndex={mounted ? undefined : 0}
+      onFocus={() => setMounted(true)}
       className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
     >
-      <Heading as="h2" level="card" className="mb-4">
+      <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
         {viz.title}
       </Heading>
-      <viz.Component model={model} />
+      {mounted ? (
+        <viz.Component model={model} />
+      ) : (
+        <Skeleton
+          aria-hidden="true"
+          className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
+        />
+      )}
     </Card>
   );
 }
 
-/** Cross-hardware comparison of one op: workload, metric and GPU controls over the visualizations. */
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
@@ -110,14 +140,13 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const workload = view?.workloads.find((w) => w.id === view.workload);
   const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
   const colors = useMemo(
-    () => generateVendorColors(view?.hardware.map((h) => h.id) ?? [], theme),
+    () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
   );
   const hardware = useMemo(
     () => (picked ? available.filter((h) => picked.includes(h)) : available),
     [picked, available],
   );
-  // No baseline until one is picked.
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
   const model = useMemo(() => {
     if (!view) return null;
@@ -153,7 +182,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>
     );
-  // While another workload loads, the previous one stays on screen, dimmed.
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
@@ -233,8 +261,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         <div className="grid gap-4 lg:grid-cols-2">
           {layout(
             VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
-          ).map(({ viz, wide }) => (
-            <VizCard key={viz.id} model={model} viz={viz} wide={wide} />
+          ).map(({ viz, wide }, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} wide={wide} eager={index === 0} />
           ))}
         </div>
       </Pending>

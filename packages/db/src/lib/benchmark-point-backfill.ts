@@ -18,7 +18,6 @@ function asMetricsRecord(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
 }
 
-/** Reject a replayed correction when its audited source telemetry changed. */
 export function matchesExpectedBackfillMetrics(
   value: unknown,
   backfill: BenchmarkPointBackfill,
@@ -39,13 +38,6 @@ const VALIDATED_CACHE_KEYS: ReadonlySet<string> = new Set([
   ...CACHE_VALIDITY_TRACE_KEYS,
 ]);
 
-/**
- * Refuse a backfill that would rewrite cache-hit metrics, their overall
- * source, or the validity fields vouching for them, on a row carrying a
- * producer validity contract: the producer's eligibility covers its own
- * values, not borrowed ones. Rows without a contract (every donor target
- * today) are unaffected.
- */
 export function assertBackfillKeepsValidatedCache(
   metrics: Record<string, unknown>,
   backfill: BenchmarkPointBackfill,
@@ -85,7 +77,6 @@ function isApplied(row: BackfillRow, backfill: BenchmarkPointBackfill): boolean 
   );
 }
 
-/** Recover only the exact JSONB array written by the original broken backfill. */
 function recoverMalformedMetrics(
   value: unknown,
   backfill: BenchmarkPointBackfill,
@@ -101,7 +92,6 @@ function recoverMalformedMetrics(
   return originalMetrics;
 }
 
-/** The caller must first resolve exactly one source-or-destination identity. */
 export function planBenchmarkPointBackfill(
   row: BackfillRow,
   backfill: BenchmarkPointBackfill,

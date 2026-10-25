@@ -46,7 +46,6 @@ describe('agentxWindowPlan', () => {
         'kimik3_recipe-a_conc96.json',
         5000,
       ),
-      // A top-level document names the concurrency but carries no retained alias.
       'power_validation_legacy.json': {
         power_valid: true,
         selected_window: nested(48, RESULT_48, 2000).selected_window,
@@ -110,7 +109,6 @@ describe('attachAgentxAudits', () => {
     expect(single.points[0]!.powerAudit).toBe(producerAudit);
     expect(single).toMatchObject({ attached: 0, refused: [] });
 
-    // Nothing is withheld when every point at the concurrency already carries one.
     const shared = attachAgentxAudits(
       plan,
       [

@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { useState } from 'react';
 
+import GpuMetricsChart from '@/components/gpu-power/GpuPowerChart';
 import { TelemetryDisplayControls } from '@/components/gpu-power/TelemetryDisplayControls';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
@@ -97,6 +98,53 @@ describe('PowerX telemetry interactions', () => {
     registerAnalyticsClient({ capture: cy.stub().as('capture') });
   });
 
+  for (const [locale, width, label] of [
+    ['en', 1280, 'Temperature'],
+    ['zh', 390, '温度'],
+  ] as const) {
+    it(`renders Celsius gaps on the ${locale} point chart`, () => {
+      cy.viewport(width, 900);
+      const native = {
+        ...payload,
+        series: [
+          {
+            ...payload.series[0],
+            sampleCount: 3,
+            gpuCount: 1,
+            data: [
+              { timestamp: '2026-09-21T00:00:00Z', index: 0, power: 400, temperature: 65.5 },
+              { timestamp: '2026-09-21T00:00:01Z', index: 0, power: 410 },
+              { timestamp: '2026-09-21T00:00:02Z', index: 0, power: 420, temperature: 0 },
+            ],
+          },
+        ],
+      };
+      cy.intercept('GET', endpoint, { body: native });
+      mountPoint(`${locale === 'zh' ? '/zh' : ''}/inference/agentic/${ID}`);
+      cy.get('[data-testid="power-telemetry-metric-select"]').click();
+      cy.get('[role="option"]').contains(label).click();
+      cy.get(chart).find('svg').should('contain.text', `${label} (°C)`);
+      cy.get(chart).find('svg .point').should('have.length', 2);
+      cy.get(chart)
+        .find('svg .line-0')
+        .should(($paths) => {
+          expect($paths).to.have.length(1);
+          const path = $paths.attr('d')!;
+          expect(path.match(/M/g)).to.have.length(2);
+          expect(path).not.to.match(/[LC]|NaN/u);
+        });
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="power-telemetry-display-mode-points"]').click();
+      cy.get(chart).find('svg .point').should('have.length', 2);
+      cy.get('[data-testid="power-telemetry-view"]').should(($view) => {
+        expect($view[0].scrollWidth).to.be.at.most($view[0].clientWidth + 1);
+      });
+      cy.get('[data-testid="power-telemetry-view"]').screenshot(
+        `native-temperature-${locale}-${width}`,
+      );
+    });
+  }
+
   it('changes display, window and chip aggregation independently and tracks each action', () => {
     cy.mount(<Controls />);
     cy.get('[data-testid="display-mode-points"]').click();
@@ -138,6 +186,40 @@ describe('PowerX telemetry interactions', () => {
       'have.been.calledWith',
       'inference_agentic_power_telemetry_retry_clicked',
     );
+  });
+
+  it('draws the all-in provisioned line only when switched on', () => {
+    cy.intercept('GET', endpoint, { body: payload });
+    mountPoint();
+    cy.get(chart).find('svg').should('contain.text', 'B200 TDP: 1000W');
+    cy.get(chart).find('[data-testid="gpu-power-all-in-line"]').should('not.exist');
+    cy.get('[data-testid="power-telemetry-all-in"]').click();
+    cy.get(chart)
+      .find('[data-testid="gpu-power-all-in-line"]')
+      .should('contain.text', 'B200 All-in provisioned: 1710W');
+    cy.get('@capture').should('have.been.calledWith', 'inference_agentic_power_all_in_toggled', {
+      id: ID,
+      enabled: true,
+    });
+    cy.get(chart).screenshot('power-telemetry-all-in-line');
+  });
+
+  it('keeps point tooltips on the samples while the all-in line is drawn', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/inference/agentic/206887">
+        <GpuMetricsChart
+          data={series(1, 'host-a', 500).data}
+          visibleGpus={new Set([0, 1])}
+          metricKey="power"
+          artifactName="gpu_metrics_qwen35_b200"
+          hardware="b200"
+          showAllIn
+        />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
+    cy.get('circle.point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {

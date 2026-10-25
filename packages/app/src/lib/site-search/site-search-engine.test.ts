@@ -95,18 +95,15 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await settle(engine);
 
-    // Seed is replaced by the real section; "watt" reaches it through concepts.
     expect(engine.search('watts')[0]).toMatchObject({
       url: '/chips/b200#power',
       source: 'page',
       section: 'Power',
     });
-    // Query-matching pages are fetched before the rest of the queue.
     const crawlOrder = fetchMock.mock.calls
       .map(([input]) => String(input))
       .filter((p) => p !== '/llms.txt');
     expect(crawlOrder[0]).toBe('/chips/b200');
-    // Feeds and external links from llms.txt are never fetched.
     expect(crawlOrder).not.toContain('/feed.xml');
     expect(engine.status()).toMatchObject({ crawling: false, seeded: true });
     expect(engine.status().indexedPages).toBe(engine.status().totalPages);
@@ -165,14 +162,12 @@ describe('SiteSearchEngine', () => {
     });
     const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
 
-    // Before anything is crawled, seeds link the English page, which always exists.
     await engine.seed();
     expect(engine.search('untranslated')[0].url).toBe('/blog/untranslated-post');
 
     engine.start();
     await settle(engine);
     expect(engine.search('sunflower')[0].url).toBe('/blog/untranslated-post');
-    // Translated pages switch to /zh once that page loads, replacing the English seed.
     expect(engine.search('blackwell').map((r) => r.url)).toEqual(['/zh/chips/b200']);
     expect(engine.search('chip').every((r) => r.url !== '/chips/b200')).toBe(true);
   });
@@ -206,7 +201,6 @@ describe('SiteSearchEngine', () => {
     });
     const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
     engine.start();
-    // The user types while /llms.txt is still in flight.
     engine.prioritize('mi355x');
     releaseSeeds(response(LLMS_TXT, 'text/plain'));
     await engine.seed();
@@ -228,8 +222,6 @@ describe('SiteSearchEngine', () => {
       );
       Object.defineProperty(res, 'redirected', { value: true });
       Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
-      // First attempt: the dialog closes while the page waits for idle time
-      // to be parsed, after the redirect has already been observed.
       if (calls === 1) setTimeout(() => engine.stop(), 5);
       return Promise.resolve(res);
     });

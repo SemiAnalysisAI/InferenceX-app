@@ -14,7 +14,6 @@ export interface IngestSummaryOptions {
   includeUnmappedPrecisions?: boolean;
 }
 
-/** Print the DB totals and shared skip/unmapped-value footer used by ingest scripts. */
 export function printIngestSummaryFooter(
   totals: IngestDatabaseTotals,
   tracker: SkipTracker,

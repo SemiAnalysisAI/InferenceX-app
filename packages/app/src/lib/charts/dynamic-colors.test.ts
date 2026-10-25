@@ -26,8 +26,6 @@ describe('getVendor', () => {
   });
 
   it('classifies keys that lead with a literal vendor token', () => {
-    // CollectiveX series keys carry the dataset's explicit vendor rather than a
-    // registered GPU key (their SKUs, e.g. "h200-dgxc", are not registry keys).
     expect(getVendor('nvidia_h200-dgxc_normal_ep8')).toBe('nvidia');
     expect(getVendor('amd_mi355x-oam_normal_ep8')).toBe('amd');
     expect(getVendor('google_ironwood_normal_tp8')).toBe('google');

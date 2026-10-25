@@ -19,7 +19,6 @@ interface CompareTableRendererProps {
   metricLabelOverrides?: Record<string, string>;
 }
 
-/** Pure empty/data renderer shared by every compare-page client. */
 export function CompareTableRenderer({
   aLabel,
   bLabel,

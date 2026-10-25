@@ -94,7 +94,6 @@ describe('AgentX optimizations registry', () => {
       const asset = OPTIMIZATION_FIGURES[section.figure.key];
       expect(asset, section.figure.key).toBeDefined();
       expect(existsSync(path.join(publicDir, asset.src)), asset.src).toBe(true);
-      // Dimensions feed next/image, so a wrong aspect ratio would shift layout.
       expect(asset.width).toBeGreaterThan(0);
       expect(asset.height).toBeGreaterThan(0);
       expect(section.figure.alt.length).toBeGreaterThan(20);
@@ -173,7 +172,6 @@ describe('AgentX optimizations Chinese port', () => {
       const zh = getLocalizedFramework(framework, 'zh');
 
       expect(zh.slug).toBe(framework.slug);
-      // Product names, PR references, and figure assets stay language-neutral.
       expect(zh.name).toBe(framework.name);
       expect(CJK.test(zh.summary), framework.slug).toBe(true);
       expect(CJK.test(zh.lead), framework.slug).toBe(true);

@@ -1,4 +1,3 @@
-/** Database table names. */
 export const TABLE_NAMES = {
   configs: 'configs',
   workflowRuns: 'workflow_runs',

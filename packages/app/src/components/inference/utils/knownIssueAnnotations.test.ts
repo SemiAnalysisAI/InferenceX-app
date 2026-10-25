@@ -145,7 +145,6 @@ describe('renderKnownIssueAnnotations', () => {
     expect(top1).toBeGreaterThan(bottom0);
     for (const rect of rects) {
       expect(Number(rect.getAttribute('x'))).toBeGreaterThanOrEqual(0);
-      // Right edges align at the plot's right edge minus the gap
       expect(Number(rect.getAttribute('x')) + Number(rect.getAttribute('width'))).toBe(800 - 10);
     }
   });
@@ -172,7 +171,6 @@ describe('renderKnownIssueAnnotations', () => {
   });
 
   it('omits the arrow when the series is zoomed/panned out of view', () => {
-    // Scales push every point far outside the 800x500 plot
     renderKnownIssueAnnotations(
       g,
       defs,
@@ -210,7 +208,6 @@ describe('renderKnownIssueAnnotations on phone-width plots', () => {
     const w = Number(rect.attr('width'));
     expect(x).toBeGreaterThanOrEqual(2);
     expect(x + w).toBeLessThanOrEqual(width);
-    // The long detail sentence drops to the short summary first.
     const detail = g.select('.known-issue-annotation text:nth-of-type(2)').text();
     expect(detail).not.toContain('Results may change');
   });

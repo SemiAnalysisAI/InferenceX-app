@@ -113,7 +113,7 @@ export default async function ModelDetailContent({
             <ModelArchitectureInline displayName={entry.displayName} />
           </div>
           <div className="mt-6 pt-6 border-t border-border/40">
-            {locale === 'zh' && (
+            {locale === 'zh' && page.contentLocale !== 'zh' && (
               <aside
                 role="note"
                 data-testid="model-english-article-notice"
@@ -130,7 +130,7 @@ export default async function ModelDetailContent({
             )}
             <article
               data-testid="model-page-article"
-              lang={locale === 'zh' ? 'en' : undefined}
+              lang={locale === 'zh' ? (page.contentLocale ?? 'en') : undefined}
               className="prose prose-neutral dark:prose-invert max-w-none blog-prose"
             >
               {content}

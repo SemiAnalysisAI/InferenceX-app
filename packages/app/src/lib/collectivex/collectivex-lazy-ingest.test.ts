@@ -35,7 +35,6 @@ import {
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-// Two current matrix shards: NVIDIA scale-up EP8 + AMD scale-out EP16.
 const shardA = makeRawShard({ backend: 'deepep-v2', ep: 8 });
 const shardB = makeRawShard({
   sku: 'mi355x',
@@ -84,7 +83,6 @@ function runObject(overrides: Record<string, unknown> = {}) {
     id: 160,
     name: 'CollectiveX Sweep',
     path: '.github/workflows/collectivex-sweep.yml',
-    // Deliberately a feature branch: lazy ingest accepts runs from ANY branch.
     head_branch: 'collectivex-fp8-precision',
     head_sha: 'a'.repeat(40),
     status: 'completed',
@@ -95,7 +93,6 @@ function runObject(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** One page of the run listing. A Response body reads once, so build a fresh one per call. */
 function runListing(...runs: ReturnType<typeof runObject>[]) {
   return Response.json({ total_count: runs.length, workflow_runs: runs });
 }
@@ -123,18 +120,19 @@ function artifactsBody(runId = 160, runAttempt = 1) {
 }
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   mockFetch.mockReset();
   mockGetStates.mockReset().mockResolvedValue({});
   mockInsert.mockReset().mockResolvedValue(true);
   mockRefresh.mockReset().mockResolvedValue(true);
   process.env.GITHUB_TOKEN = 'test-token';
-  // Module-level state outlives a case; without this every test after the first
-  // would be answered from the discovery cooldown and issue no requests.
+  delete process.env.INFERENCEX_SOURCE_REPOS;
   resetCollectiveXDiscoveryCooldown();
 });
 
 afterAll(() => {
   delete process.env.GITHUB_TOKEN;
+  delete process.env.INFERENCEX_SOURCE_REPOS;
   vi.unstubAllGlobals();
 });
 
@@ -178,6 +176,13 @@ describe('ensureLatestCollectiveXRun', () => {
       matrix,
     });
     expect(run.summary).toMatchObject({ run_id: '160', measured_cases: 2 });
+    expect(run.summary.source_repository).toBeUndefined();
+    expect(mockFetch.mock.calls[0][0]).toContain(
+      '/repos/SemiAnalysisAI/InferenceX/actions/workflows/collectivex-sweep.yml/runs?',
+    );
+    expect(mockFetch.mock.calls[1][0]).toContain(
+      '/repos/SemiAnalysisAI/InferenceX/actions/runs/160/artifacts?',
+    );
     expect(docs).toEqual([shardA, shardB]);
   });
 
@@ -214,7 +219,6 @@ describe('ensureLatestCollectiveXRun', () => {
   it('skips runs tagged for another version', async () => {
     mockFetch
       .mockResolvedValueOnce(twoRunListing())
-      // Run 161 carries a v2 matrix — requesting v1 must move on.
       .mockResolvedValueOnce(Response.json(artifactsBody(161)))
       .mockResolvedValueOnce(new Response(matrixZipV2))
       .mockResolvedValueOnce(new Response(shardZipV2))
@@ -281,8 +285,6 @@ describe('ensureLatestCollectiveXRun', () => {
     await ensureLatestCollectiveXRun(1);
 
     expect(mockInsert).toHaveBeenCalledTimes(1);
-    // 4 fetches total: runs, artifacts, matrix, ONE shard — the attempt-1
-    // archive is superseded and never downloaded.
     expect(mockFetch).toHaveBeenCalledTimes(4);
     expect(mockFetch.mock.calls[3][0]).toBe('https://example.test/shard-attempt2.zip');
   });
@@ -349,7 +351,6 @@ describe('discovery cooldown', () => {
     expect(collectiveXSweepErrorCode(first)).toBe('unavailable');
     const afterFirst = mockFetch.mock.calls.length;
 
-    // Same error object, and no fresh requests while the failure window holds.
     const second = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
     expect(second).toBe(first);
     expect(mockFetch.mock.calls.length).toBe(afterFirst);
@@ -527,5 +528,176 @@ describe('ensureCollectiveXRun', () => {
     const caught = await ensureCollectiveXRun(1, 'abc').catch((error: unknown) => error);
     expect(collectiveXSweepErrorCode(caught)).toBe('not-found');
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('benchmark source repositories', () => {
+  const PRIMARY = 'SemiAnalysisAI/InferenceX';
+  const EXTRA = 'ExampleOrg/ExampleBench';
+  const PRIMARY_LISTING = `/repos/${PRIMARY}/actions/workflows/collectivex-sweep.yml/runs?`;
+  const EXTRA_LISTING = `/repos/${EXTRA}/actions/workflows/collectivex-sweep.yml/runs?`;
+  const downloads: [string, () => Response][] = [
+    ['https://example.test/matrix.zip', () => new Response(matrixZip)],
+    ['https://example.test/shards.zip', () => new Response(shardZip)],
+  ];
+
+  // Answers each request from the first route whose fragment its URL contains, else 404.
+  function routeFetch(routes: [string, () => Response][]) {
+    mockFetch.mockImplementation((input: string) => {
+      const route = routes.find(([fragment]) => input.includes(fragment));
+      return Promise.resolve(route ? route[1]() : new Response(null, { status: 404 }));
+    });
+  }
+
+  beforeEach(() => {
+    process.env.INFERENCEX_SOURCE_REPOS = EXTRA;
+  });
+
+  it('walks every repository newest-first by run id', async () => {
+    mockGetStates.mockImplementation((_sql: unknown, ids: string[]) =>
+      Promise.resolve({ [ids[0]]: { state: 'live', version: 2, run_attempt: 1 } }),
+    );
+    routeFetch([
+      [PRIMARY_LISTING, () => runListing(runObject({ id: 165 }), runObject({ id: 150 }))],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }), runObject({ id: 160 }))],
+    ]);
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+
+    expect(mockGetStates.mock.calls.map(([, ids]) => ids[0])).toEqual(['170', '165', '160', '150']);
+  });
+
+  it('reads artifacts from and records the repository that ran the newest sweep', async () => {
+    routeFetch([
+      [PRIMARY_LISTING, () => runListing(runObject({ id: 160 }))],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }))],
+      [`/repos/${EXTRA}/actions/runs/170/artifacts?`, () => Response.json(artifactsBody(170))],
+      ...downloads,
+    ]);
+
+    await ensureLatestCollectiveXRun(1);
+
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][1]).toMatchObject({
+      run_id: '170',
+      summary: { source_repository: EXTRA },
+    });
+    expect(
+      mockFetch.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes(`/repos/${PRIMARY}/actions/runs/`)),
+    ).toEqual([]);
+  });
+
+  it('keeps discovering the other repositories when one cannot be listed, but not as complete', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([
+      [PRIMARY_LISTING, () => new Response(null, { status: 500 })],
+      [EXTRA_LISTING, () => runListing(runObject({ id: 170 }))],
+      [`/repos/${EXTRA}/actions/runs/170/artifacts?`, () => Response.json(artifactsBody(170))],
+      ...downloads,
+    ]);
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(false);
+
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockInsert.mock.calls[0][1].run_id).toBe('170');
+  });
+
+  it('skips another repository without a sweep workflow quietly', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([[PRIMARY_LISTING, () => runListing()]]);
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(true);
+
+    expect(warn).not.toHaveBeenCalled();
+
+    expect(
+      mockFetch.mock.calls.map(([url]) => String(url)).some((url) => url.includes(EXTRA_LISTING)),
+    ).toBe(true);
+  });
+
+  it('keeps a failed list pass incomplete without walking again during the cooldown', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([
+      [PRIMARY_LISTING, () => runListing()],
+      [EXTRA_LISTING, () => new Response(null, { status: 403 })],
+    ]);
+
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(false);
+    const requests = mockFetch.mock.calls.length;
+    await expect(ensureCollectiveXRunsList(1)).resolves.toBe(false);
+
+    expect(mockFetch.mock.calls.length).toBe(requests);
+  });
+
+  it('fails discovery when the only listable repository fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([[PRIMARY_LISTING, () => new Response(null, { status: 500 })]]);
+
+    const caught = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
+
+    expect(collectiveXSweepErrorCode(caught)).toBe('unavailable');
+  });
+
+  it('reports the latest pass as failed when another repository cannot be listed', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    routeFetch([
+      [PRIMARY_LISTING, () => runListing(runObject({ id: 160 }))],
+      [EXTRA_LISTING, () => new Response(null, { status: 500 })],
+      [`/repos/${PRIMARY}/actions/runs/160/artifacts?`, () => Response.json(artifactsBody(160))],
+      ...downloads,
+    ]);
+
+    const caught = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
+
+    expect(collectiveXSweepErrorCode(caught)).toBe('unavailable');
+    expect(mockInsert.mock.calls[0][1].run_id).toBe('160');
+  });
+
+  it('fails discovery only when every repository fails', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 500 }));
+
+    const caught = await ensureLatestCollectiveXRun(1).catch((error: unknown) => error);
+
+    expect(collectiveXSweepErrorCode(caught)).toBe('unavailable');
+    expect(
+      mockFetch.mock.calls.map(([url]) => String(url)).some((url) => url.includes(EXTRA_LISTING)),
+    ).toBe(true);
+  });
+
+  it('looks a run up in each repository and records where it was found', async () => {
+    routeFetch([
+      [`/repos/${EXTRA}/actions/runs/170/artifacts?`, () => Response.json(artifactsBody(170))],
+      [`/repos/${EXTRA}/actions/runs/170`, () => Response.json(runObject({ id: 170 }))],
+      ...downloads,
+    ]);
+
+    await ensureCollectiveXRun(1, '170');
+
+    expect(mockFetch.mock.calls.map(([url]) => String(url))[0]).toContain(
+      `/repos/${PRIMARY}/actions/runs/170`,
+    );
+    expect(mockInsert.mock.calls[0][1]).toMatchObject({
+      run_id: '170',
+      summary: { source_repository: EXTRA },
+    });
+  });
+
+  it('reports a run absent from every repository as not found', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 404 }));
+
+    const caught = await ensureCollectiveXRun(1, '170').catch((error: unknown) => error);
+
+    expect(collectiveXSweepErrorCode(caught)).toBe('not-found');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a failed lookup in one repository from reading as not found', async () => {
+    routeFetch([[`/repos/${PRIMARY}/actions/runs/170`, () => new Response(null, { status: 502 })]]);
+
+    const caught = await ensureCollectiveXRun(1, '170').catch((error: unknown) => error);
+
+    expect(collectiveXSweepErrorCode(caught)).toBe('unavailable');
   });
 });

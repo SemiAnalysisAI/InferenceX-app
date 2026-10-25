@@ -43,7 +43,6 @@ export function BlogIndexContent({ locale, activeTag: rawTag }: BlogIndexContent
   const t = BLOG_COPY[locale];
   const basePath = blogIndexPath(locale);
   const posts = getAllPosts(locale);
-  // Tags are stored lowercase; accept any casing in the query and show the canonical form.
   const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))];
   const activeTag = rawTag
     ? (allTags.find((tag) => tag.toLowerCase() === rawTag.trim().toLowerCase()) ?? rawTag.trim())

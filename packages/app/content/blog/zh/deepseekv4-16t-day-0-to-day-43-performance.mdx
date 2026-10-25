@@ -146,7 +146,7 @@ vLLM 和 Nvidia 非常快速地在 [srt-slurm](https://github.com/NVIDIA/srt-slu
 
 这是 CUDA 护城河的一个典型案例：借助 CUDA，分布式推理通常能在最新开源模型发布的第 0 天附近即获得支持。
 
-### 第 3 天 多 token 预测（MTP）推测性解码
+### 第 3 天 多 token 预测（MTP）投机解码
 
 <Figure
   src="/images/deepseekv4-16t-day-0-to-day-43-performance/day3-sglang-mtp.png"
@@ -278,7 +278,7 @@ _GB300 NVL72 DeepSeek V4 Pro 性能随时间的改进。来源：SemiAnalysis In
 
 [实时图表](https://inferencex.semianalysis.com/inference?i_hc=1&g_model=DeepSeek-V4-Pro&g_rundate=2026-06-08&g_runid=27099659001&i_prec=fp4%2Cfp8&i_gpus=gb300_dynamo-sglang%2Cgb300_dynamo-sglang_mtp&i_active=gb300_dynamo-sglang&i_dates=2026-04-30%2C2026-05-07%2C2026-05-11%2C2026-05-20%2C2026-05-22%2C2026-05-28%2C2026-06-02%2C2026-06-03%2C2026-06-08&i_dstart=2026-04-30&i_dend=2026-06-08)
 
-GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) MegaMoE 的实现。相比 5 月 7 日使用的非 MTP 实现，6 月 2 日版本的主要改进完全来自 GB300 解码拓扑的重构，而非触及 kernel 或精度。第 0 天的配方大多数点以窄 EP=8 运行，由一到两个 prefill worker 供给，并发上限为 16,384；5 月 20 日的运行将解码扩展到 EP=16，prefill 扩展到每个解码 worker 对应四到十二个 prefill worker，并将并发推到了 21,504。
+GB300 SGLang MTP 最显著的改进出现在 6 月 2 日，源自 W4A4 (MXFP4) MegaMoE 的实现。相比 5 月 7 日使用的非 MTP 实现，6 月 2 日版本的主要改进完全来自 GB300 解码拓扑的重构，而非触及 kernel 或精度。第 0 天的测试配置在多数数据点上以窄 EP=8 运行，由一到两个 prefill worker 供给，并发上限为 16,384；5 月 20 日的运行将解码扩展到 EP=16，prefill 扩展到每个解码 worker 对应四到十二个 prefill worker，并将并发推到了 21,504。
 
 根据上述图表和分析，我们可以看到，正如预期的那样，对于更大 world size 的推理系统，宽专家并行（Wide EP）是 GB300 卓越性能的主要杠杆，这通过在更多 GPU 之间分摊权重加载来实现。阅读 [InferenceX V2](https://newsletter.semianalysis.com/p/inferencex-v2-nvidia-blackwell-vs) 文章了解更多关于 Wide EP 的内容。
 
@@ -389,7 +389,7 @@ CANN（Compute Architecture for Neural Networks）是 Huawei 为在自家 Ascend
 
 在第 0 天，CANN 发布了 Ascend 芯片的优化指南和基准测试数据。通过这些信息，我们可以看到 Huawei 的 CANN 策略：通过面向中国国产模型发布的全栈推理优化，使 Ascend 具备竞争力。Huawei 试图向中国生态系统表明，如果 DeepSeek 发布新架构，CANN 能够交付 kernel、graph 路径、量化、服务集成和部署配方。
 
-我们在基准测试 MTP 时观察到 CANN 团队的一个有趣方法论，不得不在此提及：他们如何处理 MTP 草稿 token 的 AR（acceptance rate，接受率）或 AL（acceptance length，接受长度）。基准测试 MTP 并非易事，因为基准测试的 AR/AL 可能与用户的实际用例不同。例如，基准测试平均每三个草稿 token 可能接受两个，但在极其多样化的实际部署场景中，可能平均只能接受 1.5 个。
+我们在基准测试 MTP 时观察到 CANN 团队的一个有趣的做法，不得不在此提及：他们如何处理 MTP 草稿 token 的 AR（acceptance rate，接受率）或 AL（acceptance length，接受长度）。基准测试 MTP 并非易事，因为基准测试的 AR/AL 可能与用户的实际用例不同。例如，基准测试平均每三个草稿 token 可能接受两个，但在极其多样化的实际部署场景中，可能平均只能接受 1.5 个。
 
 这意味着用户可能看到的性能低于基准测试，从而错误地认为他们的设置有问题。我们在 [InferenceX v2 文章](https://newsletter.semianalysis.com/i/188090866/multi-token-prediction-mtp)中通过与 MTBench 的 AR 对比来解决这个问题。我们基准测试的未来迭代将通过使用真实 trace 来全面解决这一差距。
 
@@ -427,7 +427,7 @@ SIMT/SIMD 950 芯片有两个型号：950PR 和 950DT。PR 代表 Prefill and Re
 
 这与 TPU 的 MXU 类似。不过 Ascend 将两种功能更直接地暴露为独立的分离核心，每个核心都能加载自己的代码段，并且支持"双主模式"——AIC 和 AIV 独立运行代码，而非由 AIV 通过消息驱动 AIC。
 
-AI CPU 是一个具有直接设备内存访问权限的设备端 ARM64 执行单元。它作为 AI Core 的补充，处理不适合在 SIMD/SIMT 核心上执行的工作：分支密集的控制流、标量逻辑、动态形状处理，以及 kernel 运行前需要的值依赖的调度/分块元数据。由于 AI CPU 位于设备上，Ascend 可以将这些不规则的控制型工作保留在本地，而非在主机 CPU 之间来回传输——后者是延迟（latency）和流水线气泡的主要来源。AI CPU 也是在专用 CCU 分担通信编排之前，历史上位于旧有 AICore → AICPU → SDMA 路径上的单元。
+AI CPU 是一个具有直接设备内存访问权限的设备端 ARM64 执行单元。它作为 AI Core 的补充，处理不适合在 SIMD/SIMT 核心上执行的工作：分支密集的控制流、标量逻辑、动态形状处理，以及 kernel 运行前需要的值依赖的调度/分块元数据。由于 AI CPU 位于设备上，Ascend 可以将这些不规则的控制型工作保留在本地，而非往返传输到主机 CPU——后者是延迟（latency）和流水线气泡的主要来源。AI CPU 也是在专用 CCU 分担通信编排之前，历史上位于旧有 AICore → AICPU → SDMA 路径上的单元。
 
 与 TPU 和 Trainium 类似，Ascend 950 增加了专用的 CCU 通信引擎。该引擎与计算 die 并列，处理集合通信工作而不消耗 AI Core 的计算容量，支持远程读取 + 规约 + 本地写入，以及本地读取 + 远程写入。其优势在于更低的通信延迟、更少的 HBM 流量、更少的用户缓冲区拷贝，以及将计算核心从通信编排中解放出来，避免走旧有的 AICore → AICPU → SDMA 路径。
 
@@ -441,7 +441,7 @@ AI CPU 是一个具有直接设备内存访问权限的设备端 ARM64 执行单
 
 上图展示了 DeepSeek flash v4 在 Ascend 950DT 上的三步 profile，使用 16 rank DP/EP 部署配置运行。它显示了 16 rank 集合通信参与以及活跃的 MoE dispatch/combine 流量。
 
-与大多数栈目前的标准做法一样，CANN 也使用可在多个流上运行的独立计算和通信算子——通过控制 Cube 和 Vector 核心分配来避免资源争用从而提升性能。Prolog、Compressor 和 LightningIndexer 等操作可以重叠执行，C4A Compressor 可以完全隐藏，shared expert 计算可以隐藏在 routed expert 执行之下而不降低 routed expert 性能。
+与大多数栈目前的标准做法一样，CANN 也使用可在多个流上运行的独立计算和通信算子；通过控制 Cube 和 Vector 核心的分配来避免资源争用，从而提升性能。Prolog、Compressor 和 LightningIndexer 等操作可以重叠执行，C4A Compressor 可以完全隐藏，shared expert 计算可以隐藏在 routed expert 执行之下而不降低 routed expert 性能。
 
 <Figure
   src="/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950dt-decode-streams.png"
@@ -453,7 +453,7 @@ AI CPU 是一个具有直接设备内存访问权限的设备端 ARM64 执行单
 
 上图中的 Streams 145-148 对应元数据流。这些算子每次解码步骤触发一次，预计算后续 kernel 复用的值依赖调度/分块元数据。它们是解码步骤中唯一的 AI CPU 操作，占总时间的极小比例，且完全被 AI Core 计算重叠。其影响在更长上下文的基准测试中可能更显著，因为需要提前解析更多序列长度和掩码相关的分区。
 
-在 DeepSeek v4 中，Huawei 将稀疏注意力和 LightningIndexer 的值依赖调度阶段移到了 AI CPU 上，而非回弹到主机。这些元数据操作根据运行时序列长度、掩码和分页 KV 信息构建可复用的每核心分区张量；`SparseAttnSharedkv` 和 `QuantLightningIndexer` 随后使用它们来决定每个 cube 核心处理哪些 Batch/Head/Q-block/K-block 工作，以及相应的 vector 核心规约任务。从概念上讲，这类似于 FlashInfer 在主机端为分页 attention 所做的 planning 阶段：一个低成本、动态形状感知的设置步骤，只运行一次因此在各层间摊销——唯一区别是 Huawei 将同样的 planning 工作推到了设备端 AI CPU 上而非主机端。
+在 DeepSeek v4 中，Huawei 将稀疏注意力和 LightningIndexer 的值依赖调度阶段移到了 AI CPU 上，而非退回主机端。这些元数据操作根据运行时序列长度、掩码和分页 KV 信息构建可复用的每核心分区张量；`SparseAttnSharedkv` 和 `QuantLightningIndexer` 随后使用它们来决定每个 cube 核心处理哪些 Batch/Head/Q-block/K-block 工作，以及相应的 vector 核心规约任务。从概念上讲，这类似于 FlashInfer 在主机端为分页 attention 所做的 planning 阶段：一个低成本、动态形状感知的设置步骤，只运行一次因此在各层间摊销——唯一区别是 Huawei 将同样的 planning 工作推到了设备端 AI CPU 上而非主机端。
 
 上图中的 Stream 152 包含 LM head、最后一层，以及倒数第二层的 `o_proj` 和 MoE。这是 `npugraph_ex` 图编译器的决策，可能是为了让 `npugraph_ex` 运行时将 stream 144 上的主图视为"完成"，同时尾部工作继续异步执行。
 
@@ -489,7 +489,7 @@ CANN 早在 2024 年就引入了 MC²（merged compute-communication，计算-�
 
 DeepSeek v4 引入了压缩稀疏注意力（Compressed Sparse Attention, CSA）和高度压缩注意力（Heavily Compressed Attention, HCA），告别了多头潜在注意力（Multi-head Latent Attention, MLA）。该设计的核心动机是减小 KV cache 大小。
 
-本质上，HCA 的 KV cache 由 KV embedding 的滑动窗口和一组压缩 KV 条目组成，其中每个条目将 key/value 压缩为一个并跨越 m′ 个 token（DeepSeek V4 Pro 中 m′ = 128）。
+本质上，HCA 的 KV cache 由 KV embedding 的滑动窗口和一组压缩 KV 条目组成，其中每个条目将 m′ 个 token 的 key/value 压缩为一项（DeepSeek V4 Pro 中 m′ = 128）。
 
 <Figure
   src="/images/deepseekv4-16t-day-0-to-day-43-performance/dsv4-hca-compression.png"
@@ -558,7 +558,7 @@ _本文后续包含 H200 和 GB200 NVL72 的完整总拥有成本和每 token �
       "name": "DeepSeek V4 的注意力架构是什么？CSA / HCA 如何减少 KV cache？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "DeepSeek V4 用压缩稀疏注意力（CSA）和高度压缩注意力（HCA）取代了多头潜在注意力（MLA）。HCA 的 KV cache 由 KV embedding 的滑动窗口和压缩 KV 条目组成，每个条目跨越 128 个 token（DeepSeek V4 Pro 中 m'=128）压缩 key 和 value。CSA 使用相同的压缩机制但压缩率更低（m=4），并通过 lightning indexer 对压缩后的条目应用稀疏注意力，继承自 DeepSeek V3.2 的稀疏注意力模式。交错使用 CSA 和 HCA 在 1M 上下文长度下实现了约 50 倍的 KV cache 缩减。"
+        "text": "DeepSeek V4 用压缩稀疏注意力（CSA）和高度压缩注意力（HCA）取代了多头潜在注意力（MLA）。HCA 的 KV cache 由 KV embedding 的滑动窗口和压缩 KV 条目组成，每个条目将 128 个 token（DeepSeek V4 Pro 中 m'=128）的 key 和 value 压缩为一项。CSA 使用相同的压缩机制但压缩率更低（m=4），并通过 lightning indexer 对压缩后的条目应用稀疏注意力，继承自 DeepSeek V3.2 的稀疏注意力模式。交错使用 CSA 和 HCA 在 1M 上下文长度下实现了约 50 倍的 KV cache 缩减。"
       }
     },
     {

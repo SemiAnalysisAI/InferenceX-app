@@ -48,7 +48,7 @@ const STRINGS = {
     tooltipCol: '列',
     methodology: '测试方法',
     methodologyText:
-      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示 L2 分区的共享亲和度。',
+      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示共享 L2 分区的远近关系。',
     statsIntraGpc: 'GPC 内平均',
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',
@@ -58,7 +58,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Minimum cell size in pixels for readability. */
 const MIN_CELL = 3;
 const MAX_CELL = 6;
 
@@ -96,7 +95,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const g = svg.append('g').attr('transform', `translate(${marginLeft},${marginTop})`);
 
-    // Draw heatmap cells
     const matrix = result.matrix;
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
@@ -112,7 +110,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       }
     }
 
-    // Die separator
     const dieASms = result.dieACount;
     if (dieASms > 0 && dieASms < n) {
       const sep = dieASms * cellSize;
@@ -131,7 +128,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('stroke', 'white')
         .attr('stroke-width', 2.5);
 
-      // Die labels
       g.append('text')
         .attr('x', (dieASms * cellSize) / 2)
         .attr('y', -6)
@@ -150,7 +146,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .text('Die B');
     }
 
-    // GPC boxes and labels
     for (const bound of result.gpcBounds) {
       const x = bound.start * cellSize;
       const y = bound.start * cellSize;
@@ -176,7 +171,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .text(`GPC${bound.gpc}${isPartial ? '*' : ''}`);
     }
 
-    // Color bar
     const barWidth = 14;
     const barHeight = chartSize;
     const barX = chartSize + 16;
@@ -192,7 +186,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('height', barHeight / barSteps + 1)
         .attr('fill', colorScale(val));
     }
-    // Color bar ticks
     const tickVals = [0, result.stats.max / 2, result.stats.max];
     for (const tv of tickVals) {
       const ty = ((result.stats.max - tv) / result.stats.max) * barHeight;
@@ -214,10 +207,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       .attr('font-size', '8px')
       .text(t.colorBarLabel);
 
-    // Crosshair group
     const crosshairG = g.append('g').attr('class', 'crosshair').style('pointer-events', 'none');
 
-    // Interaction overlay
     const overlay = g
       .append('rect')
       .attr('width', chartSize)
@@ -265,7 +256,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const drawCrosshair = (i: number, j: number) => {
       crosshairG.selectAll('*').remove();
-      // Row highlight
       crosshairG
         .append('rect')
         .attr('x', 0)
@@ -276,7 +266,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('stroke', 'var(--foreground)')
         .attr('stroke-width', 0.5)
         .attr('opacity', 0.6);
-      // Col highlight
       crosshairG
         .append('rect')
         .attr('x', j * cellSize)
@@ -289,11 +278,9 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('opacity', 0.6);
     };
 
-    // Redraws (e.g. after pinning) clear the SVG; restore the pinned crosshair.
     if (pinnedCell) drawCrosshair(pinnedCell.i, pinnedCell.j);
 
     overlay.on('mousemove', (event: MouseEvent) => {
-      // A pinned tooltip stays on its cell until dismissed.
       if (pinnedCell) return;
       const [mx, my] = d3.pointer(event);
       const i = Math.floor(my / cellSize);
@@ -334,7 +321,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
     return () => window.removeEventListener('resize', handleResize);
   }, [drawChart]);
 
-  // Dismiss pinned tooltip on outside click
   useEffect(() => {
     if (!pinnedCell) return;
     const handler = (e: MouseEvent) => {
@@ -393,7 +379,6 @@ export function SmL2Content() {
           </h2>
           <SmL2HeatmapChart result={view} locale={locale} />
 
-          {/* Stats */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
             <div className="rounded-md border p-3">
               <div className="font-medium">{t.statsIntraGpc}</div>
@@ -415,7 +400,6 @@ export function SmL2Content() {
             </div>
           </div>
 
-          {/* Methodology */}
           <div className="mt-4 text-xs text-muted-foreground space-y-1">
             <h3 className="text-sm font-semibold">{t.methodology}</h3>
             <p>{t.methodologyText}</p>

@@ -1,10 +1,3 @@
-/**
- * Closeout cases from the X1-I independent review: incomplete or contradictory
- * tiers, mixed new/old frontiers, validity traces without a core schema, the
- * #3964 detail-only seam, and eligibility surviving a donor rewrite. Producer
- * payloads come from `packages/db/src/etl/fixtures/` (synthetic inputs run
- * through the producer itself; not historical results).
- */
 import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { BENCHMARK_POINT_BACKFILLS } from '@semianalysisai/inferencex-db/etl/run-overrides';
@@ -46,11 +39,9 @@ const ASSUMPTIONS: ProfitEstimatorAssumptions = {
   utilizationPct: 100,
   labCutPct: 0,
 };
-/** 1000 tok/s/GPU, 80% input, priced 2 / 0.2 / 10 $/M tok. */
 const REVENUE_AT_H70 = 9.3312;
 const REVENUE_AT_H0 = 12.96;
 
-/** Cache metrics exactly as the real ETL mapper stores them for one producer payload. */
 function etlCacheMetrics(serverMetrics: Record<string, unknown>): Record<string, number> {
   const mapped = mapBenchmarkRow(
     {
@@ -124,7 +115,6 @@ function apiRow(
   };
 }
 
-/** One config at 40 and 20 tok/s/user (1000 and 1600 tok/s/GPU), plus optional faster points. */
 function frontier(...caches: Record<string, number>[]): BenchmarkRow[] {
   return caches.map((cache, i) => {
     const interactivity = 40 - 20 * i;

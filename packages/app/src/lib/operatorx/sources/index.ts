@@ -1,9 +1,3 @@
-/**
- * Picks the OperatorX source from the environment:
- *   OPERATORX_SOURCE=database (default) | local
- *   DATABASE_OPERATORX_READONLY_URL   database: read-only OperatorX database connection
- *   OPERATORX_LOCAL_ARTIFACT_DIR      local: directory of <runId>.json bundles (development only)
- */
 import { type OperatorXSource, OperatorXSourceError } from '../source';
 import { DatabaseSource } from './database';
 import { LocalDirectorySource } from './local-directory';

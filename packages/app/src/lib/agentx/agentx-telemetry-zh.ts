@@ -1,13 +1,3 @@
-/**
- * Simplified Chinese port of `agentx-telemetry.ts`.
- *
- * Translations are keyed by section id and carry only the prose: figure
- * assets, section ordering, and link targets come from the English guide, so
- * the two languages cannot drift structurally. `agentx-telemetry.test.ts`
- * fails if a section, paragraph, bullet, or highlight here does not line up
- * with its English counterpart.
- */
-
 import {
   AGENTX_TELEMETRY_GUIDE,
   type TelemetryFigureCopy,
@@ -21,7 +11,6 @@ interface SectionTranslation {
   paragraphs: readonly string[];
   bullets?: readonly string[];
   figure?: TelemetryFigureCopy;
-  /** Link labels, in the same order as the English section's `links`. */
   links?: readonly string[];
 }
 
@@ -143,7 +132,6 @@ function localizeSection(section: TelemetrySection, zh: SectionTranslation): Tel
   };
 }
 
-/** The tutorial for a locale, with English structure and localized prose. */
 export function getTelemetryGuide(locale: Locale): TelemetryGuide {
   if (locale === 'en') return AGENTX_TELEMETRY_GUIDE;
   return {
@@ -164,5 +152,4 @@ export function getTelemetryGuide(locale: Locale): TelemetryGuide {
   };
 }
 
-/** Exported for the parity test, which walks the same keys the resolver reads. */
 export const TELEMETRY_ZH_INTERNALS = { GUIDE_ZH };

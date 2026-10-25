@@ -107,9 +107,6 @@ export default function EvaluationChartDisplay() {
     retry,
   } = useEvaluation();
   const { isUnofficialRun } = useUnofficialRun();
-  // In unofficial-run mode the bar chart already shows both, but the table only
-  // takes one input. Merge the unofficial rows in so users can drill into samples
-  // for unofficial configs via the live-fetch path.
   const tableData = useMemo(
     () => (isUnofficialRun ? [...chartData, ...unofficialChartData] : chartData),
     [isUnofficialRun, chartData, unofficialChartData],

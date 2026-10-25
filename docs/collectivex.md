@@ -44,11 +44,9 @@ Key invariants:
   `ON CONFLICT (run_id) DO NOTHING`; concurrent first-viewers can't double-ingest or
   expose a partial run. A GitHub re-run (newer `run_attempt`) is replaced through a
   `FOR UPDATE`-guarded refresh statement.
-- **Reads after lazy persistence use the primary**: discovery state checks, writes, and
-  each route's post-discovery query use `DATABASE_COLLECTIVEX_WRITE_URL`. This guarantees
-  that a newly inserted or refreshed run is visible in the same request even when
-  `DATABASE_COLLECTIVEX_READONLY_URL` points at a lagging replica. Ordinary read-only
-  consumers can still use the read URL.
+- **Reads use the primary**: discovery state checks, writes, and every route query use
+  `DATABASE_COLLECTIVEX_WRITE_URL`, so a newly inserted or refreshed run is visible in the
+  same request.
 - **Deletion tombstones** (`cx_runs.deleted_at`, documents freed): discovery must never
   resurrect a deleted run. Re-ingesting via the CLI
   (`bun run admin:db:ingest:collectivex <run-url-or-id>`) clears the tombstone — that CLI is
@@ -70,34 +68,29 @@ Key invariants:
   `s-maxage` (freshness bound for lazy discovery). Run deletion and
   `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the main dashboard's
   blob cache is untouched by CollectiveX operations.
-- **Env**: `DATABASE_COLLECTIVEX_READONLY_URL` is the ordinary read-only connection and
-  may point at a replica. `DATABASE_COLLECTIVEX_WRITE_URL` is the primary used by lazy
-  persistence, its consistent reads, deletion, and migrations via
-  `bun run admin:db:migrate:collectivex`. `COLLECTIVEX_ADMIN_SECRET` is the delete route
-  Bearer token (deliberately not `INVALIDATE_SECRET`, since it is remembered in browser
-  localStorage), and `GITHUB_TOKEN` authorizes artifact reads.
+- **Env**: `DATABASE_COLLECTIVEX_WRITE_URL` is the primary used by lazy persistence, all
+  route reads, deletion, and migrations via `bun run admin:db:migrate:collectivex`.
+  `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.
+  `COLLECTIVEX_ADMIN_SECRET` is the delete route Bearer token (deliberately not
+  `INVALIDATE_SECRET`, since it is remembered in browser localStorage). When it is unset,
+  the delete route returns 500 with `COLLECTIVEX_ADMIN_SECRET is not set`. `GITHUB_TOKEN`
+  authorizes artifact reads.
+- **Source repositories**: sweeps are discovered in `SemiAnalysisAI/InferenceX` and in
+  every repository listed in `INFERENCEX_SOURCE_REPOS`, merged newest-first by run id. A
+  listed repository whose sweep-workflow listing returns 404 is skipped; GitHub also
+  returns 404 for a misspelled repository or one the token cannot see. One that fails to
+  list for another reason is logged, and the pass then counts as failed: the runs list
+  keeps `discovery_complete: false` and both passes use the failure cooldown. Discovery
+  throws when every repository is skipped or fails. Per-run lookups try each repository
+  in order. A run from any other repository records it as `source_repository` in its
+  summary, and source, methodology, and run links use it; runs without the field link to
+  `SemiAnalysisAI/InferenceX`. The ingest CLI takes the repository from its `[repo]`
+  argument, then from a full run URL, then `INGEST_REPO`, and exits when none is set.
+  `GITHUB_TOKEN` must be able to
+  read Actions runs and artifacts in every listed repository.
 
-## Multi-run explorer
+## Known-support matrix
 
-The frontend loads every stored live run summary for the selected benchmark version and keeps
-refetching while recent GitHub history is still being ingested. The summary query has no arbitrary
-row cap and does not load artifact documents. Each table row has a visibility checkbox; checking a
-run fetches its cached dataset through `/api/v1/collectivex/runs/[runId]`. Checked datasets are
-combined client-side, and the EP, phase, kernel mode, precision, SKU, and backend controls filter
-their combined series. Shift-clicking a checkbox applies its new state to every row between it and the
-previously clicked row, in the table's current (suite-filtered) order.
-
-Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
-independently toggleable. Configuration color stays consistent across runs; run identity is encoded
-by the active selection order: the first checked run is solid and each additional checked run gets
-the next non-repeating dash pattern. Removing a run compacts those style slots, so a lone remaining
-run is always solid. Active patterns appear in both the run table and legend, keeping run ids out of
-visible legend labels while retaining them in the legend item's accessible title.
-The newest run with measured cases is checked by default; newer incomplete sweeps remain listed but
-cannot blank the initial explorer. Deletion is available per row or as one confirmed action for all
-currently shown runs; both paths keep the same tombstone semantics described above.
-The Runs card's suite filter narrows the table to runs containing EP or KV cases; a run containing
-both appears under both filters, and changing the filter does not alter the checked-run selection.
 The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
 throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of which runs are
 checked. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
@@ -117,8 +110,6 @@ read-time assembly can never drift; shipping raw docs to the client would only m
 same shared transform across the wire.
 
 ## vLLM swap_blocks
-
-**English** | [中文](./collectivex-swap-blocks_zh.md)
 
 Standalone `backend=swap-blocks` sweep runs are discovered through the same matrix/shard
 artifact path. Their execution-only matrix (`include` with one or more swap-blocks cells) maps to

@@ -1,7 +1,17 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
+import {
+  Car,
+  Crosshair,
+  Moon,
+  PencilLine,
+  Pickaxe,
+  Shield,
+  Skull,
+  Sun,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -17,9 +27,9 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   gta: Car,
   doom: Skull,
   halo: Shield,
+  excalidraw: PencilLine,
 };
 
-/** Neutral half-moon shown before hydration, when the saved theme is unknown. */
 function PendingIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="fill-current">
@@ -28,7 +38,6 @@ function PendingIcon() {
   );
 }
 
-/** One click advances to the next presentation theme. */
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
@@ -39,7 +48,6 @@ export function ModeToggle() {
 
   const buttonClasses = cn(HEADER_ACTION_STYLE, 'size-11');
 
-  // Keep the button mounted and clickable while the saved theme hydrates.
   const current = mounted ? theme : undefined;
   const ActiveIcon = THEME_ICONS[current ?? ''];
 

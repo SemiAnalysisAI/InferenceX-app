@@ -8,7 +8,6 @@ export interface RooflineConfig {
   isVisible?: (key: string) => boolean;
   strokeWidth?: number;
   strokeDasharray?: string;
-  /** Per-curve dash pattern; `null` draws a solid line. Takes precedence over `strokeDasharray`. */
   getDasharray?: (key: string) => string | null;
   curve?: d3.CurveFactory;
 }
@@ -22,10 +21,6 @@ interface RooflineEntry<T> {
   points: T[];
 }
 
-/**
- * Render Pareto frontier rooflines as monotone spline paths.
- * Uses enter/update/exit for DOM reuse.
- */
 export function renderRooflines<T extends { x: number; y: number }>(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   rooflines: Record<string, T[]>,
@@ -55,17 +50,14 @@ export function renderRooflines<T extends { x: number; y: number }>(
     .selectAll<SVGPathElement, RooflineEntry<T>>('.roofline-path')
     .data(entries, (d) => d.key);
 
-  // Enter
   const entered = selection
     .enter()
     .append('path')
     .attr('class', (d) => `roofline-path roofline-${d.key}`)
     .attr('fill', 'none');
 
-  // Exit
   selection.exit().remove();
 
-  // Update all
   const merged = entered.merge(selection);
   merged
     .attr('class', (d) => `roofline-path roofline-${d.key}`)
@@ -88,7 +80,6 @@ export function renderRooflines<T extends { x: number; y: number }>(
   });
 }
 
-/** Restyle existing rooflines without rejoining entries or rewriting path geometry. */
 export function updateRooflinesForDisplay(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   config: RooflineConfig,
@@ -105,7 +96,6 @@ export function updateRooflinesForDisplay(
     });
 }
 
-/** Update roofline paths on zoom with new scales. */
 export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   rooflines: Record<string, T[]>,
@@ -121,8 +111,6 @@ export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
 
   Object.entries(rooflines).forEach(([key, points]) => {
     if (points.length < 2) return;
-    // Keys can contain characters that are invalid in a CSS selector (e.g. `~`
-    // from run-comparison series ids), so escape before selecting by class.
     const selection = zoomGroup.select<SVGPathElement>(`.${cssEscapeToken(`roofline-${key}`)}`);
     if (!selection.empty()) {
       selection.attr('d', lineGenerator(points) as string);
@@ -130,10 +118,7 @@ export function updateRooflinesOnZoom<T extends { x: number; y: number }>(
   });
 }
 
-/** Escape a class token for safe use in a CSS selector. */
 function cssEscapeToken(token: string): string {
   if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(token);
-  // Fallback (non-DOM environments): escape everything outside the CSS-safe set.
-  // The token always starts with "roofline-", so a leading digit is never escaped.
   return token.replaceAll(/[^a-zA-Z0-9_-]/gu, (c) => `\\${c}`);
 }

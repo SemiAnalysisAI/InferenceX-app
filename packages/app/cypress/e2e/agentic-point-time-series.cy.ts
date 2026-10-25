@@ -140,9 +140,6 @@ describe('Agentic point request metric time series', () => {
       },
     });
     cy.visit('/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
-    // The segmented toggle is present in the server-rendered HTML. Waiting for
-    // this client-only query proves hydration has attached its click handlers,
-    // avoiding a Firefox race where an early click leaves `?view=` unchanged.
     cy.wait('@requestChartData');
   });
 
@@ -371,9 +368,6 @@ describe('Agentic point request metric time series', () => {
       cy.get('[data-testid="interactivity-percentile-toggle"]')
         .find('[role="tab"][aria-selected="true"]')
         .should('have.text', 'P90');
-      // 6 points: profiling slice includes requests 0-4 (profiling) + request 5
-      // (phase='warmup' label but start=5s > profiling boundary=0s, so
-      // sliceTimelineByPhase keeps it); cancelled r6 and null-metric r7/r8 are dropped.
       cy.get('[data-testid="interactivity-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'P90 (rolling 50 req)');
@@ -383,7 +377,6 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.contains('h2', 'TTFT over time').should('be.visible');
-      // Same 6-point slice as interactivity (warmup r5 included by time-boundary).
       cy.get('[data-testid="ttft-point-count"]').should('have.text', '6 points');
       cy.get('svg circle').should('have.length', 6);
       cy.get('svg').should('contain.text', 'TTFT (s)');
@@ -416,9 +409,6 @@ describe('Agentic point request metric time series', () => {
     cy.get('[data-testid="ttft-over-time-chart"]').within(() => {
       cy.get('[data-testid="latency-metric-e2e"]').click();
       cy.contains('h2', 'E2E latency over time').should('be.visible');
-      // 8 points: e2e = (end−start)/1e6 > 0 for all non-cancelled requests —
-      // includes r0-r5 (profiling slice) + r7, r8 (subagent/aux with null ttft/tpot
-      // but valid start/end). Cancelled r6 is excluded.
       cy.get('[data-testid="e2e-point-count"]').should('have.text', '8 points');
       cy.get('svg circle').should('have.length', 8);
       cy.get('svg').should('contain.text', 'E2E latency (s)');
@@ -475,14 +465,6 @@ describe('Agentic point request metric time series', () => {
   it('shows total idle time on the request timeline (time-boundary phase slice, consistent with the charts)', () => {
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.location('search').should('contain', 'view=timeline');
-    // The Gantt now slices by TIME BOUNDARY (sliceTimelineByPhase), matching the
-    // per-point charts, instead of the per-request phase LABEL. The earliest
-    // profiling request starts at t=0, so the boundary is 0 and warmup-labelled
-    // r5 (start=5s) is counted as profiling here too — exactly as the interactivity
-    // /TTFT charts already count it (their 6-point slice includes r5). That fills
-    // the former 5–6s gap that label-based filtering left open, so in-flight
-    // coverage is now continuous across [0s, 7s]: idle 0ms (0.0%). A 1.00s value
-    // here would mean the Gantt had regressed to label-based filtering.
     cy.get('[data-testid="timeline-total-idle-time"]').should('have.text', 'idle 0ms (0.0%)');
     cy.get('[data-timeline-row-kind="parent"]')
       .should('have.length', 2)
@@ -542,7 +524,6 @@ describe('Agentic point request metric time series', () => {
   });
 
   it('retries the failed log-file inventory, initial content, and search queries independently', () => {
-    // Keep each endpoint failing until its Retry action, regardless of background refetches.
     let fileAttempts = 0;
     let failFile = true;
     let fileAttemptsBeforeRetry = 0;
@@ -588,9 +569,6 @@ describe('Agentic point request metric time series', () => {
             },
       );
     }).as('retryServerLogSearch');
-    // Distinct URL: the previous test visits this same logs view, and with
-    // testIsolation off a same-URL visit does not reliably reload, so these
-    // failing intercepts would never be exercised.
     cy.visit('/zh/inference/agentic/206885?view=logs&e2e=log-retries', {
       onBeforeLoad: unlockAgenticGate,
     });
@@ -603,8 +581,6 @@ describe('Agentic point request metric time series', () => {
       failFile = false;
     });
     cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
-    // The error view unmounts as soon as the refetch starts, before the request
-    // reaches the intercept, so retry the count instead of reading it once.
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
     cy.wrap(null).should(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 
@@ -661,8 +637,6 @@ describe('Agentic point request metric time series', () => {
       .should(($scroller) => {
         expect($scroller[0].scrollLeft).to.be.greaterThan(0);
       });
-    // Bars on a dataset-linked run render inside SVG <a> anchors (open-in-new-tab
-    // support), not plain <g> groups.
     cy.get('[data-testid="request-timeline-svg"] a > rect').then(($rects) => {
       const viewport = $rects[0].ownerDocument.documentElement;
       const visibleRect = [...$rects].find((element) => {
@@ -1110,8 +1084,6 @@ describe('Agentic point per-engine KV overlay', () => {
         decodeTps: [],
         prefixCacheHitsTps: [],
         hostKvCacheUsage: [],
-        // Bare DP ranks plus a role-qualified engine, as the ETL emits for a
-        // disaggregated run where the decode worker reports no rank label.
         kvCacheUsageByEngine: [
           engineSeries('0', 0.2),
           engineSeries('1', 0.4),
@@ -1129,11 +1101,9 @@ describe('Agentic point per-engine KV overlay', () => {
       .within(() => {
         cy.contains('text', 'DP 0').should('be.visible');
         cy.contains('text', 'DP 1').should('be.visible');
-        // Already self-describing — must NOT come out as "DP decode".
         cy.contains('text', 'decode').should('be.visible');
         cy.contains('text', 'DP decode').should('not.exist');
         cy.contains('text', 'Avg').should('be.visible');
-        // One line per engine plus the average, and no duplicate chips.
         cy.get('path[fill="none"]').should('have.length', 4);
       });
   });

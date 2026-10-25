@@ -9,7 +9,6 @@ const backfills = BENCHMARK_POINT_BACKFILLS.filter(
 
 describe('benchmark point backfill recovery', () => {
   it.each(backfills)('extends the previously applied c$conc offload patch', (backfill) => {
-    // State written before #975 added the cache-hit fields to this ledger entry.
     const row = {
       offload_mode: 'on',
       metrics: {
@@ -22,7 +21,6 @@ describe('benchmark point backfill recovery', () => {
       },
     };
     const original = structuredClone(row);
-    // Reproduces the failure without the explicitly registered previous version.
     expect(() => planBenchmarkPointBackfill(row, { ...backfill, previousSet: undefined })).toThrow(
       'desired identity has unexpected data',
     );

@@ -26,10 +26,6 @@ const EN_TOUCH =
 const ZH_MOUSE = '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框';
 const ZH_TOUCH = '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框';
 
-/**
- * The vitest setup stubs matchMedia to match every query (desktop default),
- * which would read as touch-primary here; emulate the pointer type explicitly.
- */
 function stubTouchPrimary(matches: boolean) {
   vi.stubGlobal(
     'matchMedia',

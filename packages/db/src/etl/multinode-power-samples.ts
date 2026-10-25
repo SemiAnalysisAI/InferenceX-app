@@ -1,31 +1,13 @@
-/**
- * Parser for the multinode power producer's `LOGS/power/samples.csv`.
- *
- * `benchmark-multinode-tmpl.yml` uploads no `gpu_metrics_` artifact; its
- * telemetry travels inside `power_audit_<suffix>` as one CSV for the whole
- * deployment, written by `srt-slurm.dcgm-power` for native NVIDIA or AMD
- * telemetry:
- *
- *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
- *
- * Version 2 adds optional GPU utilization and version 3 adds temperature in
- * Celsius. Uncollected readings retain null. Rows are regrouped per host so
- * each host becomes its own series, the shape the reader already uses for
- * multinode staging ("one CSV per node"). Pure module: no I/O.
- */
-
 import {
   emptySample,
   splitCsvLine,
   type GpuMetricSample,
   type GpuMetricsVendor,
-} from './gpu-metrics-csv.js';
+} from './gpu-metrics-csv';
 
 export interface MultinodePowerHost {
   hostname: string;
-  /** Host-local GPU indices, as the collector reports them. */
   samples: GpuMetricSample[];
-  /** gpu_index → gpu_uuid for the identity sidecar. */
   gpuUuids: Record<number, string>;
 }
 
@@ -36,11 +18,6 @@ export function isMultinodePowerSamplesPath(relativePath: string): boolean {
   return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
 }
 
-/**
- * Group the deployment-wide CSV by host. Returns null when the header is not
- * the multinode power schema; malformed rows are skipped. Hosts sort by name
- * so series order is stable across re-ingests.
- */
 export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[] | null {
   const lines = csvText
     .split('\n')
@@ -54,7 +31,6 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
   const readInRange = (cells: string[], name: string, min: number, max: number): number | null => {
     const text = at(cells, name);
     const value = text ? Number(text) : Number.NaN;
-    // DCGM reserves INT32_BLANK and larger values for unavailable readings.
     return Number.isFinite(value) && value < 2147483632 && value >= min && value <= max
       ? value
       : null;
@@ -101,7 +77,6 @@ export function multinodePowerVendor(manifest: Record<string, unknown> | null): 
     .filter((value): value is string => typeof value === 'string')
     .join(' ')
     .toLowerCase();
-  // `amd-smi`, `rocm_smi`: the tool name may continue with `-` or `_`.
   if (/\b(?:amd|rocm)/u.test(source)) return 'amd';
   return 'nvidia';
 }

@@ -9,7 +9,6 @@ export interface BarLabelConfig<T> {
   foreground: string;
 }
 
-/** Render percentage/score labels on bars using enter/update/exit. */
 export function renderBarLabels<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -49,7 +48,6 @@ export function renderBarLabels<T>(
     .text((d) => config.getLabel(d));
 }
 
-/** Update bar label positions on zoom. */
 export function updateBarLabelsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -58,6 +56,5 @@ export function updateBarLabelsOnZoom<T>(
   height: number,
   config: BarLabelConfig<T>,
 ): void {
-  // Easiest to re-render since positions + font size depend on bar height
   renderBarLabels(group, data, xScale, yScale, height, config);
 }

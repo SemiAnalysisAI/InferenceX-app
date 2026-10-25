@@ -84,12 +84,10 @@ describe('whitepaper registry', () => {
       expect(en.methodSteps.length).toBe(zh.methodSteps.length);
       expect(en.assumptions.length).toBe(zh.assumptions.length);
       expect(en.sources.length).toBe(zh.sources.length);
-      // Headline numbers are locale-independent; the Chinese cards keep them verbatim.
       expect(zh.kpis.map((kpi) => kpi.value)).toEqual(en.kpis.map((kpi) => kpi.value));
       expect(zh.comparison.items.map((item) => item.value)).toEqual(
         en.comparison.items.map((item) => item.value),
       );
-      // Chinese copy is real Chinese, English copy carries no Han characters.
       for (const text of [
         zh.title,
         zh.subtitle,
@@ -114,7 +112,6 @@ describe('whitepaper registry', () => {
       ]) {
         expect(text).not.toMatch(HAN);
       }
-      // External sources keep the same destinations; only internal ones may move to /zh.
       for (const [index, source] of en.sources.entries()) {
         const zhHref = zh.sources[index]!.href;
         expect(zhHref.replace(`${SITE_URL}/zh/`, `${SITE_URL}/`)).toBe(source.href);
@@ -146,8 +143,16 @@ describe('whitepaper registry', () => {
     expect(paper?.chipImageHeight).toBe(1073);
     expect(paper?.chart.tcoSourceHref).toBe('https://semianalysis.com/ai-cloud-tco-model/');
     expect(paper?.en.abstract).toContain('$32.6 billion');
+    expect(paper?.en.abstract).toContain("whitepaper's P90 45 tok/s/user");
     expect(paper?.zh.abstract).toContain('326 亿美元');
+    expect(paper?.zh.abstract).toContain('本白皮书采用的 P90 交互性 45 tok/s/user');
     expect(paper?.en.assumptions.find((row) => row.item === 'Data date')?.value).toBe('2026-09-04');
+    expect(paper?.en.sources[0]?.href).toBe(
+      'https://inferencex.semianalysis.com/profit-estimator-per-gigawatt/kimi-k3/target/45',
+    );
+    expect(paper?.zh.sources[0]?.href).toBe(
+      'https://inferencex.semianalysis.com/zh/profit-estimator-per-gigawatt/kimi-k3/target/45',
+    );
     expect(getWhitepaper('missing-paper')).toBeUndefined();
   });
 
@@ -257,7 +262,6 @@ describe('whitepaper JSON-LD', () => {
       inLanguage: 'zh-CN',
       url: `${SITE_URL}/zh/whitepaper/${MI355X_SLUG}`,
       headline: paper.zh.title,
-      // Organization attribution stays the English legal name in both locales.
       author: { name: WHITEPAPER_AUTHORS },
     });
   });

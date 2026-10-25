@@ -11,11 +11,6 @@ interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/**
- * Bare `/profit-estimator` opens on the tab's default model (Kimi K3, see
- * `defaultRouteModel`). Switching models in the selector rewrites the address
- * bar to `/profit-estimator/<model>` in place; see the `[model]` sibling.
- */
 export default async function ProfitEstimatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);

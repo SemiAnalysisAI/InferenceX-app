@@ -64,40 +64,44 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. Kimi K3 opens on 45 tok/s/user and Moonshot's list
- * price ($3.00 / $0.30 cached / $15.00 per M tok, flat at any context length)
- * because third-party hosts undercut it on OpenRouter, where the catalog
- * aggregate sits near $1.80 / $9.00. GLM 5.2/5.3 opens on Z.ai's list price
- * ($1.40 / $0.26 cached / $4.40 per M tok) because third-party hosts undercut
- * it on OpenRouter, and on 100 tok/s/user: Z.ai serves at 48 tok/s/user, but
- * no priced SKU has a measured point that low yet, so the nearest round
- * operating point every curve covers is used until one does. MiniMax M3 opens
- * on MiniMax's standard list price for <=512K-token calls ($0.30 / $0.06
- * cached / $1.20 per M tok, the permanent 50%-off rate) because the OpenRouter
- * aggregate also sits below it, and on 83 tok/s/user, the speed MiniMax's own
- * API serves at; the B200/B300/GB200/MI355X agentic curves all cover that
- * point, and the Hopper and MI300-series curves top out below it and list as
- * not priced. GLM 5.2/5.3 and MiniMax M3 open on a 20% model license fee
- * instead of the 30% the other models assume. DeepSeek V4 Pro opens on
- * DeepSeek's peak-hour list price ($1.32 / $0.044 cached / $3.96 per M tok;
- * off-peak is half that) because third-party hosts undercut it on OpenRouter,
- * on 35 tok/s/user, and on a 0% model license fee. The 35 tok/s/user default
- * was chosen on 2026-10-13 using the early-October OpenRouter snapshot as
- * context (40.8 tok/s mean and 39.5 median across 22 endpoint P50 values):
- * https://openrouter.ai/deepseek/deepseek-v4-pro-0813#providers
- * It is an editable assumption, not a measured P90-equivalent statistic.
- * The weights ship under the MIT license, so there is no lab cut to model.
- * Curves that do not bracket the target remain unpriced. DeepSeek V4.1 Flash opens on the
- * `deepseek-flash` peak-hour list price ($0.30 / $0.006 cached / $1.20 per M
- * tok; off-peak is half that) from the same pricing page, on 125 tok/s/user,
- * the speed DeepSeek's own API serves the Flash tier at, and on the same 0%
- * MIT license fee. It entered the fleet on AgentX only, so the
- * estimator serves it from day zero; SKUs whose curves stop short of 125
- * tok/s/user list as not priced rather than extrapolated.
+ * Per-model defaults. On 2026-10-24, the four newest models took the first
+ * 5-tok/s/user step that maximized priced AgentX SKU coverage in a 5–150 sweep:
+ * Muse Spark Open 85, MiniMax M3.1 Flash 125, Qwen3.5 115, Qwen3.8 Flash Next 90.
+ * On 2026-10-25, the same rule over 5–300 selected Kimi K3 60, GLM 5.2/5.3
+ * 135, MiniMax M3 115, DeepSeek V4 Pro 170, and DeepSeek V4.1 Flash 150.
+ * These editable P90 targets show measured configurations; they are not claims
+ * about hosted API speeds. Curves outside the target range stay unpriced.
+ *
+ * Kimi K3 uses Moonshot's list price ($3.00 / $0.30 cached / $15.00 per M tok),
+ * GLM 5.2/5.3 uses Z.ai's list price ($1.40 / $0.26 / $4.40), and MiniMax M3
+ * uses MiniMax's <=512K list price ($0.30 / $0.06 / $1.20). Third-party
+ * OpenRouter hosts can undercut those labs. GLM and MiniMax M3 assume a 20%
+ * model license fee. DeepSeek V4 Pro and V4.1 Flash use DeepSeek's peak-hour
+ * list prices and a 0% fee because their weights ship under the MIT license.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
+  [Model.Muse_Spark_Open]: {
+    interactivity: 85,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.MiniMax_M3_1_Flash]: {
+    interactivity: 125,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.Qwen3_5]: {
+    interactivity: 115,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
+  [Model.Qwen3_8_Flash_Next]: {
+    interactivity: 90,
+    labCutPct: DEFAULT_LAB_CUT_PCT,
+    listPricing: null,
+  },
   [Model.DeepSeek_V4_Pro]: {
-    interactivity: 35,
+    interactivity: 170,
     labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
@@ -108,7 +112,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.DeepSeek_V4_1_Flash]: {
-    interactivity: 125,
+    interactivity: 150,
     labCutPct: 0,
     listPricing: {
       vendor: 'DeepSeek',
@@ -119,7 +123,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.Kimi_K3]: {
-    interactivity: DEFAULT_PROFIT_INTERACTIVITY,
+    interactivity: 60,
     labCutPct: DEFAULT_LAB_CUT_PCT,
     listPricing: {
       vendor: 'Moonshot',
@@ -130,7 +134,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.GLM_5_2]: {
-    interactivity: 100,
+    interactivity: 135,
     labCutPct: 20,
     listPricing: {
       vendor: 'Z.ai',
@@ -141,7 +145,7 @@ const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
     },
   },
   [Model.MiniMax_M3]: {
-    interactivity: 83,
+    interactivity: 115,
     labCutPct: 20,
     listPricing: {
       vendor: 'MiniMax',

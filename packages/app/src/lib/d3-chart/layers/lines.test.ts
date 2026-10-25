@@ -4,8 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { createMockGroup } from './test-helpers';
 import { renderLines, updateLinesOnZoom, type LineConfig } from './lines';
 
-// ── Fixtures ─────────────────────────────────────────────────────────
-
 const COLORS: Record<string, string> = {
   seriesA: '#f00',
   seriesB: '#0f0',
@@ -37,8 +35,6 @@ function makeScales() {
   const yScale = d3.scaleLinear().domain([0, 50]).range([200, 0]);
   return { xScale, yScale };
 }
-
-// ── renderLines ──────────────────────────────────────────────────────
 
 describe('renderLines', () => {
   it('creates one path per line series', () => {
@@ -138,7 +134,6 @@ describe('renderLines', () => {
     const paths = group.selectAll('.line-path');
     for (const el of paths.elements) {
       const d = el.attrs['d'] as string;
-      // d attribute should be a non-empty string starting with M (move-to)
       expect(d).toBeTruthy();
       expect(String(d).startsWith('M')).toBe(true);
     }
@@ -154,7 +149,6 @@ describe('renderLines', () => {
     renderLines(group as any, lines, xScale, yScale, makeConfig());
 
     const paths = group.selectAll('.line-path');
-    // Only seriesA and seriesB should appear
     expect(paths.elements).toHaveLength(2);
   });
 
@@ -203,7 +197,6 @@ describe('renderLines', () => {
 
     const paths = group.selectAll('.line-path');
     expect(paths.elements).toHaveLength(1);
-    // The d attribute should still be generated (with a gap)
     const d = String(paths.elements[0].attrs['d']);
     expect(d).toBeTruthy();
   });
@@ -211,11 +204,9 @@ describe('renderLines', () => {
   it('uses curveMonotoneX by default', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();
-    // Just verify it doesn't throw with default curve
     renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
 
     const paths = group.selectAll('.line-path');
-    // Monotone curves produce C (cubic bezier) commands
     const d = String(paths.elements[0].attrs['d']);
     expect(d.includes('C') || d.includes('M')).toBe(true);
   });
@@ -227,12 +218,9 @@ describe('renderLines', () => {
 
     const paths = group.selectAll('.line-path');
     const d = String(paths.elements[0].attrs['d']);
-    // Linear curve produces L (line-to) commands, not C
     expect(d.includes('L')).toBe(true);
   });
 });
-
-// ── updateLinesOnZoom ────────────────────────────────────────────────
 
 describe('updateLinesOnZoom', () => {
   it('does not throw on empty group', () => {
@@ -246,15 +234,10 @@ describe('updateLinesOnZoom', () => {
     const { xScale, yScale } = makeScales();
     renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
 
-    // Zoom: change both scales
     const newXScale = d3.scaleLinear().domain([0, 2]).range([0, 300]);
     const newYScale = d3.scaleLinear().domain([0, 100]).range([200, 0]);
 
     updateLinesOnZoom(group as any, SAMPLE_LINES, newXScale, newYScale);
-
-    // The update uses group.select(`.line-${key}`).datum().attr('d', ...)
-    // which writes to single elements found by class selector.
-    // Since our mock tracks these, verify the function at least runs without error.
   });
 
   it('skips series not present in the group', () => {
@@ -262,9 +245,7 @@ describe('updateLinesOnZoom', () => {
     const { xScale, yScale } = makeScales();
     renderLines(group as any, { seriesA: SAMPLE_LINES.seriesA }, xScale, yScale, makeConfig());
 
-    // Try updating with a series that wasn't rendered
     updateLinesOnZoom(group as any, { seriesZ: [{ x: 0, y: 0 }] }, xScale, yScale);
-    // Should not throw
   });
 
   it('respects isDefined in zoom update', () => {
@@ -277,7 +258,6 @@ describe('updateLinesOnZoom', () => {
     renderLines(group as any, SAMPLE_LINES, xScale, yScale, config);
 
     updateLinesOnZoom(group as any, SAMPLE_LINES, xScale, yScale, { isDefined: config.isDefined });
-    // Should not throw
   });
 
   it('respects custom curve in zoom update', () => {

@@ -1,7 +1,3 @@
-// Header site search: lazy loading, live-page indexing, progressive crawl,
-// keyboard navigation and the /zh tree. Crawled pages are stubbed so the
-// spec does not depend on every route rendering in fixtures mode.
-
 const LLMS_TXT = `# InferenceX by SemiAnalysis
 
 ## Chip Pages
@@ -15,9 +11,6 @@ function stubPage(title: string, main: string): string {
 }
 
 function stubSite() {
-  // The crawler requests pages with exactly `Accept: text/html`; browser
-  // navigations send a longer Accept list and are not matched. Specific stubs
-  // registered below take precedence over this catch-all.
   cy.intercept(
     { method: 'GET', headers: { accept: 'text/html' } },
     {
@@ -60,7 +53,6 @@ describe('Site search', () => {
     cy.get('[data-testid="site-search-toggle"]').click();
     cy.get('[data-testid="site-search-input"]').should('be.focused').type('watts');
     cy.wait('@b200');
-    // "watts" reaches the "1000 W" power section through the power concept group.
     cy.get('[data-testid="site-search-result"]')
       .first()
       .should('have.attr', 'href', '/chips/b200#power')

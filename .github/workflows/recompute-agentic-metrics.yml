@@ -1,9 +1,9 @@
 name: Recompute Agentic Metrics
-run-name: Recompute metrics for ${{ inputs.run-id || 'all' }} (${{ inputs.neon-branch || 'production' }})
+run-name: Recompute metrics for ${{ inputs.run-id || 'all' }} (${{ inputs.neon-branch || 'DATABASE_WRITE_URL' }})
 
 on:
   push:
-    branches: [master]
+    branches: [main, master]
     paths:
       - '.github/workflows/recompute-agentic-metrics.yml'
       - 'packages/db/src/backfill-chart-series.ts'
@@ -19,7 +19,7 @@ on:
         required: true
         type: string
       neon-branch:
-        description: Optional existing Neon child branch; omit for production on master
+        description: Optional existing Neon child branch; omit to use DATABASE_WRITE_URL from the default branch
         required: false
         type: string
       atom-kv-capacity-only:
@@ -77,7 +77,7 @@ jobs:
   migrate:
     name: Apply database migrations
     needs: scope
-    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || inputs.neon-branch != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -97,12 +97,13 @@ jobs:
       - name: Select database
         timeout-minutes: 8
         env:
-          PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          WRITE_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
         run: |
-          database_url="$PRODUCTION_DATABASE_URL"
+          database_url="$WRITE_DATABASE_URL"
           if [ -n "$NEON_BRANCH_NAME" ]; then
             if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
               echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
@@ -127,9 +128,11 @@ jobs:
             jq -e --arg branch "$branch_id" --arg host "$database_host" \
               '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null
             echo "Child database: $NEON_BRANCH_NAME ($branch_id), host $database_host"
-          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
-            echo '::error::Production migration requires master'
+          elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Migrating DATABASE_WRITE_URL requires the default branch ($DEFAULT_BRANCH)"
             exit 1
+          else
+            : "${WRITE_DATABASE_URL:?DATABASE_WRITE_URL secret is not set}"
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
@@ -138,7 +141,7 @@ jobs:
   recompute:
     name: Recompute stored metrics (shard ${{ matrix.shard }})
     needs: [scope, migrate]
-    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || inputs.neon-branch != ''
     runs-on: blacksmith-16vcpu-ubuntu-2404
     timeout-minutes: 360
     strategy:
@@ -162,12 +165,13 @@ jobs:
       - name: Select database
         timeout-minutes: 8
         env:
-          PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          WRITE_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
         run: |
-          database_url="$PRODUCTION_DATABASE_URL"
+          database_url="$WRITE_DATABASE_URL"
           if [ -n "$NEON_BRANCH_NAME" ]; then
             if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
               echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required"
@@ -196,9 +200,11 @@ jobs:
               echo "Host: $database_host"
               echo "Expires: $(jq -r '.expires_at' <<<"$branch")"
             } | tee -a "$GITHUB_STEP_SUMMARY"
-          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
-            echo '::error::Production recomputation requires master'
+          elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Recomputing DATABASE_WRITE_URL requires the default branch ($DEFAULT_BRANCH)"
             exit 1
+          else
+            : "${WRITE_DATABASE_URL:?DATABASE_WRITE_URL secret is not set}"
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
@@ -239,7 +245,7 @@ jobs:
           RUN_ID: ${{ inputs.run-id }}
         run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
   invalidate:
-    name: Invalidate production cache
+    name: Invalidate cache
     needs: recompute
     if: inputs.neon-branch == ''
     runs-on: ubuntu-latest
@@ -256,7 +262,11 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      - name: Invalidate production cache after all shards pass
+      - name: Invalidate cache after all shards pass
         env:
+          APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          bun run admin:cache:invalidate "$APP_URL"

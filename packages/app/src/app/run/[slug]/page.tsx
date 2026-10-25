@@ -62,8 +62,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: runPageKeywords(entry),
     authors: [{ name: AUTHOR_NAME }],
-    // Valid slugs without benchmark data render an empty state; keep those
-    // out of the index (the sitemap already excludes them).
     ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: enAlternates(`/run/${entry.slug}`),
     openGraph: { title: `${title} | ${SITE_NAME}`, description, url, type: 'article' },

@@ -1,36 +1,3 @@
-/**
- * Per-run overrides and special cases for the ingest pipeline.
- *
- * Entries are enforced at ingest time. Changes merged to main or master are also applied
- * automatically to production by CI, followed by database verification, cache invalidation,
- * and cache warmup. Use `bun run db:apply-overrides` only for local preview or manual recovery.
- *
- * CONCLUSION_OVERRIDES — force the conclusion for a run (e.g. 'success' when
- *   the benchmark ran fine but CI failed on a non-benchmark step).
- *
- * PURGED_RUNS — runs to skip on ingest and delete from the DB,
- *   e.g. typically due to experimental runs or features which generate lots of broken data.
- *
- * PURGED_RUN_ATTEMPTS — purge only specific attempts of a run, leaving the others intact.
- *   Use this when a single attempt produced bad data but a later attempt is expected to succeed
- *   (or has already succeeded), so we can't nuke the entire run.
- *
- * PURGED_BENCHMARK_POINTS, purge individual benchmark rows from an otherwise valid
- * run attempt and skip them on every future ingest. Each entry uses the row's durable
- * database natural key, which can be queried from the linked dashboard point.
- *
- * CHANGELOG_BACKFILLS — correct stored changelog metadata for one exact run attempt
- * and base/head ref pair.
- *
- * BENCHMARK_POINT_BACKFILLS — correct metrics, offload identity, and/or recipe
- * identity for one exact benchmark point. These are applied both during ingest
- * and against existing DB rows.
- *
- * Note: GitHub deletes old workflow runs over time so these overrides may not be applicable forever,
- *       but we should keep them around for historical reference. You can find these on github (if available) by filling
- *       in the run id into the following link: https://github.com/SemiAnalysisAI/InferenceX/actions/runs/{run_id_here}
- */
-
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
 import {
@@ -44,6 +11,17 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  39112710364, // 2026-10-20 | DeepSeek-V4.1-Flash B300 Dynamo + vLLM AgentX | Reason: Accidentally merged despite containing an EFA patch
+  38878624849, // 2026-10-19 | Muse Spark H100 | Reason: 256k corpus used for 1M context length model
+  38925660934, // 2026-10-19 | Muse Spark H100 HiCache | Reason: 256k corpus used for 1M context length model
+  38819015342, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38835086328, // 2026-10-19 | Muse Spark GB300 TP4 | Reason: 256k corpus used for 1M context length model
+  38826180170, // 2026-10-19 | Muse Spark H200 TP8 | Reason: 256k corpus used for 1M context length model
+  38825818513, // 2026-10-19 | Muse Spark B300 TP4 | Reason: 256k corpus used for 1M context length model
+  38824954621, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
+  38834513220, // 2026-10-19 | Muse Spark GB200 TP4 | Reason: 256k corpus used for 1M context length model
+  38825822770, // 2026-10-19 | Muse Spark B200 TP4 | Reason: 256k corpus used for 1M context length model
+  38851010434, // 2026-10-19 | Muse Spark B200 TP8 | Reason: 256k corpus used for 1M context length model
   32403083041, // 2026-09-30 | Reason: dsv4 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
   33219708211, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
   31927376673, // 2026-09-30 | Reason: qwen3.5 trtllm gb300-fp4 AgentX: NVIDIA accidentally set publish_events_and_metrics to false
@@ -118,6 +96,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34819578354, // 2026-09-19 | Reason: narrower than the curve it supersedes — this kimik3-fp4-h200-vllm-agentic-balanced sweep carries only the TP8/EP32/DPA offload=off arm (c1-c16), so ingesting it made 2026-09-19 the latest H200 date and hid the three-curve 2026-09-13 set (TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Its values match the superseded arm within +/-6%, so nothing is lost by dropping it; re-ingest once the full H200 curve set is collected (source run of the PR #3053 sweep-reuse ingest)
   34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
   34819961093, // 2026-09-19 | Reason: sibling of 34819578354 — this kimik3-fp4-h200-vllm-agentic-simple sweep (PR #3054, feat/kimik3-h200-simple-power) carries only the TP8/EP32/DPA offload=on arm (c8-c32, 13 points). Once 34819578354 was purged it became the latest H200 Kimi-K3 curve and kept hiding the three-arm 2026-09-13 set (35 points: TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Same vllm/vllm-openai:kimi-k3 image and recipe as the arm it duplicates, so no coverage is lost; re-ingest once the full H200 curve set is collected with measured power
+  40065869885, // 2026-10-25 | Reason: Uses skip indexer
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
@@ -153,7 +132,6 @@ export interface BenchmarkPointKey {
   osl: number | null;
   conc: number;
   offloadMode: string;
-  /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
 }
 
@@ -162,12 +140,6 @@ export interface PurgedBenchmarkPoint extends BenchmarkPointKey {
   runAttempt: number;
 }
 
-/**
- * Individual benchmark rows to skip on ingest and delete from the DB.
- * Keep a dated reason comment beside every entry for auditability:
- * `{ githubRunId, runAttempt, configId, benchmarkType, isl, osl, conc, offloadMode,
- * recipeFingerprint }`. Omitted fingerprints target only legacy NULL rows.
- */
 export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
   // 2026-08-03 | Point 438205 | Qwen3.5 FP4 B300 SGLang MTP, TP2/EP2, conc 32.
   // Reason: the one-hour AgentX profile stopped after 3,102s, then emitted no requests for 538s.
@@ -263,9 +235,7 @@ export const PURGED_BENCHMARK_POINTS: readonly PurgedBenchmarkPoint[] = [
 ];
 
 interface AuditedBackfill {
-  /** Stable, descriptive identifier used in logs and review history. */
   id: string;
-  /** Why artifact data is being corrected instead of re-running the benchmark. */
   reason: string;
 }
 
@@ -282,10 +252,6 @@ export interface ChangelogBackfill extends AuditedBackfill {
   };
 }
 
-/**
- * Audited corrections to changelog rows already produced by workflow artifacts.
- * Selectors use the table's complete durable identity. `set` is a partial patch.
- */
 export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
   {
     id: 'run-34744300699-restore-append-only',
@@ -336,65 +302,25 @@ export type JsonValue =
 export interface BenchmarkPointBackfill extends AuditedBackfill {
   githubRunId: number;
   runAttempt: number;
-  /** Production ID retained for audit logs only. Never use it to match another DB branch. */
   productionConfigId?: number;
-  /** Public benchmark row ID when its production config ID is not exposed. Audit only. */
   productionBenchmarkId?: number;
-  /** Stable configuration dimensions shared by production, staging, and rebuilt databases. */
   config: ConfigParams;
   benchmarkType: string;
   isl: number | null;
   osl: number | null;
   conc: number;
   offloadMode: string;
-  /** Producer recipe identity. Omit or set null only for legacy rows. */
   recipeFingerprint?: string | null;
-  /** Source-bound corrections require an exact run attempt and these unchanged metrics. */
   expectedMetrics?: Readonly<Record<string, number>>;
-  /** Previously applied patch accepted when extending an identity-changing backfill. */
   previousSet?: BenchmarkPointBackfill['set'];
   set: {
-    /** Updates both the first-class column and metrics.offload_mode. */
     offloadMode?: 'on' | 'off';
-    /** Audited producer recipe identity for a legacy row that predates fingerprints. */
     recipeFingerprint?: string;
-    /** Shallow JSONB merge; existing unrelated metrics are preserved. */
     metricsMerge?: Readonly<Record<string, JsonValue>>;
-    /** Top-level metric keys to remove before metricsMerge is applied. */
     metricsRemove?: readonly string[];
   };
 }
 
-/**
- * Audited corrections to individual benchmark points. The selector is the row's
- * complete pre-backfill natural identity; `set` contains only the desired changes.
- *
- * Example:
- * {
- *   id: 'run-123-attempt-1-conc-64-enable-offload',
- *   reason: 'The artifact omitted offload metadata for this point.',
- *   githubRunId: 123,
- *   runAttempt: 1,
- *   productionConfigId: 456,
- *   config: {
- *     hardware: 'gb300', framework: 'dynamo-vllm', model: 'dsv4',
- *     precision: 'fp4', specMethod: 'mtp', disagg: true, isMultinode: true,
- *     prefillTp: 8, prefillEp: 8, prefillDpAttn: true, prefillNumWorkers: 1,
- *     decodeTp: 8, decodeEp: 8, decodeDpAttn: true, decodeNumWorkers: 1,
- *     numPrefillGpu: 8, numDecodeGpu: 8,
- *   },
- *   benchmarkType: 'agentic_traces',
- *   isl: null,
- *   osl: null,
- *   conc: 64,
- *   offloadMode: 'off',
- *   recipeFingerprint: null,
- *   set: {
- *     offloadMode: 'on',
- *     metricsMerge: { kv_offloading: 'dram', kv_offload_backend: 'lmcache' },
- *   },
- * }
- */
 function disaggregatedConfig(
   base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
   prefill: { tp: number; ep: number; dpAttn: boolean; numWorkers: number },
@@ -456,7 +382,6 @@ const KIMI3_H200_VLLM_TP16: ConfigParams = {
 const KIMI3_H200_VLLM_TP16_RECIPE =
   'a6aa413ff9af529330e547e9fe13ef32c3d5e83a18887c3ee795df596ce3ecb5';
 
-/** Aggregated multi-node config where prefill and decode share one TP-only worker. */
 function aggregatedMultinodeConfig(
   base: Pick<ConfigParams, 'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'>,
   tp: number,
@@ -478,20 +403,6 @@ function aggregatedMultinodeConfig(
   };
 }
 
-/**
- * Measured Dynamo + vLLM prefix-cache hit rates from the GB200 DeepSeek-V4 AgentX
- * sweep in run 31965016666 (attempt 2), keyed by concurrency.
- *
- * The GB300 launcher has no dedicated dsv4 dynamo-vllm AgentX branch, so those
- * sweeps fall through to the generic srt-slurm v1.0.36 pin, which predates the
- * logical-worker metrics discovery that GB200 gets from v1.0.45. Without
- * `AIPERF_SERVER_METRICS_URLS`, AIPerf scraped only the Dynamo frontend, which
- * exposes no `vllm:prefix_cache_*` counters, so every
- * `server_metrics.cache.*_cache_hit_rate` landed as null. Cache-aware pricing
- * treats a missing hit rate as 0 and bills ~97% cache hits at the full input
- * price. Until the GB300 sweeps are re-run with worker scraping, each point
- * borrows the nearest-concurrency GB200 measurement.
- */
 const GB200_DYNAMO_VLLM_CACHE_HIT_RATES = {
   1: { gpu: 0.9631118724591531, external: 0, cpu: 0 },
   4: { gpu: 0.9564614718743584, external: 0, cpu: 0 },
@@ -896,7 +807,6 @@ function backfillProductionPointIdentity(
   return pointIdentity({
     githubRunId: backfill.githubRunId,
     runAttempt: backfill.runAttempt,
-    // Without a config ID, conservatively reject a possible purge overlap.
     configId: backfill.productionConfigId ?? purgedConfigId,
     benchmarkType: backfill.benchmarkType,
     isl: backfill.isl,
@@ -945,7 +855,6 @@ function validateBackfillConfig(config: ConfigParams, id: string): void {
   }
 }
 
-/** Validate the backfill ledger before an ingest or database write starts. */
 export function validateRunBackfills(
   changelogs: readonly ChangelogBackfill[] = CHANGELOG_BACKFILLS,
   points: readonly BenchmarkPointBackfill[] = BENCHMARK_POINT_BACKFILLS,
@@ -1143,7 +1052,6 @@ interface BackfillableChangelog<T extends BackfillableChangelogEntry> {
   entries: T[];
 }
 
-/** Apply changelog corrections before artifact metadata is written to PostgreSQL. */
 export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
   githubRunId: number,
   runAttempt: number | null | undefined,
@@ -1180,8 +1088,6 @@ export function applyChangelogBackfills<T extends BackfillableChangelogEntry>(
         appendOnly,
       }));
     }
-    // ingestChangelogEntries upserts every entry onto the same (run, base, head)
-    // identity, so the final artifact entry is the row that persists.
     const entryIndex = changelog.entries.length - 1;
     const entry = changelog.entries[entryIndex];
     changelog.entries[entryIndex] = {
@@ -1213,7 +1119,6 @@ function matchesBenchmarkPoint(
   );
 }
 
-/** Apply one point patch to an ingest row before it reaches PostgreSQL. */
 export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   githubRunId: number,
   runAttempt: number | null | undefined,
@@ -1275,7 +1180,6 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   };
 }
 
-/** Fail if two distinct artifact points collapse onto one identity after correction. */
 export function recordBackfilledPointIdentity(
   seen: Map<string, string>,
   sourceIdentity: string,
@@ -1290,10 +1194,6 @@ export function recordBackfilledPointIdentity(
   seen.set(desiredIdentity, sourceIdentity);
 }
 
-/**
- * True when this exact benchmark result is suppressed. When an ingest source
- * cannot determine the attempt, match the point across every attempt of its run.
- */
 export function isBenchmarkPointPurged(
   githubRunId: number,
   runAttempt: number | null | undefined,
@@ -1317,12 +1217,6 @@ export type BenchmarkPointPlan<T extends BackfillablePoint> =
   | { kind: 'purged' }
   | { kind: 'planned'; point: T; backfillId: string | null };
 
-/**
- * The one decision every ingest path makes per artifact row, in this order: an
- * exact purge wins over any correction; a matching backfill patches the row;
- * two source rows collapsing onto one corrected identity fail the batch.
- * Callers log and persist; this owner only decides.
- */
 export function planBenchmarkPoint<T extends BackfillablePoint>(
   run: { githubRunId: number; runAttempt: number | null | undefined },
   point: T,
@@ -1334,10 +1228,6 @@ export function planBenchmarkPoint<T extends BackfillablePoint>(
   return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
 }
 
-/**
- * True when the (run, attempt) pair should be skipped on ingest. Pass `runAttempt`
- * to honor PURGED_RUN_ATTEMPTS; omit it to check whole-run purges only.
- */
 export function isRunAttemptPurged(githubRunId: number, runAttempt?: number): boolean {
   if (PURGED_RUNS.has(githubRunId)) return true;
   if (runAttempt === undefined) return false;

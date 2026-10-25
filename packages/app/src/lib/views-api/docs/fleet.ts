@@ -7,8 +7,6 @@ import {
   parameterErrorSchema as errorSchema,
 } from '@/lib/api/api-documentation-helpers';
 
-// The 'views' group id is registered by the docs coordinator alongside the
-// route catalog entries; fragments are written against it ahead of that.
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const lifecyclePointSchema: ApiSchema = {
@@ -217,7 +215,7 @@ export const operations: ApiOperation[] = [
         true,
         'string',
         'Display model name or compare slug.',
-        '展示模型名称或对比 slug。',
+        '模型显示名称或对比页 slug。',
         { type: 'string' },
         'DeepSeek-V4-Pro',
       ),

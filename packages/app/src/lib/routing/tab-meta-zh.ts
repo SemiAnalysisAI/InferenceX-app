@@ -110,11 +110,6 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   },
 };
 
-/**
- * Server-rendered Chinese intro shown above the interactive dashboard on each
- * /zh tab page. The charts themselves render in English; this block gives
- * crawlers and readers genuine Chinese content describing the page.
- */
 export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   inference:
     '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨芯片、推理框架与模型对比吞吐量（token/s/chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
@@ -133,7 +128,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   'profit-estimator':
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
-    '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
+    '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每吉瓦全电源配置功率预算计算各芯片的年收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
@@ -156,7 +151,6 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
 
-/** Chinese labels for the dashboard tab bar (TabNav) on /zh pages. */
 export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   inference: '推理性能',
   evaluation: '准确率评估',
@@ -181,7 +175,6 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
 
 export type HeaderNavHref = '/' | '/agentx' | '/overview' | '/inference' | '/ubenchx' | '/about';
 
-/** Chinese labels for the site header nav, keyed by its exact English href set. */
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
@@ -193,8 +186,6 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
 
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
-/** Chinese copy for the per-model tab routes (/zh/calculator/<slug>,
- *  /zh/historical/<slug>). Model names stay in English per site convention. */
 export const MODEL_TAB_META_ZH: Record<
   ModelRouteTab,
   {
@@ -233,9 +224,6 @@ export const MODEL_TAB_META_ZH: Record<
   },
 };
 
-/** Generate Next.js Metadata for a per-model /zh tab page. Canonical (and
- *  hreflang) mirror the English rule in `modelTabCanonicalPath`: the default
- *  model's page points at the bare tab path, others are self-canonical. */
 export function modelTabMetadataZh(
   tab: ModelRouteTab,
   route: ModelRoute,
@@ -262,7 +250,6 @@ export function modelTabMetadataZh(
   };
 }
 
-/** Generate Next.js Metadata for a /zh tab page (mirrors `tabMetadata`). */
 export function tabMetadataZh(tab: DashboardRouteKey): Metadata {
   const meta = TAB_META_ZH[tab];
   const enPath = getDashboardRoute(tab).canonicalPath;

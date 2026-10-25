@@ -3,7 +3,6 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Controllable next-themes mock — tests flip resolvedTheme and re-render.
 const themeState = vi.hoisted(() => ({ resolvedTheme: 'dark' as string | undefined }));
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: themeState.resolvedTheme }),
@@ -11,8 +10,6 @@ vi.mock('next-themes', () => ({
 
 import { useThemeColors, type UseThemeColorsResult } from './useThemeColors';
 
-// Lightweight renderHook — TLR isn't installed, so we mount a 1-component root
-// and capture the latest hook return value in a ref-style object.
 function renderHook<T>(hook: () => T): {
   result: { current: T };
   rerender: () => void;
@@ -65,8 +62,6 @@ describe('useThemeColors mount behavior', () => {
     const initialThemeColors = result.current.themeColors;
     const initialGetCssColor = result.current.getCssColor;
 
-    // Flush the post-mount timer window where the old implementation re-set
-    // themeColors (new object identity → full D3 rebuild in every chart).
     act(() => {
       vi.runAllTimers();
     });
@@ -84,8 +79,6 @@ describe('useThemeColors mount behavior', () => {
     );
     const initialThemeColors = result.current.themeColors;
 
-    // next-themes mounts and reports the theme that the pre-hydration inline
-    // script already applied to <html> — no visual change, so no update.
     themeState.resolvedTheme = 'dark';
     rerender();
     act(() => {
@@ -144,12 +137,9 @@ describe('useThemeColors color maps', () => {
       useThemeColors({ highContrast: false, activeKeys: ['h100', 'mi300x'] }),
     );
 
-    // Active keys resolve to concrete oklch colors from the vendor palette.
     expect(result.current.resolveColor('h100')).toMatch(/^oklch\(/u);
     expect(result.current.resolveColor('mi300x')).toMatch(/^oklch\(/u);
-    // NVIDIA and AMD land in different hue zones.
     expect(result.current.resolveColor('h100')).not.toBe(result.current.resolveColor('mi300x'));
-    // Inactive keys fall back to the muted foreground variable.
     expect(result.current.resolveColor('gb200')).toBe('var(--muted-foreground)');
     unmount();
   });
@@ -171,14 +161,8 @@ describe('useThemeColors color maps', () => {
     unmountOn();
   });
 
-  // Regression: deselecting a legend line must not recolor the remaining lines.
-  // The HC palette is sized/indexed by the key set it's generated over, so when
-  // it was generated over the *active* subset (no hcKeys), shrinking the
-  // selection re-sized the palette and shifted every remaining line's hue (most
-  // visible on single-vendor agentic runs spanning the full wheel). Passing a
-  // stable `hcKeys` (the full set with data) fixes each line's color.
   it('keeps a line HC color stable across active subsets when hcKeys is the full set', () => {
-    const FULL = ['b200', 'b300']; // single-vendor (NVIDIA) agentic comparison
+    const FULL = ['b200', 'b300'];
 
     const all = renderHook<UseThemeColorsResult>(() =>
       useThemeColors({ highContrast: true, activeKeys: ['b200', 'b300'], hcKeys: FULL }),
@@ -187,7 +171,6 @@ describe('useThemeColors color maps', () => {
     const b300Color = all.result.current.resolveColor('b300');
     all.unmount();
 
-    // b300 deselected → only b200 active, but hcKeys is still the full set.
     const subset = renderHook<UseThemeColorsResult>(() =>
       useThemeColors({ highContrast: true, activeKeys: ['b200'], hcKeys: FULL }),
     );
@@ -195,7 +178,7 @@ describe('useThemeColors color maps', () => {
     subset.unmount();
 
     expect(b200WithBoth).toMatch(/^#[0-9a-f]{6}$/iu);
-    expect(b200WithBoth).not.toBe(b300Color); // HC still produces distinct hues
-    expect(b200Alone).toBe(b200WithBoth); // deselecting b300 did NOT recolor b200
+    expect(b200WithBoth).not.toBe(b300Color);
+    expect(b200Alone).toBe(b200WithBoth);
   });
 });

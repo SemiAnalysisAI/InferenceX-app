@@ -1,14 +1,3 @@
-/**
- * Compact per-request data used by the default agentic point charts.
- *
- * The full request timeline contains source-trace metadata and Gantt-only
- * timing fields. Large runs can make that document hundreds of megabytes,
- * even though the summary charts need only nine values per request. Legacy
- * JSONB timelines of up to 250,000 requests are projected once in Postgres so
- * only those values cross the network. Gzip timelines and larger legacy
- * timelines are scanned in Node, keeping only those values of each request.
- */
-
 import {
   REQUEST_TIMELINE_VERSION,
   type RequestRecord,
@@ -59,10 +48,8 @@ export interface RequestChartDataWire {
 interface RawChartMetaRow {
   trace_replay_id: number;
   has_blob: boolean;
-  /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
   gz_bytes: number | null;
   timeline_version: number | null;
-  /** Length of a legacy timeline's `requests` array, for rows without a gzip timeline. */
   legacy_request_count: number | null;
 }
 
@@ -83,12 +70,6 @@ interface RawProjectedChartRow {
   ][];
 }
 
-/**
- * Most requests a legacy JSONB timeline may hold and still be projected in
- * SQL. The projection costs about 155 bytes per request: trace row 3811's
- * 459,630 requests projected to 71.5 MB, past Neon's 64 MiB response cap.
- * Larger legacy timelines are scanned in Node from bounded text chunks.
- */
 export const LEGACY_PROJECTION_MAX_REQUESTS = 250_000;
 
 type ChartRecord = Pick<
@@ -96,7 +77,6 @@ type ChartRecord = Pick<
   'cid' | 'phase' | 'start' | 'end' | 'ttftMs' | 'tpotMs' | 'isl' | 'osl' | 'cancelled'
 >;
 
-/** The request fields a chart tuple is built from. */
 const CHART_REQUEST_FIELDS: ReadonlySet<string> = new Set<keyof ChartRecord>([
   'cid',
   'phase',
@@ -124,10 +104,6 @@ const roundMilliseconds = (value: number | null): number | null =>
 const nullableNumber = (value: unknown): number | null =>
   typeof value === 'number' ? value : null;
 
-/**
- * Dictionary-encode chart records one at a time, so a scanned timeline never
- * needs an array of its records.
- */
 function createRequestChartEncoder(): {
   add: (record: ChartRecord) => void;
   finish: (
@@ -181,8 +157,6 @@ async function projectLegacyRequestChartData(
   sql: DbClient,
   traceReplayId: number,
 ): Promise<RequestChartDataWire | null> {
-  // The version predicate keeps a timeline that was converted and cleared
-  // since the metadata read from being returned as an empty chart.
   const rows = (await sql`
     select
       (atr.request_timeline->>'startNs')::double precision as start_ns,
@@ -232,12 +206,6 @@ async function projectLegacyRequestChartData(
   );
 }
 
-/**
- * Encode a current stored timeline by scanning it in Node: the gzip copy when
- * `gzBytes` is non-null, else the legacy JSONB text. Only the chart fields of
- * one request are held at a time. Logs and returns null when the stored
- * timeline cannot be read.
- */
 async function scanStoredRequestChartData(
   sql: DbClient,
   traceReplayId: number,
@@ -288,8 +256,6 @@ export async function getRequestChartData(
   benchmarkResultId: number,
   legacyProjectionMaxRequests = LEGACY_PROJECTION_MAX_REQUESTS,
 ): Promise<RequestChartDataWire | null> {
-  // The gzip copy wins whenever it exists and is never detoasted here. A
-  // legacy row's request count detoasts its JSONB, as reading its version does.
   const rows = (await sql`
     select
       atr.id as trace_replay_id,

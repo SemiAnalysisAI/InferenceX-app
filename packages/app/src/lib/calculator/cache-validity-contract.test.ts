@@ -1,10 +1,3 @@
-/**
- * Consumer contract for the producer's cache-validity core, end to end: a v3
- * artifact goes through the real ETL mapper, becomes an API row, and is priced
- * by the calculator, revenue, trend and series paths. Producer payloads come
- * from `packages/db/src/etl/fixtures/cache-validity-producer.json` (synthetic
- * inputs run through the producer itself; not historical results).
- */
 import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
@@ -43,7 +36,6 @@ const PRICING: TokenRevenuePricing = {
   cachedInputPerMillion: 0.2,
   outputPerMillion: 10,
 };
-/** A price list where the cache hit rate cannot move revenue. */
 const FLAT_CACHE_PRICING: TokenRevenuePricing = { ...PRICING, cachedInputPerMillion: 2 };
 const SPECS = { powerKwPerGpu: 1.5, costPerGpuHour: 2 };
 const ASSUMPTIONS: ProfitEstimatorAssumptions = {
@@ -53,7 +45,6 @@ const ASSUMPTIONS: ProfitEstimatorAssumptions = {
 };
 const CORE_POLICIES: CacheRatePolicy[] = ['enforce-when-present', 'strict'];
 
-/** Cache metrics exactly as the real ETL mapper stores them for one producer case. */
 function etlCacheMetrics(name: CaseName): Record<string, number> {
   const mapped = mapBenchmarkRow(
     {
@@ -84,7 +75,6 @@ function etlCacheMetrics(name: CaseName): Record<string, number> {
   );
 }
 
-/** API row (the shape the benchmarks API returns) carrying the given metrics. */
 function apiRow(
   metrics: Record<string, number>,
   overrides: Partial<BenchmarkRow> = {},
@@ -129,7 +119,6 @@ function apiRow(
   };
 }
 
-/** Two operating points of one config, so interpolation runs the spline path. */
 function frontier(first: Record<string, number>, second = first): BenchmarkRow[] {
   const faster = {
     median_intvty: 20,
@@ -141,7 +130,6 @@ function frontier(first: Record<string, number>, second = first): BenchmarkRow[]
   return [apiRow(first, { conc: 8 }), apiRow({ ...second, ...faster }, { conc: 16 })];
 }
 
-/** The chart and trend paths only price registered GPUs; reuse their test config. */
 const chartRow = (row: BenchmarkRow): BenchmarkRow => ({
   ...row,
   hardware: 'h200',
@@ -155,13 +143,11 @@ const basis = (row: BenchmarkRow, policy: CacheRatePolicy) =>
     policy,
   );
 
-/** Series and inference-chart path: `applyTokenRevenuePricing` on a chart point. */
 function chartRevenue(row: BenchmarkRow, policy: CacheRatePolicy, pricing = PRICING) {
   const point = rowToLightweightPoint(chartRow(row), ['tpPerGpu'], null, DEFAULT_TCO_BASIS, policy);
   return applyTokenRevenuePricing([point!], pricing, policy)[0]!.tokenRevenuePerGpuHour?.y ?? null;
 }
 
-/** Fleet Lifecycle path: group, interpolate, apply the cache mode, price one SKU. */
 function calculatorEstimate(
   rows: BenchmarkRow[],
   policy: CacheRatePolicy,
@@ -185,7 +171,6 @@ function calculatorEstimate(
   };
 }
 
-/** Historical Trends path: lightweight points, then the cache-aware revenue spline. */
 function trendRevenue(rows: BenchmarkRow[], policy: CacheRatePolicy, pricing = PRICING) {
   const points = rows.map((row) =>
     rowToLightweightPoint(

@@ -150,8 +150,6 @@ describe('getTraceServerMetrics', () => {
     const result = await getTraceServerMetrics(sql, 42);
 
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
-    // 3 calls: meta read, blob read, then the fire-and-forget chart_series
-    // write-back that self-heals the stale precomputed series.
     expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('server_metrics_json_gz as blob');
     expect(calls[2]).toContain('update agentic_trace_replay set chart_series');
@@ -209,14 +207,6 @@ describe('getTraceServerMetricSource', () => {
   });
 });
 
-// ── All-endpoints KV overlay collapses per worker ───────────────────────
-//
-// `chart_series.kvCacheUsageByEngine` is per DP rank. On a PD-disaggregated
-// run that is unreadable (6 prefill workers x DP4 + decode = 28 lines), so the
-// read layer averages each worker's ranks into one line. Derived here, not in
-// the ETL, so it needs no CHART_SERIES_VERSION bump or backfill.
-
-/** One metric source (worker) owning `ranks` engines, each at a flat value. */
 function workerSource(
   role: MetricSourceSeries['source']['role'],
   workerId: string,
@@ -276,8 +266,6 @@ describe('getTraceServerMetrics all-endpoints KV overlay', () => {
   });
 
   it('keeps the stored per-rank overlay for a single-worker run', async () => {
-    // A plain DP deployment has no per-source data; rank skew is the signal
-    // there, so the stored per-rank lines must survive untouched.
     const perRank = [
       { engineLabel: '0', points: [{ t: 0, value: 0.1 }] },
       { engineLabel: '1', points: [{ t: 0, value: 0.9 }] },

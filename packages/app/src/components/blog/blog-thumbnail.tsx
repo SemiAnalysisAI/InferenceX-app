@@ -9,15 +9,10 @@ import { optimizedThumbnailSrc, THUMBNAIL_WIDTHS } from '@/lib/blog/blog-thumbna
 import { cn } from '@/lib/shared/utils';
 
 export interface BlogThumbnailProps {
-  /** Per-theme figure paths from `getPostThumbnail`; null renders the text-free tile. */
   thumbnail: PostThumbnail | null;
-  /** First tag of the post, shown as a badge in the tile's corner. */
   tag?: string;
-  /** Reading-time label, shown top-right in the tile. */
   readingLabel?: string;
-  /** Eager-load the figure (featured card and first row of the index). */
   priority?: boolean;
-  /** `tile` is a grid card (one third of the row); `card` is the featured post. */
   variant?: 'tile' | 'card';
   className?: string;
 }
@@ -28,9 +23,6 @@ const CARD_SIZES = '(min-width: 1024px) 50vw, 100vw';
 const IMG_CLASS =
   'block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]';
 
-/** Dot grid and line grid from the whitepaper hero, drawn in the current text
- *  colour so they follow the theme. The mask fades toward the bottom-right in
- *  the tile and toward the right on the featured card. */
 const TILE_MASK =
   'linear-gradient(115deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.4) 55%, rgba(0, 0, 0, 0.08) 90%)';
 const CARD_MASK =
@@ -47,20 +39,16 @@ const LINES_STYLE: CSSProperties = {
   backgroundSize: '80px 80px, 80px 80px',
 };
 
-/** Soft primary glow in the top-right corner, kept inside the box so nothing
- *  leaks past the card edge. */
 const GLOW_STYLE: CSSProperties = {
   background:
     'radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 55%)',
 };
 
 interface GridTextureProps {
-  /** `tile` fades toward the bottom-right; `card` fades toward the right edge. */
   variant: 'tile' | 'card';
   className?: string;
 }
 
-/** Decorative grid layer. Positioned absolutely; the parent must be `relative`. */
 export function BlogGridTexture({ variant, className }: GridTextureProps) {
   const mask = variant === 'tile' ? TILE_MASK : CARD_MASK;
   const maskStyle: CSSProperties = { maskImage: mask, WebkitMaskImage: mask };
@@ -85,12 +73,6 @@ export function BlogGridTexture({ variant, className }: GridTextureProps) {
   );
 }
 
-/**
- * Thumbnail box for article cards. Uses the post's first figure at 1200/630
- * when one exists (per theme when light/dark variants are paired); otherwise
- * a shorter 3/1 textured tile carrying only the first tag and the reading
- * time, so the card title is never repeated inside the image.
- */
 export function BlogThumbnail({
   thumbnail,
   tag,

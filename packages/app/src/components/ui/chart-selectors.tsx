@@ -115,9 +115,6 @@ function CategorySectionTitle({
   );
 }
 
-// Full-color creator logo beside each model name, in the dropdown rows and
-// the closed trigger alike. `ModelLogo` renders nothing for models without
-// a configured logo, so rows degrade to plain text instead of breaking.
 const toOption = (model: string, badge?: ReactNode) => ({
   value: model,
   label: getModelLabel(model as Model),
@@ -133,17 +130,7 @@ interface ModelSelectorProps {
   onOpenChange?: (open: boolean) => void;
   availableModels: string[];
   'data-testid'?: string;
-  /**
-   * Optional affordance rendered beside the closed trigger (outside the
-   * dropdown) — e.g. the
-   * model-architecture deep-dive link on the inference dashboard.
-   */
   trailing?: ReactNode;
-  /**
-   * Models whose dropdown rows carry a NEW pill (localized). The inference
-   * dashboard passes the featured AgentX set; surfaces that don't highlight
-   * new models simply omit the prop.
-   */
   newModels?: ReadonlySet<string>;
 }
 
@@ -253,7 +240,6 @@ interface SequenceSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so per-model scenario retirements group as Deprecated. */
   model?: Model | null;
   'data-testid'?: string;
 }
@@ -338,19 +324,10 @@ interface ScenarioSelectorProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   availableSequences: string[];
-  /** Selected model, so retired scenarios carry the correct status in their labels. */
   model?: Model | null;
   'data-testid'?: string;
 }
 
-/**
- * Scenario selector — fixed-seq-len rows grouped under "Fixed Sequence Length",
- * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
- * framing only applies to the fixed-seq subset).
- *
- * A single selected scenario stays visible in the same control, disabled when
- * there is no alternative workload to choose.
- */
 export function ScenarioSelector({
   id = 'scenario-select',
   value,
@@ -422,7 +399,6 @@ export function ScenarioSelector({
         open={isOnlySelectedScenario ? false : open}
         onOpenChange={onOpenChange}
         groups={[
-          // Agentic is already named in its row, so it needs no repeated heading.
           { label: '', options: agentic.map(toScenarioOption) },
           {
             label: t.fixedSequenceLength,
@@ -441,11 +417,6 @@ interface PercentileSelectorProps {
   'data-testid'?: string;
 }
 
-/**
- * Latency percentile selector for agentic-trace charts. The selected value
- * rewrites the chart x-axis metric from `median_*` to `{percentile}_*`, so
- * picking p99 plots p99 e2e latency / interactivity instead of the median.
- */
 export function PercentileSelector({
   id = 'percentile-select',
   value,
@@ -492,10 +463,6 @@ interface PrecisionSelectorProps {
   'data-testid'?: string;
 }
 
-/**
- * Precision multi-select. Keep a single selected precision visible in the same
- * disabled control so benchmark context and geometry remain consistent.
- */
 export function PrecisionSelector({
   id = 'precision-select',
   value,

@@ -11,10 +11,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Export an SVG element as a PNG image with a title overlay.
- * Detects minecraft/light mode from document classes.
- */
 export function exportSvgToPng(
   svg: SVGSVGElement,
   opts: {
@@ -49,27 +45,22 @@ export function exportSvgToPng(
     const ctx = canvas.getContext('2d')!;
     ctx.scale(scale, scale);
 
-    // Background
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    // Title
     ctx.fillStyle = fgColor;
     ctx.font = 'bold 14px monospace';
     ctx.fillText(opts.title, padding, padding + 20);
 
-    // Subtitle
     if (opts.subtitle) {
       ctx.fillStyle = mutedColor;
       ctx.font = '10px monospace';
       ctx.fillText(opts.subtitle, padding, padding + 34);
     }
 
-    // SVG
     ctx.drawImage(img, padding, titleHeight + padding, opts.svgWidth, opts.svgHeight);
     URL.revokeObjectURL(url);
 
-    // Download
     const a = document.createElement('a');
     a.download = opts.filename;
     a.href = canvas.toDataURL('image/png');
@@ -79,7 +70,6 @@ export function exportSvgToPng(
   img.src = url;
 }
 
-/** Render an Export PNG button. */
 export function ExportPngButton({
   onClick,
   label,

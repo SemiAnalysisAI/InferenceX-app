@@ -96,7 +96,6 @@ export default async function ComparePrecisionIndexPage() {
 
       {modelsWithPairs.map((model) => {
         const pairs = precisionPairsByModel.get(model.slug) ?? [];
-        // Group by GPU for cleaner presentation.
         const gpuGroups = new Map<string, typeof pairs>();
         for (const pair of pairs) {
           let list = gpuGroups.get(pair.gpu);

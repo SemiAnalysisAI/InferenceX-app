@@ -11,7 +11,6 @@ const STATES: { id: OperatorXStatus | 'not-run'; label: string; className: strin
   { id: 'not-run', label: 'Not run', className: 'bg-muted' },
 ];
 
-/** Per-GPU status breakdown of the workload's cases, as thin stacked bars. */
 export function CoverageStrip({ model }: { model: ComparisonModel }) {
   const total = model.view.cases.length;
   return (

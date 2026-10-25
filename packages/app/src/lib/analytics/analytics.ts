@@ -17,10 +17,6 @@ export function registerAnalyticsClient(client: AnalyticsClient): void {
   }
 }
 
-/**
- * Track an analytics event via PostHog. Events emitted before PostHog finishes
- * its deferred initialization are queued and flushed in order.
- */
 export function track(eventName: string, properties?: Record<string, unknown>): void {
   if (typeof window === 'undefined') return;
   if (analyticsClient) {

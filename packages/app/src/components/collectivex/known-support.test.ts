@@ -22,7 +22,6 @@ describe('COLLECTIVEX_KNOWN_SUPPORT', () => {
   });
 
   it('never leaves a broken or not-applicable degree without a why', () => {
-    // The whole point of the table: red (and gray) must explain themselves.
     for (const mode of MODES) {
       for (const sku of COLLECTIVEX_KNOWN_SKUS) {
         for (const library of COLLECTIVEX_KNOWN_LIBRARIES) {
@@ -59,8 +58,6 @@ describe('COLLECTIVEX_KNOWN_SUPPORT', () => {
   it('keeps at least one known-broken cell explained (the table is not vacuous)', () => {
     const order = collectiveXKnownFootnoteOrder('normal');
     expect(order.length).toBeGreaterThan(0);
-    // A canary for the highest-traffic wall: mori EP16 on mi355x is red with
-    // the upstream-issue note until ROCm/mori#610 resolves.
     const cell = COLLECTIVEX_KNOWN_SUPPORT.normal.mi355x.mori;
     expect(cell.ep8.status).toBe('works');
     expect(cell.ep16).toEqual({ status: 'broken', note: 'mori-inter-node-corruption' });

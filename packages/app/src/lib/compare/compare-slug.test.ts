@@ -261,8 +261,6 @@ describe('compareModelDisplayLabel', () => {
 });
 
 describe('compareModelSeoName', () => {
-  // Single, natural, current-version search name per model — no version-group
-  // slashes, no param-count suffix, no fully-qualified checkpoint id.
   const EXPECTED: Record<string, string> = {
     'muse-spark-open': 'Muse Spark Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
@@ -273,6 +271,7 @@ describe('compareModelSeoName', () => {
     'glm-5-1': 'GLM-5',
     'glm-5-3': 'GLM-5.3',
     'minimax-m3': 'MiniMax M3',
+    'minimax-m31-flash': 'MiniMax M3.1 Flash',
     'minimax-m27': 'MiniMax M2.7',
     'qwen-3-8-flash-next': 'Qwen3.8-Flash-Next',
     'qwen-3-8-27b': 'Qwen3.8-27B',
@@ -313,7 +312,6 @@ describe('compareSeoTitle', () => {
 
   it('drops "Inference" → "Benchmark" for a long GPU pair + model name', () => {
     const title = compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro');
-    // "…Inference Benchmark" would exceed ~60 chars, so it shortens.
     expect(title).toBe('GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro Benchmark');
     expect(title.includes('Inference Benchmark')).toBe(false);
     expect(title.startsWith('GB200 NVL72 vs GB300 NVL72:')).toBe(true);
@@ -351,9 +349,6 @@ describe('getCompareModelBySlug', () => {
   });
 
   it('keeps the bare kimi alias on the K2 series, with kimi-k3 canonical and separate', () => {
-    // K3 is a distinct architecture, not a K2 point release: it must not join
-    // the kimi-k26 dbKey group, and the family alias stays where it was so
-    // existing /compare/kimi-* links keep resolving to K2.
     expect(getCompareModelBySlug('kimi')?.slug).toBe('kimi-k26');
     const k3 = getCompareModelBySlug('kimi-k3');
     expect(k3?.slug).toBe('kimi-k3');

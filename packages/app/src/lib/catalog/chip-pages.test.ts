@@ -47,7 +47,6 @@ describe('chip page registry integrity', () => {
   it('covers 9 chips and 12 versus pages (44 localized URLs with the index)', () => {
     expect(getAllChipPages()).toHaveLength(9);
     expect(getAllChipVsPages()).toHaveLength(12);
-    // index + chips + versus, each in en and zh
     expect(2 * (1 + getAllChipRouteSlugs().length)).toBe(44);
   });
 
@@ -83,7 +82,6 @@ describe('chip page registry integrity', () => {
         expect(CHIP_VS_HIGHLIGHT_LABELS_ZH[row.key]).toBeDefined();
         expect(row.aValue.length).toBeGreaterThan(0);
         expect(row.bValue.length).toBeGreaterThan(0);
-        // Only fp4 may omit the ratio (when one side lacks FP4 support).
         if (row.key !== 'fp4') {
           expect(row.ratio, `${page.slug} ${row.key} ratio`).toBeDefined();
         }
@@ -125,16 +123,28 @@ describe('Chinese chip page parity', () => {
       expect(zh.summary).toMatch(/[\u4E00-\u9FFF]/u);
       expect(zh.summary).toContain(entry.label);
       expect(zh.keywords.length).toBeGreaterThanOrEqual(5);
-      // zh-copy rule: the standalone English noun "Chip" must not appear.
       for (const text of [zh.summary, ...zh.overview, zh.benchmarkContext]) {
         expect(text).not.toMatch(/(?<![A-Za-z])[Cc]hips?(?![A-Za-z])/u);
       }
     }
   });
 
+  it('preserves pricing basis, exact domain capacity and throughput units in Chinese FAQs', () => {
+    const chip = getChipPage('b200')!;
+    const faq = buildZhChipFaq(chip);
+    expect(faq[0].answer).toContain('批量采购并自有设备');
+    expect(faq[0].answer).toContain('$1.73');
+    expect(faq[1].answer).toContain('8 颗芯片');
+    expect(faq[1].answer).toContain('合计 1,440 GB');
+    const comparison = buildZhChipVsFaq(getChipVsPage('b300-vs-b200')!);
+    expect(comparison[1].answer).toContain('B300 为 $2.26/hr');
+    expect(comparison[1].answer).not.toContain('租价');
+    expect(comparison[2].answer).toContain('每秒');
+  });
+
   it('localizes generated FAQ answers and highlight values', () => {
     expect(localizeVsHighlightValueZh('Not supported')).toBe('不支持');
-    expect(localizeVsHighlightValueZh('72 chips')).toBe('72 芯片');
+    expect(localizeVsHighlightValueZh('72 chips')).toBe('72 颗芯片');
     expect(localizeVsHighlightValueZh('8 TB/s')).toBe('8 TB/s');
     for (const entry of getAllChipPages()) {
       for (const item of buildZhChipFaq(entry)) {

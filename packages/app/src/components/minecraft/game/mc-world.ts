@@ -42,12 +42,9 @@ export interface Chunk {
   cz: number;
   blocks: Uint8Array;
   meta: Uint8Array;
-  /** High nibble sky light, low nibble block light. */
   light: Uint8Array;
   lit: boolean;
-  /** Geometry needs rebuilding. */
   dirty: boolean;
-  /** Block edits relative to generation, keyed by index: id | meta << 8. */
   edits: Map<number, number>;
 }
 
@@ -66,7 +63,6 @@ interface Column {
   steep: boolean;
 }
 
-/** Deterministic terrain shaping shared by generation, spawning and tests. */
 export class Terrain {
   readonly seed: number;
   private n: Simplex[];
@@ -89,7 +85,6 @@ export class Terrain {
     } else {
       h = SEA + 1 + (c + 0.18) * 24 + h1 * 9 * (0.6 + m) + d * 2.2 + m * ridge * ridge * 56;
     }
-    // Rivers cut through lowland, not mountain ranges.
     const r = Math.abs(river.fbm2(x / 360 + 200, z / 360 + 200, 3));
     const isRiver = c >= -0.18 && r < 0.04 && m < 0.6;
     if (isRiver) {
@@ -121,7 +116,6 @@ export class Terrain {
 
   isCave(x: number, y: number, z: number, surface: number, biome: Biome) {
     if (y < 4 || y > surface) return false;
-    // Keep the floors of oceans and rivers sealed.
     if (surface < SEA + 1 && y > surface - 7) return false;
     if ((biome === 'beach' || biome === 'snowy_beach') && y > surface - 4) return false;
     const a = this.n[3].noise3(x / 34, y / 22, z / 34);
@@ -131,13 +125,11 @@ export class Terrain {
     return false;
   }
 
-  /** Surface height for spawning: highest solid block + 1. */
   spawnHeight(x: number, z: number) {
     return this.column(x, z).height + 1;
   }
 }
 
-/** Ore vein table: block, deepslate variant, veins per chunk, size, max y. */
 const ORES: [number, number, number, number, number][] = [
   [B.coalOre, B.deepslateCoal, 18, 12, 120],
   [B.ironOre, B.deepslateIron, 16, 8, 72],
@@ -174,13 +166,10 @@ export class World {
   readonly seed: number;
   readonly terrain: Terrain;
   readonly chunks = new Map<number, Chunk>();
-  /** Saved edits for chunks not generated yet, keyed by chunk. */
   private pendingEdits = new Map<number, Map<number, number>>();
   private fluidQueue = new Map<string, FluidUpdate>();
   tick = 0;
-  /** Positions of blocks that changed this tick (for physics of falling blocks etc). */
   readonly changed: { x: number; y: number; z: number; old: number; id: number }[] = [];
-  /** Hook for game-level reactions to neighbour changes (falling sand, plant support). */
   onNeighborChange?: (x: number, y: number, z: number) => void;
 
   constructor(seed: number, dimension: Dimension = 'overworld') {
@@ -189,9 +178,6 @@ export class World {
     this.terrain = new Terrain(this.seed);
   }
 
-  // -------------------------------------------------------------------------
-  // Access
-  // -------------------------------------------------------------------------
   chunkAt(x: number, z: number) {
     return this.chunks.get(chunkKey(x >> 4, z >> 4));
   }
@@ -209,7 +195,6 @@ export class World {
     return c ? c.meta[blockIndex(x & 15, y, z & 15)] : 0;
   }
 
-  /** Raw light byte (sky << 4 | block); sky above the world, dark below. */
   getLight(x: number, y: number, z: number): number {
     if (y >= HEIGHT) return 240;
     if (y < 0) return 0;
@@ -221,9 +206,6 @@ export class World {
     return Boolean(this.chunkAt(x, z));
   }
 
-  // -------------------------------------------------------------------------
-  // Generation
-  // -------------------------------------------------------------------------
   loadEdits(edits: Map<number, Map<number, number>>) {
     for (const [key, map] of edits) this.pendingEdits.set(key, map);
   }
@@ -246,7 +228,6 @@ export class World {
     return chunk;
   }
 
-  /** Remove a far chunk from memory, keeping its edits for later. */
   unloadChunk(cx: number, cz: number) {
     const key = chunkKey(cx, cz);
     const c = this.chunks.get(key);
@@ -255,7 +236,6 @@ export class World {
     this.chunks.delete(key);
   }
 
-  /** All edits, including unloaded chunks, for saving. */
   allEdits(): Map<number, Map<number, number>> {
     const out = new Map(this.pendingEdits);
     for (const [key, c] of this.chunks) if (c.edits.size > 0) out.set(key, c.edits);
@@ -304,7 +284,6 @@ export class World {
             id =
               y < DEEPSLATE + Math.floor(hash3(this.seed, x, y + 1, z) * 4) ? B.deepslate : B.stone;
             if (h < SEA) {
-              // Sea and river beds.
               if (depth < 3) id = h < SEA - 12 ? B.gravel : B.sand;
               if (depth < 2 && hash3(this.seed, x >> 2, 3, z >> 2) < 0.08) id = B.clay;
             } else if (biome === 'desert') {
@@ -333,7 +312,6 @@ export class World {
       }
     }
 
-    // Ores and stone variants.
     const random = rng(hash3(this.seed, cx, 99, cz) * 4294967296);
     const vein = (ore: number, deep: number, size: number, maxY: number, replaceDeep = true) => {
       let x = Math.floor(random() * 16);
@@ -369,7 +347,6 @@ export class World {
       }
     }
 
-    // Trees from a jittered grid so they can straddle chunk borders.
     const place = (x: number, y: number, z: number, id: number, onlyAir: boolean) => {
       const lx = x - x0;
       const lz = z - z0;
@@ -405,7 +382,6 @@ export class World {
       }
     }
 
-    // Ground cover inside this chunk.
     for (let lz = 0; lz < CHUNK; lz++) {
       for (let lx = 0; lx < CHUNK; lx++) {
         const x = x0 + lx;
@@ -433,7 +409,6 @@ export class World {
               blocks[blockIndex(lx, y + k, lz)] = B.cactus;
           } else if (r < 0.014) blocks[i] = B.deadBush;
         }
-        // Sugar cane on shores next to water.
         if (
           (below === B.sand || below === B.grass || below === B.dirt) &&
           y - 1 === SEA &&
@@ -462,9 +437,6 @@ export class World {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Lighting
-  // -------------------------------------------------------------------------
   private static readonly PAD = 15;
   private static readonly RW = CHUNK + World.PAD * 2;
   private static attn = new Uint8Array(World.RW * World.RW * HEIGHT);
@@ -472,7 +444,6 @@ export class World {
   private static blk = new Uint8Array(World.RW * World.RW * HEIGHT);
   private static queue = new Int32Array(World.RW * World.RW * HEIGHT);
 
-  /** Whether all eight neighbours have block data, so light and geometry are exact. */
   neighborsReady(cx: number, cz: number) {
     for (let dz = -1; dz <= 1; dz++)
       for (let dx = -1; dx <= 1; dx++)
@@ -480,7 +451,6 @@ export class World {
     return true;
   }
 
-  /** Full light for one chunk from a padded neighbourhood (requires neighbours). */
   lightChunk(chunk: Chunk) {
     const PAD = World.PAD;
     const RW = World.RW;
@@ -513,7 +483,6 @@ export class World {
         }
       }
     }
-    // Sky columns.
     for (let rz = 0; rz < RW; rz++) {
       for (let rx = 0; rx < RW; rx++) {
         let level = 15;
@@ -539,7 +508,6 @@ export class World {
               queue[tail++] = ri;
               continue;
             }
-            // Seed only cells next to a darker transparent neighbour.
             if (
               (rx > 0 && light[ri - 1] < l - 1 && attn[ri - 1] < 15) ||
               (rx < RW - 1 && light[ri + 1] < l - 1 && attn[ri + 1] < 15) ||
@@ -614,7 +582,6 @@ export class World {
     return def.opaque ? 15 : (def.filter ?? 0);
   }
 
-  /** Incremental relight around one changed cell (both channels). */
   relight(x: number, y: number, z: number) {
     for (const isSky of [true, false]) {
       const remove: [number, number, number, number][] = [];
@@ -640,7 +607,6 @@ export class World {
           } else add.push([nx, ny, nz]);
         }
       }
-      // Seed the changed cell itself.
       const a = this.attnAt(x, y, z);
       if (isSky) {
         if (a < 15) {
@@ -669,7 +635,6 @@ export class World {
           add.push([x, y, z]);
         }
       }
-      // Propagate.
       let guard = 0;
       while (add.length > 0 && guard++ < 200000) {
         const [ax, ay, az] = add.pop()!;
@@ -712,10 +677,6 @@ export class World {
     if (c) c.dirty = true;
   }
 
-  // -------------------------------------------------------------------------
-  // Edits
-  // -------------------------------------------------------------------------
-  /** Set a block, updating light, geometry, edit history and neighbour reactions. */
   setBlock(x: number, y: number, z: number, id: number, meta = 0, notify = true) {
     if (y < 0 || y >= HEIGHT) return false;
     const c = this.chunkAt(x, z);
@@ -742,9 +703,6 @@ export class World {
     return true;
   }
 
-  // -------------------------------------------------------------------------
-  // Fluids
-  // -------------------------------------------------------------------------
   scheduleFluids(x: number, y: number, z: number) {
     this.scheduleFluid(x, y, z);
     for (const [dx, dy, dz] of DIRS) this.scheduleFluid(x + dx, y + dy, z + dz);
@@ -759,7 +717,6 @@ export class World {
     this.fluidQueue.set(key, { x, y, z, at: this.tick + delay });
   }
 
-  /** Liquid level 0 (source) .. 7, or 8 when falling; -1 when not this fluid. */
   private level(x: number, y: number, z: number, fluid: number) {
     if (this.getBlock(x, y, z) !== fluid) return -1;
     return this.getMeta(x, y, z);
@@ -770,7 +727,6 @@ export class World {
     return !BLOCKS[id].solid && !isLiquid(id) && id !== B.ladder && id !== B.door;
   }
 
-  /** Advance scheduled fluid updates; returns the number processed. */
   stepFluids(budget = 400) {
     this.tick++;
     let n = 0;
@@ -797,7 +753,6 @@ export class World {
     const max = 7;
     const other = water ? B.lava : B.water;
     const meta = this.getMeta(x, y, z);
-    // Lava meeting water hardens.
     if (!water) {
       for (const [dx, dy, dz] of DIRS) {
         if (dy === -1) continue;
@@ -809,7 +764,6 @@ export class World {
     }
     let level = meta;
     if (meta !== 0) {
-      // Recompute from feeders.
       const above = this.level(x, y + 1, z, fluid);
       let best = 99;
       let sources = 0;
@@ -832,7 +786,6 @@ export class World {
         return;
       }
     }
-    // Spread.
     const belowId = this.getBlock(x, y - 1, z);
     if (belowId === other && !water) {
       this.setBlock(x, y - 1, z, B.stone);
@@ -880,7 +833,6 @@ export class World {
     return BLOCKS[id].solid || (id === B.water && this.getMeta(x, y, z) === 0);
   }
 
-  /** Plants washed away by fluids; the game turns these into drops. */
   readonly washed: { x: number; y: number; z: number; id: number }[] = [];
   private dropPlant(x: number, y: number, z: number) {
     const id = this.getBlock(x, y, z);
@@ -891,7 +843,6 @@ export class World {
     return this.fluidQueue.size;
   }
 
-  /** Highest non-air block at a column (for spawn and rain). */
   topSolid(x: number, z: number) {
     for (let y = HEIGHT - 1; y > 0; y--) {
       const id = this.getBlock(x, y, z);

@@ -18,15 +18,11 @@ import { layoutChartLegend } from './chart-legend';
 import { interpAt, maxTimeSeriesValue, type ChartSeries } from './time-series-math';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-// Historical entry point: the pure data-shaping helpers lived in this module
-// before being extracted; re-export them so both import paths stay valid.
 export * from './time-series-math';
 
-/** A constant horizontal reference line (e.g. a capacity ceiling). */
 export interface ReferenceLine {
   value: number;
   label: string;
-  /** Line + label color. Defaults to a muted emerald. */
   color?: string;
 }
 
@@ -38,11 +34,6 @@ interface TimeSeriesChartProps {
   yAxisLabel?: string;
   width?: number;
   height?: number;
-  /**
-   * Horizontal reference lines drawn across the plot. Their values are folded
-   * into the auto y-max so the line stays on-chart even when it exceeds the
-   * data (e.g. a KV-cache pool ceiling well above the working set).
-   */
   refLines?: readonly ReferenceLine[];
 }
 
@@ -63,8 +54,6 @@ export function TimeSeriesChart({
   const locale = useLocale();
   const W = width;
 
-  // Legend entries, skipping series flagged hideFromHover so per-engine
-  // underlays don't take a legend slot with no visible line.
   const legendEntries = useMemo<ChartLegendEntry[]>(
     () =>
       series
@@ -73,9 +62,6 @@ export function TimeSeriesChart({
     [series],
   );
 
-  // Wrap the legend to as many rows as the labels need, then grow the viewBox
-  // and the bottom padding by the same amount. The plot area keeps its exact
-  // geometry and the extra rows extend the SVG downward.
   const legend = useMemo(
     () =>
       layoutChartLegend(
@@ -92,8 +78,6 @@ export function TimeSeriesChart({
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - padBottom;
     const xMax = Math.max(durationS, 1);
-    // Fold reference-line values into the auto max so a ceiling above the data
-    // (e.g. KV-cache pool >> working set) still renders inside the plot.
     let refMax = 0;
     for (const refLine of refLines) refMax = Math.max(refMax, refLine.value);
     const yMax = yMaxOpt ?? maxTimeSeriesValue(series, Math.max(1e-9, refMax));
@@ -110,7 +94,6 @@ export function TimeSeriesChart({
     return stride > 1 ? arr.filter((_, i) => i % stride === 0) : arr;
   };
 
-  // Pre-format axis ticks.
   const xTickVals = Array.from({ length: 5 }, (_, i) => (xMax * i) / 4);
   const yTickVals = Array.from({ length: 5 }, (_, i) => (yMax * i) / 4);
 
@@ -133,7 +116,6 @@ export function TimeSeriesChart({
 
   return (
     <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
-      {/* y-axis gridlines + labels */}
       {yTickVals.map((v, i) => {
         const y = yScale(v);
         return (
@@ -160,7 +142,6 @@ export function TimeSeriesChart({
         );
       })}
 
-      {/* Raw scatter underlay */}
       {series
         .filter((s) => s.rawData && s.rawData.length > 0)
         .map((s, si) =>
@@ -176,7 +157,6 @@ export function TimeSeriesChart({
           )),
         )}
 
-      {/* Lines */}
       {series.map((s, si) => {
         if (s.data.length === 0) return null;
         const sampled = subsample(s.data);
@@ -198,8 +178,6 @@ export function TimeSeriesChart({
         );
       })}
 
-      {/* Horizontal reference lines (e.g. KV-cache pool ceiling). Drawn on top
-          of the data lines, with a label pinned to the right edge. */}
       {refLines.map((ref, i) => {
         if (!Number.isFinite(ref.value) || ref.value < 0 || ref.value > yMax) return null;
         const y = yScale(ref.value);
@@ -230,7 +208,6 @@ export function TimeSeriesChart({
         );
       })}
 
-      {/* X-axis */}
       <line
         x1={PAD.left}
         x2={PAD.left + innerW}
@@ -291,8 +268,6 @@ export function TimeSeriesChart({
   );
 }
 
-// Fixed colors for the token-source names the chart-series builder emits
-// (vLLM names first, then the SGLang names compute-chart-series produces).
 const KNOWN_SOURCE_COLORS: Record<string, string> = {
   local_compute: '#f97316',
   local_cache_hit: '#3b82f6',
@@ -319,8 +294,6 @@ const SOURCE_LABELS: Record<string, Record<string, string>> = {
   },
 };
 
-// Fallback palette for any source name not in KNOWN_SOURCE_COLORS so we never
-// emit two layers in the same shade. Cycles by stack (insertion) order.
 const FALLBACK_PALETTE = [
   '#3b82f6',
   '#f97316',
@@ -332,7 +305,6 @@ const FALLBACK_PALETTE = [
   '#ec4899',
 ];
 
-/** Stacked-area chart for token-source share over time. */
 export function StackedAreaChart({
   sourceSeries,
   durationS,
@@ -352,22 +324,10 @@ export function StackedAreaChart({
     const entries = Object.entries(sourceSeries).filter(([, v]) => v.length > 0);
     if (entries.length === 0) return null;
 
-    // Different sources can land on different scrape timestamps
-    // (SGLang's hits/misses fire on alternating ticks), so we MUST
-    // align across all sources before computing shares — otherwise the
-    // share calculation indexes into each source's own time axis and
-    // mixes values from different moments.
-    //
-    // Approach: union all timestamps across sources, then for each
-    // unique timestamp carry forward the cumulative sum for every
-    // source (a source that didn't report at time t holds its previous
-    // cumulative value rather than dropping to 0).
     const tValues = [...new Set(entries.flatMap(([, arr]) => arr.map((p) => p.t)))].toSorted(
       (a, b) => a - b,
     );
 
-    // For each source, walk its (sorted) array and produce a parallel
-    // cumulative-sum array indexed against `tValues` via carry-forward.
     const cum: Record<string, number[]> = {};
     for (const [name, arr] of entries) {
       const valByT = new Map(arr.map((p) => [p.t, p.value]));
@@ -399,9 +359,6 @@ export function StackedAreaChart({
 
   const stackOrder = Object.keys(shares);
 
-  // Assign colors once per render in stack order so the layers and the hover
-  // tooltip always agree, including for unknown source names on the fallback
-  // palette.
   const colorByName = new Map<string, string>();
   let fallbackIdx = 0;
   for (const name of stackOrder) {
@@ -410,8 +367,6 @@ export function StackedAreaChart({
   }
   const colorFor = (name: string): string => colorByName.get(name) ?? FALLBACK_PALETTE[0]!;
 
-  // Wrap the legend, then grow the viewBox and bottom padding by the same
-  // amount so the plot area is untouched (see TimeSeriesChart).
   const legendEntries: ChartLegendEntry[] = stackOrder.map((name) => ({
     label: sourceLabels[name] ?? name,
     color: colorFor(name),
@@ -450,7 +405,6 @@ export function StackedAreaChart({
 
   const resolve = (fraction: number) => {
     const t = fraction * xMax;
-    // Find the closest tValue index.
     let idx = 0;
     let bestDist = Infinity;
     for (let i = 0; i < tValues.length; i++) {

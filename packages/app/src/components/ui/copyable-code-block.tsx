@@ -23,7 +23,6 @@ const STRINGS = {
   },
 } as const;
 
-/** A bounded reader, not a truncated preview: copy always includes every byte. */
 export function CopyableCodeBlock({
   children,
   locale,

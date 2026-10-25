@@ -1,10 +1,3 @@
-/**
- * Shared API response types used by both dashboard pages and API routes.
- * Single source of truth — import from here instead of defining inline.
- */
-
-// ── Raw body search ─────────────────────────────────────────────
-
 export interface RawBodySearchResult {
   id: string;
   sessionId: string;
@@ -15,8 +8,6 @@ export interface RawBodySearchResult {
   matchedIn: 'request' | 'response';
   snippet: string;
 }
-
-// ── Overview ────────────────────────────────────────────────────
 
 export interface UsageBucket {
   hour: string;
@@ -80,8 +71,6 @@ export interface OverviewStats {
   dailyUsageHistogram: DailyUsageBucket[];
 }
 
-// ── Sessions ────────────────────────────────────────────────────
-
 export interface Session {
   id: string;
   clientId: string;
@@ -92,36 +81,21 @@ export interface Session {
     cliVersion?: string;
     os?: string;
     arch?: string;
-    /** Proxy route label ('openai' | 'codex'); absent on the Anthropic route. Not the harness. */
     client?: string;
   } | null;
   clientApiKeyHash: string;
   requestCount: number;
-  /**
-   * Sum of `input_tokens` (i.e. neither cache_read nor cache_write) across
-   * the session's requests. Used together with cache totals to derive the
-   * session's API cache hit rate without a follow-up query.
-   */
   totalInput: number;
   totalCacheRead: number;
   totalCacheWrite: number;
   totalOutput: number;
-  /** Sum of `cost_usd` across the session's visible requests, in USD. */
   totalCost: number;
   privacyMode: 'anon' | 'full';
 }
 
-/**
- * Payload returned by `/api/v1/agentic-workload-explorer/sessions/[id]/hash-stats` — the lazy-loaded
- * theoretical upper-bound cache hit rate per session row. Computed by walking
- * a chain-hash trie over every request's hash IDs (no eviction, no TTL).
- */
 export interface SessionHashStats {
-  /** Total hash-block tokens served from prior chains in the session. */
   hashCached: number;
-  /** Total hash-block tokens across every chronologically-ordered request. */
   hashTotal: number;
-  /** Convenience: hashCached / hashTotal * 100, or 0 when there's no data. */
   hitRate: number;
 }
 
@@ -130,8 +104,6 @@ export interface SessionStats {
   last48h: number;
   last7d: number;
 }
-
-// ── Session insights ────────────────────────────────────────────
 
 export interface HistogramBin {
   min: number;
@@ -164,8 +136,6 @@ export interface SessionInsightsData {
   dailySessions: { day: string; sessionCount: number }[];
   hourlyConcurrent: { hour: string; activeSessions: number }[];
 }
-
-// ── Costs ───────────────────────────────────────────────────────
 
 export interface CostSummary {
   totalCost: number;
@@ -239,8 +209,6 @@ export interface CostData {
   pricingCoverage: PricingCoverage;
 }
 
-// ── Errors ──────────────────────────────────────────────────────
-
 export interface ErrorData {
   summary: {
     totalErrors: number;
@@ -288,8 +256,6 @@ export interface ErrorReach {
   byClient: ErrorReachCohort[];
 }
 
-// ── Traffic ─────────────────────────────────────────────────────
-
 export interface TrafficStats {
   totalRequests: number;
   requestsToday: number;
@@ -320,8 +286,6 @@ export interface TrafficData {
   heatmap: TrafficHeatmapCell[];
   streamingBreakdown: StreamingDay[];
 }
-
-// ── Cache ───────────────────────────────────────────────────────
 
 export interface CacheStats {
   totalCacheRead: number;
@@ -363,8 +327,6 @@ export interface CacheData {
   byClient: ClientCache[];
 }
 
-// ── Models ──────────────────────────────────────────────────────
-
 export interface TokensByModel {
   model: string;
   inputTokens: number;
@@ -390,8 +352,6 @@ export interface ModelsData {
   tokensByModel: TokensByModel[];
   timeSeries: ModelTimeSeries[];
 }
-
-// ── Streaming ───────────────────────────────────────────────────
 
 export interface PerformancePercentileStats {
   p50: number;
@@ -457,8 +417,6 @@ export interface StreamingData {
   throughputDistribution: GraphHistogram;
 }
 
-// ── Platform ────────────────────────────────────────────────────
-
 export interface PlatformStat {
   os: string | null;
   cliVersion: string | null;
@@ -477,8 +435,6 @@ export interface PlatformData {
   stats: PlatformStat[];
   timeSeries: PlatformTimeSeries[];
 }
-
-// ── Web search ──────────────────────────────────────────────────
 
 export interface WebSearchStats {
   totalSearches: number;
@@ -514,8 +470,6 @@ export interface WebSearchData {
   topSessions: WebSearchTopSession[];
 }
 
-// ── Clients ─────────────────────────────────────────────────────
-
 export interface Client {
   id: string;
   apiKeyHash: string;
@@ -540,8 +494,6 @@ export interface ClientStats {
   last48h: number;
   sessions7d: number;
 }
-
-// ── User ────────────────────────────────────────────────────────
 
 export interface UserActivity {
   stats: {

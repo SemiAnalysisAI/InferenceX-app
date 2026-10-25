@@ -11,7 +11,6 @@ import { mapBenchmarkRow } from './benchmark-mapper';
 import producer from './fixtures/cache-validity-producer.json';
 import { createSkipTracker } from './skip-tracker';
 
-/** Minimal v3 agentic agg row around one producer `server_metrics` payload. */
 function v3Row(serverMetrics: Record<string, unknown>): Record<string, any> {
   return {
     infmax_model_prefix: 'dsv4',

@@ -1,36 +1,9 @@
-/**
- * Backfill or repair PowerX telemetry (`gpu_metrics_<suffix>` artifacts, or the
- * `power_audit_<suffix>` bundle of a suffix without one) in the migration-016
- * tables from a run's GitHub artifacts.
- *
- * GitHub keeps run artifacts for 90 days and the GCS mirror only covers
- * scheduled/push runs on main, so the reachable history is bounded by GitHub
- * retention; runs not visible to the token are reported and skipped. Each
- * gpu_metrics artifact is paired with its exact `bmk_<suffix>`
- * (or `bmk_agentic_<suffix>`) sibling, the raw rows are mapped through the
- * production mapper, and the series is linked to those persisted points.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-gpu-metrics --run 34557177019 --yes
- *   bun run --cwd packages/db db:backfill-gpu-metrics --all --yes
- *   bun run --cwd packages/db db:backfill-gpu-metrics --all --dry-run
- *   bun run --cwd packages/db db:backfill-gpu-metrics --all --force --limit 20 --yes
- *   bun run --cwd packages/db db:backfill-gpu-metrics --run 34557177019 --attempt 2 --artifact gpu_metrics_example --receipt power-publication.json --yes
- *
- * --all skips runs with complete retained telemetry inventories unless --force is passed;
- * --run selects its run either way. --force also replaces the stored samples of
- * unchanged series, so a parser fix reaches runs whose artifacts GitHub retains.
- * --attempt selects one attempt (default: latest); --artifact restricts repair to
- * one exact artifact name; --receipt updates an existing publication receipt in place.
- * These three options require --run.
- */
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 
-import { hasNoSslFlag } from './cli-utils.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
@@ -76,7 +49,6 @@ import {
   type GpuMetricSeriesCoverageRow,
 } from './queries/gpu-metrics-coverage.js';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
 const PAIR_CONCURRENCY = 4;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 4, onnotice: () => {} });
@@ -114,11 +86,6 @@ function nonEmpty(flag: string, value: string | undefined): string | null {
   return value ?? null;
 }
 
-/**
- * Strict, so an unknown flag stops the run before any database work instead of
- * being ignored. `--yes` and `--no-ssl` are read by the shared CLI helpers; they
- * are declared here only so strict parsing accepts them.
- */
 function parseFlags(args: string[]): BackfillFlags {
   const { values } = parseArgs({
     args,
@@ -207,11 +174,6 @@ function writeReceipt(receiptPath: string, manifest: PowerPublicationManifest): 
   fs.renameSync(temporary, receiptPath);
 }
 
-/**
- * The verifier compares the receipt with the database, so a merged CI receipt
- * that expected no audit must expect the one recovered here. Match by stored
- * identity: after the offload fallback, the mapped identity differs from it.
- */
 async function expectRecoveredAudits(
   manifest: PowerPublicationManifest,
   audits: readonly AgentxAuditWrite[],
@@ -249,7 +211,6 @@ type PairOutcome =
   | { kind: 'unmatched' }
   | { kind: 'failed' };
 
-/** Download one gpu_metrics/bmk pair, resolve its points, and persist the series. */
 async function processPair(
   run: CandidateRun,
   pair: GpuMetricsArtifactPair,
@@ -317,8 +278,6 @@ async function processPair(
     gpuMetricsDir = await retryArtifactOperation(`downloading ${pair.gpuMetrics.name}`, () =>
       downloadArtifact(pair.gpuMetrics, tempDir),
     );
-    // One plan per pair: the bundle's retained windows attached to the single
-    // stored point at each concurrency.
     const plan = agentxWindowPlan(readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name));
     const attached = attachAgentxAudits(plan, agenticPoints, (point) => `benchmark ${point.id}`);
     for (const refusal of attached.refused) {
@@ -340,7 +299,6 @@ async function processPair(
     if (ingested.seriesIds.length === 0) {
       throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
     }
-    // Provenance is written only after every host series is stored and linked.
     const written = await applyAgentxAudits(sql, { workflowRunId: run.id, writes: audits });
     return {
       kind: 'ingested',
@@ -397,7 +355,7 @@ async function main(): Promise<void> {
     let failedRuns = 0;
     for (const run of runs) {
       try {
-        const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+        const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
         const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
         if (artifacts === null) {
           goneRuns++;
@@ -449,7 +407,7 @@ async function main(): Promise<void> {
 
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
-    const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
     const runStart = Date.now();
     const manifest = flags.receipt === null ? null : readReceipt(flags.receipt, run);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
@@ -479,8 +437,6 @@ async function main(): Promise<void> {
       const pairs = allPairs.filter(
         (pair) => !flags.artifact || pair.gpuMetrics.name === flags.artifact,
       );
-      // Receipt expectations come from benchmark siblings even when no telemetry
-      // was uploaded. Counting only the successful pairs would hide missing points.
       const missing =
         flags.receipt === null
           ? { observations: [], errors: [] }
@@ -603,8 +559,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // latest_benchmarks copies the AgentX audits; refresh even when this run wrote
-  // none, so rerunning after an interrupted write still publishes them.
   await refreshLatestBenchmarks(sql);
   console.log(
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +

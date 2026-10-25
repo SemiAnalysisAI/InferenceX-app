@@ -26,7 +26,6 @@ const SOURCE_ROLE_LABEL: Record<Locale, Record<MetricSource['role'], string>> = 
   zh: { router: '路由', prefill: '预填充', decode: '解码', combined: '合并', unknown: '未知' },
 };
 
-/** "Role · instance" label for one server-metrics endpoint. */
 export function metricSourceLabel(source: MetricSource, locale: Locale = 'en'): string {
   const engineLabel = (engine: string) => (locale === 'zh' ? `引擎 ${engine}` : `engine ${engine}`);
   const instance =
@@ -39,9 +38,6 @@ export function metricSourceLabel(source: MetricSource, locale: Locale = 'en'): 
     : SOURCE_ROLE_LABEL[locale][source.role];
 }
 
-// Warmup vs profiling stage selector. Drives the server-metric charts AND the
-// request-derived charts (ISL/OSL, latency-over-time, in-flight). Only shown
-// when the point actually has a warmup phase.
 const TOOLBAR_STRINGS = {
   en: {
     stage: 'Stage',
@@ -68,11 +64,6 @@ export function stagePhaseLabels(locale: Locale): { profiling: string; warmup: s
   return { profiling: t.profiling, warmup: t.warmup };
 }
 
-/**
- * Sticky per-point toolbar: warmup/profiling stage toggle (when the point has
- * a warmup phase) and the server-metrics endpoint selector (when the point has
- * more than one source). The parent decides when to render it at all.
- */
 export function MetricSourceToolbar({
   hasWarmup,
   phase,
@@ -88,7 +79,6 @@ export function MetricSourceToolbar({
   metricSources: MetricSourceDescriptor[];
   selectedSource: MetricSourceDescriptor | undefined;
   onSourceChange: (id: string) => void;
-  /** Adapter reported in analytics when the selected source lookup misses. */
   fallbackAdapter: string | undefined;
 }) {
   const locale = useLocale();

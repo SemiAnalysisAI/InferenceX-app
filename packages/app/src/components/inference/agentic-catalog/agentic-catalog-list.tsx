@@ -4,17 +4,6 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogCardLink } from './agentic-catalog-link';
 
-/**
- * Model-grouped catalog of the AgentX runs that have stored telemetry, laid
- * out the way `/compare` lays out its comparison catalog: a summary card, then
- * one `<section>` per model holding a grid of link cards.
- *
- * One card per (hardware, framework, precision) config rather than per point.
- * There are hundreds of trace-backed points, and the detail page carries a
- * sibling navigator, so a card opens that config's representative point and
- * the reader moves between concurrencies from there.
- */
-
 const STRINGS = {
   en: {
     eyebrow: 'Telemetry catalog',
@@ -84,9 +73,6 @@ export function AgenticCatalogList({
                   archLine={`${card.vendor} · ${card.arch}`}
                   precisionLabel={card.precisionLabel}
                   detailLine={t.detail(card.points, card.minConc, card.maxConc, card.latestDate)}
-                  // Precision is part of the key: a model/SKU/engine can ship
-                  // both an FP4 and an FP8 config, and the two are separate
-                  // cards that must not collide on the same test id.
                   target={`${group.key}-${card.hardwareKey}-${card.frameworkLabel}-${card.precisionLabel}`
                     .toLowerCase()
                     .replaceAll(/[^a-z0-9]+/gu, '-')}

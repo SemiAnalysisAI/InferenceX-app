@@ -48,8 +48,6 @@ const STRINGS = {
   },
 } as const;
 
-// ── Agent color palette ──────────────────────────────────────────
-
 const AGENT_COLORS: Record<string, string> = {
   Main: '#6b7280',
   'Explore Agent': '#0ea5e9',
@@ -67,14 +65,10 @@ const AGENT_COLORS: Record<string, string> = {
 
 const AGENT_COLOR_DEFAULT = '#ec4899';
 
-/** @visibleForTesting */
 export function getAgentColor(label: string): string {
   return AGENT_COLORS[label] || AGENT_COLOR_DEFAULT;
 }
 
-// ── Tool colors ───────────────────────────────────────────────────
-
-// Canonical per-tool palette plus the timeline-only bar kinds.
 const TOOL_COLORS: Record<string, string> = {
   ...BASE_TOOL_COLORS,
   assistant: '#6b7280',
@@ -82,12 +76,9 @@ const TOOL_COLORS: Record<string, string> = {
   other: '#ec4899',
 };
 
-/** @visibleForTesting */
 export function getToolColor(toolName: string): string {
   return TOOL_COLORS[toolName] || TOOL_COLORS.other;
 }
-
-// ── Types ─────────────────────────────────────────────────────────
 
 interface TimelineBar {
   id: string;
@@ -106,8 +97,8 @@ interface TimelineBar {
 
 interface TimelineRow {
   id: string;
-  label: string; // "Main", "Explore Agent #1", etc.
-  agentType: string; // "Main", "Explore Agent", etc. (for color)
+  label: string;
+  agentType: string;
   bars: TimelineBar[];
   totalCost: number;
 }
@@ -119,9 +110,6 @@ interface TooltipData {
   bar: TimelineBar;
 }
 
-// ── Extract dominant tool from response ───────────────────────────
-
-/** @visibleForTesting */
 export function getDominantTool(request: SessionRequest): string {
   const responseBody = request.responseBody as {
     body?: {
@@ -144,10 +132,6 @@ export function getDominantTool(request: SessionRequest): string {
   return 'assistant';
 }
 
-// ── Build timeline rows ───────────────────────────────────────────
-// Main agent requests are collected into a single "Main" row.
-
-/** @visibleForTesting */
 export function buildTimelineRows(requests: SessionRequest[]): {
   rows: TimelineRow[];
   totalDurationMs: number;
@@ -160,11 +144,9 @@ export function buildTimelineRows(requests: SessionRequest[]): {
 
   const sessionStart = new Date(sorted[0].timestamp).getTime();
 
-  // Main agent row collects all main requests
   const mainBars: TimelineBar[] = [];
   let mainCost = 0;
 
-  // Track instance counts per agent type for numbering
   const instanceCounts = new Map<string, number>();
   const subagentRows: TimelineRow[] = [];
 
@@ -203,14 +185,12 @@ export function buildTimelineRows(requests: SessionRequest[]): {
         totalCost: cost,
       });
     } else {
-      // Main agent request
       const bar = makeBar(run.req);
       mainBars.push(bar);
       mainCost += bar.costUsd || 0;
     }
   }
 
-  // Build final rows: Main first, then sub-agents in order of appearance
   const rows: TimelineRow[] = [];
 
   if (mainBars.length > 0) {
@@ -225,23 +205,17 @@ export function buildTimelineRows(requests: SessionRequest[]): {
 
   rows.push(...subagentRows);
 
-  // Total duration
   const allBars = rows.flatMap((r) => r.bars);
   const totalDurationMs = allBars.length > 0 ? Math.max(...allBars.map((b) => b.endMs)) : 0;
 
   return { rows, totalDurationMs };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-/** @visibleForTesting */
 export function formatTickLabel(ms: number): string {
   if (ms < 1000) return `+${ms}ms`;
   if (ms < 60000) return `+${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`;
   return `+${(ms / 60000).toFixed(1)}m`;
 }
-
-// ── Tooltip component ─────────────────────────────────────────────
 
 type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
@@ -310,8 +284,6 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────
-
 export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
   const t = STRINGS[useLocale()];
   const explorerHref = useExplorerHref();
@@ -322,14 +294,12 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
 
   const { rows, totalDurationMs } = useMemo(() => buildTimelineRows(requests), [requests]);
 
-  // Zoom & pan state: visible time window in ms
   const [viewStart, setViewStart] = useState(0);
-  const [viewEnd, setViewEnd] = useState<number | null>(null); // null = full range
+  const [viewEnd, setViewEnd] = useState<number | null>(null);
   const dragRef = useRef<{ startX: number; startViewStart: number; startViewEnd: number } | null>(
     null,
   );
 
-  // ── Layout constants ────────────────────────────────────────────
   const LABEL_WIDTH = 180;
   const ROW_HEIGHT = 32;
   const ROW_GAP = 4;
@@ -340,14 +310,12 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
   const chartWidth = Math.max(600, 800);
   const svgHeight = HEADER_HEIGHT + rows.length * (ROW_HEIGHT + ROW_GAP) + 8;
 
-  // Zoom/pan: compute visible range
   const vStart = viewStart;
   const vEnd = viewEnd ?? totalDurationMs;
   const visibleDuration = Math.max(vEnd - vStart, 1);
   const scale = (chartWidth - PADDING_RIGHT) / visibleDuration;
   const isZoomed = viewEnd !== null;
 
-  // Time axis ticks (based on visible range)
   const tickCount = Math.min(10, Math.max(4, Math.floor(chartWidth / 80)));
   const tickIntervalMs = visibleDuration / tickCount;
   const niceIntervals = [
@@ -360,7 +328,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     if (tv >= vStart) ticks.push(tv);
   }
 
-  // Zoom handler: scroll wheel zooms around cursor position
   const handleWheel = useCallback(
     (e: React.WheelEvent<SVGSVGElement>) => {
       e.preventDefault();
@@ -378,7 +345,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
       let newStart = pivot - mouseRatio * newDuration;
       let newEnd = pivot + (1 - mouseRatio) * newDuration;
 
-      // Clamp
       if (newStart < 0) {
         newEnd -= newStart;
         newStart = 0;
@@ -400,7 +366,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     [viewStart, viewEnd, totalDurationMs, chartWidth, PADDING_RIGHT],
   );
 
-  // Pan handlers: drag to pan
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (e.button !== 0) return;
@@ -450,13 +415,10 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     setViewEnd(null);
   }, []);
 
-  // Unique agent types for legend
   const uniqueTypes = [...new Set(rows.map((r) => r.agentType))];
 
-  // Total cost
   const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
 
-  // ── Export to PNG ─────────────────────────────────────────────
   const exportToPng = useCallback(() => {
     const container = chartRef.current;
     if (!container) return;
@@ -473,17 +435,14 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
 
     ctx.scale(dpr, dpr);
 
-    // Background
     const isMinecraft = document.documentElement.classList.contains('minecraft');
     const darkLike = isMinecraft;
     ctx.fillStyle = isMinecraft ? '#1e1e1e' : '#fafafa';
     ctx.fillRect(0, 0, totalWidth, totalHeight);
 
-    // Draw label column background
     ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
     ctx.fillRect(0, 0, LABEL_WIDTH, totalHeight);
 
-    // Label column border
     ctx.strokeStyle = darkLike ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -491,43 +450,36 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
     ctx.lineTo(LABEL_WIDTH, totalHeight);
     ctx.stroke();
 
-    // Header text
     ctx.font = '600 9px ui-monospace, SFMono-Regular, monospace';
     ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
     ctx.fillText('AGENT', 8, HEADER_HEIGHT - 8);
 
-    // Header border
     ctx.beginPath();
     ctx.moveTo(0, HEADER_HEIGHT);
     ctx.lineTo(totalWidth, HEADER_HEIGHT);
     ctx.stroke();
 
-    // Row labels
     ctx.font = '500 10px ui-monospace, SFMono-Regular, monospace';
     for (let ri = 0; ri < rows.length; ri++) {
       const row = rows[ri];
       const y = HEADER_HEIGHT + ri * (ROW_HEIGHT + ROW_GAP) + ROW_HEIGHT / 2 + 4;
       const color = getAgentColor(row.agentType);
 
-      // Color bar
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.roundRect(8, y - 10, 3, 14, 1);
       ctx.fill();
 
-      // Label text
       ctx.fillStyle = color;
       const label = row.label.length > 22 ? `${row.label.slice(0, 20)}...` : row.label;
       ctx.fillText(label, 16, y);
 
-      // Count
       ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
       ctx.font = '400 9px ui-monospace, SFMono-Regular, monospace';
       ctx.fillText(String(row.bars.length), LABEL_WIDTH - 16, y);
       ctx.font = '500 10px ui-monospace, SFMono-Regular, monospace';
     }
 
-    // Draw the SVG portion onto canvas
     const svg = container.querySelector('svg');
     if (!svg) return;
 
@@ -542,7 +494,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
       ctx.drawImage(img, LABEL_WIDTH, 0, chartWidth, svgHeight);
       URL.revokeObjectURL(url);
 
-      // Download
       const link = document.createElement('a');
       link.download = `agent-timeline-${params.id || 'session'}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -562,7 +513,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
 
   return (
     <div className="space-y-3">
-      {/* Section header */}
       <div className="flex items-center gap-3">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.sectionTitle}
@@ -591,7 +541,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
         <span className="text-3xs font-mono text-muted-foreground">{t.rows(rows.length)}</span>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
         {uniqueTypes.map((agentType) => (
           <div key={agentType} className="flex items-center gap-1.5">
@@ -604,10 +553,8 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
         ))}
       </div>
 
-      {/* Chart container */}
       <div className="rounded-md border border-border bg-surface overflow-hidden">
         <div className="flex">
-          {/* Fixed left labels — one per row */}
           <div
             className="flex-shrink-0 border-r border-border bg-surface"
             style={{ width: LABEL_WIDTH }}
@@ -643,7 +590,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
             })}
           </div>
 
-          {/* Scrollable SVG chart */}
           <div className="flex-1 overflow-x-auto" ref={chartRef}>
             <svg
               width={chartWidth}
@@ -656,7 +602,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
             >
-              {/* Header background */}
               <rect
                 x={0}
                 y={0}
@@ -673,7 +618,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                 strokeWidth={1}
               />
 
-              {/* Time axis ticks */}
               {ticks.map((tick) => {
                 const x = (tick - vStart) * scale;
                 return (
@@ -703,7 +647,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                 );
               })}
 
-              {/* Row background stripes */}
               {rows.map((_, rowIdx) => (
                 <rect
                   key={`row-bg-${rowIdx}`}
@@ -717,7 +660,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                 />
               ))}
 
-              {/* Row separator lines */}
               {rows.map((_, rowIdx) => {
                 if (rowIdx === 0) return null;
                 const y = HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP) - ROW_GAP / 2;
@@ -736,7 +678,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                 );
               })}
 
-              {/* Timeline bars */}
               {rows.map((row, rowIdx) =>
                 row.bars.map((bar) => {
                   const x = (bar.startMs - vStart) * scale;
@@ -765,7 +706,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                       }
                       className="cursor-pointer"
                     >
-                      {/* Hover area */}
                       <rect
                         x={x - 1}
                         y={HEADER_HEIGHT + rowIdx * (ROW_HEIGHT + ROW_GAP)}
@@ -775,7 +715,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                         className="hover:fill-surface-hover/50"
                         rx={2}
                       />
-                      {/* Main bar (agent color) */}
                       <rect
                         x={x}
                         y={y}
@@ -785,7 +724,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                         fill={color}
                         opacity={0.85}
                       />
-                      {/* Tool color accent strip at bottom */}
                       <rect
                         x={x}
                         y={y + barHeight - 3}
@@ -795,7 +733,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                         fill={toolColor}
                         opacity={0.7}
                       />
-                      {/* Duration text inside bar */}
                       {barWidth > 50 && (
                         <text
                           x={x + barWidth / 2}
@@ -811,7 +748,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                           {formatDuration(bar.durationMs)}
                         </text>
                       )}
-                      {/* Tool name if enough space */}
                       {barWidth > 90 && (
                         <text
                           x={x + 5}
@@ -836,7 +772,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
         </div>
       </div>
 
-      {/* Summary */}
       <div className="flex items-center gap-4 text-2xs font-mono text-muted-foreground px-1">
         <span>{t.requests(rows.reduce((s, r) => s + r.bars.length, 0))}</span>
         <span className="h-px w-3 bg-border" />
@@ -855,7 +790,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
         )}
       </div>
 
-      {/* Tooltip */}
       {tooltip && <TimelineTooltip data={tooltip} t={t} />}
     </div>
   );

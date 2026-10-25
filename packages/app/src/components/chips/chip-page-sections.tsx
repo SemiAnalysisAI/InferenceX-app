@@ -1,11 +1,3 @@
-/**
- * Server-rendered sections shared by the /chips and /zh/chips pages.
- *
- * Locale is passed as a prop per AGENTS.md rule 5 (server components take an
- * optional `locale`); all prose comes from `chip-pages.ts` (en) and
- * `chip-pages-zh.ts` (zh), and every number is derived from GPU_SPECS and
- * HW_REGISTRY so the pages can never drift from the dashboard.
- */
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/seo/json-ld';
@@ -123,7 +115,7 @@ const STRINGS = {
     relatedChips: '相关芯片',
     liveCta: '查看实时基准测试结果',
     liveCtaBody:
-      '以上都是静态硬件数据。实际交付的 token 吞吐量、每百万 token 成本和每 token 能耗在仪表板上持续测量：',
+      '以上都是静态硬件数据。实测每秒 token 数、每百万 token 成本和每 token 能耗在仪表板上持续测量：',
     liveLinkInference: '实时推理仪表板',
     liveLinkCompare: '对比不同芯片运行同一模型的表现',
     liveLinkPerDollar: '每美元性能',
@@ -140,7 +132,7 @@ const STRINGS = {
       vendor: '厂商',
       arch: '架构',
       memory: '显存（可用）',
-      memoryBandwidth: '内存带宽',
+      memoryBandwidth: '显存带宽',
       fp4: 'FP4 稠密 TFLOP/s',
       fp8: 'FP8 稠密 TFLOP/s',
       bf16: 'BF16 稠密 TFLOP/s',
@@ -152,7 +144,7 @@ const STRINGS = {
       nic: '网卡',
       tdp: '单芯片 TDP',
       allInPower: '单芯片综合功耗',
-      costHyperscaler: '自有 - 超大规模云大批量 $/芯片/小时',
+      costHyperscaler: '自有 · 超大规模云厂商批量采购 $/芯片/小时',
       costRetail: '零售档 $/芯片/小时',
     },
     notSupported: '不支持',
@@ -333,11 +325,11 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
               <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
                 <th
                   scope="row"
-                  className="w-[52%] py-2.5 pr-4 text-left font-medium text-muted-foreground"
+                  className="w-[52%] px-4 py-2.5 text-left font-medium text-muted-foreground"
                 >
                   {label}
                 </th>
-                <td className="whitespace-nowrap py-2.5 text-right font-mono">{value}</td>
+                <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">{value}</td>
               </tr>
             ))}
           </tbody>

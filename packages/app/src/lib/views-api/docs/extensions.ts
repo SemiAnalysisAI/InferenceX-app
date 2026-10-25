@@ -22,7 +22,6 @@ const imageAgePoint: ApiSchema = {
   additionalProperties: false,
 };
 
-/** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
   model: [
     'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
@@ -46,7 +45,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   gpus: [
     'Comma-separated hardware/config keys; for gpu-metrics use numeric GPU indices. Omit for all.',
-    '以逗号分隔的硬件或配置键；gpu-metrics 使用数字芯片索引。省略时选择全部。',
+    '以逗号分隔的硬件或配置键；gpu-metrics 使用数字 GPU 索引。省略时选择全部。',
   ],
   percentile: [
     'AgentX latency percentile p75 or p90; CollectiveX supports p50, p95, p99.',
@@ -73,8 +72,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '比较范围结束日期 YYYY-MM-DD，不得早于 start。历史视图将其用作含终点的数据范围。',
   ],
   target: [
-    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Profit defaults are model-specific: DeepSeek V4 Pro defaults to 35 tok/s/user in both profit views. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. This is an editable assumption, not an OpenRouter P90-equivalent measurement.',
-    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。利润视图按模型设置默认值：DeepSeek V4 Pro 在两种利润视图中均默认为 35 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这是可修改的假设值，不是与 OpenRouter P90 等价的实测值。',
+    'Positive operating-point target, tok/s/user in interactivity-to-throughput mode. Both profit views use model-specific defaults: Kimi K3 60, GLM-5.2/5.3 135, MiniMax M3 115, DeepSeek V4 Pro 170, DeepSeek V4.1 Flash 150, Muse Spark Open 85, MiniMax M3.1 Flash 125, Qwen3.5 115, and Qwen3.8 Flash Next 90 tok/s/user. Dashboard links use /<model>/target/<value> route segments; this API continues to accept the target query parameter. These are editable SKU-coverage assumptions, not OpenRouter P90-equivalent measurements.',
+    '正数工作点目标；交互性转吞吐量模式下单位为 tok/s/user。两个利润视图按模型设置默认值：Kimi K3 为 60、GLM-5.2/5.3 为 135、MiniMax M3 为 115、DeepSeek V4 Pro 为 170、DeepSeek V4.1 Flash 为 150、Muse Spark Open 为 85、MiniMax M3.1 Flash 为 125、Qwen3.5 为 115、Qwen3.8 Flash Next 为 90 tok/s/user。仪表板链接通过 /<model>/target/<value> 路径片段传递目标值；本 API 仍使用 target 查询参数。这些默认值是用于扩大 SKU 覆盖范围的可修改假设，并非与 OpenRouter P90 等价的实测值。',
   ],
   costProvider: [
     'costh = owning, costr = renting. Profit views additionally accept custom with customCosts. No costn provider.',
@@ -154,7 +153,7 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   topologies: [
     'Comma-separated exact topology keys from the Dashboard topology selector or view point topologyKey. Filters allocation and parallelism without filtering concurrency; omitted means all. Preserve the keys verbatim. Unknown keys return no matching points.',
-    '逗号分隔的精确拓扑键，取自仪表盘拓扑选择器或数据点的 topologyKey。按 GPU 分配和并行配置筛选，保留全部已测并发；省略时不限制拓扑。原样使用这些键，未知键不会匹配数据点。',
+    '逗号分隔的精确拓扑键，取自仪表板拓扑选择器或数据点的 topologyKey。按 GPU 分配和并行配置筛选，保留全部已测并发；省略时不限制拓扑。原样使用这些键，未知键不会匹配数据点。',
   ],
   allPoints: [
     'Boolean, default false. Include points clipped by dashboard limits; optimal and best still apply independently.',
@@ -169,8 +168,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '用于复现滚动可靠性或镜像日期差计算的参考日期 YYYY-MM-DD。',
   ],
   includeHistory: [
-    'true or false (default). Include 90 daily UTC image-age points ending on asOf, with nearest-rank p90AgeDays and configurationCount. Uses successful image-bearing submissions, an older seed per configuration, and current model/scenario retirement rules. Missing p90 is null; no future observations are backfilled. All image filters apply. This is submission age, not container build age.',
-    'true 或 false（默认）。返回截至 asOf 的 90 个 UTC 日期点，包含最近秩法计算的 p90AgeDays 和 configurationCount。使用带镜像的成功提交、每个配置在窗口前的最近记录，以及当前的模型和场景停用规则。无数据时 p90 为 null，不用未来记录向前回填。所有镜像筛选条件均适用。此指标是提交年龄，不是镜像构建年龄。',
+    'true or false (default). Include 90 daily UTC image-age points ending on asOf, with nearest-rank p90AgeDays and configurationCount. Covers the same configurations as ageSummary (current filtered rows dated on or before asOf), so the last point equals ageSummary. Each configuration replays its successful image-bearing submissions up to its current row date, with an older seed before the window. Missing p90 is null; no future observations are backfilled. All image filters apply. This is submission age, not container build age.',
+    'true 或 false（默认）。返回截至 asOf 的 90 个 UTC 日期点，包含最近秩法计算的 p90AgeDays 和 configurationCount。统计的配置与 ageSummary 相同，即当前筛选结果中日期不晚于 asOf 的行，因此最后一个点与 ageSummary 一致。每个配置的历史由其带镜像的成功提交重建，截至当前行的日期，并保留窗口开始前的最近一次记录。无数据时 p90 为 null，不用未来记录向前回填。所有镜像筛选条件均适用。此指标是提交年龄，不是镜像构建年龄。',
   ],
   runs: [
     'Ordered comma-separated run IDs, at most eight. Omit for newest measured run; empty value selects none.',
@@ -334,11 +333,11 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   cell: [
     'Serving cell ID. Unknown IDs fall back to the first cell, matching the UI; evidence.cell records the resolved choice.',
-    '与已发布证据一起保留的 serving cell 选择。',
+    'serving cell ID。未知 ID 与界面一致，回退到首个 cell；evidence.cell 记录解析后的选择。',
   ],
   slot: [
     'Media/fidelity slot ID. Unknown IDs fall back to the UI default; evidence.slot records the resolved choice.',
-    '与已发布证据一起保留的媒体或保真度 slot 选择。',
+    '媒体或保真度 slot ID。未知 ID 回退到界面默认值；evidence.slot 记录解析后的选择。',
   ],
   gpuBasis: [
     'Video denominator: participating (default) or allocated GPUs.',
@@ -375,10 +374,16 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
           'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
           '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
         ] as const)
-      : (PARAMETER_NOTES[name] ?? [
-          `${name} selector for ${view}; resolved value is returned in params.`,
-          `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
-        ]);
+      : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
+          name === 'model'
+        ? ([
+            'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
+            '模型显示名称或比较页 slug。仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。',
+          ] as const)
+        : (PARAMETER_NOTES[name] ?? [
+            `${name} selector for ${view}; resolved value is returned in params.`,
+            `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
+          ]);
   return {
     name,
     location: 'query',
@@ -518,7 +523,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'current-inferencex-image'
-              ? ' ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from successful image-bearing submissions with the current active catalog. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age.'
+              ? " ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from the successful image-bearing submissions of those same configurations, so the last point equals ageSummary. Configurations absent from the current table, such as speculation or node-type variants replaced by a newer run, are excluded. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age. A row is outdated when its tag version is below the base engine's latest vLLM or SGLang release. A nightly whose commit GitHub resolves is outdated only when that commit is an ancestor of the release. Other nightlies compare their build date with the release's publish date: the tag's date, else the build's earliest submission in the catalog. Other tags, and engines without a release stream, are not flagged."
               : view === 'gpu-metrics'
                 ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Stored coverage describes the entire run: complete means the recorded artifact/file inventory is present, partial means recorded telemetry is missing, and unknown means no complete inventory was retained; missingArtifacts names entirely missing artifacts and may be empty when only a file is incomplete. GitHub coverage is null (unassessed). Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Statistics cover every chip of the selected file/host series, including startup and warmup, and are computed from its samples on each read; a stored series whose samples do not match its recorded sample count returns none. Mean is sample-weighted, P50/P95/P99 interpolate linearly at p*(N-1), and standard deviation divides by N. These statistics are not serving-window power or J/token. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings. This endpoint projects the raw GPU-metrics explorer, not the inference Power Timeline. Timeline role/window evidence comes from its existing series=power read plus benchmark power_audit. Timeline i_ptaxis, i_ptlines, i_ptwindow, i_ptfocus, i_ptutility and i_ptconc share fields control client rendering only and are not accepted here; they do not change raw telemetry or full-record statistics.'
                 : ''
@@ -527,9 +532,9 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'current-inferencex-image'
-              ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于带镜像的成功提交和当前有效模型目录重建 90 个每日 ageHistory 点。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。'
+              ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于同一批配置的带镜像成功提交，重建 90 个每日 ageHistory 点，因此最后一个点与 ageSummary 一致。当前表格中没有的配置（例如已被更新 run 取代的投机解码或节点类型变体）不计入。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。镜像标签中的版本号低于对应基础引擎（vLLM 或 SGLang）的最新 release 时，该行标记为 outdated。nightly 镜像的 commit 若能在 GitHub 上解析，则仅当该 commit 是此 release 的祖先提交时才标记；其余 nightly 镜像比较构建日期与 release 发布日期，构建日期取标签中的日期，标签无日期时取该构建在镜像目录中最早的提交日期。其他标签以及没有 release 来源的引擎不作标记。'
               : view === 'gpu-metrics'
-                ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。数据库 coverage 描述整个 run：complete 表示记录的产物与文件清单均已入库，partial 表示部分已记录的遥测缺失，unknown 表示未保留完整清单；missingArtifacts 仅列出整体缺失的产物；若只是文件不完整，此列表可能为空。GitHub 数据的 coverage 为 null，表示尚未评估。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选芯片索引筛选。统计则覆盖所选文件或主机序列的全部芯片，包含启动阶段和 warmup，每次读取时由该序列的样本计算；若已存序列读取到的样本数与记录不符，则不返回统计。均值按样本加权，P50/P95/P99 在 p*(N-1) 处线性插值，标准差以 N 为分母。这些统计不是 serving-window 功率或 J/token。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。本接口投影原始 GPU-metrics 浏览器，不是推理页的 Power Timeline。时间线通过现有 series=power 读取和基准测试 power_audit 获取角色与窗口证据；i_ptaxis、i_ptlines、i_ptwindow、i_ptfocus、i_ptutility 和 i_ptconc 分享字段仅控制客户端显示，本接口不接受这些参数。它们不改变原始遥测或全记录统计。'
+                ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。数据库 coverage 描述整个 run：complete 表示记录的产物与文件清单均已入库，partial 表示部分已记录的遥测缺失，unknown 表示未保留完整清单；missingArtifacts 仅列出整体缺失的产物；若只是文件不完整，此列表可能为空。GitHub 数据的 coverage 为 null，表示尚未评估。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选 GPU 索引筛选。统计则覆盖所选文件或主机序列的全部 GPU，包含启动阶段和 warmup，每次读取时由该序列的样本计算；若已存序列读取到的样本数与记录不符，则不返回统计。均值按样本加权，P50/P95/P99 在 p*(N-1) 处线性插值，标准差以 N 为分母。这些统计不是 serving-window 功率或 J/token。折线时间以所有 GPU 的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。本接口投影原始 GPU-metrics 浏览器，不是推理页的 Power Timeline。时间线通过现有 series=power 读取和基准测试 power_audit 获取角色与窗口证据；i_ptaxis、i_ptlines、i_ptwindow、i_ptfocus、i_ptutility 和 i_ptconc 分享字段仅控制客户端显示，本接口不接受这些参数。它们不改变原始遥测或全记录统计。'
                 : ''
         }`,
       ),
@@ -604,7 +609,6 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
   },
 );
 
-/** Keep legacy detailed contracts and add every newly implemented selector. */
 export function extendViewOperations(baseOperations: readonly ApiOperation[]): ApiOperation[] {
   return baseOperations.map((operation) => {
     const view = operation.path.split('/').at(-1) as ReadonlyView;

@@ -42,7 +42,6 @@ export const UBENCHX_TESTS = [
 
 export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];
 
-/** Shared ubenchX page header: title plus a selector that switches between test views. */
 export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
   const locale = useLocale();
   const router = useRouter();

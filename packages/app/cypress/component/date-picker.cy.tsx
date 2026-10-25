@@ -39,21 +39,18 @@ function DatePickerWrapper({
 describe('DatePicker', () => {
   it('displays formatted date when date is provided', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    // Date should be formatted as "Nov 15, 2025"
     cy.contains('Nov 15, 2025').should('be.visible');
   });
 
   it('available dates are clickable', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Run Date:').click();
-    // Date 10 should be enabled (2025-11-10 is in availableDates)
     cy.get('.grid-cols-7 button').contains('10').should('not.be.disabled');
   });
 
   it('unavailable dates have visual indicator', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Run Date:').click();
-    // Date 2 is not in availableDates, so it should be disabled with line-through
     cy.get('.grid-cols-7 button')
       .contains(/^2$/u)
       .should('be.disabled')
@@ -63,20 +60,15 @@ describe('DatePicker', () => {
   it('"Go to Latest" button navigates to latest available date', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Run Date:').click();
-    // Click "Go to Latest" - should select Dec 10, 2025
     cy.contains('Go to Latest').click();
-    // Now apply the selection
     cy.contains('Apply').click();
-    // The displayed date should be the latest
     cy.contains('Dec 10, 2025').should('be.visible');
   });
 
   it('Previous/Next date arrows work', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
-    // Click next arrow to go to next available date (2025-11-20)
     cy.get('button').filter(':has(svg)').last().click();
     cy.contains('Nov 20, 2025').should('be.visible');
-    // Click previous arrow to go back
     cy.get('button').filter(':has(svg)').first().click();
     cy.contains('Nov 15, 2025').should('be.visible');
   });
@@ -84,10 +76,8 @@ describe('DatePicker', () => {
   it('Apply button submits selected date', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Run Date:').click();
-    // Click on date 10 in the calendar
     cy.get('.grid-cols-7 button').contains('10').click();
     cy.contains('Apply').click();
-    // Dialog should close and date should update
     cy.contains('Select a Run Date').should('not.exist');
     cy.contains('Nov 10, 2025').should('be.visible');
   });
@@ -95,11 +85,8 @@ describe('DatePicker', () => {
   it('Cancel reverts selection', () => {
     cy.mount(<DatePickerWrapper initialDate="2025-11-15" />);
     cy.contains('Run Date:').click();
-    // Click a different date
     cy.get('.grid-cols-7 button').contains('10').click();
-    // Click cancel
     cy.contains('Cancel').click();
-    // Original date should still be shown
     cy.contains('Nov 15, 2025').should('be.visible');
   });
 

@@ -15,7 +15,6 @@ interface BlogSidebarCtaProps {
   labels: { eyebrow: string; title: string; body: string; button: string };
 }
 
-/** Sticky-sidebar card pointing readers at the live AgentX dashboard. */
 export function BlogSidebarCta({ href, slug, labels }: BlogSidebarCtaProps) {
   return (
     <div

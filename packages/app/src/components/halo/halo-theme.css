@@ -10,9 +10,7 @@
   font-weight: 700;
   font-display: swap;
 }
-/* ── Halo Theme ── Halo Infinite menu chrome over the dark chart palettes. */
 
-/* Local Halo Infinite artwork, mounted only while the Halo theme is active. */
 .halo-scene {
   position: fixed;
   inset: 0;
@@ -132,7 +130,6 @@
   }
 }
 
-/* Header and headings use Halo Infinite's Industry face; body copy stays DM Sans. */
 .halo header {
   background: #050a11eb;
   border-bottom: 2px solid #5ed1ff66;
@@ -154,7 +151,6 @@
   border-radius: 0;
 }
 
-/* Selected menu tab: cyan underline glow, like the Halo Infinite menu bar. */
 .halo header nav a[aria-current='page'],
 .halo [data-testid='mobile-menu'] a[aria-current='page'] {
   color: #fff;
@@ -171,7 +167,6 @@
   border-radius: var(--radius);
 }
 
-/* Menu panels: near-opaque navy with a faint Forerunner-cyan frame. */
 .halo [data-slot='card'] {
   background-color: #08111beb;
   border-color: #5ed1ff26;

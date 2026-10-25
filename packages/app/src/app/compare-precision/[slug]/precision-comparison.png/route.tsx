@@ -25,8 +25,6 @@ export async function GET(
   const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
   const parsed = parsePrecisionCompareSlug(slug);
-  // Compare case-insensitively. The HTML pages lowercase before their 308, so
-  // a mixed-case PNG URL should serve rather than 404.
   if (
     !parsed ||
     canonicalPrecisionCompareSlug(parsed.model.slug, parsed.gpu, parsed.precA, parsed.precB) !==

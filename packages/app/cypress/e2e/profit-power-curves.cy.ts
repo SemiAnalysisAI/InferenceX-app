@@ -5,8 +5,6 @@ import {
   PROFIT_HISTORY_DATE,
 } from '../support/profit-fixtures';
 
-// Invalid MI355X knots dominate the valid curve in the performance frontier.
-// Power selection must recover the remaining curve before interpolation.
 function rowsFor(date = PROFIT_DATE) {
   const rows = profitBenchmarkRows('kimik3', date).map((row) => ({
     ...row,
@@ -69,7 +67,7 @@ describe('Profit power-valid curves', { testIsolation: true }, () => {
           win.HTMLAnchorElement.prototype.click = () => {};
         },
       });
-      cy.get('#profit-target').should('have.value', '45');
+      cy.get('#profit-target').should('have.value', '60');
       barCount(3);
       chart()
         .find('.x-axis')
@@ -86,7 +84,7 @@ describe('Profit power-valid curves', { testIsolation: true }, () => {
         .contains(locale === 'en' ? 'Compare both' : '对比两种估算方式')
         .click();
       barCount(8);
-      cy.get('#profit-target').should('have.value', '45');
+      cy.get('#profit-target').should('have.value', '60');
       cy.get('[data-testid="export-button"]').first().click();
       cy.get('[data-testid="export-csv-button"]').click();
       cy.then(() => csv!.text()).then((text) => {
@@ -118,7 +116,7 @@ describe('Profit power-valid curves', { testIsolation: true }, () => {
       `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=mi355x_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
       { onBeforeLoad: unlock },
     );
-    cy.get('#profit-target').should('have.value', '45');
+    cy.get('#profit-target').should('have.value', '60');
     barCount(4);
     chart().should('contain', PROFIT_HISTORY_DATE);
     cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');

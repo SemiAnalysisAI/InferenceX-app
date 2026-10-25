@@ -29,6 +29,7 @@ import { operations as fleetViews } from '../views-api/docs/fleet';
 import { operations as gpuSpecsViews } from '../views-api/docs/gpu-specs';
 import { operations as historicalViews } from '../views-api/docs/historical';
 import { operations as inferenceViews } from '../views-api/docs/inference';
+import { operations as modelArchitectureViews } from '../views-api/docs/model-architectures';
 import { operations as optionsViews } from '../views-api/docs/options';
 import { operations as overviewViews } from '../views-api/docs/overview';
 import { operations as rankingsViews } from '../views-api/docs/rankings';
@@ -648,6 +649,7 @@ const collectiveXDatasetSchema = objectSchema(
         generated_at: { type: 'string', format: 'date-time' },
         conclusion: nullableStringSchema,
         source_sha: stringSchema,
+        source_repository: stringSchema,
         requested_cases: integerSchema,
         terminal_cases: integerSchema,
         measured_cases: integerSchema,
@@ -662,7 +664,13 @@ const collectiveXDatasetSchema = objectSchema(
         kv_requested_cases: integerSchema,
         kv_measured_cases: integerSchema,
       },
-      ['kv_requested_cases', 'kv_measured_cases', 'swap_requested_cases', 'swap_measured_cases'],
+      [
+        'source_repository',
+        'kv_requested_cases',
+        'kv_measured_cases',
+        'swap_requested_cases',
+        'swap_measured_cases',
+      ],
     ),
     coverage: arraySchema(anyObjectSchema),
     series: arraySchema(anyObjectSchema),
@@ -703,6 +711,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
     run_attempt: integerSchema,
     generated_at: { type: 'string', format: 'date-time' },
     conclusion: nullableStringSchema,
+    source_repository: stringSchema,
     covered_skus: arraySchema(stringSchema),
     requested_cases: integerSchema,
     measured_cases: integerSchema,
@@ -719,7 +728,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
       measured: integerSchema,
     }),
   },
-  ['kv_cases', 'swap_cases'],
+  ['source_repository', 'kv_cases', 'swap_cases'],
 );
 const percentileSchema = objectSchema({
   mean: numberSchema,
@@ -786,6 +795,19 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   },
 ];
 
+// OperatorX remains a page-bff, recorded in api-route-catalog.ts rather than
+// published OpenAPI. Its hardware[].reference normalization basis, bandwidth
+// assumptions, cross-backend argument alignment (fastest successful backend per
+// hardware/case, with measurements[].backend provenance), and workload-resolved
+// chart defaults and optional distribution quantiles/normalization selectors are
+// documented in docs/operatorx.md. Ingest-time compact run
+// projections are fetched in one revision-aware bulk query, preserving response
+// and source identities; legacy fallback and
+// partial-read cache behavior are documented there as well. Timeline references
+// share one raw read per run, with at most four concurrent runs; reference order,
+// revision checks, null/known behavior and error contracts are preserved. Merged
+// comparisons may use a revision-keyed shared Blob cache; scope invalidation awaits
+// deletion and partial/concurrently replaced generations remain uncached.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,
@@ -801,6 +823,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...compareViews,
   ]),
   ...extensionViews,
+  ...modelArchitectureViews,
 
   {
     id: 'get-pareto',
@@ -1017,8 +1040,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). It preserves recorded total_prompt_tokens and total_generation_tokens for the agentic P/D token mix; missing totals stay missing. powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。若数据中有 total_prompt_tokens 和 total_generation_tokens，投影会保留这两个字段，用于计算智能体 P/D 工作负载的输入输出 token 比例；缺失时不补值。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. TPU tooltips and point-detail headers omit GitHub run links; API run_url remains the original producer URL. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). It preserves recorded total_prompt_tokens and total_generation_tokens for the agentic P/D token mix; missing totals stay missing. powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。TPU 提示框和数据点详情页头部不显示 GitHub 运行链接，API 的 run_url 仍保留来源运行的原始 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。若数据中有 total_prompt_tokens 和 total_generation_tokens，投影会保留这两个字段，用于计算智能体 P/D 工作负载的输入输出 token 比例；缺失时不补值。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1216,8 +1239,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/workflow-info',
     summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
-      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
+      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage for one date. date is required.',
+      '返回指定日期的工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。date 为必填参数。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1225,10 +1248,10 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'date',
         'query',
-        false,
+        true,
         'date',
-        'Optional YYYY-MM-DD filter.',
-        '可选的 YYYY-MM-DD 筛选条件。',
+        'Required YYYY-MM-DD date.',
+        '必填的 YYYY-MM-DD 日期。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1268,8 +1291,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'date is not YYYY-MM-DD.',
-        'date 不是 YYYY-MM-DD。',
+        'date is missing or not YYYY-MM-DD.',
+        '缺少 date，或 date 不是 YYYY-MM-DD。',
         PUBLIC_API_ERRORS.invalidDate,
       ),
       errorResponse(
@@ -1506,7 +1529,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '400',
         'A model, date, view, format, workload, tier, weight, or alpha value is invalid.',
-        '模型、日期、视图、格式、负载、档位、权重或 alpha 值无效。',
+        '模型、日期、视图、格式、工作负载、档位、权重或 alpha 值无效。',
         'Invalid tiers: expected comma-separated positive numbers',
       ),
       errorResponse(
@@ -1576,18 +1599,37 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease engine release (tag starting with v) among the 20 most recent GitHub releases for vLLM and SGLang, with its publish time. commits maps each unversioned nightly commit in an active benchmark image to its GitHub compare status against that release; behind means the commit is an ancestor of the release. Commits GitHub cannot resolve are omitted. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布引擎版本（标签以 v 开头）及其发布时间。commits 列出当前基准测试镜像中不带版本号的 nightly commit，以及 GitHub 比较该 commit 与此 release 的结果；behind 表示该 commit 是此 release 的祖先提交。GitHub 无法解析的 commit 不会列出。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag, ISO 8601 publish time and nightly commit statuses, or null.',
+        '框架键映射到版本标签、ISO 8601 发布时间和 nightly commit 比较结果；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+              commits: mapSchema({
+                type: 'string',
+                enum: ['ahead', 'behind', 'diverged', 'identical'],
+              }),
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: {
+            tag: 'v0.10.2',
+            publishedAt: '2026-08-01T12:00:00Z',
+            commits: { af7f9488c2210d67: 'behind', e68efc685ab1: 'diverged' },
+          },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z', commits: {} },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],
@@ -1907,8 +1949,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
+      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. run.source_repository names the GitHub repository that ran the sweep when it is not SemiAnalysisAI/InferenceX. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若扫描并非由 SemiAnalysisAI/InferenceX 执行，run.source_repository 会标明实际执行的 GitHub 仓库。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2385,8 +2427,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/request-timeline',
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
-      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing.',
-      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。',
+      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved; legacy timelines retain the same response shape.',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录；旧版时间线的响应结构不变。',
     ),
     audience: 'public',
     stability: 'beta',

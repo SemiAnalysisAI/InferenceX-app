@@ -1,27 +1,4 @@
 import { readTraceProfileChunks } from './lib/trace-profile-storage';
-/**
- * Backfill `agentic_trace_replay.request_timeline_gz` (gzip JSON plus the
- * `request_timeline_version` and `request_count` scalars) for rows whose gzip
- * timeline is missing or older than `REQUEST_TIMELINE_VERSION`.
- *
- * A row that still holds a current-version legacy `request_timeline` JSONB is
- * converted without reading its profile blob: its requests stream out of
- * Postgres in index ranges, and the gzip is written only when their count
- * matches `jsonb_array_length`. Every other row is recomputed from the stored
- * `profile_export.jsonl` gzip. A failed row does not stop the run; failures
- * are listed at the end and the process exits nonzero. Run after migration 017
- * and any time the version bumps.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-request-timeline
- *     [--limit N]            only process the first N candidate rows
- *     [--force]              recompute every row from its profile blob, even if current
- *     [--run-id ID]          only rows linked to one GitHub workflow run
- *     [--shard-count N --shard-index I]  only rows whose id falls in this shard
- *     [--drop-legacy-jsonb]  opt-in: after re-reading and verifying a row's stored
- *                            gzip timeline, set its legacy JSONB to null
- *     [--yes]                skip the confirmation prompt
- */
 
 import { hasNoSslFlag } from './cli-utils.js';
 import {
@@ -120,11 +97,6 @@ async function main(): Promise<void> {
             and wr.github_run_id = ${githubRunId}
         )`
       : sql``;
-    // A row can produce a gzip timeline from its profile blob or, without
-    // reading the profile, from a current legacy JSONB timeline. Rows with
-    // neither keep no timeline and the API serves them as "no timeline data".
-    // With --drop-legacy-jsonb, rows that already have a gzip copy and still
-    // hold legacy JSONB are candidates too; each is verified before clearing.
     const candidates = flags.force
       ? await sql<{ id: number }[]>`
           select id

@@ -1,25 +1,11 @@
-/**
- * Guards that every agentic blob-cache key is DERIVED from the version constant
- * that governs its payload — not a hand-written string. `blobSet` is write-once
- * and nothing purges the blob cache after a backfill, so an unversioned (or
- * hand-bumped) key would serve stale data forever after a payload-version bump.
- * Deriving the key from the constant means a future bump rolls the cache
- * namespace automatically; these tests fail loudly if a route drifts back to a
- * literal string.
- */
-
 import { describe, expect, it, vi } from 'vitest';
 
-// Route modules call getDb() at import time via cachedQuery's closure and pull
-// in the blob cache — stub both so importing the route is side-effect-free.
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: vi.fn(() => 'mock-sql'),
   FIXTURES_MODE: false,
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  // Passthrough so importing the route doesn't touch blob storage; the key is
-  // still exported as CACHE_KEY_PREFIX for us to assert on.
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (data: unknown) => Response.json(data),
 }));

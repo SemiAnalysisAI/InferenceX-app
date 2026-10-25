@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockParseCsvData } = vi.hoisted(() => ({
+const { mockParseCsvData, zipArchives } = vi.hoisted(() => ({
   mockParseCsvData: vi.fn((csv: string) => {
     if (csv.trim().length === 0) return [];
     return [
@@ -16,12 +16,12 @@ const { mockParseCsvData } = vi.hoisted(() => ({
       },
     ];
   }),
+  zipArchives: { byKey: new Map<string, { entryName: string; data: string }[]>() },
 }));
 
 vi.mock('@semianalysisai/inferencex-constants', () => ({
   GITHUB_API_BASE: 'https://api.github.com',
-  GITHUB_OWNER: 'TestOwner',
-  GITHUB_REPO: 'TestRepo',
+  benchmarkSourceRepos: () => ['TestOwner/TestRepo'],
 }));
 
 vi.mock('@/components/gpu-power/types', () => ({
@@ -43,14 +43,19 @@ vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
 vi.mock('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
+    private readonly buffer: Buffer;
+    constructor(buffer: Buffer) {
+      this.buffer = buffer;
+    }
     getEntries() {
-      return [
-        {
-          entryName: 'gpu_metrics_0.csv',
-          isDirectory: false,
-          getData: () => Buffer.from(csvContent),
-        },
+      const entries = zipArchives.byKey.get(this.buffer.toString('utf8')) ?? [
+        { entryName: 'gpu_metrics_0.csv', data: csvContent },
       ];
+      return entries.map((entry) => ({
+        entryName: entry.entryName,
+        isDirectory: false,
+        getData: () => Buffer.from(entry.data),
+      }));
     }
   }
   return { default: MockAdmZip };
@@ -69,10 +74,10 @@ function req(url: string): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  zipArchives.byKey.clear();
   origToken = process.env.GITHUB_TOKEN;
   origReadonlyUrl = process.env.DATABASE_READONLY_URL;
   process.env.GITHUB_TOKEN = 'test-gh-token';
-  // No readonly URL: the GitHub fallback is exercised unless a test opts in.
   delete process.env.DATABASE_READONLY_URL;
   mockGetGpuMetricsForRun.mockResolvedValue(null);
 });
@@ -175,7 +180,6 @@ describe('GET /api/gpu-metrics — database first', () => {
       source: 'database',
       artifacts: names.map((name) => ({ name })),
     });
-    // An absent selection reads every artifact; `artifact: null` narrows to the first.
     expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
       prefix: null,
       sourceResults: null,
@@ -282,12 +286,10 @@ describe('GET /api/gpu-metrics', () => {
 
     globalThis.fetch = vi
       .fn()
-      // 1st call: fetch workflow run info
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockRunData),
       })
-      // 2nd call: fetch artifacts list (page 1)
       .mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -298,10 +300,14 @@ describe('GET /api/gpu-metrics', () => {
                 name: 'gpu_metrics_dsr1_h200',
                 archive_download_url: 'https://example.com/dl/1',
               },
+              {
+                id: 2,
+                name: 'power_audit_dsr1_h200',
+                archive_download_url: 'https://example.com/dl/native',
+              },
             ],
           }),
       })
-      // 3rd call: download artifact zip
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '1024' }),
@@ -331,6 +337,7 @@ describe('GET /api/gpu-metrics', () => {
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_h200');
     expect(body.artifacts[0].data).toHaveLength(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
   });
 
   it('returns 500 when workflow run fetch fails', async () => {
@@ -388,7 +395,7 @@ describe('GET /api/gpu-metrics', () => {
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body.error).toContain('No gpu_metrics artifacts found');
+    expect(body.error).toContain('No telemetry artifacts');
   });
 
   it('skips artifacts that fail to download', async () => {
@@ -426,12 +433,10 @@ describe('GET /api/gpu-metrics', () => {
             ],
           }),
       })
-      // First artifact download fails
       .mockResolvedValueOnce({
         ok: false,
         statusText: 'Forbidden',
       })
-      // Second artifact download succeeds
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),
@@ -441,7 +446,6 @@ describe('GET /api/gpu-metrics', () => {
     const res = await GET(req('/api/gpu-metrics?runId=12345'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    // Only the second artifact should be present
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
   });
@@ -481,13 +485,11 @@ describe('GET /api/gpu-metrics', () => {
             ],
           }),
       })
-      // First artifact too large
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': String(60 * 1024 * 1024) }),
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
       })
-      // Second artifact ok
       .mockResolvedValueOnce({
         ok: true,
         headers: new Headers({ 'Content-Length': '512' }),
@@ -500,4 +502,62 @@ describe('GET /api/gpu-metrics', () => {
     expect(body.artifacts).toHaveLength(1);
     expect(body.artifacts[0].name).toBe('gpu_metrics_dsr1_b200');
   });
+});
+
+it('shows temperature from native bundles before ingestion without mixing host-local GPU indices', async () => {
+  zipArchives.byKey.set('native-temperature', [
+    {
+      entryName: 'LOGS/power/samples.csv',
+      data: [
+        'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w,gpu_util_pct,sm_active,temperature_c',
+        '3,1772323200,0,node-a,0,GPU-a,400,,,65.5',
+        '3,1772323201,1,node-a,0,GPU-a,420,,,',
+        '3,1772323200,0,node-b,0,GPU-b,300,,,0',
+      ].join('\n'),
+    },
+  ]);
+  globalThis.fetch = vi
+    .fn()
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: 12345,
+          name: 'Run',
+          head_branch: 'main',
+          head_sha: 'abc',
+          created_at: '2026-03-01T00:00:00Z',
+          html_url: '',
+          conclusion: 'success',
+          status: 'completed',
+        }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          artifacts: [
+            {
+              id: 1,
+              name: 'power_audit_dsr1_b200',
+              archive_download_url: 'https://example.com/dl/native',
+            },
+          ],
+        }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers(),
+      arrayBuffer: () => Promise.resolve(Buffer.from('native-temperature')),
+    });
+  const response = await GET(req('/api/gpu-metrics?runId=12345'));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.artifacts.map((a: { name: string }) => a.name)).toEqual([
+    'power_audit_dsr1_b200/LOGS/power/samples.csv#node-a',
+    'power_audit_dsr1_b200/LOGS/power/samples.csv#node-b',
+  ]);
+  expect(body.artifacts[0].data[0]).toMatchObject({ power: 400, index: 0, temperature: 65.5 });
+  expect(body.artifacts[0].data[1]).not.toHaveProperty('temperature');
+  expect(body.artifacts[1].data[0]).toMatchObject({ power: 300, index: 0, temperature: 0 });
 });

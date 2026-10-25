@@ -184,7 +184,6 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
-    /** How strictly actual cache pricing follows the producer's validity core. */
     cacheRatePolicy?: CacheRatePolicy;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;

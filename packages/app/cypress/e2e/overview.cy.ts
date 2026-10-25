@@ -1,19 +1,16 @@
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
-// Order mirrors DEFAULT_MODELS (MODEL_CONFIG insertion order), which fixes the
-// row order within each scenario group — AgentX rows lead the matrix, 8K/1K
-// rows follow.
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4 Pro 0813 1.6T',
   'DeepSeek V4.1 Flash 552B',
   'Kimi K3 2.8T',
   'MiniMax M3 428B',
+  'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
 ];
 
-// No trailing Details column: the link sits in the model cell instead.
 const PLATFORM_HEADERS = [
   'Model · Scenario',
   'B200 · Reference',
@@ -24,17 +21,10 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-/** Eight models: one with both a single-turn and an AgentX row (Qwen3.5),
- *  five curated AgentX-only (Muse Spark Open, Kimi K3, GLM 5.2, Qwen3.8-Flash-Next, and
- *  DeepSeek V4.1 Flash, which entered the fleet on AgentX only in
- *  InferenceX#2961), and two AgentX-only by retirement: MiniMax M3's 8k1k
- *  sweep stopped on 2026-08-04 (InferenceX#2493) and DeepSeek V4 Pro's on
- *  2026-09-08 (InferenceX#2728). */
-const MATRIX_ROWS = 9;
+const MATRIX_ROWS = 10;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
-/** Shared by both locales: the scenario is named after its acronym. */
 const AGENTX_SHORT = 'AgentX';
 
 const PAGE_TITLE = 'Agentic Inference Costs';
@@ -51,16 +41,11 @@ const OVERVIEW_TIERS = [30, 50, 75, 100, 150, 200] as const;
 
 function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
   const targetIndex = OVERVIEW_TIERS.indexOf(tier);
-  // Unlike clicks, synthetic input events are not replayed by React, so a
-  // dispatch that lands before hydration finishes is silently dropped. The
-  // `.should` callback retries the whole dispatch until React has committed
-  // the selection, which only happens once the slider is interactive.
   return cy.get<HTMLInputElement>('[data-testid="overview-tier-slider"]').should(([slider]) => {
     const view = slider.ownerDocument.defaultView;
     if (view === null) throw new Error('Slider has no window');
     const tracker = (slider as { _valueTracker?: { setValue: (next: string) => void } })
       ._valueTracker;
-    // React installs the value tracker when hydration commits the input.
     expect(tracker, 'tier slider is hydrated').to.not.eq(undefined);
     const nativeValueSetter = Object.getOwnPropertyDescriptor(
       view.HTMLInputElement.prototype,
@@ -68,7 +53,6 @@ function selectOverviewTier(tier: (typeof OVERVIEW_TIERS)[number]) {
     )?.set;
     if (nativeValueSetter === undefined) throw new Error('Range input has no native value setter');
     nativeValueSetter.call(slider, String(targetIndex));
-    // Desync the tracker so React always registers the dispatched input.
     tracker?.setValue('');
     slider.dispatchEvent(new view.Event('input', { bubbles: true }));
     expect(slider.dataset.tier, 'slider committed tier').to.eq(String(tier));
@@ -87,8 +71,6 @@ function expectNoHorizontalScroller(testId: string) {
       .filter(
         (el) =>
           !el.classList.contains('sr-only') &&
-          // Radix selects render an aria-hidden native <select> clipped to 1px,
-          // which Firefox reports as scrollable; hidden elements cannot scroll.
           el.getAttribute('aria-hidden') !== 'true' &&
           getComputedStyle(el).display !== 'inline' &&
           el.scrollWidth > el.clientWidth + 1,
@@ -129,12 +111,6 @@ function stubFullscreenApi(win: Window) {
   });
 }
 
-/**
- * The row header shows the acronym so the 22%-wide model column stays one line,
- * and keeps the full scenario name for assistive tech and the hover title. Both
- * strings are in the cell, so assert the two layers rather than their
- * concatenation. Scenarios already named by a short label render one node.
- */
 function expectAgentxScenario(fullLabel: string) {
   cy.get('[data-testid="overview-model-scenario"]')
     .should('have.attr', 'title', fullLabel)
@@ -144,13 +120,10 @@ function expectAgentxScenario(fullLabel: string) {
     });
 }
 
-/** Visible dates and snapshot framing must be gone; evidence stays in labels. */
 function expectNoVisibleDatesOrSnapshot() {
   cy.get('[data-testid="overview-pair-evidence-date"]').should('not.exist');
   cy.get('body')
     .then(([body]) => {
-      // Next.js RSC payload scripts retain evidence dates for reproducibility.
-      // Assert only against rendered page text, not serialized script/style data.
       const clone = body.cloneNode(true) as HTMLElement;
       clone.querySelectorAll('script, style, .sr-only').forEach((node) => node.remove());
       return clone.textContent ?? '';
@@ -164,8 +137,6 @@ function expectNoVisibleDatesOrSnapshot() {
     });
 }
 
-/** A model benchmarked on both scenarios has one row per scenario, so every
- *  such model must be addressed by (model, scenario) — not by model alone. */
 function desktopModel(model: string, scenario?: string) {
   const row = scenario === undefined ? '' : `[data-scenario="${scenario}"]`;
   return cy.get(`[data-testid="overview-desktop-model"][data-model="${model}"]${row}`);
@@ -176,7 +147,6 @@ function mobileModel(model: string, scenario?: string) {
   return cy.get(`[data-testid="overview-mobile-model"][data-model="${model}"]${row}`);
 }
 
-/** The comparison shade sits on the table cell wrapping the platform block. */
 function expectCellTint(hardware: string, expected: string) {
   platform(hardware).then(([cell]) => {
     expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.contain(expected);
@@ -273,8 +243,6 @@ describe('Overview page', () => {
 
     cy.viewport(1280, 900);
     cy.visit('/overview');
-    // Hold the first response open so the second click lands inside the pending
-    // window; without the delay the clicks may serialize and never race.
     cy.intercept('GET', '**/api/v1/overview*', (request) => {
       request.continue((response) => {
         response.setDelay(600);
@@ -287,10 +255,6 @@ describe('Overview page', () => {
       .click();
 
     cy.location('search').should('eq', '?tier=75&engine=all');
-    // The rendered state, not just the URL: the losing response must not win.
-    // Keeps its explicit timeout because it waits on the real API through
-    // `request.continue` plus the delay above — unlike the URL assertions
-    // around it, which the click resolves synchronously.
     cy.get('[data-testid="overview-tier-slider"]', {
       timeout: 15_000,
     }).should('have.attr', 'data-tier', '75');
@@ -301,8 +265,6 @@ describe('Overview page', () => {
   it('keeps the last matrix and history entry when a popstate request fails', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
-    // A client-derived reference switch proves hydration and the popstate
-    // listener are established without warming the tier payload under test.
     cy.get('[data-testid="overview-reference-select"]').click();
     cy.get('[data-overview-reference="b300"]').click();
     cy.location('search').should('eq', '?ref=b300');
@@ -375,12 +337,9 @@ describe('Overview page', () => {
       selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
       cy.location('search').should('eq', '?tier=75');
-      // A plain `.should` would be satisfied by the transient extra entry.
       cy.window().then((after) => {
         expect(after.history.length - before, 'one entry for one selection').to.equal(1);
       });
-      // The unsuccessful stop stays retryable: activating it again re-requests
-      // without stacking another history entry for the byte-identical href.
       selectOverviewTier(75);
       cy.wait('@overviewJsonFailure');
       cy.location('search').should('eq', '?tier=75');
@@ -533,9 +492,6 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    // The tabs sit inside the surface handed to the Fullscreen API so that
-    // presenting keeps them with the matrix, which costs them their old spot as
-    // a direct child of the page.
     cy.get('[data-testid="overview-presentation-surface"]')
       .find('[data-testid="overview-comparison-switcher"]')
       .should('have.length', 1)
@@ -584,8 +540,6 @@ describe('Overview page', () => {
           .should('have.attr', 'aria-current', 'true')
           .and('have.text', '对比 1 个月前');
       });
-    // The prose is editorial; the stable contract is that both history notes
-    // render the selected window while the caption also renders its upper bound.
     cy.get('[data-testid="overview-methodology"] p')
       .eq(0)
       .should('be.visible')
@@ -658,7 +612,6 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview?tier=75', { onBeforeLoad: stubFullscreenApi });
 
-    // A selector push creates a real same-document history entry.
     selectOverviewTier(100);
     cy.location('search').should('eq', '?tier=100');
     cy.get('[data-testid="overview-present-toggle"]').click();
@@ -715,8 +668,6 @@ describe('Overview page', () => {
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       cy.contains('a', 'View details').should('not.exist');
-      // Unlike the hardware view, B200 is a normal platform in the historical
-      // view and receives its own change badge and heat-map tint.
       platform('b200')
         .find('[data-testid="overview-cost-delta"]')
         .as('b200HistoryDelta')
@@ -771,7 +722,6 @@ describe('Overview page', () => {
       platform('b200')
         .find('[data-testid="overview-cost-delta"]')
         .should('have.attr', 'data-history-status', 'comparable');
-      // MI355X has a baseline but no exact @50 read today: nothing to compare.
       platform('mi355x').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
 
@@ -882,9 +832,6 @@ describe('Overview page', () => {
     }
   });
 
-  // Clicking the control, not just building its href: the matrix reads from a
-  // client data cache, and a cache keyed without the row params moves the
-  // address bar while leaving every row on screen.
   it('narrows the matrix when the row filter is clicked in either comparison mode', () => {
     cy.viewport(1280, 900);
 
@@ -913,9 +860,6 @@ describe('Overview page', () => {
             'have.length',
             MATRIX_ROWS - hidden,
           );
-          // The action label names the click, so it flips once the scope
-          // lands; the chip keeps the short label and the counted sentence
-          // rides the accessible name.
           cy.get(`a[${attribute}]`)
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
@@ -989,8 +933,6 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    // Standard decode is the exception, so that cell badges STP. Qwen's GB300
-    // slice is standard-decode only; its other platforms stay speculative.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
       platform('b200').should('not.contain.text', 'STP');
@@ -998,14 +940,10 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      // Speculative decode is the expected case and goes unlabelled; the stack
-      // badge stops at framework and precision.
       cy.contains('SGLang · FP4').should('exist');
       cy.get('[data-testid="overview-platform"]').should('not.contain.text', 'STP');
       cy.root().should('not.contain.text', 'Spec decode');
       platform('b200').within(() => {
-        // The estimated cost is itself the evidence link; the run date lives in
-        // its hover/focus/screen-reader label, never as visible text.
         cy.get(
           '[data-testid="overview-pair-value"][data-hardware="b200"] [data-testid="overview-cost-evidence-link"]',
         ).should('have.text', '$0.059');
@@ -1024,9 +962,6 @@ describe('Overview page', () => {
           );
         cy.get('[data-testid="overview-pair-missing"]').should('not.exist');
       });
-      // GB300's two points are a single-node and a multi-node aggregate
-      // deployment. They are separate serving series, so neither interpolates
-      // to the tier and the cell stays empty instead of blending them.
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-pair-value"]').should('not.exist');
         cy.get('[data-testid="overview-pair-missing"][data-hardware="gb300"]').should(
@@ -1058,10 +993,8 @@ describe('Overview page', () => {
         .should('contain.text', '-14%')
         .and('have.attr', 'data-cost-polarity', 'cheaper')
         .then(($badge) => {
-          // The shade lives on the cell now, never on the badge itself.
           expect($badge.attr('style') ?? '').not.to.contain('background');
         });
-      // Cheaper than B200: the whole cell carries the green wash.
       expectCellTint('mi355x', 'rgba(16, 185, 129,');
     });
 
@@ -1070,10 +1003,7 @@ describe('Overview page', () => {
         .find('[data-testid="overview-cost-delta"]')
         .should('contain.text', '+71%')
         .and('have.attr', 'data-cost-polarity', 'pricier');
-      // +71% saturates the alpha ramp; read the computed value so the
-      // assertion survives the browser normalizing `0.40` to `0.4`.
       expectCellTint('gb200', 'rgba(239, 68, 68, 0.4)');
-      // No read at the tier means nothing to grade — the cell stays untinted.
       platform('gb300').find('[data-testid="overview-cost-delta"]').should('not.exist');
       platform('gb300').then(([cell]) => {
         expect(getComputedStyle(cell.closest('td')!).backgroundColor).to.match(
@@ -1082,8 +1012,6 @@ describe('Overview page', () => {
       });
     });
 
-    // The B200 reference column is never washed: its null delta means "no
-    // comparison against itself", not the ∞ state.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').then(([cell]) => {
         const td = cell.closest('td')!;
@@ -1092,8 +1020,6 @@ describe('Overview page', () => {
       });
     });
 
-    // Priced result with no B200 baseline: neutral gray ∞ and a neutral cell —
-    // availability, not a good/bad judgment, so no red/green tint.
     desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
@@ -1104,8 +1030,6 @@ describe('Overview page', () => {
         const [r, g, b] = getComputedStyle(cell.closest('td')!)
           .backgroundColor.match(/\d+/g)!
           .map(Number);
-        // Slate gray: no channel dominates the way the red (spread 171) and
-        // green (spread 169) ramps do.
         expect(Math.max(r, g, b) - Math.min(r, g, b)).to.be.lessThan(60);
       });
     });
@@ -1130,20 +1054,14 @@ describe('Overview page', () => {
       .and('not.contain.text', 'tok/s/user')
       .and('not.contain.text', '$/1M')
       .and('not.contain.text', '8K→1K');
-    // The TCO model behind every $/GPU/hr is cited under the metric.
     cy.get('[data-testid="overview-source-link"]')
       .should('have.text', TCO_SOURCE_TITLE)
       .and('have.attr', 'href', TCO_SOURCE_URL)
       .and('have.attr', 'target', '_blank')
       .and('have.attr', 'rel', 'noopener noreferrer');
-    // Opening off-site is signalled by the shared external-link glyph.
     cy.get('[data-testid="overview-source-link"] svg').should('exist');
-    // The standing blurb above the switchers is gone.
     cy.get('body').should('not.contain.text', 'at a glance');
     cy.contains('— = no result. ∞ = B200 baseline unavailable.').should('exist');
-    // The methodology block is now just the cell-state legend and the
-    // configuration-fallback note; the cost-formula, comparability, and
-    // interpolation notes were removed.
     cy.get('[data-testid="overview-methodology"]').children('p').should('have.length', 2);
     cy.get('body')
       .invoke('text')
@@ -1167,17 +1085,13 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
-          // Column headers read at 14px, a step up from the 12px metadata.
           for (const header of $headers) {
             expect(getComputedStyle(header).fontSize).to.equal('14px');
           }
         });
-        // One row per curated (model, scenario) pair: eight models, one of
-        // which (Qwen3.5) carries a second single-turn row.
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
         cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
-        // One link per row, inside that row's model cell.
         cy.get('a').contains('View details').should('exist');
         cy.get('th[scope="row"]')
           .find('a')
@@ -1213,8 +1127,6 @@ describe('Overview page', () => {
       'have.length',
       2,
     );
-    // The AgentX row sits in the leading AgentX group; the single-turn row
-    // follows in the 8K/1K group below it, both under the same label.
     cy.get('[data-testid="overview-desktop-model"][data-model="Qwen-3.5-397B-A17B"]').then(
       ($rows) => {
         expect([...$rows].map((row) => row.dataset.scenario)).to.deep.equal([AGENTX, SINGLE_TURN]);
@@ -1224,12 +1136,9 @@ describe('Overview page', () => {
     desktopModel('Qwen-3.5-397B-A17B', AGENTX).within(() => {
       expectAgentxScenario(AGENTX_LABEL);
       cy.contains('Qwen3.5 397B').should('exist');
-      // Its detail link points at the agentic-traces workload, not 8K→1K.
       cy.contains('a', 'View details')
         .should('have.attr', 'href')
         .and('include', 'i_seq=agentic-traces');
-      // ...and names its scenario, so the two rows' links are distinguishable
-      // to a screen reader rather than both reading "View details: <model>".
       cy.contains('a', 'View details').should(
         'have.attr',
         'aria-label',
@@ -1244,9 +1153,6 @@ describe('Overview page', () => {
       );
     });
 
-    // DeepSeek V4 Pro retired its single-turn 8k1k sweep on 2026-09-08
-    // (InferenceX#2728): only the AgentX row remains, and it is priced from
-    // the agentic-trace rows — no stale 8K/1K row lingers below it.
     cy.get('[data-testid="overview-desktop-model"][data-model="DeepSeek-V4-Pro"]').should(
       'have.length',
       1,
@@ -1336,7 +1242,6 @@ describe('Overview page', () => {
     });
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
-      // A cell without a read at the tier carries no evidence link either.
       platform('gb300').within(() => {
         cy.get('[data-testid="overview-cost-evidence-link"]').should('not.exist');
       });
@@ -1388,7 +1293,6 @@ describe('Overview page', () => {
       cy.get('[data-testid="overview-pair-missing"]').should('have.length', 5);
       cy.get('[data-testid="overview-model-coverage-note"]').should('not.exist');
     });
-    // ∞ appears only inside relative badges, never as a cell value.
     cy.get('[data-testid="overview-pair-missing"]').each(($cell) => {
       expect($cell.text()).not.to.contain('∞');
     });
@@ -1402,7 +1306,6 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
-    // The tier control is labelled SLO, not "Service level".
     cy.get('[data-testid="overview-tier-switcher"]')
       .should('have.attr', 'aria-label', 'SLO')
       .and('contain.text', 'SLO');
@@ -1427,7 +1330,6 @@ describe('Overview page', () => {
     selectOverviewTier(100);
 
     cy.location('search').should('eq', '?tier=100');
-    // The metric line never repeats the tier — the switcher states it.
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE);
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-tier-option="100"]').should('have.attr', 'data-selected', 'true');
@@ -1472,7 +1374,6 @@ describe('Overview page', () => {
         .should('contain.text', '—')
         .and('contain.text', 'no exact @30 result');
     });
-    // Exact @30 read priced without a B200 baseline: cost plus the ∞ badge.
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-value"][data-hardware="b300"]').should(
@@ -1599,8 +1500,6 @@ describe('Overview page', () => {
                 expect(badgeText).not.to.equal(null);
 
                 expect(badgeRect.left - valueRect.right).to.be.at.most(8);
-                // Electron can report a 1.5 CSS-pixel font-rasterization delta;
-                // two pixels still constrains both labels to the same baseline.
                 expect(textRect(badgeText as Element).bottom).to.be.closeTo(
                   textRect(value).bottom,
                   2,
@@ -1636,12 +1535,10 @@ describe('Overview page', () => {
     cy.viewport(1280, 700);
     cy.visit('/overview');
 
-    // Tall enough to scroll the header off a non-sticky layout.
     cy.get('[data-testid="overview-desktop-matrix"]').then(([table]) => {
       expect(table.getBoundingClientRect().height).to.be.greaterThan(700);
     });
     cy.scrollTo(0, 800);
-    // Pinned just below the sticky site header (h-14 = 56px), never under it.
     cy.get('header.sticky').then(([siteHeader]) => {
       const siteBottom = siteHeader.getBoundingClientRect().bottom;
       cy.get('[data-testid="overview-desktop-matrix"] thead').should(([head]) => {
@@ -1651,7 +1548,6 @@ describe('Overview page', () => {
         );
       });
     });
-    // Opaque and above the rows it overlaps, not blended with them.
     cy.document().then((doc) => {
       cy.get('[data-testid="overview-desktop-matrix"] thead').then(([head]) => {
         const rect = head.getBoundingClientRect();
@@ -1671,8 +1567,6 @@ describe('Overview page', () => {
         const wrapper = table.parentElement as HTMLElement;
         const card = table.closest('[data-slot="card"]')!;
         const style = getComputedStyle(card);
-        // Clip the cell backgrounds to the card's actual rounded boundary,
-        // without making a scroll container that traps the sticky header.
         expect(style.overflowX).to.equal('clip');
         expect(style.overflowY).to.equal('clip');
         expect(parseFloat(style.borderTopLeftRadius)).to.be.greaterThan(0);
@@ -1756,8 +1650,6 @@ describe('Overview page', () => {
       .invoke('text')
       .should('not.match', /100 档由.+领先/);
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
-      // Stack badges stay English on the Chinese page: framework, precision and
-      // the STP decode marker are all product identifiers, not UI copy.
       platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
     });
@@ -1795,7 +1687,6 @@ describe('Overview page', () => {
     cy.get('[data-testid="overview-tier-switcher"]').within(() => {
       cy.get('[data-testid="overview-tier-slider"]')
         .should('have.attr', 'data-tier', '100')
-        // tok/s/user is a protected unit that stays untranslated on the zh route.
         .and('have.attr', 'aria-valuetext', '100 tok/s/user');
       cy.get('[data-tier-option]').should('have.length', 6);
     });

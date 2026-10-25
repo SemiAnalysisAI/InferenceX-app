@@ -23,15 +23,11 @@ interface SupplementalDataset {
   date: string;
   hardware: string;
   framework: string;
-  /** Framework reported by the source when a display-only snapshot key is used. */
   sourceFramework?: string;
   runUrl?: string;
   points: readonly PointTuple[];
-  /** Omitted means the snapshot is valid for every token metric. */
   supportedTokenMetrics?: readonly TokenMetricType[];
-  /** Defaults to 'fp4' when omitted, matching every pre-existing snapshot. */
   precision?: string;
-  /** Recorded metrics override synthesized percentile fallbacks when available. */
   metricsByConcurrency?: ReadonlyMap<number, Record<string, number>>;
 }
 
@@ -208,8 +204,6 @@ const vrJuly: readonly PointTuple[] = [
   [72, 1, 72, 400, 115.5, 183.535, 0, 400, 0, 0],
 ];
 
-// Four physical chips, each with two logical cores. Preserve the measured
-// TP8/DP1 and TP1/DP8 configurations independently from physical chip count.
 const tpuv7Qwen35August26: readonly PointTuple[] = tpuv7Snapshot.map((row) => [
   row.tp,
   row.ep,
@@ -277,16 +271,11 @@ const DATASETS: readonly SupplementalDataset[] = [
     modelAliases: ['dsr1', 'DeepSeek-R1-0528'],
     date: '2026-07-01',
     hardware: 'vr200',
-    // A snapshot-specific key keeps "(July)" attached only to these rows. A
-    // later DB-ingested `coreweave-vera-rubin` run receives its own identity.
     framework: 'rubin-july',
     sourceFramework: 'coreweave-vera-rubin',
     runUrl:
       'https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell',
     points: vrJuly,
-    // This July snapshot published output throughput against interactivity. Its
-    // stored total rate is not semantically comparable to the dashboard's total
-    // or input-token metrics. New snapshots are unrestricted unless they opt in.
     supportedTokenMetrics: ['output'],
   },
 ];
@@ -380,8 +369,6 @@ function datasetsForLatestQuery(model: string, date: string, exact: boolean) {
   const matching = DATASETS.filter((dataset) => dataset.modelAliases.includes(model));
   if (exact && date) return matching.filter((dataset) => dataset.date === date);
   const eligible = date ? matching.filter((dataset) => dataset.date <= date) : matching;
-  // Resolve each supplemental curve independently so a newer Jalapeño snapshot
-  // never suppresses the older-but-still-current VR200 curve.
   const latestByCurve = new Map<string, SupplementalDataset>();
   for (const dataset of eligible) {
     const key = `${dataset.hardware}|${dataset.framework}`;
@@ -460,12 +447,10 @@ function capabilityFor(hardware: string, framework: string, date: string) {
   )?.supportedTokenMetrics;
 }
 
-/** Snapshot-scoped capability check for raw rows (official and unofficial). */
 export function supportsTokenMetric(row: BenchmarkRow, tokenType: TokenMetricType): boolean {
   return capabilityFor(row.hardware, row.framework, row.date)?.includes(tokenType) ?? true;
 }
 
-/** Snapshot-scoped capability check after a row has become chart data. */
 export function supportsChartTokenMetric(
   hwKey: string,
   date: string,

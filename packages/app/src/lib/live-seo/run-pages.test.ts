@@ -24,7 +24,7 @@ describe('run pages registry', () => {
   it('has one candidate per (model, chip) pair', () => {
     const entries = getAllRunPageEntries();
     expect(entries.length).toBe(INFERENCE_MODEL_SLUGS.length * getAllChipPages().length);
-    expect(entries.length).toBe(144);
+    expect(entries.length).toBe(153);
   });
 
   it('has unique, well-formed slugs', () => {
@@ -81,7 +81,6 @@ describe('live-seo number formatting', () => {
     expect(fmtMs(123.4)).toBe('123 ms');
     expect(fmtMs(45.67)).toBe('45.7 ms');
     expect(pctFaster(250, 200)).toBe(25);
-    // A $1 winner against a $2 runner-up is 50% below, not 100%.
     expect(pctCheaper(1, 2)).toBe(50);
     expect(pctCheaper(1.5, 2)).toBe(25);
   });

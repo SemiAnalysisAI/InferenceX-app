@@ -48,6 +48,8 @@ import {
   type CostMetricFamilyId,
   type CostTier,
   type MetricKey,
+  countsInputTokens,
+  isInputMetric,
 } from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
@@ -65,6 +67,7 @@ import {
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
+import { TokenBasisToggle } from './TokenBasisToggle';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { defaultYAxisMetric } from '@/lib/routing/url-state';
@@ -163,11 +166,6 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
-// Full option titles carry the cost tier ("… (Owning at Large Hyperscaler
-// Volume)"). The y-axis selector collapses the published tiers of a metric
-// into one option and hands the tier to the Cost Tier selector in the chart
-// caption, so these maps serve analytics labels and the Custom User Values
-// entries.
 const METRIC_TITLE_MAP = new Map(
   (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
     `y_${key}`,
@@ -183,11 +181,9 @@ const METRIC_TITLE_ZH_MAP = new Map(
 );
 
 interface ChartControlsProps {
-  /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
-  /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
 }
 
@@ -199,10 +195,6 @@ export default function ChartControls({
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  // The percentile selector is rendered conditionally on `selectedSequence`,
-  // which on the client is hydrated from URL params. SSR doesn't see the URL,
-  // so deferring the conditional until after mount keeps the initial DOM
-  // identical between server and client (avoids hydration warnings).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -233,6 +225,7 @@ export default function ChartControls({
     openRouterPricingError,
     selectedXAxisMetric,
     selectedXAxisMode,
+    defaultXAxisMode,
     scaleType,
     powerCompare,
   } = useInferenceDisplay();
@@ -249,11 +242,6 @@ export default function ChartControls({
     setPowerCompare,
   } = useInferenceActions();
 
-  // Y-axis options come from the canonical registry and need no API data.
-  // Gated groups appear only after the feature gate unlocks. A gated metric
-  // that arrived through a shared URL keeps its own group visible while the
-  // gate is locked so the selector never shows an option it cannot name;
-  // this mirrors how tab-nav keeps a gated route's tab for the current page.
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
     () =>
@@ -276,13 +264,9 @@ export default function ChartControls({
   const selectedTier: CostTier | undefined = isMetricKey(selectedMetricKey)
     ? metricCostTier(selectedMetricKey)
     : undefined;
-  // Switching metric keeps the tier the reader is on, including Custom User
-  // Values: the tier is picked in the chart caption, not here.
   const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
 
   const searchableYAxisOptions = useMemo(() => {
-    // Shared across groups so a family listed under Custom User Values does
-    // not reappear after its published entry.
     const seenFamilies = new Set<CostMetricFamilyId>();
     return visibleGroups
       .map((group) => {
@@ -291,11 +275,6 @@ export default function ChartControls({
           const key = m.replace(/^y_/u, '') as MetricKey;
           const family = costMetricFamily(key);
           if (family) {
-            // Every pricing basis of a metric, published or custom,
-            // collapses into one option per metric family. The option
-            // tracks the tier in force so the selection highlight follows
-            // the metric; the Cost Tier selector in the chart caption
-            // changes the pricing basis.
             if (seenFamilies.has(family)) return [];
             seenFamilies.add(family);
             const tieredKey = metricForCostTier(family, carriedTier) ?? key;
@@ -325,8 +304,6 @@ export default function ChartControls({
       .filter((g) => g.options.length > 0);
   }, [visibleGroups, locale, carriedTier]);
 
-  // Keep the existing metric key in state and shared URLs. Only the menu's
-  // default presentation collapses; full metric names remain searchable.
   const groupedYAxisOptions = useMemo(() => {
     const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
     const seen = new Set<MeasuredMetricFamily>();
@@ -340,8 +317,6 @@ export default function ChartControls({
         if (!config) return [option];
         if (seen.has(config.family)) return [];
         seen.add(config.family);
-        // Keep the selected boundary (and other dimensions) when hopping between
-        // the power and energy families; fall back to the family default otherwise.
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
@@ -374,19 +349,11 @@ export default function ChartControls({
 
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
-    // A deliberate pick moves the URL onto the model's indexable subroute in
-    // place — no reload, RSC refetch, or scroll reset. Kept out of the model
-    // state effects on purpose: programmatic changes (back-nav restore,
-    // config load, auto-switch) must not rewrite the URL, and event handlers
-    // are immune to Strict Mode's double-invoked effects. `g_model` is
-    // dropped because the path now carries the model — a lingering share
-    // param would override it on the next snapshot read.
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
     if (target !== null) replaceRouterPathname(target, ['g_model']);
     track('inference_model_selected', {
       model: value,
     });
-    // Track combined after state update
     setTimeout(trackCombinedFilters, 0);
   };
 
@@ -438,13 +405,7 @@ export default function ChartControls({
     });
   };
 
-  const isInputMetric = (() => {
-    const chartDef = graphs[0]?.chartDefinition;
-    if (!chartDef) return false;
-    const titleKey = `${selectedYAxisMetric}_title` as keyof typeof chartDef;
-    const title = (chartDef[titleKey] as string) || '';
-    return title.toLowerCase().includes('input');
-  })();
+  const selectedIsInputMetric = isInputMetric(selectedYAxisMetric);
 
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
@@ -456,11 +417,17 @@ export default function ChartControls({
 
   const secondaryCount =
     (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
-    (showXAxisMode && selectedXAxisMode !== 'interactivity' ? 1 : 0) +
+    (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tokenBasisVisible =
+    mounted &&
+    featureGateUnlocked &&
+    tcoSource === 'inference' &&
+    selectedSequence === Sequence.AgenticTraces &&
+    countsInputTokens(selectedYAxisMetric);
   const tcoVisible =
     mounted &&
     showTcoBasis &&
@@ -525,11 +492,14 @@ export default function ChartControls({
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
               >
-                <LabelWithTooltip
-                  htmlFor="y-axis-select"
-                  label={t.yAxisMetric}
-                  tooltip={t.yAxisMetricTooltip}
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <LabelWithTooltip
+                    htmlFor="y-axis-select"
+                    label={t.yAxisMetric}
+                    tooltip={t.yAxisMetricTooltip}
+                  />
+                  {tokenBasisVisible && <TokenBasisToggle />}
+                </div>
                 <SearchableSelect
                   triggerId="y-axis-select"
                   triggerTestId="yaxis-metric-selector"
@@ -637,7 +607,7 @@ export default function ChartControls({
 
               {!showXAxisMode &&
                 graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric &&
+                selectedIsInputMetric &&
                 selectedSequence !== Sequence.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
@@ -664,7 +634,7 @@ export default function ChartControls({
                 )}
 
               {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric && (
+                selectedIsInputMetric && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
                       htmlFor="scale-type-select"
