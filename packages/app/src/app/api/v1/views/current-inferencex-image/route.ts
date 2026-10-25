@@ -9,6 +9,8 @@ import {
 } from '@/components/latest-image/image-age';
 import {
   daysSince,
+  earliestSubmission,
+  firstSubmissionDates,
   getActualLatestRelease,
   imageRowDisplayModel,
   imageRowSequence,
@@ -70,6 +72,7 @@ export function GET(request: NextRequest) {
     const sequences = sequenceOptionsForModel(active, model);
     const sequence = resolveSelectedSequence(sequences, s.get('sequence') ?? 'agentic-traces');
     const filters = { model, precision, spec, hardware, nodeType, frameworks, sequence };
+    const firstSubmitted = firstSubmissionDates(raw);
     const rows = active
       .filter((row) => matchesImageFilters(row, filters))
       .toSorted((a, b) => a.date.localeCompare(b.date))
@@ -82,7 +85,7 @@ export function GET(request: NextRequest) {
           sequence: imageRowSequence(row),
           ageDays,
           actualLatest: release?.tag ?? null,
-          outdated: isOutdated(row.image, release, row.date),
+          outdated: isOutdated(row.image, release, earliestSubmission(firstSubmitted, row)),
           staleAgentx: isStaleAgentx(row.benchmark_type, ageDays),
         };
       });

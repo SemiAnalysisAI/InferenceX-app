@@ -339,9 +339,14 @@ export function fetchLatestImages(signal?: AbortSignal) {
   return fetchJson<LatestImageRow[]>('/api/v1/latest-images', signal);
 }
 
+/** GitHub compare status of a benchmarked commit against the release tag. */
+export type CommitStatus = 'ahead' | 'behind' | 'diverged' | 'identical';
+
 export interface FrameworkRelease {
   tag: string;
   publishedAt: string;
+  /** Unversioned nightly commits from active benchmark images that GitHub resolved. */
+  commits: Record<string, CommitStatus>;
 }
 
 export type FrameworkReleases = Record<string, FrameworkRelease | null>;

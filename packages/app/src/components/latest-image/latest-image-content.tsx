@@ -32,6 +32,8 @@ import {
   ageRowStyle,
   baseFramework,
   daysSince,
+  earliestSubmission,
+  firstSubmissionDates,
   getActualLatestRelease,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
@@ -204,6 +206,7 @@ export function CurrentImageContent() {
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
   const activeRows = useMemo(() => data?.filter(isActiveImageRow), [data]);
+  const firstSubmitted = useMemo(() => firstSubmissionDates(data ?? []), [data]);
 
   const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
 
@@ -556,7 +559,11 @@ export function CurrentImageContent() {
                   const displayModel = imageRowDisplayModel(row);
                   const gpuLabel = row.hardware.toUpperCase();
                   const release = getActualLatestRelease(row.framework, releases);
-                  const outdated = isOutdated(row.image, release, row.date);
+                  const outdated = isOutdated(
+                    row.image,
+                    release,
+                    earliestSubmission(firstSubmitted, row),
+                  );
                   const ageDays = daysSince(row.date, today);
                   const staleAgentx = isStaleAgentx(row.benchmark_type, ageDays);
                   const stale = outdated || staleAgentx;

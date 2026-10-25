@@ -9,6 +9,8 @@ import {
   ageRowStyle,
   baseFramework,
   daysSince,
+  earliestSubmission,
+  firstSubmissionDates,
   getActualLatestRelease,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
@@ -17,6 +19,7 @@ import {
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
+  nightlyCommit,
   resolveSelectedSequence,
   sequenceOptionsForModel,
 } from './latest-image-utils';
@@ -110,8 +113,8 @@ describe('ageRowStyle', () => {
 });
 
 describe('isOutdated', () => {
-  const sglang = { tag: 'v0.5.22', publishedAt: '2026-10-10T08:00:00Z' };
-  const vllm = { tag: 'v0.32.0', publishedAt: '2026-10-01T00:00:00Z' };
+  const sglang = { tag: 'v0.5.22', publishedAt: '2026-10-10T08:00:00Z', commits: {} };
+  const vllm = { tag: 'v0.32.0', publishedAt: '2026-10-01T00:00:00Z', commits: {} };
 
   it('compares versioned tags numerically, not by substring', () => {
     expect(isOutdated('lmsysorg/sglang:v0.5.22-cu130', sglang, '2026-10-20')).toBe(false);
@@ -147,10 +150,22 @@ describe('isOutdated', () => {
     expect(isOutdated(fresh, sglang, '2026-10-20')).toBe(false);
   });
 
-  it('bounds an undated nightly by its submission date', () => {
+  it('bounds an unresolved undated nightly by its submission date', () => {
     const image = 'vllm/vllm-openai:nightly-ac7509e2b1db40fec2f03dde1ed4e9dfdc2338c9@sha256:98ad';
     expect(isOutdated(image, vllm, '2026-09-30')).toBe(true);
     expect(isOutdated(image, vllm, '2026-10-01')).toBe(false);
+  });
+
+  it('uses commit ancestry over dates when GitHub resolved the commit', () => {
+    const release = {
+      ...vllm,
+      commits: { af7f9488: 'behind', e68efc68: 'diverged', '83c078d9': 'ahead' } as const,
+    };
+    expect(isOutdated('vllm/vllm-openai:nightly-af7f9488', release, '2026-10-23')).toBe(true);
+    expect(isOutdated('vllm/vllm-openai:nightly-e68efc68', release, '2026-09-01')).toBe(false);
+    expect(isOutdated('lmsysorg/sglang:nightly-dev-20260901-83c078d9', release, '2026-09-02')).toBe(
+      false,
+    );
   });
 
   it('does not flag custom tags or frameworks without a release stream', () => {
@@ -174,10 +189,55 @@ describe('baseFramework', () => {
   });
 });
 
+describe('nightlyCommit', () => {
+  it.each([
+    [
+      'vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b@sha256:8e2f',
+      'af7f9488c2210d67e1033ecdc845b087ee7fe92b',
+    ],
+    ['vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7', 'ac9126e58aa7'],
+    ['vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28', '20ebb28'],
+    ['lmsysorg/sglang:nightly-dev-cu13-20260914-4358a161', '4358a161'],
+    [
+      'vllm/vllm-openai-rocm:nightly-rocm100-49cb2bbf71cfd36ee5aa33d1e184b1cddff55294',
+      '49cb2bbf71cfd36ee5aa33d1e184b1cddff55294',
+    ],
+  ])('reads the commit from %s', (image, commit) => {
+    expect(nightlyCommit(image)).toBe(commit);
+  });
+
+  it.each([
+    'rocm/atom-dev:nightly_202609211553',
+    'vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk',
+    'lmsysorg/sglang:v0.5.22-cu130',
+    'lmsysorg/sglang:dev-muse-spark-open',
+  ])('finds no commit in %s', (image) => {
+    expect(nightlyCommit(image)).toBeNull();
+  });
+});
+
+describe('earliestSubmission', () => {
+  const rows = [
+    { image: 'vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28', date: '2026-10-21' },
+    { image: 'vllm/vllm-openai:nightly-dev-arm64-cu13.0.1-20ebb28', date: '2026-09-28' },
+    { image: 'lmsysorg/sglang:nightly', date: '2026-08-01' },
+    { image: 'lmsysorg/sglang:nightly', date: '2026-10-22' },
+  ];
+  const dates = firstSubmissionDates(rows);
+
+  it('bounds a commit build by its first submission on any architecture', () => {
+    expect(earliestSubmission(dates, rows[0])).toBe('2026-09-28');
+  });
+
+  it('keeps each submission date for a floating tag', () => {
+    expect(earliestSubmission(dates, rows[3])).toBe('2026-10-22');
+  });
+});
+
 describe('getActualLatestRelease', () => {
   const releases = {
-    vllm: { tag: 'v0.21.0', publishedAt: '2026-06-01T00:00:00Z' },
-    sglang: { tag: 'v0.5.12', publishedAt: '2026-06-02T00:00:00Z' },
+    vllm: { tag: 'v0.21.0', publishedAt: '2026-06-01T00:00:00Z', commits: {} },
+    sglang: { tag: 'v0.5.12', publishedAt: '2026-06-02T00:00:00Z', commits: {} },
   };
 
   it.each([

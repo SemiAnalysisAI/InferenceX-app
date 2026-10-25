@@ -51,7 +51,7 @@ beforeEach(() => {
     Response.json([image, { ...image, disagg: true, hardware: 'h200' }]),
   );
   mocks.releases.mockImplementation(() =>
-    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z' } }),
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
   );
 });
 

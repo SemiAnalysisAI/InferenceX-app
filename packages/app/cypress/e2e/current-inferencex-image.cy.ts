@@ -149,8 +149,8 @@ describe('Current InferenceX Image localized routes', () => {
     },
   ];
   const releases = {
-    sglang: { tag: 'v0.5.2', publishedAt: '2026-08-01T00:00:00Z' },
-    vllm: { tag: 'v0.10.1', publishedAt: '2026-08-01T00:00:00Z' },
+    sglang: { tag: 'v0.5.2', publishedAt: '2026-08-01T00:00:00Z', commits: {} },
+    vllm: { tag: 'v0.10.1', publishedAt: '2026-08-01T00:00:00Z', commits: {} },
   };
 
   beforeEach(() => {

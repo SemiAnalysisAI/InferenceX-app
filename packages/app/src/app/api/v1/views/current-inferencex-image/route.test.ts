@@ -40,7 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.images.mockImplementation(() => Response.json([image, { ...image, disagg: true }]));
   mocks.releases.mockImplementation(() =>
-    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z' } }),
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
   );
   mocks.history.mockResolvedValue([
     { ...image, date: '2026-08-20' },
