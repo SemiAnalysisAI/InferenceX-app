@@ -1,9 +1,10 @@
 ---
-title: 'AMD MI355X GLM-5 Inference: Up to 40% Cheaper per Million Tokens than B200 on SGLang FP8'
+title: 'AMD MI355X GLM-5 Inference: Up to 29.6% Lower Cost per Million Tokens than B200 on SGLang FP8'
 subtitle: '14 weeks after GLM-5 launched, AMD landed both MTP and non-MTP SGLang FP8 recipes on MI355X — fused MLA + FP8 KV cache via TileLang flips the single-node FP8 cost curve in AMD favor across most of the performance Pareto'
-seoDescription: 'AMD MI355X runs GLM-5 up to 40% cheaper per million tokens than B200 on SGLang FP8, with fused MLA and FP8 KV cache via TileLang.'
+seoDescription: 'AMD MI355X runs GLM-5 at up to 29.6% lower cost per million tokens than B200 on SGLang FP8, with fused MLA and FP8 KV cache via TileLang.'
 date: '2026-05-25'
 publishDate: '2026-05-25'
+modifiedDate: '2026-10-25'
 tags:
   - benchmark
   - gpu
@@ -17,15 +18,15 @@ tags:
   - rocm
 ---
 
-14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across most of the single-node Pareto frontier on the 8k/1k workload (from ~10 to ~77 tok/s/user; B200 noses back ahead above ~90 tok/s/user). The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction) and **1.36x at 10 tok/s/user without MTP** ($0.31/M vs $0.23/M). Both runs are on **SGLang v0.12**, where the MI355X ROCm stack is now feature-matched with the CUDA stack on B200: both MTP and non-MTP recipes, both with FP8 KV cache, both on SGLang's latest TileLang-backed MLA path.
+14 weeks after GLM-5's release, AMD MI355X SGLang FP8 has lower cost per million tokens than NVIDIA B200 SGLang FP8 across much of their shared single-node operating ranges on the 8k/1k workload. With MTP, the largest interpolated saving is **about 29.6% near 24.3 tok/s/user** ($0.3388/M on B200 vs $0.2384/M on MI355X, a B200 / MI355X cost ratio of 1.421x). Without MTP, the largest saving is **about 23.7% near 11.2 tok/s/user** ($0.3161/M vs $0.2411/M, a 1.311x ratio). Both use **SGLang v0.5.12** and FP8 KV cache. These comparisons use the historical data available as of 2026-05-20.
 
 This is the cadence that matters. GLM-5 dropped, and within a quarter AMD shipped an upstream SGLang kernel ([sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)) along with other optimizations plus the matching InferenceX recipes ([InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)) that flipped the FP8 single-node cost curve on the model. Speed is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&g_runid=26187777287&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
-GLM-5 is ZAI's (Zhipu) MoE flagship, released 2026-02-11 — exactly 14 weeks before the InferenceX run in this post. It's a **744B-parameter sparse MoE with ~40B activated per token**: 256 experts with top-8 routing (~5.9% sparsity) plus shared experts. The published architecture name is `glm_moe_dsa` — the model integrates **DeepSeek Sparse Attention (DSA)** on the decode path, the same sparse-attention pattern DeepSeek introduced in V3.2 and that SGLang's TileLang backend was built around, paired with Multi-head Latent Attention (MLA) for KV-cache compression to support its 200K context window.
+GLM-5 is ZAI's (Zhipu) MoE flagship, released 2026-02-11 — about 14 weeks before the snapshot in this post. It's a **744B-parameter sparse MoE with ~40B activated per token**: 256 experts with top-8 routing (~5.9% sparsity) plus shared experts. The published architecture name is `glm_moe_dsa` — the model integrates **DeepSeek Sparse Attention (DSA)** on the decode path, the same sparse-attention pattern DeepSeek introduced in V3.2 and that SGLang's TileLang backend was built around, paired with Multi-head Latent Attention (MLA) for KV-cache compression to support its 200K context window.
 
 On MI355X, the equivalent capability landed via SGLang's TileLang backend in mid-April, and the resulting decode throughput moved enough that MI355X's lower per-GPU TCO ($1.48/GPU/hr vs B200 at $1.95/GPU/hr per the [SemiAnalysis AI Cloud TCO Model](https://newsletter.semianalysis.com/p/ai-cloud-economics)) now compounds into a real cost-per-token advantage instead of being swamped by software gaps.
 
@@ -39,7 +40,11 @@ The TileLang dependency was bumped to enable FP8 GEMM on AMD, and a new `sparse_
 
 ## The Numbers
 
-All rows are GLM-5 FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated node, measured on InferenceX on 2026-05-20 on **SGLang v0.12** for both CUDA (B200) and ROCm (MI355X). Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and MI355X at $1.48/GPU/hr.
+Correction (2026-10-25): the previous version overstated the cost saving as 40% and included comparisons outside the shared measured ranges. The title, opening claims and tables have been recomputed from the same historical source measurements using the dashboard’s current interpolation.
+
+All rows are GLM-5 FP8 at **ISL 8192 / OSL 1024** on a single non-disaggregated node, available in the InferenceX snapshot as of 2026-05-20 on **SGLang v0.5.12** for both CUDA (B200) and ROCm (MI355X). Cost per million total tokens is computed as `TCO_$/GPU/hr / (3600 × tput_per_gpu / 1e6)`, with B200 at $1.95/GPU/hr and MI355X at $1.48/GPU/hr.
+
+The source measurements are from [B200 run 26047946365](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26047946365/attempts/1) on 2026-05-18 and [MI355X run 26046385161](https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26046385161/attempts/1) on 2026-05-19. May 20 is the snapshot cutoff, not a shared measurement date.
 
 Container images used:
 
@@ -102,27 +107,31 @@ Container images used:
 
 ## Iso-Interactivity Cost Comparison
 
-Interpolating both Pareto frontiers at matched interactivity. For MI355X MTP the Pareto frontier is the lower of TP=4 and TP=8 at each interactivity — TP=4 dominates up to ~77 tok/s/user, with TP=8 conc 4 taking over at the high-interactivity end (~90 tok/s/user) where TP=4 can't reach.
+Throughput is interpolated on each hardware/MTP Pareto frontier with the dashboard’s monotone cubic Hermite spline; cost is then derived as `TCO_$/GPU/hr × 1e6 / (3600 × interpolated throughput)`. MI355X MTP combines TP=4 and TP=8 points into one frontier. Ratios and percentage savings are calculated from unrounded costs: `saving = 1 − MI355X cost / B200 cost`.
+
+The common measured ranges are approximately 18.052–90.435 tok/s/user with MTP and 10.722–42.032 tok/s/user without MTP. An MTP comparison at 18 tok/s/user or a non-MTP comparison at 10 tok/s/user would require extrapolation, so neither is reported. The interpolated MTP maximum is near 24.32 tok/s/user; the table uses 24.3. MI355X MTP remains cheaper up to the crossover near 89.13 tok/s/user, after which B200 is cheaper. The negative saving at 90 tok/s/user reflects that reversal.
 
 **MTP:**
 
-| Interactivity (tok/s/user) | B200 SGLang MTP $/M tok | MI355X SGLang MTP $/M tok | B200 / MI355X |
-| -------------------------- | ----------------------- | ------------------------- | ------------- |
-| **18**                     | **$0.30**               | **$0.22**                 | **1.41x**     |
-| 24                         | $0.34                   | $0.24                     | 1.40x         |
-| 35                         | $0.40                   | $0.34                     | 1.17x         |
-| 55                         | $0.55                   | $0.45                     | 1.22x         |
-| 77                         | $0.82                   | $0.66                     | 1.25x         |
-| 90                         | $1.08                   | $1.10                     | 0.98x         |
+| Interactivity (tok/s/user) | B200 SGLang MTP $/M tok | MI355X SGLang MTP $/M tok | B200 / MI355X | MI355X cost saving |
+| -------------------------- | ----------------------- | ------------------------- | ------------- | ------------------ |
+| 18.1                       | $0.2987                 | $0.2159                   | 1.384x        | 27.7%              |
+| 24                         | $0.3371                 | $0.2373                   | 1.420x        | 29.6%              |
+| **24.3**                   | **$0.3388**             | **$0.2384**               | **1.421x**    | **29.6%**          |
+| 35                         | $0.3982                 | $0.3325                   | 1.197x        | 16.5%              |
+| 55                         | $0.5500                 | $0.4538                   | 1.212x        | 17.5%              |
+| 77                         | $0.8203                 | $0.6608                   | 1.241x        | 19.4%              |
+| 90                         | $1.0475                 | $1.0765                   | 0.973x        | -2.8%              |
 
 **Non-MTP:**
 
-| Interactivity (tok/s/user) | B200 SGLang $/M tok | MI355X SGLang $/M tok | B200 / MI355X |
-| -------------------------- | ------------------- | --------------------- | ------------- |
-| 15                         | $0.37               | $0.28                 | 1.31x         |
-| 20                         | $0.45               | $0.35                 | 1.27x         |
-| 30                         | $0.66               | $0.58                 | 1.14x         |
-| 40                         | $1.07               | $1.03                 | 1.05x         |
+| Interactivity (tok/s/user) | B200 SGLang $/M tok | MI355X SGLang $/M tok | B200 / MI355X | MI355X cost saving |
+| -------------------------- | ------------------- | --------------------- | ------------- | ------------------ |
+| **11.2**                   | **$0.3161**         | **$0.2411**           | **1.311x**    | **23.7%**          |
+| 15                         | $0.3669             | $0.2817               | 1.302x        | 23.2%              |
+| 20                         | $0.4449             | $0.3450               | 1.289x        | 22.5%              |
+| 30                         | $0.6450             | $0.5723               | 1.127x        | 11.3%              |
+| 40                         | $1.0390             | $0.9822               | 1.058x        | 5.5%               |
 
 <Figure
   srcLight="/images/mi355x-glm5-fp8-sglang-40-cheaper-than-b200/benchmark-light.png"
@@ -131,7 +140,7 @@ Interpolating both Pareto frontiers at matched interactivity. For MI355X MTP the
   caption="GLM-5 FP8 8k/1k. Cost per million total tokens vs interactivity. B200 SGLang and MI355X SGLang, both with and without MTP. Labels denote GPU count per config."
 />
 
-[Live chart](https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&g_runid=26187777287&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1), pre-filtered to GLM-5 FP8 on B200 and MI355X SGLang for the 2026-05-20 run.
+[Live chart](https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1), pre-filtered to GLM-5 FP8 on B200 and MI355X SGLang for the snapshot as of 2026-05-20.
 
 ## What's Next for MI355X on GLM-5
 
@@ -144,7 +153,7 @@ This result is single-node, aggregated, FP8 only. Two gaps still need closing:
 
 This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangovan), [HaiShaw](https://github.com/HaiShaw), and the broader AMD AI team landed both the upstream SGLang TileLang fused MLA + FP8 KV kernel in a 14-week window after GLM-5 dropped. The SGLang maintainers reviewed and shipped the kernel within days of submission. Speed of the upstream-to-benchmark loop is the moat.
 
-<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&g_runid=26187777287&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
+<DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   Click to see the full InferenceX dashboard →
 </DashboardCTA>
 
@@ -157,7 +166,7 @@ This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangov
       "name": "How much cheaper is AMD MI355X than NVIDIA B200 on GLM-5 FP8 single-node serving?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "On GLM-5 FP8 at 8k/1k sequence length with SGLang MTP, MI355X serves at up to 1.41x lower cost per million tokens than B200 — a 40% reduction. The peak gap is at 18 tok/s/user, where B200 costs $0.30 per million tokens and MI355X costs $0.22. Without MTP, the peak gap is 1.36x at 10 tok/s/user ($0.31 vs $0.23). The MI355X cost advantage holds across the entire MTP curve from ~12 to ~77 tok/s/user. The headline configuration is a 4-GPU TP=4 MTP recipe on MI355X with TCO at $1.48/GPU/hr vs B200 at $1.95/GPU/hr. Measured on InferenceX as of 2026-05-20."
+        "text": "On GLM-5 FP8 at 8k/1k with SGLang MTP, MI355X has an interpolated cost saving of up to about 29.6% near 24.3 tok/s/user: $0.2384 per million total tokens versus $0.3388 for B200. B200 / MI355X cost is 1.421x, which corresponds to a 29.6% reduction. Without MTP, the largest saving is about 23.7% near 11.2 tok/s/user ($0.2411 versus $0.3161, a 1.311x ratio). The MTP comparison is supported only from approximately 18.052 to 90.435 tok/s/user; MI355X is cheaper up to about 89.13 tok/s/user. TCO assumptions are $1.48/GPU/hr for MI355X and $1.95/GPU/hr for B200. The May 20 snapshot contains B200 measurements from May 18 and MI355X measurements from May 19, 2026."
       }
     },
     {
@@ -170,10 +179,10 @@ This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangov
     },
     {
       "@type": "Question",
-      "name": "Why is the MI355X cost gap biggest at 18 tok/s/user?",
+      "name": "Why is the MI355X MTP cost advantage largest near 24.3 tok/s/user?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Two effects compound. First, the MI355X SGLang MTP recipe ships in a 4-GPU TP=4 variant that has no direct 4-GPU B200 equivalent at FP8, so MI355X spreads the same throughput across fewer GPUs at lower per-GPU TCO ($1.48 vs $1.95/GPU/hr). Second, the MI355X TP=4 throughput curve plateaus at $0.22 per million tokens across concurrency 64 and 128, both delivering ~18 tok/s/user, while B200 at the same interactivity is interpolating between conc 128 ($0.28 at 13.8 tok/s/user) and conc 64 ($0.34 at 23.6 tok/s/user). The compounded effect peaks at 18 tok/s/user (B200 $0.30 vs MI355X $0.22, 1.41x or 40% cheaper). Above 90 tok/s/user the comparison flips marginally back to B200 because there is no MI355X recipe matching B200's TP=8 conc 4 at 100+ tok/s/user."
+        "text": "MI355X MTP combines a 4-GPU TP=4 configuration with the lower assumed per-GPU TCO of $1.48/GPU/hr, versus $1.95/GPU/hr for B200 TP=8. Near 24.3 tok/s/user, the dashboard interpolates the MI355X throughput between its TP=4 concurrency 64 and 32 points, while B200 is interpolated between concurrency 64 and 32 on TP=8. Deriving cost from those interpolated throughputs gives $0.2384/M for MI355X and $0.3388/M for B200: about 29.6% lower cost and a 1.421x B200 / MI355X cost ratio. At 90 tok/s/user the comparison reverses: B200 is $1.0475/M and MI355X is $1.0765/M. The interpolated crossover is near 89.13 tok/s/user."
       }
     },
     {
@@ -181,7 +190,7 @@ This recipe loop moved fast because [Anush Elangovan](https://x.com/AnushElangov
       "name": "Is MI355X also cheaper than B200 on GLM-5 FP8 without MTP?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, but the gap narrows at higher interactivity. Without MTP, MI355X SGLang FP8 (TP=4) is 1.36x cheaper than B200 SGLang FP8 (TP=8) at 10 tok/s/user ($0.23 vs $0.31 per million tokens), 1.27x cheaper at 20 tok/s/user ($0.35 vs $0.45), and 1.05x cheaper at 40 tok/s/user ($1.03 vs $1.07). MTP widens the cheap-end gap because the speculative decoding pass lifts effective per-step throughput on MI355X TP=4 by ~1.34x: at concurrency 32, TPOT drops from 53.9 ms (non-MTP) to 40.3 ms (MTP) and tok/s/GPU rises from 1,274 to 1,707."
+        "text": "Yes. Without MTP, MI355X SGLang FP8 TP=4 has lower interpolated cost than B200 TP=8 throughout their shared measured range of 10.722 to 42.032 tok/s/user. The largest saving is about 23.7% near 11.2 tok/s/user ($0.2411 versus $0.3161 per million total tokens). At 20 tok/s/user the saving is 22.5% ($0.3450 versus $0.4449), and at 40 tok/s/user it is 5.5% ($0.9822 versus $1.0390). A comparison at 10 tok/s/user is unavailable because B200 has no measured frontier there. On MI355X TP=4 at concurrency 32, MTP increases throughput by about 34%: TPOT falls from 53.9 ms to 40.3 ms and tok/s/GPU rises from 1,274 to 1,707."
       }
     },
     {
