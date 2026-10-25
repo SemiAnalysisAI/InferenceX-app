@@ -14,14 +14,15 @@ const STRINGS = {
   },
   zh: {
     note: '注意：',
-    text: '与 SemiAnalysis 无关联或背书。此处显示的数据可能为非官方、已修改或过期数据——请访问官方网站获取权威的 InferenceX™ 结果。',
+    text: '上，且与 SemiAnalysis 无关联，也未获其背书。此处显示的数据可能为非官方、已修改或过期数据——请访问官方网站获取权威的 InferenceX™ 结果。',
     notHosted: '此部署未托管在',
   },
 } as const;
 
 export function UnofficialDomainNotice() {
   const isUnofficial = useUnofficialDomain();
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   if (!isUnofficial) return null;
 
@@ -35,7 +36,8 @@ export function UnofficialDomainNotice() {
         className="underline hover:text-foreground"
       >
         {OFFICIAL_HOSTNAME}
-      </a>{' '}
+      </a>
+      {locale === 'zh' ? '' : ' '}
       {t.text}
     </p>
   );

@@ -102,7 +102,7 @@ const STRINGS = {
     exportCsv: '导出 CSV',
     exportJson: '导出 JSON',
     windowDesc: (start: string, end: string, asOf: string, days: number) =>
-      `首次观测 ${start}–${end}（不含末日），跟踪至 ${asOf}（UTC，不含末日）。最短跟踪期：${days} 天。`,
+      `首次观测 ${start}–${end}（不含结束日），跟踪至 ${asOf}（UTC，不含结束日）。最短跟踪期：${days} 天。`,
     eligibleDesc: (sessions: string, calls: string, traceVersion: number | null) =>
       `${sessions} 个符合条件的 session · ${calls} 次调用。含短 session 及辅助/分类调用。全部模型；trace version ${traceVersion ?? 'all'}。`,
     lookbackDesc: (days: number) =>
@@ -116,7 +116,7 @@ const STRINGS = {
     coverageCohort: '覆盖群组',
     cutoffsError: '请输入 1 到 28 的逗号分隔整数天数。',
     noEligible:
-      '当前 trace version 范围内没有足够跟踪期的 session。请尝试选择"全部版本"，或等待更多历史数据积累后再查看。',
+      '当前 trace version 范围内没有足够跟踪期的 session。请尝试选择“全部版本”，或等待更多历史数据积累后再查看。',
     chartCoverageTitle: '对话时长与调用量',
     chartCoverageSubtitle: 'Session 计数与调用计数的分母不同。',
     legendSessionSpan: 'Session 跨度（窗口内）',
@@ -136,7 +136,7 @@ const STRINGS = {
     callsPerActiveCredentialDay: '调用 / 活跃凭证日',
     callsPerCredentialCalendarDay: '调用 / 凭证 / 日历日',
     activityDesc: (start: string, asOf: string, credDays: string, median: string, p90: string) =>
-      `${start}–${asOf}（不含末日）：${credDays} 活跃凭证日。每活跃凭证日中位调用 ${median} 次；p90 ${p90} 次。凭证可轮换或共享，此处并非已验证的用户数。`,
+      `${start}–${asOf}（不含结束日）：${credDays} 活跃凭证日。每活跃凭证日中位调用 ${median} 次；p90 ${p90} 次。凭证可轮换或共享，此处并非已验证的用户数。`,
     dataTableSummary: '数据表与定义',
     thCohort: '群组',
     thDays: '天数',

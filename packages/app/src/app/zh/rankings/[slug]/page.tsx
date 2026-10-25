@@ -87,7 +87,7 @@ function buildFaqZh(
           },
           {
             question: `“最快”是如何衡量的？`,
-            answer: `所有平台都在相同的交互速度档位（每用户每秒 ${data.tier} token）和${workload}下读取，再按实测单 GPU 吞吐排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
+            answer: `所有平台都在相同的交互速度档位（每用户每秒 ${data.tier} token）和${workload}下取值，再按实测单 GPU 吞吐排名。推导方式与 InferenceX 总览排行榜完全一致，因此本页排名不会与仪表盘出现分歧。`,
           },
         ]
       : [
@@ -185,7 +185,7 @@ export default async function ZhRankingPage({ params }: Props) {
     methodologyHeading: '测试方法',
     methodologyBody: [
       `本页所有数字都来自实测，而非纸面规格估算。InferenceX 集群使用社区推理引擎在真实硬件上部署 ${entry.model.seoName}，通过扫描并发数绘制每个平台的吞吐与交互速度前沿曲线。`,
-      `各平台均在同一工作点（每用户每秒 ${data.tier} token）读取数据，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
+      `各平台均在同一工作点（每用户每秒 ${data.tier} token）取值，确保在相同交互速度下进行比较。单用户速度低到无法正常使用时，即使吞吐量很高，也不能据此获得更高排名。每百万 token（输入加输出）的成本由实测吞吐量和 SemiAnalysis AI Cloud TCO 模型提供的 $/GPU/hr 费率换算得出。`,
       `推导逻辑与 InferenceX 总览排行榜共用，基准测试持续重跑，新引擎版本和新配置落地后排行会自动更新。`,
     ],
     faqHeading: '常见问题',

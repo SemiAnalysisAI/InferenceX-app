@@ -45,7 +45,7 @@ export function renderCausalEncoderDecoder(
   const attentionDetail = {
     'joint-local-swa-and-shared-global-kv': {
       en: 'Over local SWA + shared global KV',
-      zh: '共同关注局部 SWA 与共享全局 KV',
+      zh: '作用于局部 SWA 与共享全局 KV',
     },
   }[decoderAttention][locale];
   const width = Math.min(svgEl.clientWidth || svgEl.parentElement?.clientWidth || 600, 640);

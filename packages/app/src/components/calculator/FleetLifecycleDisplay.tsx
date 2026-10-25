@@ -103,10 +103,10 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '集群成本线采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
       '表格中每芯片指标按总 token、仅输入 token 还是仅输出 token 计。收入始终同时计入两类 token。',

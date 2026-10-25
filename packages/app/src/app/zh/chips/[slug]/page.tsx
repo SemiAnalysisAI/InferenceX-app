@@ -29,7 +29,7 @@ export function generateStaticParams() {
 }
 
 function vsDescriptionZh(page: ChipVsPage): string {
-  return `${page.a.title} 对比 ${page.b.title}：显存、内存带宽、FP8/FP4 算力、TDP 与云端价格并列呈现，并附相同工作负载上持续测量的 LLM 推理基准测试。${SUPPORTERS_LINE_ZH}`;
+  return `${page.a.title} 对比 ${page.b.title}：显存容量、显存带宽、FP8/FP4 算力、TDP 与云端价格并列呈现，并附相同工作负载上持续测量的 LLM 推理基准测试。${SUPPORTERS_LINE_ZH}`;
 }
 
 function vsKeywordsZh(page: ChipVsPage): string[] {
