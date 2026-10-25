@@ -20,6 +20,6 @@ Muse Spark Open 是 Meta 面向代码与智能体任务发布的开放权重模�
 
 上述层数与张量维度来自 [AMD 发布的 checkpoint 配置](https://huggingface.co/amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4/raw/main/config.json)与 [Transformers 实现文档](https://huggingface.co/docs/transformers/v5.20.0/en/model_doc/muse_spark)。Meta 的原始 checkpoint 配置需要申请访问权限，因此这里列出上述公开来源以说明数据出处，而不暗示该文件可以自由获取。
 
-## Checkpoint 与数据范围
+## Checkpoint 与适用范围
 
 Meta 以 Muse Model License 发布 BF16 和 NVFP4 checkpoint，AMD 另行发布 MXFP4 checkpoint。816B 是厂商公布的标称参数量，与仓库中的张量统计值不同，引用时应保留其原本的统计口径。架构说明属于静态元数据；下方 InferenceX 图表展示实测的推理性能（[Meta 文档](https://dev.meta.ai/docs/muse-spark-open)）。

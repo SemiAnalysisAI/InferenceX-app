@@ -21,6 +21,6 @@ DeepSeek-V4.1-Flash 是原生支持图像与文本输入的 MoE 模型，采用�
 
 上述维度以及 3 层 next-token prediction 配置均可在[公开配置](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/raw/main/config.json)中核对。[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)解释了 prefill 与 decode 激活参数量不同的原因，不能用单一数值代替。
 
-## 推理数据范围
+## 推理服务范围
 
 模型以 MIT 许可证发布。厂商报告的 FP4 KV cache 占用和有界 SWA replay 属于架构特性；InferenceX 的实测性能取决于实际 checkpoint、推理引擎及运行配置，不能只根据参数量推导速度提升（[模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)）。

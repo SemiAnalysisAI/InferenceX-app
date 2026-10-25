@@ -1,6 +1,6 @@
 ---
 title: 'B200 NVFP4 对比 H200 INT4 运行 Kimi K2.5/K2.6：每美元性能最高达 2.95 倍'
-subtitle: '在 vLLM 8K/1K 工作负载下，B200 NVFP4 路径在 30–90 tok/s/user 推理区间内每百万 tokens 成本比 H200 INT4 低 2.71x–2.95x，比同一 B200 硬件上的 INT4 低 2.45x–2.74x。三个因素——B200 的 HBM 带宽、HBM 容量和 NVFP4 张量核心——可清晰分解该优势'
+subtitle: '在 vLLM 8K/1K 工作负载下，B200 NVFP4 路径在 30–90 tok/s/user 推理区间内每百万 tokens 成本比 H200 INT4 低 2.71x–2.95x，比同一 B200 硬件上的 INT4 低 2.45x–2.74x。该优势可清晰分解为三个因素——B200 的 HBM 带宽、HBM 容量和 NVFP4 张量核心'
 seoDescription: '在 vLLM 8K/1K 下，B200 NVFP4 运行 Kimi K2.5/K2.6 每 token 成本比 H200 INT4 最多低 2.95 倍，覆盖 30–90 tok/s/user 全区间。'
 date: '2026-05-26'
 publishDate: '2026-05-26'
@@ -33,7 +33,7 @@ Kimi K2.5 和 K2.6 是 xAI Cursor Composer 2 和 Composer 2.5 背后的开源权
 
 ## Kimi K2.5 / K2.6 模型架构及下游 Cursor Composer 2.5 模型
 
-[Kimi K2.5](https://huggingface.co/moonshotai/Kimi-K2.5)（发布于 2026-01-27）和 [Kimi K2.6](https://huggingface.co/moonshotai/Kimi-K2.6)（发布于 2026-04-20）共享原始 Kimi K2 骨干网络：**1.0T 参数的 MoE，每个 token 激活 32B 参数**，**DeepSeek 风格的 top-8-of-385 专家路由，跨 61 个 Transformer 层（1 个 dense 块 + 60 个 MoE 块）**，**Multi-head Latent Attention（MLA）**、SwiGLU、**YaRN RoPE**，163,840 词汇量，以及 **256K 上下文窗口**（262,144 tokens）。HF 检查点为 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)——两者是在同一预训练架构上的后训练优化，因此**本文中的每一个推理结果都同样适用于这两个版本**。
+[Kimi K2.5](https://huggingface.co/moonshotai/Kimi-K2.5)（发布于 2026-01-27）和 [Kimi K2.6](https://huggingface.co/moonshotai/Kimi-K2.6)（发布于 2026-04-20）共享原始 Kimi K2 骨干网络：**1.0T 参数的 MoE，每个 token 激活 32B 参数**，**DeepSeek 风格的 top-8-of-385 专家路由，跨 61 个 Transformer 层（1 个 dense 块 + 60 个 MoE 块）**，**Multi-head Latent Attention（MLA）**、SwiGLU、**YaRN RoPE**，163,840 token 的词表，以及 **256K 上下文窗口**（262,144 tokens）。HF 检查点为 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)——两者是在同一预训练架构上的后训练优化，因此**本文中的每一个推理结果都同样适用于这两个版本**。
 
 <Figure
   srcLight="/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-light.png"
@@ -148,7 +148,7 @@ NVIDIA B200 SXM（Blackwell，2025）vs NVIDIA H200 SXM（Hopper，2024）——
 
 ## 致谢
 
-Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果，权重发布于 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)。Blackwell 上的 vLLM NVFP4 路径是 [vLLM 项目](https://github.com/vllm-project/vllm)以及 NVIDIA TensorRT-LLM / AITER 内核团队的工作成果，vLLM 链接了他们的 FP4 MoE 内核。持续基准测试由 SemiAnalysis 在 InferenceX 上执行。速度就是护城河。
+Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果，权重发布于 [`moonshotai/Kimi-K2.5`](https://huggingface.co/moonshotai/Kimi-K2.5) 和 [`moonshotai/Kimi-K2.6`](https://huggingface.co/moonshotai/Kimi-K2.6)。Blackwell 上的 vLLM NVFP4 路径是 [vLLM 项目](https://github.com/vllm-project/vllm)以及 NVIDIA TensorRT-LLM / AITER kernel 团队的工作成果，vLLM 链接了他们的 FP4 MoE kernel。持续基准测试由 SemiAnalysis 在 InferenceX 上执行。速度就是护城河。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-19&g_runid=26118912054&g_model=Kimi-K2.5&i_prec=fp4%2Cint4&i_active=b200_vllm%2Ch200_vllm">
   点击查看完整 InferenceX 仪表板 →
@@ -195,7 +195,7 @@ Kimi K2.5 和 K2.6 是 [Moonshot AI](https://www.moonshot.ai/) 的工作成果�
       "name": "Kimi K2.5 / K2.6 推理还有哪些未覆盖的方向？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "四个方向。第一，AMD MI355X 目前还没有 K2.5 / K2.6 的 InferenceX 方案；一旦内核覆盖到位，相同的精度解锁论证应同样适用（MI355X 有 10,066 TFLOP/s FP4 张量核心，略高于 B200）。第二，PD 分离式推理（AMD 上的 mori-sglang、NVIDIA Dynamo）是下一个约 1.5 倍的提升杠杆，目前 InferenceX 循环中还没有 K2 的方案。第三，GB200 NVL72 和 GB300 NVL72 的机架级宽 Expert Parallelism 路径尚未为 K2.5 / K2.6 接入，尽管 384 专家的架构天然适配。第四，本文测量的是 8K / 1K；32K / 2K 和 128K / 2K 的 agentic 工具调用工作负载会在 KV 缓存压力开始对 256K 上下文窗口模型产生影响后重新排列曲线。"
+        "text": "四个方向。第一，AMD MI355X 目前还没有 K2.5 / K2.6 的 InferenceX 方案；一旦 kernel 覆盖到位，相同的精度解锁论证应同样适用（MI355X 有 10,066 TFLOP/s FP4 张量核心，略高于 B200）。第二，PD 分离式推理（AMD 上的 mori-sglang、NVIDIA Dynamo）是下一个约 1.5 倍的提升杠杆，目前 InferenceX 循环中还没有 K2 的方案。第三，GB200 NVL72 和 GB300 NVL72 的机架级宽 Expert Parallelism 路径尚未为 K2.5 / K2.6 接入，尽管 384 专家的架构天然适配。第四，本文测量的是 8K / 1K；32K / 2K 和 128K / 2K 的 agentic 工具调用工作负载会在 KV 缓存压力开始对 256K 上下文窗口模型产生影响后重新排列曲线。"
       }
     }
   ]
