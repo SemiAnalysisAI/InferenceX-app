@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'abca2dd1a16347e04bc1e0912d49eaf7070cbd4418ce876fddec52e15258f1f4',
+    sourceSha256: '1786e5123ababe49281f72aa1445540a4314fbf54f28119f8e620882c1eda6d7',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -812,7 +812,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-framework-releases',
-    sourceSha256: 'ce0bd92ab1b567ee476f0a96b9a3b7ea3c5730b75b32d6941e8de661822be3f6',
+    sourceSha256: '732f39cac533a35564fce006125e6f6f09ae662b4db098568f690efdf893d4f0',
   },
   {
     source: 'src/app/api/v1/invalidate/route.ts',
@@ -1593,7 +1593,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '39beddbcbea7decf60f0e2e8217083e0c88516fab3181e3f2b94cdd1dca2b8f1',
+    sourceSha256: '1977dc4672a1105ab080727b08edec41ab278b14ceea93376f187f3c99b4992c',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',

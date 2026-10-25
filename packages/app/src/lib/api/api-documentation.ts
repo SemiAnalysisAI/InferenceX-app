@@ -1599,18 +1599,29 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease GitHub release among the 20 most recent releases for vLLM and SGLang, with its publish time. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布版本及其发布时间。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag and ISO 8601 publish time, or null.',
+        '框架键映射到版本标签和 ISO 8601 发布时间；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: { tag: 'v0.10.2', publishedAt: '2026-08-01T12:00:00Z' },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z' },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],

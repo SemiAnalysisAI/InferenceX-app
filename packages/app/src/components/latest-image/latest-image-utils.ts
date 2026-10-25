@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
-import type { FrameworkReleases, LatestImageRow } from '@/lib/api/api';
+import type { FrameworkRelease, FrameworkReleases, LatestImageRow } from '@/lib/api/api';
 import {
   Model,
   Sequence,
@@ -64,6 +64,7 @@ export const FRAMEWORK_TO_BASE: Record<string, string> = {
   'dynamo-sglang': 'sglang',
   'llmd-vllm': 'vllm',
   'mori-sglang': 'sglang',
+  'vllm-disagg': 'vllm',
 };
 
 export function baseFramework(framework: string): string {
@@ -74,7 +75,35 @@ export function baseFramework(framework: string): string {
   return framework;
 }
 
-export const UNSTABLE_PATTERNS = ['nightly', 'rocm/sgl-dev', 'sglang-rocm'];
+export type Version = readonly [number, number, number, number];
+
+/** First `X.Y.Z` (optionally `.postN`) that starts the string or follows `v`, `-`, `_`, `:`. */
+export function parseVersion(text: string): Version | null {
+  const v = /(?:^|[-_:])v?(?<a>\d+)\.(?<b>\d+)\.(?<c>\d+)(?:\.?post(?<p>\d+))?(?![\d.])/i.exec(
+    text,
+  )?.groups;
+  if (!v) return null;
+  return [Number(v.a), Number(v.b), Number(v.c), Number(v.p ?? 0)];
+}
+
+export function compareVersions(a: Version, b: Version): number {
+  for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+function imageTag(image: string): string {
+  const ref = image.split('@')[0];
+  const colon = ref.lastIndexOf(':');
+  return colon > ref.lastIndexOf('/') ? ref.slice(colon + 1) : ref;
+}
+
+function nightlyBuildDate(tag: string): string | null {
+  const date =
+    /(?:^|\D)(?<y>20\d{2})(?<m>0[1-9]|1[0-2])(?<d>0[1-9]|[12]\d|3[01])(?:\d{4})?(?!\d)/.exec(
+      tag,
+    )?.groups;
+  return date ? `${date.y}-${date.m}-${date.d}` : null;
+}
 
 export const AGE_MAX_RED_DAYS = 60;
 
@@ -111,19 +140,28 @@ export function ageRowStyle(days: number): CSSProperties | undefined {
   return { backgroundColor: `oklch(0.60 0.22 25 / ${alpha})` };
 }
 
-export function isOutdated(image: string, actualLatest: string | null): boolean {
-  const lower = image.toLowerCase();
-  if (UNSTABLE_PATTERNS.some((p) => lower.includes(p))) return true;
-  if (!actualLatest) return false;
-  return !image.includes(actualLatest);
+/**
+ * Versioned tags compare against the release version. Nightlies compare their build date (from
+ * the tag, else the submission date as an upper bound) against the release date. Anything else,
+ * or a framework without a release stream, is not flagged.
+ */
+export function isOutdated(
+  image: string,
+  release: FrameworkRelease | null,
+  submittedDate: string,
+): boolean {
+  if (!release) return false;
+  const latest = parseVersion(release.tag);
+  const tag = imageTag(image);
+  const version = parseVersion(tag);
+  if (version && latest) return compareVersions(version, latest) < 0;
+  if (!/nightly/i.test(tag)) return false;
+  return (nightlyBuildDate(tag) ?? submittedDate) < release.publishedAt.slice(0, 10);
 }
 
-export function getActualLatestTag(
+export function getActualLatestRelease(
   framework: string,
   releases: FrameworkReleases | undefined,
-): string | null {
-  if (!releases) return null;
-  const base = FRAMEWORK_TO_BASE[framework];
-  if (!base) return null;
-  return releases[base] ?? null;
+): FrameworkRelease | null {
+  return releases?.[baseFramework(framework)] ?? null;
 }

@@ -32,7 +32,7 @@ import {
   ageRowStyle,
   baseFramework,
   daysSince,
-  getActualLatestTag,
+  getActualLatestRelease,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
   isActiveImageRow,
@@ -57,7 +57,7 @@ const STRINGS = {
       'Current tags are the images used by InferenceX. Latest tags are upstream framework releases.',
     scrollHint: 'Scroll horizontally to see all image and version details.',
     reviewImage: 'Review image',
-    reviewHint: 'The image differs from the latest release or uses an unstable tag.',
+    reviewHint: 'The image predates the latest framework release.',
     staleAgentx: 'AgentX submission over 14 days old',
     unknownRelease: 'Not available',
     loading: 'Loading...',
@@ -109,7 +109,7 @@ const STRINGS = {
     versionHint: '当前标签指 InferenceX 使用的镜像，最新标签指上游框架的发布版本。',
     scrollHint: '横向滚动可查看完整的镜像与版本信息。',
     reviewImage: '镜像需核查',
-    reviewHint: '镜像与最新发布版本不同，或使用了不稳定标签。',
+    reviewHint: '该镜像早于框架的最新发布版本。',
     staleAgentx: 'AgentX 提交已超过 14 天',
     unknownRelease: '暂无信息',
     loading: '加载中……',
@@ -555,8 +555,8 @@ export function CurrentImageContent() {
                 {filtered.map((row, i) => {
                   const displayModel = imageRowDisplayModel(row);
                   const gpuLabel = row.hardware.toUpperCase();
-                  const actualLatest = getActualLatestTag(row.framework, releases);
-                  const outdated = isOutdated(row.image, actualLatest);
+                  const release = getActualLatestRelease(row.framework, releases);
+                  const outdated = isOutdated(row.image, release, row.date);
                   const ageDays = daysSince(row.date, today);
                   const staleAgentx = isStaleAgentx(row.benchmark_type, ageDays);
                   const stale = outdated || staleAgentx;
@@ -607,9 +607,9 @@ export function CurrentImageContent() {
                         )}
                       </td>
                       <td className="px-4 py-4 align-top text-sm">
-                        {actualLatest ? (
+                        {release ? (
                           <code className="inline-block break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs select-all">
-                            {actualLatest}
+                            {release.tag}
                           </code>
                         ) : (
                           <span className="text-xs text-muted-foreground">{t.unknownRelease}</span>

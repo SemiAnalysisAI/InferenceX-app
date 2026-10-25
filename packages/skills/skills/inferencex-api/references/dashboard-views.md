@@ -235,6 +235,14 @@ variants replaced by a newer run of the same curve, are excluded from every
 point. Empty days have `p90AgeDays: null`, not zero. The chart's hover and
 keyboard inspection are presentation-only and introduce no extra selectors.
 
+Each row's `actualLatest` is the latest vLLM or SGLang release tag for its base
+engine (Dynamo, MoRI, llm-d, and `-disagg` variants map to the base engine), or
+null. `outdated` is true when the image tag's `X.Y.Z` version is below that
+release, or when a nightly tag's build date is before the release's publish
+date. A nightly tag without a date uses its submission date, so it is flagged
+only when it was submitted before the release. Custom tags and engines without a
+release stream (TensorRT-LLM, ATOM) are never flagged.
+
 OperatorX is available in primary navigation without an unlock and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API. The page-owned

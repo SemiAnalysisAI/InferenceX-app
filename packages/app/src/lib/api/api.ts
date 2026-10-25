@@ -339,7 +339,12 @@ export function fetchLatestImages(signal?: AbortSignal) {
   return fetchJson<LatestImageRow[]>('/api/v1/latest-images', signal);
 }
 
-export type FrameworkReleases = Record<string, string | null>;
+export interface FrameworkRelease {
+  tag: string;
+  publishedAt: string;
+}
+
+export type FrameworkReleases = Record<string, FrameworkRelease | null>;
 
 export function fetchFrameworkReleases(signal?: AbortSignal) {
   return fetchJson<FrameworkReleases>('/api/v1/framework-releases', signal);

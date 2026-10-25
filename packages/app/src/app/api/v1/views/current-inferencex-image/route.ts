@@ -9,7 +9,7 @@ import {
 } from '@/components/latest-image/image-age';
 import {
   daysSince,
-  getActualLatestTag,
+  getActualLatestRelease,
   imageRowDisplayModel,
   imageRowSequence,
   isActiveImageRow,
@@ -75,14 +75,14 @@ export function GET(request: NextRequest) {
       .toSorted((a, b) => a.date.localeCompare(b.date))
       .map((row) => {
         const ageDays = daysSince(row.date, new Date(`${asOf}T00:00:00Z`));
-        const actualLatest = getActualLatestTag(row.framework, releaseData);
+        const release = getActualLatestRelease(row.framework, releaseData);
         return {
           ...row,
           displayModel: imageRowDisplayModel(row),
           sequence: imageRowSequence(row),
           ageDays,
-          actualLatest,
-          outdated: isOutdated(row.image, actualLatest),
+          actualLatest: release?.tag ?? null,
+          outdated: isOutdated(row.image, release, row.date),
           staleAgentx: isStaleAgentx(row.benchmark_type, ageDays),
         };
       });
