@@ -19,7 +19,7 @@ tags:
 
 GLM-5 发布 14 周后，AMD MI355X SGLang FP8 在 8k/1k 工作负载的大部分单节点 Pareto 前沿上，每百万 token 成本低于 NVIDIA B200 SGLang FP8（从约 10 到约 77 tok/s/user；B200 在约 90 tok/s/user 以上重新反超）。峰值差距为**使用 MTP 时在 18 tok/s/user 下达到 1.41 倍**（B200 $0.30/M vs MI355X $0.22/M — 降低 40%），**不使用 MTP 时在 10 tok/s/user 下达到 1.36 倍**（$0.31/M vs $0.23/M）。两项测试均使用 **SGLang v0.12**，MI355X 的 ROCm 软件栈在此版本上已与 B200 的 CUDA 软件栈功能对齐：均支持 MTP 和非 MTP 方案，均支持 FP8 KV 缓存，均基于 SGLang 最新的 TileLang MLA 路径。
 
-这正是关键的节奏。GLM-5 发布后，一个季度内 AMD 就完成了上游 SGLang 内核的合入（[sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)）及其他优化，并提交了配套的 InferenceX 方案（[InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)），将该模型的 FP8 单节点成本曲线翻转为 AMD 占优。速度就是护城河。
+这正是关键的节奏。GLM-5 发布后，一个季度内 AMD 就完成了上游 SGLang kernel 的合入（[sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)）及其他优化，并提交了配套的 InferenceX 方案（[InferenceX PR #1440](https://github.com/SemiAnalysisAI/InferenceX/pull/1440)），将该模型的 FP8 单节点成本曲线翻转为 AMD 占优。速度就是护城河。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&g_runid=26187777287&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
@@ -31,11 +31,11 @@ GLM-5 是智谱（ZAI）的 MoE 旗舰模型，于 2026-02-11 发布 — 距本�
 
 ## 推动这一结果的关键优化
 
-AMD 方面的标志性性能优化之一是 [sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)（由 [HaiShaw](https://github.com/HaiShaw) 提交，2026-04-03 合入）。该 PR 通过 SGLang 的 TileLang 后端为 MI300/MI355 启用了 FP8 KV 缓存和 FP8 注意力内核（在 DeepSeek-V3.2 和 GLM-5 上均已测试），并针对不同硬件代际采用了不同的融合策略：
+AMD 方面的标志性性能优化之一是 [sgl-project/sglang PR #21511](https://github.com/sgl-project/sglang/pull/21511)（由 [HaiShaw](https://github.com/HaiShaw) 提交，2026-04-03 合入）。该 PR 通过 SGLang 的 TileLang 后端为 MI300/MI355 启用了 FP8 KV 缓存和 FP8 注意力 kernel（在 DeepSeek-V3.2 和 GLM-5 上均已测试），并针对不同硬件代际采用了不同的融合策略：
 
-- **在 MI355 上**，该 PR **复用了现有的 `fused_qk_rope_cat_and_cache_mla` 内核来同时处理 Q 和 KV 的 FP8 量化**。QK rope 拼接、MLA 缓存写入以及 Q 和 KV 的 FP8 量化全部合并到每个解码步骤的单次内核调用中 — 无需额外的 HBM 往返，无需单独的量化内核启动。
+- **在 MI355 上**，该 PR **复用了现有的 `fused_qk_rope_cat_and_cache_mla` kernel 来同时处理 Q 和 KV 的 FP8 量化**。QK rope 拼接、MLA 缓存写入以及 Q 和 KV 的 FP8 量化全部合并到每个解码步骤的单次 kernel 调用中 — 无需额外的 HBM 往返，无需单独的量化 kernel 启动。
 
-TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `sparse_mla_fwd_decode_partial_fp8` 内核用于部分解码归约路径。该 PR 报告 MI355 吞吐量提升超过 5%（MI300 超过 10%），gsm8k 准确率无下降（DeepSeek-V3.2 0.945 → 0.946；GLM-5 0.946 → 0.950），通过 `--kv-cache-dtype fp8_e4m3` 配合 TileLang 预填充/解码后端激活。
+TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `sparse_mla_fwd_decode_partial_fp8` kernel 用于部分解码归约路径。该 PR 报告 MI355 吞吐量提升超过 5%（MI300 超过 10%），gsm8k 准确率无下降（DeepSeek-V3.2 0.945 → 0.946；GLM-5 0.946 → 0.950），通过 `--kv-cache-dtype fp8_e4m3` 配合 TileLang 预填充/解码后端激活。
 
 ## 基准测试数据
 
@@ -142,7 +142,7 @@ TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `spar
 
 ## 致谢
 
-该方案的快速落地得益于 [Anush Elangovan](https://x.com/AnushElangovan)、[HaiShaw](https://github.com/HaiShaw) 及更广泛的 AMD AI 团队在 GLM-5 发布后 14 周内完成了上游 SGLang TileLang 融合 MLA + FP8 KV 内核的提交。SGLang 维护者在提交后数天内即完成了审查与合入。从上游到基准测试的闭环速度就是护城河。
+该方案的快速落地得益于 [Anush Elangovan](https://x.com/AnushElangovan)、[HaiShaw](https://github.com/HaiShaw) 及更广泛的 AMD AI 团队在 GLM-5 发布后 14 周内完成了上游 SGLang TileLang 融合 MLA + FP8 KV kernel 的提交。SGLang 维护者在提交后数天内即完成了审查与合入。从上游到基准测试的闭环速度就是护城河。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_model=GLM-5&i_prec=fp8&g_rundate=2026-05-20&g_runid=26187777287&i_active=b200_sglang%2Cb200_sglang_mtp%2Cmi355x_sglang%2Cmi355x_sglang_mtp&i_metric=y_costh&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
@@ -165,7 +165,7 @@ TileLang 依赖版本已更新以在 AMD 上启用 FP8 GEMM，并新增了 `spar
       "name": "SGLang PR #21511 是什么？它如何帮助 MI355X 运行 GLM-5？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "sgl-project/sglang PR #21511（由 HaiShaw 提交，2026-04-03 合入）通过 SGLang 的 TileLang 后端为 AMD MI300 和 MI355 启用了 FP8 KV 缓存和 FP8 注意力内核，在 DeepSeek-V3.2 和 GLM-5 上均已测试。在 MI355 上，它复用了现有的 fused_qk_rope_cat_and_cache_mla 内核来同时处理 Q 和 KV 的 FP8 量化，将 QK rope 拼接、MLA 缓存写入以及 FP8 量化合并到每个解码步骤的单次内核调用中。在 MI300 上，使用独立的 Triton 内核 set_mla_kv_buffer_fp8_quant 处理 KV 缓存量化。该 PR 报告 MI355 吞吐量提升超过 5%（MI300 超过 10%），gsm8k 准确率无下降（GLM-5 0.946 → 0.950，DeepSeek-V3.2 0.945 → 0.946），通过 --kv-cache-dtype fp8_e4m3 配合 TileLang 预填充/解码后端激活。"
+        "text": "sgl-project/sglang PR #21511（由 HaiShaw 提交，2026-04-03 合入）通过 SGLang 的 TileLang 后端为 AMD MI300 和 MI355 启用了 FP8 KV 缓存和 FP8 注意力 kernel，在 DeepSeek-V3.2 和 GLM-5 上均已测试。在 MI355 上，它复用了现有的 fused_qk_rope_cat_and_cache_mla kernel 来同时处理 Q 和 KV 的 FP8 量化，将 QK rope 拼接、MLA 缓存写入以及 FP8 量化合并到每个解码步骤的单次 kernel 调用中。在 MI300 上，使用独立的 Triton kernel set_mla_kv_buffer_fp8_quant 处理 KV 缓存量化。该 PR 报告 MI355 吞吐量提升超过 5%（MI300 超过 10%），gsm8k 准确率无下降（GLM-5 0.946 → 0.950，DeepSeek-V3.2 0.945 → 0.946），通过 --kv-cache-dtype fp8_e4m3 配合 TileLang 预填充/解码后端激活。"
       }
     },
     {

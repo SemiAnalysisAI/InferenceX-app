@@ -18,7 +18,7 @@ tags:
 
 在 GLM-5 8K/1K 工作负载下，H200 和 B200 均运行 SGLang 时，NVIDIA 的 GLM-5-NVFP4 检查点在 B200 上实现了**等交互性（iso-interactivity）下性价比最高达 H200 SGLang FP8 的 3.65 倍**——在 80 tok/s/user 时，H200 的成本为 $1.06/M tokens，而 B200 NVFP4 仅为 $0.29/M tokens。该优势在 H200 的整个 25–84 tok/s/user 运行区间内保持在 3.24x–3.65x 范围。数据基于 2026-05-25 InferenceX 基准测试（benchmark），使用 SGLang v0.5.12。
 
-这 3.65 倍的提升在峰值处可清晰分解。在 80 tok/s/user 时，**B200 SGLang FP8 + MTP 的性价比是 H200 SGLang FP8 + MTP 的 1.22 倍**——这是在相同精度和相同 EAGLE 方案下，仅靠 Blackwell 世代硬件 + 软件带来的提升。**将 B200 的权重从 `zai-org/GLM-5-FP8` 切换为 `nvidia/GLM-5-NVFP4` 再叠加 2.98 倍**——这是仅靠精度切换带来的提升，得益于 FlashInfer 的 TRT-LLM 稀疏 MLA 内核——该内核已在 [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783) 中被设为 sm100/sm103 的默认后端。1.22 × 2.98 ≈ 3.65。在不同运行区间，两个因素的贡献比例会互换——世代因素在低交互性时贡献更大（50 tok/s/user 时为 1.36x），精度因素在高交互性时贡献更大（84 tok/s/user 时为 3.07x）——但组合提升始终保持稳定。
+这 3.65 倍的提升在峰值处可清晰分解。在 80 tok/s/user 时，**B200 SGLang FP8 + MTP 的性价比是 H200 SGLang FP8 + MTP 的 1.22 倍**——这是在相同精度和相同 EAGLE 方案下，仅靠 Blackwell 世代硬件 + 软件带来的提升。**将 B200 的权重从 `zai-org/GLM-5-FP8` 切换为 `nvidia/GLM-5-NVFP4` 再叠加 2.98 倍**——这是仅靠精度切换带来的提升，得益于 FlashInfer 的 TRT-LLM 稀疏 MLA kernel——该 kernel 已在 [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783) 中被设为 sm100/sm103 的默认后端。1.22 × 2.98 ≈ 3.65。在不同运行区间，两个因素的贡献比例会互换——世代因素在低交互性时贡献更大（50 tok/s/user 时为 1.36x），精度因素在高交互性时贡献更大（84 tok/s/user 时为 3.07x）——但组合提升始终保持稳定。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-25&g_model=GLM-5&g_runid=26381101926&i_prec=fp4%2Cfp8&i_active=b200_sglang_mtp%2Ch200_sglang_mtp&i_linelabel=1">
   点击查看完整 InferenceX 仪表板 →
@@ -65,10 +65,10 @@ NVIDIA 还发布了量化权重版本 [`nvidia/GLM-5-NVFP4`](https://huggingface
 
 ## 促成此结果的上游变更
 
-**上游软件栈。** SGLang [v0.5.10](https://github.com/sgl-project/sglang/releases/tag/v0.5.10)（2026-04-07）是 GLM-5 首次在 Blackwell 上跨所有四个精度/MTP/分离式推理变体完整端到端运行的稳定版本——[跟踪 issue #19380](https://github.com/sgl-project/sglang/issues/19380) 在同日将每个 Functional 和 Baseline Perf 行标记为 DONE。本文的基准测试运行于 [v0.5.12](https://github.com/sgl-project/sglang/releases/tag/v0.5.12)（发布于 2026-05-16），它继承了相同的 Blackwell 默认配置并增加了第一轮性能优化。关键内核变更：
+**上游软件栈。** SGLang [v0.5.10](https://github.com/sgl-project/sglang/releases/tag/v0.5.10)（2026-04-07）是 GLM-5 首次在 Blackwell 上跨所有四个精度/MTP/分离式推理变体完整端到端运行的稳定版本——[跟踪 issue #19380](https://github.com/sgl-project/sglang/issues/19380) 在同日将每个 Functional 和 Baseline Perf 行标记为 DONE。本文的基准测试运行于 [v0.5.12](https://github.com/sgl-project/sglang/releases/tag/v0.5.12)（发布于 2026-05-16），它继承了相同的 Blackwell 默认配置并增加了第一轮性能优化。关键 kernel 变更：
 
-- [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783) 将 **FlashInfer TRT-LLM 稀疏 MLA 内核设为 sm100/sm103**（B200/B300）**的默认注意力后端**。DSA prefill 和 decode 现在运行在 GLM-5/V3.2 所针对调优的内核上，而非曾在 B200 上引发 [GLM-5 精度回归](https://github.com/sgl-project/sglang/issues/21291) 的旧 `flashmla_kv` 路径。
-- [sgl-project/sglang #21405](https://github.com/sgl-project/sglang/pull/21405) 为稀疏 MLA 启用了 **IndexCache**，在连续 decode 步骤间复用索引张量，在相同内核调用序列上带来 >10% 的 decode 吞吐量提升。
+- [sgl-project/sglang #21783](https://github.com/sgl-project/sglang/pull/21783) 将 **FlashInfer TRT-LLM 稀疏 MLA kernel 设为 sm100/sm103**（B200/B300）**的默认注意力后端**。DSA prefill 和 decode 现在运行在 GLM-5/V3.2 所针对调优的 kernel 上，而非曾在 B200 上引发 [GLM-5 精度回归](https://github.com/sgl-project/sglang/issues/21291) 的旧 `flashmla_kv` 路径。
+- [sgl-project/sglang #21405](https://github.com/sgl-project/sglang/pull/21405) 为稀疏 MLA 启用了 **IndexCache**，在连续 decode 步骤间复用索引张量，在相同 kernel 调用序列上带来 >10% 的 decode 吞吐量提升。
 - [flashinfer-ai/flashinfer #2726](https://github.com/flashinfer-ai/flashinfer/pull/2726)（FlashInfer v0.6.6.post1）修复了一个间歇性 NVFP4 非法内存访问 bug，此前一直[阻塞](https://github.com/sgl-project/sglang/issues/19081) NVFP4 的功能验证签核；[flashinfer-ai/flashinfer #2836](https://github.com/flashinfer-ai/flashinfer/pull/2836)（v0.6.7）提升了 trtllm-gen 稀疏 MLA 的性能上限。
 
 **MTP。** GLM-5 复用了 SGLang 为 DeepSeek V3.2 实现的 EAGLE 投机解码机制（`--speculative-algorithm EAGLE --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4`），并通过 `SGLANG_ENABLE_SPEC_V2=1` 启用 overlap 调度器。H200 与 B200 使用完全相同的一组启动参数；在下述测试配置中，两款 SKU 之间仅模型检查点和注意力后端不同。
@@ -193,7 +193,7 @@ B200 NVFP4 相对 H200 的性价比提升在 **80 tok/s/user 时达到峰值 3.6
       "name": "SGLang v0.5.10 / v0.5.12 中的哪些变更使 GLM-5 NVFP4 + MTP 得以在 Blackwell 上运行？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "SGLang v0.5.10（发布于 2026-04-07）是 GLM-5 (G)B200 跟踪 issue（sgl-project/sglang #19380）的所有 Functional 和 Baseline Perf 行在 no-MTP/MTP 和 Agg/Disagg 全组合、FP8 和 NVFP4 两种精度下均标记为 DONE 的首个稳定版本。v0.5.12（发布于 2026-05-16）是 InferenceX 基准测试实际运行的版本。关键内核变更：sgl-project/sglang #21783 将 FlashInfer TRT-LLM 稀疏 MLA 内核设为 sm100/sm103（B200/B300）的默认后端；sgl-project/sglang #21405 启用 IndexCache 实现 >10% 的 decode 吞吐量提升；flashinfer-ai/flashinfer #2726 修复了一个间歇性 NVFP4 非法内存访问 bug，此前一直阻塞 NVFP4 的功能验证签核；flashinfer-ai/flashinfer #2836 提升了 trtllm-gen 稀疏 MLA 的性能上限。MTP 使用 EAGLE，参数为 --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4，并通过 SGLANG_ENABLE_SPEC_V2=1 启用 overlap 调度器。"
+        "text": "SGLang v0.5.10（发布于 2026-04-07）是 GLM-5 (G)B200 跟踪 issue（sgl-project/sglang #19380）的所有 Functional 和 Baseline Perf 行在 no-MTP/MTP 和 Agg/Disagg 全组合、FP8 和 NVFP4 两种精度下均标记为 DONE 的首个稳定版本。v0.5.12（发布于 2026-05-16）是 InferenceX 基准测试实际运行的版本。关键 kernel 变更：sgl-project/sglang #21783 将 FlashInfer TRT-LLM 稀疏 MLA kernel 设为 sm100/sm103（B200/B300）的默认后端；sgl-project/sglang #21405 启用 IndexCache 实现 >10% 的 decode 吞吐量提升；flashinfer-ai/flashinfer #2726 修复了一个间歇性 NVFP4 非法内存访问 bug，此前一直阻塞 NVFP4 的功能验证签核；flashinfer-ai/flashinfer #2836 提升了 trtllm-gen 稀疏 MLA 的性能上限。MTP 使用 EAGLE，参数为 --speculative-num-steps 3 --speculative-eagle-topk 1 --speculative-num-draft-tokens 4，并通过 SGLANG_ENABLE_SPEC_V2=1 启用 overlap 调度器。"
       }
     },
     {
@@ -209,7 +209,7 @@ B200 NVFP4 相对 H200 的性价比提升在 **80 tok/s/user 时达到峰值 3.6
       "name": "这次 B200 NVFP4 vs H200 FP8 的 GLM-5 对比中未涵盖哪些内容？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "还有三个方向未覆盖。（1）NVL72 上的分离式推理：本次对比均为单节点聚合方式；SGLang 跟踪 issue #19380 正在积极推进 FP8 B200 分离式 8K/1K 和 GB300 分离式 MTP 的工作，宽 Expert Parallelism 在 NVL72 上已在 Kimi K2.5 上展示了约 3 倍的每 GPU 吞吐量提升。（2）B200 FP8 聚合方式的分段 CUDA graph（sgl-project/sglang #23351 审核中，#24276 后续跟进），预计对 B200 FP8 曲线的提升大于 B200 NVFP4 曲线，将在高交互性端缩小仅精度差异的比值。（3）H200 SGLang MTP 方案（InferenceX PR #1480）在本次测试前一周才上线；H200 分离式推理、trtllm-mha 注意力或 H200 上的 KV FP8 都将在宣布世代对比完结之前进一步推高 H200 曲线。"
+        "text": "还有三个方向未覆盖。（1）NVL72 上的分离式推理：本次对比均为单节点聚合方式；SGLang 跟踪 issue #19380 正在积极推进 FP8 B200 分离式 8K/1K 和 GB300 分离式 MTP 的工作，宽 Expert Parallelism 在 NVL72 上已在 Kimi K2.5 上展示了约 3 倍的每 GPU 吞吐量提升。（2）B200 FP8 聚合式 prefill 的分段 CUDA graph（sgl-project/sglang #23351 审核中，#24276 后续跟进），预计对 B200 FP8 曲线的提升大于 B200 NVFP4 曲线，将在高交互性端缩小仅精度差异的比值。（3）H200 SGLang MTP 方案（InferenceX PR #1480）在本次测试前一周才上线；H200 分离式推理、trtllm-mha 注意力或 H200 上的 KV FP8 都将在宣布世代对比完结之前进一步推高 H200 曲线。"
       }
     }
   ]
