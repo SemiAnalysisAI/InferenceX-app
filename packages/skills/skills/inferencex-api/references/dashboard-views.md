@@ -225,13 +225,15 @@ without Agentic observations falls back to its first available active scenario.
 P90 uses nearest rank, one vote per displayed configuration, measured in whole
 days since its latest successful image-bearing submission. Reusing the same
 image tag in a new submission resets age. This is not the container's build age.
-History carries older observations into the window, includes configurations
-only from their first submission, and excludes future observations. Empty days
-have `p90AgeDays: null`, not zero. Today's model/scenario retirement rules apply
-throughout the historical window; historical retirement states are not stored.
-The current table uses the latest benchmark snapshot, whereas history uses
-successful image-bearing submission events. The chart's hover and keyboard
-inspection are presentation-only and introduce no extra selectors.
+History tracks the same configurations as `ageSummary`: the current filtered
+table rows dated on or before `asOf`. Its last point equals `ageSummary`. Each
+configuration replays its successful image-bearing submissions up to its
+current row's date, carries older observations into the window, appears only
+from its first submission, and never uses future observations. Configurations
+missing from the current table, such as Agentic speculation or node-type
+variants replaced by a newer run of the same curve, are excluded from every
+point. Empty days have `p90AgeDays: null`, not zero. The chart's hover and
+keyboard inspection are presentation-only and introduce no extra selectors.
 
 OperatorX is available in primary navigation without an unlock and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to

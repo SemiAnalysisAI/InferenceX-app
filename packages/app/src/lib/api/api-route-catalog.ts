@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'ab8fd78bd66368f13c6f72c63419e7eb83f479b6d39a8efaee2b1a24f32a0fb9',
+    sourceSha256: 'abca2dd1a16347e04bc1e0912d49eaf7070cbd4418ce876fddec52e15258f1f4',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
