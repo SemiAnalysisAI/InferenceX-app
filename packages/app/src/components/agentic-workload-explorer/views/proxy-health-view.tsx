@@ -49,7 +49,7 @@ const STRINGS = {
     totalRequests: '总请求数',
     errorRate: '错误率',
     routes: '路由',
-    errorsFinal24h: '错误（最后 24h）',
+    errorsFinal24h: '错误（最后 24 小时）',
     final7days: '最后 7 天',
     errors: (n: string) => `${n} 个错误`,
     uniqueEndpoints: '独立端点',

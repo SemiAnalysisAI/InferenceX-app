@@ -73,7 +73,7 @@ export const EXPLORER_SECTION_META = {
       title: 'Costs',
       description: 'List-price cost of the snapshot traffic by model and token type.',
     },
-    zh: { title: '成本', description: '按模型与 token 类型统计的快照流量标价成本。' },
+    zh: { title: '成本', description: '按模型与 token 类型统计的快照流量成本，按标价计算。' },
   },
   '/fast-mode': {
     en: {
@@ -155,7 +155,7 @@ export const EXPLORER_SESSION_TAB_META = {
   statistics: { en: 'Statistics', zh: '统计' },
   'prefill-vs-decode': { en: 'Prefill vs Decode', zh: 'Prefill 与 Decode' },
   flamegraph: { en: 'Flamegraph', zh: '火焰图' },
-  'tokens-over-time': { en: 'Tokens Over Time', zh: 'Token 时间分布' },
+  'tokens-over-time': { en: 'Tokens Over Time', zh: 'Token 随时间变化' },
   timeline: { en: 'Timeline', zh: '时间线' },
   flow: { en: 'Flow', zh: '流程图' },
   'radix-tree': { en: 'Radix Tree', zh: 'Radix Tree' },

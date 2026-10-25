@@ -48,7 +48,7 @@ const STRINGS = {
     tooltipCol: '列',
     methodology: '测试方法',
     methodologyText:
-      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示 L2 分区的共享亲和度。',
+      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示共享 L2 分区的远近关系。',
     statsIntraGpc: 'GPC 内平均',
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',

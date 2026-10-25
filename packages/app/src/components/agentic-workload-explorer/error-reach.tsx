@@ -41,7 +41,7 @@ const STRINGS = {
     reachDescription: (days: number) =>
       `滚动 ${days} 天统计。受影响 session 至少有一次 HTTP 请求失败；重复出错 session 有两次及以上。错误包含 HTTP 4xx/5xx 及记录的代理失败。`,
     requestErrorRate: '请求错误率',
-    sessionsAffected: '受影响 Session',
+    sessionsAffected: '受影响 session',
     repeatSessionShare: '重复出错占比',
     topTenConcentration: 'Top 10 集中度',
     requestsDetail: (errors: string, total: string) => `${errors} / ${total} 个请求`,
@@ -53,7 +53,7 @@ const STRINGS = {
     colRequests: '请求数',
     colErrors: '错误数',
     colReqRate: '请求错误率',
-    colSessionsHit: '受影响 Session',
+    colSessionsHit: '受影响 session',
     colReach: '覆盖率',
     colErrorsPerHit: '错误 / 受影响',
     colRepeatShare: '重复占比',

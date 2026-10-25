@@ -160,10 +160,10 @@ const STRINGS = {
       '哪款芯片最优，取决于用户能接受多长的首 token 等待。本页面按每一档首 token 延迟（TTFT）上限，从同时满足交互性下限的实测配置中，逐厂商选出成本最低的一个。仅使用实测数据，不做插值，每个柱形都可追溯到对应的运行记录。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '柱形成本采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '柱形成本采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
       '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量分别按 prefill 芯片和 decode 芯片统计，因此其输入、输出口径的成本并非按全部芯片计。',
@@ -183,7 +183,7 @@ const STRINGS = {
     noTtft: (stat: string) =>
       `${zhStatPhrase('首 token 延迟', stat, '当前选择的实测数据行未报告')}，无法施加上限。请尝试其他工作负载或运行日期。`,
     noneUnderCaps: (cap: string, stat: string) =>
-      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本梯度最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
+      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本阶梯的最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
     captionFloor: (min: number, stat: string) =>
       `${zhStatPhrase('交互性', stat)} ≥${min} tok/s/user`,
     captionRows: (qualifying: number, measured: number) =>
