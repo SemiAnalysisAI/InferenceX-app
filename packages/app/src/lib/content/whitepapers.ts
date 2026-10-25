@@ -392,7 +392,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       authors: WHITEPAPER_AUTHORS_ZH,
-      figureTitle: 'Kimi K3 2.8T 智能体 每吉瓦每年收入与利润估算（P90 交互性 45 tok/s/user）',
+      figureTitle: 'Kimi K3 2.8T 智能体每吉瓦年收入与利润估算（P90 交互性 45 tok/s/user）',
       figures: [
         {
           costTier: '自有 · 超大规模云厂商批量采购',

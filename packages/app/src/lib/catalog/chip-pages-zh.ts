@@ -238,7 +238,7 @@ export function buildZhChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
   return [
     {
       question: `${entry.label} 在云端每小时成本是多少？`,
-      answer: `按 SemiAnalysis AI Cloud TCO 模型，超大规模云厂商批量采购并自有设备时，${entry.label} 的每小时成本约为 $${hw.costh.toFixed(2)}；零售档价格为 $${hw.costr.toFixed(2)}/小时。InferenceX 的每美元性能页面即使用这些费率将实测吞吐量换算为每百万 token 成本。`,
+      answer: `按 SemiAnalysis AI Cloud TCO 模型，超大规模云厂商批量采购并自有设备时，${entry.label} 的每小时成本约为 $${hw.costh.toFixed(2)}；零售档价格为 $${hw.costr.toFixed(2)}/小时。InferenceX 的每美元性能页面使用的正是这些费率将实测吞吐量换算为每百万 token 成本。`,
     },
     {
       question: `${entry.label} 有多少显存？`,

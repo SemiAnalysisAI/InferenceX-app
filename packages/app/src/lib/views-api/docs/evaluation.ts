@@ -20,7 +20,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'string',
     description: text(
       'Display model name (case-insensitive) or compare-page slug.',
-      '展示模型名称（不区分大小写）或对比页 slug。',
+      '模型显示名称（不区分大小写）或对比页 slug。',
     ),
     schema: { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
     example: 'DeepSeek-V4-Pro',

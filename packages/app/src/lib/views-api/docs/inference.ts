@@ -208,7 +208,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'boolean',
     description: text(
       'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. No corresponding dashboard control or panel. JSON only.',
-      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选范围内、尚未经前沿和 best 筛选的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',

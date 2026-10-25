@@ -281,7 +281,7 @@ const responses: readonly ApiResponse[] = [
     status: '200',
     description: text(
       'Date-sorted trend lines per hardware config, interpolated at the target interactivity.',
-      '按硬件配置给出的按日期排序趋势线，在目标交互速率处插值。',
+      '按硬件配置给出的按日期排序趋势线，在目标交互性处插值。',
     ),
     schema: responseSchema,
     example: responseExample,
