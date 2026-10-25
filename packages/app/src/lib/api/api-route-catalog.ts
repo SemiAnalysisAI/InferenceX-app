@@ -761,7 +761,7 @@ export const apiRouteCatalog = [
     classification: 'ui-artifact-read',
     exclusionReason: {
       en: 'UI-only evaluation sample reader backed by live workflow artifacts with an unstable artifact contract.',
-      zh: '仅供界面读取由实时工作流制品支持的评测样本；该制品契约不稳定。',
+      zh: '仅供界面读取由实时工作流产物支持的评测样本；该产物契约不稳定。',
     },
     sourceSha256: '64d3881d026ca257336208dc3c515438d507aebcf681c4cc8860f5fb1d6b3f44',
   },

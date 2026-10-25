@@ -215,7 +215,7 @@ export const operations: ApiOperation[] = [
         true,
         'string',
         'Display model name or compare slug.',
-        '展示模型名称或对比 slug。',
+        '模型显示名称或对比页 slug。',
         { type: 'string' },
         'DeepSeek-V4-Pro',
       ),
