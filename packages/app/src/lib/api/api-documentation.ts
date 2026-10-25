@@ -1599,18 +1599,37 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease engine release (tag starting with v) among the 20 most recent GitHub releases for vLLM and SGLang, with its publish time. commits maps each unversioned nightly commit in an active benchmark image to its GitHub compare status against that release; behind means the commit is an ancestor of the release. Commits GitHub cannot resolve are omitted. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布引擎版本（标签以 v 开头）及其发布时间。commits 列出当前基准测试镜像中不带版本号的 nightly commit，以及 GitHub 比较该 commit 与此 release 的结果；behind 表示该 commit 是此 release 的祖先提交。GitHub 无法解析的 commit 不会列出。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag, ISO 8601 publish time and nightly commit statuses, or null.',
+        '框架键映射到版本标签、ISO 8601 发布时间和 nightly commit 比较结果；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+              commits: mapSchema({
+                type: 'string',
+                enum: ['ahead', 'behind', 'diverged', 'identical'],
+              }),
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: {
+            tag: 'v0.10.2',
+            publishedAt: '2026-08-01T12:00:00Z',
+            commits: { af7f9488c2210d67: 'behind', e68efc685ab1: 'diverged' },
+          },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z', commits: {} },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],

@@ -37,7 +37,7 @@ const image = {
   isl: null,
   osl: null,
   benchmark_type: 'agentic_traces',
-  image: 'example:v1',
+  image: 'example:v1.0.0',
   date: '2026-09-01',
 };
 
@@ -50,7 +50,9 @@ beforeEach(() => {
   mocks.images.mockImplementation(() =>
     Response.json([image, { ...image, disagg: true, hardware: 'h200' }]),
   );
-  mocks.releases.mockImplementation(() => Response.json({ sglang: 'v2' }));
+  mocks.releases.mockImplementation(() =>
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
+  );
 });
 
 describe('public evidence projections', () => {
