@@ -36,7 +36,7 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
 
 function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
   for (const [id, label] of [
-    ['fleet-cost', locale === 'zh' ? '成本供应商' : 'Cost Provider'],
+    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost Provider'],
     ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
   ]) {
     cy.get(`label[for="${id}"]`).should('have.text', label).click();
