@@ -87,12 +87,7 @@ export function GET(request: NextRequest) {
         };
       });
     const observations = includeHistory ? await readHistory(asOf) : [];
-    const history = includeHistory
-      ? imageAgeHistory(
-          observations.filter((row) => matchesImageFilters(row, filters)),
-          asOf,
-        )
-      : undefined;
+    const history = includeHistory ? imageAgeHistory(rows, observations, asOf) : undefined;
     return cachedJson({
       apiVersion: 'v1',
       view: 'current-inferencex-image',
