@@ -1,7 +1,15 @@
+import huawei from './data/huawei-bandwidth.json';
+
 export interface UbenchxRow {
   readonly bytes: number;
   readonly timeMs: number;
   readonly bandwidthGbps: number;
+  readonly observations?: number;
+  readonly bandwidthP10Gbps?: number;
+  readonly bandwidthP90Gbps?: number;
+  readonly processBandwidthGbps?: readonly number[];
+  readonly slots?: number;
+  readonly combinedPoolBytes?: number;
 }
 
 export interface UbenchxRunMetadata {
@@ -12,11 +20,17 @@ export interface UbenchxRunMetadata {
   readonly container: string;
   readonly date: string;
   readonly sourceUrl: string;
+  readonly protocol?: 'rotating-pool-npu-graph';
+  readonly dtype?: 'float16';
+  readonly cann?: string;
+  readonly torchNpu?: string;
+  readonly missingSizesBytes?: readonly number[];
 }
 
 export interface UbenchxRun {
   readonly metadata: UbenchxRunMetadata;
   readonly rows: readonly UbenchxRow[];
+  readonly bandwidthReference?: { readonly gbps: number; readonly source: string };
 }
 
 export const UBENCHX_GPU_KEYS = [
@@ -28,6 +42,8 @@ export const UBENCHX_GPU_KEYS = [
   'MI355X',
   'MI325X',
   'MI300X',
+  'Ascend 950PR_9579',
+  'Ascend 910B3',
 ] as const;
 
 export type UbenchxGpuKey = (typeof UBENCHX_GPU_KEYS)[number];
@@ -394,3 +410,41 @@ export const UBENCHX_RUNS: Record<string, UbenchxRun> = {
     ],
   },
 };
+
+for (const [gpu, points] of Object.entries(huawei.curves)) {
+  const b3 = gpu === 'Ascend 910B3';
+  UBENCHX_RUNS[gpu] = {
+    metadata: {
+      gpu,
+      driver: b3 ? '26.1.1' : '25.7.rc1.10',
+      torch: '2.10.0+cpu',
+      torchNpu: '2.10.0.post4',
+      cann: '9.1.0',
+      triton: 'Not used',
+      container: 'Not recorded',
+      date: b3 ? '2026-10-13' : '2026-10-07',
+      dtype: 'float16',
+      protocol: 'rotating-pool-npu-graph',
+      missingSizesBytes: b3 ? [17179869184] : [],
+      sourceUrl:
+        'https://github.com/SemiAnalysisAI/InferenceX-app/blob/0a94bf26f3703d479b930f3957241b36b6b3e6d6/packages/app/src/components/ubenchx/data/huawei-bandwidth.json',
+    },
+    bandwidthReference: {
+      gbps: 1600,
+      source: b3
+        ? '910B3/2 64 GB OEM specification and CANN 20-core memory example; exact board ceiling not independently measured'
+        : '950PR 128 GiB nominal reference assumed at 1600 GB/s; not independently verified by memory-controller counters',
+    },
+    rows: points.map((point) => ({
+      bytes: point.size_bytes,
+      timeMs: point.amortized_copy_ms,
+      bandwidthGbps: point.effective_GBps,
+      observations: point.samples,
+      bandwidthP10Gbps: point.GBps_low,
+      bandwidthP90Gbps: point.GBps_high,
+      processBandwidthGbps: point.process_GBps,
+      slots: point.slots,
+      combinedPoolBytes: point.combined_pool_bytes,
+    })),
+  };
+}

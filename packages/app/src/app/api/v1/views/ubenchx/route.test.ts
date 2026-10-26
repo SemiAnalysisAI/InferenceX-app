@@ -158,3 +158,39 @@ describe('ubenchx view', () => {
     expect(h200Last.mbuPercent).toBeCloseTo((4305.39 / 4800) * 100, 4);
   });
 });
+
+it('exposes Huawei rotating-copy evidence without inventing missing tests or sizes', async () => {
+  const response = await GET(request({ test: 'all', gpu: 'ascend 910b3' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  const run = body.memBw.gpus[0];
+  expect(run.gpu).toBe('Ascend 910B3');
+  expect(run.peakBandwidthGbps).toBe(1600);
+  expect(run.peakBandwidthSource).toContain('exact board ceiling not independently measured');
+  expect(run.metadata).toMatchObject({
+    protocol: 'rotating-pool-npu-graph',
+    dtype: 'float16',
+    missingSizesBytes: [17179869184],
+  });
+  expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(false);
+  const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 8589934592);
+  expect(endpoint.bandwidthGbps).toBeCloseTo(1271.519, 3);
+  expect(endpoint.mbuPercent).toBeCloseTo(79.46994, 4);
+  expect(endpoint.observations).toBe(360);
+  expect(body.smL2Distance.gpus).toEqual([]);
+  expect(body.tpcSkyline.gpus).toEqual([]);
+});
+
+it('preserves full-precision Huawei bandwidth arithmetic and API/UI normalization', async () => {
+  for (const gpu of ['Ascend 950PR_9579', 'Ascend 910B3']) {
+    const response = await GET(request({ test: 'mem-bw', gpu }));
+    const body = await response.json();
+    const run = body.gpus[0];
+    expect(run).toEqual(transformUbenchxRun(gpu, UBENCHX_RUNS[gpu]));
+    for (const row of run.rows) {
+      expect(row.bandwidthGbps).toBeCloseTo((2 * row.bytes) / row.timeMs / 1e6, 6);
+      expect(row.bandwidthP10Gbps).toBeLessThanOrEqual(row.bandwidthGbps);
+      expect(row.bandwidthP90Gbps).toBeGreaterThanOrEqual(row.bandwidthGbps);
+    }
+  }
+});

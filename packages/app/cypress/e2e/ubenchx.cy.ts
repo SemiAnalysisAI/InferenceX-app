@@ -125,3 +125,35 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 });
+
+const dismiss = {
+  onBeforeLoad(win: Cypress.AUTWindow) {
+    win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+  },
+};
+
+describe('Huawei copy-bandwidth evidence', () => {
+  it('renders both SKUs and qualifies the graph timing in English and Chinese', () => {
+    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.contains('Ascend 950PR_9579').should('be.visible');
+    cy.contains('Ascend 910B3').should('be.visible');
+    cy.contains('Graph time is amortized per copy').should('be.visible');
+    cy.contains('16 GiB is absent').should('be.visible');
+    cy.get('[data-testid="ubenchx-metric-select"]').click();
+    cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
+    cy.screenshot('huawei-bandwidth-en', { capture: 'fullPage' });
+    cy.visit('/zh/ubenchx/mem-bw', dismiss);
+    cy.contains('图执行时间按拷贝次数摊销').should('be.visible');
+    cy.contains('910B3 未测量 16 GiB').should('be.visible');
+    cy.screenshot('huawei-bandwidth-zh', { capture: 'fullPage' });
+  });
+  it('serves measured endpoints and empty unavailable tests through the public API', () => {
+    cy.request('/api/v1/views/ubenchx?test=all&gpu=Ascend%20910B3').then(({ body }) => {
+      expect(body.memBw.gpus[0].rows.at(-1).bytes).to.equal(8589934592);
+      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(79.46994, 0.0001);
+      expect(body.smL2Distance.gpus).to.deep.equal([]);
+      expect(body.tpcSkyline.gpus).to.deep.equal([]);
+    });
+  });
+});

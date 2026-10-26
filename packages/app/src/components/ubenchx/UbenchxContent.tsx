@@ -16,7 +16,12 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
-import { transformUbenchxRun, formatBytes, type UbenchxDerivedRow } from './ubenchx-transform';
+import {
+  transformUbenchxRun,
+  formatBytes,
+  sizeAxisTicks,
+  type UbenchxDerivedRow,
+} from './ubenchx-transform';
 
 const GPU_COLORS: Record<string, string> = {
   'B300 SXM': 'oklch(0.62 0.15 128)',
@@ -27,13 +32,17 @@ const GPU_COLORS: Record<string, string> = {
   MI355X: 'oklch(0.62 0.20 18)',
   MI325X: 'oklch(0.55 0.20 28)',
   MI300X: 'oklch(0.48 0.20 38)',
+  'Ascend 950PR_9579': '#C7000B',
+  'Ascend 910B3': '#7F0011',
 };
 
 const STRINGS = {
   en: {
     pageTitle: 'HBM Bandwidth',
     pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA and AMD GPUs.',
+      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators.',
+    protocolNote:
+      'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
     latencyTitle: 'Latency vs Message Size',
     latencyY: 'Latency (ms)',
     mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
@@ -42,10 +51,18 @@ const STRINGS = {
     bwY: 'Bandwidth (TB/s)',
     xAxis: 'Message Size',
     yMetric: 'Y-axis',
-    peakNote: "MBU is relative to each GPU's own peak HBM bandwidth from GPU_SPECS.",
+    peakNote:
+      'MBU uses each device’s bandwidth reference. Huawei’s 1.6 TB/s references are qualified below.',
     methodology: 'Methodology',
     methodologyText:
-      'Times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
+      'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
+    huaweiMethodology:
+      'Huawei: FP16 rotating source/destination pools of at least 512 MiB each, timed as full rotating-buffer NPU graph replays. Three processes, 360 observations per size; full copied-bit checks before/after each block. Graph time is amortized per copy, not isolated-copy latency. Protocols differ from the GPU curves. No physical HBM-traffic counters were collected.',
+    huaweiMissing:
+      '910B3: 16 GiB is absent because the two-slot source/destination geometry requires 64 GiB before runtime overhead.',
+    huaweiReference:
+      'Huawei MBU uses a 1,600 GB/s reference; the exact board bandwidth ceiling was not independently measured.',
+    amortized: 'Amortized graph copy time',
     source: 'Source',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
@@ -54,12 +71,14 @@ const STRINGS = {
     tooltipLatency: 'Latency',
     tooltipBandwidth: 'Bandwidth',
     tooltipMbu: 'MBU',
-    tooltipPeak: 'Peak BW',
+    tooltipPeak: 'Bandwidth reference',
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
     pageTitle: 'HBM 带宽',
-    pageSubtitle: '在 NVIDIA 和 AMD GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
+    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽。',
+    protocolNote:
+      'Huawei 使用轮转缓冲区的图执行摊销计时；NVIDIA/AMD 使用 Triton 拷贝计时。小消息延迟不能直接比较。',
     latencyTitle: '延迟 vs 消息大小',
     latencyY: '延迟（ms）',
     mbuTitle: '显存带宽利用率（MBU）vs 消息大小',
@@ -68,10 +87,16 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
-    peakNote: 'MBU 基于各 GPU 自身在 GPU_SPECS 中的峰值 HBM 带宽计算。',
+    peakNote: 'MBU 按各设备的带宽参考值计算。Huawei 的 1.6 TB/s 参考值及其限制见下文。',
     methodology: '测试方法',
     methodologyText:
-      '使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
+      'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
+    huaweiMethodology:
+      'Huawei：源和目标分别使用至少 512 MiB 的 FP16 轮转缓冲池，每次计时覆盖完整缓冲池轮转的一次 NPU 图重放。每个大小在三个进程中共测量 360 次，每个测量块前后逐位校验全部拷贝结果。图执行时间按拷贝次数摊销，不代表单次独立拷贝延迟；与 GPU 曲线的测试协议不同，且未采集物理 HBM 流量计数器。',
+    huaweiMissing:
+      '910B3 未测量 16 GiB：源和目标各保留两个缓冲槽，尚未计入运行时开销就需要 64 GiB。',
+    huaweiReference: 'Huawei 的 MBU 使用 1,600 GB/s 参考值，两款板卡的确切带宽上限未经独立实测。',
+    amortized: '摊销后的图拷贝时间',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
@@ -79,7 +104,7 @@ const STRINGS = {
     tooltipLatency: '延迟',
     tooltipBandwidth: '带宽',
     tooltipMbu: 'MBU',
-    tooltipPeak: '峰值带宽',
+    tooltipPeak: '带宽参考值',
     aria: 'ubenchX 显存拷贝带宽图表',
   },
 } as const;
@@ -143,7 +168,7 @@ function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>${point.gpuKey}
       </div>
       ${tooltipLine(t.tooltipSize, point.sizeLabel)}
-      ${tooltipLine(t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
+      ${tooltipLine(UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
       ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
       ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
       ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}
@@ -215,10 +240,7 @@ function UbenchxChart({
     return ticks;
   }, [yScaleType, yDomain]);
 
-  const xTickValues = useMemo(() => {
-    const all = [...new Set(allPoints.map((p) => p.x))].sort((a, b) => a - b);
-    return all.filter((_, i) => i % 3 === 0 || i === all.length - 1);
-  }, [allPoints]);
+  const xTickValues = useMemo(() => sizeAxisTicks(...xDomain), [xDomain]);
 
   return (
     <D3Chart<ChartPoint>
@@ -324,6 +346,7 @@ export function UbenchxContent() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
+        <p className="text-sm text-muted-foreground mt-2">{t.protocolNote}</p>
       </div>
 
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
@@ -376,11 +399,17 @@ export function UbenchxContent() {
       <section className="text-xs text-muted-foreground space-y-1">
         <h3 className="text-sm font-semibold">{t.methodology}</h3>
         <p>{t.methodologyText}</p>
+        <p>{t.huaweiMethodology}</p>
+        <p>{t.huaweiMissing}</p>
+        <p>{t.huaweiReference}</p>
         {viewResults.map((r) => (
           <p key={r.gpu}>
             <strong>{r.gpu}:</strong> {r.metadata.gpu} | Driver: {r.metadata.driver} | PyTorch:{' '}
-            {r.metadata.torch} | Triton: {r.metadata.triton} | Container: {r.metadata.container} |
-            Peak: {r.peakBandwidthGbps / 1000} TB/s (GPU_SPECS)
+            {r.metadata.torch} |{' '}
+            {r.metadata.cann
+              ? `CANN: ${r.metadata.cann} | torch_npu: ${r.metadata.torchNpu}`
+              : `Triton: ${r.metadata.triton} | Container: ${r.metadata.container}`}{' '}
+            |{r.peakBandwidthGbps / 1000} TB/s
           </p>
         ))}
         {sourceUrls.map((url) => (

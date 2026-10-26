@@ -518,7 +518,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '237d7b2f095786cea52f8d65eaed73a4f091fa880803809271e2542b0d62b4d9',
+    sourceSha256: '7446193b97506c03e3df2908ea8d25f61e134e18005efe8839ff2bb3ed105595',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -1158,6 +1158,23 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/components/ubenchx/ubenchx-transform.ts',
+    sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+  {
+    source: 'src/components/ubenchx/ubenchx-data.ts',
+    sourceSha256: 'f8a87d08efba5c17a312f3c3ffe274c31399fb4c8e3d29c43031395dda444964',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
   {
     source: 'src/lib/catalog/gpu-specs.ts',
     sourceSha256: 'fb9dc719f347fb5b73ea73cf35a19d12c640b34a284f31cd70a8b9b2df76b4fd',
