@@ -12,39 +12,36 @@ export function updateBackgroundWatermark(
   innerHeight: number,
   margin: ChartMargin,
 ): void {
-  svg.select('.historical-watermark').remove();
+  svg.select('.deprecated-watermark').remove();
   if (!label) return;
 
+  // Main's centered logo occupies at most the middle 60% of the plot height.
+  // Keep the status below its bounding box without moving or resizing the logo.
   const mark = svg
     .insert('svg', '.chart-root')
-    .attr('class', 'historical-watermark')
-    .attr('data-testid', 'historical-watermark')
-    .attr('x', margin.left)
-    .attr('y', margin.top)
-    .attr('width', innerWidth)
-    .attr('height', innerHeight)
-    .attr('viewBox', '0 0 1000 500')
+    .attr('class', 'deprecated-watermark')
+    .attr('data-testid', 'deprecated-watermark')
+    .attr('x', margin.left + innerWidth * 0.1)
+    .attr('y', margin.top + innerHeight * 0.82)
+    .attr('width', innerWidth * 0.8)
+    .attr('height', innerHeight * 0.16)
+    .attr('viewBox', '0 0 1000 200')
     .attr('preserveAspectRatio', 'xMidYMid meet')
     .attr('fill', 'currentColor')
     .attr('opacity', 0.16)
     .attr('pointer-events', 'none')
     .attr('role', 'img')
-    .attr('aria-label', label.replaceAll('\n', ' — '));
+    .attr('aria-label', label);
 
   mark
-    .selectAll('text')
-    .data(label.split('\n'))
-    .join('text')
+    .append('text')
     .attr('x', 500)
-    .attr('y', (_, index) => 230 + index * 80)
+    .attr('y', 100)
+    .attr('dominant-baseline', 'middle')
     .attr('text-anchor', 'middle')
-    .attr('font-size', (_, index) =>
-      px(
-        index === 0 ? CHART_TYPE.backgroundWatermarkTitle : CHART_TYPE.backgroundWatermarkSubtitle,
-      ),
-    )
+    .attr('font-size', px(CHART_TYPE.backgroundWatermark))
     .attr('font-weight', 800)
-    .text((line) => line);
+    .text(label);
 }
 
 function insertWatermarkRect(

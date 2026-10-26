@@ -186,44 +186,66 @@ describe('setupChartStructure', () => {
   });
 
   describe('watermark variants', () => {
-    it('keeps a large historical watermark behind the plot alongside unofficial marks through resize and removal', () => {
+    it.each([
+      [400, 600],
+      [1200, 600],
+      [800, 300],
+    ])(
+      'preserves the SemiAnalysis logo and places Deprecated below it at %s×%s',
+      (containerWidth, containerHeight) => {
+        const svgEl = makeSvgEl();
+        const config = defaultConfig({ watermark: 'logo', containerWidth, containerHeight });
+        setupChartStructure(svgEl, config);
+        const originalLogo = svgEl.querySelector('#logo-pattern-test-chart')!.outerHTML;
+        const originalRect = svgEl.querySelector('.watermark-rect')!.outerHTML;
+
+        setupChartStructure(svgEl, { ...config, backgroundWatermark: 'Deprecated' });
+        expect(svgEl.querySelector('#logo-pattern-test-chart')!.outerHTML).toBe(originalLogo);
+        expect(svgEl.querySelector('.watermark-rect')!.outerHTML).toBe(originalRect);
+        const logo = svgEl.querySelector('#logo-pattern-test-chart image')!;
+        const status = svgEl.querySelector('.deprecated-watermark')!;
+        const logoBottom = Number(logo.getAttribute('y')) + Number(logo.getAttribute('height'));
+        expect(Number(status.getAttribute('y'))).toBeGreaterThan(logoBottom);
+        expect(
+          Number(status.getAttribute('y')) + Number(status.getAttribute('height')),
+        ).toBeLessThanOrEqual(containerHeight - config.margin.bottom);
+      },
+    );
+    it('keeps a large deprecated watermark behind the plot alongside unofficial marks through resize and removal', () => {
       const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       setupChartStructure(
         svgEl,
         defaultConfig({
           watermark: 'unofficial',
-          backgroundWatermark: 'HISTORICAL BENCHMARK\nSUBMISSIONS CLOSED',
+          backgroundWatermark: 'Deprecated',
         }),
       );
-      const mark = svgEl.querySelector('.historical-watermark')!;
+      const mark = svgEl.querySelector('.deprecated-watermark')!;
       expect(mark.parentElement).toBe(svgEl);
       expect([...svgEl.children].indexOf(mark)).toBeLessThan(
         [...svgEl.children].indexOf(svgEl.querySelector('.chart-root')!),
       );
-      expect(mark.getAttribute('viewBox')).toBe('0 0 1000 500');
+      expect(mark.getAttribute('viewBox')).toBe('0 0 1000 200');
       expect(mark.getAttribute('pointer-events')).toBe('none');
       expect([...mark.querySelectorAll('text')].map((node) => node.textContent)).toEqual([
-        'HISTORICAL BENCHMARK',
-        'SUBMISSIONS CLOSED',
+        'Deprecated',
       ]);
       expect(svgEl.querySelector('.unofficial-watermark-image')).not.toBeNull();
 
       const resized = defaultConfig({
         watermark: 'unofficial',
-        backgroundWatermark: '历史基准测试\n已停止接收提交',
+        backgroundWatermark: '已弃用',
         containerWidth: 400,
       });
       setupChartStructure(svgEl, resized);
-      expect(svgEl.querySelectorAll('.historical-watermark')).toHaveLength(1);
-      expect(svgEl.querySelector('.historical-watermark')?.getAttribute('width')).toBe(
-        String(400 - resized.margin.left - resized.margin.right),
+      expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(1);
+      expect(svgEl.querySelector('.deprecated-watermark')?.getAttribute('width')).toBe(
+        String((400 - resized.margin.left - resized.margin.right) * 0.8),
       );
-      expect(svgEl.querySelector('.historical-watermark')?.textContent).toBe(
-        '历史基准测试已停止接收提交',
-      );
+      expect(svgEl.querySelector('.deprecated-watermark')?.textContent).toBe('已弃用');
 
       setupChartStructure(svgEl, defaultConfig({ watermark: 'logo' }));
-      expect(svgEl.querySelector('.historical-watermark')).toBeNull();
+      expect(svgEl.querySelector('.deprecated-watermark')).toBeNull();
       expect(svgEl.querySelector('.unofficial-watermark-image')).toBeNull();
       expect(svgEl.querySelector('.watermark-rect')).not.toBeNull();
     });

@@ -28,7 +28,7 @@ import {
 } from '@/lib/benchmarks/inference-labels';
 import {
   getChartWatermark,
-  getHistoricalChartWatermark,
+  getDeprecatedChartWatermark,
   Sequence,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -1314,7 +1314,7 @@ const GPUGraph = React.memo(
         data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
-        backgroundWatermark={getHistoricalChartWatermark(modelLabel, locale)}
+        backgroundWatermark={getDeprecatedChartWatermark(modelLabel, locale)}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}

@@ -155,7 +155,7 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-    cy.get('[data-testid="historical-watermark"]').should('not.exist');
+    cy.get('[data-testid="deprecated-watermark"]').should('not.exist');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -390,7 +390,35 @@ describe('Inference Chart', () => {
   });
 });
 
-describe('MiniMax M3 historical background watermark', () => {
+describe('Deprecated model background watermark', () => {
+  it('marks every deprecated model and clears the mark for an active model', () => {
+    cy.viewport(1280, 900);
+    for (const [display, dbKey, deprecated] of [
+      ['MiniMax-M3', 'minimaxm3', true],
+      ['MiniMax-M2.5', 'minimaxm2.5', true],
+      ['Kimi-K2.5', 'kimik2.5', true],
+      ['GLM-5', 'glm5', true],
+      ['gpt-oss-120b', 'gptoss120b', true],
+      ['Llama-3.3-70B-Instruct-FP8', 'llama70b', true],
+      ['MiniMax-M3.1-Flash', 'minimaxm31flash', false],
+    ] as const) {
+      const rows = b300Rows(null).map((row) => ({ ...row, model: dbKey }));
+      cy.intercept('GET', '/api/v1/availability', {
+        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
+      cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
+      if (deprecated) {
+        cy.get('#chart-0 .deprecated-watermark').should('have.text', 'Deprecated');
+      } else {
+        cy.get('#chart-0 .deprecated-watermark').should('not.exist');
+      }
+    }
+  });
+
   it('keeps a large plot watermark in PNG exports, overlays, and the Chinese mobile chart', () => {
     const model = 'minimaxm3';
     const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
@@ -425,7 +453,7 @@ describe('MiniMax M3 historical background watermark', () => {
     cy.get('#chart-0 [data-testid="result-context"]')
       .should('contain.text', 'Source: SemiAnalysis InferenceX™')
       .and('not.contain.text', 'Historical benchmark — submissions closed');
-    cy.get('#chart-0 svg [data-testid="historical-watermark"]').should('be.visible');
+    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]').should('be.visible');
     let exportedPng = '';
     let exportedCaption = '';
     cy.window().then((win) => {
@@ -433,7 +461,7 @@ describe('MiniMax M3 historical background watermark', () => {
         if (this.download.endsWith('.png')) {
           exportedPng = this.href;
           exportedCaption =
-            win.document.querySelector('#chart-0-export .historical-watermark')?.textContent ?? '';
+            win.document.querySelector('#chart-0-export .deprecated-watermark')?.textContent ?? '';
         }
       };
     });
@@ -442,10 +470,9 @@ describe('MiniMax M3 historical background watermark', () => {
     cy.window()
       .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
       .then(() => {
-        expect(exportedCaption).to.contain('HISTORICAL BENCHMARK');
-        expect(exportedCaption).to.contain('SUBMISSIONS CLOSED');
+        expect(exportedCaption).to.contain('Deprecated');
         cy.writeFile(
-          'cypress/downloads/minimax-m3-historical.png',
+          'cypress/downloads/deprecated-model-watermark.png',
           exportedPng.split(',')[1],
           'base64',
         );
@@ -456,21 +483,20 @@ describe('MiniMax M3 historical background watermark', () => {
     });
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
-    cy.get('#chart-0 .historical-watermark').should('contain.text', 'HISTORICAL BENCHMARK');
+    cy.get('#chart-0 .deprecated-watermark').should('contain.text', 'Deprecated');
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
     cy.get('[aria-label="Dismiss historical-m3-overlay"]').click();
     cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
-    cy.get('#chart-0 svg [data-testid="historical-watermark"]').should('be.visible');
+    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]').should('be.visible');
 
     cy.viewport(375, 900);
     cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.wait('@historicalM3Overlay');
-    cy.get('#chart-0 svg [data-testid="historical-watermark"]')
+    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]')
       .should('be.visible')
-      .and('contain.text', '历史基准测试')
-      .and('contain.text', '已停止接收提交');
+      .and('have.text', '已弃用');
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
