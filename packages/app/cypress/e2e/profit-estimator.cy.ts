@@ -1310,7 +1310,7 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '20');
 
     cy.get('[data-testid="profit-model-selector"]').click();
-    cy.contains('[role="option"]', 'MiniMax M3').click();
+    cy.contains('[role="option"]', 'MiniMax M3 428B').click();
     cy.location('pathname').should('eq', '/profit-estimator-per-gigawatt/minimax-m3');
     cy.get('[data-testid="profit-caption"] h2')
       .should('contain.text', 'MiniMax M3')
