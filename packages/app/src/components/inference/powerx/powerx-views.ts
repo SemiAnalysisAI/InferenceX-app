@@ -1,5 +1,6 @@
 import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { PowerCompare } from '../types';
+import { powerCompareVariants } from '../utils/power-compare';
 import type { MeasuredMetricField } from '../ui/MeasuredMetricControls';
 
 /** The four PowerX views; each maps onto existing metric + compare state, so no new URL param. */
@@ -43,6 +44,9 @@ export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, Record<PowerXBoun
   where: { gpu: 'y_measuredAvgPower', it: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
 };
 
+/** The compare mode behind the Where the power goes view (`i_pcompare=breakdown`). */
+export const WHERE_COMPARE = 'breakdown' satisfies PowerCompare;
+
 export const POWER_TIMELINE_METRIC = 'y_measuredPowerTimeline';
 export const POWER_PERCENT_TDP_METRIC = 'y_measuredPowerPercentTdp';
 
@@ -56,10 +60,9 @@ export function energyPerFor(metric: string): EnergyPer {
 export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView | null {
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
-  // Overlaying both boundaries of an energy metric stays on the Energy view.
-  if ((compare === 'boundaries' || compare === 'all') && config.family === 'energy')
-    return 'energy';
-  if (compare !== 'none') return 'where';
+  // The breakdown stacks and the prefill/decode split are the Where view; a boundary
+  // overlay (Count: All, with or without the rated lines) stays on the metric's own view.
+  if (compare === 'breakdown' || compare === 'roles') return 'where';
   if (config.family === 'energy') return 'energy';
   return config.display === 'timeline' ? 'time' : 'draw';
 }
@@ -81,7 +84,7 @@ export function selectPowerXView(next: PowerXView, current: PowerXSelection): Po
   if (next === view) return current;
   if (next === 'time') return { metric: POWER_TIMELINE_METRIC, compare: 'none' };
   const boundary = powerXBoundaryFor(current.metric);
-  if (next === 'where') return { metric: VIEW_METRICS.where.gpu, compare: 'boundaries' };
+  if (next === 'where') return { metric: VIEW_METRICS.where.gpu, compare: WHERE_COMPARE };
   return { metric: VIEW_METRICS[next][boundary], compare: 'none' };
 }
 
@@ -89,15 +92,52 @@ export function powerXCountFor(metric: string, compare: PowerCompare): PowerXCou
   return compare === 'boundaries' || compare === 'all' ? 'both' : powerXBoundaryFor(metric);
 }
 
-/** The Count toggle (GPU only | IT (no PUE) | Facility | All) on the Energy and Power draw views. */
+/**
+ * The Count toggle (GPU only | IT (no PUE) | Facility | All) on the Energy and Power draw
+ * views. All overlays the three measured boundaries on the view's own chart: GPU only solid,
+ * IT dashed and Facility dash-dot per chip.
+ */
 export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): PowerXSelection {
   const view = powerXViewFor(current.metric, current.compare);
-  if (next === 'both') return { metric: ENERGY_PER_METRIC.output, compare: 'boundaries' };
+  if (next === 'both') {
+    return {
+      metric: view === 'draw' ? VIEW_METRICS.draw.gpu : ENERGY_PER_METRIC.output,
+      compare: 'boundaries',
+    };
+  }
   if (view === 'draw') return { metric: VIEW_METRICS.draw[next], compare: 'none' };
   const per = energyPerFor(current.metric);
   return {
     metric: next === 'gpu' ? ENERGY_PER_METRIC[per] : VIEW_METRICS.energy[next],
     compare: 'none',
+  };
+}
+
+/**
+ * True when the rated GPU TDP and all-in provisioned lines exist for the metric: they are
+ * J per output token series, so W per chip gains nothing from `all` over `boundaries`.
+ */
+export function powerXRatedAvailable(metric: string): boolean {
+  return (
+    powerCompareVariants(metric, 'all').length > powerCompareVariants(metric, 'boundaries').length
+  );
+}
+
+/**
+ * The Rated boundaries toggle under More views: on adds the rated GPU TDP and all-in
+ * provisioned lines to the three measured boundaries (Count: All); off removes just them.
+ */
+export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerXSelection {
+  if (on) {
+    const view = powerXViewFor(current.metric, current.compare);
+    return {
+      metric: view === 'energy' ? ENERGY_PER_METRIC.output : current.metric,
+      compare: 'all',
+    };
+  }
+  return {
+    metric: current.metric,
+    compare: current.compare === 'all' ? 'boundaries' : current.compare,
   };
 }
 

@@ -129,7 +129,7 @@ export function MeasuredMetricControls({
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   const show = (field: MeasuredMetricField) => fields === undefined || fields.includes(field);
-  const compareLabels: Record<PowerCompare, string> = {
+  const compareLabels: Record<(typeof POWER_COMPARE_MODES)[number], string> = {
     none: t.compareNone,
     boundaries: t.compareBoundaries,
     all: t.compareAll,

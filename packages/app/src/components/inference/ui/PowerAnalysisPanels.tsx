@@ -109,8 +109,26 @@ export default function PowerAnalysisPanels({
     [overlaySourceKeys, runIndexByUrl, resolveColor, sourceShade],
   );
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  // Inline layout: the bar clicked last is open; clicking it again closes it.
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Inline layout: the drill-down is open under the compared chip (the one nearest the
+  // slider) from the first render and follows the slider to another chip. A clicked bar
+  // or the Hardware select pins it to a chip until the slider moves on; Collapse hides it
+  // for the rest of the session (clicking a bar opens it again).
+  const [nearestKey, setNearestKey] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<{ key: string; nearest: string | null } | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const expandedKey = collapsed
+    ? null
+    : pinned !== null && pinned.nearest === nearestKey
+      ? pinned.key
+      : nearestKey;
+  const openDrilldown = useCallback(
+    (key: string) => {
+      setCompareKey(key);
+      setPinned({ key, nearest: nearestKey });
+      setCollapsed(false);
+    },
+    [nearestKey],
+  );
   const breakdownSeries = useMemo(
     () => buildPowerBreakdowns(data, locale, powerBreakdownInteractivity(xField)),
     [data, locale, xField],
@@ -145,9 +163,15 @@ export default function PowerAnalysisPanels({
           compact
           selectedKey={drillSeries?.key ?? null}
           expandedKey={expandedKey}
+          onNearestKeyChange={setNearestKey}
           onSelectKey={(key) => {
-            setCompareKey(key);
-            setExpandedKey((current) => (current === key ? null : key));
+            // Clicking the open bar closes it, like Collapse; any other bar opens there.
+            if (key === expandedKey) {
+              setCompareKey(key);
+              setCollapsed(true);
+            } else {
+              openDrilldown(key);
+            }
           }}
           renderExpanded={(key) => {
             const series = breakdownSeries.find((entry) => entry.key === key);
@@ -159,8 +183,9 @@ export default function PowerAnalysisPanels({
                 xField={xField}
                 xLabel={xLabel}
                 selectedKey={key}
+                onSelectKey={openDrilldown}
                 compact
-                onCollapse={() => setExpandedKey(null)}
+                onCollapse={() => setCollapsed(true)}
                 heading={
                   series
                     ? { title: t.drillTitle(series.label), subtitle: t.drillSubtitle }

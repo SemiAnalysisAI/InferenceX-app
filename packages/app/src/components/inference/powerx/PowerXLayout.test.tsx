@@ -35,7 +35,8 @@ const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
 const noop = () => {};
 const energy: PowerXSelection = { metric: 'y_measuredJPerOutputToken', compare: 'none' };
 const draw: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'none' };
-const where: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'boundaries' };
+const where: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'breakdown' };
+const drawAll: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'boundaries' };
 
 describe('PowerXViewTabs', () => {
   it('shows all four views as tabs in order with the current one selected', () => {
@@ -88,12 +89,43 @@ describe('PowerXCountControls', () => {
     expect(labels).toEqual(['GPU only', 'IT (no PUE)', 'Facility', 'All']);
   });
 
-  it('offers Count and Show as on the Power draw view', () => {
+  it('offers Count (with All) and Show as on the Power draw view', () => {
     const container = render(<PowerXCountControls selection={draw} onSelectionChange={noop} />);
     expect(container.querySelector('[data-testid="powerx-energy-per"]')).toBeNull();
+    const count = [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
+    ];
+    expect(count.map((button) => button.textContent)).toEqual([
+      'GPU only',
+      'IT (no PUE)',
+      'Facility',
+      'All',
+    ]);
+    expect(count.map((button) => button.disabled)).toEqual([false, false, false, false]);
+    expect(count[3].title).toBe(
+      'GPU only (solid), IT (dashed) and Facility (dash-dot) per chip on one chart',
+    );
     const showAs = [...container.querySelectorAll('[data-testid="powerx-unit"] button')];
     expect(showAs.map((button) => button.textContent)).toEqual(['W per chip', '% of TDP']);
     expect(showAs[0].getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('reads Count: All from the three-boundary overlay and keeps % of TDP GPU-only', () => {
+    const container = render(<PowerXCountControls selection={drawAll} onSelectionChange={noop} />);
+    const count = [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
+    ];
+    expect(count.map((button) => button.getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'true',
+    ]);
+    const showAs = [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-unit"] button'),
+    ];
+    expect(showAs.map((button) => button.disabled)).toEqual([false, true]);
+    expect(showAs[1].title).toBe('TDP bounds GPU power only');
   });
 
   it('renders nothing on the Where and Over time views', () => {
@@ -136,6 +168,7 @@ describe('PowerXCountControls', () => {
     expect(count.map((button) => button.getAttribute('aria-pressed'))).toEqual([
       'false',
       'true',
+      'false',
       'false',
     ]);
     const showAs = [

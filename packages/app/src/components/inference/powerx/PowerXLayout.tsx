@@ -30,19 +30,21 @@ import { PowerBasisPill } from './PowerBasisPill';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
-  ENERGY_PER_METRIC,
   energyPerFor,
   POWERX_VIEWS,
   powerXCountFor,
   powerXMetricFields,
   powerXProvenanceText,
+  powerXRatedAvailable,
   powerXShowAsFor,
   powerXViewFor,
   selectPowerXCount,
   selectPowerXPer,
+  selectPowerXRated,
   selectPowerXShowAs,
   selectPowerXView,
   VIEW_METRICS,
+  WHERE_COMPARE,
   type EnergyPer,
   type PowerXCount,
   type PowerXProvenanceInput,
@@ -73,7 +75,7 @@ const STRINGS = {
     itHelp: 'GPU measured; CPU, server parts, fans/PSU and network share modeled. No PUE.',
     systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
     both: 'All',
-    bothHelp: 'GPU only, IT and facility on one chart',
+    bothHelp: 'GPU only (solid), IT (dashed) and Facility (dash-dot) per chip on one chart',
     systemOutputOnly: 'IT and facility are modeled per output token only',
     readout: {
       it: 'IT',
@@ -104,19 +106,18 @@ const STRINGS = {
     tdpSystemHelp: 'TDP bounds GPU power only',
     moreViews: 'More views',
     moreViewsHint: 'prefill vs decode · P75/P90 · rated boundaries · power over time',
-    compareBoundaries: 'Compare boundaries',
+    compareBoundaries: 'Rated boundaries',
     compareOff: 'Off',
-    compareAll: 'All five',
-    compareAllHelp: 'Adds the rated GPU TDP and all-in provisioned boundaries',
-    compareUnavailable: 'Available for average W per chip and J per output token',
+    compareAll: 'TDP + provisioned',
+    compareAllHelp:
+      'Adds the rated GPU TDP and all-in provisioned lines to the three measured boundaries (Count: All)',
+    compareUnavailable: 'Rated lines exist for J per output token only',
     splitBy: 'Split by',
     boundaries: 'Boundary',
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
     openTimeline: 'Open power over time',
-    curve: 'Compare on the curve',
-    curveHint: 'GPU only (solid) vs IT and facility (dashed) across interactivity',
     howWeMeasure: 'How we measure',
     method:
       'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
@@ -143,7 +144,7 @@ const STRINGS = {
     itHelp: 'GPU 为实测；CPU、服务器部件、风扇/电源与网络分摊为模型估算。不含 PUE。',
     systemHelp: 'IT × PUE：GPU 为实测，服务器其他组件与数据中心开销为模型估算',
     both: '全部',
-    bothHelp: '在同一图中对比仅 GPU、IT 与数据中心',
+    bothHelp: '在同一图中按芯片对比仅 GPU（实线）、IT（虚线）与数据中心（点划线）',
     systemOutputOnly: 'IT 与数据中心仅按输出 Token 建模',
     readout: {
       it: 'IT',
@@ -174,19 +175,17 @@ const STRINGS = {
     tdpSystemHelp: 'TDP 仅限定 GPU 功耗',
     moreViews: '更多视图',
     moreViewsHint: '预填充 vs 解码 · P75/P90 · 额定边界 · 功耗随时间变化',
-    compareBoundaries: '对比功耗边界',
+    compareBoundaries: '额定边界',
     compareOff: '关闭',
-    compareAll: '全部五个',
-    compareAllHelp: '加入额定 GPU TDP 与整体预配两个边界',
-    compareUnavailable: '仅支持平均每芯片 W 与每输出 token 能耗',
+    compareAll: 'TDP + 整体预配',
+    compareAllHelp: '在三个实测边界（统计范围：全部）之上加入额定 GPU TDP 与整体预配两条线',
+    compareUnavailable: '额定边界仅适用于每输出 token 能耗',
     splitBy: '拆分方式',
     boundaries: '功耗边界',
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
     openTimeline: '打开功耗随时间变化',
-    curve: '在曲线上对比',
-    curveHint: '仅 GPU（实线）与 IT、数据中心（虚线）随交互性的变化',
     howWeMeasure: '测量方法',
     method:
       '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。',
@@ -275,12 +274,13 @@ export function PowerXCountControls({
   if (view !== 'energy' && view !== 'draw') return null;
   const energyPer = energyPerFor(selection.metric);
   const count = powerXCountFor(selection.metric, selection.compare);
-  const boundary = count === 'both' ? 'gpu' : count;
+  // IT and facility are modeled per output token only; W per chip has every boundary.
+  const modeledDisabled = view === 'energy' && energyPer !== 'output';
   return (
     <>
       <Field label={t.count}>
         <SegmentedToggle<PowerXCount>
-          value={view === 'energy' ? count : boundary}
+          value={count}
           ariaLabel={t.count}
           role="group"
           testId="powerx-boundary"
@@ -295,26 +295,21 @@ export function PowerXCountControls({
             {
               value: 'it',
               label: POWER_COUNT_LABELS['it-modeled'][locale],
-              title: view === 'energy' && energyPer !== 'output' ? t.systemOutputOnly : t.itHelp,
-              disabled: view === 'energy' && energyPer !== 'output',
+              title: modeledDisabled ? t.systemOutputOnly : t.itHelp,
+              disabled: modeledDisabled,
             },
             {
               value: 'system',
               label: POWER_COUNT_LABELS['utility-modeled'][locale],
-              title:
-                view === 'energy' && energyPer !== 'output' ? t.systemOutputOnly : t.systemHelp,
-              disabled: view === 'energy' && energyPer !== 'output',
+              title: modeledDisabled ? t.systemOutputOnly : t.systemHelp,
+              disabled: modeledDisabled,
             },
-            ...(view === 'energy'
-              ? [
-                  {
-                    value: 'both' as const,
-                    label: t.both,
-                    title: energyPer === 'output' ? t.bothHelp : t.systemOutputOnly,
-                    disabled: energyPer !== 'output',
-                  },
-                ]
-              : []),
+            {
+              value: 'both',
+              label: t.both,
+              title: modeledDisabled ? t.systemOutputOnly : t.bothHelp,
+              disabled: modeledDisabled,
+            },
           ]}
         />
       </Field>
@@ -356,8 +351,8 @@ export function PowerXCountControls({
               {
                 value: 'tdp',
                 label: t.tdp,
-                disabled: boundary !== 'gpu',
-                title: boundary === 'gpu' ? undefined : t.tdpSystemHelp,
+                disabled: count !== 'gpu',
+                title: count === 'gpu' ? undefined : t.tdpSystemHelp,
               },
             ]}
           />
@@ -423,7 +418,10 @@ export function PowerXSplitBy({
         size="default"
         buttonClassName="whitespace-nowrap"
         onValueChange={(value) =>
-          onSelectionChange({ metric: VIEW_METRICS.where.gpu, compare: value })
+          onSelectionChange({
+            metric: VIEW_METRICS.where.gpu,
+            compare: value === 'roles' ? 'roles' : WHERE_COMPARE,
+          })
         }
         options={[
           { value: 'boundaries', label: t.boundaries },
@@ -464,9 +462,10 @@ export function PowerXMoreViews({
   const bodyId = useId();
   const view = powerXViewFor(selection.metric, selection.compare);
   const fields = powerXMetricFields(selection.metric, selection.compare);
-  const compareAllAvailable = powerCompareAvailable(selection.metric, 'all');
-  const compareMode: 'none' | 'all' =
-    selection.compare === 'all' || selection.compare === 'boundaries' ? 'all' : 'none';
+  const compareAllAvailable = powerXRatedAvailable(selection.metric);
+  // Count: All draws the three measured boundaries; this adds the two rated lines on top,
+  // and turning it off leaves the measured three in place.
+  const ratedMode: 'none' | 'all' = selection.compare === 'all' ? 'all' : 'none';
   return (
     <div className={cn('no-export min-w-0', className)} data-testid="powerx-more-views">
       <button
@@ -501,7 +500,7 @@ export function PowerXMoreViews({
           )}
           <Field label={t.compareBoundaries}>
             <SegmentedToggle<'none' | 'all'>
-              value={compareMode}
+              value={ratedMode}
               ariaLabel={t.compareBoundaries}
               role="group"
               testId="powerx-compare-boundaries"
@@ -509,13 +508,7 @@ export function PowerXMoreViews({
               buttonClassName="whitespace-nowrap"
               onValueChange={(mode) => {
                 track('inference_power_compare_changed', { mode, family: 'powerx' });
-                onSelectionChange({
-                  metric:
-                    mode === 'all' && view === 'energy'
-                      ? ENERGY_PER_METRIC.output
-                      : selection.metric,
-                  compare: mode,
-                });
+                onSelectionChange(selectPowerXRated(mode === 'all', selection));
               }}
               options={[
                 { value: 'none', label: t.compareOff },
@@ -549,43 +542,6 @@ export function PowerXMoreViews({
         </div>
       )}
     </div>
-  );
-}
-
-/** The boundary line chart under the Where view, collapsed by default. */
-export function PowerXCurveSection({
-  children,
-  defaultOpen = false,
-}: {
-  children: ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const t = usePowerXStrings();
-  const [open, setOpen] = useState(defaultOpen);
-  const bodyId = useId();
-  return (
-    <section className="mt-2" data-testid="powerx-curve">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        data-testid="powerx-curve-toggle"
-        onClick={() => {
-          setOpen((current) => !current);
-          track('inference_powerx_curve_toggled', { expanded: !open });
-        }}
-        className="flex min-h-11 w-full items-center gap-2 rounded-md text-left hover:bg-muted/40 md:min-h-8"
-      >
-        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        <span className="text-sm font-semibold">{t.curve}</span>
-        <span className="min-w-0 truncate text-xs text-muted-foreground">{t.curveHint}</span>
-      </button>
-      {open && (
-        <div id={bodyId} className="mt-2">
-          {children}
-        </div>
-      )}
-    </section>
   );
 }
 

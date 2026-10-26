@@ -62,7 +62,6 @@ import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import {
   PowerXChartConfig,
-  PowerXCurveSection,
   PowerXFacilitySwitch,
   PowerXProvenance,
   PowerXReadout,
@@ -75,6 +74,7 @@ import {
   POWERX_DEFAULT_METRIC,
   powerXShowsHeadroom,
   powerXViewFor,
+  WHERE_COMPARE,
   type PowerXSelection,
 } from '@/components/inference/powerx/powerx-views';
 import {
@@ -956,7 +956,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     visibleComparisonRows,
   ]);
   useEffect(() => {
-    if (rolesHaveData === false && powerCompare === 'roles') setPowerCompare('boundaries');
+    if (rolesHaveData === false && powerCompare === 'roles') setPowerCompare(WHERE_COMPARE);
   }, [rolesHaveData, powerCompare, setPowerCompare]);
 
   const renderChartButtons = (graph: (typeof renderableGraphs)[number], graphIndex: number) => {
@@ -1490,16 +1490,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                       const scatter = renderScatter(chartCaption);
-                      const curveScatter = renderScatter(undefined);
-                      // Where view: the caption stays at the top of the card, the chip
-                      // comparison is the visual, and the curve is one click away.
+                      // Where view: the caption stays at the top of the card and the chip
+                      // comparison is the visual; the boundary curves live on Power draw
+                      // under Count: All.
                       if (powerXLayout && powerXTab === 'where' && powerCompare !== 'roles')
-                        return (
-                          <>
-                            <div className="order-first">{chartCaption}</div>
-                            <PowerXCurveSection>{curveScatter}</PowerXCurveSection>
-                          </>
-                        );
+                        return <div className="order-first">{chartCaption}</div>;
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
                           ? visibleDateComparisonRows(graph.data, footerOverlay)

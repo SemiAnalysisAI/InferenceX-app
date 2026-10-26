@@ -95,6 +95,7 @@ export default function PowerChipCompare({
   compact = false,
   expandedKey = null,
   renderExpanded,
+  onNearestKeyChange,
 }: {
   data: InferenceData[];
   xField?: keyof AggDataEntry;
@@ -105,6 +106,8 @@ export default function PowerChipCompare({
   /** Series whose drill-down renders inline under its bar (PowerX v2). */
   expandedKey?: string | null;
   renderExpanded?: (key: string) => React.ReactNode;
+  /** Reports the chip whose point sits nearest the slider; the drill-down opens under it. */
+  onNearestKeyChange?: (key: string | null) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -145,6 +148,21 @@ export default function PowerChipCompare({
     () => (value ? compareBreakdownsAt(series, value) : { rows: [], outOfRange: [] }),
     [series, value],
   );
+  // The compared chip: the one whose point is closest to the slider interactivity.
+  const nearestKey = useMemo(() => {
+    if (value === null) return null;
+    let best: string | null = null;
+    let bestDistance = Infinity;
+    for (const row of rows) {
+      const distance = Math.abs(Math.log(row.entry.interactivity / value));
+      if (distance < bestDistance) {
+        best = row.series.key;
+        bestDistance = distance;
+      }
+    }
+    return best;
+  }, [rows, value]);
+  useEffect(() => onNearestKeyChange?.(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
   const categories = POWER_BREAKDOWN_STACK_ORDER.filter((key) =>
     rows.some((row) => row.entry.wattsPerGpu[key] > 0),
@@ -225,8 +243,10 @@ export default function PowerChipCompare({
         <ol className="space-y-1.5" data-testid="power-chip-compare-rows">
           {rows.map(({ series: entry, entry: point }) => {
             const color = resolveColor(entry.hwKey);
-            const active = entry.key === selectedKey;
             const expanded = renderExpanded !== undefined && entry.key === expandedKey;
+            // Inline layout: the bar whose drill-down is open is the active one.
+            const active =
+              entry.key === (renderExpanded && expandedKey !== null ? expandedKey : selectedKey);
             const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
             return (
               <li key={entry.key}>
@@ -307,6 +327,18 @@ export default function PowerChipCompare({
           })}
         </ol>
       )}
+      {/* A chip picked in the drill-down's Hardware select may have no bar near this
+          interactivity; its drill-down then follows the list instead of vanishing. */}
+      {renderExpanded !== undefined &&
+        expandedKey !== null &&
+        !rows.some((row) => row.series.key === expandedKey) && (
+          <div
+            className="rounded-md border border-border/60 p-3"
+            data-testid="power-chip-compare-drilldown"
+          >
+            {renderExpanded(expandedKey)}
+          </div>
+        )}
       <p className="text-xs text-muted-foreground">
         {includeFacility ? t.perGpu : t.perGpuIt}
         {outOfRange.length > 0 &&

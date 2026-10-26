@@ -91,10 +91,15 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
   line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
   the footer notes. On phones the plot height is capped at 55 % of the viewport.
-- Where the power goes: the caption stays at the top of the card; the chip comparison is the
-  visual; clicking a bar opens that chip's drill-down inline under it (`PowerAnalysisPanels`
-  `layout="inline"`); the boundary line chart sits in a collapsed **Compare on the curve**
-  section below.
+- Where the power goes (`i_pcompare=breakdown`): the caption stays at the top of the card and
+  the chip comparison is the visual. The compared chip's drill-down (the "across load"
+  stacked bars / stacked area, with its Hardware select, Stacked bars | Stacked area toggle
+  (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
+  inline under that chip's bar from the first render and follows the slider to whichever
+  chip is nearest; clicking a bar or picking another chip in the Hardware select moves it,
+  Collapse hides it for the session (`PowerAnalysisPanels` `layout="inline"`). The stack
+  legend above the bars is the only one. There is no boundary line chart on this view: the
+  three measured boundaries are compared on Power draw under Count: All.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer notes end with one muted provenance line (`powerXProvenanceText`: measured
   points, validated windows, power model revision, PUE) that is the summary of the collapsed
@@ -113,8 +118,12 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
   `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
-  "All in Measured IT (no PUE)". `COUNT_COMPARE_BASES` draws all three for
-  `i_pcompare=boundaries`; `all` adds the two rated bounds (five lines).
+  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per output token)
+  sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
+  (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
+  legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
+  The **Rated boundaries** toggle under More views sets `all`, which adds the two rated
+  bounds (five lines); turning it off returns to the measured three.
 - **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw, in the TCO
   badge row's outline-badge style): IT W/GPU,
   GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
@@ -178,7 +187,8 @@ resolves their run/audit provenance automatically.
 
 `i_pcompare=boundaries|all|roles` (default `''`, "Off") overlays sibling series on the selected
 metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
-and All in Measured; `all` adds the two provisioned bounds. `utils/power-compare.ts` is the single source: `useChartData` and
+and All in Measured; `all` adds the two provisioned bounds. `i_pcompare=breakdown` is the PowerX
+Where the power goes view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
 `x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points

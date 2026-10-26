@@ -226,8 +226,12 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
 
-/** `boundaries`: GPU only, IT (no PUE) and Facility. `all`: also the two rated provisioned bounds. */
-export type PowerCompare = 'none' | 'boundaries' | 'all' | 'roles';
+/**
+ * `boundaries`: GPU only, IT (no PUE) and Facility. `all`: also the two rated provisioned
+ * bounds. `roles`: prefill vs decode GPUs. `breakdown`: the PowerX Where the power goes
+ * view (per-chip stacks at one interactivity); it overlays no series on the chart.
+ */
+export type PowerCompare = 'none' | 'boundaries' | 'all' | 'roles' | 'breakdown';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 

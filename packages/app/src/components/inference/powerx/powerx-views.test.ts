@@ -7,11 +7,13 @@ import {
   powerXCountFor,
   powerXMetricFields,
   powerXProvenanceText,
+  powerXRatedAvailable,
   powerXShowAsFor,
   powerXShowsHeadroom,
   powerXViewFor,
   selectPowerXCount,
   selectPowerXPer,
+  selectPowerXRated,
   selectPowerXShowAs,
   selectPowerXView,
 } from './powerx-views';
@@ -27,10 +29,13 @@ describe('powerXViewFor', () => {
     expect(powerXViewFor('y_notAPowerMetric', 'none')).toBeNull();
   });
 
-  it('keeps an energy boundary overlay on the Energy view and sends power splits to Where', () => {
+  it('keeps a boundary overlay on its own view and sends the breakdown and role splits to Where', () => {
     expect(powerXViewFor('y_measuredJPerOutputToken', 'boundaries')).toBe('energy');
     expect(powerXViewFor('y_measuredJPerOutputToken', 'all')).toBe('energy');
-    expect(powerXViewFor('y_measuredAvgPower', 'boundaries')).toBe('where');
+    // Count: All on Power draw draws GPU only, IT and Facility on the one scatter.
+    expect(powerXViewFor('y_measuredAvgPower', 'boundaries')).toBe('draw');
+    expect(powerXViewFor('y_measuredAvgPower', 'all')).toBe('draw');
+    expect(powerXViewFor('y_measuredAvgPower', 'breakdown')).toBe('where');
     expect(powerXViewFor('y_measuredAvgPower', 'roles')).toBe('where');
   });
 });
@@ -44,7 +49,7 @@ describe('selectPowerXView', () => {
     });
     expect(selectPowerXView('where', energy)).toEqual({
       metric: 'y_measuredAvgPower',
-      compare: 'boundaries',
+      compare: 'breakdown',
     });
     expect(selectPowerXView('time', energy)).toEqual({
       metric: 'y_measuredPowerTimeline',
@@ -53,7 +58,7 @@ describe('selectPowerXView', () => {
   });
 
   it('returns to GPU-only energy from the Where and Over time views', () => {
-    const where = { metric: 'y_measuredAvgPower', compare: 'boundaries' as const };
+    const where = { metric: 'y_measuredAvgPower', compare: 'breakdown' as const };
     expect(selectPowerXView('energy', where)).toEqual({
       metric: 'y_measuredJPerOutputToken',
       compare: 'none',
@@ -78,6 +83,8 @@ describe('Count, Per and Show as', () => {
     expect(powerXCountFor('y_itModeledJPerOutputToken', 'none')).toBe('it');
     expect(powerXCountFor('y_utilityModeledWatts', 'none')).toBe('system');
     expect(powerXCountFor('y_measuredJPerOutputToken', 'boundaries')).toBe('both');
+    expect(powerXCountFor('y_measuredAvgPower', 'boundaries')).toBe('both');
+    expect(powerXCountFor('y_measuredAvgPower', 'all')).toBe('both');
     expect(powerXBoundaryFor('y_gpuProvisionedJPerOutputToken')).toBe('system');
   });
 
@@ -129,6 +136,49 @@ describe('Count, Per and Show as', () => {
     });
   });
 
+  it('overlays all three measured boundaries on the Power draw scatter and back', () => {
+    const draw = { metric: 'y_itModeledWatts', compare: 'none' as const };
+    expect(selectPowerXCount('both', draw)).toEqual({
+      metric: 'y_measuredAvgPower',
+      compare: 'boundaries',
+    });
+    const all = { metric: 'y_measuredAvgPower', compare: 'boundaries' as const };
+    expect(powerXViewFor(all.metric, all.compare)).toBe('draw');
+    expect(selectPowerXCount('system', all)).toEqual({
+      metric: 'y_utilityModeledWatts',
+      compare: 'none',
+    });
+  });
+
+  it('offers the rated lines for J per output token only', () => {
+    expect(powerXRatedAvailable('y_measuredJPerOutputToken')).toBe(true);
+    expect(powerXRatedAvailable('y_itModeledJPerOutputToken')).toBe(true);
+    // The rated bases have no W per chip series: All already draws every boundary there.
+    expect(powerXRatedAvailable('y_measuredAvgPower')).toBe(false);
+    expect(powerXRatedAvailable('y_measuredPowerPercentTdp')).toBe(false);
+    expect(powerXRatedAvailable('y_measuredPowerTimeline')).toBe(false);
+  });
+
+  it('adds and removes only the rated lines with the Rated boundaries toggle', () => {
+    const three = { metric: 'y_measuredAvgPower', compare: 'boundaries' as const };
+    expect(selectPowerXRated(true, three)).toEqual({
+      metric: 'y_measuredAvgPower',
+      compare: 'all',
+    });
+    expect(selectPowerXRated(false, { ...three, compare: 'all' })).toEqual(three);
+    // From a single boundary the rated lines imply the comparison; off is a no-op.
+    const single = { metric: 'y_measuredAvgPower', compare: 'none' as const };
+    expect(selectPowerXRated(true, single)).toEqual({
+      metric: 'y_measuredAvgPower',
+      compare: 'all',
+    });
+    expect(selectPowerXRated(false, single)).toEqual(single);
+    // On the Energy view the rated lines exist per output token only.
+    expect(
+      selectPowerXRated(true, { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' }),
+    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'all' });
+  });
+
   it('reads the unit from the metric, whatever its boundary or role', () => {
     expect(energyPerFor('y_measuredJPerOutputToken')).toBe('output');
     expect(energyPerFor('y_utilityModeledJPerOutputToken')).toBe('output');
@@ -178,6 +228,7 @@ describe('powerXMetricFields', () => {
 
   it('offers nothing for comparisons, the modeled whole system and the timeline', () => {
     expect(powerXMetricFields('y_measuredAvgPower', 'boundaries')).toEqual([]);
+    expect(powerXMetricFields('y_measuredAvgPower', 'breakdown')).toEqual([]);
     expect(powerXMetricFields('y_measuredAvgPower', 'roles')).toEqual([]);
     expect(powerXMetricFields('y_utilityModeledWatts', 'none')).toEqual([]);
     expect(powerXMetricFields('y_utilityModeledJPerOutputToken', 'none')).toEqual([]);

@@ -18,7 +18,9 @@ export const POWER_COMPARE_MODES = [
 ] as const satisfies readonly PowerCompare[];
 
 export function parsePowerCompare(value: string | null | undefined): PowerCompare {
-  return value === 'boundaries' || value === 'all' || value === 'roles' ? value : 'none';
+  return value === 'boundaries' || value === 'all' || value === 'roles' || value === 'breakdown'
+    ? value
+    : 'none';
 }
 
 export type PowerSeriesField = keyof Pick<
@@ -87,7 +89,8 @@ function comparableQuantity(metric: string): 'watts' | 'energy' | null {
 
 export function powerCompareBase(metric: string, mode: PowerCompare): PowerVariant | null {
   const config = getMeasuredMetricConfig(metric);
-  if (!config || mode === 'none') return null;
+  // The Where view's breakdown stacks are panels, not sibling series on the chart.
+  if (!config || mode === 'none' || mode === 'breakdown') return null;
   if (mode === 'boundaries' || mode === 'all') {
     return comparableQuantity(metric) ? { kind: 'basis', id: config.basis } : null;
   }

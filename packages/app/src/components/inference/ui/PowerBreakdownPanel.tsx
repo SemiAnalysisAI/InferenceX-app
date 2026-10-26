@@ -725,9 +725,10 @@ export default function PowerBreakdownPanel({
   data: InferenceData[];
   contextLabel?: string;
   /**
-   * Inline drill-down under a chip-compare bar (PowerX v2): the bar already names the
-   * series and the compare legend already explains the stack, so the Source select,
-   * the subtitle and the legend list are dropped; a Collapse button closes it.
+   * Inline drill-down under a chip-compare bar (PowerX v2): the compare legend above the
+   * bars already explains the stack, so the legend list is dropped and the title row is
+   * one line; the Hardware select and the Stacked bars | Stacked area toggle stay, and a
+   * Collapse button closes it.
    */
   compact?: boolean;
   onCollapse?: () => void;
@@ -856,45 +857,43 @@ export default function PowerBreakdownPanel({
       ) : (
         <>
           <div className="no-export flex min-w-0 flex-wrap items-end gap-3">
-            {!compact && (
-              <div className="min-w-0 flex-1 basis-64 space-y-1">
-                <label
-                  htmlFor={`${sectionId}-source`}
-                  className="text-xs font-medium text-muted-foreground"
+            <div className="min-w-0 flex-1 basis-64 space-y-1">
+              <label
+                htmlFor={`${sectionId}-source`}
+                className="text-xs font-medium text-muted-foreground"
+              >
+                {t.source}
+              </label>
+              <Select
+                value={series.key}
+                onValueChange={(value) => {
+                  setSelectedKey(value);
+                  track('inference_power_breakdown_source_selected');
+                }}
+              >
+                <SelectTrigger
+                  id={`${sectionId}-source`}
+                  data-testid="power-breakdown-source"
+                  className="w-full min-w-0"
                 >
-                  {t.source}
-                </label>
-                <Select
-                  value={series.key}
-                  onValueChange={(value) => {
-                    setSelectedKey(value);
-                    track('inference_power_breakdown_source_selected');
-                  }}
-                >
-                  <SelectTrigger
-                    id={`${sectionId}-source`}
-                    data-testid="power-breakdown-source"
-                    className="w-full min-w-0"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent portalled={false}>
-                    {breakdowns.map((entry) => (
-                      <SelectItem key={entry.key} value={entry.key}>
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            aria-hidden
-                            className="size-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: colorOf(entry) }}
-                          />
-                          <span className="truncate">{entry.label}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent portalled={false}>
+                  {breakdowns.map((entry) => (
+                    <SelectItem key={entry.key} value={entry.key}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          aria-hidden
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: colorOf(entry) }}
+                        />
+                        <span className="truncate">{entry.label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <SegmentedToggle<PowerBreakdownView>
               value={view}
               ariaLabel={t.view}
