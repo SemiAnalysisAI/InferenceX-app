@@ -19,8 +19,7 @@ import {
   PowerXChartConfig,
   PowerXCountControls,
   PowerXFacilitySwitch,
-  PowerXMoreViews,
-  PowerXProvenance,
+  PowerXMethod,
   PowerXReadout,
   PowerXSplitBy,
   PowerXViewTabs,
@@ -190,29 +189,67 @@ describe('PowerXCountControls', () => {
 });
 
 describe('PowerXChartConfig', () => {
-  it('puts Count, Per and the More views expander in the Chart Config fieldset', () => {
-    const container = render(
-      <PowerXChartConfig selection={energy} onSelectionChange={noop} rolesHaveData={false} />,
-    );
+  it('lays Count, Per, Scope and Rated boundaries out as plain controls, with no expander', () => {
+    const container = render(<PowerXChartConfig selection={energy} onSelectionChange={noop} />);
     const config = container.querySelector('[data-testid="powerx-chart-config"]');
     expect(config?.querySelector('[data-testid="powerx-boundary"]')).not.toBeNull();
     expect(config?.querySelector('[data-testid="powerx-energy-per"]')).not.toBeNull();
-    expect(container.querySelector('[data-testid="powerx-more-views-toggle"]')).not.toBeNull();
+    expect(config?.querySelector('[data-testid="measured-energy-scope"]')).not.toBeNull();
+    expect(config?.querySelector('[data-testid="measured-power-statistic-average"]')).toBeNull();
+    const rated = [
+      ...(config?.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="powerx-compare-boundaries"] button',
+      ) ?? []),
+    ];
+    expect(rated.map((button) => button.textContent)).toEqual(['Off', 'TDP + provisioned']);
+    expect(rated.map((button) => button.disabled)).toEqual([false, false]);
+    expect(container.querySelector('[data-testid="powerx-more-views-toggle"]')).toBeNull();
+    expect(container.querySelector('[data-testid="powerx-split"]')).toBeNull();
+    expect(container.querySelector('[data-testid="powerx-open-timeline"]')).toBeNull();
+    expect(container.textContent).not.toContain('More views');
     // Nothing PowerX-specific is left for the legend rail.
     expect(container.querySelector('[data-testid="powerx-legend-controls"]')).toBeNull();
   });
-});
 
-describe('PowerXMoreViews', () => {
-  it('names the features it holds while collapsed', () => {
+  it('shows Scope and Power statistic on Power draw, where rated lines do not exist', () => {
+    const container = render(<PowerXChartConfig selection={draw} onSelectionChange={noop} />);
+    const config = container.querySelector('[data-testid="powerx-chart-config"]');
+    expect(config?.querySelector('[data-testid="powerx-unit"]')).not.toBeNull();
+    expect(config?.querySelector('[data-testid="measured-power-scope"]')).not.toBeNull();
+    expect(
+      config
+        ?.querySelector('[data-testid="measured-power-statistic-average"]')
+        ?.getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(config?.querySelector('[data-testid="powerx-compare-boundaries"]')).toBeNull();
+  });
+
+  it('keeps only Count and the Rated boundaries toggle once Count: All is on', () => {
     const container = render(
-      <PowerXMoreViews selection={energy} onSelectionChange={noop} rolesHaveData={false} />,
+      <PowerXChartConfig
+        selection={{ metric: 'y_measuredJPerOutputToken', compare: 'all' }}
+        onSelectionChange={noop}
+      />,
     );
-    const toggle = container.querySelector('[data-testid="powerx-more-views-toggle"]');
-    expect(toggle?.textContent).toContain('More views');
-    expect(toggle?.textContent).toContain('prefill vs decode · P75/P90 · rated boundaries');
-    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-    expect(container.querySelector('[data-testid="powerx-split"]')).toBeNull();
+    const config = container.querySelector('[data-testid="powerx-chart-config"]');
+    expect(config?.querySelector('[data-testid="measured-metric-controls"]')).toBeNull();
+    const rated = [
+      ...(config?.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="powerx-compare-boundaries"] button',
+      ) ?? []),
+    ];
+    expect(rated.map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+  });
+
+  it('shows nothing on the Where and Over time views', () => {
+    for (const selection of [where, { metric: 'y_measuredPowerTimeline', compare: 'none' }]) {
+      const container = render(
+        <PowerXChartConfig selection={selection as PowerXSelection} onSelectionChange={noop} />,
+      );
+      expect(container.querySelector('[data-testid="powerx-chart-config"]')?.children).toHaveLength(
+        0,
+      );
+    }
   });
 });
 
@@ -232,31 +269,24 @@ describe('PowerXSplitBy', () => {
   });
 });
 
-describe('PowerXProvenance', () => {
-  it('is the summary of the collapsed How we measure details', () => {
-    const container = render(
-      <PowerXProvenance
-        provenance={{ measuredPoints: 42, powerModelRevision: '0123456789ab', pue: 1.3 }}
-      />,
-    );
+describe('PowerXMethod', () => {
+  it('is a collapsed How we measure note with the method sentences and nothing else', () => {
+    const container = render(<PowerXMethod />);
     const details = container.querySelector('details[data-testid="powerx-method"]');
     expect(details?.hasAttribute('open')).toBe(false);
-    expect(details?.querySelector('summary [data-testid="powerx-provenance"]')?.textContent).toBe(
-      '42 measured points · validated serving windows only · power model rev 0123456 · PUE 1.3',
-    );
-    expect(details?.querySelector('summary')?.textContent).toContain('How we measure');
+    expect(details?.querySelector('summary')?.textContent).toBe('How we measure');
+    expect(details?.querySelector('[data-testid="powerx-provenance"]')).toBeNull();
+    expect(details?.textContent).not.toContain('measured point');
+    expect(details?.textContent).not.toContain('power model rev');
+    expect(details?.textContent).not.toContain('PUE');
     expect(details?.querySelector('p')?.textContent).toBe(
       'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
     );
+    expect(render(<PowerXMethod />, 'zh').querySelector('summary')?.textContent).toBe('测量方法');
   });
 
   it('adds only the AgentX calibration sentence on agentic scenarios, with nothing else', () => {
-    const container = render(
-      <PowerXProvenance
-        provenance={{ measuredPoints: 1, powerModelRevision: '0123456789ab' }}
-        agentic
-      />,
-    );
+    const container = render(<PowerXMethod agentic />);
     const details = container.querySelector('details[data-testid="powerx-method"]');
     expect(details?.querySelector('p')?.textContent).toContain(
       'AgentX estimates are not calibrated against measured system power.',
@@ -266,13 +296,7 @@ describe('PowerXProvenance', () => {
     expect(details?.querySelector('[data-testid="powerx-utilization-note"]')).toBeNull();
     expect(details?.querySelectorAll('p')).toHaveLength(1);
     expect(details?.textContent).not.toContain('on-board telemetry');
-    const zh = render(
-      <PowerXProvenance
-        provenance={{ measuredPoints: 1, powerModelRevision: '0123456789ab' }}
-        agentic
-      />,
-      'zh',
-    );
+    const zh = render(<PowerXMethod agentic />, 'zh');
     expect(zh.querySelector('details p')?.textContent).toBe(
       '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。 AgentX 估算值尚未用实测的系统功耗校准。',
     );

@@ -6,7 +6,6 @@ import {
   powerXBoundaryFor,
   powerXCountFor,
   powerXMetricFields,
-  powerXProvenanceText,
   powerXRatedAvailable,
   powerXShowAsFor,
   powerXShowsHeadroom,
@@ -233,51 +232,5 @@ describe('powerXMetricFields', () => {
     expect(powerXMetricFields('y_utilityModeledWatts', 'none')).toEqual([]);
     expect(powerXMetricFields('y_utilityModeledJPerOutputToken', 'none')).toEqual([]);
     expect(powerXMetricFields('y_measuredPowerTimeline', 'none')).toEqual([]);
-  });
-});
-
-describe('powerXProvenanceText', () => {
-  const revision = 'abcdef0123456789';
-
-  it('lists points, windows, revision and PUE, in that order', () => {
-    expect(
-      powerXProvenanceText({ measuredPoints: 1234, powerModelRevision: revision, pue: 1.3 }),
-    ).toBe(
-      '1,234 measured points · validated serving windows only · power model rev abcdef0 · PUE 1.3',
-    );
-  });
-
-  it('adds the sample count only when a timeline supplied one, and omits a missing PUE', () => {
-    expect(
-      powerXProvenanceText({
-        measuredPoints: 1,
-        samplesPerPoint: 6019,
-        powerModelRevision: revision,
-        pue: null,
-      }),
-    ).toBe(
-      '1 measured point · ~6k 1-second GPU samples per point · validated serving windows only · power model rev abcdef0',
-    );
-    expect(
-      powerXProvenanceText({
-        measuredPoints: 2,
-        samplesPerPoint: 1500,
-        powerModelRevision: revision,
-      }),
-    ).toContain('~1.5k 1-second GPU samples per point');
-    expect(
-      powerXProvenanceText({ measuredPoints: 2, samplesPerPoint: 0, powerModelRevision: revision }),
-    ).not.toContain('samples');
-  });
-
-  it('has a Chinese rendering', () => {
-    expect(
-      powerXProvenanceText(
-        { measuredPoints: 12, samplesPerPoint: 420, powerModelRevision: revision, pue: 1.3 },
-        'zh',
-      ),
-    ).toBe(
-      '12 个实测数据点 · 每点约 420 个 1 秒 GPU 采样 · 仅统计通过验证的服务窗口 · 功耗模型版本 abcdef0 · PUE 1.3',
-    );
   });
 });

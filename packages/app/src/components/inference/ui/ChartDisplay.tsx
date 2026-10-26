@@ -63,7 +63,7 @@ import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import {
   PowerXChartConfig,
   PowerXFacilitySwitch,
-  PowerXProvenance,
+  PowerXMethod,
   PowerXReadout,
   PowerXSplitBy,
   PowerXViewTabs,
@@ -368,7 +368,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     ],
   );
   const powerXHeadroom = powerXSurface && powerXShowsHeadroom(selectedYAxisMetric, powerCompare);
-  // Phones: cap the plot so the legend rail and the provenance line stay within reach.
+  // Phones: cap the plot so the legend rail and the footer notes stay within reach.
   const phoneViewport = useMediaQuery('(max-width: 640px)');
   const powerXChartHeight =
     powerXSurface && phoneViewport && typeof window !== 'undefined'
@@ -1080,43 +1080,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     visibleComparisonRows,
   ]);
 
-  // PowerX provenance strip: what the plotted points are made of.
-  const powerXProvenance = useMemo(() => {
-    const graph = renderableGraphs[0];
-    if (!powerXSurface || !graph) return null;
-    const overlay = selectUnofficialOverlayForMode(
-      selectedXAxisMode,
-      graph.chartDefinition.chartType,
-      overlayDataByChartType,
-    );
-    const isGpuComparison =
-      selectedGPUs.length > 0 &&
-      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
-    const { officialRows, overlayRows } = isGpuComparison
-      ? visibleDateComparisonRows(graph.data, overlay)
-      : visibleComparisonRows(graph.data, overlay);
-    const points = [...officialRows, ...overlayRows].filter((point) => !point.powerVariant);
-    const estimate = points
-      .map((point) => point.modeledSystemPower)
-      .find((candidate) => candidate !== undefined && candidate.status === 'supported');
-    return {
-      measuredPoints: points.length,
-      powerModelRevision: SYSTEM_POWER_MODEL_REVISION,
-      pue: estimate?.status === 'supported' ? estimate.pue : null,
-    };
-  }, [
-    powerXSurface,
-    renderableGraphs,
-    selectedXAxisMode,
-    overlayDataByChartType,
-    selectedGPUs.length,
-    selectedDateRange.startDate,
-    selectedDateRange.endDate,
-    selectedDates.length,
-    visibleDateComparisonRows,
-    visibleComparisonRows,
-  ]);
-
   const displayGraphs =
     isFirstLoad || isDerivedXAxisLoading
       ? [
@@ -1167,8 +1130,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const powerXFooter =
-              powerXSurface && powerXProvenance && selectedPowerBasis ? (
-                <PowerXProvenance provenance={powerXProvenance} agentic={isAgenticSequence} />
+              powerXSurface && selectedPowerBasis ? (
+                <PowerXMethod agentic={isAgenticSequence} />
               ) : null;
             const footerNotices =
               hasOffloadHalo || isAgenticSequence || hasAtomSeries || powerXFooter ? (
@@ -1606,7 +1569,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <PowerXChartConfig
                           selection={powerXSelection}
                           onSelectionChange={setPowerXSelection}
-                          rolesHaveData={rolesHaveData}
                         />
                       ) : undefined
                     }

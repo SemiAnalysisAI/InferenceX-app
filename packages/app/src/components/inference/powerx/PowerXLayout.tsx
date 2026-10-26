@@ -1,7 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { type ReactNode, useId, useState } from 'react';
+import { type ReactNode, useId } from 'react';
 
 import { MeasuredMetricControls } from '@/components/inference/ui/MeasuredMetricControls';
 import { powerCompareAvailable } from '@/components/inference/utils/power-compare';
@@ -34,7 +33,6 @@ import {
   POWERX_VIEWS,
   powerXCountFor,
   powerXMetricFields,
-  powerXProvenanceText,
   powerXRatedAvailable,
   powerXShowAsFor,
   powerXViewFor,
@@ -47,7 +45,6 @@ import {
   WHERE_COMPARE,
   type EnergyPer,
   type PowerXCount,
-  type PowerXProvenanceInput,
   type PowerXSelection,
   type PowerXShowAs,
   type PowerXView,
@@ -104,20 +101,16 @@ const STRINGS = {
     watts: 'W per chip',
     tdp: '% of TDP',
     tdpSystemHelp: 'TDP bounds GPU power only',
-    moreViews: 'More views',
-    moreViewsHint: 'prefill vs decode · P75/P90 · rated boundaries · power over time',
     compareBoundaries: 'Rated boundaries',
     compareOff: 'Off',
     compareAll: 'TDP + provisioned',
     compareAllHelp:
       'Adds the rated GPU TDP and all-in provisioned lines to the three measured boundaries (Count: All)',
-    compareUnavailable: 'Rated lines exist for J per output token only',
     splitBy: 'Split by',
     boundaries: 'Boundary',
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
-    openTimeline: 'Open power over time',
     howWeMeasure: 'How we measure',
     method:
       'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
@@ -173,19 +166,15 @@ const STRINGS = {
     watts: '每芯片 W',
     tdp: 'TDP 占比',
     tdpSystemHelp: 'TDP 仅限定 GPU 功耗',
-    moreViews: '更多视图',
-    moreViewsHint: '预填充 vs 解码 · P75/P90 · 额定边界 · 功耗随时间变化',
     compareBoundaries: '额定边界',
     compareOff: '关闭',
     compareAll: 'TDP + 整体预配',
     compareAllHelp: '在三个实测边界（统计范围：全部）之上加入额定 GPU TDP 与整体预配两条线',
-    compareUnavailable: '额定边界仅适用于每输出 token 能耗',
     splitBy: '拆分方式',
     boundaries: '功耗边界',
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
-    openTimeline: '打开功耗随时间变化',
     howWeMeasure: '测量方法',
     method:
       '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。',
@@ -363,33 +352,58 @@ export function PowerXCountControls({
 }
 
 /**
- * The PowerX part of the Chart Config fieldset: Count, Per or Show as beside the
- * X-axis pick, then the collapsed More views row underneath.
+ * The PowerX part of the Chart Config fieldset, laid out like the /inference
+ * controls: Count, Per or Show as beside the X-axis pick, then Scope and Power
+ * statistic on the views they apply to, and the Rated boundaries toggle where
+ * rated lines exist. Split by lives in the Where the power goes card.
  */
 export function PowerXChartConfig({
   selection,
   onSelectionChange,
-  rolesHaveData,
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
-  rolesHaveData?: boolean;
 }) {
+  const t = usePowerXStrings();
+  const fields = powerXMetricFields(selection.metric, selection.compare);
+  // Count: All draws the three measured boundaries; this adds the two rated lines on top,
+  // and turning it off leaves the measured three in place.
+  const ratedMode: 'none' | 'all' = selection.compare === 'all' ? 'all' : 'none';
   return (
-    <>
-      <div
-        className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3"
-        data-testid="powerx-chart-config"
-      >
-        <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
-      </div>
-      <PowerXMoreViews
-        selection={selection}
-        onSelectionChange={onSelectionChange}
-        rolesHaveData={rolesHaveData}
-        className="sm:col-span-2"
-      />
-    </>
+    <div
+      className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3"
+      data-testid="powerx-chart-config"
+    >
+      <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
+      {fields.length > 0 && (
+        <MeasuredMetricControls
+          metric={selection.metric}
+          onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
+          fields={fields}
+          className="contents [&>div]:min-w-40"
+        />
+      )}
+      {powerXRatedAvailable(selection.metric) && (
+        <Field label={t.compareBoundaries}>
+          <SegmentedToggle<'none' | 'all'>
+            value={ratedMode}
+            ariaLabel={t.compareBoundaries}
+            role="group"
+            testId="powerx-compare-boundaries"
+            size="default"
+            buttonClassName="whitespace-nowrap"
+            onValueChange={(mode) => {
+              track('inference_power_compare_changed', { mode, family: 'powerx' });
+              onSelectionChange(selectPowerXRated(mode === 'all', selection));
+            }}
+            options={[
+              { value: 'none', label: t.compareOff },
+              { value: 'all', label: t.compareAll, title: t.compareAllHelp },
+            ]}
+          />
+        </Field>
+      )}
+    </div>
   );
 }
 
@@ -442,130 +456,20 @@ export function PowerXSplitBy({
   );
 }
 
-/**
- * "More views" under the Chart Config controls: everything the first prototype
- * showed as separate tabs or an Advanced drawer, one expander away.
- */
-export function PowerXMoreViews({
-  selection,
-  onSelectionChange,
-  rolesHaveData,
-  className,
-}: {
-  selection: PowerXSelection;
-  onSelectionChange: (next: PowerXSelection) => void;
-  rolesHaveData?: boolean;
-  className?: string;
-}) {
-  const t = usePowerXStrings();
-  const [open, setOpen] = useState(false);
-  const bodyId = useId();
-  const view = powerXViewFor(selection.metric, selection.compare);
-  const fields = powerXMetricFields(selection.metric, selection.compare);
-  const compareAllAvailable = powerXRatedAvailable(selection.metric);
-  // Count: All draws the three measured boundaries; this adds the two rated lines on top,
-  // and turning it off leaves the measured three in place.
-  const ratedMode: 'none' | 'all' = selection.compare === 'all' ? 'all' : 'none';
-  return (
-    <div className={cn('no-export min-w-0', className)} data-testid="powerx-more-views">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        data-testid="powerx-more-views-toggle"
-        onClick={() => {
-          setOpen((current) => !current);
-          track('inference_powerx_more_views_toggled', { expanded: !open });
-        }}
-        className="flex min-h-11 w-full items-center gap-2 rounded-md text-left hover:bg-muted/40 md:min-h-8"
-      >
-        <span className="flex shrink-0 items-center gap-1 text-sm font-medium whitespace-nowrap text-foreground">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          {t.moreViews}
-        </span>
-        <span className="min-w-0 truncate text-xs text-muted-foreground">{t.moreViewsHint}</span>
-      </button>
-      {open && (
-        <div
-          id={bodyId}
-          className="mt-1 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3 border-l border-border pl-3"
-        >
-          {fields.length > 0 && (
-            <MeasuredMetricControls
-              metric={selection.metric}
-              onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
-              fields={fields}
-              className="contents"
-            />
-          )}
-          <Field label={t.compareBoundaries}>
-            <SegmentedToggle<'none' | 'all'>
-              value={ratedMode}
-              ariaLabel={t.compareBoundaries}
-              role="group"
-              testId="powerx-compare-boundaries"
-              size="default"
-              buttonClassName="whitespace-nowrap"
-              onValueChange={(mode) => {
-                track('inference_power_compare_changed', { mode, family: 'powerx' });
-                onSelectionChange(selectPowerXRated(mode === 'all', selection));
-              }}
-              options={[
-                { value: 'none', label: t.compareOff },
-                {
-                  value: 'all',
-                  label: t.compareAll,
-                  disabled: !compareAllAvailable,
-                  title: compareAllAvailable ? t.compareAllHelp : t.compareUnavailable,
-                },
-              ]}
-            />
-          </Field>
-          <PowerXSplitBy
-            selection={selection}
-            onSelectionChange={onSelectionChange}
-            rolesHaveData={rolesHaveData}
-          />
-          {view !== 'time' && (
-            <button
-              type="button"
-              data-testid="powerx-open-timeline"
-              onClick={() => {
-                track('inference_powerx_tab_selected', { tab: 'time', source: 'more_views' });
-                onSelectionChange(selectPowerXView('time', selection));
-              }}
-              className="min-h-11 self-end justify-self-start rounded-md border border-border/60 px-3 text-xs font-medium text-foreground hover:bg-muted md:min-h-9"
-            >
-              {t.openTimeline} →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * The provenance strip in the chart footer: the one summary line, and the
- * three-sentence method behind "How we measure".
- */
-export function PowerXProvenance({
-  provenance,
+/** The "How we measure" note in the chart footer: the method, one sentence each. */
+export function PowerXMethod({
   agentic = false,
 }: {
-  provenance: PowerXProvenanceInput;
   /** AgentX scenario: adds the calibration caveat. */
   agentic?: boolean;
 }) {
-  const locale = useLocale();
-  const t = STRINGS[locale];
+  const t = usePowerXStrings();
   return (
-    <details className="text-xs text-muted-foreground" data-testid="powerx-method">
-      <summary className="min-h-11 cursor-pointer select-none leading-snug md:min-h-0">
-        <span data-testid="powerx-provenance">{powerXProvenanceText(provenance, locale)}</span>{' '}
-        <span className="underline underline-offset-2">{t.howWeMeasure}</span>
+    <details className="text-xs leading-5 text-muted-foreground" data-testid="powerx-method">
+      <summary className="min-h-11 cursor-pointer select-none underline underline-offset-2 md:min-h-0">
+        {t.howWeMeasure}
       </summary>
-      <p className="mt-1 max-w-prose">
+      <p className="mt-1 max-w-prose leading-snug">
         {t.method}
         {agentic && ` ${t.agentxMethod}`}
       </p>

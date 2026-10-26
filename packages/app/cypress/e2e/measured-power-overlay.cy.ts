@@ -16,8 +16,8 @@ describe('Measured power on unofficial-run overlay', () => {
       'Measured Average Power per Chip',
     );
     cy.get('[data-testid="powerx-advanced"]').should('not.exist');
-    // PowerX v2: Scope and Power statistic sit in the legend rail's More views expander.
-    cy.get('[data-testid="powerx-more-views-toggle"]').click();
+    // PowerX: Scope and Power statistic are plain Chart Config controls, no expander.
+    cy.get('[data-testid="powerx-more-views-toggle"]').should('not.exist');
     cy.get('[data-testid="measured-power-scope"]').should('contain.text', 'All GPUs');
     cy.get('[data-testid="measured-power-statistic-average"]').should(
       'have.attr',
@@ -40,7 +40,6 @@ describe('Measured power on unofficial-run overlay', () => {
       'aria-pressed',
       'true',
     );
-    cy.get('[data-testid="powerx-more-views-toggle"]').click();
     cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'All GPUs');
     cy.get('[data-testid="measured-energy-denominator"]').should('not.exist');
     cy.get('[data-testid="measured-energy-unit"]').should('not.exist');

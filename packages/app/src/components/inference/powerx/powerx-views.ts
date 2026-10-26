@@ -124,7 +124,7 @@ export function powerXRatedAvailable(metric: string): boolean {
 }
 
 /**
- * The Rated boundaries toggle under More views: on adds the rated GPU TDP and all-in
+ * The Rated boundaries toggle in Chart Config: on adds the rated GPU TDP and all-in
  * provisioned lines to the three measured boundaries (Count: All); off removes just them.
  */
 export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerXSelection {
@@ -194,54 +194,4 @@ export function powerXMetricFields(
   )
     return ['scope'];
   return [];
-}
-
-export interface PowerXProvenanceInput {
-  /** Benchmark points with validated measured GPU power in the current selection. */
-  measuredPoints: number;
-  /** Mean one-second GPU samples per point, when a timeline has been loaded. */
-  samplesPerPoint?: number | null;
-  powerModelRevision: string;
-  /** The facility assumption of the selected model, when one is modeled. */
-  pue?: number | null;
-}
-
-const PROVENANCE_STRINGS = {
-  en: {
-    points: (n: number) => `${n.toLocaleString('en-US')} measured point${n === 1 ? '' : 's'}`,
-    samples: (s: string) => `~${s} 1-second GPU samples per point`,
-    windows: 'validated serving windows only',
-    revision: (rev: string) => `power model rev ${rev}`,
-    pue: (pue: string) => `PUE ${pue}`,
-  },
-  zh: {
-    points: (n: number) => `${n.toLocaleString('zh-CN')} 个实测数据点`,
-    samples: (s: string) => `每点约 ${s} 个 1 秒 GPU 采样`,
-    windows: '仅统计通过验证的服务窗口',
-    revision: (rev: string) => `功耗模型版本 ${rev}`,
-    pue: (pue: string) => `PUE ${pue}`,
-  },
-} as const;
-
-function formatSamples(samples: number): string {
-  if (samples >= 1000) {
-    const k = samples / 1000;
-    return `${k >= 10 ? Math.round(k) : Math.round(k * 10) / 10}k`;
-  }
-  return String(Math.round(samples));
-}
-
-/** The one-line provenance strip under the chart. Items without a value are left out. */
-export function powerXProvenanceText(
-  input: PowerXProvenanceInput,
-  locale: 'en' | 'zh' = 'en',
-): string {
-  const t = PROVENANCE_STRINGS[locale];
-  const items = [t.points(input.measuredPoints)];
-  if (typeof input.samplesPerPoint === 'number' && input.samplesPerPoint > 0)
-    items.push(t.samples(formatSamples(input.samplesPerPoint)));
-  items.push(t.windows, t.revision(input.powerModelRevision.slice(0, 7)));
-  if (typeof input.pue === 'number' && Number.isFinite(input.pue))
-    items.push(t.pue(String(input.pue)));
-  return items.join(' · ');
 }

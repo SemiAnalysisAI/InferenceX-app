@@ -531,7 +531,6 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
     expectInteractivity();
     cy.get('[data-testid="powerx-tab-energy"]').click();
     cy.contains('[data-testid="powerx-energy-per"] button', 'Input').click();
-    cy.get('[data-testid="powerx-more-views-toggle"]').click();
     cy.get('[data-testid="measured-energy-scope"]').click();
     cy.get('[role="option"][data-value="prefill"]').click();
     cy.get('[data-testid="chart-figure"] h2').should(

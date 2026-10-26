@@ -82,10 +82,10 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
   Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
-  Metric beside `PowerXChartConfig`: Count, Per or Show as, and a collapsed **More views**
-  expander (`PowerXMoreViews`) with Scope, Power statistic, Compare boundaries, Split by and
-  a shortcut to the Over time view) in place of the Y-axis metric pick, the **Compare
-  history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
+  Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
+  on the views they apply to, and the Rated boundaries toggle where rated lines exist, all as
+  plain labelled controls with no expander) in place of the Y-axis metric pick, the
+  **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
   Compare history fieldsets fold into "More chart controls" exactly as on `/inference`.
 - The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
   `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
@@ -101,9 +101,8 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   legend above the bars is the only one. There is no boundary line chart on this view: the
   three measured boundaries are compared on Power draw under Count: All.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
-- The footer notes end with one muted provenance line (`powerXProvenanceText`: measured
-  points, validated windows, power model revision, PUE) that is the summary of the collapsed
-  "How we measure" details (`PowerXProvenance`). The details hold three sentences only: each
+- The footer notes end with a collapsed "How we measure" details (`PowerXMethod`), a plain
+  muted link like the other footer notes. The details hold three sentences only: each
   point is one benchmark configuration; GPU power is measured every second and averaged over
   the validated serving window, other components are modeled; AgentX estimates are not
   calibrated against measured system power (AgentX scenarios only). The meaning of the GPU /
@@ -122,7 +121,7 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
-  The **Rated boundaries** toggle under More views sets `all`, which adds the two rated
+  The **Rated boundaries** toggle in Chart Config sets `all`, which adds the two rated
   bounds (five lines); turning it off returns to the measured three.
 - **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw, in the TCO
   badge row's outline-badge style): IT W/GPU,
