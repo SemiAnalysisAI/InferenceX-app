@@ -170,18 +170,8 @@ describe('landing model curation', () => {
           'fill',
           '#76B900',
         );
+        cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]')
-          .next()
-          .should('have.attr', 'data-testid', 'landing-rubin-results-link')
-          .and('have.attr', 'href', `${prefix}/inference/minimax-m3`)
-          .and(
-            'contain.text',
-            prefix
-              ? 'Vera Rubin NVL72 MiniMax M3 提交结果'
-              : 'Vera Rubin NVL72 MiniMax M3 Submission',
-          )
-          .and('contain.text', prefix ? '4280 亿参数 AgentX' : '428 Billion parameters AgentX');
-        cy.get('[data-testid="landing-rubin-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
           .and(
@@ -191,11 +181,6 @@ describe('landing model curation', () => {
           )
           .and('contain.text', 'OpenAI Jalapeño')
           .and('contain.text', 'DeepSeek R1');
-        cy.get('[data-testid="landing-rubin-nvidia-logo"] path').should(
-          'have.attr',
-          'fill',
-          '#76B900',
-        );
         cy.get('[data-testid="landing-jalapeno-openai-logo"] path').should(
           'have.attr',
           'fill',
@@ -290,10 +275,10 @@ describe('landing model curation', () => {
       cy.location('pathname').should('eq', prefix || '/');
     });
 
-    it(`opens MiniMax M3 Rubin AgentX results from ${prefix || '/'}`, () => {
+    it(`opens MiniMax M3 Rubin AgentX results from ${prefix}/compare`, () => {
       interceptMinimaxM3RubinData();
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.visit(`${prefix}/compare`);
+      cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
@@ -307,7 +292,7 @@ describe('landing model curation', () => {
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.go('back');
-      cy.location('pathname').should('eq', prefix || '/');
+      cy.location('pathname').should('eq', `${prefix}/compare`);
     });
 
     it(`opens Jalapeño R1 results from ${prefix || '/'}`, () => {
@@ -327,7 +312,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
 
-    it(`does not carry TPU precision through Back into Rubin on ${prefix || '/'}`, () => {
+    it(`does not carry TPU precision through Back into Rubin on ${prefix}/compare`, () => {
       const rubinRows = [
         ...minimaxM3RubinRows,
         ...minimaxM3RubinRows
@@ -341,12 +326,12 @@ describe('landing model curation', () => {
       ];
       interceptMinimaxM3RubinData(rubinRows);
       interceptTpuLaunchData();
-      cy.visit(prefix || '/');
+      cy.visit(`${prefix}/compare`);
       cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
       assertTpuView();
       cy.go('back');
-      cy.location('pathname').should('eq', prefix || '/');
-      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/compare`);
+      cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
       cy.get('[data-testid="precision-multiselect"]')
         .should('contain.text', 'FP4')
         .and('contain.text', 'FP8');
@@ -354,6 +339,8 @@ describe('landing model curation', () => {
       cy.reload();
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.go('back');
+      cy.location('pathname').should('eq', `${prefix}/compare`);
+      cy.visit(prefix || '/');
       cy.get('[data-testid="landing-jalapeno-results-link"]').click();
       cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');

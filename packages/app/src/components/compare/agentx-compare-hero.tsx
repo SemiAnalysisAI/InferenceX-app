@@ -417,17 +417,6 @@ const LANDING_HARDWARE_RESULTS = [
     analyticsEvent: 'landing_rubin_results_clicked',
   },
   {
-    id: 'rubin',
-    vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 MiniMax M3 Submission',
-    titleZh: 'Vera Rubin NVL72 MiniMax M3 提交结果',
-    subtitle: '428 Billion parameters AgentX',
-    subtitleZh: '4280 亿参数 AgentX',
-    href: '/inference/minimax-m3',
-    model: 'minimax-m3',
-    analyticsEvent: 'landing_rubin_results_clicked',
-  },
-  {
     id: 'jalapeno',
     vendor: 'OpenAI',
     title: 'OpenAI Jalapeño',
