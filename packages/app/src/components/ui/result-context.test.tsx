@@ -28,12 +28,12 @@ function renderContext(locale: 'en' | 'zh') {
 
 describe('ResultContext', () => {
   it.each([
-    ['en', 'SemiAnalysis InferenceX™', 'Source: SemiAnalysis InferenceX™ (deprecated)'],
+    ['en', 'SemiAnalysis InferenceX™', 'Source: SemiAnalysis InferenceX™ (Deprecated)'],
     ['zh', 'SemiAnalysis InferenceX™', '来源: SemiAnalysis InferenceX™ (已弃用)'],
     [
       'en',
       'SemiAnalysis InferenceX™ + UNOFFICIAL overlays',
-      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (deprecated)',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
     ],
     [
       'zh',

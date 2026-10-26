@@ -36,13 +36,13 @@ results or treat its interpolated values as separately measured operating points
    MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
    through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
    Flash remains in the default model group.
-   For models with `category=deprecated`, inference charts append `(deprecated)`
+   For models with `category=deprecated`, inference charts append `(Deprecated)`
    to the source attribution, or `(已弃用)` in Chinese. The suffix is also included
    in PNG exports and unofficial-run overlays; there are no deprecated background
    watermarks. This is presentation only: view API values and filters are unchanged.
 
    中文：对于 `category=deprecated` 的模型，推理图表在来源署名后添加 `(已弃用)`，
-   英文页面显示 `(deprecated)`。PNG 导出和非官方 run overlay 中也保留该后缀，
+   英文页面显示 `(Deprecated)`。PNG 导出和非官方 run overlay 中也保留该后缀，
    不再显示“已弃用”背景水印。此变更仅影响展示，不改变视图 API 的数值或筛选行为。
 
 2. Build one public HTTPS GET URL using `URLSearchParams`, especially for JSON

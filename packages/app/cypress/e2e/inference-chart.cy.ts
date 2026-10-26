@@ -412,7 +412,7 @@ describe('Deprecated model source attribution', () => {
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
       cy.get('#chart-0 [data-testid="result-context"]')
         .should('contain.text', 'Source: SemiAnalysis InferenceX™')
-        .and(deprecated ? 'contain.text' : 'not.contain.text', '(deprecated)');
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
       cy.get('.deprecated-watermark').should('not.exist');
     }
   });
@@ -450,7 +450,7 @@ describe('Deprecated model source attribution', () => {
     });
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ (deprecated)',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
     );
     let exportedPng = '';
     let exportedCaption = '';
@@ -471,7 +471,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('[data-testid="export-png-button"]').click();
     cy.window().should(() => {
       expect(exportedPng).to.match(/^data:image\/png;base64,/u);
-      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (deprecated)');
+      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (Deprecated)');
     });
 
     cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
@@ -481,7 +481,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (deprecated)',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
     );
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
     cy.get('.deprecated-watermark').should('not.exist');
@@ -489,7 +489,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ (deprecated)',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
     );
 
     cy.viewport(375, 900);
