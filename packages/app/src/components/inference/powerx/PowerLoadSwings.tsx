@@ -137,9 +137,9 @@ export function PowerLoadSwings({
   const pctTdp = (watts: number, tdp: number) =>
     tdp > 0 ? ` · ${Math.round((watts / tdp) * 100)}% ${t.tdp}` : '';
   return (
-    <section className="min-w-0 space-y-2 pb-2" data-testid="powerx-load-swings">
+    <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h3 className="text-sm font-semibold">{t.title}</h3>
+        <h3 className="text-sm font-medium">{t.title}</h3>
         <label className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
           <Switch
             checked={rack}
@@ -159,41 +159,37 @@ export function PowerLoadSwings({
           </span>
         </label>
       </div>
-      <div className="min-w-0 overflow-x-auto">
+      <div className="max-h-96 min-w-0 overflow-auto">
         <table
           className="w-full min-w-[64rem] text-left text-xs tabular-nums"
           data-testid="powerx-load-swings-table"
         >
-          <thead>
-            <tr className="border-b border-border/60 text-muted-foreground">
-              <th className="py-1 pr-2 font-normal">{t.trace}</th>
-              <th className="px-2 py-1 font-normal">
+          <thead className="sticky top-0 bg-background">
+            <tr>
+              <th className="p-2">{t.trace}</th>
+              <th className="p-2">
                 {t.peak}
                 <PowerBasisPill tag="gpu" />
               </th>
-              <th className="px-2 py-1 font-normal">{t.min}</th>
-              <th className="px-2 py-1 font-normal">{t.idle}</th>
-              <th className="px-2 py-1 font-normal">{t.mean}</th>
-              <th className="px-2 py-1 font-normal">{t.p5p95}</th>
-              <th className="px-2 py-1 font-normal">{t.d1}</th>
-              <th className="px-2 py-1 font-normal">{t.d5}</th>
-              <th className="px-2 py-1 font-normal">{t.up}</th>
-              <th className="px-2 py-1 font-normal">{t.down}</th>
-              <th className="px-2 py-1 font-normal">{t.volatility}</th>
-              <th className="px-2 py-1 font-normal no-export">{t.downloads}</th>
+              <th className="p-2">{t.min}</th>
+              <th className="p-2">{t.idle}</th>
+              <th className="p-2">{t.mean}</th>
+              <th className="p-2">{t.p5p95}</th>
+              <th className="p-2">{t.d1}</th>
+              <th className="p-2">{t.d5}</th>
+              <th className="p-2">{t.up}</th>
+              <th className="p-2">{t.down}</th>
+              <th className="p-2">{t.volatility}</th>
+              <th className="p-2 no-export">{t.downloads}</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="border-t">
             {rows.map(({ trace, color, label, stats, tdpWatts }) => {
               const id = trace.point.id;
               const persisted = isPersistedBenchmarkId(id);
               return (
-                <tr
-                  key={trace.key}
-                  className="border-b border-border/40"
-                  data-testid="powerx-load-swings-row"
-                >
-                  <td className="py-1 pr-2 whitespace-nowrap">
+                <tr key={trace.key} data-testid="powerx-load-swings-row">
+                  <th className="p-2 align-top font-normal whitespace-nowrap">
                     <span
                       aria-hidden
                       className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
@@ -207,30 +203,32 @@ export function PowerLoadSwings({
                     {stats.mean === null && (
                       <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>
                     )}
-                  </td>
-                  <td className="px-2 py-1">{value(stats.peak)}</td>
-                  <td className="px-2 py-1">{value(stats.min)}</td>
-                  <td className="px-2 py-1">{value(stats.idleFloor)}</td>
-                  <td className="px-2 py-1">{value(stats.mean)}</td>
-                  <td className="px-2 py-1 whitespace-nowrap">
+                  </th>
+                  <td className="p-2 align-top">{value(stats.peak)}</td>
+                  <td className="p-2 align-top">{value(stats.min)}</td>
+                  <td className="p-2 align-top">{value(stats.idleFloor)}</td>
+                  <td className="p-2 align-top">{value(stats.mean)}</td>
+                  <td className="p-2 align-top whitespace-nowrap">
                     {value(stats.p5)} / {value(stats.p95)}
                   </td>
-                  <td className="px-2 py-1 whitespace-nowrap">
+                  <td className="p-2 align-top whitespace-nowrap">
                     {value(stats.maxDelta1s)}
                     {pctTdp(stats.maxDelta1s, tdpWatts)}
                   </td>
-                  <td className="px-2 py-1 whitespace-nowrap">
+                  <td className="p-2 align-top whitespace-nowrap">
                     {value(stats.maxDelta5s)}
                     {pctTdp(stats.maxDelta5s, tdpWatts)}
                   </td>
-                  <td className="px-2 py-1 whitespace-nowrap">{value(stats.rampUpPerSecond)}/s</td>
-                  <td className="px-2 py-1 whitespace-nowrap">
+                  <td className="p-2 align-top whitespace-nowrap">
+                    {value(stats.rampUpPerSecond)}/s
+                  </td>
+                  <td className="p-2 align-top whitespace-nowrap">
                     {value(stats.rampDownPerSecond)}/s
                   </td>
-                  <td className="px-2 py-1">
+                  <td className="p-2 align-top">
                     {stats.volatility === null ? '—' : `${(stats.volatility * 100).toFixed(1)}%`}
                   </td>
-                  <td className="no-export px-2 py-1 whitespace-nowrap">
+                  <td className="no-export p-2 align-top whitespace-nowrap">
                     {persisted ? (
                       <>
                         <a

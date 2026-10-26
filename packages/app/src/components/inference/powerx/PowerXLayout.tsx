@@ -1,42 +1,20 @@
 'use client';
 
-import { BarChart3, ChevronDown, ChevronRight, Table2 } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 
-import {
-  useInferenceActions,
-  useInferenceData,
-  useInferenceFilters,
-} from '@/components/inference/InferenceContext';
 import { MeasuredMetricControls } from '@/components/inference/ui/MeasuredMetricControls';
-import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { powerCompareAvailable } from '@/components/inference/utils/power-compare';
-import { Card } from '@/components/ui/card';
-import { SEGMENTED_CONTAINER_STYLE } from '@/components/ui/control-styles';
-import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { ModelLogo } from '@/components/ui/model-logo';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { ShareButton } from '@/components/ui/share-button';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
-import {
-  getModelCategory,
-  getModelLabel,
-  getPrecisionLabel,
-  getSequenceLabel,
-  groupByCategory,
-  type Model,
-  type Precision,
-  type Sequence,
-} from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
   gpusPerMegawatt,
   IT_NOT_MODELED_NOTE,
   modeledFacilityWattsPerGpu,
   modeledItWattsPerGpu,
-  POWER_BASIS_TAG_TITLES,
-  POWER_BASIS_TAGS,
   POWER_COUNT_LABELS,
 } from '@/lib/power/power-basis';
 import { getHardwareConfig } from '@/lib/catalog/constants';
@@ -49,8 +27,6 @@ import {
 } from '@/components/inference/ui/powerx-surface';
 
 import { PowerBasisPill } from './PowerBasisPill';
-import { replaceRouterPathname } from '@/lib/routing/client-navigation';
-import { inferenceModelRouteForSelection } from '@/lib/routing/inference-model-slug';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
@@ -78,7 +54,8 @@ import {
 const STRINGS = {
   en: {
     title: 'PowerX',
-    description: 'Measured chip power and energy per token for every benchmark point.',
+    description:
+      'Measured GPU power and energy per token for every benchmark point, with a modeled IT and facility breakdown.',
     viewsLabel: 'PowerX view',
     views: {
       energy: 'Energy per token',
@@ -92,29 +69,20 @@ const STRINGS = {
       where: 'GPU, server and facility at one interactivity',
       time: 'Power trace through a run',
     } satisfies Record<PowerXView, string>,
-    viewMode: 'View mode',
-    chart: 'Chart',
-    table: 'Table',
-    model: 'Model',
-    scenario: 'Scenario',
-    precision: 'Precision',
     count: 'Count',
     itHelp: 'GPU measured; CPU, server parts, fans/PSU and network share modeled. No PUE.',
     systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
     both: 'All',
     bothHelp: 'GPU only, IT and facility on one chart',
     systemOutputOnly: 'IT and facility are modeled per output token only',
-    whatIs: 'What is PowerX?',
-    whatIsBody:
-      'Measured GPU power from InferenceX benchmark runs, plus a modeled IT and facility breakdown. Not the energy team’s grid power model.',
     readout: {
       it: 'IT',
       wPerGpu: 'W/GPU',
-      gpusPerMw: 'GPUs per MW (IT)',
+      gpusPerMw: 'GPUs/MW',
       facility: 'Facility',
       atPue: (pue: string) => `W/GPU at PUE ${pue}`,
       gpu: 'GPU',
-      measured: 'W measured',
+      measured: 'W',
       noModel: 'No IT model for this setup yet',
       pinned: 'Pinned point',
       hovered: 'Hovered point',
@@ -123,9 +91,6 @@ const STRINGS = {
     },
     includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
     includeFacilityHelp: 'Appends the PUE overhead after the IT stack; off by default on PowerX.',
-    basisKey: 'Every power number carries one of three tags:',
-    utilization:
-      'Utilization means three different things, and PowerX reports only the third: serving efficiency (how busy the deployment is while it serves), demand (what share of capacity customers use over a day), and power draw vs TDP (measured watts as a share of the chip’s rated power).',
     per: 'Per',
     perOptions: {
       output: 'Output token',
@@ -153,11 +118,14 @@ const STRINGS = {
     curve: 'Compare on the curve',
     curveHint: 'GPU only (solid) vs IT and facility (dashed) across interactivity',
     howWeMeasure: 'How we measure',
-    legendMobile: 'Chips & options',
+    method:
+      'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
+    agentxMethod: 'AgentX estimates are not calibrated against measured system power.',
   },
   zh: {
     title: 'PowerX 功耗',
-    description: '每个基准测试点的实测芯片功耗与每 Token 能耗。',
+    description:
+      '每个基准测试点的实测 GPU 功耗与每 Token 能耗，并附模型估算的 IT 与数据中心功耗构成。',
     viewsLabel: 'PowerX 视图',
     views: {
       energy: '每 Token 能耗',
@@ -171,29 +139,20 @@ const STRINGS = {
       where: '同一交互性下的 GPU、服务器与数据中心功耗',
       time: '运行期间的功耗曲线',
     } satisfies Record<PowerXView, string>,
-    viewMode: '视图模式',
-    chart: '图表',
-    table: '表格',
-    model: '模型',
-    scenario: '场景',
-    precision: '精度',
     count: '统计范围',
     itHelp: 'GPU 为实测；CPU、服务器部件、风扇/电源与网络分摊为模型估算。不含 PUE。',
     systemHelp: 'IT × PUE：GPU 为实测，服务器其他组件与数据中心开销为模型估算',
     both: '全部',
     bothHelp: '在同一图中对比仅 GPU、IT 与数据中心',
     systemOutputOnly: 'IT 与数据中心仅按输出 Token 建模',
-    whatIs: '什么是 PowerX？',
-    whatIsBody:
-      '来自 InferenceX 基准测试运行的实测 GPU 功耗，加上模型估算的 IT 与数据中心功耗构成。它不是能源团队的电网功耗模型。',
     readout: {
       it: 'IT',
       wPerGpu: 'W/GPU',
-      gpusPerMw: '每 MW 可支持的 GPU 数（IT）',
+      gpusPerMw: 'GPU/MW',
       facility: '数据中心',
       atPue: (pue: string) => `W/GPU（PUE ${pue}）`,
       gpu: 'GPU',
-      measured: 'W 实测',
+      measured: 'W',
       noModel: '该配置暂无 IT 功耗模型',
       pinned: '已固定的数据点',
       hovered: '悬停的数据点',
@@ -202,9 +161,6 @@ const STRINGS = {
     },
     includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
     includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；PowerX 默认关闭。',
-    basisKey: '每个功耗数值都带有以下三种标签之一：',
-    utilization:
-      '“利用率”有三种不同含义，PowerX 只报告第三种：服务效率（部署在服务期间的繁忙程度）、需求（客户一天内使用的容量占比），以及功耗占 TDP 的比例（实测瓦数占芯片额定功耗的份额）。',
     per: '计量单位',
     perOptions: {
       output: '输出 Token',
@@ -232,7 +188,9 @@ const STRINGS = {
     curve: '在曲线上对比',
     curveHint: '仅 GPU（实线）与 IT、数据中心（虚线）随交互性的变化',
     howWeMeasure: '测量方法',
-    legendMobile: '芯片与选项',
+    method:
+      '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。',
+    agentxMethod: 'AgentX 估算值尚未用实测的系统功耗校准。',
   },
 } as const;
 
@@ -240,228 +198,71 @@ export function usePowerXStrings() {
   return STRINGS[useLocale()];
 }
 
-type ViewMode = 'chart' | 'table';
-
-/** The compact view-tab strip: four views as tabs, the Chart/Table toggle on the right. */
+/** The four views as a tab strip under the section header, where /inference has no equivalent. */
 export function PowerXViewTabs({
   selection,
   onSelectionChange,
-  viewMode,
-  onViewModeChange,
-  toolbar,
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  /** Export buttons and other per-chart actions. */
-  toolbar?: ReactNode;
 }) {
   const t = usePowerXStrings();
   const view = powerXViewFor(selection.metric, selection.compare);
-  const viewModeOptions: SegmentedToggleOption<ViewMode>[] = [
-    {
-      value: 'chart',
-      label: t.chart,
-      icon: <BarChart3 className="size-3.5" />,
-      testId: 'inference-chart-view-btn',
-    },
-    {
-      value: 'table',
-      label: t.table,
-      icon: <Table2 className="size-3.5" />,
-      testId: 'inference-table-view-btn',
-    },
-  ];
-  return (
-    <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-border/60">
-      <div
-        role="tablist"
-        aria-label={t.viewsLabel}
-        data-testid="powerx-tabs"
-        className="-mb-px flex min-w-0 max-w-full gap-1 overflow-x-auto"
-      >
-        {POWERX_VIEWS.map((value) => {
-          const selected = value === view;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              title={t.hints[value]}
-              data-testid={`powerx-tab-${value}`}
-              onClick={() => {
-                if (selected) return;
-                track('inference_powerx_tab_selected', { tab: value });
-                onSelectionChange(selectPowerXView(value, selection));
-              }}
-              className={cn(
-                'inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors hover:border-muted-foreground/30 md:min-h-9',
-                selected && 'border-secondary text-secondary dark:border-primary dark:text-primary',
-              )}
-            >
-              {t.views[value]}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-2">
-        <SegmentedToggle
-          value={viewMode}
-          options={viewModeOptions}
-          onValueChange={onViewModeChange}
-          ariaLabel={t.viewMode}
-          testId="inference-view-toggle-0"
-        />
-        {toolbar}
-      </div>
-    </div>
-  );
-}
-
-/** Model (dropdown), scenario and precision (segmented, only with a choice) and the run chip. */
-export function PowerXCaptionRow() {
-  const locale = useLocale();
-  const t = STRINGS[locale];
-  const { availableModels, availableSequences, availablePrecisions } = useInferenceData();
-  const { selectedModel, selectedSequence, selectedPrecisions } = useInferenceFilters();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useInferenceActions();
-  const [modelOpen, setModelOpen] = useState(false);
-  const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
-  const modelOptions = [
-    ...groups.default,
-    ...groups.experimental,
-    ...groups.maintenance,
-    ...groups.deprecated,
-  ];
-
-  const selectModel = (value: Model) => {
-    setModelOpen(false);
-    if (value === selectedModel) return;
-    setSelectedModel(value);
-    const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceRouterPathname(target, ['g_model']);
-    track('inference_model_selected', { model: value });
-  };
-
   return (
     <div
-      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2"
-      data-testid="powerx-caption"
+      role="tablist"
+      aria-label={t.viewsLabel}
+      data-testid="powerx-tabs"
+      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60"
     >
-      <Popover open={modelOpen} onOpenChange={setModelOpen}>
-        <PopoverTrigger asChild>
+      {POWERX_VIEWS.map((value) => {
+        const selected = value === view;
+        return (
           <button
+            key={value}
             type="button"
-            aria-label={t.model}
-            data-testid="powerx-model-trigger"
-            className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-md px-1 text-base font-semibold text-foreground hover:bg-muted/40 md:min-h-9"
+            role="tab"
+            aria-selected={selected}
+            title={t.hints[value]}
+            data-testid={`powerx-tab-${value}`}
+            onClick={() => {
+              if (selected) return;
+              track('inference_powerx_tab_selected', { tab: value });
+              onSelectionChange(selectPowerXView(value, selection));
+            }}
+            className={cn(
+              '-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors hover:border-muted-foreground/30 md:min-h-9',
+              selected && 'border-secondary text-secondary dark:border-primary dark:text-primary',
+            )}
           >
-            <ModelLogo model={selectedModel as Model} className="size-6 shrink-0" />
-            <span className="truncate">{getModelLabel(selectedModel as Model)}</span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            {t.views[value]}
           </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" className="max-h-[60vh] w-80 overflow-y-auto p-1">
-          <ul role="listbox" aria-label={t.model} data-testid="powerx-model-menu">
-            {modelOptions.map((model) => (
-              <li key={model}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={model === selectedModel}
-                  onClick={() => selectModel(model as Model)}
-                  className={cn(
-                    'flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-accent md:min-h-8',
-                    model === selectedModel && 'bg-muted/60 font-medium',
-                  )}
-                >
-                  <ModelLogo model={model as Model} className="size-4 shrink-0" />
-                  <span className="truncate">{getModelLabel(model as Model)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </PopoverContent>
-      </Popover>
-
-      {availableSequences.length > 1 && (
-        <SegmentedToggle<string>
-          value={selectedSequence}
-          ariaLabel={t.scenario}
-          role="group"
-          testId="powerx-scenario"
-          buttonClassName="whitespace-nowrap"
-          onValueChange={(value) => {
-            setSelectedSequence(value as Sequence);
-            track('inference_sequence_selected', { sequence: value });
-          }}
-          options={availableSequences.map((seq) => ({
-            value: seq,
-            label: getSequenceLabel(seq as Sequence, locale),
-          }))}
-        />
-      )}
-
-      {availablePrecisions.length > 1 && (
-        <div
-          role="group"
-          aria-label={t.precision}
-          data-testid="powerx-precision"
-          className={SEGMENTED_CONTAINER_STYLE}
-        >
-          {availablePrecisions.map((precision) => {
-            const pressed = selectedPrecisions.includes(precision);
-            return (
-              <button
-                key={precision}
-                type="button"
-                aria-pressed={pressed}
-                disabled={pressed && selectedPrecisions.length === 1}
-                onClick={() => {
-                  const next = pressed
-                    ? selectedPrecisions.filter((p) => p !== precision)
-                    : [...selectedPrecisions, precision];
-                  setSelectedPrecisions(next);
-                  track('inference_precision_selected', { precision: next.join(',') });
-                }}
-                className={cn(
-                  'inline-flex min-h-11 items-center rounded-[max(0px,calc(var(--radius)-var(--segmented-inset)))] px-2 py-1 text-sm font-medium transition-colors md:min-h-6 md:py-0.5',
-                  pressed
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                  pressed && selectedPrecisions.length === 1 && 'cursor-default',
-                )}
-              >
-                {getPrecisionLabel(precision as Precision)}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="ml-auto min-w-0">
-        <WorkflowInfoDisplay compact />
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/** One labelled control, the same label style as the Chart Config selects. */
+function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mt-2 flex min-w-0 flex-col items-start gap-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <div className={cn('flex min-w-0 flex-col space-y-1.5', className)}>
+      <Label>{label}</Label>
       {children}
     </div>
   );
 }
 
-/**
- * The PowerX toggles that live in the legend rail: Count, Per and Show as per
- * view. Rendered between the series list and the chart switches.
- */
-export function PowerXLegendControls({
+/** Count, Per and Show as for the Energy and Power draw views. */
+export function PowerXCountControls({
   selection,
   onSelectionChange,
 }: {
@@ -476,13 +277,15 @@ export function PowerXLegendControls({
   const count = powerXCountFor(selection.metric, selection.compare);
   const boundary = count === 'both' ? 'gpu' : count;
   return (
-    <div className="no-export" data-testid="powerx-legend-controls">
+    <>
       <Field label={t.count}>
         <SegmentedToggle<PowerXCount>
           value={view === 'energy' ? count : boundary}
           ariaLabel={t.count}
           role="group"
           testId="powerx-boundary"
+          size="default"
+          buttonClassName="whitespace-nowrap"
           onValueChange={(next) => {
             track('inference_powerx_boundary_selected', { boundary: next });
             onSelectionChange(selectPowerXCount(next, selection));
@@ -522,6 +325,7 @@ export function PowerXLegendControls({
             ariaLabel={t.per}
             role="group"
             testId="powerx-energy-per"
+            size="default"
             buttonClassName="whitespace-nowrap"
             onValueChange={(next) => {
               track('inference_powerx_energy_per_selected', { per: next });
@@ -541,6 +345,8 @@ export function PowerXLegendControls({
             ariaLabel={t.showAs}
             role="group"
             testId="powerx-unit"
+            size="default"
+            buttonClassName="whitespace-nowrap"
             onValueChange={(next) =>
               onSelectionChange({ metric: selectPowerXShowAs(next), compare: 'none' })
             }
@@ -557,7 +363,38 @@ export function PowerXLegendControls({
           />
         </Field>
       )}
-    </div>
+    </>
+  );
+}
+
+/**
+ * The PowerX part of the Chart Config fieldset: Count, Per or Show as beside the
+ * X-axis pick, then the collapsed More views row underneath.
+ */
+export function PowerXChartConfig({
+  selection,
+  onSelectionChange,
+  rolesHaveData,
+}: {
+  selection: PowerXSelection;
+  onSelectionChange: (next: PowerXSelection) => void;
+  rolesHaveData?: boolean;
+}) {
+  return (
+    <>
+      <div
+        className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3"
+        data-testid="powerx-chart-config"
+      >
+        <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
+      </div>
+      <PowerXMoreViews
+        selection={selection}
+        onSelectionChange={onSelectionChange}
+        rolesHaveData={rolesHaveData}
+        className="sm:col-span-2"
+      />
+    </>
   );
 }
 
@@ -583,6 +420,8 @@ export function PowerXSplitBy({
         ariaLabel={t.splitBy}
         role="group"
         testId="powerx-split"
+        size="default"
+        buttonClassName="whitespace-nowrap"
         onValueChange={(value) =>
           onSelectionChange({ metric: VIEW_METRICS.where.gpu, compare: value })
         }
@@ -606,17 +445,19 @@ export function PowerXSplitBy({
 }
 
 /**
- * "More views" at the bottom of the legend rail: everything the first prototype
+ * "More views" under the Chart Config controls: everything the first prototype
  * showed as separate tabs or an Advanced drawer, one expander away.
  */
 export function PowerXMoreViews({
   selection,
   onSelectionChange,
   rolesHaveData,
+  className,
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
   rolesHaveData?: boolean;
+  className?: string;
 }) {
   const t = usePowerXStrings();
   const [open, setOpen] = useState(false);
@@ -627,7 +468,7 @@ export function PowerXMoreViews({
   const compareMode: 'none' | 'all' =
     selection.compare === 'all' || selection.compare === 'boundaries' ? 'all' : 'none';
   return (
-    <div className="no-export mt-3 border-t border-border/60 pt-2" data-testid="powerx-more-views">
+    <div className={cn('no-export min-w-0', className)} data-testid="powerx-more-views">
       <button
         type="button"
         aria-expanded={open}
@@ -637,24 +478,25 @@ export function PowerXMoreViews({
           setOpen((current) => !current);
           track('inference_powerx_more_views_toggled', { expanded: !open });
         }}
-        className="flex min-h-11 w-full flex-col items-start justify-center gap-0.5 rounded-md text-left hover:bg-muted/40 md:min-h-8"
+        className="flex min-h-11 w-full items-center gap-2 rounded-md text-left hover:bg-muted/40 md:min-h-8"
       >
-        <span className="flex items-center gap-1 text-xs font-medium text-foreground">
+        <span className="flex shrink-0 items-center gap-1 text-sm font-medium whitespace-nowrap text-foreground">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           {t.moreViews}
         </span>
-        <span className="pl-[18px] text-2xs leading-tight text-muted-foreground">
-          {t.moreViewsHint}
-        </span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{t.moreViewsHint}</span>
       </button>
       {open && (
-        <div id={bodyId} className="ml-1 border-l border-border pl-3">
+        <div
+          id={bodyId}
+          className="mt-1 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3 border-l border-border pl-3"
+        >
           {fields.length > 0 && (
             <MeasuredMetricControls
               metric={selection.metric}
               onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
               fields={fields}
-              className="mt-2 grid-cols-1 gap-2"
+              className="contents"
             />
           )}
           <Field label={t.compareBoundaries}>
@@ -663,6 +505,8 @@ export function PowerXMoreViews({
               ariaLabel={t.compareBoundaries}
               role="group"
               testId="powerx-compare-boundaries"
+              size="default"
+              buttonClassName="whitespace-nowrap"
               onValueChange={(mode) => {
                 track('inference_power_compare_changed', { mode, family: 'powerx' });
                 onSelectionChange({
@@ -697,7 +541,7 @@ export function PowerXMoreViews({
                 track('inference_powerx_tab_selected', { tab: 'time', source: 'more_views' });
                 onSelectionChange(selectPowerXView('time', selection));
               }}
-              className="mt-3 min-h-11 rounded-md border border-border/60 px-3 text-xs font-medium text-foreground hover:bg-muted md:min-h-8"
+              className="min-h-11 self-end justify-self-start rounded-md border border-border/60 px-3 text-xs font-medium text-foreground hover:bg-muted md:min-h-9"
             >
               {t.openTimeline} →
             </button>
@@ -745,59 +589,30 @@ export function PowerXCurveSection({
   );
 }
 
-/** One muted provenance line; it is the summary of the "How we measure" details. */
+/**
+ * The provenance strip in the chart footer: the one summary line, and the
+ * three-sentence method behind "How we measure".
+ */
 export function PowerXProvenance({
   provenance,
-  summary,
-  children,
+  agentic = false,
 }: {
   provenance: PowerXProvenanceInput;
-  /** The one-sentence method line that heads the details body. */
-  summary: string;
-  children: ReactNode;
+  /** AgentX scenario: adds the calibration caveat. */
+  agentic?: boolean;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <details className="mt-3 text-xs text-muted-foreground" data-testid="powerx-method">
+    <details className="text-xs text-muted-foreground" data-testid="powerx-method">
       <summary className="min-h-11 cursor-pointer select-none leading-snug md:min-h-0">
         <span data-testid="powerx-provenance">{powerXProvenanceText(provenance, locale)}</span>{' '}
         <span className="underline underline-offset-2">{t.howWeMeasure}</span>
       </summary>
-      <p className="mt-1">
-        {summary} {children}
+      <p className="mt-1 max-w-prose">
+        {t.method}
+        {agentic && ` ${t.agentxMethod}`}
       </p>
-      <p className="mt-2">{t.basisKey}</p>
-      <dl
-        className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1"
-        data-testid="powerx-basis-key"
-      >
-        {POWER_BASIS_TAGS.map((tag) => (
-          <div key={tag} className="contents">
-            <dt>
-              <PowerBasisPill tag={tag} className="ml-0" />
-            </dt>
-            <dd>{POWER_BASIS_TAG_TITLES[tag][locale]}</dd>
-          </div>
-        ))}
-      </dl>
-      <p className="mt-2" data-testid="powerx-utilization-note">
-        {t.utilization}
-      </p>
-    </details>
-  );
-}
-
-/** The one-line "What is PowerX?" disclosure under the page description. */
-export function PowerXWhatIs() {
-  const t = usePowerXStrings();
-  return (
-    <details className="-mt-2 text-xs text-muted-foreground" data-testid="powerx-what-is">
-      <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 select-none md:min-h-0">
-        <ChevronRight size={12} className="shrink-0 [details[open]_&]:rotate-90" aria-hidden />
-        <span className="underline underline-offset-2">{t.whatIs}</span>
-      </summary>
-      <p className="mt-1 max-w-prose">{t.whatIsBody}</p>
     </details>
   );
 }
@@ -828,9 +643,18 @@ export function defaultReadoutPoint(points: readonly InferenceData[]): Inference
   return best;
 }
 
+function ReadoutBadge({ children, testId }: { children: ReactNode; testId: string }) {
+  return (
+    <Badge variant="outline" data-testid={testId} className="gap-1 py-0 text-muted-foreground">
+      {children}
+    </Badge>
+  );
+}
+
 /**
- * The readout row under the caption: IT W per GPU, GPUs per MW and the facility
- * figure for the hovered or pinned point (or the point nearest 80 tok/s/user).
+ * The readout row under the chart caption, in the TCO badge row's style: IT W
+ * per GPU, GPUs per MW and the facility figure for the hovered or pinned point
+ * (or the point nearest 80 tok/s/user).
  */
 export function PowerXReadout({ points }: { points: readonly InferenceData[] }) {
   const locale = useLocale();
@@ -852,8 +676,8 @@ export function PowerXReadout({ points }: { points: readonly InferenceData[] }) 
         : t.nearest(String(READOUT_INTERACTIVITY));
   const label = getDisplayLabel(getHardwareConfig(point.hwKey, point.model));
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 rounded-md border border-border/60 px-3 py-1.5 text-xs text-muted-foreground"
+    <p
+      className="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground"
       data-testid="powerx-readout"
       aria-live="polite"
     >
@@ -865,35 +689,39 @@ export function PowerXReadout({ points }: { points: readonly InferenceData[] }) 
         <span data-testid="powerx-readout-no-model">{t.noModel}</span>
       ) : (
         <>
-          <span className="whitespace-nowrap" data-testid="powerx-readout-it">
-            {t.it} <b className="text-foreground tabular-nums">{watts(it)}</b> {t.wPerGpu}
-            <PowerBasisPill tag="it" />
-          </span>
+          <ReadoutBadge testId="powerx-readout-it">
+            {t.it}: <span className="font-medium text-foreground tabular-nums">{watts(it)}</span>{' '}
+            {t.wPerGpu}
+            <PowerBasisPill tag="it" className="ml-0" />
+          </ReadoutBadge>
           {perMw !== null && (
-            <span className="whitespace-nowrap" data-testid="powerx-readout-gpus-per-mw">
-              <b className="text-foreground tabular-nums">{watts(perMw)}</b> {t.gpusPerMw}
-              <PowerBasisPill tag="it" />
-            </span>
+            <ReadoutBadge testId="powerx-readout-gpus-per-mw">
+              <span className="font-medium text-foreground tabular-nums">{watts(perMw)}</span>{' '}
+              {t.gpusPerMw}
+              <PowerBasisPill tag="it" className="ml-0" />
+            </ReadoutBadge>
           )}
           {facility !== null && pue !== null && (
-            <span className="whitespace-nowrap" data-testid="powerx-readout-facility">
-              {t.facility} <b className="text-foreground tabular-nums">{watts(facility)}</b>{' '}
+            <ReadoutBadge testId="powerx-readout-facility">
+              {t.facility}:{' '}
+              <span className="font-medium text-foreground tabular-nums">{watts(facility)}</span>{' '}
               {t.atPue(String(pue))}
-              <PowerBasisPill tag="facility" />
-            </span>
+              <PowerBasisPill tag="facility" className="ml-0" />
+            </ReadoutBadge>
           )}
         </>
       )}
       {gpu !== null && (
-        <span className="whitespace-nowrap" data-testid="powerx-readout-gpu">
-          {t.gpu} <b className="text-foreground tabular-nums">{watts(gpu)}</b> {t.measured}
-          <PowerBasisPill tag="gpu" />
-        </span>
+        <ReadoutBadge testId="powerx-readout-gpu">
+          {t.gpu}: <span className="font-medium text-foreground tabular-nums">{watts(gpu)}</span>{' '}
+          {t.measured}
+          <PowerBasisPill tag="gpu" className="ml-0" />
+        </ReadoutBadge>
       )}
-      <span className="ml-auto text-2xs" data-testid="powerx-readout-source">
+      <span className="text-2xs" data-testid="powerx-readout-source">
         {source}
       </span>
-    </div>
+    </p>
   );
 }
 
@@ -906,8 +734,8 @@ export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
   const id = useId();
   if (!setIncludeFacility) return null;
   return (
-    <div className="mt-2 flex min-w-0 flex-col gap-1" data-testid="powerx-facility-switch">
-      <label htmlFor={id} className="flex min-h-11 items-center gap-2 text-xs md:min-h-8">
+    <div className="flex min-w-0 flex-col gap-1" data-testid="powerx-facility-switch">
+      <label htmlFor={id} className="flex min-h-11 items-center gap-2 text-xs md:min-h-9">
         <Switch
           id={id}
           checked={includeFacility}
@@ -925,49 +753,5 @@ export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
         {IT_NOT_MODELED_NOTE[locale]}
       </span>
     </div>
-  );
-}
-
-/**
- * The PowerX page frame: header, the view tabs, the caption row, then the chart
- * and whatever follows it. Nothing sits between the header and the plot except
- * the caption row; the toggles live in the legend rail.
- */
-export function PowerXFrame({
-  selection,
-  onSelectionChange,
-  viewMode,
-  onViewModeChange,
-  toolbar,
-  children,
-}: {
-  selection: PowerXSelection;
-  onSelectionChange: (next: PowerXSelection) => void;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  toolbar?: ReactNode;
-  children: ReactNode;
-}) {
-  const t = usePowerXStrings();
-  return (
-    <Card data-testid="powerx-frame" data-coach-mark-root="">
-      <div className="flex min-w-0 flex-col gap-3">
-        <DashboardSectionHeader
-          title={t.title}
-          description={t.description}
-          actions={<ShareButton />}
-        />
-        <PowerXWhatIs />
-        <PowerXViewTabs
-          selection={selection}
-          onSelectionChange={onSelectionChange}
-          viewMode={viewMode}
-          onViewModeChange={onViewModeChange}
-          toolbar={toolbar}
-        />
-        <PowerXCaptionRow />
-        {children}
-      </div>
-    </Card>
   );
 }

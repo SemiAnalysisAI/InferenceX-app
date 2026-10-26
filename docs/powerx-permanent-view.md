@@ -70,31 +70,39 @@ not promise more.
 When no point in the selection reports the selected telemetry axis, the chart's empty state says
 the selection has no measured GPU power (`noMeasuredDataHint`) instead of the generic hint.
 
-## PowerX v2 layout (experimental)
+## PowerX layout
 
-`/powerx` and `/zh/powerx` render the shared `ChartDisplay` data pipeline through the
-PowerX frame in `src/components/inference/powerx/` instead of the Inference Performance
-control stack. Nothing in the data layer changes: the frame writes the same `i_metric` and
-`i_pcompare` state, so share links, `?unofficialrun=` overlays and the views API are untouched.
+`/powerx` and `/zh/powerx` render the shared `ChartDisplay` data pipeline and the same page
+chrome as `/inference`, so the two tabs read as one dashboard. Nothing in the data layer
+changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
+`?unofficialrun=` overlays and the views API are untouched.
 
-- `PowerXFrame`: section header, then the four views as compact tabs (Energy per token,
-  Power draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a
-  metric + compare pair, see `selectPowerXView`), the Chart/Table toggle and export menu on
-  the right of the strip, then one caption row (model dropdown, scenario and precision
-  toggles only when there is a choice, the compact run chip with the changelog), then the plot.
-- The legend rail carries the PowerX toggles (`PowerXLegendControls`: Count, Per, Show as)
-  above the chart switches, and a collapsed **More views** expander (`PowerXMoreViews`) with
-  Scope, Power statistic, Compare boundaries (Off | All four), Split by and a shortcut to
-  the Over time view. On phones the rail folds into a "Chips & options" row under the plot
-  and the plot height is capped at 55 % of the viewport.
-- Where the power goes: the chip comparison is the visual; clicking a bar opens that chip's
-  drill-down inline under it (`PowerAnalysisPanels` `layout="inline"`); the boundary line
-  chart sits in a collapsed **Compare on the curve** section below.
+- Header card (`DashboardSectionHeader` + `ChartControls`, as on `/inference`): title and
+  description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
+  draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
+  compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
+  Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
+  Metric beside `PowerXChartConfig`: Count, Per or Show as, and a collapsed **More views**
+  expander (`PowerXMoreViews`) with Scope, Power statistic, Compare boundaries, Split by and
+  a shortcut to the Over time view) in place of the Y-axis metric pick, the **Compare
+  history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
+  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`.
+- The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
+  `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
+  line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
+  the footer notes. On phones the plot height is capped at 55 % of the viewport.
+- Where the power goes: the caption stays at the top of the card; the chip comparison is the
+  visual; clicking a bar opens that chip's drill-down inline under it (`PowerAnalysisPanels`
+  `layout="inline"`); the boundary line chart sits in a collapsed **Compare on the curve**
+  section below.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
-- One muted provenance line under the chart (`powerXProvenanceText`: measured points,
-  validated windows, power model revision, PUE) is the summary of the collapsed
-  "How we measure" details, which also carries the GPU / IT / Facility tag key and the
-  three-meanings-of-utilization note.
+- The footer notes end with one muted provenance line (`powerXProvenanceText`: measured
+  points, validated windows, power model revision, PUE) that is the summary of the collapsed
+  "How we measure" details (`PowerXProvenance`). The details hold three sentences only: each
+  point is one benchmark configuration; GPU power is measured every second and averaged over
+  the validated serving window, other components are modeled; AgentX estimates are not
+  calibrated against measured system power (AgentX scenarios only). The meaning of the GPU /
+  IT / Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose.
 
 ### P0 additions (IT basis, headroom, load swings, labels)
 
@@ -107,7 +115,8 @@ control stack. Nothing in the data layer changes: the frame writes the same `i_m
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
   "All in Measured IT (no PUE)". `COUNT_COMPARE_BASES` draws all three for
   `i_pcompare=boundaries`; `all` adds the two rated bounds (five lines).
-- **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw): IT W/GPU,
+- **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw, in the TCO
+  badge row's outline-badge style): IT W/GPU,
   GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
   pinned point (`PowerXSurfaceProvider` active-point context, fed by `ScatterGraph`), or the
   point nearest 80 tok/s/user.
@@ -117,12 +126,17 @@ control stack. Nothing in the data layer changes: the frame writes the same `i_m
   comparison, the drill-down and the tooltips agree; the note "Storage and out-of-rack
   network are not modeled" stays under the bars.
 - **Headroom** (Power draw shown as % of TDP, no comparison): `ScatterGraph` adds a
-  `powerx-headroom` layer that shades between each chip's P90 line (P90 W × the point's own
-  % TDP ÷ avg W) and 100 %; `PowerXHeadroomTable` lists avg W, P90 W, % TDP (P90) and
-  headroom = 1 − P90/TDP at 25 / 50 / 100 / 300 tok/s/user via
-  `lib/power/headroom.ts` (`interpolateMetricAtInteractivity`, so the numbers match the
-  chart's iso-interactivity readings; outside the measured range is "—"), with a CSV button
-  and one example sentence. The views API serves the same rows with `headroom=true`.
+  `powerx-headroom` layer, beneath the lines, that shades between each chip's P90 line (P90
+  W × the point's own % TDP ÷ avg W) and 100 %; the y-axis reaches the rating so the band
+  ends at the dashed 100 % TDP line. Unofficial-run overlay lines get their own band in the
+  run's color (`overlayRunColor`), filtered by `activeOverlayHwTypes`. `PowerXHeadroomTable`
+  lists avg W, P90 W, % TDP (P90) and headroom = 1 − P90/TDP at 25 / 50 / 100 / 300
+  tok/s/user via `lib/power/headroom.ts` (`interpolateMetricAtInteractivity`, so the numbers
+  match the chart's iso-interactivity readings; outside the measured range is "—"), one row
+  per overlay line and run after the official rows (`runIndex`, run-colored dot, the run tag
+  in the label), with a CSV button (`source` column: official / unofficial) and one example
+  sentence read from the official points. The views API serves the official rows with
+  `headroom=true`.
 - **Load swings** (Over time, PowerX only): `PowerLoadSwings` computes
   `lib/power/load-swing-stats.ts` per visible trace (peak, min, idle floor = P5 before the
   window, window mean, P5/P95, max Δ1s / Δ5s in W and % TDP, ramp up/down W/s, volatility =
@@ -132,8 +146,8 @@ control stack. Nothing in the data layer changes: the frame writes the same `i_m
   (`storedPowerSeries`). The fixed caveat line under the chart reads "1 s DCGM samples ·
   single node · inference only · sub-second swings not captured".
 - **Labels**: `PowerBasisPill` (GPU / IT / Facility) on readouts, table headers, the breakdown
-  totals and the tooltip's power-model block; the collapsed "What is PowerX?" line under the
-  description separates PowerX from the energy team's grid power model.
+  totals and the tooltip's power-model block; each pill's `title` is the tag's one-clause
+  meaning (GPU board power, measured by DCGM · GPU + modeled server, no PUE · IT × PUE).
 
 ## Article figure → share link
 

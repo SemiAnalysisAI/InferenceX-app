@@ -4,6 +4,8 @@ import { observedPoints } from '@/components/inference/utils/equal-service-compa
 import { powerBreakdownSeriesKey } from '@/components/inference/utils/power-breakdown';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
 import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
+import { getOverlayLineLabel, type OverlayRunIdentity } from '@/lib/benchmarks/inference-labels';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import { isPositive } from './power-basis';
@@ -37,6 +39,8 @@ export interface HeadroomRow {
   hwKey: string;
   precision: string;
   label: string;
+  /** Set on rows read from an unofficial-run overlay: the run's palette index. */
+  runIndex?: number;
   tdpWatts: number;
   /** Interactivity range of the measured points the cells are read from. */
   interactivityMin: number;
@@ -63,53 +67,97 @@ function cellAt(
   };
 }
 
+/** The unofficial-run overlay points shown beside the official ones, with their run identities. */
+export interface HeadroomOverlayInput {
+  points: readonly InferenceData[];
+  runIndexByUrl: Record<string, number>;
+  runInfos: readonly OverlayRunIdentity[];
+}
+
+const usable = (point: InferenceData) =>
+  isPositive(point.x) &&
+  isPositive(point.measuredAvgPower?.y) &&
+  isPositive(point.measuredP90Power?.y) &&
+  isPositive(point.tpPerGpu?.y);
+
+function headroomRow(
+  key: string,
+  group: InferenceData[],
+  interactivities: readonly number[],
+  overlay?: { runIndex: number; run: OverlayRunIdentity | undefined },
+): HeadroomRow | null {
+  const first = group[0];
+  const tdpWatts = getGpuSpecs(first.hwKey).tdp;
+  if (!isPositive(tdpWatts)) return null;
+  const xs = group.map((point) => point.x);
+  const interactivityMin = Math.min(...xs);
+  const interactivityMax = Math.max(...xs);
+  if (!(interactivityMax > interactivityMin)) return null;
+  const chipLabel = [
+    getDisplayLabel(getHardwareConfig(first.hwKey, first.model)),
+    getPrecisionLabel(first.precision as Precision),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return {
+    key,
+    hwKey: first.hwKey,
+    precision: first.precision,
+    // Overlay rows carry the run tag the chart's line pills use, so the two match.
+    label: overlay?.run ? getOverlayLineLabel(chipLabel, overlay.run, true) : chipLabel,
+    ...(overlay ? { runIndex: overlay.runIndex } : {}),
+    tdpWatts,
+    interactivityMin,
+    interactivityMax,
+    cells: interactivities.map((interactivity) => cellAt(group, interactivity, tdpWatts)),
+  };
+}
+
 /**
  * One row per visible chip line that has measured average and P90 power, a
  * registry TDP and at least two measured points. Points are the main chart's
- * points, so `x` is already the chart's interactivity.
+ * points, so `x` is already the chart's interactivity. Unofficial-run overlay
+ * points get their own rows per run, after the official ones.
  */
 export function buildHeadroomRows(
   points: readonly InferenceData[],
   interactivities: readonly number[] = HEADROOM_INTERACTIVITIES,
+  overlay?: HeadroomOverlayInput,
 ): HeadroomRow[] {
   const groups = new Map<string, InferenceData[]>();
   for (const point of observedPoints(points)) {
-    if (
-      !isPositive(point.x) ||
-      !isPositive(point.measuredAvgPower?.y) ||
-      !isPositive(point.measuredP90Power?.y) ||
-      !isPositive(point.tpPerGpu?.y)
-    )
-      continue;
+    if (!usable(point)) continue;
     const key = powerBreakdownSeriesKey(point);
     groups.set(key, [...(groups.get(key) ?? []), point]);
   }
   const rows: HeadroomRow[] = [];
   for (const [key, group] of groups) {
-    const first = group[0];
-    const tdpWatts = getGpuSpecs(first.hwKey).tdp;
-    if (!isPositive(tdpWatts)) continue;
-    const xs = group.map((point) => point.x);
-    const interactivityMin = Math.min(...xs);
-    const interactivityMax = Math.max(...xs);
-    if (!(interactivityMax > interactivityMin)) continue;
-    rows.push({
-      key,
-      hwKey: first.hwKey,
-      precision: first.precision,
-      label: [
-        getDisplayLabel(getHardwareConfig(first.hwKey, first.model)),
-        getPrecisionLabel(first.precision as Precision),
-      ]
-        .filter(Boolean)
-        .join(' '),
-      tdpWatts,
-      interactivityMin,
-      interactivityMax,
-      cells: interactivities.map((interactivity) => cellAt(group, interactivity, tdpWatts)),
-    });
+    const row = headroomRow(key, group, interactivities);
+    if (row) rows.push(row);
   }
-  return rows.toSorted((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key));
+  rows.sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key));
+
+  const overlayGroups = new Map<string, { runIndex: number; points: InferenceData[] }>();
+  for (const point of observedPoints(overlay?.points ?? [])) {
+    if (!usable(point)) continue;
+    const runIndex = overlayRunIndex(point.run_url ?? null, overlay!.runIndexByUrl);
+    const key = `${powerBreakdownSeriesKey(point)}|run${runIndex}`;
+    const entry = overlayGroups.get(key) ?? { runIndex, points: [] };
+    entry.points.push(point);
+    overlayGroups.set(key, entry);
+  }
+  const overlayRows: HeadroomRow[] = [];
+  for (const [key, { runIndex, points: group }] of overlayGroups) {
+    const row = headroomRow(key, group, interactivities, {
+      runIndex,
+      run: overlay?.runInfos[runIndex],
+    });
+    if (row) overlayRows.push(row);
+  }
+  overlayRows.sort(
+    (a, b) => (a.runIndex ?? 0) - (b.runIndex ?? 0) || a.label.localeCompare(b.label),
+  );
+  return [...rows, ...overlayRows];
 }
 
 export interface HeadroomExample {
@@ -168,6 +216,7 @@ export function headroomCsvRows(rows: readonly HeadroomRow[]) {
       headroom_pct: cell ? Number(cell.headroomPercent.toFixed(1)) : '',
       tdp_w: row.tdpWatts,
       basis: 'GPU',
+      source: row.runIndex === undefined ? 'official' : 'unofficial',
     })),
   );
 }

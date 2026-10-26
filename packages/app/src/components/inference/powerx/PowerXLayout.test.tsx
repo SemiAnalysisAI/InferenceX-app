@@ -12,42 +12,18 @@ import type { PowerXSelection } from './powerx-views';
 const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/components/inference/ui/WorkflowInfoDisplay', () => ({
-  default: ({ compact }: { compact?: boolean }) => (
-    <div data-testid="powerx-run-chip" data-compact={String(Boolean(compact))} />
-  ),
-}));
-vi.mock('@/components/ui/share-button', () => ({ ShareButton: () => <button type="button" /> }));
-vi.mock('@/components/inference/InferenceContext', () => ({
-  useInferenceData: () => ({
-    availableModels: ['DeepSeek-V4-Pro', 'GLM-5'],
-    availableSequences: ['agentic_traces', '8k/1k'],
-    availablePrecisions: ['fp4', 'fp8'],
-  }),
-  useInferenceFilters: () => ({
-    selectedModel: 'DeepSeek-V4-Pro',
-    selectedSequence: 'agentic_traces',
-    selectedPrecisions: ['fp4'],
-  }),
-  useInferenceActions: () => ({
-    setSelectedModel: vi.fn(),
-    setSelectedSequence: vi.fn(),
-    setSelectedPrecisions: vi.fn(),
-  }),
-}));
 
+import { PowerBasisPill } from './PowerBasisPill';
 import {
   defaultReadoutPoint,
-  PowerXCaptionRow,
+  PowerXChartConfig,
+  PowerXCountControls,
   PowerXFacilitySwitch,
-  PowerXFrame,
-  PowerXLegendControls,
   PowerXMoreViews,
   PowerXProvenance,
   PowerXReadout,
   PowerXSplitBy,
   PowerXViewTabs,
-  PowerXWhatIs,
 } from './PowerXLayout';
 
 const render = (node: React.ReactNode, locale: 'en' | 'zh' = 'en') => {
@@ -63,14 +39,7 @@ const where: PowerXSelection = { metric: 'y_measuredAvgPower', compare: 'boundar
 
 describe('PowerXViewTabs', () => {
   it('shows all four views as tabs in order with the current one selected', () => {
-    const container = render(
-      <PowerXViewTabs
-        selection={where}
-        onSelectionChange={noop}
-        viewMode="chart"
-        onViewModeChange={noop}
-      />,
-    );
+    const container = render(<PowerXViewTabs selection={where} onSelectionChange={noop} />);
     const tabs = [
       ...container.querySelectorAll<HTMLElement>('[role="tab"][data-testid^="powerx-tab-"]'),
     ];
@@ -95,32 +64,21 @@ describe('PowerXViewTabs', () => {
     // One short hint per tab, as a tooltip, not a question line.
     for (const tab of tabs) expect(tab.getAttribute('title')).toBeTruthy();
     expect(container.querySelector('[data-testid="powerx-question"]')).toBeNull();
-    // The Chart/Table toggle sits in the strip.
-    expect(container.querySelector('[data-testid="inference-view-toggle-0"]')).not.toBeNull();
+    // The Chart/Table toggle lives in the chart toolbar, as on /inference, not in the strip.
+    expect(container.querySelector('[data-testid="inference-view-toggle-0"]')).toBeNull();
   });
 
   it('is bilingual', () => {
-    const container = render(
-      <PowerXViewTabs
-        selection={energy}
-        onSelectionChange={noop}
-        viewMode="table"
-        onViewModeChange={noop}
-      />,
-      'zh',
-    );
+    const container = render(<PowerXViewTabs selection={energy} onSelectionChange={noop} />, 'zh');
     expect(container.querySelector('[data-testid="powerx-tab-where"]')?.textContent).toBe(
       '功耗去向',
-    );
-    expect(container.querySelector('[data-testid="inference-table-view-btn"]')?.textContent).toBe(
-      '表格',
     );
   });
 });
 
-describe('PowerXLegendControls', () => {
+describe('PowerXCountControls', () => {
   it('offers Count and Per on the Energy view', () => {
-    const container = render(<PowerXLegendControls selection={energy} onSelectionChange={noop} />);
+    const container = render(<PowerXCountControls selection={energy} onSelectionChange={noop} />);
     expect(container.querySelector('[data-testid="powerx-boundary"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="powerx-energy-per"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="powerx-unit"]')).toBeNull();
@@ -131,7 +89,7 @@ describe('PowerXLegendControls', () => {
   });
 
   it('offers Count and Show as on the Power draw view', () => {
-    const container = render(<PowerXLegendControls selection={draw} onSelectionChange={noop} />);
+    const container = render(<PowerXCountControls selection={draw} onSelectionChange={noop} />);
     expect(container.querySelector('[data-testid="powerx-energy-per"]')).toBeNull();
     const showAs = [...container.querySelectorAll('[data-testid="powerx-unit"] button')];
     expect(showAs.map((button) => button.textContent)).toEqual(['W per chip', '% of TDP']);
@@ -140,11 +98,11 @@ describe('PowerXLegendControls', () => {
 
   it('renders nothing on the Where and Over time views', () => {
     expect(
-      render(<PowerXLegendControls selection={where} onSelectionChange={noop} />).innerHTML,
+      render(<PowerXCountControls selection={where} onSelectionChange={noop} />).innerHTML,
     ).toBe('');
     expect(
       render(
-        <PowerXLegendControls
+        <PowerXCountControls
           selection={{ metric: 'y_measuredPowerTimeline', compare: 'none' }}
           onSelectionChange={noop}
         />,
@@ -154,7 +112,7 @@ describe('PowerXLegendControls', () => {
 
   it('disables the IT and facility Counts unless energy is per output token', () => {
     const container = render(
-      <PowerXLegendControls
+      <PowerXCountControls
         selection={{ metric: 'y_measuredJPerInputToken', compare: 'none' }}
         onSelectionChange={noop}
       />,
@@ -167,7 +125,7 @@ describe('PowerXLegendControls', () => {
 
   it('disables % of TDP on the IT and facility Power draw boundaries', () => {
     const container = render(
-      <PowerXLegendControls
+      <PowerXCountControls
         selection={{ metric: 'y_itModeledWatts', compare: 'none' }}
         onSelectionChange={noop}
       />,
@@ -188,13 +146,27 @@ describe('PowerXLegendControls', () => {
 
   it('names the Count boundaries in Chinese', () => {
     const container = render(
-      <PowerXLegendControls selection={energy} onSelectionChange={noop} />,
+      <PowerXCountControls selection={energy} onSelectionChange={noop} />,
       'zh',
     );
     const labels = [...container.querySelectorAll('[data-testid="powerx-boundary"] button')].map(
       (button) => button.textContent,
     );
     expect(labels).toEqual(['仅 GPU', 'IT（不含 PUE）', '数据中心（含 PUE）', '全部']);
+  });
+});
+
+describe('PowerXChartConfig', () => {
+  it('puts Count, Per and the More views expander in the Chart Config fieldset', () => {
+    const container = render(
+      <PowerXChartConfig selection={energy} onSelectionChange={noop} rolesHaveData={false} />,
+    );
+    const config = container.querySelector('[data-testid="powerx-chart-config"]');
+    expect(config?.querySelector('[data-testid="powerx-boundary"]')).not.toBeNull();
+    expect(config?.querySelector('[data-testid="powerx-energy-per"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="powerx-more-views-toggle"]')).not.toBeNull();
+    // Nothing PowerX-specific is left for the legend rail.
+    expect(container.querySelector('[data-testid="powerx-legend-controls"]')).toBeNull();
   });
 });
 
@@ -232,10 +204,7 @@ describe('PowerXProvenance', () => {
     const container = render(
       <PowerXProvenance
         provenance={{ measuredPoints: 42, powerModelRevision: '0123456789ab', pue: 1.3 }}
-        summary="GPU power from on-board telemetry."
-      >
-        Each point is one benchmark configuration.
-      </PowerXProvenance>,
+      />,
     );
     const details = container.querySelector('details[data-testid="powerx-method"]');
     expect(details?.hasAttribute('open')).toBe(false);
@@ -243,56 +212,56 @@ describe('PowerXProvenance', () => {
       '42 measured points · validated serving windows only · power model rev 0123456 · PUE 1.3',
     );
     expect(details?.querySelector('summary')?.textContent).toContain('How we measure');
-    expect(details?.querySelector('p')?.textContent).toContain('Each point is one benchmark');
+    expect(details?.querySelector('p')?.textContent).toBe(
+      'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
+    );
   });
 
-  it('explains the three basis tags once and the three meanings of utilization', () => {
+  it('adds only the AgentX calibration sentence on agentic scenarios, with nothing else', () => {
     const container = render(
       <PowerXProvenance
         provenance={{ measuredPoints: 1, powerModelRevision: '0123456789ab' }}
-        summary="GPU power from on-board telemetry."
-      >
-        detail
-      </PowerXProvenance>,
+        agentic
+      />,
     );
-    const pills = [
-      ...container.querySelectorAll<HTMLElement>(
-        '[data-testid="powerx-basis-key"] [data-testid="power-basis-pill"]',
-      ),
-    ];
-    expect(pills.map((pill) => pill.dataset.basis)).toEqual(['gpu', 'it', 'facility']);
-    expect(pills.map((pill) => pill.textContent)).toEqual(['GPU', 'IT', 'Facility']);
-    expect(container.querySelector('[data-testid="powerx-basis-key"]')?.textContent).toContain(
-      'No PUE. Storage and out-of-rack network are not modeled.',
+    const details = container.querySelector('details[data-testid="powerx-method"]');
+    expect(details?.querySelector('p')?.textContent).toContain(
+      'AgentX estimates are not calibrated against measured system power.',
     );
-    expect(
-      container.querySelector('[data-testid="powerx-utilization-note"]')?.textContent,
-    ).toContain('three different things');
+    // The tag key and the utilization paragraph are gone; the pill titles carry the tag meaning.
+    expect(details?.querySelector('[data-testid="powerx-basis-key"]')).toBeNull();
+    expect(details?.querySelector('[data-testid="powerx-utilization-note"]')).toBeNull();
+    expect(details?.querySelectorAll('p')).toHaveLength(1);
+    expect(details?.textContent).not.toContain('on-board telemetry');
     const zh = render(
       <PowerXProvenance
         provenance={{ measuredPoints: 1, powerModelRevision: '0123456789ab' }}
-        summary="s"
-      >
-        d
-      </PowerXProvenance>,
+        agentic
+      />,
       'zh',
     );
-    expect(zh.querySelector('[data-testid="powerx-utilization-note"]')?.textContent).toContain(
-      '三种不同含义',
+    expect(zh.querySelector('details p')?.textContent).toBe(
+      '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。 AgentX 估算值尚未用实测的系统功耗校准。',
     );
   });
 });
 
-describe('PowerXWhatIs', () => {
-  it('is a collapsed one-liner that separates PowerX from the grid power model', () => {
-    const container = render(<PowerXWhatIs />);
-    const details = container.querySelector('details[data-testid="powerx-what-is"]');
-    expect(details?.hasAttribute('open')).toBe(false);
-    expect(details?.querySelector('summary')?.textContent).toContain('What is PowerX?');
-    expect(details?.querySelector('p')?.textContent).toBe(
-      'Measured GPU power from InferenceX benchmark runs, plus a modeled IT and facility breakdown. Not the energy team’s grid power model.',
-    );
-    expect(render(<PowerXWhatIs />, 'zh').textContent).toContain('什么是 PowerX？');
+describe('PowerBasisPill', () => {
+  it('explains each tag in its title, in one clause', () => {
+    const titles = (locale: 'en' | 'zh') =>
+      (['gpu', 'it', 'facility'] as const).map(
+        (tag) => render(<PowerBasisPill tag={tag} />, locale).querySelector('span')?.title,
+      );
+    expect(titles('en')).toEqual([
+      'GPU board power, measured by DCGM',
+      'GPU + modeled server, no PUE',
+      'IT × PUE',
+    ]);
+    expect(titles('zh')).toEqual([
+      'GPU 板卡功耗，由 DCGM 实测',
+      'GPU + 模型估算的服务器功耗，不含 PUE',
+      'IT × PUE',
+    ]);
   });
 });
 
@@ -321,17 +290,19 @@ describe('PowerXReadout', () => {
     const container = render(<PowerXReadout points={points} />);
     const readout = container.querySelector('[data-testid="powerx-readout"]');
     expect(readout?.querySelector('[data-testid="powerx-readout-it"]')?.textContent).toBe(
-      'IT 1,000 W/GPUIT',
+      'IT: 1,000 W/GPUIT',
     );
     expect(readout?.querySelector('[data-testid="powerx-readout-gpus-per-mw"]')?.textContent).toBe(
-      '1,000 GPUs per MW (IT)IT',
+      '1,000 GPUs/MWIT',
     );
     expect(readout?.querySelector('[data-testid="powerx-readout-facility"]')?.textContent).toBe(
-      'Facility 1,300 W/GPU at PUE 1.3Facility',
+      'Facility: 1,300 W/GPU at PUE 1.3Facility',
     );
     expect(readout?.querySelector('[data-testid="powerx-readout-gpu"]')?.textContent).toBe(
-      'GPU 700 W measuredGPU',
+      'GPU: 700 WGPU',
     );
+    // The same outline badges the TCO $/chip/hr row uses.
+    expect(readout?.querySelectorAll('[data-slot="badge"]')).toHaveLength(4);
     expect(readout?.querySelector('[data-testid="powerx-readout-source"]')?.textContent).toBe(
       'Near 80 tok/s/user · hover a point to change',
     );
@@ -354,8 +325,8 @@ describe('PowerXReadout', () => {
     expect(container.querySelector('[data-testid="powerx-readout-no-model"]')?.textContent).toBe(
       '该配置暂无 IT 功耗模型',
     );
-    expect(container.querySelector('[data-testid="powerx-readout-gpu"]')?.textContent).toContain(
-      'W 实测',
+    expect(container.querySelector('[data-testid="powerx-readout-gpu"]')?.textContent).toBe(
+      'GPU: 700 WGPU',
     );
     expect(render(<PowerXReadout points={[]} />).innerHTML).toBe('');
   });
@@ -376,51 +347,5 @@ describe('PowerXFacilitySwitch', () => {
     );
     // Outside PowerX there is no switch: the breakdown always shows the facility meter.
     expect(render(<PowerXFacilitySwitch pue={1.3} />).innerHTML).toBe('');
-  });
-});
-
-describe('PowerXCaptionRow and PowerXFrame', () => {
-  it('shows the model dropdown, scenario and precision toggles and the compact run chip', () => {
-    const container = render(<PowerXCaptionRow />);
-    expect(container.querySelector('[data-testid="powerx-model-trigger"]')?.textContent).toContain(
-      'DeepSeek',
-    );
-    expect(
-      [...container.querySelectorAll('[data-testid="powerx-scenario"] button')].map(
-        (button) => button.textContent,
-      ),
-    ).toHaveLength(2);
-    const precisions = [
-      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-precision"] button'),
-    ];
-    expect(precisions.map((button) => button.textContent)).toEqual(['FP4', 'FP8']);
-    // The only selected precision cannot be deselected.
-    expect(precisions[0].getAttribute('aria-pressed')).toBe('true');
-    expect(precisions[0].disabled).toBe(true);
-    expect(
-      container.querySelector<HTMLElement>('[data-testid="powerx-run-chip"]')?.dataset.compact,
-    ).toBe('true');
-  });
-
-  it('orders header, tabs, caption row, then the chart', () => {
-    const container = render(
-      <PowerXFrame
-        selection={energy}
-        onSelectionChange={noop}
-        viewMode="chart"
-        onViewModeChange={noop}
-      >
-        <div data-testid="chart-body" />
-      </PowerXFrame>,
-      'zh',
-    );
-    const frame = container.querySelector('[data-testid="powerx-frame"]');
-    const order = [
-      ...(frame?.querySelectorAll<HTMLElement>(
-        'h2, [data-testid="powerx-tabs"], [data-testid="powerx-caption"], [data-testid="chart-body"]',
-      ) ?? []),
-    ].map((el) => el.dataset.testid ?? el.tagName.toLowerCase());
-    expect(order).toEqual(['h2', 'powerx-tabs', 'powerx-caption', 'chart-body']);
-    expect(frame?.querySelector('h2')?.textContent).toBe('PowerX 功耗');
   });
 });

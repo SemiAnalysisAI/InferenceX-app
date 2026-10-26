@@ -53,19 +53,11 @@ export const POWER_BASIS_TAG_LABELS: Record<PowerBasisTag, { en: string; zh: str
   facility: { en: 'Facility', zh: '数据中心' },
 };
 
+/** The pill's tooltip: the whole meaning of a tag, in one clause. */
 export const POWER_BASIS_TAG_TITLES: Record<PowerBasisTag, { en: string; zh: string }> = {
-  gpu: {
-    en: 'GPU board power, measured by DCGM every second and averaged over the validated serving window.',
-    zh: 'GPU 板卡功耗：DCGM 每秒采样并在通过验证的服务窗口内取平均。',
-  },
-  it: {
-    en: 'IT power: measured GPU plus modeled CPU, server parts, fans and PSU loss, and the network share. No PUE. Storage and out-of-rack network are not modeled.',
-    zh: 'IT 功耗：实测 GPU 加上建模的 CPU、服务器部件、风扇与电源损耗以及网络分摊。不含 PUE。存储和机架外网络未建模。',
-  },
-  facility: {
-    en: 'Facility power: IT × PUE, what the building draws for that IT load.',
-    zh: '数据中心功耗：IT × PUE，即该 IT 负载对应的建筑总用电。',
-  },
+  gpu: { en: 'GPU board power, measured by DCGM', zh: 'GPU 板卡功耗，由 DCGM 实测' },
+  it: { en: 'GPU + modeled server, no PUE', zh: 'GPU + 模型估算的服务器功耗，不含 PUE' },
+  facility: { en: 'IT × PUE', zh: 'IT × PUE' },
 };
 
 export const IT_NOT_MODELED_NOTE = {

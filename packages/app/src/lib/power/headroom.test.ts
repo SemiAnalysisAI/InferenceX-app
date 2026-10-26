@@ -109,6 +109,38 @@ describe('buildHeadroomRows', () => {
     expect(headroomExample(h200)).toBeNull();
   });
 
+  it('adds one row per unofficial-run overlay line, after the official rows, tagged with the run', () => {
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    const overlay = b200.map((p) => ({
+      ...p,
+      id: 0,
+      run_url: runUrl,
+      measuredAvgPower: metric(p.measuredAvgPower!.y * 1.1),
+      measuredP90Power: metric(p.measuredP90Power!.y * 1.1),
+    }));
+    const rows = buildHeadroomRows([...b200, ...h200], HEADROOM_INTERACTIVITIES, {
+      points: overlay,
+      runIndexByUrl: { [runUrl]: 1 },
+      runInfos: [
+        { id: 99, branch: 'main' },
+        { id: 123, branch: 'feat/powerx-overlay' },
+      ],
+    });
+    expect(rows.map((row) => [row.label, row.runIndex])).toEqual([
+      ['B200 (SGLang) FP8', undefined],
+      ['H200 (TRTLLM) FP8', undefined],
+      ['B200 (SGLang) FP8 · feat/powerx-overlay', 1],
+    ]);
+    // The overlay row is read from its own points, not merged into the official B200 line.
+    expect(rows[2].cells[1]!.p90Watts).toBeCloseTo(rows[0].cells[1]!.p90Watts * 1.1, 6);
+    expect(headroomCsvRows(rows).map((row) => row.source)).toEqual([
+      ...Array.from({ length: 8 }, () => 'official'),
+      ...Array.from({ length: 4 }, () => 'unofficial'),
+    ]);
+    // Without overlay input nothing changes.
+    expect(buildHeadroomRows([...b200, ...h200])).toHaveLength(2);
+  });
+
   it('flattens rows for CSV with blanks outside the measured range', () => {
     const csv = headroomCsvRows(buildHeadroomRows(h200));
     expect(csv).toHaveLength(4);

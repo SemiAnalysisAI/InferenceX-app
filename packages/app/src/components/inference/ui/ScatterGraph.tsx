@@ -1386,9 +1386,12 @@ const ScatterGraph = React.memo(
       const ceiling = metricAxisCeiling(selectedYAxisMetric);
       if (ceiling !== undefined && !useLog) yMin = 0;
       // % TDP stops at 100%; values above the rating keep the plain 5% headroom.
+      // The PowerX headroom band runs up to the rating, so the axis reaches it then.
       const yMax =
         ceiling !== undefined && ext[1] <= ceiling
-          ? Math.min(ext[1] * 1.05, ceiling)
+          ? headroomShading
+            ? ceiling
+            : Math.min(ext[1] * 1.05, ceiling)
           : ext[1] * 1.05;
 
       return {
@@ -1403,6 +1406,7 @@ const ScatterGraph = React.memo(
       niceAxes,
       yExtentOverride,
       selectedYAxisMetric,
+      headroomShading,
     ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
@@ -3449,30 +3453,56 @@ const ScatterGraph = React.memo(
           drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
       };
 
-      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP.
-      const headroomSeries = headroomShading
-        ? Object.entries(groupedData).flatMap(([key, points]) => {
-            if (points[0]?.powerVariant) return [];
-            const hwKey = points[0]?.hwKey;
-            if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
-            const band = points
-              .filter(
-                (p) =>
-                  selectedPrecisions.includes(p.precision) &&
-                  (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(p))) &&
-                  Number.isFinite(p.measuredP90Power?.y) &&
-                  Number.isFinite(p.measuredAvgPower?.y) &&
-                  (p.measuredAvgPower?.y ?? 0) > 0 &&
-                  Number.isFinite(p.measuredPowerPercentTdp?.y),
-              )
-              .map((p) => ({
-                x: p.x,
-                // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
-                y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
-              }))
-              .toSorted((a, b) => a.x - b.x);
-            return band.length >= 2 ? [{ key, color: getCssColor(resolveColor(hwKey)), band }] : [];
-          })
+      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP,
+      // for the official chip lines and for every unofficial-run overlay line in its run color.
+      const headroomBand = (points: InferenceData[], optimal: (p: InferenceData) => boolean) =>
+        points
+          .filter(
+            (p) =>
+              selectedPrecisions.includes(p.precision) &&
+              (!hideNonOptimal || optimal(p)) &&
+              Number.isFinite(p.measuredP90Power?.y) &&
+              Number.isFinite(p.measuredAvgPower?.y) &&
+              (p.measuredAvgPower?.y ?? 0) > 0 &&
+              Number.isFinite(p.measuredPowerPercentTdp?.y),
+          )
+          .map((p) => ({
+            x: p.x,
+            // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
+            y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
+          }))
+          .toSorted((a, b) => a.x - b.x);
+      const headroomSeries: {
+        key: string;
+        color: string;
+        band: { x: number; y: number }[];
+        runIndex: number | null;
+      }[] = headroomShading
+        ? [
+            ...Object.entries(groupedData).flatMap(([key, points]) => {
+              if (points[0]?.powerVariant) return [];
+              const hwKey = points[0]?.hwKey;
+              if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
+              const band = headroomBand(points, (p) => optimalPointKeys.has(optimalPointKey(p)));
+              return band.length >= 2
+                ? [{ key, color: getCssColor(resolveColor(hwKey)), band, runIndex: null }]
+                : [];
+            }),
+            ...Object.entries(overlayGroups).flatMap(([key, group]) => {
+              if (group.variant !== null || !activeOverlayHwTypes.has(group.hwKey)) return [];
+              const band = headroomBand(group.points, (p) => overlayOptimalPoints.has(p));
+              return band.length >= 2
+                ? [
+                    {
+                      key: `overlay-${key}`,
+                      color: overlayRunColor(group.runIndex),
+                      band,
+                      runIndex: group.runIndex,
+                    },
+                  ]
+                : [];
+            }),
+          ]
         : [];
       const drawHeadroom = (
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -3497,6 +3527,7 @@ const ScatterGraph = React.memo(
           .join('g')
           .attr('class', 'headroom-band')
           .attr('data-testid', 'headroom-band')
+          .attr('data-run-index', (d) => (d.runIndex === null ? null : d.runIndex))
           .attr('pointer-events', 'none');
         g.selectAll('path.headroom-area')
           .data((d) => [d])
@@ -3515,17 +3546,6 @@ const ScatterGraph = React.memo(
           .attr('stroke-width', 1)
           .attr('stroke-dasharray', '2,3')
           .attr('d', (d) => line(d.band));
-        zoomGroup
-          .selectAll('text.headroom-key')
-          .data(headroomSeries.length > 0 ? [topY] : [])
-          .join('text')
-          .attr('class', 'headroom-key')
-          .attr('x', 4)
-          .attr('y', (y) => y + 12)
-          .attr('font-size', 10)
-          .attr('fill', 'var(--muted-foreground)')
-          .attr('pointer-events', 'none')
-          .text('Shaded: headroom from P90 draw (dotted) to TDP');
         void width;
       };
       const headroomLayer: CustomLayerConfig = {
@@ -3590,6 +3610,9 @@ const ScatterGraph = React.memo(
       powerCompareBaseId,
       headroomShading,
       groupedData,
+      overlayGroups,
+      activeOverlayHwTypes,
+      overlayOptimalPoints,
       effectiveActiveHwTypes,
       selectedPrecisions,
       hideNonOptimal,

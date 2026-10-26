@@ -303,7 +303,9 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .should(
           'contain.text',
-          locale === 'en' ? 'not been calibrated against measured AgentX' : '尚未用 AgentX',
+          locale === 'en'
+            ? 'AgentX estimates are not calibrated against measured system power.'
+            : 'AgentX 估算值尚未用实测的系统功耗校准。',
         );
       cy.get('header').invoke('css', 'visibility', 'hidden');
       cy.get('[data-testid="chart-figure"]')

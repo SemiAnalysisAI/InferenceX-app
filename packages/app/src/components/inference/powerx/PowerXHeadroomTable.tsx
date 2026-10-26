@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 
 import type { InferenceData } from '@/components/inference/types';
 import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -13,6 +14,8 @@ import {
   headroomCsvRows,
   headroomExample,
 } from '@/lib/power/headroom';
+
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 
 import { PowerBasisPill } from './PowerBasisPill';
 
@@ -27,6 +30,7 @@ const STRINGS = {
     headroom: 'Headroom',
     download: 'Download CSV',
     note: 'Interpolated along each chip’s optimal points (monotone, in log interactivity). "—" means outside the measured range; nothing is extrapolated. Headroom = 1 − P90 / TDP.',
+    key: 'Shaded band on the chart: headroom from each chip’s P90 draw (dotted) up to its TDP.',
     empty:
       'No chip in this view has measured average and P90 power at two or more interactivities.',
     example: (
@@ -51,6 +55,7 @@ const STRINGS = {
     headroom: '余量',
     download: '下载 CSV',
     note: '沿各芯片的最优点插值（单调样条，按对数交互性）。“—”表示超出实测范围，不做外推。余量 = 1 − P90 / TDP。',
+    key: '图中阴影：各芯片从 P90 功耗（虚线）到其 TDP 之间的余量。',
     empty: '当前视图中没有芯片在两个及以上交互性下同时具备实测平均功耗与 P90 功耗。',
     example: (
       name: string,
@@ -77,14 +82,28 @@ const pct = (value: number) => `${Math.round(value)}%`;
  */
 export function PowerXHeadroomTable({
   points,
+  overlayPoints,
   contextLabel,
 }: {
   points: readonly InferenceData[];
+  /** Unofficial-run overlay points: one row per chip line and run, in the run's color. */
+  overlayPoints?: readonly InferenceData[];
   contextLabel?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const rows = useMemo(() => buildHeadroomRows(points), [points]);
+  const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
+  const rows = useMemo(
+    () =>
+      buildHeadroomRows(
+        points,
+        HEADROOM_INTERACTIVITIES,
+        overlayPoints && overlayPoints.length > 0
+          ? { points: overlayPoints, runIndexByUrl, runInfos: unofficialRunInfos }
+          : undefined,
+      ),
+    [points, overlayPoints, runIndexByUrl, unofficialRunInfos],
+  );
   const example = useMemo(() => headroomExample(points, rows), [points, rows]);
   const exportCsv = () => {
     const csv = headroomCsvRows(rows);
@@ -97,9 +116,9 @@ export function PowerXHeadroomTable({
     track('inference_powerx_headroom_exported', { rows: rows.length });
   };
   return (
-    <section className="mt-4 min-w-0 space-y-2" data-testid="powerx-headroom">
+    <section className="mt-4 min-w-0 space-y-2 px-1" data-testid="powerx-headroom">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">{t.title}</h3>
+        <h3 className="text-sm font-medium">{t.title}</h3>
         {rows.length > 0 && (
           <button
             type="button"
@@ -132,40 +151,41 @@ export function PowerXHeadroomTable({
           {t.empty}
         </p>
       ) : (
-        <div className="min-w-0 overflow-x-auto">
+        <div className="max-h-96 min-w-0 overflow-auto">
           <table
             className="w-full min-w-[52rem] text-left text-xs tabular-nums"
             data-testid="powerx-headroom-table"
           >
-            <thead>
-              <tr className="border-b border-border/60">
-                <th rowSpan={2} className="py-1 pr-2 align-bottom font-medium">
+            <thead className="sticky top-0 bg-background">
+              <tr>
+                <th rowSpan={2} className="p-2 align-bottom">
                   {t.chip}
                 </th>
                 {HEADROOM_INTERACTIVITIES.map((x) => (
-                  <th
-                    key={x}
-                    colSpan={4}
-                    className="border-l border-border/60 px-2 py-1 text-center font-medium"
-                  >
+                  <th key={x} colSpan={4} className="border-l border-border/60 p-2 text-center">
                     {t.perUser(x)}
                   </th>
                 ))}
               </tr>
-              <tr className="border-b border-border/60 text-muted-foreground">
+              <tr className="text-muted-foreground">
                 {HEADROOM_INTERACTIVITIES.map((x) => (
                   <HeadroomGroupHeaders key={x} t={t} />
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="border-t">
               {rows.map((row) => (
-                <tr
-                  key={row.key}
-                  className="border-b border-border/40"
-                  data-testid="powerx-headroom-row"
-                >
-                  <td className="py-1 pr-2 font-medium whitespace-nowrap">{row.label}</td>
+                <tr key={row.key} data-testid="powerx-headroom-row" data-run-index={row.runIndex}>
+                  <th className="p-2 align-top font-normal whitespace-nowrap">
+                    {row.runIndex !== undefined && (
+                      <span
+                        aria-hidden
+                        className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
+                        style={{ backgroundColor: overlayRunColor(row.runIndex) }}
+                      />
+                    )}
+                    {row.label}
+                  </th>
                   {row.cells.map((cell, index) =>
                     cell ? (
                       <HeadroomCells
@@ -185,7 +205,9 @@ export function PowerXHeadroomTable({
           </table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{t.note}</p>
+      <p className="text-xs text-muted-foreground">
+        <span data-testid="powerx-headroom-key">{t.key}</span> {t.note}
+      </p>
     </section>
   );
 }
@@ -193,16 +215,16 @@ export function PowerXHeadroomTable({
 function HeadroomGroupHeaders({ t }: { t: Strings }) {
   return (
     <>
-      <th className="border-l border-border/60 px-2 py-1 font-normal whitespace-nowrap">
+      <th className="border-l border-border/60 p-2 font-normal whitespace-nowrap">
         {t.avg}
         <PowerBasisPill tag="gpu" />
       </th>
-      <th className="px-2 py-1 font-normal whitespace-nowrap">
+      <th className="p-2 font-normal whitespace-nowrap">
         {t.p90}
         <PowerBasisPill tag="gpu" />
       </th>
-      <th className="px-2 py-1 font-normal whitespace-nowrap">{t.pct}</th>
-      <th className="px-2 py-1 font-normal whitespace-nowrap">{t.headroom}</th>
+      <th className="p-2 font-normal whitespace-nowrap">{t.pct}</th>
+      <th className="p-2 font-normal whitespace-nowrap">{t.headroom}</th>
     </>
   );
 }
@@ -220,7 +242,7 @@ function HeadroomCells({
   headroom: string;
   muted?: boolean;
 }) {
-  const cls = `px-2 py-1 ${muted ? 'text-muted-foreground/60' : ''}`;
+  const cls = `p-2 align-top ${muted ? 'text-muted-foreground/60' : ''}`;
   return (
     <>
       <td className={`border-l border-border/60 ${cls}`}>{avg}</td>

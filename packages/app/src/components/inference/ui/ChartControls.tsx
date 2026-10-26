@@ -3,7 +3,7 @@
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
@@ -186,6 +186,8 @@ interface ChartControlsProps {
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
   showXAxisMode?: boolean;
+  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
+  powerXControls?: ReactNode;
 }
 
 export default function ChartControls({
@@ -193,6 +195,7 @@ export default function ChartControls({
   tcoSource = 'inference',
   showTcoBasis = false,
   showXAxisMode = false,
+  powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -426,16 +429,6 @@ export default function ChartControls({
     });
   };
 
-  // PowerX fixes its scenario and precision to what has measured power: a select
-  // with one option is noise there, so it is dropped (the caption still names them).
-  const scenarioLocked =
-    availableSequences.length === 1 && availableSequences[0] === selectedSequence;
-  const precisionLocked =
-    availablePrecisions.length === 1 &&
-    selectedPrecisions.length === 1 &&
-    availablePrecisions[0] === selectedPrecisions[0];
-  const showScenario = !(powerXSurface && scenarioLocked);
-  const showPrecision = !(powerXSurface && precisionLocked);
   const secondaryCount =
     // PowerX picks the metric through its tabs, so it is not a changed chart control there.
     (powerXSurface || selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
@@ -461,14 +454,9 @@ export default function ChartControls({
       <div className="grid min-w-0 items-start gap-3 lg:grid-cols-3">
         <ControlPanel
           legend={t.benchmarkControls}
-          // PowerX keeps Benchmark Config, Chart Config and Compare history on one row.
-          className={
-            hideGpuComparison ? 'lg:col-span-2' : powerXSurface ? undefined : 'lg:col-span-3'
-          }
+          className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
-          <div
-            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${powerXSurface ? '' : 'md:grid-cols-4'}`}
-          >
+          <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:grid-cols-4">
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
@@ -481,31 +469,27 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            {showScenario && (
-              <div className={`min-w-0 ${showPrecision ? '' : 'col-span-2'}`}>
-                <ScenarioSelector
-                  value={selectedSequence}
-                  onChange={handleSequenceChange}
-                  open={openDropdown === 'sequence'}
-                  onOpenChange={handleDropdownOpenChange('sequence')}
-                  availableSequences={availableSequences}
-                  model={selectedModel}
-                  data-testid="scenario-selector"
-                />
-              </div>
-            )}
-            {showPrecision && (
-              <div className={`min-w-0 ${showScenario ? '' : 'col-span-2'}`}>
-                <PrecisionSelector
-                  value={selectedPrecisions}
-                  onChange={handlePrecisionChange}
-                  open={openDropdown === 'precision'}
-                  onOpenChange={handleDropdownOpenChange('precision')}
-                  availablePrecisions={availablePrecisions}
-                  data-testid="precision-multiselect"
-                />
-              </div>
-            )}
+            <div className="min-w-0">
+              <ScenarioSelector
+                value={selectedSequence}
+                onChange={handleSequenceChange}
+                open={openDropdown === 'sequence'}
+                onOpenChange={handleDropdownOpenChange('sequence')}
+                availableSequences={availableSequences}
+                model={selectedModel}
+                data-testid="scenario-selector"
+              />
+            </div>
+            <div className="min-w-0">
+              <PrecisionSelector
+                value={selectedPrecisions}
+                onChange={handlePrecisionChange}
+                open={openDropdown === 'precision'}
+                onOpenChange={handleDropdownOpenChange('precision')}
+                availablePrecisions={availablePrecisions}
+                data-testid="precision-multiselect"
+              />
+            </div>
           </div>
         </ControlPanel>
 
@@ -518,12 +502,13 @@ export default function ChartControls({
           <ControlPanel
             legend={t.chartControls}
             data-testid="inference-chart-configuration"
-            className={showXAxisMode && !powerXSurface ? 'lg:col-span-2' : undefined}
+            className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
               className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
               {showXAxisMode && <XAxisModeSelector />}
+              {powerXSurface && powerXControls}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
                 hidden={powerXSurface}

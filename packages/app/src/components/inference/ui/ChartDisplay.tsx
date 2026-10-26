@@ -61,14 +61,13 @@ import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import {
+  PowerXChartConfig,
   PowerXCurveSection,
   PowerXFacilitySwitch,
-  PowerXFrame,
-  PowerXLegendControls,
-  PowerXMoreViews,
   PowerXProvenance,
   PowerXReadout,
   PowerXSplitBy,
+  PowerXViewTabs,
   usePowerXStrings,
 } from '@/components/inference/powerx/PowerXLayout';
 import { PowerXHeadroomTable } from '@/components/inference/powerx/PowerXHeadroomTable';
@@ -152,18 +151,11 @@ import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 
 type InferenceViewMode = 'chart' | 'table';
 
-/** PowerX v2 figure body: the frame already provides the card, so the chart sits in a plain column. */
-function PowerXFigureShell({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-w-0 flex-col">{children}</div>;
-}
-
 const STRINGS = {
   en: {
     inferencePerformance: 'Inference Performance',
     inferencePerformanceDesc:
       'Agentic inference metrics from the AgentX scenario and fixed-sequence inference metrics across models, hardware configurations, and serving parameters.',
-    powerXTitle: 'PowerX',
-    powerXDesc: 'Measured chip power and energy per token for every benchmark point.',
     chart: 'Chart',
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
@@ -180,13 +172,6 @@ const STRINGS = {
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    powerXMethod: {
-      gpu: 'GPU power from on-board telemetry, averaged per chip over the measured serving window.',
-      system: 'GPU power is measured; the rest of the server and the facility (PUE) are modeled.',
-    },
-    howWeMeasure: 'How we measure',
-    powerXMethodDetail:
-      'Each point is one benchmark configuration. Power is sampled per GPU throughout the run and averaged over the serving window that passed validation.',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU Level Provisioned (TDP) · Joules per output token = rated TDP per GPU from the hardware registry × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
@@ -203,8 +188,6 @@ const STRINGS = {
     inferencePerformance: '推理性能',
     inferencePerformanceDesc:
       '不同模型、硬件配置和服务参数下，来自 AgentX 场景的智能体推理指标与固定序列推理指标。',
-    powerXTitle: 'PowerX 功耗',
-    powerXDesc: '每个基准测试点的实测芯片功耗与每 Token 能耗。',
     chart: '图表',
     table: '表格',
     sourceUnofficial: '来源：非官方',
@@ -219,13 +202,6 @@ const STRINGS = {
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
-    powerXMethod: {
-      gpu: '功耗来自 GPU 板载遥测，按芯片在实测服务窗口内取平均。',
-      system: 'GPU 功耗为实测；服务器其他组件与数据中心（PUE）为模型估算。',
-    },
-    howWeMeasure: '测量方法',
-    powerXMethodDetail:
-      '每个数据点代表一个基准测试配置。功耗在整个运行过程中按每颗 GPU 采样，并在通过验证的服务窗口内取平均。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 每输出 token 能耗 = 硬件注册表中每 GPU 的额定 TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
@@ -983,12 +959,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (rolesHaveData === false && powerCompare === 'roles') setPowerCompare('boundaries');
   }, [rolesHaveData, powerCompare, setPowerCompare]);
 
-  // The export toolbar; PowerX v2 lifts it into the view-tab strip without the view toggle.
-  const renderChartButtons = (
-    graph: (typeof renderableGraphs)[number],
-    graphIndex: number,
-    { viewToggle }: { viewToggle: boolean },
-  ) => {
+  const renderChartButtons = (graph: (typeof renderableGraphs)[number], graphIndex: number) => {
     const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
     const isTimelineMode = Boolean(
       selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
@@ -1009,17 +980,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               : 'interactivity'
         }
         leadingControls={
-          viewToggle ? (
-            <SegmentedToggle
-              value={getViewMode(graphIndex)}
-              options={viewModeOptions}
-              onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-              ariaLabel={t.viewMode}
-              testId={`inference-view-toggle-${graphIndex}`}
-            />
-          ) : undefined
+          <SegmentedToggle
+            value={getViewMode(graphIndex)}
+            options={viewModeOptions}
+            onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+            ariaLabel={t.viewMode}
+            testId={`inference-view-toggle-${graphIndex}`}
+          />
         }
-        className={viewToggle ? undefined : 'mb-0'}
         hideImageExport={getViewMode(graphIndex) === 'table'}
         setIsLegendExpanded={setIsLegendExpanded}
         hideLegendOnExport={showLineLabels}
@@ -1082,6 +1050,73 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     );
   };
 
+  // PowerX readout row: the visible plotted points the hovered/pinned readout reads from.
+  const powerXReadoutPoints = useMemo(() => {
+    const graph = renderableGraphs[0];
+    if (!powerXLayout || !graph || powerXTab === 'where' || powerXTab === 'time') return null;
+    const overlay = selectUnofficialOverlayForMode(
+      selectedXAxisMode,
+      graph.chartDefinition.chartType,
+      overlayDataByChartType,
+    );
+    const isGpuComparison =
+      selectedGPUs.length > 0 &&
+      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
+    const { officialRows, overlayRows } = isGpuComparison
+      ? visibleDateComparisonRows(graph.data, overlay)
+      : visibleComparisonRows(graph.data, overlay);
+    return [...officialRows, ...overlayRows];
+  }, [
+    powerXLayout,
+    powerXTab,
+    renderableGraphs,
+    selectedXAxisMode,
+    overlayDataByChartType,
+    selectedGPUs.length,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+    selectedDates.length,
+    visibleDateComparisonRows,
+    visibleComparisonRows,
+  ]);
+
+  // PowerX provenance strip: what the plotted points are made of.
+  const powerXProvenance = useMemo(() => {
+    const graph = renderableGraphs[0];
+    if (!powerXSurface || !graph) return null;
+    const overlay = selectUnofficialOverlayForMode(
+      selectedXAxisMode,
+      graph.chartDefinition.chartType,
+      overlayDataByChartType,
+    );
+    const isGpuComparison =
+      selectedGPUs.length > 0 &&
+      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
+    const { officialRows, overlayRows } = isGpuComparison
+      ? visibleDateComparisonRows(graph.data, overlay)
+      : visibleComparisonRows(graph.data, overlay);
+    const points = [...officialRows, ...overlayRows].filter((point) => !point.powerVariant);
+    const estimate = points
+      .map((point) => point.modeledSystemPower)
+      .find((candidate) => candidate !== undefined && candidate.status === 'supported');
+    return {
+      measuredPoints: points.length,
+      powerModelRevision: SYSTEM_POWER_MODEL_REVISION,
+      pue: estimate?.status === 'supported' ? estimate.pue : null,
+    };
+  }, [
+    powerXSurface,
+    renderableGraphs,
+    selectedXAxisMode,
+    overlayDataByChartType,
+    selectedGPUs.length,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+    selectedDates.length,
+    visibleDateComparisonRows,
+    visibleComparisonRows,
+  ]);
+
   const displayGraphs =
     isFirstLoad || isDerivedXAxisLoading
       ? [
@@ -1131,9 +1166,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            const FigureShell = powerXLayout ? PowerXFigureShell : Card;
+            const powerXFooter =
+              powerXSurface && powerXProvenance && selectedPowerBasis ? (
+                <PowerXProvenance provenance={powerXProvenance} agentic={isAgenticSequence} />
+              ) : null;
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries || powerXFooter ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
@@ -1168,25 +1206,18 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {formatTokenLength(residentSequenceLengths.osl.p99)}
                     </p>
                   )}
+                  {powerXFooter}
                 </>
               ) : undefined;
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0 rounded-xl">
-                  {!minimalChrome &&
-                    !powerXLayout &&
-                    renderChartButtons(graph, graphIndex, { viewToggle: true })}
-                  <FigureShell data-coach-mark-root="">
+                  {!minimalChrome && renderChartButtons(graph, graphIndex)}
+                  <Card data-coach-mark-root="">
                     {(() => {
                       const chartCaption = (
                         <>
-                          <div
-                            className={
-                              powerXLayout
-                                ? 'export-only hidden items-start gap-1'
-                                : 'flex items-start gap-1'
-                            }
-                          >
+                          <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
                               <ModelLogo
                                 model={graph.model as Model}
@@ -1242,7 +1273,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             )}
                           </div>
                           <ResultContext
-                            className={powerXLayout ? 'export-only hidden' : undefined}
                             locale={locale}
                             precision={
                               embedded
@@ -1308,34 +1338,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               renderCostBadges={renderInferenceTcoBadges}
                             />
                           )}
-                          {powerXLayout ? null : powerXSurface &&
-                            selectedPowerBasis &&
-                            powerXTab ? (
-                            <details
-                              className="mb-2 text-xs text-muted-foreground"
-                              data-testid="powerx-method"
-                            >
-                              <summary className="cursor-pointer select-none">
-                                {
-                                  t.powerXMethod[
-                                    selectedPowerBasis === 'gpu-measured' && powerCompare === 'none'
-                                      ? 'gpu'
-                                      : 'system'
-                                  ]
-                                }{' '}
-                                <span className="underline underline-offset-2">
-                                  {t.howWeMeasure}
-                                </span>
-                              </summary>
-                              <p className="mt-1">
-                                {t.powerXMethodDetail}{' '}
-                                {selectedPowerBasis !== 'gpu-measured' &&
-                                  t.powerBasisAssumptions[selectedPowerBasis]}{' '}
-                                {ALL_IN_MEASURED_NOTE[locale]}{' '}
-                                {isAgenticSequence && ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
-                              </p>
-                            </details>
-                          ) : (
+                          {powerXLayout &&
+                            powerXMounted &&
+                            powerXReadoutPoints &&
+                            getViewMode(graphIndex) === 'chart' && (
+                              <PowerXReadout points={powerXReadoutPoints} />
+                            )}
+                          {!powerXSurface && (
                             <>
                               {/* One caption line for the power method: boundary, then the modeled-
                               parts note when comparing, then the AgentX calibration caveat. */}
@@ -1457,7 +1466,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             runNumbering={runNumbering}
                           />
                         );
-                      const scatter = (
+                      const renderScatter = (caption: React.ReactNode) => (
                         <div className="relative">
                           <ScatterGraph
                             chartId={`chart-${graphIndex}`}
@@ -1468,7 +1477,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             xLabel={resolvedXLabel}
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
-                            caption={chartCaption}
+                            caption={caption}
                             overlayData={
                               selectUnofficialOverlayForMode(
                                 selectedXAxisMode,
@@ -1477,30 +1486,20 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               ) ?? undefined
                             }
                             plotHeight={powerXChartHeight}
-                            legendControls={
-                              powerXLayout ? (
-                                <PowerXLegendControls
-                                  selection={powerXSelection}
-                                  onSelectionChange={setPowerXSelection}
-                                />
-                              ) : undefined
-                            }
-                            legendFooter={
-                              powerXLayout ? (
-                                <PowerXMoreViews
-                                  selection={powerXSelection}
-                                  onSelectionChange={setPowerXSelection}
-                                  rolesHaveData={rolesHaveData}
-                                />
-                              ) : undefined
-                            }
-                            legendMobileLabel={powerXLayout ? powerXT.legendMobile : undefined}
                           />
                         </div>
                       );
-                      // Where view: the chip comparison is the visual; the curve is one click away.
+                      const scatter = renderScatter(chartCaption);
+                      const curveScatter = renderScatter(undefined);
+                      // Where view: the caption stays at the top of the card, the chip
+                      // comparison is the visual, and the curve is one click away.
                       if (powerXLayout && powerXTab === 'where' && powerCompare !== 'roles')
-                        return <PowerXCurveSection>{scatter}</PowerXCurveSection>;
+                        return (
+                          <>
+                            <div className="order-first">{chartCaption}</div>
+                            <PowerXCurveSection>{curveScatter}</PowerXCurveSection>
+                          </>
+                        );
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
                           ? visibleDateComparisonRows(graph.data, footerOverlay)
@@ -1509,7 +1508,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           <>
                             {scatter}
                             <PowerXHeadroomTable
-                              points={[...officialRows, ...overlayRows]}
+                              points={officialRows}
+                              overlayPoints={overlayRows}
                               contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
                             />
                           </>
@@ -1578,150 +1578,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         xLabel={resolvedXLabel}
                       />
                     )}
-                  </FigureShell>
+                  </Card>
                 </figure>
               </section>
             );
           });
-
-  // PowerX readout row: the visible plotted points the hovered/pinned readout reads from.
-  const powerXReadoutPoints = useMemo(() => {
-    const graph = renderableGraphs[0];
-    if (!powerXLayout || !graph || powerXTab === 'where' || powerXTab === 'time') return null;
-    const overlay = selectUnofficialOverlayForMode(
-      selectedXAxisMode,
-      graph.chartDefinition.chartType,
-      overlayDataByChartType,
-    );
-    const isGpuComparison =
-      selectedGPUs.length > 0 &&
-      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
-    const { officialRows, overlayRows } = isGpuComparison
-      ? visibleDateComparisonRows(graph.data, overlay)
-      : visibleComparisonRows(graph.data, overlay);
-    return [...officialRows, ...overlayRows];
-  }, [
-    powerXLayout,
-    powerXTab,
-    renderableGraphs,
-    selectedXAxisMode,
-    overlayDataByChartType,
-    selectedGPUs.length,
-    selectedDateRange.startDate,
-    selectedDateRange.endDate,
-    selectedDates.length,
-    visibleDateComparisonRows,
-    visibleComparisonRows,
-  ]);
-
-  // PowerX v2 provenance strip: what the plotted points are made of.
-  const powerXProvenance = useMemo(() => {
-    const graph = renderableGraphs[0];
-    if (!powerXLayout || !graph) return null;
-    const overlay = selectUnofficialOverlayForMode(
-      selectedXAxisMode,
-      graph.chartDefinition.chartType,
-      overlayDataByChartType,
-    );
-    const isGpuComparison =
-      selectedGPUs.length > 0 &&
-      ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
-    const { officialRows, overlayRows } = isGpuComparison
-      ? visibleDateComparisonRows(graph.data, overlay)
-      : visibleComparisonRows(graph.data, overlay);
-    const points = [...officialRows, ...overlayRows].filter((point) => !point.powerVariant);
-    const estimate = points
-      .map((point) => point.modeledSystemPower)
-      .find((candidate) => candidate !== undefined && candidate.status === 'supported');
-    return {
-      measuredPoints: points.length,
-      powerModelRevision: SYSTEM_POWER_MODEL_REVISION,
-      pue: estimate?.status === 'supported' ? estimate.pue : null,
-    };
-  }, [
-    powerXLayout,
-    renderableGraphs,
-    selectedXAxisMode,
-    overlayDataByChartType,
-    selectedGPUs.length,
-    selectedDateRange.startDate,
-    selectedDateRange.endDate,
-    selectedDates.length,
-    visibleDateComparisonRows,
-    visibleComparisonRows,
-  ]);
-
-  if (powerXLayout) {
-    const firstGraph = renderableGraphs[0];
-    return (
-      <div data-testid="inference-chart-display" className="flex flex-col gap-4">
-        <PowerXFrame
-          selection={powerXSelection}
-          onSelectionChange={setPowerXSelection}
-          viewMode={getViewMode(0)}
-          onViewModeChange={(mode) => handleViewModeChange(0, mode)}
-          toolbar={
-            powerXMounted && firstGraph && !isFirstLoad
-              ? renderChartButtons(firstGraph, 0, { viewToggle: false })
-              : undefined
-          }
-        >
-          {powerXMounted && powerXReadoutPoints && getViewMode(0) === 'chart' && (
-            <PowerXReadout points={powerXReadoutPoints} />
-          )}
-          <div
-            className="motion-stale flex flex-col gap-4"
-            data-stale={isRefetching || undefined}
-            aria-busy={isRefetching || undefined}
-          >
-            {displayGraphs}
-          </div>
-          <ActiveQuickFilters />
-          {selectedGPUs.length > 0 && (
-            <ComparisonChangelog
-              changelogs={changelogs}
-              selectedGPUs={selectedGPUs}
-              selectedPrecisions={selectedPrecisions}
-              modelDbKeys={modelDbKeys}
-              selectedSequence={selectedSequence}
-              defaultExpanded={false}
-              loading={changelogsLoading}
-              totalDatesQueried={totalDatesQueried}
-              selectedDates={selectedDates}
-              selectedDateRange={selectedDateRange}
-              onAddDate={(date) => {
-                setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
-              }}
-              onRemoveDate={(date) => {
-                setSelectedDates((prev) => prev.filter((d) => d !== date));
-              }}
-              onAddAllDates={(dates) => {
-                setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
-              }}
-              firstAvailableDate={dateRangeAvailableDates[0]}
-            />
-          )}
-          {powerXMounted && powerXProvenance && selectedPowerBasis && (
-            <PowerXProvenance
-              provenance={powerXProvenance}
-              summary={
-                t.powerXMethod[
-                  selectedPowerBasis === 'gpu-measured' && powerCompare === 'none'
-                    ? 'gpu'
-                    : 'system'
-                ]
-              }
-            >
-              {t.powerXMethodDetail}{' '}
-              {selectedPowerBasis !== 'gpu-measured' && t.powerBasisAssumptions[selectedPowerBasis]}{' '}
-              {ALL_IN_MEASURED_NOTE[locale]}{' '}
-              {isAgenticSequence && ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
-            </PowerXProvenance>
-          )}
-        </PowerXFrame>
-      </div>
-    );
-  }
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
@@ -1732,13 +1593,28 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               {!embedded && (
                 <>
                   <DashboardSectionHeader
-                    title={powerXSurface ? t.powerXTitle : t.inferencePerformance}
-                    description={powerXSurface ? t.powerXDesc : t.inferencePerformanceDesc}
+                    title={powerXSurface ? powerXT.title : t.inferencePerformance}
+                    description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
                     actions={<ShareButton />}
                   />
+                  {powerXLayout && powerXMounted && (
+                    <PowerXViewTabs
+                      selection={powerXSelection}
+                      onSelectionChange={setPowerXSelection}
+                    />
+                  )}
                   <ChartControls
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
+                    powerXControls={
+                      powerXLayout && powerXMounted ? (
+                        <PowerXChartConfig
+                          selection={powerXSelection}
+                          onSelectionChange={setPowerXSelection}
+                          rolesHaveData={rolesHaveData}
+                        />
+                      ) : undefined
+                    }
                   />
                 </>
               )}
