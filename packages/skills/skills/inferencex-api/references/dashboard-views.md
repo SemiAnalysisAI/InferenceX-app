@@ -33,9 +33,20 @@ results or treat its interpolated values as separately measured operating points
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
-   through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
-   Flash remains in the default model group.
+   Every model with `category=deprecated` in `options.models` receives large
+   “Deprecated” plot watermarks (“已弃用” in Chinese), including PNG exports and
+   unofficial-run overlays. They appear in separate bands above and below the existing SemiAnalysis logo
+   so the marks do not overlap; logo styling and official-domain behavior follow the
+   main site. This is presentation only; view API values and filters are unchanged.
+   Deprecated models remain selectable through explicit model parameters and
+   overview `modelScope=all`. MiniMax M3 is deprecated; M3.1 Flash remains default.
+
+   中文：`options.models` 中分类为 `deprecated` 的所有模型，都会在绘图区背景中显示大号
+   “已弃用”水印，PNG 导出和非官方 run overlay 中同样保留。水印分别放在现有 SemiAnalysis
+   标志的上方和下方，彼此不会重叠；标志样式及其在正式域名上的显示规则与主站一致。该水印仅用于
+   展示，不改变视图 API 的数值或筛选行为。已弃用模型仍可通过显式模型参数或 overview 的
+   `modelScope=all` 查询。MiniMax M3 已弃用，M3.1 Flash 仍保留在默认模型组中。
+
 2. Build one public HTTPS GET URL using `URLSearchParams`, especially for JSON
    costs, commas, slashes, and run-specific comparison dates. No credentials are
    required. Unknown or repeated parameter names return 400.

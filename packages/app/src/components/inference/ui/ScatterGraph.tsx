@@ -45,6 +45,7 @@ import {
 } from '@/lib/catalog/constants';
 import {
   getChartWatermark,
+  getDeprecatedChartWatermark,
   getPrecisionLabel,
   getSequenceLabel,
   type Precision,
@@ -3723,6 +3724,7 @@ const ScatterGraph = React.memo(
           metricIdentity={metricIdentity}
           margin={CHART_MARGIN}
           watermark={getChartWatermark(isUnofficialRun)}
+          backgroundWatermark={getDeprecatedChartWatermark(modelLabel, locale)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}

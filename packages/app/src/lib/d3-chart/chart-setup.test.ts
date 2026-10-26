@@ -186,6 +186,77 @@ describe('setupChartStructure', () => {
   });
 
   describe('watermark variants', () => {
+    it.each([
+      [400, 600],
+      [1200, 600],
+      [800, 300],
+    ])(
+      'preserves the SemiAnalysis logo and places Deprecated above and below it at %s×%s',
+      (containerWidth, containerHeight) => {
+        const svgEl = makeSvgEl();
+        const config = defaultConfig({ watermark: 'logo', containerWidth, containerHeight });
+        setupChartStructure(svgEl, config);
+        const originalLogo = svgEl.querySelector('#logo-pattern-test-chart')!.outerHTML;
+        const originalRect = svgEl.querySelector('.watermark-rect')!.outerHTML;
+
+        setupChartStructure(svgEl, { ...config, backgroundWatermark: 'Deprecated' });
+        expect(svgEl.querySelector('#logo-pattern-test-chart')!.outerHTML).toBe(originalLogo);
+        expect(svgEl.querySelector('.watermark-rect')!.outerHTML).toBe(originalRect);
+        const logo = svgEl.querySelector('#logo-pattern-test-chart image')!;
+        const above = svgEl.querySelector('.deprecated-watermark[data-position="above"]')!;
+        const status = svgEl.querySelector('.deprecated-watermark[data-position="below"]')!;
+        expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(2);
+        expect(Number(above.getAttribute('y'))).toBeGreaterThanOrEqual(config.margin.top);
+        expect(Number(above.getAttribute('y')) + Number(above.getAttribute('height'))).toBeLessThan(
+          Number(logo.getAttribute('y')),
+        );
+        expect(above.getAttribute('opacity')).toBe('0.3');
+        expect(status.getAttribute('opacity')).toBe('0.3');
+        const logoBottom = Number(logo.getAttribute('y')) + Number(logo.getAttribute('height'));
+        expect(Number(status.getAttribute('y'))).toBeGreaterThan(logoBottom);
+        expect(
+          Number(status.getAttribute('y')) + Number(status.getAttribute('height')),
+        ).toBeLessThanOrEqual(containerHeight - config.margin.bottom);
+      },
+    );
+    it('keeps a large deprecated watermark behind the plot alongside unofficial marks through resize and removal', () => {
+      const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      setupChartStructure(
+        svgEl,
+        defaultConfig({
+          watermark: 'unofficial',
+          backgroundWatermark: 'Deprecated',
+        }),
+      );
+      const mark = svgEl.querySelector('.deprecated-watermark')!;
+      expect(mark.parentElement).toBe(svgEl);
+      expect([...svgEl.children].indexOf(mark)).toBeLessThan(
+        [...svgEl.children].indexOf(svgEl.querySelector('.chart-root')!),
+      );
+      expect(mark.getAttribute('viewBox')).toBe('0 0 1000 200');
+      expect(mark.getAttribute('pointer-events')).toBe('none');
+      expect([...mark.querySelectorAll('text')].map((node) => node.textContent)).toEqual([
+        'Deprecated',
+      ]);
+      expect(svgEl.querySelector('.unofficial-watermark-image')).not.toBeNull();
+
+      const resized = defaultConfig({
+        watermark: 'unofficial',
+        backgroundWatermark: '已弃用',
+        containerWidth: 400,
+      });
+      setupChartStructure(svgEl, resized);
+      expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(2);
+      expect(svgEl.querySelector('.deprecated-watermark')?.getAttribute('width')).toBe(
+        String((400 - resized.margin.left - resized.margin.right) * 0.8),
+      );
+      expect(svgEl.querySelector('.deprecated-watermark')?.textContent).toBe('已弃用');
+
+      setupChartStructure(svgEl, defaultConfig({ watermark: 'logo' }));
+      expect(svgEl.querySelector('.deprecated-watermark')).toBeNull();
+      expect(svgEl.querySelector('.unofficial-watermark-image')).toBeNull();
+      expect(svgEl.querySelector('.watermark-rect')).not.toBeNull();
+    });
     it('creates logo watermark when watermark is "logo"', () => {
       const svgEl = makeSvgEl();
       const config = defaultConfig({ watermark: 'logo' });

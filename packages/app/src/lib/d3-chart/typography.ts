@@ -7,6 +7,7 @@ export const CHART_TYPE = {
   lineLabel: 13,
   micro: 9,
   watermark: 20,
+  backgroundWatermark: 108,
 } as const;
 
 export function px(size: number): string {

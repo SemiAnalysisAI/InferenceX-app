@@ -258,6 +258,14 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
+export function getDeprecatedChartWatermark(
+  model: string | undefined,
+  locale: 'en' | 'zh',
+): string | undefined {
+  if (!model || !isModelDeprecated(model as Model)) return undefined;
+  return locale === 'zh' ? '已弃用' : 'Deprecated';
+}
+
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
   (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
     .filter(([, c]) => c.prefix)

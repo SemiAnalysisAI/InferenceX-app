@@ -4,6 +4,7 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getDeprecatedChartWatermark,
   getOpenRouterModelId,
   MODEL_OPTIONS,
   SEQUENCE_OPTIONS,
@@ -167,6 +168,27 @@ describe('getModelAndSequenceFromArtifact', () => {
 });
 
 describe('isModelDeprecated', () => {
+  it.each([
+    Model.MiniMax_M3,
+    Model.MiniMax_M2_5,
+    Model.Kimi_K2_5,
+    Model.GLM_5,
+    Model.GptOss,
+    Model.Llama3_3_70B,
+  ])('adds a localized Deprecated watermark to %s', (model) => {
+    expect(getDeprecatedChartWatermark(model, 'en')).toBe('Deprecated');
+    expect(getDeprecatedChartWatermark(model, 'zh')).toBe('已弃用');
+  });
+
+  it.each([
+    Model.MiniMax_M3_1_Flash,
+    Model.DeepSeek_R1,
+    Model.Qwen3_8_27B,
+    Model.Llama3_1_70B,
+    undefined,
+  ])('does not mark the non-deprecated model %s', (model) => {
+    expect(getDeprecatedChartWatermark(model, 'en')).toBeUndefined();
+  });
   it('returns true for deprecated model Llama3_3_70B', () => {
     expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
   });
