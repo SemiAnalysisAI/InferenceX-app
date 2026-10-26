@@ -57,6 +57,15 @@ describe('GET /api/v1/views/options', () => {
     expect(dsv4.dbKeys).toContain('dsv4');
     expect(typeof dsv4.category).toBe('string');
     expect(body.models.every((m: { dbKeys: string[] }) => m.dbKeys.length > 0)).toBe(true);
+    expect(body.models.find((m: { name: string }) => m.name === 'MiniMax-M3')).toMatchObject({
+      dbKeys: ['minimaxm3'],
+      category: 'deprecated',
+    });
+    expect(
+      body.models.find((m: { name: string }) => m.name === 'MiniMax-M3.1-Flash'),
+    ).toMatchObject({
+      category: 'default',
+    });
   });
 
   it('describes sequences with isl/osl and deprecation flags', async () => {

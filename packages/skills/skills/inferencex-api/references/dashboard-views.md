@@ -33,6 +33,9 @@ results or treat its interpolated values as separately measured operating points
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
+   MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
+   through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
+   Flash remains in the default model group.
 2. Build one public HTTPS GET URL using `URLSearchParams`, especially for JSON
    costs, commas, slashes, and run-specific comparison dates. No credentials are
    required. Unknown or repeated parameter names return 400.

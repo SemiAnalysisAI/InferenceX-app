@@ -315,7 +315,7 @@ describe('isActiveImageRow', () => {
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
-    expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
@@ -332,6 +332,7 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.5', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.6', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm2.5', '8k/1k'))).toBe(false);

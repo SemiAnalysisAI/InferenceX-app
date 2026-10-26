@@ -122,6 +122,13 @@ const responseExample = {
       releaseDate: '2026-06-30',
       compareSlug: 'deepseek-v4-pro',
     },
+    {
+      name: 'MiniMax-M3',
+      dbKeys: ['minimaxm3'],
+      category: 'deprecated',
+      releaseDate: '2026-06-07',
+      compareSlug: 'minimax-m3',
+    },
   ],
   sequences: [
     {
