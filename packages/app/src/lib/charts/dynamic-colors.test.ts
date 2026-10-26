@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hsl } from 'd3';
+import { hsl, rgb } from 'd3';
 
 import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
@@ -158,5 +158,61 @@ describe('TPUv7 vendor colors', () => {
     expect(jalapenoHue).toBeLessThanOrEqual(330);
     expect(colors.tpuv7_vllm).toBe('#4285F4');
     expect(VENDOR_OKLCH_ZONES.openai.start).toBeGreaterThan(VENDOR_OKLCH_ZONES.google.end);
+  });
+});
+
+function luminance(css: string): number {
+  const c = rgb(css);
+  const values = [c.r, c.g, c.b]
+    .map((v) => v / 255)
+    .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722;
+}
+
+function contrastAgainst(color: string, background: string): number {
+  const a = luminance(color),
+    b = luminance(background);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+describe('Huawei shared identity colors', () => {
+  it('recognizes canonical, display, SKU and framework keys without catching unrelated words', () => {
+    for (const key of [
+      'ascend950pr',
+      'Huawei 950PR',
+      'Ascend950PR_9579',
+      'ascend950pr_torch_npu_linear',
+      'huawei_950pr',
+      'ascend910b3',
+    ])
+      expect(getVendor(key)).toBe('huawei');
+    expect(getVendor('ascendant')).toBe('unknown');
+    expect(getVendor('other_huawei')).toBe('unknown');
+  });
+  it.each(['light', 'dark'] as const)(
+    'uses the same readable amber for aliases and preserves other vendor colors (%s)',
+    (theme) => {
+      const other = ['mi300x', 'mi355x', 'h100', 'tpuv7', 'jalapeno', 'mystery'];
+      const before = generateVendorColors(other, theme),
+        after = generateVendorColors([...other, 'ascend950pr'], theme);
+      for (const key of other) expect(after[key]).toBe(before[key]);
+      const color = after.ascend950pr;
+      expect(generateVendorColors(['Huawei 950PR'], theme)['Huawei 950PR']).toBe(color);
+      expect(hsl(color).h).toBeGreaterThan(35);
+      expect(hsl(color).h).toBeLessThan(55);
+      expect(
+        contrastAgainst(color, theme === 'light' ? '#ffffff' : '#111214'),
+      ).toBeGreaterThanOrEqual(4.5);
+      expect(generateGpuDateColors(['ascend950pr'], 1, theme)['0_ascend950pr']).toBe(color);
+      const dates = generateGpuDateColors(['ascend950pr'], 3, theme);
+      expect(hueOf(dates['0_ascend950pr'])).toBeCloseTo(hueOf(dates['2_ascend950pr']), 6);
+      expect(dates['0_ascend950pr']).not.toBe(dates['2_ascend950pr']);
+    },
+  );
+  it('keeps multiple Huawei chips in their own amber family', () => {
+    const colors = generateVendorColors(['ascend950pr', 'ascend910b3'], 'dark');
+    expect(hueOf(colors.ascend950pr)).toBeGreaterThanOrEqual(80);
+    expect(hueOf(colors.ascend950pr)).toBeLessThanOrEqual(100);
+    expect(colors.ascend950pr).not.toBe(colors.ascend910b3);
   });
 });
