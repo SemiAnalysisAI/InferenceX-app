@@ -361,10 +361,15 @@ intercept, not idle power, and do not read the line outside its x-range.
 `powerBreakdown=true` returns `powerBreakdowns`: per hardware line (`hwKey|precision`,
 the chart legend grouping), each point's All in Measured W/GPU split into `gpu`
 (measured board power), `measuredCpu` (Grace sockets, NVL72 only, when socket telemetry
-is valid), and the modeled `server` parts, `fansPsu` (fans + conversion loss), `network`
-(scale-out share) and `facility` (PUE overhead). Each part is the deployment share ÷
-allocated GPUs, so the parts sum to `totalWattsPerGpu`. Only `gpu` and `measuredCpu` are
-measured; call the rest modeled at the point's measured GPU power under `modelRevision`.
+is valid), and the modeled `cpu` (host sockets), `memory` (host DRAM), `nic` (NIC cards +
+system-side optics), `nvswitch` (NVLink switch ASICs and trays), `storage` (NVMe), `other`
+(PCIe switches, retimers, shelf controllers), `fans`, `psuLoss` (AC/DC + DC/DC conversion
+loss), `network` (scale-out share) and `facility` (PUE overhead), in that stack order.
+`categories` lists the parts with watts on at least one point: an NVL72 line with measured
+sockets has no `cpu` or `memory` (the socket figure covers both), an AMD line has no
+`nvswitch`, a B300 line has no `other`. Each part is the deployment share ÷ allocated GPUs, so the parts sum to
+`totalWattsPerGpu`. Only `gpu` and `measuredCpu` are measured; call the rest modeled at the
+point's measured GPU power under `modelRevision`.
 `tdpWattsPerGpu` and `allInProvisionedWattsPerGpu` are rated references, not Pareto power
 metrics. Points are sorted by `interactivity` on `interactivityField`: the chart's
 interactivity x-axis (AgentX P90/P75 included), otherwise `median_intvty`. Points without
@@ -409,7 +414,7 @@ Power draw shown as % of TDP shades each chip's headroom between its P90 draw an
 adds the headroom table (`headroom=true`) with a CSV download. On Where the power goes the
 chip comparison stacks IT only by default; an Include facility switch (presentation only, no
 API selector) appends the PUE part; the compared chip's across-load drill-down (stacked bars or
-stacked area, `i_pbview`) is open inline under its bar and follows the slider, and the view
+stacked area, `i_pbview`, stacked area by default) is open inline under its bar and follows the slider, and the view
 itself is `i_pcompare=breakdown` (no boundary line chart; the boundaries are compared on Power
 draw under Count: All). Over time adds a load-swing table per
 trace (peak, min, idle floor, mean, P5/P95, max 1 s and 5 s change, ramp up/down, volatility),
@@ -429,7 +434,8 @@ These analytical results (`serviceCompare`, `roleShare`, `powerFit`, `powerBreak
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
 同并发表格或分享参数。功耗拟合（`powerFit`）同样仅通过 API 提供；PowerX 标签页保留角色分析与系统功耗构成面板，分别对应 `roleShare`
-和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
+和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分（`cpu`、`memory`、
+`nic`、`nvswitch`、`storage`、`other`、`fans`、`psuLoss`、`network`、`facility`）为
 按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。各点按 `interactivityField` 上的
 `interactivity` 排序：图表 x 轴为交互性时（含 AgentX P90/P75）沿用该轴，否则使用 `median_intvty`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 

@@ -110,7 +110,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_pctl: 'p90',
   i_mstat: 'median',
   i_tokens: 'total',
-  i_pbview: 'bars',
+  i_pbview: 'area',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',

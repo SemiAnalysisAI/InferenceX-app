@@ -4,6 +4,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
@@ -140,8 +141,10 @@ describe('power boundaries through the derived-field builder', () => {
     expect(itWatts).toBeCloseTo(model.deploymentItWatts / model.gpuCount, 9);
     const parts = model.deploymentBreakdownWatts;
     const stackedIt =
-      (parts.gpu + parts.measuredCpu + parts.server + parts.fansPsu + parts.network) /
-      model.gpuCount;
+      SYSTEM_POWER_CATEGORIES.filter((key) => key !== 'facility').reduce(
+        (sum, key) => sum + parts[key],
+        0,
+      ) / model.gpuCount;
     expect(itWatts).toBeCloseTo(stackedIt, 6);
     expect(facility).toBeCloseTo(itWatts! + parts.facility / model.gpuCount, 6);
     // Both modeled energies scale measured J/token by their watt ratio.

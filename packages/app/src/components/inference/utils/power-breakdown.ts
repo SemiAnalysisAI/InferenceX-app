@@ -4,6 +4,7 @@ import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { isPositive, modeledFacilityWattsPerGpu } from '@/lib/power/power-basis';
 import {
+  MEASURED_SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_CATEGORIES,
   type SystemPowerBreakdown,
   type SystemPowerCategory,
@@ -18,29 +19,44 @@ import {
 /**
  * Per-point "what each power account counts" breakdown (PowerX Figure 1): the
  * All in Measured W/GPU of one point split into measured GPU board power,
- * measured Grace sockets (NVL72 only), modeled server parts, fans + PSU loss,
- * the scale-out network share and PUE facility overhead. Every part is the
- * deployment's share divided by its allocated GPUs, so the parts sum to the
- * point's All in Measured W/GPU exactly.
+ * measured Grace sockets (NVL72 only), the modeled host CPUs, memory, NICs,
+ * NVSwitch, storage and PCIe parts, fans, PSU loss, the scale-out network
+ * share and PUE facility overhead. Every part is the deployment's share
+ * divided by its allocated GPUs, so the parts sum to the point's All in
+ * Measured W/GPU exactly.
  */
 
 export { SYSTEM_POWER_CATEGORIES };
 export type { SystemPowerCategory };
 
 /** Drawn bottom-up; measured parts sit under the modeled ones. */
-export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = [
-  'gpu',
-  'measuredCpu',
-  'server',
-  'fansPsu',
-  'network',
-  'facility',
-];
+export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = SYSTEM_POWER_CATEGORIES;
 
-export const MEASURED_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> = new Set([
-  'gpu',
-  'measuredCpu',
-]);
+export const MEASURED_POWER_CATEGORIES = MEASURED_SYSTEM_POWER_CATEGORIES;
+
+/**
+ * One colour per part, shared by every chip, so the layers of a single
+ * hardware line stay tellable apart. The tokens live next to the
+ * `--overlay-run-*` palette in `globals.css` with light and dark values;
+ * measured and modeled CPU share a hue and differ by the modeled hatch.
+ */
+export const POWER_CATEGORY_COLOR_TOKEN: Record<SystemPowerCategory, string> = {
+  gpu: '--power-part-gpu',
+  measuredCpu: '--power-part-cpu',
+  cpu: '--power-part-cpu',
+  memory: '--power-part-memory',
+  nic: '--power-part-nic',
+  nvswitch: '--power-part-nvswitch',
+  storage: '--power-part-storage',
+  other: '--power-part-other',
+  fans: '--power-part-fans',
+  psuLoss: '--power-part-psu-loss',
+  network: '--power-part-network',
+  facility: '--power-part-facility',
+};
+
+export const powerCategoryColor = (category: SystemPowerCategory): string =>
+  `var(${POWER_CATEGORY_COLOR_TOKEN[category]})`;
 
 export interface PowerBreakdownPoint {
   point: InferenceData;

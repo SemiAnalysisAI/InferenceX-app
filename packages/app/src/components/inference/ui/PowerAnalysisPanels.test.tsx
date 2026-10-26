@@ -208,17 +208,21 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     expect(container.querySelector('[data-testid="power-breakdown-legend"]')).toBeNull();
   });
 
-  it('switches the compact panel to the stacked area view', () => {
-    const area = container.querySelector<HTMLButtonElement>(
-      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-view-area"]',
-    )!;
-    expect(area.getAttribute('aria-pressed')).toBe('false');
-    act(() => area.click());
+  it('opens on the stacked area view and switches the compact panel to stacked bars', () => {
+    const drilldown = '[data-testid="power-chip-compare-drilldown"]';
     expect(
       container
-        .querySelector(
-          '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-view-area"]',
-        )
+        .querySelector(`${drilldown} [data-testid="power-breakdown-view-area"]`)
+        ?.getAttribute('aria-pressed'),
+    ).toBe('true');
+    const bars = container.querySelector<HTMLButtonElement>(
+      `${drilldown} [data-testid="power-breakdown-view-bars"]`,
+    )!;
+    expect(bars.getAttribute('aria-pressed')).toBe('false');
+    act(() => bars.click());
+    expect(
+      container
+        .querySelector(`${drilldown} [data-testid="power-breakdown-view-bars"]`)
         ?.getAttribute('aria-pressed'),
     ).toBe('true');
     expect(

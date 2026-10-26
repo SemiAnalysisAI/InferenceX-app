@@ -568,7 +568,19 @@ describe('GET /api/v1/views/inference', () => {
     const [series] = body.powerBreakdowns;
     expect(series).toMatchObject({
       precision: 'fp8',
-      categories: ['gpu', 'server', 'fansPsu', 'network', 'facility'],
+      categories: [
+        'gpu',
+        'cpu',
+        'memory',
+        'nic',
+        'nvswitch',
+        'storage',
+        'other',
+        'fans',
+        'psuLoss',
+        'network',
+        'facility',
+      ],
       tdpWattsPerGpu: 700,
       interactivityField: 'median_intvty',
     });
@@ -590,10 +602,13 @@ describe('GET /api/v1/views/inference', () => {
       expect(point).not.toHaveProperty('configKey');
       expect(point.point).toMatchObject({ id: [300, 301][index] });
     }
-    // Load moves the measured GPU part and fans/PSU loss; fixed server parts stay put.
+    // Load moves the measured GPU part, the fans and the PSU loss; fixed parts stay put.
     const [high, low] = series.points;
-    expect(high.wattsPerGpu.server).toBeCloseTo(low.wattsPerGpu.server, 6);
-    expect(high.wattsPerGpu.fansPsu).toBeGreaterThan(low.wattsPerGpu.fansPsu);
+    for (const key of ['cpu', 'memory', 'nic', 'nvswitch', 'storage', 'other', 'network']) {
+      expect(high.wattsPerGpu[key]).toBeCloseTo(low.wattsPerGpu[key], 6);
+    }
+    expect(high.wattsPerGpu.fans).toBeGreaterThan(low.wattsPerGpu.fans);
+    expect(high.wattsPerGpu.psuLoss).toBeGreaterThan(low.wattsPerGpu.psuLoss);
 
     const offResponse = await GET(
       request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower'),

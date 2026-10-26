@@ -1,5 +1,6 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import {
   text,
   stringSchema,
@@ -279,8 +280,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), modeled server parts, fans + PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
-      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时）、建模的服务器部件、风扇 + 电源损耗、Scale-out 网络分摊以及 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), and the modeled host CPU, memory, NICs, NVSwitch, storage, PCIe and misc parts, fans, PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
+      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时），以及建模的主机 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他部件、风扇、电源损耗、Scale-out 网络分摊和 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -629,7 +630,9 @@ const responseSchema = objectSchema(
         label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
         categories: arraySchema({
           type: 'string',
-          enum: ['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility'],
+          enum: [...SYSTEM_POWER_CATEGORIES],
+          description:
+            'Parts with watts on at least one point, in stack order. gpu and measuredCpu are measured; the rest are modeled.',
         }),
         tdpWattsPerGpu: nullableNumber('Rated board TDP per GPU (reference, not a measurement).'),
         allInProvisionedWattsPerGpu: nullableNumber(
@@ -649,14 +652,9 @@ const responseSchema = objectSchema(
               description: 'tok/s/user on interactivityField; points are sorted by it.',
             },
             configLabel: { type: 'string', description: 'Date, topology and recipe of the point.' },
-            wattsPerGpu: objectSchema({
-              gpu: numberSchema,
-              measuredCpu: numberSchema,
-              server: numberSchema,
-              fansPsu: numberSchema,
-              network: numberSchema,
-              facility: numberSchema,
-            }),
+            wattsPerGpu: objectSchema(
+              Object.fromEntries(SYSTEM_POWER_CATEGORIES.map((key) => [key, numberSchema])),
+            ),
             totalWattsPerGpu: { ...numberSchema, description: 'All in Measured W/GPU.' },
             pue: numberSchema,
             cpuBasis: {

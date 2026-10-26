@@ -49,8 +49,14 @@ const STRINGS = {
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
-      server: 'Server parts',
-      fansPsu: 'Fans + PSU loss',
+      cpu: 'CPU',
+      memory: 'Memory',
+      nic: 'NICs',
+      nvswitch: 'NVSwitch',
+      storage: 'Storage',
+      other: 'PCIe & misc',
+      fans: 'Fans',
+      psuLoss: 'PSU loss',
       network: 'Network share',
       facility: 'Facility (PUE)',
     } satisfies Record<SystemPowerCategory, string>,
@@ -73,8 +79,14 @@ const STRINGS = {
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
-      server: '服务器部件',
-      fansPsu: '风扇 + 电源损耗',
+      cpu: 'CPU',
+      memory: '内存',
+      nic: '网卡',
+      nvswitch: 'NVSwitch',
+      storage: '存储',
+      other: 'PCIe 及其他',
+      fans: '风扇',
+      psuLoss: '电源损耗',
       network: '网络分摊',
       facility: '机房开销（PUE）',
     } satisfies Record<SystemPowerCategory, string>,
@@ -225,10 +237,7 @@ export default function PowerChipCompare({
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden>
         {categories.map((key) => (
           <li key={key} className="flex items-center gap-1.5">
-            <span
-              className="inline-block size-3 rounded-[2px] border border-muted-foreground/60"
-              style={swatchStyle(key, 'var(--muted-foreground)')}
-            />
+            <span className="inline-block size-3 rounded-[2px]" style={swatchStyle(key)} />
             {t.categories[key]}
             <span className="opacity-70">
               · {MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}
@@ -292,7 +301,7 @@ export default function PowerChipCompare({
                             className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
-                              ...swatchStyle(key, color),
+                              ...swatchStyle(key),
                             }}
                           >
                             {share >= MIN_LABEL_SHARE ? watts(w) : ''}

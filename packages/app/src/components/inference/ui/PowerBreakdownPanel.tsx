@@ -38,7 +38,9 @@ import {
   MEASURED_POWER_CATEGORIES,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
+  powerCategoryColor,
   stackPowerBreakdown,
+  SYSTEM_POWER_CATEGORIES,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
   type SystemPowerCategory,
@@ -75,9 +77,15 @@ const STRINGS = {
       'No point in this view has both validated GPU telemetry and a supported system power model.',
     categories: {
       gpu: ['Measured GPU', 'GPU board power from telemetry'],
-      measuredCpu: ['Measured Grace CPU', 'Grace socket telemetry'],
-      server: ['Server parts', 'CPUs, memory, NICs, NVSwitch, drives'],
-      fansPsu: ['Fans + PSU loss', 'Moves with load'],
+      measuredCpu: ['Measured Grace CPU', 'Grace socket telemetry, CPU + LPDDR'],
+      cpu: ['CPU', 'Host CPU sockets'],
+      memory: ['Memory', 'Host DRAM'],
+      nic: ['NICs', 'NIC cards + system-side optics'],
+      nvswitch: ['NVSwitch', 'NVLink switch ASICs and trays'],
+      storage: ['Storage', 'NVMe drives'],
+      other: ['PCIe & misc', 'PCIe switches, retimers, shelf controllers'],
+      fans: ['Fans', 'Moves with load'],
+      psuLoss: ['PSU loss', 'AC/DC + DC/DC conversion loss'],
       network: ['Network share', 'Scale-out switch + its optics'],
       facility: ['Facility overhead', 'PUE'],
     } satisfies Record<SystemPowerCategory, [string, string]>,
@@ -107,9 +115,15 @@ const STRINGS = {
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
     categories: {
       gpu: ['实测 GPU', '遥测得到的 GPU 板卡功耗'],
-      measuredCpu: ['实测 Grace CPU', 'Grace 插槽遥测'],
-      server: ['服务器部件', 'CPU、内存、网卡、NVSwitch、硬盘'],
-      fansPsu: ['风扇 + 电源损耗', '随负载变化'],
+      measuredCpu: ['实测 Grace CPU', 'Grace 插槽遥测（CPU + LPDDR）'],
+      cpu: ['CPU', '主机 CPU 插槽'],
+      memory: ['内存', '主机 DRAM'],
+      nic: ['网卡', '网卡及系统侧光模块'],
+      nvswitch: ['NVSwitch', 'NVLink 交换芯片及交换托盘'],
+      storage: ['存储', 'NVMe 硬盘'],
+      other: ['PCIe 及其他', 'PCIe 交换芯片、retimer、电源架控制器'],
+      fans: ['风扇', '随负载变化'],
+      psuLoss: ['电源损耗', 'AC/DC 与 DC/DC 转换损耗'],
       network: ['网络分摊', 'Scale-out 交换机及其光模块'],
       facility: ['机房开销', 'PUE'],
     } satisfies Record<SystemPowerCategory, [string, string]>,
@@ -117,20 +131,16 @@ const STRINGS = {
 };
 
 /**
- * One color per hardware line (the same vendor color as the main chart legend);
- * parts step down in opacity like the Profit Estimator's stacked bars, and the
- * facility overhead is hatched like its loss segment. Measured parts are the
- * most opaque so the metered base reads first.
+ * Each part has its own colour (`powerCategoryColor`, shared by every chip),
+ * so the layers of one hardware line stay tellable apart; the chip's vendor
+ * colour marks only its total (area top edge and dots) and its legend dot.
+ * Measured parts are solid; modeled parts are hatched over a lighter fill,
+ * like the Profit Estimator's loss segment, and the facility overhead is the
+ * lightest since it is PUE, not a component.
  */
-export const CATEGORY_OPACITY: Record<SystemPowerCategory, number> = {
-  gpu: 0.9,
-  measuredCpu: 0.72,
-  server: 0.5,
-  fansPsu: 0.34,
-  network: 0.2,
-  facility: 0,
-};
-const HATCH_OPACITY = 0.18;
+const MEASURED_FILL_OPACITY = 0.85;
+const MODELED_BG_OPACITY = 0.32;
+const FACILITY_BG_OPACITY = 0.14;
 const SEGMENT_LABEL_MIN_PX = 15;
 const SEGMENT_LABEL_MIN_BAND = 30;
 const MAX_BAR_PX = 48;
@@ -143,6 +153,21 @@ const X_TICK_SPACING_PX = 70;
 const REFERENCE_LABEL_CHAR_PX = 6.5;
 const REFERENCE_LABEL_CLEARANCE_PX = 34;
 const BAR_GAP_FRACTION = 0.72;
+
+const CSV_COLUMNS: Record<SystemPowerCategory, string> = {
+  gpu: 'measured_gpu_w_per_gpu',
+  measuredCpu: 'measured_grace_cpu_w_per_gpu',
+  cpu: 'cpu_w_per_gpu',
+  memory: 'memory_w_per_gpu',
+  nic: 'nic_w_per_gpu',
+  nvswitch: 'nvswitch_w_per_gpu',
+  storage: 'storage_w_per_gpu',
+  other: 'pcie_misc_w_per_gpu',
+  fans: 'fans_w_per_gpu',
+  psuLoss: 'psu_loss_w_per_gpu',
+  network: 'network_share_w_per_gpu',
+  facility: 'facility_overhead_w_per_gpu',
+};
 
 const watts = d3.format(',.0f');
 const percent = d3.format('.0%');
@@ -184,18 +209,24 @@ function hatchId(sectionId: string, category: SystemPowerCategory = 'facility') 
 /** Modeled parts are hatched (estimates), measured parts solid. */
 const isHatched = (category: SystemPowerCategory) => !MEASURED_POWER_CATEGORIES.has(category);
 const hatchBgOpacity = (category: SystemPowerCategory) =>
-  category === 'facility' ? HATCH_OPACITY : CATEGORY_OPACITY[category];
+  category === 'facility' ? FACILITY_BG_OPACITY : MODELED_BG_OPACITY;
 
 /**
- * Each modeled part gets its own stripe angle, so neighbouring estimates stay
- * distinguishable without relying on opacity alone. Degrees, SVG convention:
+ * Neighbouring modeled parts alternate stripe angles, so two estimates stay
+ * distinguishable even where their hues are close. Degrees, SVG convention:
  * the rotation applied to a vertical stripe (0 = vertical, 90 = horizontal).
  */
 export const HATCH_ANGLE: Record<SystemPowerCategory, number> = {
   gpu: 45,
   measuredCpu: 45,
-  server: 45,
-  fansPsu: 135,
+  cpu: 45,
+  memory: 135,
+  nic: 45,
+  nvswitch: 135,
+  storage: 45,
+  other: 135,
+  fans: 45,
+  psuLoss: 135,
   network: 0,
   facility: 90,
 };
@@ -203,7 +234,9 @@ export const HATCH_ANGLE: Record<SystemPowerCategory, number> = {
 /** CSS `repeating-linear-gradient` angle that draws the same stripes as the SVG pattern. */
 export const cssHatchAngle = (category: SystemPowerCategory) => (HATCH_ANGLE[category] + 90) % 360;
 
-export function swatchStyle(category: SystemPowerCategory, color: string): React.CSSProperties {
+/** The part's own colour as a legend swatch or a comparison-bar segment. */
+export function swatchStyle(category: SystemPowerCategory): React.CSSProperties {
+  const color = powerCategoryColor(category);
   if (isHatched(category)) {
     return {
       backgroundColor: `color-mix(in oklab, ${color} ${hatchBgOpacity(category) * 100}%, transparent)`,
@@ -212,7 +245,7 @@ export function swatchStyle(category: SystemPowerCategory, color: string): React
     };
   }
   return {
-    backgroundColor: `color-mix(in oklab, ${color} ${CATEGORY_OPACITY[category] * 100}%, transparent)`,
+    backgroundColor: `color-mix(in oklab, ${color} ${MEASURED_FILL_OPACITY * 100}%, transparent)`,
     border: `1px solid ${color}`,
   };
 }
@@ -220,7 +253,6 @@ export function swatchStyle(category: SystemPowerCategory, color: string): React
 function tooltipHtml(
   series: PowerBreakdownSeries,
   column: Column,
-  color: string,
   xLabel: string,
   t: (typeof STRINGS)['en'],
   totalLabel: string = t.total,
@@ -233,7 +265,8 @@ function tooltipHtml(
       const [label] = t.categories[key];
       const suffix = key === 'facility' ? ` (${t.pue} ${entry.pue})` : '';
       const basis = MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled;
-      return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${isHatched(key) ? 'transparent' : color};opacity:${isHatched(key) ? 1 : CATEGORY_OPACITY[key]};border:1px ${isHatched(key) ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
+      const color = powerCategoryColor(key);
+      return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${isHatched(key) ? `color-mix(in oklab, ${color} ${hatchBgOpacity(key) * 100}%, transparent)` : color};border:1px ${isHatched(key) ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
     })
     .join('');
   // The model revision and the rated-reference caveat live here rather than
@@ -324,9 +357,9 @@ function BreakdownChart({
       ...references.map((reference) => reference.value),
     ) * 1.08;
   const fill = (category: SystemPowerCategory) =>
-    isHatched(category) ? `url(#${hatchId(sectionId, category)})` : color;
+    isHatched(category) ? `url(#${hatchId(sectionId, category)})` : powerCategoryColor(category);
   const fillOpacity = (category: SystemPowerCategory) =>
-    isHatched(category) ? 1 : CATEGORY_OPACITY[category];
+    isHatched(category) ? 1 : MEASURED_FILL_OPACITY;
   const hatchedCategories = series.categories.filter(isHatched);
 
   const drawDefs: NonNullable<CustomLayerConfig['render']> = (group) => {
@@ -355,9 +388,9 @@ function BreakdownChart({
       .attr('patternTransform', (category) => `rotate(${HATCH_ANGLE[category]})`);
     pattern
       .select('.hatch-bg')
-      .attr('fill', color)
+      .attr('fill', (category) => powerCategoryColor(category))
       .attr('fill-opacity', (category) => hatchBgOpacity(category));
-    pattern.select('.hatch-line').attr('stroke', color);
+    pattern.select('.hatch-line').attr('stroke', (category) => powerCategoryColor(category));
   };
 
   const drawStack: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
@@ -406,7 +439,7 @@ function BreakdownChart({
       .attr('rx', 1)
       .attr('fill', (d) => fill(d.key))
       .attr('fill-opacity', (d) => fillOpacity(d.key))
-      .attr('stroke', color)
+      .attr('stroke', (d) => powerCategoryColor(d.key))
       .attr('stroke-opacity', 0.9)
       .attr('stroke-width', 1);
 
@@ -447,7 +480,10 @@ function BreakdownChart({
       .attr('class', 'breakdown-edge')
       .attr('d', (d) => edge(d.values))
       .attr('fill', 'none')
-      .attr('stroke', color)
+      // The top edge is the chip's total, in its vendor colour; inner edges outline each part.
+      .attr('stroke', (d) =>
+        d.key === series.categories.at(-1) ? color : powerCategoryColor(d.key),
+      )
       .attr('stroke-opacity', 0.9)
       .attr('stroke-width', (d) => (d.key === series.categories.at(-1) ? 2 : 1));
     group
@@ -700,7 +736,7 @@ function BreakdownChart({
       layers={layers}
       tooltip={{
         rulerType: 'none',
-        content: (column) => tooltipHtml(series, column, color, xLabel, t, totalLabel),
+        content: (column) => tooltipHtml(series, column, xLabel, t, totalLabel),
         attachToLayer: 4,
         onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
         onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
@@ -747,8 +783,9 @@ export default function PowerBreakdownPanel({
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
+  // Stacked area by default: one chip's layers read as bands across load.
   const [view, setView] = useState<PowerBreakdownView>(() =>
-    getUrlParam('i_pbview') === 'area' ? 'area' : 'bars',
+    getUrlParam('i_pbview') === 'bars' ? 'bars' : 'area',
   );
   useEffect(() => {
     setUrlParams({ i_pbview: view });
@@ -793,7 +830,6 @@ export default function PowerBreakdownPanel({
   const color = series ? colorOf(series) : 'currentColor';
 
   const exportCsv = () => {
-    const keys = ['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility'] as const;
     exportToCsv(
       'InferenceX_power_breakdown',
       [
@@ -801,12 +837,7 @@ export default function PowerBreakdownPanel({
         'configuration',
         'concurrency',
         interactivity.field,
-        'measured_gpu_w_per_gpu',
-        'measured_grace_cpu_w_per_gpu',
-        'server_parts_w_per_gpu',
-        'fans_psu_loss_w_per_gpu',
-        'network_share_w_per_gpu',
-        'facility_overhead_w_per_gpu',
+        ...SYSTEM_POWER_CATEGORIES.map((key) => CSV_COLUMNS[key]),
         'all_in_measured_w_per_gpu',
         'pue',
         'chassis_basis',
@@ -819,7 +850,7 @@ export default function PowerBreakdownPanel({
           point.configLabel,
           point.concurrency,
           point.interactivity,
-          ...keys.map((key) => point.wattsPerGpu[key]),
+          ...SYSTEM_POWER_CATEGORIES.map((key) => point.wattsPerGpu[key]),
           point.totalWattsPerGpu,
           point.pue,
           point.chassisBasis,
@@ -923,7 +954,7 @@ export default function PowerBreakdownPanel({
                     <span
                       aria-hidden
                       className="inline-block size-3 shrink-0 translate-y-0.5 rounded-[2px]"
-                      style={swatchStyle(key, color)}
+                      style={swatchStyle(key)}
                     />
                     <span className="shrink-0 font-medium whitespace-nowrap">{label}</span>
                     <span className="min-w-0 text-muted-foreground">
