@@ -61,10 +61,8 @@ export interface ProfitModelDefaults {
 }
 
 /**
- * Per-model defaults. On 2026-10-24, the four newest models took the first
- * 5-tok/s/user step that maximized priced AgentX SKU coverage in a 5–150 sweep:
- * Muse Spark Open 85, MiniMax M3.1 Flash 125, Qwen3.5 115, Qwen3.8 Flash Next 90.
- * On 2026-10-25, the same rule over 5–300 selected Kimi K3 60, GLM 5.2/5.3
+ * Per-model defaults. On 2026-10-25, the first 5-tok/s/user step that
+ * maximized priced AgentX SKU coverage in a 5–300 sweep selected Kimi K3 60, GLM 5.2/5.3
  * 135, MiniMax M3 115, DeepSeek V4 Pro 170, and DeepSeek V4.1 Flash 150.
  * These editable P90 targets show measured configurations; they are not claims
  * about hosted API speeds. Curves outside the target range stay unpriced.
@@ -77,26 +75,6 @@ export interface ProfitModelDefaults {
  * list prices and a 0% fee because their weights ship under the MIT license.
  */
 const PROFIT_MODEL_DEFAULTS: Partial<Record<Model, ProfitModelDefaults>> = {
-  [Model.Muse_Spark_Open]: {
-    interactivity: 85,
-    labCutPct: DEFAULT_LAB_CUT_PCT,
-    listPricing: null,
-  },
-  [Model.MiniMax_M3_1_Flash]: {
-    interactivity: 125,
-    labCutPct: DEFAULT_LAB_CUT_PCT,
-    listPricing: null,
-  },
-  [Model.Qwen3_5]: {
-    interactivity: 115,
-    labCutPct: DEFAULT_LAB_CUT_PCT,
-    listPricing: null,
-  },
-  [Model.Qwen3_8_Flash_Next]: {
-    interactivity: 90,
-    labCutPct: DEFAULT_LAB_CUT_PCT,
-    listPricing: null,
-  },
   [Model.DeepSeek_V4_Pro]: {
     interactivity: 170,
     labCutPct: 0,

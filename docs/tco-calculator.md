@@ -460,31 +460,11 @@ gigawatt-year buys for that SKU (`gw-year`).
 Both tabs offer the same model list. A model needs AgentX (`agentic_traces`)
 measurements with an interpolable operating point and a token price source.
 The page intersects its supported routes with live AgentX availability, so a
-model without current trace data disappears from the selector. Muse Spark Open,
-Qwen3.5, Qwen3.8 Flash Next, and MiniMax M3.1 Flash use OpenRouter pricing by
-default; users can supply custom prices. GLM-5 currently has too little trace
-data to interpolate a profit row.
+model without current trace data disappears from the selector.
 The public profit view APIs accept any known model and may return empty rows;
 their `model` parameter is not restricted to the dashboard's list.
 
-The four additions use model-specific default P90 interactivity targets. On
-2026-10-24, a sweep of the public profit view API at every 5 tok/s/user from 5
-to 150 found these lowest targets that maximize priced official SKU rows in
-that range (using custom token prices to keep price availability independent of
-curve coverage):
-
-| Model              | Rows at 45 | Default target (tok/s/user) | Rows at default |
-| ------------------ | ---------: | --------------------------: | --------------: |
-| Muse Spark Open    |          1 |                          85 |               7 |
-| MiniMax M3.1 Flash |          2 |                         125 |               7 |
-| Qwen3.5            |          2 |                         115 |              10 |
-| Qwen3.8 Flash Next |          3 |                          90 |               6 |
-
-Both per-chip-hour and per-GW-year views returned the same row counts at these
-targets. New benchmark runs can change the coverage. The target remains an
-editable operating-point assumption, not a hosted API speed claim.
-
-The five earlier models now follow the same rule. A 2026-10-25 public API sweep
+Each model uses a default P90 interactivity target. A 2026-10-25 public API sweep
 at every 5 tok/s/user from 5 to 300 found these lowest targets that maximize
 priced official SKU rows in that range, again using custom token prices to
 isolate curve coverage:

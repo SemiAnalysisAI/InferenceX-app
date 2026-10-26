@@ -396,12 +396,15 @@ describe('getModelLabel', () => {
 });
 
 describe('getOpenRouterModelId', () => {
-  it('maps catalog models to exact OpenRouter ids', () => {
+  it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
+      if (model === Model.Muse_Spark_Open) {
+        expect(getOpenRouterModelId(model)).toBeNull();
+        continue;
+      }
       expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
     }
     expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
-    expect(getOpenRouterModelId(Model.Muse_Spark_Open)).toBe('meta/muse-spark-open');
   });
 });
 
