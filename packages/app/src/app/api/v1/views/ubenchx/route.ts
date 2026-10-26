@@ -64,13 +64,11 @@ export function GET(request: NextRequest) {
       }
 
       // test === 'all': return every test
-      const smL2GpuKeys = Object.keys(SM_L2_RUNS);
-      const smL2Gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...smL2GpuKeys], 'all');
       const smL2Results =
-        smL2Gpu === 'all'
+        rawGpu === null || gpu === 'all'
           ? Object.entries(SM_L2_RUNS).map(([key, run]) => transformSmL2Run(key, run))
-          : SM_L2_RUNS[smL2Gpu]
-            ? [transformSmL2Run(smL2Gpu, SM_L2_RUNS[smL2Gpu])]
+          : SM_L2_RUNS[gpu]
+            ? [transformSmL2Run(gpu, SM_L2_RUNS[gpu])]
             : [];
 
       return Promise.resolve(
@@ -85,11 +83,12 @@ export function GET(request: NextRequest) {
           // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
           // match the GPU key case-insensitively as parseEnumParam does for the others.
           tpcSkyline: {
-            gpus: tpcSkylineResults(
-              Object.keys(TPC_SKYLINE_RUNS).find(
-                (key) => key.toLowerCase() === rawGpu?.toLowerCase(),
-              ) ?? 'all',
-            ),
+            gpus:
+              rawGpu === null || gpu === 'all'
+                ? tpcSkylineResults('all')
+                : TPC_SKYLINE_RUNS[gpu]
+                  ? tpcSkylineResults(gpu)
+                  : [],
           },
         }),
       );

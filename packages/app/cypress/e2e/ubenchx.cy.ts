@@ -125,3 +125,93 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 });
+
+const dismiss = {
+  onBeforeLoad(win: Cypress.AUTWindow) {
+    win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+  },
+};
+
+describe('Huawei copy-bandwidth evidence', () => {
+  it('renders Huawei 950PR and qualifies the graph timing in English and Chinese', () => {
+    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.contains('Huawei 950PR').should('be.visible');
+    cy.contains('910B3').should('not.exist');
+    cy.contains('Graph time is amortized per copy').should('be.visible');
+    cy.get('[data-testid="ubenchx-metric-select"]').click();
+    cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
+    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
+    cy.screenshot('huawei-bandwidth-en', { capture: 'fullPage' });
+    cy.visit('/zh/ubenchx/mem-bw', dismiss);
+    cy.contains('图执行时间按拷贝次数摊销').should('be.visible');
+    cy.contains('910B3').should('not.exist');
+    cy.screenshot('huawei-bandwidth-zh', { capture: 'fullPage' });
+  });
+  it('serves measured endpoints and empty unavailable tests through the public API', () => {
+    cy.request('/api/v1/views/ubenchx?test=all&gpu=Huawei%20950PR').then(({ body }) => {
+      expect(body.memBw.gpus[0].rows.at(-1).bytes).to.equal(17179869184);
+      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(90.4545974, 0.0001);
+      expect(body.smL2Distance.gpus).to.deep.equal([]);
+      expect(body.tpcSkyline.gpus).to.deep.equal([]);
+    });
+  });
+});
+
+function assertBandwidthRuler(chart: string) {
+  cy.get(`${chart} circle.point`)
+    .filter((_, element) => {
+      const datum = (
+        element as unknown as SVGCircleElement & { __data__: { gpuKey: string; bytes: number } }
+      ).__data__;
+      return datum.gpuKey === 'H200 SXM' && datum.bytes === 33554432;
+    })
+    .should('have.length', 1)
+    .then(($point) => {
+      const x = Number($point.attr('cx')),
+        y = Number($point.attr('cy'));
+      cy.wrap($point).trigger('mouseenter', { force: true });
+      cy.get(`${chart} .horizontal-ruler`).should(($line) => {
+        expect(Number($line.attr('y1'))).to.be.closeTo(y, 0.01);
+        expect(Number($line.attr('y2'))).to.be.closeTo(y, 0.01);
+      });
+      cy.get(`${chart} .vertical-ruler`).should(($line) => {
+        expect(Number($line.attr('x1'))).to.be.closeTo(x, 0.01);
+        expect(Number($line.attr('x2'))).to.be.closeTo(x, 0.01);
+      });
+    });
+}
+
+it('keeps bandwidth hover guides on the rendered point in every metric and after zoom', () => {
+  cy.visit('/ubenchx/mem-bw', dismiss);
+  assertBandwidthRuler('#ubenchx-mbu');
+  for (const [label, chart] of [
+    ['Bandwidth (TB/s)', '#ubenchx-bandwidth'],
+    ['Latency (ms)', '#ubenchx-latency'],
+  ]) {
+    cy.get('[data-testid="ubenchx-metric-select"]').click();
+    cy.contains('[role="option"]', label).click();
+    assertBandwidthRuler(chart);
+  }
+  cy.get('#ubenchx-latency circle.point')
+    .first()
+    .then(($point) => {
+      const previousX = $point.attr('cx');
+      cy.get('#ubenchx-latency svg').then(($svg) => {
+        const rect = $svg[0].getBoundingClientRect();
+        cy.wrap($svg).trigger('wheel', {
+          eventConstructor: 'WheelEvent',
+          deltaY: -200,
+          shiftKey: true,
+          clientX: rect.left + 150,
+          clientY: rect.top + 100,
+          force: true,
+        });
+      });
+      cy.get('#ubenchx-latency circle.point')
+        .first()
+        .should(($current) => {
+          expect($current.attr('cx')).not.to.equal(previousX);
+        });
+    });
+  assertBandwidthRuler('#ubenchx-latency');
+});
