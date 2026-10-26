@@ -175,6 +175,11 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
   });
 
+  it('moves MiniMax M3 to deprecated while keeping M3.1 Flash active', () => {
+    expect(isModelDeprecated(Model.MiniMax_M3)).toBe(true);
+    expect(isModelDeprecated(Model.MiniMax_M3_1_Flash)).toBe(false);
+  });
+
   it('returns true for deprecated model GptOss', () => {
     expect(isModelDeprecated(Model.GptOss)).toBe(true);
   });

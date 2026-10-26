@@ -109,7 +109,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
-    category: 'default',
+    category: 'deprecated',
     openRouterModelId: 'minimax/minimax-m3',
     logo: 'minimax-color.svg',
   },

@@ -318,7 +318,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.viewport(1440, 900);
     const retiredImage = 'lmsysorg/sglang:v0.4.9-minimax-8k1k-retired';
     const retiredDeepSeekImage = 'vllm/vllm-openai:v0.10.0-dsv4-8k1k-retired';
-    const activeMiniMaxImage = 'lmsysorg/sglang:v0.5.2-minimax-agentic';
+    const activeFlashImage = 'lmsysorg/sglang:v0.5.2-minimax-m31flash-agentic';
     const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
     cy.intercept('GET', '**/api/v1/latest-images', [
       ...imageRows,
@@ -332,12 +332,12 @@ describe('Current InferenceX Image localized routes', () => {
       },
       {
         ...imageRows[0],
-        model: 'minimaxm3',
+        model: 'minimaxm31flash',
         framework: 'sglang',
         isl: null,
         osl: null,
         benchmark_type: 'agentic_traces',
-        image: activeMiniMaxImage,
+        image: activeFlashImage,
         date: today,
       },
       { ...imageRows[1], model: 'kimik2.5', image: deprecatedModelImage },
@@ -363,16 +363,17 @@ describe('Current InferenceX Image localized routes', () => {
 
     cy.get('#image-model-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'Kimi-K2.5');
-    cy.get('[data-slot="select-item"]').contains('MiniMax-M3').click();
+    cy.get('[data-slot="select-item"]').should(($items) => {
+      expect([...$items].map((item) => item.textContent?.trim())).not.to.include('MiniMax-M3');
+    });
+    cy.get('[data-slot="select-item"]').contains('MiniMax-M3.1-Flash').click();
 
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('have.length', 1).and('contain.text', 'Agentic');
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
-    cy.get('table')
-      .should('contain.text', activeMiniMaxImage)
-      .and('not.contain.text', retiredImage);
+    cy.get('table').should('contain.text', activeFlashImage).and('not.contain.text', retiredImage);
   });
   it('keeps full configuration and long image tags readable while filtering the catalog', () => {
     cy.viewport(1440, 900);
