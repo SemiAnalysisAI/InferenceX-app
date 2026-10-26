@@ -42,8 +42,7 @@ export const UBENCHX_GPU_KEYS = [
   'MI355X',
   'MI325X',
   'MI300X',
-  'Ascend 950PR_9579',
-  'Ascend 910B3',
+  'Huawei 950PR',
 ] as const;
 
 export type UbenchxGpuKey = (typeof UBENCHX_GPU_KEYS)[number];
@@ -412,28 +411,26 @@ export const UBENCHX_RUNS: Record<string, UbenchxRun> = {
 };
 
 for (const [gpu, points] of Object.entries(huawei.curves)) {
-  const b3 = gpu === 'Ascend 910B3';
   UBENCHX_RUNS[gpu] = {
     metadata: {
-      gpu,
-      driver: b3 ? '26.1.1' : '25.7.rc1.10',
+      gpu: 'Ascend950PR_9579',
+      driver: '25.7.rc1.10',
       torch: '2.10.0+cpu',
       torchNpu: '2.10.0.post4',
       cann: '9.1.0',
       triton: 'Not used',
       container: 'Not recorded',
-      date: b3 ? '2026-10-13' : '2026-10-07',
+      date: '2026-10-07',
       dtype: 'float16',
       protocol: 'rotating-pool-npu-graph',
-      missingSizesBytes: b3 ? [17179869184] : [],
+      missingSizesBytes: [],
       sourceUrl:
-        'https://github.com/SemiAnalysisAI/InferenceX-app/blob/0a94bf26f3703d479b930f3957241b36b6b3e6d6/packages/app/src/components/ubenchx/data/huawei-bandwidth.json',
+        'https://github.com/SemiAnalysisAI/InferenceX-app/blob/0e7525c9b62124a43856d26e1ce2ac5b2ae31b93/packages/app/src/components/ubenchx/data/huawei-bandwidth.json',
     },
     bandwidthReference: {
       gbps: 1600,
-      source: b3
-        ? '910B3/2 64 GB OEM specification and CANN 20-core memory example; exact board ceiling not independently measured'
-        : '950PR 128 GiB nominal reference assumed at 1600 GB/s; not independently verified by memory-controller counters',
+      source:
+        '950PR 128 GiB nominal reference assumed at 1600 GB/s; not independently verified by memory-controller counters',
     },
     rows: points.map((point) => ({
       bytes: point.size_bytes,

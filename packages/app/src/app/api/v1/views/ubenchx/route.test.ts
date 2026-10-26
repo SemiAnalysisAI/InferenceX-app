@@ -160,29 +160,29 @@ describe('ubenchx view', () => {
 });
 
 it('exposes Huawei rotating-copy evidence without inventing missing tests or sizes', async () => {
-  const response = await GET(request({ test: 'all', gpu: 'ascend 910b3' }));
+  const response = await GET(request({ test: 'all', gpu: 'huawei 950pr' }));
   expect(response.status).toBe(200);
   const body = await response.json();
   const run = body.memBw.gpus[0];
-  expect(run.gpu).toBe('Ascend 910B3');
+  expect(run.gpu).toBe('Huawei 950PR');
   expect(run.peakBandwidthGbps).toBe(1600);
-  expect(run.peakBandwidthSource).toContain('exact board ceiling not independently measured');
+  expect(run.peakBandwidthSource).toContain('not independently verified');
   expect(run.metadata).toMatchObject({
     protocol: 'rotating-pool-npu-graph',
     dtype: 'float16',
-    missingSizesBytes: [17179869184],
+    missingSizesBytes: [],
   });
-  expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(false);
-  const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 8589934592);
-  expect(endpoint.bandwidthGbps).toBeCloseTo(1271.519, 3);
-  expect(endpoint.mbuPercent).toBeCloseTo(79.46994, 4);
+  expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
+  const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
+  expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
+  expect(endpoint.mbuPercent).toBeCloseTo(90.45459740350728, 6);
   expect(endpoint.observations).toBe(360);
   expect(body.smL2Distance.gpus).toEqual([]);
   expect(body.tpcSkyline.gpus).toEqual([]);
 });
 
 it('preserves full-precision Huawei bandwidth arithmetic and API/UI normalization', async () => {
-  for (const gpu of ['Ascend 950PR_9579', 'Ascend 910B3']) {
+  for (const gpu of ['Huawei 950PR']) {
     const response = await GET(request({ test: 'mem-bw', gpu }));
     const body = await response.json();
     const run = body.gpus[0];
@@ -193,4 +193,12 @@ it('preserves full-precision Huawei bandwidth arithmetic and API/UI normalizatio
       expect(row.bandwidthP90Gbps).toBeGreaterThanOrEqual(row.bandwidthGbps);
     }
   }
+});
+
+it('does not expose the removed 910B3 bandwidth series', async () => {
+  const all = await GET(request({ test: 'mem-bw', gpu: 'all' }));
+  const body = await all.json();
+  expect(body.gpus.some((run: { gpu: string }) => run.gpu === 'Ascend 910B3')).toBe(false);
+  const removed = await GET(request({ test: 'mem-bw', gpu: 'Ascend 910B3' }));
+  expect(removed.status).toBe(400);
 });

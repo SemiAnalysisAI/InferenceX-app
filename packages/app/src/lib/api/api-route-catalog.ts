@@ -1168,7 +1168,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/ubenchx/ubenchx-data.ts',
-    sourceSha256: 'f8a87d08efba5c17a312f3c3ffe274c31399fb4c8e3d29c43031395dda444964',
+    sourceSha256: '21beff5ed2452035aae42df208734cbda323272539ed265bf8dd39c3043981d1',
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',

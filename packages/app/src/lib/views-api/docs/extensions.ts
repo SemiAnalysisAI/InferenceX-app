@@ -357,8 +357,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON 对象，将视频数据点 ID 映射为 {hourly,source,date} 字符串；hourly 为非负 USD/deployment-hour。',
   ],
   gpu: [
-    'Accelerator key, e.g. "H100 SXM", "Ascend 950PR_9579" or "Ascend 910B3". Default: first available device. "all" returns all devices; unavailable tests retain their section object with an empty gpus array for an explicitly selected device.',
-    '加速器键，如 "H100 SXM"、"Ascend 950PR_9579" 或 "Ascend 910B3"。默认首个可用设备；"all" 返回全部设备。显式选择设备时，没有数据的测试部分保留对象结构，其中 gpus 数组为空。',
+    'Accelerator key, e.g. "H100 SXM", "Huawei 950PR". Default: first available device. "all" returns all devices; unavailable tests retain their section object with an empty gpus array for an explicitly selected device.',
+    '加速器键，如 "H100 SXM"或 "Huawei 950PR"。默认首个可用设备；"all" 返回全部设备。显式选择设备时，没有数据的测试部分保留对象结构，其中 gpus 数组为空。',
   ],
   test: [
     'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, or all (default). Determines which benchmark data is returned.',

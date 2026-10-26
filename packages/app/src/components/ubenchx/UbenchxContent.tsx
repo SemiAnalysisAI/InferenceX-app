@@ -32,8 +32,7 @@ const GPU_COLORS: Record<string, string> = {
   MI355X: 'oklch(0.62 0.20 18)',
   MI325X: 'oklch(0.55 0.20 28)',
   MI300X: 'oklch(0.48 0.20 38)',
-  'Ascend 950PR_9579': '#C7000B',
-  'Ascend 910B3': '#7F0011',
+  'Huawei 950PR': '#C7000B',
 };
 
 const STRINGS = {
@@ -58,8 +57,6 @@ const STRINGS = {
       'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
     huaweiMethodology:
       'Huawei: FP16 rotating source/destination pools of at least 512 MiB each, timed as full rotating-buffer NPU graph replays. Three processes, 360 observations per size; full copied-bit checks before/after each block. Graph time is amortized per copy, not isolated-copy latency. Protocols differ from the GPU curves. No physical HBM-traffic counters were collected.',
-    huaweiMissing:
-      '910B3: 16 GiB is absent because the two-slot source/destination geometry requires 64 GiB before runtime overhead.',
     huaweiReference:
       'Huawei MBU uses a 1,600 GB/s reference; the exact board bandwidth ceiling was not independently measured.',
     amortized: 'Amortized graph copy time',
@@ -93,9 +90,7 @@ const STRINGS = {
       'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
     huaweiMethodology:
       'Huawei：源和目标分别使用至少 512 MiB 的 FP16 轮转缓冲池，每次计时覆盖完整缓冲池轮转的一次 NPU 图重放。每个大小在三个进程中共测量 360 次，每个测量块前后逐位校验全部拷贝结果。图执行时间按拷贝次数摊销，不代表单次独立拷贝延迟；与 GPU 曲线的测试协议不同，且未采集物理 HBM 流量计数器。',
-    huaweiMissing:
-      '910B3 未测量 16 GiB：源和目标各保留两个缓冲槽，尚未计入运行时开销就需要 64 GiB。',
-    huaweiReference: 'Huawei 的 MBU 使用 1,600 GB/s 参考值，两款板卡的确切带宽上限未经独立实测。',
+    huaweiReference: 'Huawei 的 MBU 使用 1,600 GB/s 参考值，该板卡的确切带宽上限未经独立实测。',
     amortized: '摊销后的图拷贝时间',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
@@ -306,6 +301,8 @@ function UbenchxChart({
       }}
       tooltip={{
         rulerType: 'crosshair',
+        getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
+        getRulerY: (point, scale) => scale(point.y),
         attachToLayer: 1,
         content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale]),
       }}
@@ -400,7 +397,6 @@ export function UbenchxContent() {
         <h3 className="text-sm font-semibold">{t.methodology}</h3>
         <p>{t.methodologyText}</p>
         <p>{t.huaweiMethodology}</p>
-        <p>{t.huaweiMissing}</p>
         <p>{t.huaweiReference}</p>
         {viewResults.map((r) => (
           <p key={r.gpu}>
