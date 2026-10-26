@@ -2,6 +2,9 @@
 
 import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes/themes';
+import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
 
 import {
   Select,
@@ -32,7 +35,6 @@ const GPU_COLORS: Record<string, string> = {
   MI355X: 'oklch(0.62 0.20 18)',
   MI325X: 'oklch(0.55 0.20 28)',
   MI300X: 'oklch(0.48 0.20 38)',
-  'Huawei 950PR': '#C7000B',
 };
 
 const STRINGS = {
@@ -154,8 +156,13 @@ function paddedDomain(values: number[]): [number, number] {
 const tooltipLine = (label: string, value: string) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
-function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)[Locale]): string {
-  const color = GPU_COLORS[point.gpuKey] ?? '#888';
+function formatTooltip(
+  point: ChartPoint,
+  isPinned: boolean,
+  t: (typeof STRINGS)[Locale],
+  colors: Record<string, string>,
+): string {
+  const color = colors[point.gpuKey] ?? '#888';
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
@@ -171,14 +178,20 @@ function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)
   `;
 }
 
-function GpuLegend({ gpuKeys }: { gpuKeys: readonly string[] }) {
+function GpuLegend({
+  gpuKeys,
+  colors,
+}: {
+  gpuKeys: readonly string[];
+  colors: Record<string, string>;
+}) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       {gpuKeys.map((key) => (
         <span key={key} className="inline-flex items-center gap-1.5">
           <span
             className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: GPU_COLORS[key] ?? '#888' }}
+            style={{ backgroundColor: colors[key] ?? '#888' }}
           />
           {key}
         </span>
@@ -194,6 +207,8 @@ function UbenchxChart({
   yLabel,
   yScaleType,
   locale,
+  colors,
+  theme,
 }: {
   chartId: string;
   allPoints: ChartPoint[];
@@ -201,6 +216,8 @@ function UbenchxChart({
   yLabel: string;
   yScaleType: 'log' | 'linear';
   locale: Locale;
+  colors: Record<string, string>;
+  theme: 'light' | 'dark';
 }) {
   const t = STRINGS[locale];
 
@@ -240,6 +257,7 @@ function UbenchxChart({
   return (
     <D3Chart<ChartPoint>
       chartId={chartId}
+      displayIdentity={theme}
       data={allPoints}
       height={440}
       margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
@@ -272,7 +290,7 @@ function UbenchxChart({
           key: `ubenchx-line-${chartId}`,
           lines,
           config: {
-            getColor: (key) => GPU_COLORS[key] ?? '#888',
+            getColor: (key) => colors[key] ?? '#888',
             strokeWidth: 2.25,
             curve: d3.curveMonotoneX,
           },
@@ -286,7 +304,7 @@ function UbenchxChart({
             getCy: () => 0,
             getX: (point) => point.x,
             getY: (point) => point.y,
-            getColor: (point) => GPU_COLORS[point.gpuKey] ?? '#888',
+            getColor: (point) => colors[point.gpuKey] ?? '#888',
             getRadius: () => 3.5,
             stroke: 'var(--background)',
             strokeWidth: 1,
@@ -304,13 +322,24 @@ function UbenchxChart({
         getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
         getRulerY: (point, scale) => scale(point.y),
         attachToLayer: 1,
-        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale]),
+        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
       }}
     />
   );
 }
 
 export function UbenchxContent() {
+  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
+  const colors = useMemo(
+    () => ({
+      ...GPU_COLORS,
+      ...generateVendorColors(
+        UBENCHX_GPU_KEYS.filter((key) => getVendor(key) === 'huawei'),
+        theme,
+      ),
+    }),
+    [theme],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -377,7 +406,7 @@ export function UbenchxContent() {
         </Select>
       </div>
 
-      <GpuLegend gpuKeys={gpuKeys} />
+      <GpuLegend gpuKeys={gpuKeys} colors={colors} />
 
       <section>
         <h2 className="text-lg font-semibold mb-2">{t[metric.title]}</h2>
@@ -390,6 +419,8 @@ export function UbenchxContent() {
           yLabel={t[metric.label]}
           yScaleType={metric.scale}
           locale={locale}
+          colors={colors}
+          theme={theme}
         />
       </section>
 

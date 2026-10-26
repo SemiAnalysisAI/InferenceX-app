@@ -641,3 +641,5 @@ switch/topology fields remain null (unspecified), not their NICs. The
 and CSV. MI355X's scale-up technology is fourth-generation Infinity Fabric.
 Chinese ownership-tier wording denotes owning hardware at hyperscaler purchase
 volume, not a rental quote; the wording does not change the underlying TCO rates.
+
+Vendor-series colors are presentation-only. Huawei/Ascend series use a shared, theme-aware amber identity across the chart generators; historical dates and high-contrast configurations may use related shades. Colors do not change API measurements, hardware identities, filters or normalization references. Sequential heatmap scales encode values rather than vendor identity.
