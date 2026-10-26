@@ -286,6 +286,17 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
       appendOnly: true,
     },
   },
+  {
+    id: 'run-40211526054-pr-link',
+    reason: 'PR #4511 merged its changelog entry with the pull/XXX placeholder link.',
+    githubRunId: 40211526054,
+    runAttempt: 1,
+    baseRef: '88588aaf353a025a86190d41a5af737e1685d4a6',
+    headRef: '1c3e892a8493ae4bc6b25bc688ccd6d6916742c3',
+    set: {
+      prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4511',
+    },
+  },
 ];
 
 export type JsonValue =
