@@ -6,6 +6,7 @@ import {
   createLogoWatermark,
   createUnofficialWatermark,
   positionUnofficialWatermarkImage,
+  updateBackgroundWatermark,
 } from './watermark';
 
 export function setupChartStructure(
@@ -119,6 +120,7 @@ export function setupChartStructure(
         .text(config.xLabel);
     }
 
+    updateBackgroundWatermark(svg, config.backgroundWatermark, width, height, margin);
     return { svg, g, zoomGroup, xAxisGroup, yAxisGroup, gridGroup, defs, width, height, margin };
   }
 
@@ -194,6 +196,8 @@ export function setupChartStructure(
       positionUnofficialWatermarkImage(svg, width, height, margin);
     }
   }
+
+  updateBackgroundWatermark(svg, config.backgroundWatermark, width, height, margin);
 
   const yLabel = svg.select('.y-axis-label');
   if (!yLabel.empty()) {

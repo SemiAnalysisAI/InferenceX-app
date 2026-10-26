@@ -4,6 +4,7 @@ import {
   getModelAndSequence,
   getModelAndSequenceFromArtifact,
   getModelLabel,
+  getHistoricalChartWatermark,
   getOpenRouterModelId,
   MODEL_OPTIONS,
   SEQUENCE_OPTIONS,
@@ -167,6 +168,16 @@ describe('getModelAndSequenceFromArtifact', () => {
 });
 
 describe('isModelDeprecated', () => {
+  it('adds a localized historical watermark only to MiniMax M3', () => {
+    expect(getHistoricalChartWatermark(Model.MiniMax_M3, 'en')).toBe(
+      'HISTORICAL BENCHMARK\nSUBMISSIONS CLOSED',
+    );
+    expect(getHistoricalChartWatermark(Model.MiniMax_M3, 'zh')).toBe(
+      '历史基准测试\n已停止接收提交',
+    );
+    expect(getHistoricalChartWatermark(Model.MiniMax_M3_1_Flash, 'en')).toBeUndefined();
+    expect(getHistoricalChartWatermark(Model.DeepSeek_R1, 'en')).toBeUndefined();
+  });
   it('returns true for deprecated model Llama3_3_70B', () => {
     expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
   });

@@ -186,6 +186,47 @@ describe('setupChartStructure', () => {
   });
 
   describe('watermark variants', () => {
+    it('keeps a large historical watermark behind the plot alongside unofficial marks through resize and removal', () => {
+      const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      setupChartStructure(
+        svgEl,
+        defaultConfig({
+          watermark: 'unofficial',
+          backgroundWatermark: 'HISTORICAL BENCHMARK\nSUBMISSIONS CLOSED',
+        }),
+      );
+      const mark = svgEl.querySelector('.historical-watermark')!;
+      expect(mark.parentElement).toBe(svgEl);
+      expect([...svgEl.children].indexOf(mark)).toBeLessThan(
+        [...svgEl.children].indexOf(svgEl.querySelector('.chart-root')!),
+      );
+      expect(mark.getAttribute('viewBox')).toBe('0 0 1000 500');
+      expect(mark.getAttribute('pointer-events')).toBe('none');
+      expect([...mark.querySelectorAll('text')].map((node) => node.textContent)).toEqual([
+        'HISTORICAL BENCHMARK',
+        'SUBMISSIONS CLOSED',
+      ]);
+      expect(svgEl.querySelector('.unofficial-watermark-image')).not.toBeNull();
+
+      const resized = defaultConfig({
+        watermark: 'unofficial',
+        backgroundWatermark: '历史基准测试\n已停止接收提交',
+        containerWidth: 400,
+      });
+      setupChartStructure(svgEl, resized);
+      expect(svgEl.querySelectorAll('.historical-watermark')).toHaveLength(1);
+      expect(svgEl.querySelector('.historical-watermark')?.getAttribute('width')).toBe(
+        String(400 - resized.margin.left - resized.margin.right),
+      );
+      expect(svgEl.querySelector('.historical-watermark')?.textContent).toBe(
+        '历史基准测试已停止接收提交',
+      );
+
+      setupChartStructure(svgEl, defaultConfig({ watermark: 'logo' }));
+      expect(svgEl.querySelector('.historical-watermark')).toBeNull();
+      expect(svgEl.querySelector('.unofficial-watermark-image')).toBeNull();
+      expect(svgEl.querySelector('.watermark-rect')).not.toBeNull();
+    });
     it('creates logo watermark when watermark is "logo"', () => {
       const svgEl = makeSvgEl();
       const config = defaultConfig({ watermark: 'logo' });

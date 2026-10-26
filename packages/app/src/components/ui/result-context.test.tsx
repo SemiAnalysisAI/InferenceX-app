@@ -71,25 +71,6 @@ describe('ResultContext', () => {
     );
   });
 
-  it('keeps a historical status beside its source in the visible and exportable caption', () => {
-    for (const [locale, status] of [
-      ['en', 'Historical benchmark — submissions closed'],
-      ['zh', '历史基准测试（已停止接收提交）'],
-    ] as const) {
-      const container = document.createElement('div');
-      act(() => {
-        createRoot(container).render(
-          <ResultContext locale={locale} source="SemiAnalysis InferenceX™" sourceNote={status} />,
-        );
-      });
-      const note = container.querySelector('[data-testid="result-context-source-note"]');
-      expect(note?.textContent).toBe(` · ${status}`);
-      expect(note?.closest('dd')?.textContent).toBe(`SemiAnalysis InferenceX™ · ${status}`);
-      expect(container.cloneNode(true).textContent).toContain(status);
-      expect(note?.closest('.no-export')).toBeNull();
-    }
-  });
-
   it('hosts an inline Cost Tier control and keeps a plain-text twin for PNG export', () => {
     const container = document.createElement('div');
     act(() => {

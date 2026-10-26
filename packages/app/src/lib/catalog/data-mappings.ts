@@ -258,6 +258,16 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 
+export function getHistoricalChartWatermark(
+  model: string | undefined,
+  locale: 'en' | 'zh',
+): string | undefined {
+  if (model !== Model.MiniMax_M3) return undefined;
+  return locale === 'zh'
+    ? '历史基准测试\n已停止接收提交'
+    : 'HISTORICAL BENCHMARK\nSUBMISSIONS CLOSED';
+}
+
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
   (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
     .filter(([, c]) => c.prefix)

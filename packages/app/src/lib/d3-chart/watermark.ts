@@ -5,6 +5,48 @@ import { CHART_TYPE, px } from './typography';
 
 const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/kanye-west.png';
 
+export function updateBackgroundWatermark(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  label: string | undefined,
+  innerWidth: number,
+  innerHeight: number,
+  margin: ChartMargin,
+): void {
+  svg.select('.historical-watermark').remove();
+  if (!label) return;
+
+  const mark = svg
+    .insert('svg', '.chart-root')
+    .attr('class', 'historical-watermark')
+    .attr('data-testid', 'historical-watermark')
+    .attr('x', margin.left)
+    .attr('y', margin.top)
+    .attr('width', innerWidth)
+    .attr('height', innerHeight)
+    .attr('viewBox', '0 0 1000 500')
+    .attr('preserveAspectRatio', 'xMidYMid meet')
+    .attr('fill', 'currentColor')
+    .attr('opacity', 0.16)
+    .attr('pointer-events', 'none')
+    .attr('role', 'img')
+    .attr('aria-label', label.replace('\n', ' — '));
+
+  mark
+    .selectAll('text')
+    .data(label.split('\n'))
+    .join('text')
+    .attr('x', 500)
+    .attr('y', (_, index) => 230 + index * 80)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', (_, index) =>
+      px(
+        index === 0 ? CHART_TYPE.backgroundWatermarkTitle : CHART_TYPE.backgroundWatermarkSubtitle,
+      ),
+    )
+    .attr('font-weight', 800)
+    .text((line) => line);
+}
+
 function insertWatermarkRect(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
   innerWidth: number,

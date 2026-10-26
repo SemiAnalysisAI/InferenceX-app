@@ -79,7 +79,7 @@ import {
   useUnofficialRun,
 } from '@/providers/unofficial-run-provider';
 import {
-  Model,
+  type Model,
   type Precision,
   Sequence,
   getModelLabel,
@@ -136,7 +136,6 @@ const STRINGS = {
     table: 'Table',
     sourceUnofficial: 'Source: UNOFFICIAL',
     sourceOfficial: 'Source: SemiAnalysis InferenceX™',
-    historicalBenchmarkStatus: 'Historical benchmark — submissions closed',
     revenuePrices: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `Input $${input}/M tok · Output $${output}/M tok`
@@ -168,7 +167,6 @@ const STRINGS = {
     table: '表格',
     sourceUnofficial: '来源：非官方',
     sourceOfficial: '来源：SemiAnalysis InferenceX™',
-    historicalBenchmarkStatus: '历史基准测试（已停止接收提交）',
     revenuePrices: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
@@ -1122,11 +1120,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                   ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
                                   : 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays'
                                 : 'SemiAnalysis InferenceX™'
-                            }
-                            sourceNote={
-                              graph.model === Model.MiniMax_M3
-                                ? t.historicalBenchmarkStatus
-                                : undefined
                             }
                             costBasis={
                               usesTokenSalePricing(selectedYAxisMetric) && tokenRevenuePricing

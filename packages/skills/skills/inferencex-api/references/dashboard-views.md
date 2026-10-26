@@ -36,14 +36,14 @@ results or treat its interpolated values as separately measured operating points
    MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
    through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
    Flash remains in the default model group. MiniMax M3 inference charts label
-   historical results as “Historical benchmark — submissions closed” beside
-   their source attribution, including PNG exports and unofficial-run overlays.
-   This label is presentation only; view API values and filters are unchanged.
+   historical results with a large “HISTORICAL BENCHMARK / SUBMISSIONS CLOSED”
+   watermark behind the plot, including PNG exports and unofficial-run overlays.
+   This watermark is presentation only; view API values and filters are unchanged.
 
    中文：MiniMax M3 在 `options.models` 中的分类为 `deprecated`，仍可通过显式模型参数或
    overview 的 `modelScope=all` 查询；MiniMax M3.1 Flash 仍保留在默认模型组中。MiniMax M3
-   的推理图表会在来源标注旁显示“历史基准测试（已停止接收提交）”，PNG 导出和非官方 run
-   overlay 中同样保留。该标注仅用于展示，不改变视图 API 的数值或筛选行为。
+   的推理图表会在绘图区背景中显示大号“历史基准测试 / 已停止接收提交”水印，PNG 导出和非官方
+   run overlay 中同样保留。该水印仅用于展示，不改变视图 API 的数值或筛选行为。
 
 2. Build one public HTTPS GET URL using `URLSearchParams`, especially for JSON
    costs, commas, slashes, and run-specific comparison dates. No credentials are

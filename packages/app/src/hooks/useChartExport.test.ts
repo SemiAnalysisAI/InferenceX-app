@@ -16,7 +16,6 @@ import {
   normalizeChartSvgWidthsForExport,
   useChartExport,
 } from './useChartExport';
-import { ResultContext } from '@/components/ui/result-context';
 
 describe('useChartExport failure messages', () => {
   let root: Root;
@@ -88,36 +87,6 @@ describe('useChartExport failure messages', () => {
     expect(current.isExporting).toBe(false);
     expect(exportContainer.childElementCount).toBe(0);
     expect(chart.textContent).toBe('DeepSeek R1');
-  });
-
-  it('includes the historical source note in the PNG capture clone', async () => {
-    const captionRoot = createRoot(chart);
-    act(() => {
-      captionRoot.render(
-        createElement(ResultContext, {
-          locale: 'en',
-          source: 'SemiAnalysis InferenceX™',
-          sourceNote: 'Historical benchmark — submissions closed',
-        }),
-      );
-    });
-    let snapshot: HTMLElement | undefined;
-    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
-      snapshot = element.cloneNode(true) as HTMLElement;
-      throw new Error('stop after capture');
-    });
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    await act(async () => {
-      await current.exportToImage();
-    });
-
-    expect(snapshot?.querySelector('[data-testid="result-context-source-note"]')?.textContent).toBe(
-      ' · Historical benchmark — submissions closed',
-    );
-    expect(snapshot?.textContent).toContain('Source: SemiAnalysis InferenceX™');
-    act(() => captionRoot.unmount());
   });
 
   it.each([true, false])(
