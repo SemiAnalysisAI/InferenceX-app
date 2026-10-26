@@ -191,7 +191,7 @@ describe('setupChartStructure', () => {
       [1200, 600],
       [800, 300],
     ])(
-      'preserves the SemiAnalysis logo and places Deprecated below it at %s×%s',
+      'preserves the SemiAnalysis logo and places Deprecated above and below it at %s×%s',
       (containerWidth, containerHeight) => {
         const svgEl = makeSvgEl();
         const config = defaultConfig({ watermark: 'logo', containerWidth, containerHeight });
@@ -203,7 +203,15 @@ describe('setupChartStructure', () => {
         expect(svgEl.querySelector('#logo-pattern-test-chart')!.outerHTML).toBe(originalLogo);
         expect(svgEl.querySelector('.watermark-rect')!.outerHTML).toBe(originalRect);
         const logo = svgEl.querySelector('#logo-pattern-test-chart image')!;
-        const status = svgEl.querySelector('.deprecated-watermark')!;
+        const above = svgEl.querySelector('.deprecated-watermark[data-position="above"]')!;
+        const status = svgEl.querySelector('.deprecated-watermark[data-position="below"]')!;
+        expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(2);
+        expect(Number(above.getAttribute('y'))).toBeGreaterThanOrEqual(config.margin.top);
+        expect(Number(above.getAttribute('y')) + Number(above.getAttribute('height'))).toBeLessThan(
+          Number(logo.getAttribute('y')),
+        );
+        expect(above.getAttribute('opacity')).toBe('0.3');
+        expect(status.getAttribute('opacity')).toBe('0.3');
         const logoBottom = Number(logo.getAttribute('y')) + Number(logo.getAttribute('height'));
         expect(Number(status.getAttribute('y'))).toBeGreaterThan(logoBottom);
         expect(
@@ -238,7 +246,7 @@ describe('setupChartStructure', () => {
         containerWidth: 400,
       });
       setupChartStructure(svgEl, resized);
-      expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(1);
+      expect(svgEl.querySelectorAll('.deprecated-watermark')).toHaveLength(2);
       expect(svgEl.querySelector('.deprecated-watermark')?.getAttribute('width')).toBe(
         String((400 - resized.margin.left - resized.margin.right) * 0.8),
       );

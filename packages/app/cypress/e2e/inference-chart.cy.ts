@@ -412,7 +412,11 @@ describe('Deprecated model background watermark', () => {
       });
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
       if (deprecated) {
-        cy.get('#chart-0 .deprecated-watermark').should('have.text', 'Deprecated');
+        cy.get('#chart-0 .deprecated-watermark')
+          .should('have.length', 2)
+          .each(($mark) => {
+            cy.wrap($mark).should('have.text', 'Deprecated').and('have.attr', 'opacity', '0.3');
+          });
       } else {
         cy.get('#chart-0 .deprecated-watermark').should('not.exist');
       }
@@ -455,13 +459,14 @@ describe('Deprecated model background watermark', () => {
       .and('not.contain.text', 'Historical benchmark — submissions closed');
     cy.get('#chart-0 svg [data-testid="deprecated-watermark"]').should('be.visible');
     let exportedPng = '';
-    let exportedCaption = '';
+    let exportedLabels: string[] = [];
     cy.window().then((win) => {
       win.HTMLAnchorElement.prototype.click = function () {
         if (this.download.endsWith('.png')) {
           exportedPng = this.href;
-          exportedCaption =
-            win.document.querySelector('#chart-0-export .deprecated-watermark')?.textContent ?? '';
+          exportedLabels = [
+            ...win.document.querySelectorAll('#chart-0-export .deprecated-watermark'),
+          ].map((mark) => mark.textContent ?? '');
         }
       };
     });
@@ -470,7 +475,7 @@ describe('Deprecated model background watermark', () => {
     cy.window()
       .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
       .then(() => {
-        expect(exportedCaption).to.contain('Deprecated');
+        expect(exportedLabels).to.deep.equal(['Deprecated', 'Deprecated']);
         cy.writeFile(
           'cypress/downloads/deprecated-model-watermark.png',
           exportedPng.split(',')[1],
@@ -496,7 +501,8 @@ describe('Deprecated model background watermark', () => {
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 svg [data-testid="deprecated-watermark"]')
       .should('be.visible')
-      .and('have.text', '已弃用');
+      .and('have.length', 2)
+      .each(($mark) => cy.wrap($mark).should('have.text', '已弃用'));
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
