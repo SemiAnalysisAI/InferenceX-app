@@ -823,9 +823,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     }
     return [...ids];
   }, [isAgenticSequence, selectedPrecisions, visibleGraphs]);
+  // PowerX drops the ISL/OSL footer line, so it never asks for the sketches either.
   const residentSequenceLengthsQuery = useResidentSequenceLengths(
     residentPointIds,
-    isAgenticSequence && !isUnofficialRun,
+    isAgenticSequence && !isUnofficialRun && !powerXSurface,
   );
   const residentSequenceLengths =
     residentSequenceLengthsQuery.data?.coveredPoints ===
@@ -1142,7 +1143,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
                     )}
                   </div>
-                  {residentSequenceLengths && !minimalChrome && (
+                  {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"
                       data-testid="resident-sequence-lengths"

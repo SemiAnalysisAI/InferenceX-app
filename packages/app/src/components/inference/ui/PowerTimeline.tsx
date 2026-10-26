@@ -1592,7 +1592,7 @@ export default function PowerTimeline({
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
         testId="power-timeline-chart-svg"
         grabCursor
-        instructions={t.instructions}
+        instructions={powerXSurface ? '' : t.instructions}
         xScale={
           xMode === 'wall'
             ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
