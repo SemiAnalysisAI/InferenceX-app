@@ -208,7 +208,7 @@ export function ResultContext({
           <dt className="inline font-medium text-foreground">{labels.source}:</dt>{' '}
           <dd className="inline">
             {source}
-            {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
+            {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (Deprecated)')}
           </dd>
         </div>
       )}
