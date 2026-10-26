@@ -218,3 +218,76 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       .should('exist');
   });
 });
+
+const operatorPoints = () =>
+  cy
+    .get('[data-testid="operatorx-viz-roofline"] circle.point')
+    .filter(
+      (_, element) =>
+        (element as unknown as { __data__: { hw: string } }).__data__.hw === 'ascend950pr',
+    );
+
+const bandwidthPoints = () =>
+  cy
+    .get('#ubenchx-mbu circle.point')
+    .filter(
+      (_, element) =>
+        (element as unknown as { __data__: { gpuKey: string } }).__data__.gpuKey === 'Huawei 950PR',
+    );
+
+it('uses shared Huawei colors in OperatorX and ubenchX across a live theme switch', () => {
+  const ascend = normalizeBundle(run('201', 'ascend950pr-external', [64, 128]));
+  const nvidia = normalizeBundle(run('202', 'h200-dgxc', [64, 128]));
+  for (const dataset of [ascend, nvidia]) {
+    for (const row of dataset.results) {
+      const m = Number(row.args.m);
+      row.args = { ...row.args, n: 4096, k: 4096 };
+      row.shape = `${m} × 4096 × 4096`;
+      row.latencyUs = 100;
+      row.tflops = (2 * m * 4096 * 4096) / (100 * 1e6);
+    }
+  }
+  const view = comparisonView(
+    buildComparison('gemm', [
+      { runner: 'ascend950pr-external', dataset: ascend },
+      { runner: 'h200-dgxc', dataset: nvidia },
+    ]),
+    null,
+  );
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('colorComparison');
+  const visitOptions = {
+    onBeforeLoad(win: Cypress.AUTWindow) {
+      win.localStorage.setItem('theme', 'light');
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    },
+  };
+  cy.visit('/operatorx', visitOptions);
+  cy.wait('@colorComparison');
+  cy.get('[data-testid="operatorx-viz-roofline"]').scrollIntoView();
+  operatorPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
+    .find('.rounded-full')
+    .first()
+    .should('have.css', 'background-color', 'rgb(148, 106, 0)');
+  cy.get('[data-testid="operatorx-viz-roofline"]').screenshot('huawei-operatorx-light');
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get('html').should('have.class', 'dark');
+  operatorPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  cy.contains('[data-testid="operatorx-coverage"] li', '950PR')
+    .find('.rounded-full')
+    .first()
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+  cy.get('[data-testid="operatorx-viz-roofline"]').screenshot('huawei-operatorx-dark');
+
+  cy.visit('/ubenchx/mem-bw', visitOptions);
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(148, 106, 0)');
+  cy.get('[data-testid="theme-toggle"]').click();
+  bandwidthPoints().first().should('have.css', 'fill', 'rgb(235, 192, 74)');
+  bandwidthPoints().eq(20).trigger('mouseenter', { force: true });
+  cy.get('[data-chart-tooltip="ubenchx-mbu"]')
+    .should('contain', 'Huawei 950PR')
+    .find('span')
+    .first()
+    .should('have.css', 'background-color', 'rgb(235, 192, 74)');
+  cy.get('#ubenchx-mbu').screenshot('huawei-ubenchx-dark');
+});

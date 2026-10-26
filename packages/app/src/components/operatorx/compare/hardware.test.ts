@@ -107,13 +107,15 @@ describe('Ascend OperatorX reference', () => {
   });
 
   it.each(['light', 'dark'] as const)(
-    'uses a separate crimson without recoloring AMD in %s mode',
+    'uses the shared Huawei palette without recoloring AMD in %s mode',
     (theme) => {
       const otherKeys = ['mi300x', 'mi325x', 'mi355x', 'h100', 'unknown'];
       const colors = operatorXColors([...otherKeys, 'ascend950pr'], theme);
       for (const key of otherKeys)
         expect(colors[key]).toBe(generateVendorColors(otherKeys, theme)[key]);
-      expect(colors.ascend950pr).toMatch(/ 355\)$/u);
+      expect(colors.ascend950pr).toBe(
+        generateVendorColors(['Huawei 950PR'], theme)['Huawei 950PR'],
+      );
       expect(colors.ascend950pr).not.toBe(colors.mi355x);
       expect(operatorXColors(['ascend950pr'], theme).ascend950pr).toBe(colors.ascend950pr);
       expect(operatorXColors([], theme)).toEqual({});

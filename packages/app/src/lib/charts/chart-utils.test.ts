@@ -1,3 +1,5 @@
+import { hsl } from 'd3';
+import { generateVendorColors } from './dynamic-colors';
 import { describe, it, expect, vi } from 'vitest';
 
 import iwanthue from 'iwanthue';
@@ -1578,4 +1580,32 @@ describe('metricChartTitle', () => {
     const bare = { ...interactivity, y_tpPerGpu_chartTitle: undefined };
     expect(metricChartTitle(bare, 'y_tpPerGpu', 'en')).toBe('Token Throughput per Chip');
   });
+});
+
+it.each(['light', 'dark'] as const)(
+  'keeps Huawei high-contrast colors consistent and amber (%s)',
+  (theme) => {
+    const one = generateHighContrastColors(['ascend950pr', 'mi355x', 'h100'], theme);
+    expect(one.ascend950pr).toBe(generateVendorColors(['ascend950pr'], theme).ascend950pr);
+    const many = generateHighContrastColors(
+      ['ascend950pr_bf16', 'ascend950pr_fp8', 'ascend910b3'],
+      theme,
+    );
+    expect(new Set(Object.values(many)).size).toBe(3);
+    for (const color of Object.values(many)) {
+      const [r, g, b] = parseRgb(color);
+      expect(r).toBeGreaterThan(b);
+      expect(g).toBeGreaterThan(b);
+    }
+  },
+);
+
+it('reserves amber from other high-contrast series when Huawei is present, including cached palettes', () => {
+  const other = [...Array.from({ length: 8 }, (_, i) => `nvidia_series${i}`), 'amd_series'];
+  generateHighContrastColors(other, 'dark');
+  const colors = generateHighContrastColors([...other, 'ascend950pr'], 'dark');
+  for (const key of other) {
+    const hue = hsl(colors[key]).h;
+    expect(hue < 35 || hue > 65, `${key}: ${colors[key]}`).toBe(true);
+  }
 });

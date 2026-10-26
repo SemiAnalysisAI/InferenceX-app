@@ -1159,6 +1159,23 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/ubenchx/ubenchx-transform.ts',
+    sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+  {
+    source: 'src/components/ubenchx/ubenchx-data.ts',
+    sourceSha256: '21beff5ed2452035aae42df208734cbda323272539ed265bf8dd39c3043981d1',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
+  {
     source: 'src/components/ubenchx/core-memory-profiles.ts',
     sourceSha256: '33e66e68f44e8382bc3b09f33c89f96caeaa011d5171958c4c0f9c1cd98178fb',
     reviewArea: {
