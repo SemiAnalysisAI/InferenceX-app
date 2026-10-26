@@ -24,6 +24,7 @@ export interface ResultContextProps {
   dates?: readonly string[];
   dateRange?: { start: string; end: string };
   source?: string;
+  sourceNote?: string;
   costBasis?: string;
   costBasisTestId?: string;
 }
@@ -83,6 +84,7 @@ export function ResultContext({
   dates,
   dateRange,
   source,
+  sourceNote,
   costBasis,
   costBasisTestId,
 }: ResultContextProps) {
@@ -204,7 +206,18 @@ export function ResultContext({
       {source && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.source}:</dt>{' '}
-          <dd className="inline">{source}</dd>
+          <dd className="inline">
+            {source}
+            {sourceNote && (
+              <span
+                data-testid="result-context-source-note"
+                className="font-medium text-amber-700 dark:text-amber-300"
+              >
+                {' · '}
+                {sourceNote}
+              </span>
+            )}
+          </dd>
         </div>
       )}
       {costBasis && (

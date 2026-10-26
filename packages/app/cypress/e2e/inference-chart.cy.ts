@@ -14,6 +14,7 @@ import {
 } from '../support/e2e';
 import {
   interceptOverlayRun,
+  AGENTIC_DATE,
   OVERLAY_RUN_ID,
   OVERLAY_RUN_URL,
   SINGLE_TURN_DATE,
@@ -154,6 +155,7 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
+    cy.get('[data-testid="result-context-source-note"]').should('not.exist');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -385,6 +387,92 @@ describe('Inference Chart', () => {
     cy.visit('/inference');
     cy.wait('@availabilityFailure');
     cy.contains('h2', 'Something went wrong!').should('be.visible');
+  });
+});
+
+describe('MiniMax M3 historical benchmark attribution', () => {
+  it('keeps the status beside the source for official charts, overlays, and the Chinese mobile chart', () => {
+    const model = 'minimaxm3';
+    const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
+    const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
+    cy.intercept('GET', '/api/v1/availability', {
+      body: officialRows.map(({ metrics: _metrics, ...row }) => row),
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: officialRows });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            name: 'historical-m3-overlay',
+            branch: 'historical-m3-overlay',
+            sha: 'abc000',
+            createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: overlayRows,
+        evaluations: [],
+      },
+    }).as('historicalM3Overlay');
+
+    cy.visit('/inference/minimax-m3?i_seq=agentic-traces', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('#chart-0 [data-testid="result-context"]')
+      .should('contain.text', 'Source: SemiAnalysis InferenceX™')
+      .and('contain.text', 'Historical benchmark — submissions closed');
+    cy.get('#chart-0 [data-testid="result-context-source-note"]').should('be.visible');
+    let exportedPng = '';
+    let exportedCaption = '';
+    cy.window().then((win) => {
+      win.HTMLAnchorElement.prototype.click = function () {
+        if (this.download.endsWith('.png')) {
+          exportedPng = this.href;
+          exportedCaption = win.document.querySelector('#chart-0-export')?.textContent ?? '';
+        }
+      };
+    });
+    cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window()
+      .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
+      .then(() => {
+        expect(exportedCaption).to.contain('Historical benchmark — submissions closed');
+        cy.writeFile(
+          'cypress/downloads/minimax-m3-historical.png',
+          exportedPng.split(',')[1],
+          'base64',
+        );
+      });
+
+    cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#chart-0 [data-testid="result-context-source-note"]').should(
+      'have.text',
+      ' · Historical benchmark — submissions closed',
+    );
+    cy.get('[aria-label="Dismiss historical-m3-overlay"]').click();
+    cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
+    cy.get('#chart-0 [data-testid="result-context-source-note"]').should('be.visible');
+
+    cy.viewport(375, 900);
+    cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 [data-testid="result-context-source-note"]')
+      .should('be.visible')
+      .and('have.text', ' · 历史基准测试（已停止接收提交）');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
   });
 });
 
