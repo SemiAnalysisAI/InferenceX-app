@@ -1,0 +1,28 @@
+---
+title: 'MiMo V2.6 Flash'
+developer: 'Xiaomi'
+releaseDate: '2026 年 9 月 21 日'
+description: '小米的多模态 MoE 模型，总参数量 309B、每个 token 激活 15B，包含 39 层滑动窗口注意力和 9 层全局注意力，支持 1M token 上下文，并附带 DFlash draft 模型。'
+---
+
+## 概述
+
+MiMo-V2.6-Flash 是小米发布的 MoE（混合专家）模型，总参数量 309B，每个 token 激活 15B。它支持文本、图像、视频和音频输入，输出文本，上下文长度为 1M token。InferenceX 测试的是以 MIT 许可证发布的 RL checkpoint `XiaomiMiMo/MiMo-V2.6-Flash-RL`（[模型卡](https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL)）。
+
+## 架构
+
+- **主干：**48 层，隐藏维度 4096，词表大小 152576。
+- **注意力分布：**39 层滑动窗口注意力，窗口为 128 token，并带有每个 head 的可学习 attention sink；9 层全局注意力，分别位于第 0、5、11、17、23、29、35、41 和 47 层。
+- **注意力 head：**64 个 query head，query 与 key 维度为 192，value 维度为 128。全局注意力层使用 4 个 KV head，滑动窗口层使用 8 个。
+- **位置编码：**部分 RoPE，约覆盖每个 head 的三分之一（旋转比例 0.334）；全局注意力层的 RoPE theta 为 10,000,000，滑动窗口层为 10,000。
+- **FFN 分布：**第一层使用中间维度 16384 的稠密 SwiGLU FFN，其余 47 层使用 MoE。
+- **专家：**256 个路由专家，每个 token 通过 sigmoid 打分选出 top-8，采用无辅助损失的负载均衡；没有共享专家；专家中间维度为 2048。
+- **上下文：**配置中的位置上限为 1,048,576。
+- **量化：**路由专家以 MXFP4 存储；稠密层、注意力 QKV 与 MTP 权重为 FP8 E4M3，按 128 x 128 分块；注意力输出投影保持 BF16。
+- **投机解码：**checkpoint 自带 3 层 MTP，以及独立的 5 层 DFlash draft 模型。
+
+上述维度、注意力分布和量化布局均来自[公开配置](https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL/raw/main/config.json)。
+
+## InferenceX 覆盖范围
+
+MiMo V2.6 Flash 是实验性模型，目前只在 AgentX 场景中测试，硬件为 B200，推理框架为 SGLang 和 vLLM，未启用投机解码。AgentX 的 trace 只有文本，因此不会用到其视觉和音频编码器。

@@ -29,6 +29,7 @@ describe('MODEL_RELEASE_DATES coverage', () => {
 
   it('anchors each model to its weights publication, not its first sweep', () => {
     expect(getModelReleaseDate(Model.MiniMax_M3_1_Flash)).toBe('2026-10-23');
+    expect(getModelReleaseDate(Model.MiMo_V2_6_Flash)).toBe('2026-09-21');
     expect(getModelReleaseDate(Model.Kimi_K3)).toBe('2026-07-27');
     expect(getModelReleaseDate(Model.GLM_5_2)).toBe('2026-06-13');
     expect(getModelReleaseDate(Model.MiniMax_M3)).toBe('2026-06-07');
@@ -64,6 +65,7 @@ describe('MODEL_ARCHITECTURES', () => {
       Model.MiniMax_M2_5,
       Model.MiniMax_M3,
       Model.MiniMax_M3_1_Flash,
+      Model.MiMo_V2_6_Flash,
     ];
 
     for (const model of models) {

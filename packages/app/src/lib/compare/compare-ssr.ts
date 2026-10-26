@@ -41,6 +41,7 @@ export const KNOWN_MODELS = new Set([
   'MiniMax-M2.5',
   'MiniMax-M3',
   'MiniMax-M3.1-Flash',
+  'MiMo-V2.6-Flash',
   'GLM-5',
   'GLM-5.2',
   'DeepSeek-V4-Pro',

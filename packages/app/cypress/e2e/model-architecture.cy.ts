@@ -502,6 +502,7 @@ describe('Completed architecture catalog', () => {
     ['muse-spark-open', 'Pooled MoE (4096-dim latent)'],
     ['deepseek-v41-flash', '20-layer causal encoder'],
     ['minimax-m31-flash', 'NVFP4 Experts'],
+    ['mimo-v26-flash', 'MXFP4 Experts'],
     ['qwen-3-8-27b', 'Dense FFN'],
     ['qwen-3-8-27b-eager', 'Same model, eager execution'],
     ['glm-5-1', 'DSA: top-2048 tokens'],
@@ -529,6 +530,7 @@ describe('Completed architecture catalog', () => {
     'muse-spark-open',
     'deepseek-v41-flash',
     'minimax-m31-flash',
+    'mimo-v26-flash',
     'qwen-3-8-27b',
     'qwen-3-8-27b-eager',
   ]) {
