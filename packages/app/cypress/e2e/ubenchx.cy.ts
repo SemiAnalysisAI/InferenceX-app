@@ -125,3 +125,43 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });
 });
+
+const dismiss = {
+  onBeforeLoad(win: Cypress.AUTWindow) {
+    win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+  },
+};
+
+describe('Ascend core memory-access profiles', () => {
+  it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
+    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.get('[data-testid="ubenchx-test-select"]').click();
+    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
+    cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')
+      .focus()
+      .trigger('keydown', { key: 'ArrowRight' });
+    cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
+      'contain',
+      '0 ↔ 2: 15.30 SYS_CNT ticks',
+    );
+    cy.get('[data-testid="profile-scalar_128MiB_vector_concurrent"] svg').should('exist');
+    cy.screenshot('ascend-core-profiles-en', { capture: 'fullPage' });
+    cy.visit('/zh/ubenchx/core-memory-profiles', dismiss);
+    cy.contains('h2', '核心访存特征').should('be.visible');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', '核心访存特征');
+    cy.contains('不是核心间通信延迟').should('be.visible');
+    cy.contains('没有网格级起始同步屏障').should('be.visible');
+    cy.screenshot('ascend-core-profiles-zh', { capture: 'fullPage' });
+  });
+  it('returns the displayed matrix values and preserves absent GPU measurements', () => {
+    cy.request('/api/v1/views/ubenchx?test=all&gpu=Ascend%20950PR_9579').then(({ body }) => {
+      const panel = body.coreMemoryProfiles.gpus[0].panels[0];
+      expect(panel.coreIds.slice(12, 16)).to.deep.equal([14, 15, 54, 55]);
+      expect(panel.matrix[0][14]).to.be.closeTo(96.70648193359, 1e-8);
+      expect(panel.unit).to.equal('SYS_CNT ticks');
+      expect(body.smL2Distance.gpus).to.deep.equal([]);
+    });
+  });
+});

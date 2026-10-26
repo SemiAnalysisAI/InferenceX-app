@@ -518,7 +518,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '237d7b2f095786cea52f8d65eaed73a4f091fa880803809271e2542b0d62b4d9',
+    sourceSha256: '9ecf85848715cddf23b32f74d2f6ede9ee1f33a87e95447d2898532c2f1ac60a',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -1158,6 +1158,15 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/components/ubenchx/core-memory-profiles.ts',
+    sourceSha256: '33e66e68f44e8382bc3b09f33c89f96caeaa011d5171958c4c0f9c1cd98178fb',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
   {
     source: 'src/lib/catalog/gpu-specs.ts',
     sourceSha256: 'fb9dc719f347fb5b73ea73cf35a19d12c640b34a284f31cd70a8b9b2df76b4fd',

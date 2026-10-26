@@ -24,7 +24,7 @@ describe('ubenchx view', () => {
     expect(body.view).toBe('ubenchx');
     expect(body.apiVersion).toBe('v1');
     expect(body.test).toBe('all');
-    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance', 'tpc-skyline']);
+    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance', 'tpc-skyline', 'core-memory-profiles']);
     expect(body.memBw.gpus).toHaveLength(1);
     expect(body.smL2Distance.gpus.length).toBeGreaterThanOrEqual(1);
     expect(body.tpcSkyline.gpus).toHaveLength(Object.keys(TPC_SKYLINE_RUNS).length);
@@ -157,4 +157,28 @@ describe('ubenchx view', () => {
     const h200Last = h200Body.gpus[0].rows.at(-1);
     expect(h200Last.mbuPercent).toBeCloseTo((4305.39 / 4800) * 100, 4);
   });
+});
+
+it('returns the Ascend core profiles with raw timer units and leaves unavailable tests empty', async () => {
+  const response = await GET(request({ test: 'all', gpu: 'ascend 950pr_9579' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.memBw.gpus).toEqual([]);
+  expect(body.smL2Distance.gpus).toEqual([]);
+  expect(body.tpcSkyline.gpus).toEqual([]);
+  const run = body.coreMemoryProfiles.gpus[0];
+  expect(run.gpu).toBe('Ascend 950PR_9579');
+  expect(run.panels.map((panel: { coreIds: number[] }) => panel.coreIds.length)).toEqual([
+    28, 28, 56, 56,
+  ]);
+  expect(run.panels[0].unit).toBe('SYS_CNT ticks');
+  expect(run.panels[0].coreIds.slice(12, 16)).toEqual([14, 15, 54, 55]);
+  expect(run.panels[0].stats.withinDieGroupMean).toBeCloseTo(18.55499211685, 8);
+  expect(run.panels[0].stats.betweenDieGroupMean).toBeCloseTo(93.12987720723, 8);
+  expect(run.panels[0].matrix[0][14]).toBeCloseTo(96.70648193359, 8);
+  const onlyResponse = await GET(request({ test: 'core-memory-profiles' }));
+  const only = await onlyResponse.json();
+  expect(only.gpus).toEqual(body.coreMemoryProfiles.gpus);
+  const missing = await GET(request({ test: 'core-memory-profiles', gpu: 'H100 SXM' }));
+  expect(missing.status).toBe(400);
 });
