@@ -357,8 +357,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON 对象，将视频数据点 ID 映射为 {hourly,source,date} 字符串；hourly 为非负 USD/deployment-hour。',
   ],
   gpu: [
-    'GPU key, e.g. "H100 SXM"; default first available GPU. "all" returns every GPU.',
-    'GPU 键，如 "H100 SXM"；默认首个可用 GPU。设为 "all" 返回全部 GPU。',
+    'Accelerator key, e.g. "H100 SXM", "Huawei 950PR", "B200 SXM" or "Ascend 950PR_9579". core-memory-profiles and tpc-skyline default to "all"; other tests default to the first available device. "all" returns all devices; unavailable tests retain an empty gpus array for an explicitly selected device.',
+    '加速器键，如 "H100 SXM"、"Huawei 950PR"、"B200 SXM" 或 "Ascend 950PR_9579"。core-memory-profiles 和 tpc-skyline 默认 "all"，其他测试默认首个可用设备。"all" 返回全部设备；显式选择设备时，没有数据的测试保留空 gpus 数组。',
   ],
   test: [
     'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, core-memory-profiles, or all (default). Determines which benchmark data is returned.',
@@ -503,8 +503,8 @@ const NEW_VIEWS = {
     },
   ],
   ubenchx: [
-    'ubenchX microbenchmarks (mem-bw, sm-l2-distance, tpc-skyline, and core-memory-profiles)',
-    'ubenchX 微基准测试（mem-bw、sm-l2-distance、tpc-skyline 和 core-memory-profiles）',
+    'ubenchX microbenchmarks with per-device protocols and bandwidth references (mem-bw, sm-l2-distance, tpc-skyline, and core-memory-profiles)',
+    'ubenchX 微基准测试及各设备的测试协议和带宽参考值（mem-bw、sm-l2-distance、tpc-skyline 和 core-memory-profiles）',
     {
       gpus: objects,
       tests: strings,
@@ -526,7 +526,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
       path: `/api/v1/views/${view}`,
       summary: text(en, zh),
       description: text(
-        `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${view === 'ubenchx' ? ' core-memory-profiles returns panels with actual coreIds, dieGroups, full matrices, raw SYS_CNT tick units and unique-pair within/between-group statistics; a missing pair class is null. Shared colorLimits and limitations preserve the interpretation. These are profile differences, not core-to-core latency or a floorplan. mem-bw includes Huawei rotating-pool FP16 graph results. timeMs is amortized per copy for metadata.protocol=rotating-pool-npu-graph. peakBandwidthSource documents the per-run normalization reference; optional rows retain observations, bandwidthP10Gbps, bandwidthP90Gbps, processBandwidthGbps, slots and combinedPoolBytes. Missing sizes are listed in metadata.missingSizesBytes.' : ''}${
+        `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${view === 'ubenchx' ? ' core-memory-profiles defaults to gpu=all and returns B200 SXM plus Ascend 950PR_9579; gpu selects either device. B200 retains orderedSms, smInfo, gpcBounds, matrix, stats and metadata, with unit=clock64 cycles and its own colorLimits. The legacy sm-l2-distance API remains available with its original shape. Ascend returns panels with actual coreIds, dieGroups, full matrices, raw SYS_CNT tick units and unique-pair within/between-group statistics; a missing pair class is null. Shared colorLimits and limitations preserve the interpretation. These are profile differences, not core-to-core latency or a floorplan. mem-bw includes Huawei rotating-pool FP16 graph results. timeMs is amortized per copy for metadata.protocol=rotating-pool-npu-graph. peakBandwidthSource documents the per-run normalization reference; optional rows retain observations, bandwidthP10Gbps, bandwidthP90Gbps, processBandwidthGbps, slots and combinedPoolBytes. Missing sizes are listed in metadata.missingSizesBytes.' : ''}${
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'current-inferencex-image'
@@ -535,7 +535,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
                 ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Stored coverage describes the entire run: complete means the recorded artifact/file inventory is present, partial means recorded telemetry is missing, and unknown means no complete inventory was retained; missingArtifacts names entirely missing artifacts and may be empty when only a file is incomplete. GitHub coverage is null (unassessed). Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Statistics cover every chip of the selected file/host series, including startup and warmup, and are computed from its samples on each read; a stored series whose samples do not match its recorded sample count returns none. Mean is sample-weighted, P50/P95/P99 interpolate linearly at p*(N-1), and standard deviation divides by N. These statistics are not serving-window power or J/token. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings. This endpoint projects the raw GPU-metrics explorer, not the inference Power Timeline. Timeline role/window evidence comes from its existing series=power read plus benchmark power_audit. Timeline i_ptaxis, i_ptlines, i_ptwindow, i_ptfocus, i_ptutility and i_ptconc share fields control client rendering only and are not accepted here; they do not change raw telemetry or full-record statistics.'
                 : ''
         }`,
-        `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${view === 'ubenchx' ? ' core-memory-profiles 返回各面板的实际 coreIds、dieGroups、完整矩阵、原始 SYS_CNT tick 单位及去重核心对的组内和组间统计；没有对应核心对时为 null。colorLimits 和 limitations 保留统一色标及解释限制。这些数据是访存特征差异，不是核心间通信延迟或物理布局图。 mem-bw 包含 Huawei FP16 轮转缓冲池图执行结果。metadata.protocol=rotating-pool-npu-graph 时，timeMs 为每次拷贝的摊销时间。peakBandwidthSource 说明该次测量采用的归一化参考值；行数据可保留 observations、bandwidthP10Gbps、bandwidthP90Gbps、processBandwidthGbps、slots 和 combinedPoolBytes。缺失大小列在 metadata.missingSizesBytes。' : ''}${
+        `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${view === 'ubenchx' ? ' core-memory-profiles 默认 gpu=all，返回 B200 SXM 和 Ascend 950PR_9579；gpu 可单独选择设备。B200 保留 orderedSms、smInfo、gpcBounds、matrix、stats 和 metadata，单位为 clock64 cycles，使用独立 colorLimits。旧版 sm-l2-distance API 仍可使用，响应结构不变。Ascend 返回各面板的实际 coreIds、dieGroups、完整矩阵、原始 SYS_CNT tick 单位及去重核心对的组内和组间统计；没有对应核心对时为 null。colorLimits 和 limitations 保留统一色标及解释限制。这些数据是访存特征差异，不是核心间通信延迟或物理布局图。 mem-bw 包含 Huawei FP16 轮转缓冲池图执行结果。metadata.protocol=rotating-pool-npu-graph 时，timeMs 为每次拷贝的摊销时间。peakBandwidthSource 说明该次测量采用的归一化参考值；行数据可保留 observations、bandwidthP10Gbps、bandwidthP90Gbps、processBandwidthGbps、slots 和 combinedPoolBytes。缺失大小列在 metadata.missingSizesBytes。' : ''}${
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'current-inferencex-image'

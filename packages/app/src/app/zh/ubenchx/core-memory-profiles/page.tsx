@@ -7,7 +7,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX：核心访存特征';
 const DESCRIPTION =
-  '展示 Ascend 950PR 的 Cube 与 Vector 标量控制器在 128 MiB 内存上的访存特征差异，包含单核执行与并发启动结果。';
+  '对比 B200 SM 与 Huawei 950PR Cube/Vector 的访存特征，保留各设备原始计时单位和测试条件。';
 
 export const metadata: Metadata = {
   title: TITLE,

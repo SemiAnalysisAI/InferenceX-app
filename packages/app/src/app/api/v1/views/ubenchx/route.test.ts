@@ -176,11 +176,38 @@ it('returns the Ascend core profiles with raw timer units and leaves unavailable
   expect(run.panels[0].stats.withinDieGroupMean).toBeCloseTo(18.55499211685, 8);
   expect(run.panels[0].stats.betweenDieGroupMean).toBeCloseTo(93.12987720723, 8);
   expect(run.panels[0].matrix[0][14]).toBeCloseTo(96.70648193359, 8);
-  const onlyResponse = await GET(request({ test: 'core-memory-profiles' }));
+  const onlyResponse = await GET(
+    request({ test: 'core-memory-profiles', gpu: 'Ascend 950PR_9579' }),
+  );
   const only = await onlyResponse.json();
   expect(only.gpus).toEqual(body.coreMemoryProfiles.gpus);
   const missing = await GET(request({ test: 'core-memory-profiles', gpu: 'H100 SXM' }));
   expect(missing.status).toBe(400);
+});
+
+it('combines both hardware profiles without converting or pooling their units', async () => {
+  const response = await GET(request({ test: 'core-memory-profiles' }));
+  const body = await response.json();
+  expect(body.params).toEqual({ test: 'core-memory-profiles', gpu: 'all' });
+  expect(body.gpus.map((run: { gpu: string }) => run.gpu)).toEqual([
+    'B200 SXM',
+    'Ascend 950PR_9579',
+  ]);
+  const b200 = body.gpus[0];
+  expect(b200).toMatchObject(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
+  expect(b200.unit).toBe('clock64 cycles');
+  expect(b200.colorLimits).toEqual([0, b200.stats.max]);
+  expect(body.gpus[1].panels[0].unit).toBe('SYS_CNT ticks');
+  const filteredResponse = await GET(request({ test: 'core-memory-profiles', gpu: 'b200 sxm' }));
+  const filtered = await filteredResponse.json();
+  expect(filtered.params.gpu).toBe('B200 SXM');
+  expect(filtered.gpus).toEqual([b200]);
+  const allResponse = await GET(request({ test: 'all', gpu: 'B200 SXM' }));
+  const all = await allResponse.json();
+  expect(all.coreMemoryProfiles.gpus).toEqual([b200]);
+  const legacyResponse = await GET(request({ test: 'sm-l2-distance', gpu: 'B200 SXM' }));
+  const legacy = await legacyResponse.json();
+  expect(legacy.gpus[0]).toEqual(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
 });
 
 it('exposes Huawei rotating-copy evidence without inventing missing tests or sizes', async () => {

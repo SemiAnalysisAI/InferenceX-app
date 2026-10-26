@@ -7,7 +7,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX: Core memory-access profiles';
 const DESCRIPTION =
-  'Measured 128 MiB memory-access profile differences for Ascend 950PR Cube and Vector scalar controllers, with isolated and concurrent launches.';
+  'Compare B200 SM and Huawei 950PR Cube/Vector memory-access profiles, preserving each device’s native timer units and measurement conditions.';
 
 export const metadata: Metadata = {
   title: TITLE,

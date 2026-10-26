@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summarizeCoreProfile } from './core-memory-profiles';
+import { coreMemoryProfileResults, summarizeCoreProfile } from './core-memory-profiles';
 
 describe('core profile pair statistics', () => {
   it('averages unique off-diagonal pairs in their decoded groups', () => {
@@ -46,4 +46,12 @@ it('preserves an absent pair class instead of inventing a zero measurement', () 
       ['A', 'B'],
     ),
   ).toEqual({ withinDieGroupMean: null, betweenDieGroupMean: 8 });
+});
+
+it('filters the unified collection without inventing absent measurements', () => {
+  expect(coreMemoryProfileResults('H100 SXM')).toEqual([]);
+  expect(coreMemoryProfileResults('Ascend 950PR_9579')).toHaveLength(1);
+  const all = coreMemoryProfileResults();
+  expect(all.map((run) => run.gpu)).toEqual(['B200 SXM', 'Ascend 950PR_9579']);
+  expect(coreMemoryProfileResults('B200 SXM')).toEqual([all[0]]);
 });

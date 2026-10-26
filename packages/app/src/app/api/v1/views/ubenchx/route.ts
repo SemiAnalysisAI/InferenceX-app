@@ -1,4 +1,8 @@
-import { CORE_PROFILE_GPU, coreMemoryProfiles } from '@/components/ubenchx/core-memory-profiles';
+import {
+  CORE_PROFILE_GPU,
+  CORE_PROFILE_GPU_KEYS,
+  coreMemoryProfileResults,
+} from '@/components/ubenchx/core-memory-profiles';
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
 import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
@@ -35,14 +39,14 @@ export function GET(request: NextRequest) {
     const rawGpu = s.get('gpu');
 
     if (test === 'core-memory-profiles') {
-      const gpu = parseEnumParam(rawGpu, 'gpu', ['all', CORE_PROFILE_GPU], CORE_PROFILE_GPU);
+      const gpu = parseEnumParam(rawGpu, 'gpu', ['all', ...CORE_PROFILE_GPU_KEYS], 'all');
       return Promise.resolve(
         cachedJson({
           apiVersion: 'v1',
           view: 'ubenchx',
           test,
           params: { test, gpu },
-          gpus: [coreMemoryProfiles()],
+          gpus: coreMemoryProfileResults(gpu),
         }),
       );
     }
@@ -105,10 +109,7 @@ export function GET(request: NextRequest) {
           memBw: { gpus: memBwResults },
           smL2Distance: { gpus: smL2Results },
           coreMemoryProfiles: {
-            gpus:
-              rawGpu === null || gpu === 'all' || gpu === CORE_PROFILE_GPU
-                ? [coreMemoryProfiles()]
-                : [],
+            gpus: coreMemoryProfileResults(rawGpu === null ? 'all' : gpu),
           },
           // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
           // match the GPU key case-insensitively as parseEnumParam does for the others.

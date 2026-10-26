@@ -1,4 +1,6 @@
 import data from './data/ascend-core-profiles.json';
+import { SM_L2_RUNS } from './sm-l2-data';
+import { transformSmL2Run } from './sm-l2-transform';
 
 export const CORE_PROFILE_GPU = 'Ascend 950PR_9579';
 export interface CoreProfilePanel {
@@ -66,4 +68,26 @@ export function coreMemoryProfiles() {
       'Runtime-ID die groups are not a recovered physical floorplan',
     ],
   };
+}
+
+/** One page/API collection, preserving each benchmark's native units and schema. */
+export const CORE_PROFILE_GPU_KEYS = [...Object.keys(SM_L2_RUNS), CORE_PROFILE_GPU];
+
+export function coreMemoryProfileResults(gpu = 'all') {
+  const nvidia = Object.entries(SM_L2_RUNS)
+    .filter(([key]) => gpu === 'all' || gpu === key)
+    .map(([key, run]) => {
+      const view = transformSmL2Run(key, run);
+      return {
+        ...view,
+        unit: 'clock64 cycles',
+        metric: 'Mean absolute difference between matched-address latency profiles',
+        colorLimits: [0, view.stats.max],
+        limitations: [
+          'Profile differences are not direct SM-to-SM communication latency or physical coordinates',
+          'clock64 cycles and Ascend SYS_CNT ticks are not directly comparable',
+        ],
+      };
+    });
+  return [...nvidia, ...(gpu === 'all' || gpu === CORE_PROFILE_GPU ? [coreMemoryProfiles()] : [])];
 }

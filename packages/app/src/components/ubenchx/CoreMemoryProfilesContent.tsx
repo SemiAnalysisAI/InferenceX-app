@@ -4,12 +4,29 @@ import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { coreMemoryProfiles, type CoreProfilePanel } from './core-memory-profiles';
+import {
+  coreMemoryProfiles,
+  CORE_PROFILE_GPU,
+  CORE_PROFILE_GPU_KEYS,
+  type CoreProfilePanel,
+} from './core-memory-profiles';
+import { SmL2Content } from './SmL2Heatmap';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const STRINGS = {
   en: {
     noPairs: 'No pairs',
     title: 'Core memory-access profiles',
+    hardware: 'Hardware',
+    allHardware: 'All hardware',
+    comparison:
+      'Compare memory-access grouping patterns on B200 and Huawei 950PR. Each device keeps its own color scale: B200 uses clock64 cycles; 950PR uses SYS_CNT ticks. Equal colors or numbers across devices do not mean equal latency.',
     subtitle: 'Ascend 950PR_9579 · 128 MiB · Cube and Vector scalar controllers',
     isolated: 'One active core',
     concurrent: 'Concurrent launch',
@@ -35,6 +52,10 @@ const STRINGS = {
   zh: {
     noPairs: '无核心对',
     title: '核心访存特征',
+    hardware: '硬件',
+    allHardware: '全部硬件',
+    comparison:
+      '对比 B200 与 Huawei 950PR 的访存分组模式。各设备使用独立色标：B200 以 clock64 周期计，950PR 以 SYS_CNT ticks 计。不同设备上颜色或数值相同，并不代表延迟相同。',
     subtitle: 'Ascend 950PR_9579 · 128 MiB · Cube 与 Vector 标量控制器',
     isolated: '单个核心执行',
     concurrent: '并发启动',
@@ -268,14 +289,14 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
   );
 }
 
-export function CoreMemoryProfilesContent() {
+function AscendCoreProfiles() {
   const locale = useLocale(),
     t = STRINGS[locale];
   const result = useMemo(coreMemoryProfiles, []);
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">{t.title}</h2>
+        <h2 className="text-xl font-semibold">Huawei 950PR</h2>
         <p className="text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
       <p className="text-sm text-muted-foreground">{t.limits}</p>
@@ -306,6 +327,50 @@ export function CoreMemoryProfilesContent() {
           {t.source}
         </a>
       </section>
+    </div>
+  );
+}
+
+export function CoreMemoryProfilesContent() {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const [gpu, setGpu] = useState('all');
+  return (
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h2 className="text-xl font-semibold">{t.title}</h2>
+        <p className="text-sm text-muted-foreground max-w-4xl">{t.comparison}</p>
+      </div>
+      <div className="space-y-1.5 sm:w-72">
+        <label htmlFor="core-profile-hardware" className="text-sm font-medium">
+          {t.hardware}
+        </label>
+        <Select
+          value={gpu}
+          onValueChange={(value) => {
+            setGpu(value);
+            track('ubenchx_core_profile_hardware_selected', { gpu: value });
+          }}
+        >
+          <SelectTrigger id="core-profile-hardware" data-testid="core-profile-hardware">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t.allHardware}</SelectItem>
+            {CORE_PROFILE_GPU_KEYS.map((key) => (
+              <SelectItem key={key} value={key}>
+                {key === CORE_PROFILE_GPU ? 'Huawei 950PR' : key}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {gpu !== CORE_PROFILE_GPU && <SmL2Content gpu={gpu} />}
+      {(gpu === 'all' || gpu === CORE_PROFILE_GPU) && (
+        <section className="border-t pt-8" data-testid="ascend-core-profiles">
+          <AscendCoreProfiles />
+        </section>
+      )}
     </div>
   );
 }

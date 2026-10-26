@@ -518,7 +518,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '9ecf85848715cddf23b32f74d2f6ede9ee1f33a87e95447d2898532c2f1ac60a',
+    sourceSha256: '20755a02e4f59eb3d3a833b8b6cb6c8179c046930b72376b06a5817fa5eab05a',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -1177,7 +1177,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/ubenchx/core-memory-profiles.ts',
-    sourceSha256: '33e66e68f44e8382bc3b09f33c89f96caeaa011d5171958c4c0f9c1cd98178fb',
+    sourceSha256: 'e616d19a91e814a414ddcfef871fb89b79b62d81b76b6ace3454a563d48054c8',
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',

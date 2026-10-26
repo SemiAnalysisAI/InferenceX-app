@@ -21,7 +21,6 @@ const STRINGS = {
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'HBM Bandwidth',
-    smL2Title: 'SM-SM L2 Latency Difference',
     tpcSkylineTitle: 'TPC Skyline',
     coreProfilesTitle: 'Core memory-access profiles',
   },
@@ -31,7 +30,6 @@ const STRINGS = {
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
-    smL2Title: 'SM 间 L2 延迟差异',
     tpcSkylineTitle: 'TPC Skyline',
     coreProfilesTitle: '核心访存特征',
   },
@@ -39,7 +37,6 @@ const STRINGS = {
 
 export const UBENCHX_TESTS = [
   { slug: 'mem-bw', titleKey: 'memBwTitle' },
-  { slug: 'sm-l2-distance', titleKey: 'smL2Title' },
   { slug: 'tpc-skyline', titleKey: 'tpcSkylineTitle' },
   { slug: 'core-memory-profiles', titleKey: 'coreProfilesTitle' },
 ] as const;

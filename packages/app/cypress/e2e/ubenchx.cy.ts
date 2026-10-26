@@ -26,7 +26,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
-  it('switches to sm-l2-distance with the test selector', () => {
+  it('switches to the combined core profiles with the test selector', () => {
     cy.visit('/ubenchx/mem-bw', dismissModal);
     cy.contains('ubenchX').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
@@ -36,10 +36,10 @@ describe('ubenchX hub and test routes', () => {
       .should('include', '/zh/ubenchx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'SM-SM L2 Latency Difference').click();
-    cy.url().should('include', '/ubenchx/sm-l2-distance');
+    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.url().should('include', '/ubenchx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'SM-SM L2 Latency Difference');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
@@ -90,7 +90,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx/sm-l2-distance');
+      .should('include', '/zh/ubenchx/core-memory-profiles');
 
     cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
     cy.get('@overlay').click(520, 120, { force: true });
@@ -193,6 +193,42 @@ it('unpins core-profile cells by repeated click or Enter and clears them outside
   cy.get(`${panel} svg rect`).eq(1).click();
   cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
   cy.get(clear).should('be.disabled');
+});
+
+it('filters both devices on one page and preserves their API values and units', () => {
+  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.get('[data-testid="core-profile-hardware"]').should('contain', 'All hardware').click();
+  cy.contains('[role="option"]', 'B200 SXM').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
+  cy.get('[data-testid="ascend-core-profiles"]').should('not.exist');
+  cy.request('/api/v1/views/ubenchx?test=core-memory-profiles&gpu=B200%20SXM').then(({ body }) => {
+    expect(body.gpus).to.have.length(1);
+    expect(body.gpus[0].unit).to.equal('clock64 cycles');
+    cy.contains(`${body.gpus[0].stats.crossDieMean.toFixed(1)} cycles`).should('be.visible');
+  });
+  cy.get('[data-testid="core-profile-hardware"]').click();
+  cy.contains('[role="option"]', 'Huawei 950PR').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('not.exist');
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus();
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
+    'contain',
+    '0 ↔ 1: 19.03 SYS_CNT ticks',
+  );
+  cy.get('[data-testid="core-profile-hardware"]').click();
+  cy.contains('[role="option"]', 'All hardware').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.screenshot('combined-core-profiles-desktop', { capture: 'fullPage' });
+  cy.visit('/zh/ubenchx/sm-l2-distance', dismiss);
+  cy.location('pathname').should('equal', '/zh/ubenchx/core-memory-profiles');
+  cy.viewport(390, 844);
+  cy.get('[data-testid="core-profile-hardware"]').should('contain', '全部硬件');
+  cy.contains('不同设备上颜色或数值相同，并不代表延迟相同').should('be.visible');
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.screenshot('combined-core-profiles-mobile-zh', { capture: 'fullPage' });
 });
 
 describe('Huawei copy-bandwidth evidence', () => {

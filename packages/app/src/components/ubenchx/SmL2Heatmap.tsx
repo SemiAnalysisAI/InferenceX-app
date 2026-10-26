@@ -12,11 +12,8 @@ import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'SM-SM L2 Latency Difference',
-    pageSubtitle:
-      'Pointer-chase L2 cache benchmark revealing SM-to-SM latency differences and GPC/die topology.',
     heatmapTitle: 'SM-SM L2 Latency Difference',
-    colorBarLabel: 'mean |diff| per address (cycles)',
+    colorBarLabel: 'mean |diff| per address (clock64 cycles)',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
@@ -26,7 +23,7 @@ const STRINGS = {
     tooltipCol: 'column',
     methodology: 'Methodology',
     methodologyText:
-      'L2 pointer-chase benchmark: each SM walks a linked-list through L2 cache lines, recording per-hop latency via clock64(). The matrix shows mean |diff| between per-address latency vectors of each SM pair, revealing shared L2 partition proximity.',
+      'Each SM walks a linked list through L2 cache lines, recording per-hop latency with clock64(). Each cell is the mean absolute difference between two SMs’ matched-address latency profiles, not direct SM-to-SM communication latency or a physical distance.',
     statsIntraGpc: 'Intra-GPC mean',
     statsInterGpc: 'Inter-GPC (same die) mean',
     statsCrossDie: 'Cross-die mean',
@@ -35,10 +32,8 @@ const STRINGS = {
     noData: 'No SM-L2 distance data available.',
   },
   zh: {
-    pageTitle: 'SM 间 L2 延迟差异',
-    pageSubtitle: '基于指针追踪的 L2 缓存基准测试，揭示 SM 间延迟差异和 GPC/die 拓扑结构。',
     heatmapTitle: 'SM 间 L2 延迟差异',
-    colorBarLabel: '每地址平均 |差值|（周期）',
+    colorBarLabel: '每地址平均 |差值|（clock64 周期）',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
@@ -48,7 +43,7 @@ const STRINGS = {
     tooltipCol: '列',
     methodology: '测试方法',
     methodologyText:
-      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示共享 L2 分区的远近关系。',
+      '每个 SM 沿链表遍历 L2 缓存行，并用 clock64() 记录每跳延迟。每个单元格表示两个 SM 在相同地址上测得的延迟特征之间的平均绝对差，既不是 SM 间直接通信延迟，也不是物理距离。',
     statsIntraGpc: 'GPC 内平均',
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',
@@ -348,17 +343,19 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
   );
 }
 
-export function SmL2Content() {
+export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
 
   const results = useMemo(
     () =>
-      Object.entries(SM_L2_RUNS).map(([key, run]) => ({
-        key,
-        view: transformSmL2Run(key, run),
-      })),
-    [],
+      Object.entries(SM_L2_RUNS)
+        .filter(([key]) => gpu === 'all' || gpu === key)
+        .map(([key, run]) => ({
+          key,
+          view: transformSmL2Run(key, run),
+        })),
+    [gpu],
   );
 
   if (results.length === 0) {
@@ -367,11 +364,6 @@ export function SmL2Content() {
 
   return (
     <div className="space-y-8" role="group" aria-label={t.aria}>
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
-      </div>
-
       {results.map(({ key, view }) => (
         <section key={key}>
           <h2 className="text-lg font-semibold mb-2">
