@@ -64,6 +64,7 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
 
   cy.visit('/operatorx');
   cy.wait('@gemm');
+  cy.get('[data-testid="operatorx-page"] h1').should('have.text', 'OperatorX (Experimental Beta)');
   cy.get('[data-testid="operatorx-coverage"]')
     .should('contain.text', 'Coverage of 2 cases')
     .and('contain.text', '2/2')
@@ -117,6 +118,10 @@ for (const prefix of ['', '/zh']) {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
     cy.visit(`${prefix}/operatorx`);
     cy.wait('@gemm');
+    cy.get('[data-testid="operatorx-page"] h1').should(
+      'have.text',
+      prefix ? 'OperatorX（实验性 Beta）' : 'OperatorX (Experimental Beta)',
+    );
     cy.get('[data-testid="operatorx-viz-distribution"]')
       .scrollIntoView()
       .within(() => {
