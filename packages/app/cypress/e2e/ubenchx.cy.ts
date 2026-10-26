@@ -26,7 +26,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
-  it('switches to sm-l2-distance with the test selector', () => {
+  it('switches to the combined core profiles with the test selector', () => {
     cy.visit('/ubenchx/mem-bw', dismissModal);
     cy.contains('ubenchX').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('be.visible');
@@ -36,10 +36,10 @@ describe('ubenchX hub and test routes', () => {
       .should('include', '/zh/ubenchx/mem-bw');
 
     cy.get('[data-testid="ubenchx-test-select"]').click();
-    cy.contains('[role="option"]', 'SM-SM L2 Latency Difference').click();
-    cy.url().should('include', '/ubenchx/sm-l2-distance');
+    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.url().should('include', '/ubenchx/core-memory-profiles');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'SM-SM L2 Latency Difference');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Core memory-access profiles');
   });
 
   it('switches to the TPC Skyline table with the test selector', () => {
@@ -90,7 +90,7 @@ describe('ubenchX hub and test routes', () => {
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx/sm-l2-distance');
+      .should('include', '/zh/ubenchx/core-memory-profiles');
 
     cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
     cy.get('@overlay').click(520, 120, { force: true });
@@ -131,6 +131,105 @@ const dismiss = {
     win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
   },
 };
+
+describe('Ascend core memory-access profiles', () => {
+  it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
+    cy.visit('/ubenchx/mem-bw', dismiss);
+    cy.get('[data-testid="ubenchx-test-select"]').click();
+    cy.contains('[role="option"]', 'Core memory-access profiles').click();
+    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.contains('SYS_CNT ticks are not clock64 cycles').should('be.visible');
+    cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg')
+      .focus()
+      .trigger('keydown', { key: 'ArrowRight' });
+    cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
+      'contain',
+      '0 ↔ 2: 15.30 SYS_CNT ticks',
+    );
+    cy.get('[data-testid="profile-scalar_128MiB_vector_concurrent"] svg').should('exist');
+    cy.screenshot('ascend-core-profiles-en', { capture: 'fullPage' });
+    cy.visit('/zh/ubenchx/core-memory-profiles', dismiss);
+    cy.contains('h2', '核心访存特征').should('be.visible');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', '核心访存特征');
+    cy.contains('不是核心间通信延迟').should('be.visible');
+    cy.contains('没有网格级起始同步屏障').should('be.visible');
+    cy.screenshot('ascend-core-profiles-zh', { capture: 'fullPage' });
+  });
+  it('returns the displayed matrix values and preserves absent GPU measurements', () => {
+    cy.request('/api/v1/views/ubenchx?test=all&gpu=Ascend%20950PR_9579').then(({ body }) => {
+      const panel = body.coreMemoryProfiles.gpus[0].panels[0];
+      expect(panel.coreIds.slice(12, 16)).to.deep.equal([14, 15, 54, 55]);
+      expect(panel.matrix[0][14]).to.be.closeTo(96.70648193359, 1e-8);
+      expect(panel.unit).to.equal('SYS_CNT ticks');
+      expect(body.smL2Distance.gpus).to.deep.equal([]);
+    });
+  });
+});
+
+it('unpins core-profile cells by repeated click or Enter and clears them outside or by button', () => {
+  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
+  const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
+  const clear = '[data-testid="profile-scalar_128MiB_cube_isolated-clear"]';
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 1: 19.03');
+  cy.get(`${panel} svg rect`).eq(2).click();
+  cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 2: 15.30');
+  cy.get(`${panel} svg rect`).eq(2).click();
+  cy.get(value).should('not.contain', 'core pair:');
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg`)
+    .trigger('keydown', { key: 'ArrowRight' })
+    .trigger('keydown', { key: 'Enter' });
+  cy.get(value).should('contain', 'Pinned core pair:');
+  cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.contains('h2', 'Core memory-access profiles').click();
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(clear).click();
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
+  cy.get(clear).should('be.disabled');
+});
+
+it('filters both devices on one page and preserves their API values and units', () => {
+  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.get('[data-testid="core-profile-hardware"]').should('contain', 'All hardware').click();
+  cy.contains('[role="option"]', 'B200 SXM').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
+  cy.get('[data-testid="ascend-core-profiles"]').should('not.exist');
+  cy.request('/api/v1/views/ubenchx?test=core-memory-profiles&gpu=B200%20SXM').then(({ body }) => {
+    expect(body.gpus).to.have.length(1);
+    expect(body.gpus[0].unit).to.equal('clock64 cycles');
+    cy.contains(`${body.gpus[0].stats.crossDieMean.toFixed(1)} cycles`).should('be.visible');
+  });
+  cy.get('[data-testid="core-profile-hardware"]').click();
+  cy.contains('[role="option"]', 'Huawei 950PR').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('not.exist');
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus();
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
+    'contain',
+    '0 ↔ 1: 19.03 SYS_CNT ticks',
+  );
+  cy.get('[data-testid="core-profile-hardware"]').click();
+  cy.contains('[role="option"]', 'All hardware').click();
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.screenshot('combined-core-profiles-desktop', { capture: 'fullPage' });
+  cy.visit('/zh/ubenchx/sm-l2-distance', dismiss);
+  cy.location('pathname').should('equal', '/zh/ubenchx/core-memory-profiles');
+  cy.viewport(390, 844);
+  cy.get('[data-testid="core-profile-hardware"]').should('contain', '全部硬件');
+  cy.contains('不同设备上颜色或数值相同，并不代表延迟相同').should('be.visible');
+  cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+  cy.get('[data-testid="ascend-core-profiles"]').should('exist');
+  cy.screenshot('combined-core-profiles-mobile-zh', { capture: 'fullPage' });
+});
 
 describe('Huawei copy-bandwidth evidence', () => {
   it('renders Huawei 950PR and qualifies the graph timing in English and Chinese', () => {

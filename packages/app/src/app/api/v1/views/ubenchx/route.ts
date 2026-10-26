@@ -1,3 +1,8 @@
+import {
+  CORE_PROFILE_GPU,
+  CORE_PROFILE_GPU_KEYS,
+  coreMemoryProfileResults,
+} from '@/components/ubenchx/core-memory-profiles';
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
 import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
@@ -12,7 +17,12 @@ import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const AVAILABLE_TESTS = ['mem-bw', 'sm-l2-distance', 'tpc-skyline'] as const;
+const AVAILABLE_TESTS = [
+  'mem-bw',
+  'sm-l2-distance',
+  'tpc-skyline',
+  'core-memory-profiles',
+] as const;
 
 /** TPC per GPC groupings for every GPU (`gpu=all`, the default) or one GPU. */
 function tpcSkylineResults(gpu: string) {
@@ -27,6 +37,19 @@ export function GET(request: NextRequest) {
     const s = request.nextUrl.searchParams;
     const test = parseEnumParam(s.get('test'), 'test', ['all', ...AVAILABLE_TESTS], 'all');
     const rawGpu = s.get('gpu');
+
+    if (test === 'core-memory-profiles') {
+      const gpu = parseEnumParam(rawGpu, 'gpu', ['all', ...CORE_PROFILE_GPU_KEYS], 'all');
+      return Promise.resolve(
+        cachedJson({
+          apiVersion: 'v1',
+          view: 'ubenchx',
+          test,
+          params: { test, gpu },
+          gpus: coreMemoryProfileResults(gpu),
+        }),
+      );
+    }
 
     if (test === 'tpc-skyline') {
       const gpuKeys = Object.keys(TPC_SKYLINE_RUNS);
@@ -43,13 +66,18 @@ export function GET(request: NextRequest) {
     }
 
     if (test === 'mem-bw' || test === 'all') {
-      const gpuKeys = Object.keys(UBENCHX_RUNS);
+      const gpuKeys =
+        test === 'all'
+          ? [...Object.keys(UBENCHX_RUNS), CORE_PROFILE_GPU]
+          : Object.keys(UBENCHX_RUNS);
       const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...gpuKeys], gpuKeys[0]);
 
       const memBwResults =
         gpu === 'all'
           ? Object.entries(UBENCHX_RUNS).map(([key, run]) => transformUbenchxRun(key, run))
-          : [transformUbenchxRun(gpu, UBENCHX_RUNS[gpu])];
+          : UBENCHX_RUNS[gpu]
+            ? [transformUbenchxRun(gpu, UBENCHX_RUNS[gpu])]
+            : [];
 
       if (test === 'mem-bw') {
         return Promise.resolve(
@@ -80,6 +108,9 @@ export function GET(request: NextRequest) {
           tests: AVAILABLE_TESTS,
           memBw: { gpus: memBwResults },
           smL2Distance: { gpus: smL2Results },
+          coreMemoryProfiles: {
+            gpus: coreMemoryProfileResults(rawGpu === null ? 'all' : gpu),
+          },
           // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
           // match the GPU key case-insensitively as parseEnumParam does for the others.
           tpcSkyline: {
