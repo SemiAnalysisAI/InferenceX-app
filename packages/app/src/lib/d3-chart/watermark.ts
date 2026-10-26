@@ -29,7 +29,7 @@ export function updateBackgroundWatermark(
     .attr('opacity', 0.16)
     .attr('pointer-events', 'none')
     .attr('role', 'img')
-    .attr('aria-label', label.replace('\n', ' — '));
+    .attr('aria-label', label.replaceAll('\n', ' — '));
 
   mark
     .selectAll('text')
