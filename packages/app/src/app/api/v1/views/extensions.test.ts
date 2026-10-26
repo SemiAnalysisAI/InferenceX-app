@@ -327,10 +327,6 @@ describe('new dashboard projections', () => {
     [Model.MiniMax_M3, 'minimaxm3', 115],
     [Model.DeepSeek_V4_Pro, 'dsv4', 170],
     [Model.DeepSeek_V4_1_Flash, 'dsv41flash', 150],
-    [Model.Muse_Spark_Open, 'musespark', 85],
-    [Model.MiniMax_M3_1_Flash, 'minimaxm31flash', 125],
-    [Model.Qwen3_5, 'qwen3.5', 115],
-    [Model.Qwen3_8_Flash_Next, 'qwen3.8next', 90],
   ] as const)(
     'prices supported agentic model %s at its default through both public profit views',
     async (model, dbKey, target) => {

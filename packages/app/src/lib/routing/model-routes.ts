@@ -34,15 +34,11 @@ export function defaultRouteModel(tab: ModelRouteTab): Model {
 }
 
 const PROFIT_ESTIMATOR_MODELS: readonly Model[] = [
-  Model.Muse_Spark_Open,
   Model.Kimi_K3,
   Model.GLM_5_2,
   Model.MiniMax_M3,
-  Model.MiniMax_M3_1_Flash,
   Model.DeepSeek_V4_Pro,
   Model.DeepSeek_V4_1_Flash,
-  Model.Qwen3_5,
-  Model.Qwen3_8_Flash_Next,
 ];
 const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> = {
   'profit-estimator': PROFIT_ESTIMATOR_MODELS,

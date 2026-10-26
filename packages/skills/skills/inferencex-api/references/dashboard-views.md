@@ -95,21 +95,9 @@ unavailable. Pass `cacheHitMode=actual` for measured cache behavior; dashboard
 links preserve that choice as `/cache-hit-mode/actual`. Report the resolved
 `params.cacheHitMode` alongside the pricing assumptions.
 
-The four newly supported models use separate defaults on both views. They are
-the lowest multiples of 5 tok/s/user that reached each model's maximum priced
-official SKU count in a 5–150 sweep of the public view API on 2026-10-24:
-
-| Model              | Default `target` | Priced rows at 45 → default |
-| ------------------ | ---------------: | --------------------------: |
-| Muse Spark Open    |               85 |                       1 → 7 |
-| MiniMax M3.1 Flash |              125 |                       2 → 7 |
-| Qwen3.5            |              115 |                      2 → 10 |
-| Qwen3.8 Flash Next |               90 |                       3 → 6 |
-
-These are editable P90 operating-point assumptions. Always report the resolved
-`params.target`; newly ingested runs can change SKU coverage.
-
-The other five models use the same rule in a 5–300 sweep on 2026-10-25:
+Both views use model-specific defaults: the lowest multiples of 5 tok/s/user
+that reached each model's maximum priced official SKU count in a 5–300 sweep
+of the public view API on 2026-10-25:
 
 | Model               | Previous `target` | Default `target` | Priced rows before → default |
 | ------------------- | ----------------: | ---------------: | ---------------------------: |
@@ -192,7 +180,7 @@ which API selectors belong together.
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                                                                                                                                                                                                                              |
 | `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations and `recipe` from data.recipes. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                                                                                                                                                                                                                                                                                 |
-| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO, actual/theoretical cache-hit mode and provisioned/modeled/compare power. USD/chip-hour. The dashboard offers models with usable AgentX curves and a price source, including Muse Spark Open, Qwen3.5, Qwen3.8 Flash Next, and MiniMax M3.1 Flash; the API accepts other known models and may return empty rows.                                                                           |
+| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO, actual/theoretical cache-hit mode and provisioned/modeled/compare power. USD/chip-hour.                                                                                                                                                                                                                                                                                                   |
 | `profit-estimator-per-gigawatt` | Same selectors; USD/GW-year basis and owning-cost default.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `fleet`                         | Model/sequence/precision/GPUs, target/percentile, TCO/token type/cost provider, MW, input/output prices, ramp, cache discount, MTBI, recovery, horizon and metric. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                  |
 | `evaluation`                    | Model, task, date, precision and GPU selection; public unofficial runs remain separately labeled and independent of the official date cutoff. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                                                       |

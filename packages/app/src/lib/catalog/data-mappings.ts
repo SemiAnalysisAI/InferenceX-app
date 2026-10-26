@@ -74,7 +74,6 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     label: 'Muse Spark Open 816B',
     prefix: 'musespark',
     category: 'default',
-    openRouterModelId: 'meta/muse-spark-open',
     logo: 'muse-mascot.webp',
   },
   [Model.DeepSeek_V4_Pro]: {

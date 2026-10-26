@@ -334,19 +334,6 @@ describe('parseTokenPriceInput', () => {
 
 describe('profitModelDefaults', () => {
   it.each([
-    [Model.Muse_Spark_Open, 85],
-    [Model.MiniMax_M3_1_Flash, 125],
-    [Model.Qwen3_5, 115],
-    [Model.Qwen3_8_Flash_Next, 90],
-  ] as const)('opens %s at a 5-step target chosen for broader SKU coverage', (model, target) => {
-    const defaults = profitModelDefaults(model);
-    expect(defaults.interactivity).toBe(target);
-    expect(defaults.interactivity % 5).toBe(0);
-    expect(defaults.listPricing).toBeNull();
-    expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
-  });
-
-  it.each([
     [Model.Kimi_K3, 60],
     [Model.GLM_5_2, 135],
     [Model.MiniMax_M3, 115],
