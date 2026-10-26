@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { coreMemoryProfiles, type CoreProfilePanel } from './core-memory-profiles';
@@ -18,7 +18,7 @@ const STRINGS = {
     within: 'Within decoded die group',
     between: 'Between decoded die groups',
     instructions:
-      'Hover or focus a heatmap; use arrow keys to inspect core pairs. Click or press Enter to pin, Escape to clear.',
+      'Hover or focus a heatmap; use arrow keys to inspect core pairs. Click or press Enter to pin; repeat to unpin. Click outside or press Escape to clear.',
     method:
       'Both core types execute the same scalar pointer chase on one allocation. Six passes are averaged at each matched address, then the mean absolute difference between each pair of core profiles is computed.',
     limits:
@@ -27,7 +27,9 @@ const STRINGS = {
       'Concurrent launches have no grid-wide starting barrier. Their fine structure is less repeatable than the broad grouping; these panels do not establish which cores physically share a cache.',
     source: 'Source data',
     methodology: 'Methodology',
-    selected: 'Selected core pair',
+    selected: 'Core pair',
+    pinned: 'Pinned core pair',
+    clear: 'Clear selection',
     sharedScale: 'All four panels use the same color scale.',
   },
   zh: {
@@ -40,7 +42,8 @@ const STRINGS = {
     units: '平均绝对差（SYS_CNT ticks）',
     within: '解码出的同一 die 分组内',
     between: '解码出的不同 die 分组间',
-    instructions: '悬停或聚焦热力图，用方向键查看核心对；点击或按 Enter 固定，按 Escape 清除。',
+    instructions:
+      '悬停或聚焦热力图，用方向键查看核心对；点击或按 Enter 固定，再次操作可取消固定；点击图外或按 Escape 清除。',
     method:
       '两类核心在同一块分配的内存上执行相同的标量指针追踪。先在每个对应地址上对六次遍历取平均，再计算每对核心访存特征之间的平均绝对差。',
     limits:
@@ -49,13 +52,17 @@ const STRINGS = {
       '并发启动没有网格级起始同步屏障。相比整体分组，细节模式的可重复性较弱；这些图不能确定哪些核心在物理上共享缓存。',
     source: '数据来源',
     methodology: '测试方法',
-    selected: '选中的核心对',
+    selected: '核心对',
+    pinned: '已固定的核心对',
+    clear: '清除选择',
     sharedScale: '四幅图使用相同的色标范围。',
   },
 } as const;
 
 type Copy = (typeof STRINGS)[keyof typeof STRINGS];
 function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; text: Copy }) {
+  const panelRef = useRef<HTMLElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const [cell, setCell] = useState<[number, number] | null>(null);
   const [pinned, setPinned] = useState(false);
   const n = panel.coreIds.length,
@@ -68,6 +75,41 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
     ...new Set([0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1]),
   ];
   const id = `profile-${panel.condition}`;
+  const clear = useCallback(
+    (reason: string) => {
+      setCell(null);
+      setPinned(false);
+      track('ubenchx_core_profile_cell_cleared', { condition: panel.condition, reason });
+    },
+    [panel.condition],
+  );
+  const hasCell = cell !== null;
+  useEffect(() => {
+    if (!hasCell) return;
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !panelRef.current?.contains(event.target))
+        clear('outside');
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') clear('escape');
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [hasCell, clear]);
+  const hitTest = (event: {
+    currentTarget: SVGSVGElement;
+    clientX: number;
+    clientY: number;
+  }): [number, number] | null => {
+    const box = event.currentTarget.getBoundingClientRect();
+    const j = Math.floor((((event.clientX - box.left) * 420) / box.width - start) / step);
+    const i = Math.floor((((event.clientY - box.top) * 420) / box.height - top) / step);
+    return i >= 0 && j >= 0 && i < n && j < n ? [i, j] : null;
+  };
   const choose = (pair: [number, number]) => {
     setCell(pair);
     setPinned(true);
@@ -78,11 +120,12 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
     });
   };
   return (
-    <section className="space-y-2 min-w-0" data-testid={id}>
+    <section ref={panelRef} className="space-y-2 min-w-0" data-testid={id}>
       <h3 className="text-base font-semibold">
         {panel.coreType === 'cube' ? 'Cube' : 'Vector'} · {text[panel.launchMode]}
       </h3>
       <svg
+        ref={svgRef}
         viewBox="0 0 420 420"
         className="w-full"
         role="img"
@@ -92,23 +135,29 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           if (!cell) setCell([0, 1]);
         }}
         onPointerMove={(event) => {
-          if (pinned) return;
-          const box = event.currentTarget.getBoundingClientRect();
-          const j = Math.floor((((event.clientX - box.left) * 420) / box.width - start) / step);
-          const i = Math.floor((((event.clientY - box.top) * 420) / box.height - top) / step);
-          if (i >= 0 && j >= 0 && i < n && j < n) setCell([i, j]);
+          if (!pinned) setCell(hitTest(event));
         }}
-        onClick={() => {
-          if (cell) choose(cell);
+        onPointerLeave={() => {
+          if (!pinned) setCell(null);
         }}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            setPinned(false);
-            setCell(null);
+        onBlur={() => {
+          if (!pinned) setCell(null);
+        }}
+        onClick={(event) => {
+          const pair = hitTest(event);
+          svgRef.current?.focus({ preventScroll: true });
+          if (!pair) {
+            clear('blank');
             return;
           }
+          if (pinned && cell && cell[0] === pair[0] && cell[1] === pair[1]) clear('toggle');
+          else choose(pair);
+        }}
+        onKeyDown={(event) => {
           if (event.key === 'Enter' && cell) {
-            choose(cell);
+            event.preventDefault();
+            if (pinned) clear('toggle');
+            else choose(cell);
             return;
           }
           const delta: Record<string, [number, number]> = {
@@ -199,9 +248,18 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
       </svg>
       <output className="block text-sm min-h-6" aria-live="polite" data-testid={`${id}-value`}>
         {cell
-          ? `${text.selected}: ${panel.coreIds[cell[0]]} ↔ ${panel.coreIds[cell[1]]}: ${panel.matrix[cell[0]][cell[1]].toFixed(2)} SYS_CNT ticks`
+          ? `${pinned ? text.pinned : text.selected}: ${panel.coreIds[cell[0]]} ↔ ${panel.coreIds[cell[1]]}: ${panel.matrix[cell[0]][cell[1]].toFixed(2)} SYS_CNT ticks`
           : text.instructions}
       </output>
+      <button
+        type="button"
+        className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+        disabled={!cell}
+        onClick={() => clear('button')}
+        data-testid={`${id}-clear`}
+      >
+        {text.clear}
+      </button>
       <p className="text-xs text-muted-foreground">
         {text.within}: {panel.stats.withinDieGroupMean?.toFixed(2) ?? text.noPairs} · {text.between}
         : {panel.stats.betweenDieGroupMean?.toFixed(2) ?? text.noPairs} SYS_CNT ticks

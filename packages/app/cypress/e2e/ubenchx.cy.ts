@@ -165,3 +165,32 @@ describe('Ascend core memory-access profiles', () => {
     });
   });
 });
+
+it('unpins core-profile cells by repeated click or Enter and clears them outside or by button', () => {
+  cy.visit('/ubenchx/core-memory-profiles', dismiss);
+  const panel = '[data-testid="profile-scalar_128MiB_cube_isolated"]';
+  const value = '[data-testid="profile-scalar_128MiB_cube_isolated-value"]';
+  const clear = '[data-testid="profile-scalar_128MiB_cube_isolated-clear"]';
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 1: 19.03');
+  cy.get(`${panel} svg rect`).eq(2).click();
+  cy.get(value).should('contain', 'Pinned core pair: 0 ↔ 2: 15.30');
+  cy.get(`${panel} svg rect`).eq(2).click();
+  cy.get(value).should('not.contain', 'core pair:');
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg`)
+    .trigger('keydown', { key: 'ArrowRight' })
+    .trigger('keydown', { key: 'Enter' });
+  cy.get(value).should('contain', 'Pinned core pair:');
+  cy.get(`${panel} svg`).trigger('keydown', { key: 'Enter' });
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.contains('h2', 'Core memory-access profiles').click();
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(clear).click();
+  cy.get(clear).should('be.disabled');
+  cy.get(`${panel} svg rect`).eq(1).click();
+  cy.get(`${panel} svg`).trigger('keydown', { key: 'Escape' });
+  cy.get(clear).should('be.disabled');
+});
