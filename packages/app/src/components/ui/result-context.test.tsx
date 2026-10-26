@@ -27,6 +27,37 @@ function renderContext(locale: 'en' | 'zh') {
 }
 
 describe('ResultContext', () => {
+  it.each([
+    ['en', 'SemiAnalysis InferenceX™', 'Source: SemiAnalysis InferenceX™ (deprecated)'],
+    ['zh', 'SemiAnalysis InferenceX™', '来源: SemiAnalysis InferenceX™ (已弃用)'],
+    [
+      'en',
+      'SemiAnalysis InferenceX™ + UNOFFICIAL overlays',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (deprecated)',
+    ],
+    [
+      'zh',
+      'SemiAnalysis InferenceX™ + 非官方 overlays',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    ],
+  ] as const)('appends the deprecated status to the %s source %s', (locale, source, expected) => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated />));
+    expect(container.textContent).toBe(expected);
+    act(() => root.render(<ResultContext locale={locale} source={source} deprecated={false} />));
+    expect(container.textContent).toBe(`${locale === 'zh' ? '来源' : 'Source'}: ${source}`);
+    act(() => root.unmount());
+  });
+
+  it('does not render an orphan deprecated label without a source', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    act(() => root.render(<ResultContext locale="en" deprecated />));
+    expect(container.textContent).toBe('');
+    act(() => root.unmount());
+  });
+
   it('renders all effective result inputs in English', () => {
     const context = renderContext('en');
     expect(context.querySelector('[data-testid="result-context"]')?.textContent).toContain(
