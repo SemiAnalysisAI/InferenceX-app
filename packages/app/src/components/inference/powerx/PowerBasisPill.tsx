@@ -30,8 +30,8 @@ export function powerBasisPillHtml(tag: PowerBasisTag, locale: Locale): string {
 
 /**
  * The small GPU / IT / Facility tag next to a power number. One vocabulary for
- * tooltips, table headers, readouts and axis titles; the meaning of each tag is
- * explained once inside the PowerX "How we measure" details.
+ * tooltips, table headers, readouts and axis titles; each pill's `title`
+ * (`POWER_BASIS_TAG_TITLES`) is the only place the tag's meaning is explained.
  */
 export function PowerBasisPill({
   tag,

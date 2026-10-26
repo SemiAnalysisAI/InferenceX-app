@@ -120,10 +120,6 @@ const STRINGS = {
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
-    howWeMeasure: 'How we measure',
-    method:
-      'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
-    agentxMethod: 'AgentX estimates are not calibrated against measured system power.',
   },
   zh: {
     title: 'PowerX 功耗',
@@ -191,10 +187,6 @@ const STRINGS = {
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
-    howWeMeasure: '测量方法',
-    method:
-      '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。',
-    agentxMethod: 'AgentX 估算值尚未用实测的系统功耗校准。',
   },
 } as const;
 
@@ -483,27 +475,6 @@ export function PowerXSplitBy({
         </span>
       )}
     </Field>
-  );
-}
-
-/** The "How we measure" note in the chart footer: the method, one sentence each. */
-export function PowerXMethod({
-  agentic = false,
-}: {
-  /** AgentX scenario: adds the calibration caveat. */
-  agentic?: boolean;
-}) {
-  const t = usePowerXStrings();
-  return (
-    <details className="text-xs leading-5 text-muted-foreground" data-testid="powerx-method">
-      <summary className="min-h-11 cursor-pointer select-none underline underline-offset-2 md:min-h-0">
-        {t.howWeMeasure}
-      </summary>
-      <p className="mt-1 max-w-prose leading-snug">
-        {t.method}
-        {agentic && ` ${t.agentxMethod}`}
-      </p>
-    </details>
   );
 }
 

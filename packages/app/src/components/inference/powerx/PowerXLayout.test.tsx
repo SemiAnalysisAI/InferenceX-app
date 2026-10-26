@@ -19,7 +19,6 @@ import {
   PowerXChartConfig,
   PowerXCountControls,
   PowerXFacilitySwitch,
-  PowerXMethod,
   PowerXReadout,
   PowerXSplitBy,
   PowerXViewTabs,
@@ -353,40 +352,6 @@ describe('PowerXSplitBy', () => {
     expect(
       container.querySelector('[data-testid="powerx-roles-unavailable"]')?.textContent,
     ).toContain('No validated prefill/decode telemetry');
-  });
-});
-
-describe('PowerXMethod', () => {
-  it('is a collapsed How we measure note with the method sentences and nothing else', () => {
-    const container = render(<PowerXMethod />);
-    const details = container.querySelector('details[data-testid="powerx-method"]');
-    expect(details?.hasAttribute('open')).toBe(false);
-    expect(details?.querySelector('summary')?.textContent).toBe('How we measure');
-    expect(details?.querySelector('[data-testid="powerx-provenance"]')).toBeNull();
-    expect(details?.textContent).not.toContain('measured point');
-    expect(details?.textContent).not.toContain('power model rev');
-    expect(details?.textContent).not.toContain('PUE');
-    expect(details?.querySelector('p')?.textContent).toBe(
-      'Each point is one benchmark configuration. GPU power is measured every second and averaged over the validated serving window; other components are modeled.',
-    );
-    expect(render(<PowerXMethod />, 'zh').querySelector('summary')?.textContent).toBe('测量方法');
-  });
-
-  it('adds only the AgentX calibration sentence on agentic scenarios, with nothing else', () => {
-    const container = render(<PowerXMethod agentic />);
-    const details = container.querySelector('details[data-testid="powerx-method"]');
-    expect(details?.querySelector('p')?.textContent).toContain(
-      'AgentX estimates are not calibrated against measured system power.',
-    );
-    // The tag key and the utilization paragraph are gone; the pill titles carry the tag meaning.
-    expect(details?.querySelector('[data-testid="powerx-basis-key"]')).toBeNull();
-    expect(details?.querySelector('[data-testid="powerx-utilization-note"]')).toBeNull();
-    expect(details?.querySelectorAll('p')).toHaveLength(1);
-    expect(details?.textContent).not.toContain('on-board telemetry');
-    const zh = render(<PowerXMethod agentic />, 'zh');
-    expect(zh.querySelector('details p')?.textContent).toBe(
-      '每个数据点代表一个基准测试配置。GPU 功耗每秒实测一次，并在通过验证的服务窗口内取平均；其他组件为模型估算。 AgentX 估算值尚未用实测的系统功耗校准。',
-    );
   });
 });
 

@@ -63,7 +63,6 @@ import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import {
   PowerXChartConfig,
   PowerXFacilitySwitch,
-  PowerXMethod,
   PowerXReadout,
   PowerXSplitBy,
   PowerXViewTabs,
@@ -1129,12 +1128,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
-            const powerXFooter =
-              powerXSurface && selectedPowerBasis ? (
-                <PowerXMethod agentic={isAgenticSequence} />
-              ) : null;
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries || powerXFooter ? (
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
@@ -1169,7 +1164,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       {formatTokenLength(residentSequenceLengths.osl.p99)}
                     </p>
                   )}
-                  {powerXFooter}
                 </>
               ) : undefined;
             return (

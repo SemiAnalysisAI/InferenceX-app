@@ -298,15 +298,6 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .find('.unofficial-overlay-pt')
         .should('have.length', 1);
-      // PowerX keeps the AgentX calibration caveat in the collapsed method note.
-      cy.get('[data-testid="powerx-method"]')
-        .first()
-        .should(
-          'contain.text',
-          locale === 'en'
-            ? 'AgentX estimates are not calibrated against measured system power.'
-            : 'AgentX 估算值尚未用实测的系统功耗校准。',
-        );
       cy.get('header').invoke('css', 'visibility', 'hidden');
       cy.get('[data-testid="chart-figure"]')
         .first()

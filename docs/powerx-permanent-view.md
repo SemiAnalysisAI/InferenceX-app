@@ -101,11 +101,8 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   legend above the bars is the only one. There is no boundary line chart on this view: the
   three measured boundaries are compared on Power draw under Count: All.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
-- The footer notes end with a collapsed "How we measure" details (`PowerXMethod`), a plain
-  muted link like the other footer notes. The details hold three sentences only: each
-  point is one benchmark configuration; GPU power is measured every second and averaged over
-  the validated serving window, other components are modeled; AgentX estimates are not
-  calibrated against measured system power (AgentX scenarios only). The meaning of the GPU /
+- The footer carries no PowerX-specific note: the former collapsed "How we measure" details
+  is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
   IT / Facility tags lives in each pill's `title` (`POWER_BASIS_TAG_TITLES`), not in prose.
 
 ### P0 additions (IT basis, headroom, load swings, labels)
