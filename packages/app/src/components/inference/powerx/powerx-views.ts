@@ -61,7 +61,8 @@ export function powerXViewFor(metric: string, compare: PowerCompare): PowerXView
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
   // The breakdown stacks and the prefill/decode split are the Where view; a boundary
-  // overlay (Count: All, with or without the rated lines) stays on the metric's own view.
+  // overlay (Count: All, the rated pair, or a share link's five lines) stays on the
+  // metric's own view.
   if (compare === 'breakdown' || compare === 'roles') return 'where';
   if (config.family === 'energy') return 'energy';
   return config.display === 'timeline' ? 'time' : 'draw';
@@ -114,30 +115,39 @@ export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): 
 }
 
 /**
- * True when the rated GPU TDP and all-in provisioned lines exist for the metric: they are
- * J per output token series, so W per chip gains nothing from `all` over `boundaries`.
+ * True when the all-in provisioned line exists for the metric: it is a J per output
+ * token series, so W per chip has no rated pair to draw.
  */
 export function powerXRatedAvailable(metric: string): boolean {
-  return (
-    powerCompareVariants(metric, 'all').length > powerCompareVariants(metric, 'boundaries').length
+  return powerCompareVariants(metric, 'provisioned').some(
+    (series) => series.variant.id === 'utility-provisioned',
   );
 }
 
+/** True when the chart draws the rated pair, or a share link's five boundaries (`all`). */
+export function powerXRatedOn(compare: PowerCompare): boolean {
+  return compare === 'provisioned' || compare === 'all';
+}
+
 /**
- * The Rated boundaries toggle in Chart Config: on adds the rated GPU TDP and all-in
- * provisioned lines to the three measured boundaries (Count: All); off removes just them.
+ * The Rated boundaries toggle in Chart Config. On draws exactly two lines per chip,
+ * measured GPU power (solid) and the all-in provisioned bound (dashed), on the view's
+ * GPU-only metric (`i_pcompare=provisioned`); the five-line `all` stays reachable from
+ * share links only. Off returns to the single GPU-only series, or to the three measured
+ * boundaries when a share link's `all` is turned off.
  */
 export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerXSelection {
   if (on) {
     const view = powerXViewFor(current.metric, current.compare);
     return {
-      metric: view === 'energy' ? ENERGY_PER_METRIC.output : current.metric,
-      compare: 'all',
+      metric: view === 'draw' ? VIEW_METRICS.draw.gpu : ENERGY_PER_METRIC.output,
+      compare: 'provisioned',
     };
   }
+  if (current.compare === 'all') return { metric: current.metric, compare: 'boundaries' };
   return {
     metric: current.metric,
-    compare: current.compare === 'all' ? 'boundaries' : current.compare,
+    compare: current.compare === 'provisioned' ? 'none' : current.compare,
   };
 }
 
@@ -170,6 +180,28 @@ export function selectPowerXShowAs(next: PowerXShowAs): string {
 /** True on the Power draw view shown as % of TDP, where the headroom shading and table apply. */
 export function powerXShowsHeadroom(metric: string, compare: PowerCompare): boolean {
   return metric === POWER_PERCENT_TDP_METRIC && compare === 'none';
+}
+
+/**
+ * How many PowerX Chart Config controls are off their default, for the mobile
+ * "More chart controls (N changed)" fold: Count (GPU only), Per (output token),
+ * Show as (W per chip), Scope (all GPUs), Power statistic (average) and Rated
+ * boundaries (off). The Where and Over time views keep their controls in the card.
+ */
+export function powerXChangedCount(selection: PowerXSelection): number {
+  const view = powerXViewFor(selection.metric, selection.compare);
+  if (view !== 'energy' && view !== 'draw') return 0;
+  const config = getMeasuredMetricConfig(selection.metric);
+  let changed = powerXCountFor(selection.metric, selection.compare) === 'gpu' ? 0 : 1;
+  if (config?.scope !== undefined && config.scope !== 'all') changed += 1;
+  if (view === 'energy') {
+    if (energyPerFor(selection.metric) !== 'output') changed += 1;
+    if (powerXRatedOn(selection.compare)) changed += 1;
+  } else {
+    if (powerXShowAsFor(selection.metric) === 'tdp') changed += 1;
+    if (config?.family === 'power' && config.statistic !== 'average') changed += 1;
+  }
+  return changed;
 }
 
 /**

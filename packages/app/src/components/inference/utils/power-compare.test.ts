@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '../types';
 import {
+  parsePowerCompare,
   powerCompareVariants,
   powerLineLabelSuffix,
   powerSeriesLabel,
@@ -9,7 +10,7 @@ import {
   powerVariantShortLabel,
 } from './power-compare';
 
-const ids = (metric: string, mode: 'boundaries' | 'all') =>
+const ids = (metric: string, mode: 'boundaries' | 'provisioned' | 'all') =>
   powerCompareVariants(metric, mode).map((series) => series.variant.id);
 
 describe('powerCompareVariants boundaries', () => {
@@ -25,7 +26,21 @@ describe('powerCompareVariants boundaries', () => {
     ).toEqual(['itModeledWatts', 'utilityModeledWatts']);
   });
 
-  it('adds the rated provisioned bounds when comparing all boundaries', () => {
+  it('pairs measured GPU power with the all-in provisioned bound only, for the Rated boundaries toggle', () => {
+    expect(ids('y_measuredJPerOutputToken', 'provisioned')).toEqual(['utility-provisioned']);
+    expect(
+      powerCompareVariants('y_measuredJPerOutputToken', 'provisioned').map(
+        (series) => series.field,
+      ),
+    ).toEqual(['utilityProvisionedJPerOutputToken']);
+    // No GPU-level TDP line, no IT, no Facility.
+    expect(ids('y_measuredJPerOutputToken', 'provisioned')).not.toContain('gpu-provisioned');
+    // The rated bounds are J per output token series only.
+    expect(ids('y_measuredAvgPower', 'provisioned')).toEqual([]);
+    expect(parsePowerCompare('provisioned')).toBe('provisioned');
+  });
+
+  it('adds the rated provisioned bounds when comparing all boundaries (share links only)', () => {
     const all = ids('y_measuredJPerOutputToken', 'all');
     expect(all).toEqual(
       expect.arrayContaining(['utility-modeled', 'gpu-provisioned', 'utility-provisioned']),

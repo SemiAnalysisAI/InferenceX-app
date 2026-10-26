@@ -201,7 +201,10 @@ describe('PowerXChartConfig', () => {
         '[data-testid="powerx-compare-boundaries"] button',
       ) ?? []),
     ];
-    expect(rated.map((button) => button.textContent)).toEqual(['Off', 'TDP + provisioned']);
+    expect(rated.map((button) => button.textContent)).toEqual(['Off', 'All-in provisioned']);
+    expect(rated[1].title).toBe(
+      'Draws two lines per chip: measured GPU power (solid) and the all-in provisioned bound (dashed), nothing else.',
+    );
     expect(rated.map((button) => button.disabled)).toEqual([false, false]);
     expect(container.querySelector('[data-testid="powerx-more-views-toggle"]')).toBeNull();
     expect(container.querySelector('[data-testid="powerx-split"]')).toBeNull();
@@ -209,6 +212,62 @@ describe('PowerXChartConfig', () => {
     expect(container.textContent).not.toContain('More views');
     // Nothing PowerX-specific is left for the legend rail.
     expect(container.querySelector('[data-testid="powerx-legend-controls"]')).toBeNull();
+  });
+
+  it('renders every control as a cell of the Chart Config grid, labelled like X-Axis Metric', () => {
+    const container = render(<PowerXChartConfig selection={energy} onSelectionChange={noop} />);
+    const config = container.querySelector<HTMLElement>('[data-testid="powerx-chart-config"]');
+    // No wrapper box of its own: the cells join the grid ChartControls lays out.
+    expect(config?.className).toBe('contents');
+    expect(
+      container.querySelector('[data-testid="measured-metric-controls"]')?.className,
+    ).toContain('contents');
+    const cells = [
+      ...container.querySelectorAll<HTMLElement>(
+        '[data-testid="powerx-chart-config"] > *, [data-testid="measured-metric-controls"] > *',
+      ),
+    ].filter((cell) => cell.dataset.testid !== 'measured-metric-controls');
+    expect(cells.map((cell) => cell.querySelector('label')?.textContent)).toEqual([
+      'Count',
+      'Per',
+      'Scope',
+      'Rated boundaries',
+    ]);
+    // Count is two cells wide from the sm grid up; everything else is one cell, one per row on phones.
+    expect(cells.map((cell) => cell.classList.contains('sm:col-span-2'))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ]);
+    for (const cell of cells) {
+      expect(cell.className).toContain('min-w-0');
+      // The (i) help beside the label, as on the X-Axis Metric select.
+      expect(cell.querySelector('label + button')).not.toBeNull();
+    }
+    for (const toggle of container.querySelectorAll<HTMLElement>('[role="group"]')) {
+      expect(toggle.classList.contains('w-full')).toBe(true);
+      for (const segment of toggle.querySelectorAll('button')) {
+        expect(segment.className).toContain('flex-1');
+        expect(segment.className).toContain('min-w-max');
+      }
+    }
+  });
+
+  it('lays the Power draw cells out as Count, Show as, Scope, Power statistic', () => {
+    const container = render(<PowerXChartConfig selection={draw} onSelectionChange={noop} />);
+    const labels = [...container.querySelectorAll('label')].map((label) => label.textContent);
+    expect(labels).toEqual(['Count', 'Show as', 'Scope', 'Power statistic']);
+  });
+
+  it('names the controls in Chinese, with Count and Scope told apart', () => {
+    const container = render(
+      <PowerXChartConfig selection={energy} onSelectionChange={noop} />,
+      'zh',
+    );
+    const labels = [...container.querySelectorAll('label')].map((label) => label.textContent);
+    // 统计口径 (which boundary counts) vs 统计范围 (which GPUs): the two must not share a name.
+    expect(labels).toEqual(['统计口径', '计量单位', '统计范围', '额定边界']);
   });
 
   it('shows Scope and Power statistic on Power draw, where rated lines do not exist', () => {
@@ -224,21 +283,49 @@ describe('PowerXChartConfig', () => {
     expect(config?.querySelector('[data-testid="powerx-compare-boundaries"]')).toBeNull();
   });
 
-  it('keeps only Count and the Rated boundaries toggle once Count: All is on', () => {
+  it('shows the rated pair as on, with Count on GPU only and no Scope', () => {
+    for (const compare of ['provisioned', 'all'] as const) {
+      const container = render(
+        <PowerXChartConfig
+          selection={{ metric: 'y_measuredJPerOutputToken', compare }}
+          onSelectionChange={noop}
+        />,
+      );
+      const config = container.querySelector('[data-testid="powerx-chart-config"]');
+      expect(config?.querySelector('[data-testid="measured-metric-controls"]')).toBeNull();
+      const rated = [
+        ...(config?.querySelectorAll<HTMLButtonElement>(
+          '[data-testid="powerx-compare-boundaries"] button',
+        ) ?? []),
+      ];
+      expect(rated.map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    }
+    const onSelectionChange = vi.fn();
     const container = render(
-      <PowerXChartConfig
-        selection={{ metric: 'y_measuredJPerOutputToken', compare: 'all' }}
-        onSelectionChange={noop}
-      />,
+      <PowerXChartConfig selection={energy} onSelectionChange={onSelectionChange} />,
     );
-    const config = container.querySelector('[data-testid="powerx-chart-config"]');
-    expect(config?.querySelector('[data-testid="measured-metric-controls"]')).toBeNull();
-    const rated = [
-      ...(config?.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="powerx-compare-boundaries"] button',
-      ) ?? []),
+    const count = [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-testid="powerx-boundary"] button'),
     ];
-    expect(rated.map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+    expect(count.map((button) => button.getAttribute('aria-pressed'))).toEqual([
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+  });
+
+  it('names the rated pair in Chinese', () => {
+    const container = render(
+      <PowerXChartConfig selection={energy} onSelectionChange={noop} />,
+      'zh',
+    );
+    const rated = [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        '[data-testid="powerx-compare-boundaries"] button',
+      ),
+    ];
+    expect(rated.map((button) => button.textContent)).toEqual(['关闭', '整体预配']);
   });
 
   it('shows nothing on the Where and Over time views', () => {

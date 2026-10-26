@@ -4,9 +4,11 @@ import {
   energyPerFor,
   POWERX_DEFAULT_METRIC,
   powerXBoundaryFor,
+  powerXChangedCount,
   powerXCountFor,
   powerXMetricFields,
   powerXRatedAvailable,
+  powerXRatedOn,
   powerXShowAsFor,
   powerXShowsHeadroom,
   powerXViewFor,
@@ -31,6 +33,7 @@ describe('powerXViewFor', () => {
   it('keeps a boundary overlay on its own view and sends the breakdown and role splits to Where', () => {
     expect(powerXViewFor('y_measuredJPerOutputToken', 'boundaries')).toBe('energy');
     expect(powerXViewFor('y_measuredJPerOutputToken', 'all')).toBe('energy');
+    expect(powerXViewFor('y_measuredJPerOutputToken', 'provisioned')).toBe('energy');
     // Count: All on Power draw draws GPU only, IT and Facility on the one scatter.
     expect(powerXViewFor('y_measuredAvgPower', 'boundaries')).toBe('draw');
     expect(powerXViewFor('y_measuredAvgPower', 'all')).toBe('draw');
@@ -84,6 +87,8 @@ describe('Count, Per and Show as', () => {
     expect(powerXCountFor('y_measuredJPerOutputToken', 'boundaries')).toBe('both');
     expect(powerXCountFor('y_measuredAvgPower', 'boundaries')).toBe('both');
     expect(powerXCountFor('y_measuredAvgPower', 'all')).toBe('both');
+    // The rated pair keeps the GPU-only base: Count reads GPU only.
+    expect(powerXCountFor('y_measuredJPerOutputToken', 'provisioned')).toBe('gpu');
     expect(powerXBoundaryFor('y_gpuProvisionedJPerOutputToken')).toBe('system');
   });
 
@@ -158,24 +163,35 @@ describe('Count, Per and Show as', () => {
     expect(powerXRatedAvailable('y_measuredPowerTimeline')).toBe(false);
   });
 
-  it('adds and removes only the rated lines with the Rated boundaries toggle', () => {
-    const three = { metric: 'y_measuredAvgPower', compare: 'boundaries' as const };
-    expect(selectPowerXRated(true, three)).toEqual({
-      metric: 'y_measuredAvgPower',
-      compare: 'all',
-    });
-    expect(selectPowerXRated(false, { ...three, compare: 'all' })).toEqual(three);
-    // From a single boundary the rated lines imply the comparison; off is a no-op.
-    const single = { metric: 'y_measuredAvgPower', compare: 'none' as const };
+  it('draws only GPU measured and All in Provisioned with the Rated boundaries toggle', () => {
+    // On: the GPU-only metric with the provisioned pair, whatever Count was before.
+    const single = { metric: 'y_measuredJPerOutputToken', compare: 'none' as const };
     expect(selectPowerXRated(true, single)).toEqual({
-      metric: 'y_measuredAvgPower',
-      compare: 'all',
+      metric: 'y_measuredJPerOutputToken',
+      compare: 'provisioned',
     });
-    expect(selectPowerXRated(false, single)).toEqual(single);
-    // On the Energy view the rated lines exist per output token only.
+    expect(
+      selectPowerXRated(true, { metric: 'y_measuredJPerOutputToken', compare: 'boundaries' }),
+    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' });
     expect(
       selectPowerXRated(true, { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' }),
-    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'all' });
+    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' });
+    // Off: back to the single GPU-only series; a no-op when nothing rated is drawn.
+    expect(selectPowerXRated(false, { ...single, compare: 'provisioned' })).toEqual(single);
+    expect(selectPowerXRated(false, single)).toEqual(single);
+    // The UI never sets the five-line `all`; a share link's `all` turned off keeps the measured three.
+    expect(selectPowerXRated(false, { ...single, compare: 'all' })).toEqual({
+      ...single,
+      compare: 'boundaries',
+    });
+    expect(powerXRatedOn('provisioned')).toBe(true);
+    expect(powerXRatedOn('all')).toBe(true);
+    expect(powerXRatedOn('boundaries')).toBe(false);
+    // Changing Count drops the rated pair rather than adding a third line to it.
+    expect(selectPowerXCount('it', { ...single, compare: 'provisioned' })).toEqual({
+      metric: 'y_itModeledJPerOutputToken',
+      compare: 'none',
+    });
   });
 
   it('reads the unit from the metric, whatever its boundary or role', () => {
@@ -232,5 +248,45 @@ describe('powerXMetricFields', () => {
     expect(powerXMetricFields('y_utilityModeledWatts', 'none')).toEqual([]);
     expect(powerXMetricFields('y_utilityModeledJPerOutputToken', 'none')).toEqual([]);
     expect(powerXMetricFields('y_measuredPowerTimeline', 'none')).toEqual([]);
+  });
+});
+
+describe('powerXChangedCount', () => {
+  it('counts nothing on the default Energy and Power draw selections', () => {
+    expect(powerXChangedCount({ metric: POWERX_DEFAULT_METRIC, compare: 'none' })).toBe(0);
+    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'none' })).toBe(0);
+  });
+
+  it('counts each Energy control off its default: Count, Per, Scope and Rated boundaries', () => {
+    expect(powerXChangedCount({ metric: 'y_itModeledJPerOutputToken', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredJPerInputToken', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredDecodeJPerOutputToken', compare: 'none' })).toBe(
+      1,
+    );
+    expect(powerXChangedCount({ metric: 'y_measuredPrefillJPerInputToken', compare: 'none' })).toBe(
+      2,
+    );
+    expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'boundaries' })).toBe(
+      1,
+    );
+    // The rated pair is one change (Count stays GPU only); a share link's `all` is two.
+    expect(
+      powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' }),
+    ).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'all' })).toBe(2);
+  });
+
+  it('counts each Power draw control off its default: Count, Show as, Scope and statistic', () => {
+    expect(powerXChangedCount({ metric: 'y_utilityModeledWatts', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredPowerPercentTdp', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredP90Power', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredPrefillAvgPower', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'boundaries' })).toBe(1);
+  });
+
+  it('counts nothing on the Where and Over time views, whose controls sit in the card', () => {
+    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'breakdown' })).toBe(0);
+    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'roles' })).toBe(0);
+    expect(powerXChangedCount({ metric: 'y_measuredPowerTimeline', compare: 'none' })).toBe(0);
   });
 });

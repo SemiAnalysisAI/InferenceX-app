@@ -5,7 +5,7 @@ import { type ReactNode, useId } from 'react';
 import { MeasuredMetricControls } from '@/components/inference/ui/MeasuredMetricControls';
 import { powerCompareAvailable } from '@/components/inference/utils/power-compare';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -34,6 +34,7 @@ import {
   powerXCountFor,
   powerXMetricFields,
   powerXRatedAvailable,
+  powerXRatedOn,
   powerXShowAsFor,
   powerXViewFor,
   selectPowerXCount,
@@ -69,6 +70,8 @@ const STRINGS = {
       time: 'Power trace through a run',
     } satisfies Record<PowerXView, string>,
     count: 'Count',
+    countHelp:
+      'GPU only is measured board power. IT adds the modeled CPU, server parts, fans/PSU and network share, with no PUE. Facility is IT × PUE. All draws the three boundaries per chip on one chart.',
     itHelp: 'GPU measured; CPU, server parts, fans/PSU and network share modeled. No PUE.',
     systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
     both: 'All',
@@ -91,6 +94,8 @@ const STRINGS = {
     includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
     includeFacilityHelp: 'Appends the PUE overhead after the IT stack; off by default on PowerX.',
     per: 'Per',
+    perHelp:
+      'What one unit of energy is charged to: an output token, an input token, every token including the prompt, or one successful query in watt-hours.',
     perOptions: {
       output: 'Output token',
       input: 'Input',
@@ -98,15 +103,19 @@ const STRINGS = {
       query: 'Query',
     } satisfies Record<EnergyPer, string>,
     showAs: 'Show as',
+    showAsHelp:
+      'Watts per chip, or the average as a percentage of the rated GPU TDP. Percent of TDP is a GPU-only reading.',
     watts: 'W per chip',
     tdp: '% of TDP',
     tdpSystemHelp: 'TDP bounds GPU power only',
     compareBoundaries: 'Rated boundaries',
     compareOff: 'Off',
-    compareAll: 'TDP + provisioned',
+    compareAll: 'All-in provisioned',
     compareAllHelp:
-      'Adds the rated GPU TDP and all-in provisioned lines to the three measured boundaries (Count: All)',
+      'Draws two lines per chip: measured GPU power (solid) and the all-in provisioned bound (dashed), nothing else.',
     splitBy: 'Split by',
+    splitByHelp:
+      'Stack the GPU, IT and facility boundaries, or split measured GPU power between prefill and decode GPUs on disaggregated deployments.',
     boundaries: 'Boundary',
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
@@ -133,7 +142,9 @@ const STRINGS = {
       where: '同一交互性下的 GPU、服务器与数据中心功耗',
       time: '运行期间的功耗曲线',
     } satisfies Record<PowerXView, string>,
-    count: '统计范围',
+    count: '统计口径',
+    countHelp:
+      '仅 GPU 为实测板卡功耗；IT 在此基础上加入模型估算的 CPU、服务器部件、风扇/电源与网络分摊，不含 PUE；数据中心为 IT × PUE；全部则在同一图中按芯片绘制三个边界。',
     itHelp: 'GPU 为实测；CPU、服务器部件、风扇/电源与网络分摊为模型估算。不含 PUE。',
     systemHelp: 'IT × PUE：GPU 为实测，服务器其他组件与数据中心开销为模型估算',
     both: '全部',
@@ -156,6 +167,8 @@ const STRINGS = {
     includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
     includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；PowerX 默认关闭。',
     per: '计量单位',
+    perHelp:
+      '能耗的计量单位：每输出 Token、每输入 Token、含提示词的全部 Token，或每次成功查询（以 Wh 计）。',
     perOptions: {
       output: '输出 Token',
       input: '输入',
@@ -163,14 +176,17 @@ const STRINGS = {
       query: '每次查询',
     } satisfies Record<EnergyPer, string>,
     showAs: '显示为',
+    showAsHelp: '每芯片瓦数，或平均功耗占 GPU 额定 TDP 的百分比；TDP 占比仅针对 GPU。',
     watts: '每芯片 W',
     tdp: 'TDP 占比',
     tdpSystemHelp: 'TDP 仅限定 GPU 功耗',
     compareBoundaries: '额定边界',
     compareOff: '关闭',
-    compareAll: 'TDP + 整体预配',
-    compareAllHelp: '在三个实测边界（统计范围：全部）之上加入额定 GPU TDP 与整体预配两条线',
+    compareAll: '整体预配',
+    compareAllHelp: '每芯片仅绘制两条线：GPU 实测功耗（实线）与整体预配功耗（虚线）。',
     splitBy: '拆分方式',
+    splitByHelp:
+      '按 GPU、IT 与数据中心边界堆叠，或在预填充/解码分离部署中将实测 GPU 功耗拆分为预填充与解码两部分。',
     boundaries: '功耗边界',
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
@@ -231,23 +247,32 @@ export function PowerXViewTabs({
   );
 }
 
-/** One labelled control, the same label style as the Chart Config selects. */
+/**
+ * One Chart Config cell: the same wrapper, label and (i) help as the X-Axis
+ * Metric select, so the PowerX controls sit in the /inference grid as peers.
+ */
 function Field({
   label,
+  tooltip,
   children,
   className,
 }: {
   label: string;
+  tooltip: string;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn('flex min-w-0 flex-col space-y-1.5', className)}>
-      <Label>{label}</Label>
+      <LabelWithTooltip label={label} tooltip={tooltip} />
       {children}
     </div>
   );
 }
+
+/** A segmented toggle that fills its Chart Config cell with equal segments and wraps rather than overflows. */
+const CELL_TOGGLE_CLASS = 'w-full';
+const CELL_SEGMENT_CLASS = 'min-w-max flex-1 justify-center whitespace-nowrap';
 
 /** Count, Per and Show as for the Energy and Power draw views. */
 export function PowerXCountControls({
@@ -267,14 +292,16 @@ export function PowerXCountControls({
   const modeledDisabled = view === 'energy' && energyPer !== 'output';
   return (
     <>
-      <Field label={t.count}>
+      {/* Four segments: two cells wide from the sm grid up; one per row on phones. */}
+      <Field label={t.count} tooltip={t.countHelp} className="sm:col-span-2">
         <SegmentedToggle<PowerXCount>
           value={count}
           ariaLabel={t.count}
           role="group"
           testId="powerx-boundary"
           size="default"
-          buttonClassName="whitespace-nowrap"
+          className={CELL_TOGGLE_CLASS}
+          buttonClassName={CELL_SEGMENT_CLASS}
           onValueChange={(next) => {
             track('inference_powerx_boundary_selected', { boundary: next });
             onSelectionChange(selectPowerXCount(next, selection));
@@ -303,14 +330,15 @@ export function PowerXCountControls({
         />
       </Field>
       {view === 'energy' && (
-        <Field label={t.per}>
+        <Field label={t.per} tooltip={t.perHelp}>
           <SegmentedToggle<EnergyPer>
             value={energyPer}
             ariaLabel={t.per}
             role="group"
             testId="powerx-energy-per"
             size="default"
-            buttonClassName="whitespace-nowrap"
+            className={CELL_TOGGLE_CLASS}
+            buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) => {
               track('inference_powerx_energy_per_selected', { per: next });
               onSelectionChange(selectPowerXPer(next, selection));
@@ -323,14 +351,15 @@ export function PowerXCountControls({
         </Field>
       )}
       {view === 'draw' && (
-        <Field label={t.showAs}>
+        <Field label={t.showAs} tooltip={t.showAsHelp}>
           <SegmentedToggle<PowerXShowAs>
             value={powerXShowAsFor(selection.metric)}
             ariaLabel={t.showAs}
             role="group"
             testId="powerx-unit"
             size="default"
-            buttonClassName="whitespace-nowrap"
+            className={CELL_TOGGLE_CLASS}
+            buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) =>
               onSelectionChange({ metric: selectPowerXShowAs(next), compare: 'none' })
             }
@@ -352,10 +381,12 @@ export function PowerXCountControls({
 }
 
 /**
- * The PowerX part of the Chart Config fieldset, laid out like the /inference
- * controls: Count, Per or Show as beside the X-axis pick, then Scope and Power
- * statistic on the views they apply to, and the Rated boundaries toggle where
- * rated lines exist. Split by lives in the Where the power goes card.
+ * The PowerX part of the Chart Config fieldset. It renders as `contents`, so
+ * every control is a cell of the same grid /inference lays its Chart Config
+ * out in (X-Axis Metric first; see ChartControls): row one is X-Axis Metric
+ * and Count, row two Per or Show as, then Scope, Power statistic and Rated
+ * boundaries on the views they apply to, flowing left to right with no gaps.
+ * Split by lives in the Where the power goes card.
  */
 export function PowerXChartConfig({
   selection,
@@ -366,39 +397,38 @@ export function PowerXChartConfig({
 }) {
   const t = usePowerXStrings();
   const fields = powerXMetricFields(selection.metric, selection.compare);
-  // Count: All draws the three measured boundaries; this adds the two rated lines on top,
-  // and turning it off leaves the measured three in place.
-  const ratedMode: 'none' | 'all' = selection.compare === 'all' ? 'all' : 'none';
+  // On: measured GPU power against the all-in provisioned bound, two lines per chip.
+  const ratedMode: 'none' | 'provisioned' = powerXRatedOn(selection.compare)
+    ? 'provisioned'
+    : 'none';
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-start gap-x-4 gap-y-3"
-      data-testid="powerx-chart-config"
-    >
+    <div className="contents" data-testid="powerx-chart-config">
       <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
       {fields.length > 0 && (
         <MeasuredMetricControls
           metric={selection.metric}
           onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
           fields={fields}
-          className="contents [&>div]:min-w-40"
+          className="contents"
         />
       )}
       {powerXRatedAvailable(selection.metric) && (
-        <Field label={t.compareBoundaries}>
-          <SegmentedToggle<'none' | 'all'>
+        <Field label={t.compareBoundaries} tooltip={t.compareAllHelp}>
+          <SegmentedToggle<'none' | 'provisioned'>
             value={ratedMode}
             ariaLabel={t.compareBoundaries}
             role="group"
             testId="powerx-compare-boundaries"
             size="default"
-            buttonClassName="whitespace-nowrap"
+            className={CELL_TOGGLE_CLASS}
+            buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(mode) => {
               track('inference_power_compare_changed', { mode, family: 'powerx' });
-              onSelectionChange(selectPowerXRated(mode === 'all', selection));
+              onSelectionChange(selectPowerXRated(mode === 'provisioned', selection));
             }}
             options={[
               { value: 'none', label: t.compareOff },
-              { value: 'all', label: t.compareAll, title: t.compareAllHelp },
+              { value: 'provisioned', label: t.compareAll, title: t.compareAllHelp },
             ]}
           />
         </Field>
@@ -423,7 +453,7 @@ export function PowerXSplitBy({
   const rolesAvailable = rolesSupported && rolesHaveData !== false;
   const rolesReason = rolesSupported ? t.rolesNoData : t.rolesUnavailable;
   return (
-    <Field label={t.splitBy}>
+    <Field label={t.splitBy} tooltip={t.splitByHelp}>
       <SegmentedToggle<'boundaries' | 'roles'>
         value={selection.compare === 'roles' ? 'roles' : 'boundaries'}
         ariaLabel={t.splitBy}

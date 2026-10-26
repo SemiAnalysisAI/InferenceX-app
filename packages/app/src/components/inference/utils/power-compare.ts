@@ -18,7 +18,11 @@ export const POWER_COMPARE_MODES = [
 ] as const satisfies readonly PowerCompare[];
 
 export function parsePowerCompare(value: string | null | undefined): PowerCompare {
-  return value === 'boundaries' || value === 'all' || value === 'roles' || value === 'breakdown'
+  return value === 'boundaries' ||
+    value === 'provisioned' ||
+    value === 'all' ||
+    value === 'roles' ||
+    value === 'breakdown'
     ? value
     : 'none';
 }
@@ -91,7 +95,7 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
   const config = getMeasuredMetricConfig(metric);
   // The Where view's breakdown stacks are panels, not sibling series on the chart.
   if (!config || mode === 'none' || mode === 'breakdown') return null;
-  if (mode === 'boundaries' || mode === 'all') {
+  if (mode === 'boundaries' || mode === 'provisioned' || mode === 'all') {
     return comparableQuantity(metric) ? { kind: 'basis', id: config.basis } : null;
   }
   if (config.basis !== 'gpu-measured') return null;
@@ -107,8 +111,8 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
 
 /**
  * The three measured boundaries the PowerX tab's "Count" control names (GPU
- * only, IT without PUE, Facility). `boundaries` draws just these; `all` adds the
- * rated provisioned bounds.
+ * only, IT without PUE, Facility). `boundaries` draws just these; `all` (share
+ * links only) adds the two rated provisioned bounds.
  */
 export const COUNT_COMPARE_BASES = [
   'gpu-measured',
@@ -116,10 +120,25 @@ export const COUNT_COMPARE_BASES = [
   'utility-modeled',
 ] as const satisfies readonly PowerBasis[];
 
+/**
+ * The PowerX "Rated boundaries: All-in provisioned" pair: measured GPU power
+ * (solid) against the all-in provisioned bound (dashed), and nothing else, so
+ * the chart stays readable.
+ */
+export const PROVISIONED_COMPARE_BASES = [
+  'gpu-measured',
+  'utility-provisioned',
+] as const satisfies readonly PowerBasis[];
+
+function defaultCompareBases(mode: PowerCompare): readonly PowerBasis[] {
+  if (mode === 'all') return POWER_BASES;
+  return mode === 'provisioned' ? PROVISIONED_COMPARE_BASES : COUNT_COMPARE_BASES;
+}
+
 export function powerCompareVariants(
   metric: string,
   mode: PowerCompare,
-  bases: readonly PowerBasis[] = mode === 'all' ? POWER_BASES : COUNT_COMPARE_BASES,
+  bases: readonly PowerBasis[] = defaultCompareBases(mode),
 ): PowerCompareSeries[] {
   const base = powerCompareBase(metric, mode);
   const config = getMeasuredMetricConfig(metric);

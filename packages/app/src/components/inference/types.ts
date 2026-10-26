@@ -231,7 +231,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
  * bounds. `roles`: prefill vs decode GPUs. `breakdown`: the PowerX Where the power goes
  * view (per-chip stacks at one interactivity); it overlays no series on the chart.
  */
-export type PowerCompare = 'none' | 'boundaries' | 'all' | 'roles' | 'breakdown';
+export type PowerCompare = 'none' | 'boundaries' | 'provisioned' | 'all' | 'roles' | 'breakdown';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 

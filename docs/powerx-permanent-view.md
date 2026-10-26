@@ -121,8 +121,12 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
-  The **Rated boundaries** toggle in Chart Config sets `all`, which adds the two rated
-  bounds (five lines); turning it off returns to the measured three.
+  The **Rated boundaries** toggle in Chart Config (Off | All-in provisioned) sets
+  `i_pcompare=provisioned` on the GPU-only metric, which draws exactly two lines per chip
+  (`PROVISIONED_COMPARE_BASES`: GPU Level Measured solid, All in Provisioned dashed; no IT,
+  Facility or GPU-level TDP line, to keep the chart readable); turning it off returns to the
+  single GPU-only series. The five-line `all` is reachable from share links only; turning
+  the toggle off there returns to the measured three.
 - **Readout row** (`PowerXReadout`, under the caption on Energy and Power draw, in the TCO
   badge row's outline-badge style): IT W/GPU,
   GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
@@ -184,9 +188,11 @@ resolves their run/audit provenance automatically.
 
 ## Comparison series (`i_pcompare`)
 
-`i_pcompare=boundaries|all|roles` (default `''`, "Off") overlays sibling series on the selected
+`i_pcompare=boundaries|provisioned|all|roles` (default `''`, "Off") overlays sibling series on the selected
 metric without changing it. `boundaries` draws GPU Level Measured, All in Measured IT (no PUE)
-and All in Measured; `all` adds the two provisioned bounds. `i_pcompare=breakdown` is the PowerX
+and All in Measured; `provisioned` (the PowerX Rated boundaries toggle) draws GPU Level
+Measured and All in Provisioned only; `all` (share links only) adds both provisioned bounds
+to the measured three. `i_pcompare=breakdown` is the PowerX
 Where the power goes view (per-chip stacks at one interactivity) and overlays nothing. `utils/power-compare.ts` is the single source: `useChartData` and
 the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
 `expandPowerCompareSeries`, which appends one clone per sibling to every base point — same

@@ -61,6 +61,7 @@ import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
+import { powerXChangedCount } from '../powerx/powerx-views';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -430,8 +431,13 @@ export default function ChartControls({
   };
 
   const secondaryCount =
-    // PowerX picks the metric through its tabs, so it is not a changed chart control there.
-    (powerXSurface || selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
+    // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
+    // Power statistic and Rated boundaries controls count instead.
+    (powerXSurface
+      ? powerXChangedCount({ metric: selectedYAxisMetric, compare: powerCompare })
+      : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
+        ? 0
+        : 1) +
     (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
@@ -448,6 +454,21 @@ export default function ChartControls({
     showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
     showsTcoBasisSelector(selectedModel, selectedSequence);
+  // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
+  // where its options are longer, and the rest of the row shares what is left. PowerX
+  // keeps the same first column and splits the rest in two, so its Count toggle (two
+  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one
+  // cell each) flow left to right in rows of three. Below sm every cell is a row.
+  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  const chartConfigGridClass = powerXSurface
+    ? xAxisWide
+      ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
+      : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
+    : showXAxisMode
+      ? xAxisWide
+        ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'
+        : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
+      : 'sm:grid-cols-2';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -505,7 +526,7 @@ export default function ChartControls({
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
-              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+              className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
               {showXAxisMode && <XAxisModeSelector />}
               {powerXSurface && powerXControls}

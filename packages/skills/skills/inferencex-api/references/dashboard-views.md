@@ -401,7 +401,8 @@ Every power number on the tab carries a GPU, IT or Facility tag, explained once 
 measure, and a readout row under the caption gives the hovered or pinned point's IT W per
 GPU, GPUs per MW (1e6 ÷ IT W per GPU) and facility W per GPU at the model's PUE. The four
 views are tabs above the plot; Count, Per and Show as, then Scope, Power statistic and
-Rated boundaries (`i_pcompare=all`: adds the two rated bounds to Count: All) are plain Chart
+Rated boundaries (Off | All-in provisioned, `i_pcompare=provisioned`: GPU Level Measured
+solid and All in Provisioned dashed per chip, nothing else) are plain Chart
 Config controls, each shown only on the views where it applies; Split by sits in the Where
 the power goes card.
 Power draw shown as % of TDP shades each chip's headroom between its P90 draw and 100 % and
@@ -415,12 +416,12 @@ trace (peak, min, idle floor, mean, P5/P95, max 1 s and 5 s change, ramp up/down
 a × 72 per NVL72 rack switch, and per-point CSV / JSON downloads served by
 `/api/v1/gpu-metrics-point/stats` (`format=csv|json`, `scale=gpu|nvl72`), which computes the
 same statistics from the same stored buckets. None of this adds `inference` view selectors.
-A share link with `i_pcompare=all` adds the two provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
+A share link with `i_pcompare=all` (not offered by the UI) adds both provisioned bounds to the measured three. Inference Performance offers no power metrics: an `/inference` link with a
 measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` with the same
 filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
 芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
-统计范围控件命名三个实测边界：仅 GPU（`gpu-measured`）、IT（不含 PUE）（`it-modeled`）与数据中心（`utility-modeled`），外加“全部”；“全部”（`i_pcompare=boundaries`）在功耗或能耗散点图上按芯片绘制这三条（仅 GPU 实线、IT 虚线、数据中心点划线），图例、曲线标签、提示框、表格与 CSV 也沿用这一叫法；页面不再有第二层控件。页面上每个功耗数值都带有 GPU / IT / 数据中心标签，并在“测量方法”中统一解释；标题行下方的读数行给出悬停或固定数据点的每 GPU IT 功耗、每 MW 可支持的 GPU 数（1e6 ÷ 每 GPU IT 功耗）以及按模型 PUE 计的每 GPU 数据中心功耗。四个视图为图表上方的标签页；统计范围、计量单位与显示方式，以及 GPU 范围、功耗统计量和额定边界（`i_pcompare=all`，在“统计范围：全部”之上加入两个额定边界）都是图表配置中的普通控件，仅在适用的视图上显示；拆分方式位于“功耗去向”卡片中。“功耗”视图按 TDP 占比显示时，会在各芯片 P90 功耗与 100% 之间填充余量，并附带余量表（`headroom=true`）与 CSV 下载。“功耗去向”中芯片对比默认只堆叠 IT 部分；“计入数据中心开销”开关（仅为展示，不新增 API 选择项）追加 PUE 部分；所对比芯片的“随负载变化”下钻图（堆叠柱状图或堆叠面积图，`i_pbview`）默认即在其横条下方内联展开并随滑块切换芯片，该视图本身为 `i_pcompare=breakdown`（不再有功耗边界曲线图；边界对比位于“功耗”视图的“统计范围：全部”）。“随时间变化”新增每条曲线的负载波动表（峰值、最小值、空闲底线、均值、P5/P95、最大 1 秒与 5 秒变化、上升/下降速率、波动率）、“× 72（每 NVL72 机架）”开关，以及由 `/api/v1/gpu-metrics-point/stats`（`format=csv|json`、`scale=gpu|nvl72`）提供的逐点 CSV / JSON 下载，该接口用同一函数基于同一已存数据桶计算统计。这些都不新增 `inference` 视图的选择项。分享链接带 `i_pcompare=all` 时会加入两个额定边界。
+统计口径控件命名三个实测边界：仅 GPU（`gpu-measured`）、IT（不含 PUE）（`it-modeled`）与数据中心（`utility-modeled`），外加“全部”；“全部”（`i_pcompare=boundaries`）在功耗或能耗散点图上按芯片绘制这三条（仅 GPU 实线、IT 虚线、数据中心点划线），图例、曲线标签、提示框、表格与 CSV 也沿用这一叫法；页面不再有第二层控件。页面上每个功耗数值都带有 GPU / IT / 数据中心标签，并在“测量方法”中统一解释；标题行下方的读数行给出悬停或固定数据点的每 GPU IT 功耗、每 MW 可支持的 GPU 数（1e6 ÷ 每 GPU IT 功耗）以及按模型 PUE 计的每 GPU 数据中心功耗。四个视图为图表上方的标签页；统计口径、计量单位与显示方式，以及 GPU 范围、功耗统计量和额定边界（关闭 | 整体预配，`i_pcompare=provisioned`：每芯片仅绘制 GPU 实测功耗实线与整体预配功耗虚线两条线）都是图表配置中的普通控件，仅在适用的视图上显示；拆分方式位于“功耗去向”卡片中。“功耗”视图按 TDP 占比显示时，会在各芯片 P90 功耗与 100% 之间填充余量，并附带余量表（`headroom=true`）与 CSV 下载。“功耗去向”中芯片对比默认只堆叠 IT 部分；“计入数据中心开销”开关（仅为展示，不新增 API 选择项）追加 PUE 部分；所对比芯片的“随负载变化”下钻图（堆叠柱状图或堆叠面积图，`i_pbview`）默认即在其横条下方内联展开并随滑块切换芯片，该视图本身为 `i_pcompare=breakdown`（不再有功耗边界曲线图；边界对比位于“功耗”视图的“统计口径：全部”）。“随时间变化”新增每条曲线的负载波动表（峰值、最小值、空闲底线、均值、P5/P95、最大 1 秒与 5 秒变化、上升/下降速率、波动率）、“× 72（每 NVL72 机架）”开关，以及由 `/api/v1/gpu-metrics-point/stats`（`format=csv|json`、`scale=gpu|nvl72`）提供的逐点 CSV / JSON 下载，该接口用同一函数基于同一已存数据桶计算统计。这些都不新增 `inference` 视图的选择项。分享链接带 `i_pcompare=all`（界面不提供）时，会在三个实测边界之上加入两个额定边界。
 Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
 These analytical results (`serviceCompare`, `roleShare`, `powerFit`, `powerBreakdown`, `headroom`) require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured and its IT boundary, which export `tableRows`.
