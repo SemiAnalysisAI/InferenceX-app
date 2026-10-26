@@ -24,6 +24,7 @@ export interface ResultContextProps {
   dates?: readonly string[];
   dateRange?: { start: string; end: string };
   source?: string;
+  deprecated?: boolean;
   costBasis?: string;
   costBasisTestId?: string;
 }
@@ -83,6 +84,7 @@ export function ResultContext({
   dates,
   dateRange,
   source,
+  deprecated = false,
   costBasis,
   costBasisTestId,
 }: ResultContextProps) {
@@ -204,7 +206,10 @@ export function ResultContext({
       {source && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.source}:</dt>{' '}
-          <dd className="inline">{source}</dd>
+          <dd className="inline">
+            {source}
+            {deprecated && (locale === 'zh' ? ' (已弃用)' : ' (deprecated)')}
+          </dd>
         </div>
       )}
       {costBasis && (

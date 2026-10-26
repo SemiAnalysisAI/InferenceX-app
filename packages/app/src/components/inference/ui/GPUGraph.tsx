@@ -26,11 +26,7 @@ import {
   getInferenceRunLabel,
   getOverlayLineLabel,
 } from '@/lib/benchmarks/inference-labels';
-import {
-  getChartWatermark,
-  getDeprecatedChartWatermark,
-  Sequence,
-} from '@/lib/catalog/data-mappings';
+import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
@@ -1314,7 +1310,6 @@ const GPUGraph = React.memo(
         data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
-        backgroundWatermark={getDeprecatedChartWatermark(modelLabel, locale)}
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}

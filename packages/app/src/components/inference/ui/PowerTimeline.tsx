@@ -29,7 +29,6 @@ import { lttbDownsample } from '@/lib/d3-chart/downsample';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { getDeprecatedChartWatermark } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
 import {
@@ -629,8 +628,7 @@ export default function PowerTimeline({
   const locale = useLocale();
   const t = STRINGS[locale];
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
-  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates, selectedModel } =
-    useInferenceFilters();
+  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
   const { setBestPerSku, toggleHwType, setIsLegendExpanded, toggleActiveDate } =
     useInferenceActions();
@@ -1425,7 +1423,6 @@ export default function PowerTimeline({
         height={CHART_HEIGHT}
         margin={MARGIN}
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
-        backgroundWatermark={getDeprecatedChartWatermark(selectedModel, locale)}
         testId="power-timeline-chart-svg"
         grabCursor
         instructions={t.instructions}

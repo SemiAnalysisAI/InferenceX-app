@@ -26,7 +26,6 @@ export interface ChartSetupConfig {
   containerHeight: number;
   margin: ChartMargin;
   watermark: 'logo' | 'unofficial' | 'none';
-  backgroundWatermark?: string;
   xLabel?: string;
   yLabel?: string;
   clipContent?: boolean;

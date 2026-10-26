@@ -155,7 +155,6 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-    cy.get('[data-testid="deprecated-watermark"]').should('not.exist');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -390,8 +389,8 @@ describe('Inference Chart', () => {
   });
 });
 
-describe('Deprecated model background watermark', () => {
-  it('marks every deprecated model and clears the mark for an active model', () => {
+describe('Deprecated model source attribution', () => {
+  it('marks every deprecated model in the source, without a background watermark', () => {
     cy.viewport(1280, 900);
     for (const [display, dbKey, deprecated] of [
       ['MiniMax-M3', 'minimaxm3', true],
@@ -411,19 +410,14 @@ describe('Deprecated model background watermark', () => {
         onBeforeLoad: unlockAgenticGate,
       });
       cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
-      if (deprecated) {
-        cy.get('#chart-0 .deprecated-watermark')
-          .should('have.length', 2)
-          .each(($mark) => {
-            cy.wrap($mark).should('have.text', 'Deprecated').and('have.attr', 'opacity', '0.3');
-          });
-      } else {
-        cy.get('#chart-0 .deprecated-watermark').should('not.exist');
-      }
+      cy.get('#chart-0 [data-testid="result-context"]')
+        .should('contain.text', 'Source: SemiAnalysis InferenceX™')
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(deprecated)');
+      cy.get('.deprecated-watermark').should('not.exist');
     }
   });
 
-  it('keeps a large plot watermark in PNG exports, overlays, and the Chinese mobile chart', () => {
+  it('keeps the suffix in PNG exports, overlays, and the Chinese mobile chart', () => {
     const model = 'minimaxm3';
     const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
     const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
@@ -454,58 +448,61 @@ describe('Deprecated model background watermark', () => {
     cy.visit('/inference/minimax-m3?i_seq=agentic-traces', {
       onBeforeLoad: unlockAgenticGate,
     });
-    cy.get('#chart-0 [data-testid="result-context"]')
-      .should('contain.text', 'Source: SemiAnalysis InferenceX™')
-      .and('not.contain.text', 'Historical benchmark — submissions closed');
-    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]').should('be.visible');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (deprecated)',
+    );
     let exportedPng = '';
-    let exportedLabels: string[] = [];
+    let exportedCaption = '';
     cy.window().then((win) => {
       win.HTMLAnchorElement.prototype.click = function () {
         if (this.download.endsWith('.png')) {
           exportedPng = this.href;
-          exportedLabels = [
-            ...win.document.querySelectorAll('#chart-0-export .deprecated-watermark'),
-          ].map((mark) => mark.textContent ?? '');
+          exportedCaption =
+            win.document.querySelector('#chart-0-export [data-testid="result-context"]')
+              ?.textContent ?? '';
+          expect(win.document.querySelector('#chart-0-export .deprecated-watermark')).to.equal(
+            null,
+          );
         }
       };
     });
     cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
     cy.get('[data-testid="export-png-button"]').click();
-    cy.window()
-      .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
-      .then(() => {
-        expect(exportedLabels).to.deep.equal(['Deprecated', 'Deprecated']);
-        cy.writeFile(
-          'cypress/downloads/deprecated-model-watermark.png',
-          exportedPng.split(',')[1],
-          'base64',
-        );
-      });
+    cy.window().should(() => {
+      expect(exportedPng).to.match(/^data:image\/png;base64,/u);
+      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (deprecated)');
+    });
 
     cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
-    cy.get('#chart-0 .deprecated-watermark').should('contain.text', 'Deprecated');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (deprecated)',
+    );
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
+    cy.get('.deprecated-watermark').should('not.exist');
     cy.get('[aria-label="Dismiss historical-m3-overlay"]').click();
     cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
-    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]').should('be.visible');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (deprecated)',
+    );
 
     cy.viewport(375, 900);
     cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
       onBeforeLoad: unlockAgenticGate,
     });
     cy.wait('@historicalM3Overlay');
-    cy.get('#chart-0 svg [data-testid="deprecated-watermark"]')
-      .should('be.visible')
-      .and('have.length', 2)
-      .each(($mark) => cy.wrap($mark).should('have.text', '已弃用'));
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    );
+    cy.get('.deprecated-watermark').should('not.exist');
+    expectNoPageOverflow();
   });
 });
 
