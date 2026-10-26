@@ -1196,7 +1196,7 @@ export const apiContractSourceDigests = [
     source: 'src/lib/catalog/model-architectures.ts',
     // Reviewed for the MiMo-V2.6-Flash addition (InferenceX#4330): one new
     // entry with existing fields only, so the architecture catalog shape stands.
-    sourceSha256: 'a52bd2242ef8336bb23e42a77d31ec70115d3f08e2c7042e869b485de118d027',
+    sourceSha256: '95a2e2cc6bd1450fc6b44cab88c4845d47746cb31c7981020cb891022536032c',
     reviewArea: {
       en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
       zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',

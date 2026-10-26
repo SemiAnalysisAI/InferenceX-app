@@ -454,6 +454,7 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
     hasSharedExpert: false,
     denseFFNLayers: 1,
     denseFFNDim: 16384,
+    denseLayerAttentionLabel: 'Global GQA',
     alternatingLayers: [
       {
         label: 'Sliding Attention + Sink',
@@ -466,9 +467,8 @@ export const MODEL_ARCHITECTURES: Partial<Record<Model, ModelArchitecture>> = {
       },
       {
         label: 'Global GQA',
-        description:
-          'Full causal GQA without a sink, at layers 0, 5, 11, 17, 23, 29, 35, 41 and 47',
-        count: 9,
+        description: 'Full causal GQA without a sink, at layers 5, 11, 17, 23, 29, 35, 41 and 47',
+        count: 8,
         colorKey: 'norm',
         attentionShape: '64 Q / 4 KV heads · 192d QK, 128d V',
       },
