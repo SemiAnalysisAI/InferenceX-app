@@ -12,12 +12,7 @@ export const POWERX_VIEWS = [
   'time',
 ] as const satisfies readonly PowerXView[];
 /** The three measured boundaries the Count toggle names: GPU only, IT (no PUE), Facility. */
-export type PowerXBoundary = 'gpu' | 'it' | 'system';
-export const POWERX_BOUNDARIES = [
-  'gpu',
-  'it',
-  'system',
-] as const satisfies readonly PowerXBoundary[];
+type PowerXBoundary = 'gpu' | 'it' | 'system';
 /** Count on the Energy view: one boundary, or all three on one chart. */
 export type PowerXCount = PowerXBoundary | 'both';
 /** What one unit of energy is charged to on the Energy view. */
@@ -26,7 +21,7 @@ export type EnergyPer = 'output' | 'input' | 'total' | 'query';
 export const POWERX_DEFAULT_METRIC = 'y_measuredJPerOutputToken';
 
 /** GPU-measured metric behind each Energy unit. Only output tokens have an IT or facility basis. */
-export const ENERGY_PER_METRIC: Record<EnergyPer, string> = {
+const ENERGY_PER_METRIC: Record<EnergyPer, string> = {
   output: 'y_measuredJPerOutputToken',
   input: 'y_measuredJPerInputToken',
   total: 'y_measuredJPerTotalToken',
@@ -47,7 +42,7 @@ export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, Record<PowerXBoun
 /** The compare mode behind the Where the power goes view (`i_pcompare=breakdown`). */
 export const WHERE_COMPARE = 'breakdown' satisfies PowerCompare;
 
-export const POWER_TIMELINE_METRIC = 'y_measuredPowerTimeline';
+const POWER_TIMELINE_METRIC = 'y_measuredPowerTimeline';
 export const POWER_PERCENT_TDP_METRIC = 'y_measuredPowerPercentTdp';
 
 export function energyPerFor(metric: string): EnergyPer {

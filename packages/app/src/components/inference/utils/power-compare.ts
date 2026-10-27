@@ -114,7 +114,7 @@ export function powerCompareBase(metric: string, mode: PowerCompare): PowerVaria
  * only, IT without PUE, Facility). `boundaries` draws just these; `all` (share
  * links only) adds the two rated provisioned bounds.
  */
-export const COUNT_COMPARE_BASES = [
+const COUNT_COMPARE_BASES = [
   'gpu-measured',
   'it-modeled',
   'utility-modeled',
@@ -125,7 +125,7 @@ export const COUNT_COMPARE_BASES = [
  * (solid) against the all-in provisioned bound (dashed), and nothing else, so
  * the chart stays readable.
  */
-export const PROVISIONED_COMPARE_BASES = [
+const PROVISIONED_COMPARE_BASES = [
   'gpu-measured',
   'utility-provisioned',
 ] as const satisfies readonly PowerBasis[];
@@ -135,17 +135,14 @@ function defaultCompareBases(mode: PowerCompare): readonly PowerBasis[] {
   return mode === 'provisioned' ? PROVISIONED_COMPARE_BASES : COUNT_COMPARE_BASES;
 }
 
-export function powerCompareVariants(
-  metric: string,
-  mode: PowerCompare,
-  bases: readonly PowerBasis[] = defaultCompareBases(mode),
-): PowerCompareSeries[] {
+export function powerCompareVariants(metric: string, mode: PowerCompare): PowerCompareSeries[] {
   const base = powerCompareBase(metric, mode);
   const config = getMeasuredMetricConfig(metric);
   if (!base || !config) return [];
   if (base.kind === 'basis') {
     const quantity = comparableQuantity(metric);
     if (!quantity) return [];
+    const bases = defaultCompareBases(mode);
     return POWER_BASES.flatMap((basis): PowerCompareSeries[] => {
       if (basis === base.id || !bases.includes(basis)) return [];
       const field =
@@ -172,9 +169,8 @@ export function expandPowerCompareSeries(
   points: readonly InferenceData[],
   metric: string,
   mode: PowerCompare,
-  bases?: readonly PowerBasis[],
 ): InferenceData[] {
-  const series = powerCompareVariants(metric, mode, bases);
+  const series = powerCompareVariants(metric, mode);
   if (series.length === 0) return [...points];
   const result: InferenceData[] = [...points];
   for (const { variant, field } of series) {

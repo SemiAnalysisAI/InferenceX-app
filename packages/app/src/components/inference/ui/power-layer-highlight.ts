@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import {
@@ -9,7 +9,7 @@ import {
   type PowerLayerTarget,
 } from '../utils/power-breakdown';
 
-export interface PowerLayerHighlightControls {
+interface PowerLayerHighlightControls {
   highlight: PowerLayerHighlight | null;
   /** Hover start (a band, or a part with its band) or end (`null`); ignored while pinned. */
   hover: (target: PowerLayerTarget | null) => void;
@@ -25,22 +25,12 @@ export interface PowerLayerHighlightControls {
  * modeled band anywhere lights it everywhere. A parts-list row drives it
  * through its component (`partTarget`), which lights the row and raises its
  * band; the plot and the legends drive it by band alone (`bandTarget`).
- * Controlled when the Where view lifts the state above the panels;
- * otherwise the panel keeps its own. Escape unpins.
+ * The Where view lifts the state above the panels. Escape unpins.
  */
 export function usePowerLayerHighlight(
-  controlled?: PowerLayerHighlight | null,
-  onChange?: (next: PowerLayerHighlight | null) => void,
+  highlight: PowerLayerHighlight | null,
+  set: (next: PowerLayerHighlight | null) => void,
 ): PowerLayerHighlightControls {
-  const [own, setOwn] = useState<PowerLayerHighlight | null>(null);
-  const highlight = controlled === undefined ? own : controlled;
-  const set = useCallback(
-    (next: PowerLayerHighlight | null) => {
-      setOwn(next);
-      onChange?.(next);
-    },
-    [onChange],
-  );
   const hover = useCallback(
     (target: PowerLayerTarget | null) => {
       if (highlight?.pinned) return;

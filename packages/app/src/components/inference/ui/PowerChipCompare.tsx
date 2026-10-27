@@ -2,9 +2,8 @@
 
 import * as d3 from 'd3';
 import { Pin } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 
-import { Heading } from '@/components/ui/heading';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
@@ -13,7 +12,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
-import { swatchStyle } from './PowerBreakdownPanel';
+import { swatchStyle } from './power-layer-style';
 import { usePowerLayerHighlight } from './power-layer-highlight';
 import {
   bandPartsAt,
@@ -46,8 +45,6 @@ import {
 
 const STRINGS = {
   en: {
-    title: 'Compare chips at one interactivity',
-    subtitle: 'Each bar is one chip’s point nearest the chosen interactivity.',
     target: 'Interactivity',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -90,8 +87,6 @@ const STRINGS = {
     } satisfies Record<SystemPowerCategory, string>,
   },
   zh: {
-    title: '在同一交互性下对比芯片',
-    subtitle: '每条横条为该芯片最接近所选交互性的基准测试点。',
     target: '交互性',
     unit: 'tok/s/user',
     at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
@@ -151,8 +146,7 @@ export default function PowerChipCompare({
   xField,
   selectedKey,
   onSelectKey,
-  compact = false,
-  expandedKey = null,
+  expandedKey,
   renderExpanded,
   onNearestKeyChange,
   layerHighlight,
@@ -167,16 +161,14 @@ export default function PowerChipCompare({
   xField?: keyof AggDataEntry;
   selectedKey: string | null;
   onSelectKey: (key: string) => void;
-  /** PowerX v2: no heading, the view tab names the chart; the slider is the first row. */
-  compact?: boolean;
-  /** Series whose drill-down renders inline under its bar (PowerX v2). */
-  expandedKey?: string | null;
-  renderExpanded?: (key: string) => React.ReactNode;
+  /** Series whose drill-down renders inline under its bar. */
+  expandedKey: string | null;
+  renderExpanded: (key: string) => React.ReactNode;
   /** Reports the chip whose point sits nearest the slider; the drill-down opens under it. */
-  onNearestKeyChange?: (key: string | null) => void;
-  /** Shared with the drill-down's plot on the Where view; own state when omitted. */
-  layerHighlight?: PowerLayerHighlight | null;
-  onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
+  onNearestKeyChange: (key: string | null) => void;
+  /** Shared with the drill-down's plot on the Where view. */
+  layerHighlight: PowerLayerHighlight | null;
+  onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
   comparedPoints?: PowerComparedPoints;
   /** The row's pin marker was clicked: that chip follows the slider again. */
@@ -225,14 +217,11 @@ export default function PowerChipCompare({
     return xs.length > 0 ? [Math.min(...xs), Math.max(...xs)] : [1, 1];
   }, [series]);
   const fallback = useMemo(() => defaultComparisonInteractivity(series), [series]);
-  // On PowerX the target is shared with the drill-down and the main chart.
-  const sharedTarget = usePowerXCompareTarget();
-  const setSharedTarget = useSetPowerXCompareTarget();
-  const [ownTarget, setOwnTarget] = useState<number | null>(null);
-  const target = setSharedTarget ? sharedTarget : ownTarget;
-  const setTarget = setSharedTarget ?? setOwnTarget;
+  // The target is shared with the drill-down and the main chart.
+  const target = usePowerXCompareTarget();
+  const setTarget = useSetPowerXCompareTarget();
   // A new model or scenario changes the range; return to the shared middle.
-  useEffect(() => setTarget(null), [lo, hi, setTarget]);
+  useEffect(() => setTarget?.(null), [lo, hi, setTarget]);
   const value = target ?? fallback;
 
   // Rows keep the series order (registry order, overlays last) whatever the slider reads.
@@ -259,7 +248,7 @@ export default function PowerChipCompare({
     }
     return best;
   }, [series, value]);
-  useEffect(() => onNearestKeyChange?.(nearestKey), [nearestKey, onNearestKeyChange]);
+  useEffect(() => onNearestKeyChange(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
   const bands = POWER_BANDS.filter((band) =>
     rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
@@ -294,15 +283,6 @@ export default function PowerChipCompare({
 
   return (
     <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
-      {!compact && (
-        <div className="space-y-1">
-          <Heading as="h3" level="card">
-            {t.title}
-          </Heading>
-          <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-        </div>
-      )}
-
       <div className="no-export flex flex-wrap items-center gap-x-4 gap-y-2">
         <label className="flex min-w-0 flex-1 basis-72 items-center gap-3 text-sm">
           <span className="shrink-0 font-medium text-muted-foreground">{t.target}</span>
@@ -312,7 +292,7 @@ export default function PowerChipCompare({
             max={SLIDER_STEPS}
             value={toStep(value)}
             onChange={(event) => {
-              setTarget(fromStep(Number(event.target.value)));
+              setTarget?.(fromStep(Number(event.target.value)));
               onTargetChange?.();
             }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
@@ -393,10 +373,9 @@ export default function PowerChipCompare({
                 ? resolveColor(entry.hwKey)
                 : overlayRunColor(entry.overlayRunIndex);
             const rowBands = bands.filter((band) => bandWattsPerGpu(point, band) > 0);
-            const expanded = renderExpanded !== undefined && entry.key === expandedKey;
-            // Inline layout: the bar whose drill-down is open is the active one.
-            const active =
-              entry.key === (renderExpanded && expandedKey !== null ? expandedKey : selectedKey);
+            const expanded = entry.key === expandedKey;
+            // The bar whose drill-down is open is the active one.
+            const active = entry.key === (expandedKey ?? selectedKey);
             const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
             const chipName = (
               <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -482,7 +461,7 @@ export default function PowerChipCompare({
                     track('inference_power_compare_chip_selected');
                   }}
                   aria-pressed={active}
-                  aria-expanded={renderExpanded ? expanded : undefined}
+                  aria-expanded={expanded}
                   data-testid="power-chip-compare-row"
                   data-pinned={pinnedPoint ? 'true' : undefined}
                   data-layout={compactRows ? 'compact' : undefined}
@@ -561,16 +540,14 @@ export default function PowerChipCompare({
       )}
       {/* A chip picked in the drill-down's Hardware select may have no bar near this
           interactivity; its drill-down then follows the list instead of vanishing. */}
-      {renderExpanded !== undefined &&
-        expandedKey !== null &&
-        !rows.some((row) => row.series.key === expandedKey) && (
-          <div
-            className="rounded-md border border-border/60 p-3"
-            data-testid="power-chip-compare-drilldown"
-          >
-            {renderExpanded(expandedKey)}
-          </div>
-        )}
+      {expandedKey !== null && !rows.some((row) => row.series.key === expandedKey) && (
+        <div
+          className="rounded-md border border-border/60 p-3"
+          data-testid="power-chip-compare-drilldown"
+        >
+          {renderExpanded(expandedKey)}
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         {includeFacility ? t.perGpu : t.perGpuIt}
         {outOfRange.length > 0 &&

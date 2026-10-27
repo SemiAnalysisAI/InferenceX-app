@@ -289,15 +289,6 @@ export function groupPoolsBySize(
     }));
 }
 
-export function referenceLabelSlots(lines: readonly { watts: number }[]): number[] {
-  const used = new Map<number, number>();
-  return lines.map((line) => {
-    const slot = used.get(line.watts) ?? 0;
-    used.set(line.watts, slot + 1);
-    return slot;
-  });
-}
-
 /** Seconds of the centered rolling mean the timeline draws unless raw samples are requested. */
 export const POWER_TIMELINE_SMOOTH_SECONDS = 30;
 
@@ -374,32 +365,6 @@ export function spreadLabelYs(
   for (const index of order.toReversed()) {
     if (ys[index] > ceiling) ys[index] = ceiling;
     ceiling = ys[index] - row;
-  }
-  return ys;
-}
-
-export function stackTraceLabels(
-  labels: readonly { left: number; right: number; y: number }[],
-  rowHeight: number,
-): number[] {
-  const ys = labels.map((label) => label.y);
-  const placed: { left: number; right: number; y: number }[] = [];
-  const order = labels.map((_, index) => index).toSorted((a, b) => labels[a].y - labels[b].y);
-  for (const index of order) {
-    const { left, right } = labels[index];
-    let y = ys[index];
-    let moved = true;
-    while (moved) {
-      moved = false;
-      for (const other of placed) {
-        if (left < other.right && other.left < right && Math.abs(y - other.y) < rowHeight) {
-          y = other.y + rowHeight;
-          moved = true;
-        }
-      }
-    }
-    ys[index] = y;
-    placed.push({ left, right, y });
   }
   return ys;
 }

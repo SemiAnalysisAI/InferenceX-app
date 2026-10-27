@@ -22,7 +22,7 @@ import { isPositive } from './power-basis';
  */
 export const HEADROOM_INTERACTIVITIES = [25, 50, 100, 300] as const;
 
-export interface HeadroomCell {
+interface HeadroomCell {
   interactivity: number;
   /** Interpolated measured average W per chip. */
   avgWatts: number;
@@ -34,7 +34,7 @@ export interface HeadroomCell {
   headroomPercent: number;
 }
 
-export interface HeadroomRow {
+interface HeadroomRow {
   key: string;
   hwKey: string;
   precision: string;
@@ -68,7 +68,7 @@ function cellAt(
 }
 
 /** The unofficial-run overlay points shown beside the official ones, with their run identities. */
-export interface HeadroomOverlayInput {
+interface HeadroomOverlayInput {
   points: readonly InferenceData[];
   runIndexByUrl: Record<string, number>;
   runInfos: readonly OverlayRunIdentity[];
@@ -83,7 +83,6 @@ const usable = (point: InferenceData) =>
 function headroomRow(
   key: string,
   group: InferenceData[],
-  interactivities: readonly number[],
   overlay?: { runIndex: number; run: OverlayRunIdentity | undefined },
 ): HeadroomRow | null {
   const first = group[0];
@@ -109,7 +108,7 @@ function headroomRow(
     tdpWatts,
     interactivityMin,
     interactivityMax,
-    cells: interactivities.map((interactivity) => cellAt(group, interactivity, tdpWatts)),
+    cells: HEADROOM_INTERACTIVITIES.map((interactivity) => cellAt(group, interactivity, tdpWatts)),
   };
 }
 
@@ -121,7 +120,6 @@ function headroomRow(
  */
 export function buildHeadroomRows(
   points: readonly InferenceData[],
-  interactivities: readonly number[] = HEADROOM_INTERACTIVITIES,
   overlay?: HeadroomOverlayInput,
 ): HeadroomRow[] {
   const groups = new Map<string, InferenceData[]>();
@@ -132,7 +130,7 @@ export function buildHeadroomRows(
   }
   const rows: HeadroomRow[] = [];
   for (const [key, group] of groups) {
-    const row = headroomRow(key, group, interactivities);
+    const row = headroomRow(key, group);
     if (row) rows.push(row);
   }
   rows.sort((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key));
@@ -148,7 +146,7 @@ export function buildHeadroomRows(
   }
   const overlayRows: HeadroomRow[] = [];
   for (const [key, { runIndex, points: group }] of overlayGroups) {
-    const row = headroomRow(key, group, interactivities, {
+    const row = headroomRow(key, group, {
       runIndex,
       run: overlay?.runInfos[runIndex],
     });
@@ -160,7 +158,7 @@ export function buildHeadroomRows(
   return [...rows, ...overlayRows];
 }
 
-export interface HeadroomExample {
+interface HeadroomExample {
   row: HeadroomRow;
   /** The faster operating point (at most 300 tok/s/user). */
   high: HeadroomCell;

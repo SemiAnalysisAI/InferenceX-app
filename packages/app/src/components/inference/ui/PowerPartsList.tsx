@@ -93,7 +93,7 @@ const behaviourLabel = (behaviour: PowerPartBehaviour, t: (typeof STRINGS)['en']
   behaviour === 'measured' ? t.measured : behaviour === 'load' ? t.modeledLoad : t.modeledFixed;
 
 /** The row's bar: the chip colour at its layer's step; modeled bars get a dashed left edge. */
-export function partBarStyle(row: PowerPartRow, color: string): React.CSSProperties {
+function partBarStyle(row: PowerPartRow, color: string): React.CSSProperties {
   return {
     backgroundColor: powerLayerFill(color, powerBandFillOpacity(row.band)),
     borderLeft: isHatchedBand(row.band) ? `2px dashed ${color}` : undefined,

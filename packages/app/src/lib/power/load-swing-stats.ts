@@ -17,7 +17,7 @@ import {
  * previous one) are counted, never interpolated over, and no delta is read
  * across one.
  */
-export interface LoadSwingInput {
+interface LoadSwingInput {
   /** Per-bucket values (W per GPU); null buckets are skipped. */
   samples: readonly (number | null)[];
   /** Bucket time in seconds from the first bucket, same length as `samples`. */
@@ -178,7 +178,7 @@ export function scaleLoadSwingStatsToRack(stats: LoadSwingStats): LoadSwingStats
 }
 
 /** The per-GPU mean trace of a bucketed series as a `LoadSwingInput`. */
-export function loadSwingInputFromSeries(
+function loadSwingInputFromSeries(
   series: GpuPowerSeries,
   windowStartMs: number | null,
   windowEndMs: number | null,

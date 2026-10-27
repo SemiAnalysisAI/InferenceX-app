@@ -111,7 +111,7 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
 }
 
 /** Reader-facing collector name; the raw producer id stays in the title attribute. */
-export function collectorDisplayName(producer: string): string {
+function collectorDisplayName(producer: string): string {
   if (/dcgm/iu.test(producer)) return 'NVIDIA DCGM';
   if (/amd-smi|amdsmi|rocm-smi/iu.test(producer)) return 'AMD SMI';
   if (/nvidia-smi|nvml/iu.test(producer)) return 'nvidia-smi';

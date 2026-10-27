@@ -97,7 +97,6 @@ export function PowerXHeadroomTable({
     () =>
       buildHeadroomRows(
         points,
-        HEADROOM_INTERACTIVITIES,
         overlayPoints && overlayPoints.length > 0
           ? { points: overlayPoints, runIndexByUrl, runInfos: unofficialRunInfos }
           : undefined,

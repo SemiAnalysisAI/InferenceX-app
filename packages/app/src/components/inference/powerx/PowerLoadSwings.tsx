@@ -13,7 +13,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import {
   loadSwingStatsFromSeries,
   NVL72_GPUS_PER_RACK,
-  scaleLoadSwingStatsToRack,
   type LoadSwingStats,
 } from '@/lib/power/load-swing-stats';
 
@@ -78,7 +77,7 @@ const STRINGS = {
   },
 } as const;
 
-export interface LoadSwingTraceRow {
+interface LoadSwingTraceRow {
   trace: PowerTimelineTrace;
   color: string;
   label: string;
@@ -87,7 +86,7 @@ export interface LoadSwingTraceRow {
 }
 
 /** Statistics of every visible trace; traces without usable samples are left out. */
-export function loadSwingRows(
+function loadSwingRows(
   traces: readonly PowerTimelineTrace[],
   colorOf: (trace: PowerTimelineTrace) => string,
   labelOf: (point: InferenceData) => string,
@@ -107,7 +106,7 @@ export function loadSwingRows(
   });
 }
 
-export function statsDownloadUrl(pointId: number, format: 'csv' | 'json', rack: boolean): string {
+function statsDownloadUrl(pointId: number, format: 'csv' | 'json', rack: boolean): string {
   const params = new URLSearchParams({ id: String(pointId), format });
   if (rack) params.set('scale', 'nvl72');
   return `/api/v1/gpu-metrics-point/stats?${params.toString()}`;
@@ -282,9 +281,4 @@ export function PowerLoadSwingsCaveat() {
       {STRINGS[locale].fixed}
     </p>
   );
-}
-
-/** Rack scaling of a stats block, for callers that need the numbers rather than the table. */
-export function scaledStats(stats: LoadSwingStats, rack: boolean): LoadSwingStats {
-  return rack ? scaleLoadSwingStatsToRack(stats) : stats;
 }

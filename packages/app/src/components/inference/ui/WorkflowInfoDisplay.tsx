@@ -95,12 +95,7 @@ function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; l
   );
 }
 
-export default function WorkflowInfoDisplay({
-  compact = false,
-}: {
-  /** PowerX v2: one chip-sized row (date, run, changelog) in the chart caption. */
-  compact?: boolean;
-} = {}) {
+export default function WorkflowInfoDisplay() {
   const locale = useLocale();
   const t = WORKFLOW_STRINGS[locale];
   const { selectedRunDate, selectedRunId } = useInferenceFilters();
@@ -150,14 +145,7 @@ export default function WorkflowInfoDisplay({
   })();
 
   return (
-    <div
-      className={
-        compact
-          ? 'flex flex-wrap items-center gap-1.5 text-muted-foreground [&_button]:text-xs [&_[data-slot=select-trigger]]:text-xs'
-          : 'flex flex-wrap gap-2 lg:gap-4 text-muted-foreground'
-      }
-      data-testid={compact ? 'powerx-run-chip' : undefined}
-    >
+    <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
       <DatePicker
         date={selectedRunDate}
         onChange={(date) => setSelectedRunDate(date)}
@@ -246,7 +234,7 @@ export default function WorkflowInfoDisplay({
       <div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size={compact ? 'sm' : 'default'}>
+            <Button variant="outline">
               <strong>{t.changelog}</strong>
               <ChevronDownIcon />
             </Button>
