@@ -89,8 +89,3 @@ export function fetchView(url: string): Promise<TutorialViewResponse> {
   cache.set(url, request);
   return request;
 }
-
-/** Test seam: forget every cached response. */
-export function resetViewCache(): void {
-  cache.clear();
-}

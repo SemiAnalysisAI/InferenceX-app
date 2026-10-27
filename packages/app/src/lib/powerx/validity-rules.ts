@@ -5,8 +5,6 @@
  */
 
 export const MAX_SAMPLE_GAP_SECONDS = 3;
-export const CLOCK_TOLERANCE_SECONDS = 0.5;
-export const CLOCK_TOLERANCE_FRACTION = 0.01;
 
 export const VALIDITY_CHECKS = [
   { id: 'devices', reason: 'expected_device_missing' },
@@ -16,9 +14,3 @@ export const VALIDITY_CHECKS = [
   { id: 'tokens', reason: 'invalid_output_token_count' },
 ] as const;
 export type ValidityCheckId = (typeof VALIDITY_CHECKS)[number]['id'];
-export type ValidityReason = (typeof VALIDITY_CHECKS)[number]['reason'];
-
-/** Allowed drift between the client's window and the telemetry window: max(0.5 s, 1 %). */
-export function windowTolerance(windowSeconds: number): number {
-  return Math.max(CLOCK_TOLERANCE_SECONDS, CLOCK_TOLERANCE_FRACTION * windowSeconds);
-}

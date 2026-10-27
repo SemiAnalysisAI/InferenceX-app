@@ -4,7 +4,6 @@ import {
   type BasisComponent,
   type BasisHardware,
   computeBasis,
-  defaultBasisSelection,
   hardwareAllInWatts,
   hardwareTdp,
 } from './power-basis';
@@ -55,7 +54,7 @@ export function partGroup(name: string): PartGroup {
   return 'other';
 }
 
-export type LadderSegmentGroup = 'gpu' | 'grace' | PartGroup;
+export type LadderSegmentGroup = 'gpu' | PartGroup;
 
 export interface LadderSegment {
   group: LadderSegmentGroup;
@@ -67,75 +66,52 @@ export interface LadderSegment {
 
 export interface Ladder {
   hardware: LadderHardware;
-  gpuCount: number;
   gpuWatts: number;
-  /** GPU first, a measured Grace socket second, then modeled groups by size. */
+  /** GPU first, then modeled groups by size. */
   segments: LadderSegment[];
   itWatts: number;
   facilityWatts: number;
   pue: number;
-  coolingMode: string;
   tdpWatts: number;
   allInWatts: number;
   gpusPerMw: number;
   percentOfTdp: number;
-  modelVersion: string;
 }
 
 function groupComponents(components: BasisComponent[]): LadderSegment[] {
   const sums = new Map<LadderSegmentGroup, LadderSegment>();
   for (const component of components) {
-    const group: LadderSegmentGroup = component.measured
-      ? /grace/iu.test(component.name)
-        ? 'grace'
-        : 'gpu'
-      : partGroup(component.name);
+    const group: LadderSegmentGroup = component.measured ? 'gpu' : partGroup(component.name);
     const kind = component.measured ? 'measured' : 'modeled';
     const current = sums.get(group) ?? { group, kind, watts: 0 };
     current.watts += component.watts;
     sums.set(group, current);
   }
-  const measured = ['gpu', 'grace'].flatMap((group) => {
-    const segment = sums.get(group as LadderSegmentGroup);
-    return segment ? [segment] : [];
-  });
+  const gpu = sums.get('gpu');
   const modeled = [...sums.values()]
     .filter((segment) => segment.kind === 'modeled' && segment.watts > 0)
     .toSorted((a, b) => b.watts - a.watts);
-  return [...measured, ...modeled];
+  return [...(gpu ? [gpu] : []), ...modeled];
 }
 
-export function buildLadder(
-  hardware: LadderHardware,
-  gpuWatts: number,
-  graceWatts: number | null = null,
-): Ladder | null {
-  const result = computeBasis({
-    ...defaultBasisSelection(hardware),
-    workload: 'agentic',
-    gpuWatts,
-    grace: graceWatts === null ? 'modeled' : 'measured',
-    graceWatts: graceWatts ?? 0,
-  });
+export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder | null {
+  const result = computeBasis(hardware, gpuWatts);
   if (!result.ok) return null;
   const perGpu = (watts: number) => watts / result.gpuCount;
   return {
     hardware,
-    gpuCount: result.gpuCount,
     gpuWatts,
     segments: groupComponents(result.components).map((segment) => ({
       ...segment,
       watts: perGpu(segment.watts),
     })),
-    itWatts: result.perGpu.it,
-    facilityWatts: result.perGpu.facility,
+    itWatts: result.itPerGpu,
+    facilityWatts: result.facilityPerGpu,
     pue: result.pue,
-    coolingMode: result.coolingMode,
     tdpWatts: hardwareTdp(hardware),
     allInWatts: hardwareAllInWatts(hardware),
     gpusPerMw: result.gpusPerMw,
     percentOfTdp: result.percentOfTdp,
-    modelVersion: result.modelVersion,
   };
 }
 
@@ -150,10 +126,7 @@ export const decodeLadderHardware = (raw: string | null): LadderHardware =>
   snapTo(raw ?? undefined, LADDER_HARDWARE, DEFAULT_LADDER_HARDWARE);
 
 export interface LoadSweep {
-  hardware: LadderHardware;
   tdpWatts: number;
-  /** GPU watts at each step, 0 … TDP inclusive. */
-  gpuWatts: number[];
   /** Per-GPU watts of every segment at each step, in ladder order of the TDP step. */
   tracks: { group: LadderSegmentGroup; kind: 'measured' | 'modeled'; values: number[] }[];
 }
@@ -168,12 +141,12 @@ export function loadSweep(hardware: LadderHardware, steps = 20): LoadSweep {
   const order = ladders.at(-1)?.segments.map((segment) => segment.group) ?? [];
   const tracks = order.map((group) => ({
     group,
-    kind: group === 'gpu' || group === 'grace' ? ('measured' as const) : ('modeled' as const),
+    kind: group === 'gpu' ? ('measured' as const) : ('modeled' as const),
     values: ladders.map(
       (ladder) => ladder?.segments.find((segment) => segment.group === group)?.watts ?? 0,
     ),
   }));
-  return { hardware, tdpWatts, gpuWatts, tracks };
+  return { tdpWatts, tracks };
 }
 
 /** True when a track changes by more than one watt per GPU across the sweep. */

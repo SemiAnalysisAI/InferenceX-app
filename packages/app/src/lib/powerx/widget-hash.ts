@@ -1,8 +1,8 @@
 /**
- * URL-hash state for the tutorial widgets. Each widget owns one namespace (`pb`, `rc`, `vd`, `ch`)
- * and the hash holds `key=value` pairs joined by `&`, e.g. `#pb=b200_fixed_single_600&vd=1_8_0.1`.
- * A bare heading anchor (`#reading-the-charts`) carries no pairs and is left alone on read; it is
- * dropped on the first write, because by then the reader has scrolled past it.
+ * URL-hash state for the tutorial widgets. Each widget owns one key (`hw`, `mm`, `ld`, `rc`) and
+ * the hash holds `key=value` pairs joined by `&`, e.g. `#hw=gb200&ld=600`. A bare heading anchor
+ * carries no pairs and is left alone on read; it is dropped on the first write, because by then
+ * the reader has scrolled past it.
  */
 
 const PAIR = /^(?<key>[a-z]+)=(?<value>[^&]*)$/u;
@@ -34,17 +34,4 @@ export function snapTo<T extends string>(
   fallback: T,
 ): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
-}
-
-/** Parses a finite number clamped to `[min, max]`, otherwise `fallback`. */
-export function snapNumber(
-  value: string | undefined,
-  min: number,
-  max: number,
-  fallback: number,
-): number {
-  if (value === undefined || value.trim() === '') return fallback;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, parsed));
 }

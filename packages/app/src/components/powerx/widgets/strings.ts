@@ -5,7 +5,6 @@ import type { LadderSegmentGroup } from '@/lib/powerx/ladder';
 export const GROUP_LABELS: Record<Locale, Record<LadderSegmentGroup, string>> = {
   en: {
     gpu: 'GPU',
-    grace: 'Grace socket',
     cpu: 'CPUs',
     memory: 'Memory',
     network: 'NICs and scale-out',
@@ -18,7 +17,6 @@ export const GROUP_LABELS: Record<Locale, Record<LadderSegmentGroup, string>> = 
   },
   zh: {
     gpu: 'GPU',
-    grace: 'Grace socket',
     cpu: 'CPU',
     memory: '内存',
     network: 'NIC 与 scale-out 网络',
@@ -34,8 +32,6 @@ export const GROUP_LABELS: Record<Locale, Record<LadderSegmentGroup, string>> = 
 export const GROUP_TITLES: Record<Locale, Record<LadderSegmentGroup, string>> = {
   en: {
     gpu: 'Measured: the exporter sample, time-weighted over the serving window',
-    grace:
-      'Measured on NVL72 when the window passes the Grace check: CPU, LPDDR5X and socket regulation',
     cpu: 'Modeled at a fixed level per operating state',
     memory: 'Modeled at a fixed level per operating state',
     network: 'Modeled: NICs, transceivers and the chassis share of the scale-out switch, fixed',
@@ -48,7 +44,6 @@ export const GROUP_TITLES: Record<Locale, Record<LadderSegmentGroup, string>> = 
   },
   zh: {
     gpu: '实测：exporter 采样值，在服务窗口内按时间加权',
-    grace: 'NVL72 上窗口通过 Grace 校验时实测：CPU、LPDDR5X 和 socket 供电',
     cpu: '建模：按工作状态取固定值',
     memory: '建模：按工作状态取固定值',
     network: '建模：NIC、光模块和机箱分摊的 scale-out 交换机，固定值',
