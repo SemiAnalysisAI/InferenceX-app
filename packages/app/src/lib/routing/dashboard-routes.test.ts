@@ -69,6 +69,12 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
   });
 
+  it('exposes OperatorX in primary navigation for both locales', () => {
+    expect(getDashboardRoute('operatorx').navGroup).toBe('primary');
+    expect(dashboardRouteForPathname('/operatorx')?.key).toBe('operatorx');
+    expect(dashboardRouteForPathname('/zh/operatorx')?.key).toBe('operatorx');
+  });
+
   it('declares the standalone and self-seeded provider capabilities', () => {
     expect(getDashboardRoute('collectivex').providers).toEqual({
       globalFilters: false,

@@ -52,15 +52,21 @@ function configurationKey(row: ImageAgeObservation): string {
   ]);
 }
 
-export function imageAgeSummary(rows: readonly ImageAgeObservation[], asOf: string): ImageAgePoint {
+function latestDates(rows: readonly ImageAgeObservation[], asOf: string): Map<string, string> {
   const dates = new Map<string, string>();
   for (const row of rows) {
     if (row.date > asOf || !Number.isFinite(Date.parse(`${row.date}T00:00:00Z`))) continue;
     const key = configurationKey(row);
     if (!dates.has(key) || dates.get(key)! < row.date) dates.set(key, row.date);
   }
+  return dates;
+}
+
+export function imageAgeSummary(rows: readonly ImageAgeObservation[], asOf: string): ImageAgePoint {
   const today = new Date(`${asOf}T00:00:00Z`);
-  const ages = [...dates.values()].map((date) => daysSince(date, today)).sort((a, b) => a - b);
+  const ages = [...latestDates(rows, asOf).values()]
+    .map((date) => daysSince(date, today))
+    .sort((a, b) => a - b);
   return {
     date: asOf,
     p90AgeDays: ages.length > 0 ? ages[Math.ceil(ages.length * 0.9) - 1] : null,
@@ -68,12 +74,23 @@ export function imageAgeSummary(rows: readonly ImageAgeObservation[], asOf: stri
   };
 }
 
+/**
+ * Replays submissions for the configurations `imageAgeSummary(rows, asOf)` counts, so the last
+ * point equals that summary. Superseded variants absent from `rows` would otherwise age forever.
+ */
 export function imageAgeHistory(
+  rows: readonly ImageAgeObservation[],
   observations: readonly ImageAgeObservation[],
   asOf: string,
 ): ImageAgePoint[] {
   const end = Date.parse(`${asOf}T00:00:00Z`);
-  const sorted = observations.toSorted((a, b) => a.date.localeCompare(b.date));
+  const cohort = latestDates(rows, asOf);
+  const sorted = [...rows, ...observations]
+    .filter((row) => {
+      const current = cohort.get(configurationKey(row));
+      return current !== undefined && row.date <= current;
+    })
+    .toSorted((a, b) => a.date.localeCompare(b.date));
   const latest = new Map<string, ImageAgeObservation>();
   let cursor = 0;
   return Array.from({ length: 90 }, (_, index) => {

@@ -107,6 +107,7 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
+  isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
@@ -1232,6 +1233,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
+                            deprecated={isModelDeprecated(selectedModel)}
                             precision={
                               embedded
                                 ? selectedPrecisions

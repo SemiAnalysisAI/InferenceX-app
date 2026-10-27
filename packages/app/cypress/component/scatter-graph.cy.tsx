@@ -1890,7 +1890,7 @@ describe('ChartDisplay responsive status notes', () => {
         cy.get('[data-testid="option-help-content-agentic-optimizations"]').should(
           'contain.text',
           locale === 'zh'
-            ? '每项配置可能使用推测解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
+            ? '每项配置可能使用投机解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
             : 'Each configuration may use inference optimizations such as speculative decoding. Hover over a point to see its exact settings.',
         );
       });

@@ -23,12 +23,18 @@ export async function POST(request: Request) {
     process.env.VERCEL_GIT_COMMIT_REF === 'staging' &&
     Boolean(request.headers.get('x-vercel-protection-bypass'));
 
-  if (!isProtectedStagingRequest && (!secret || !bearerMatches(authHeader, secret))) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!isProtectedStagingRequest) {
+    if (!secret) {
+      return new NextResponse('INVALIDATE_SECRET is not set', { status: 500 });
+    }
+    if (!bearerMatches(authHeader, secret)) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
   }
 
-  // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the
-  // default remains a full purge (which covers both).
+  // ?scope=collectivex or ?scope=operatorx purges only that cache scope. The
+  // default full purge covers CollectiveX but not OperatorX, which only its own
+  // ingest invalidates.
   const scope = new URL(request.url).searchParams.get('scope');
   if (scope && scope !== COLLECTIVEX_CACHE_SCOPE && scope !== OPERATORX_CACHE_SCOPE) {
     return NextResponse.json({ error: 'unknown scope' }, { status: 400 });
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
-    purgeOperatorX();
+    await purgeOperatorX();
     return NextResponse.json({ invalidated: true, scope });
   }
 

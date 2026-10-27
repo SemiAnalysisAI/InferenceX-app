@@ -90,6 +90,19 @@ describe('AgentX comparison links', () => {
     expect(overviewScenariosForModel(Model.Muse_Spark_Open)).toEqual(['agentx']);
   });
 
+  it('routes MiniMax M3.1 Flash to AgentX without featuring it on the ledger', () => {
+    const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'minimax-m31-flash')!;
+    expect(comparisonScenarioForModel(flash)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(comparisonPairHref('en', 'minimax-m31-flash-b300-vs-b200', flash)).toBe(
+      '/compare/minimax-m31-flash-b300-vs-b200/agentic',
+    );
+    expect(FEATURED_AGENTX_MODELS).not.toContain(flash);
+    expect(overviewScenariosForModel(Model.MiniMax_M3_1_Flash)).toEqual(['agentx']);
+  });
+
   it('agrees with the overview matrix about which models are AgentX-only', () => {
     const modelValues = new Set<string>(Object.values(Model));
     for (const entry of COMPARE_MODEL_SLUGS) {

@@ -27,10 +27,19 @@ jobs:
       - name: Wait for the sweep run to complete
         env:
           BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          DATABASE_OPERATORX_WRITE_URL: ${{ secrets.DATABASE_OPERATORX_WRITE_URL }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${BENCHMARK_REPO:?BENCHMARK_REPO repository variable is not set}"
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
+          : "${DATABASE_OPERATORX_WRITE_URL:?DATABASE_OPERATORX_WRITE_URL secret is not set}"
+          : "${GH_TOKEN:?INFX_MAIN_PAT secret is not set}"
           for _ in $(seq 60); do
             status=$(gh api "repos/$BENCHMARK_REPO/actions/runs/$RUN_ID" --jq .status)
             [ "$status" = completed ] && exit 0
@@ -87,6 +96,21 @@ jobs:
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx" "${headers[@]}"
+
+      - name: Warm default OperatorX comparisons
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          headers=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          for op in gemm moe; do
+            curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
+              "${APP_URL%/}/api/v1/operatorx/compare?op=$op" "${headers[@]}" -o /dev/null
+          done
 
       - name: Notify Slack on failure
         if: failure()

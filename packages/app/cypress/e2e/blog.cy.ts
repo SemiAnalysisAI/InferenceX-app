@@ -33,6 +33,47 @@ describe('Blog', () => {
     }
   });
 
+  describe('GLM-5 historical cost correction', () => {
+    for (const locale of ['', '/zh']) {
+      for (const width of [390, 1280]) {
+        it(`keeps the verified cost comparison and metadata aligned on ${locale || '/en'} at ${width}px`, () => {
+          cy.viewport(width, 900);
+          cy.visit(`${locale}/blog/mi355x-glm5-fp8-sglang-40-cheaper-than-b200`);
+          cy.get('h1').should('contain.text', '29.6%');
+          cy.get('meta[name="description"]').should('have.attr', 'content').and('include', '29.6%');
+          cy.contains('article.prose table', 'B200 / MI355X').within(() => {
+            cy.contains('tbody tr', '24.3')
+              .find('td')
+              .then(($cells) => {
+                expect([...$cells].map((cell) => cell.textContent?.trim())).to.deep.equal([
+                  '24.3',
+                  '$0.3388',
+                  '$0.2384',
+                  '1.421x',
+                  '29.6%',
+                ]);
+              });
+            cy.contains('tbody tr', '90').should('contain.text', '-2.8%');
+          });
+          cy.get('script[type="application/ld+json"]').then(($scripts) => {
+            const article = [...$scripts]
+              .map((script) => JSON.parse(script.textContent ?? '{}'))
+              .find((value) => value['@type'] === 'BlogPosting');
+            expect(article.headline).to.include('29.6%');
+            expect(article.description).to.include('29.6%');
+            expect(article.dateModified).to.equal('2026-10-25T00:00:00Z');
+          });
+          cy.get('article.prose a[href*="g_rundate=2026-05-20"]').each(($link) => {
+            expect($link.attr('href')).not.to.include('g_runid=');
+          });
+          cy.document().then((doc) => {
+            expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+          });
+        });
+      }
+    }
+  });
+
   describe('Blog listing page', () => {
     beforeEach(() => {
       cy.intercept(

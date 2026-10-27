@@ -237,6 +237,15 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
   });
 
+  it('keeps the OperatorX CDN tag and Blob subtree — results ingests do not change OperatorX', async () => {
+    mockBlobPurge.mockResolvedValue(0);
+
+    await purgeAll();
+
+    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/']);
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
+  });
+
   it('returns 0 when no blobs were deleted', async () => {
     mockBlobPurge.mockResolvedValue(0);
 

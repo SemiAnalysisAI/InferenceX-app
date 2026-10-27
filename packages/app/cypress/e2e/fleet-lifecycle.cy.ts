@@ -36,7 +36,7 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
 
 function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
   for (const [id, label] of [
-    ['fleet-cost', locale === 'zh' ? '成本供应商' : 'Cost Provider'],
+    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost Provider'],
     ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
   ]) {
     cy.get(`label[for="${id}"]`).should('have.text', label).click();
@@ -887,7 +887,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
   it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
     for (const [option, label] of [
       ['租赁 - 3 年承诺', '租赁设备 · 3 年承诺'],
-      ['自有 - 超大规模云大批量', '自有设备 · 超大规模云大批量'],
+      ['自有 · 超大规模云厂商批量采购', '自有设备 · 超大规模云厂商批量采购'],
     ]) {
       cy.get('[data-testid="fleet-cost-selector"]').click();
       cy.contains('[role="option"]', option).click();

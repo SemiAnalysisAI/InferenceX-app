@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { compileMDX } from 'next-mdx-remote/rsc';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
 import { compareBlogPair } from '../i18n/zh-objective-guard';
@@ -84,5 +86,27 @@ describe.each(enFiles)('%s', (file) => {
     ] as const) {
       expect(countMathFences(raw) % 2, `${locale}: unbalanced $$ fences`).toBe(0);
     }
+  });
+});
+
+describe('Chinese technical Markdown rendering', () => {
+  it('renders every multiplication factor in the workflow job calculation', async () => {
+    const source = read(path.join(ZH_DIR, 'inferencemax-open-source-inference-benchmarking.mdx'));
+    const paragraph = source.split('\n\n').find((block) => block.startsWith('具体来说：'));
+    expect(paragraph).toBeDefined();
+    const { content } = await compileMDX({ source: paragraph! });
+    const html = renderToStaticMarkup(content);
+    expect(html).toContain('3 * 7 * 3 * 2 * 4 * 4 = 2016');
+    expect(html).not.toContain('<em>');
+  });
+
+  it('preserves underscores and the wildcard in the SGLang optimization flag', async () => {
+    const source = read(path.join(ZH_DIR, 'mi355x-deepseek-v4-pro-sglang-110x-in-26-days.mdx'));
+    const paragraph = source
+      .split('\n')
+      .find((block) => block.startsWith('- **分支 → SGLang main 上游迁移。**'));
+    expect(paragraph).toBeDefined();
+    const { content } = await compileMDX({ source: paragraph! });
+    expect(renderToStaticMarkup(content)).toContain('<code>SGLANG_OPT_*</code>');
   });
 });

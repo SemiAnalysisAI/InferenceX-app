@@ -161,10 +161,21 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 
 export const GOOGLE_BLUE = '#4285F4';
 
+export const HUAWEI_CHART_PALETTE = {
+  colors: { light: '#946A00', dark: '#EBC04A' },
+  oklch: { start: 80, end: 100, chroma: { light: 0.14, dark: 0.16 } },
+  // iwanthue uses CIE Lab hue, not OKLCH.
+  lab: { hmin: 75, hmax: 100 },
+  reservedLab: { hmin: 60, hmax: 115 },
+} as const;
+
+export const HUAWEI_CHART_COLORS = HUAWEI_CHART_PALETTE.colors;
+
 export const VENDOR_OKLCH_ZONES: Record<
   string,
   { start: number; end: number; chroma: { light: number; dark: number } }
 > = {
+  huawei: HUAWEI_CHART_PALETTE.oklch,
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
   openai: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },

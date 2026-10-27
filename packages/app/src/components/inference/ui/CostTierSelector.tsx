@@ -44,7 +44,7 @@ const STRINGS = {
   zh: {
     costTier: '成本层级',
     costTierTooltip:
-      '成本类和每美元 token 数指标所依据的 $/芯片/小时 价格口径。InferenceX 公开自有（超大规模云大批量）与租赁 - 3 年承诺两档；更短租期的价格收录在 SemiAnalysis AI Cloud TCO 模型中。',
+      '成本类和每美元 token 数指标所依据的 $/芯片/小时 价格口径。InferenceX 公开“自有 · 超大规模云厂商批量采购”和“租赁 - 3 年承诺”两档；更短租期的价格收录在 SemiAnalysis AI Cloud TCO 模型中。',
   },
 } as const;
 

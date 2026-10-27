@@ -24,7 +24,7 @@ describe('ubenchx view', () => {
     expect(body.view).toBe('ubenchx');
     expect(body.apiVersion).toBe('v1');
     expect(body.test).toBe('all');
-    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance', 'tpc-skyline']);
+    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance', 'tpc-skyline', 'core-memory-profiles']);
     expect(body.memBw.gpus).toHaveLength(1);
     expect(body.smL2Distance.gpus.length).toBeGreaterThanOrEqual(1);
     expect(body.tpcSkyline.gpus).toHaveLength(Object.keys(TPC_SKYLINE_RUNS).length);
@@ -157,4 +157,99 @@ describe('ubenchx view', () => {
     const h200Last = h200Body.gpus[0].rows.at(-1);
     expect(h200Last.mbuPercent).toBeCloseTo((4305.39 / 4800) * 100, 4);
   });
+});
+
+it('returns the Ascend core profiles with raw timer units and leaves unavailable tests empty', async () => {
+  const response = await GET(request({ test: 'all', gpu: 'ascend 950pr_9579' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.memBw.gpus).toEqual([]);
+  expect(body.smL2Distance.gpus).toEqual([]);
+  expect(body.tpcSkyline.gpus).toEqual([]);
+  const run = body.coreMemoryProfiles.gpus[0];
+  expect(run.gpu).toBe('Ascend 950PR_9579');
+  expect(run.panels.map((panel: { coreIds: number[] }) => panel.coreIds.length)).toEqual([
+    28, 28, 56, 56,
+  ]);
+  expect(run.panels[0].unit).toBe('SYS_CNT ticks');
+  expect(run.panels[0].coreIds.slice(12, 16)).toEqual([14, 15, 54, 55]);
+  expect(run.panels[0].stats.withinDieGroupMean).toBeCloseTo(18.55499211685, 8);
+  expect(run.panels[0].stats.betweenDieGroupMean).toBeCloseTo(93.12987720723, 8);
+  expect(run.panels[0].matrix[0][14]).toBeCloseTo(96.70648193359, 8);
+  const onlyResponse = await GET(
+    request({ test: 'core-memory-profiles', gpu: 'Ascend 950PR_9579' }),
+  );
+  const only = await onlyResponse.json();
+  expect(only.gpus).toEqual(body.coreMemoryProfiles.gpus);
+  const missing = await GET(request({ test: 'core-memory-profiles', gpu: 'H100 SXM' }));
+  expect(missing.status).toBe(400);
+});
+
+it('combines both hardware profiles without converting or pooling their units', async () => {
+  const response = await GET(request({ test: 'core-memory-profiles' }));
+  const body = await response.json();
+  expect(body.params).toEqual({ test: 'core-memory-profiles', gpu: 'all' });
+  expect(body.gpus.map((run: { gpu: string }) => run.gpu)).toEqual([
+    'Ascend 950PR_9579',
+    'B200 SXM',
+  ]);
+  const b200 = body.gpus[1];
+  expect(b200).toMatchObject(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
+  expect(b200.unit).toBe('clock64 cycles');
+  expect(b200.colorLimits).toEqual([0, b200.stats.max]);
+  expect(body.gpus[0].panels[0].unit).toBe('SYS_CNT ticks');
+  const filteredResponse = await GET(request({ test: 'core-memory-profiles', gpu: 'b200 sxm' }));
+  const filtered = await filteredResponse.json();
+  expect(filtered.params.gpu).toBe('B200 SXM');
+  expect(filtered.gpus).toEqual([b200]);
+  const allResponse = await GET(request({ test: 'all', gpu: 'B200 SXM' }));
+  const all = await allResponse.json();
+  expect(all.coreMemoryProfiles.gpus).toEqual([b200]);
+  const legacyResponse = await GET(request({ test: 'sm-l2-distance', gpu: 'B200 SXM' }));
+  const legacy = await legacyResponse.json();
+  expect(legacy.gpus[0]).toEqual(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
+});
+
+it('exposes Huawei rotating-copy evidence without inventing missing tests or sizes', async () => {
+  const response = await GET(request({ test: 'all', gpu: 'huawei 950pr' }));
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  const run = body.memBw.gpus[0];
+  expect(run.gpu).toBe('Huawei 950PR');
+  expect(run.peakBandwidthGbps).toBe(1600);
+  expect(run.peakBandwidthSource).toContain('not independently verified');
+  expect(run.metadata).toMatchObject({
+    protocol: 'rotating-pool-npu-graph',
+    dtype: 'float16',
+    missingSizesBytes: [],
+  });
+  expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
+  const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
+  expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
+  expect(endpoint.mbuPercent).toBeCloseTo(90.45459740350728, 6);
+  expect(endpoint.observations).toBe(360);
+  expect(body.smL2Distance.gpus).toEqual([]);
+  expect(body.tpcSkyline.gpus).toEqual([]);
+});
+
+it('preserves full-precision Huawei bandwidth arithmetic and API/UI normalization', async () => {
+  for (const gpu of ['Huawei 950PR']) {
+    const response = await GET(request({ test: 'mem-bw', gpu }));
+    const body = await response.json();
+    const run = body.gpus[0];
+    expect(run).toEqual(transformUbenchxRun(gpu, UBENCHX_RUNS[gpu]));
+    for (const row of run.rows) {
+      expect(row.bandwidthGbps).toBeCloseTo((2 * row.bytes) / row.timeMs / 1e6, 6);
+      expect(row.bandwidthP10Gbps).toBeLessThanOrEqual(row.bandwidthGbps);
+      expect(row.bandwidthP90Gbps).toBeGreaterThanOrEqual(row.bandwidthGbps);
+    }
+  }
+});
+
+it('does not expose the removed 910B3 bandwidth series', async () => {
+  const all = await GET(request({ test: 'mem-bw', gpu: 'all' }));
+  const body = await all.json();
+  expect(body.gpus.some((run: { gpu: string }) => run.gpu === 'Ascend 910B3')).toBe(false);
+  const removed = await GET(request({ test: 'mem-bw', gpu: 'Ascend 910B3' }));
+  expect(removed.status).toBe(400);
 });

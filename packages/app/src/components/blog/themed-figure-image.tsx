@@ -2,9 +2,10 @@
 
 import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes/themes';
+import { isDarkTheme, LIGHT_THEMES } from '@/lib/themes/themes';
 
-const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=document.documentElement.classList.contains('light'),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
+// Pre-hydration copy of LIGHT_THEMES; a static literal so no value is spliced into script source.
+const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=['light','excalidraw'].some((c)=>document.documentElement.classList.contains(c)),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
 
 const subscribeClient = () => () => {};
 const getClientSnapshot = () => true;
@@ -29,7 +30,9 @@ export function ThemedFigureImage({
   const isClient = useSyncExternalStore(subscribeClient, getClientSnapshot, getServerSnapshot);
   const clientTheme =
     resolvedTheme ??
-    (isClient && document.documentElement.classList.contains('light') ? 'light' : 'dark');
+    (isClient && LIGHT_THEMES.some((theme) => document.documentElement.classList.contains(theme))
+      ? 'light'
+      : 'dark');
   const src = isClient ? (isDarkTheme(clientTheme) ? srcDark : srcLight) : undefined;
 
   return (

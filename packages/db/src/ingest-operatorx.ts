@@ -106,7 +106,15 @@ function checkRepo(repo: string): string {
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
+  const replaceIndex = process.argv.indexOf('--replace-run');
+  const replaceRunKey = replaceIndex === -1 ? undefined : process.argv[replaceIndex + 1];
+  if (
+    replaceIndex !== -1 &&
+    (mode !== '--bundle' || !replaceRunKey || replaceRunKey.startsWith('--'))
+  )
+    throw new Error('--replace-run requires --bundle and an existing run key');
   const args = process.argv.slice(3).filter((a) => !a.startsWith('--'));
+  if (replaceRunKey) args.splice(args.indexOf(replaceRunKey), 1);
   const bundles: OperatorXRawBundle[] = [];
   let tempDir: string | null = null;
   try {
@@ -134,8 +142,10 @@ async function main(): Promise<void> {
       onnotice: () => {},
     });
     try {
+      if (replaceRunKey && bundles.length !== 1)
+        throw new Error('--replace-run requires exactly one bundle');
       for (const bundle of bundles) {
-        const { docs, results } = await saveOperatorXBundle(sql, bundle);
+        const { docs, results } = await saveOperatorXBundle(sql, bundle, replaceRunKey);
         console.log(
           `  stored run ${bundle.run.run_id}: ${bundle.shards.length} shards, ${docs} docs, ${results} results`,
         );

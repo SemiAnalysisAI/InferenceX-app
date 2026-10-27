@@ -1,0 +1,106 @@
+/* Everything in this file is loaded only after the optional theme is selected. */
+html.orange-chicken:not([data-inferencex-embed]) {
+  color-scheme: light;
+  --background: #fff8ed;
+  --card: #fffcf6;
+  --popover: #fffcf6;
+  --primary: #ad360e;
+  --primary-foreground: #fffaf2;
+  --brand: var(--primary);
+  --muted: #f1e5d3;
+  --accent: #f8e6cc;
+  --border: #a58b6e;
+  --border-alt: #e4cfaf;
+  --input: #a58b6e;
+  --ring: #9b3510;
+}
+
+html.orange-chicken:not([data-inferencex-embed]) :is(.circuit-bg, .autumn-leaves) {
+  display: none;
+}
+
+.orange-chicken-theme-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1rem 1.5rem;
+  overflow: hidden;
+  border: 1px solid #d8b68a;
+  border-radius: var(--radius);
+  background: #fff0d8;
+  color: #54260f;
+}
+
+.orange-chicken-banner-art {
+  flex: 0 0 auto;
+  width: 15rem;
+  height: 9rem;
+  pointer-events: none;
+}
+
+.orange-chicken-marker {
+  display: none;
+  pointer-events: none;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-orange-chicken-eligible='true']
+  .orange-chicken-marker {
+  display: inline;
+}
+
+/* Opacity leaves the original precision shape and its pointer geometry intact.
+   Scope to decorated points, so an unloaded/failed theme never hides chart data. */
+html.orange-chicken:not([data-inferencex-embed])
+  [data-orange-chicken-eligible='true']
+  [data-orange-chicken-decorated]
+  > .visible-shape {
+  opacity: 0;
+}
+
+html.orange-chicken:not([data-inferencex-embed])
+  [data-orange-chicken-decorated]:hover
+  > .orange-chicken-marker {
+  transform: scale(1.15);
+}
+
+html:not(.orange-chicken) [data-testid='orange-chicken-theme-banner'],
+html[data-inferencex-embed] [data-testid='orange-chicken-theme-banner'] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .orange-chicken-theme-banner {
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .orange-chicken-banner-art {
+    width: 6rem;
+    height: 5rem;
+  }
+}
+
+@media (forced-colors: active) {
+  html.orange-chicken:not([data-inferencex-embed])
+    [data-orange-chicken-eligible='true']
+    .orange-chicken-marker,
+  .orange-chicken-banner-art {
+    display: none;
+  }
+
+  html.orange-chicken:not([data-inferencex-embed])
+    [data-orange-chicken-eligible='true']
+    [data-orange-chicken-decorated]
+    > .visible-shape {
+    opacity: 1;
+  }
+
+  .orange-chicken-theme-banner {
+    border-color: CanvasText;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

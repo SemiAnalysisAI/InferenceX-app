@@ -132,8 +132,10 @@ describe('profitTargetUrlValue', () => {
   });
 
   it("compares against the selected model's default, not a global one", () => {
-    expect(profitTargetUrlValue(Model.DeepSeek_V4_Pro, 35)).toBe('');
-    expect(profitTargetUrlValue(Model.Kimi_K3, 35)).toBe('35');
+    expect(profitTargetUrlValue(Model.DeepSeek_V4_Pro, 170)).toBe('');
+    expect(profitTargetUrlValue(Model.Kimi_K3, 170)).toBe('170');
+    expect(profitTargetUrlValue(Model.Kimi_K3, 60)).toBe('');
+    expect(profitTargetUrlValue(Model.DeepSeek_V4_Pro, 60)).toBe('60');
   });
 
   it('never writes a non-positive or non-finite target', () => {

@@ -5,7 +5,7 @@ description: Author an InferenceX benchmark blog post in MDX. Codifies the struc
 
 # Writing an InferenceX blog post
 
-InferenceX blog posts are short, evidence-dense technical writeups that anchor a single headline number (e.g. "1.41x cheaper", "3.13x throughput", "7.7x peak throughput in 25 days") to (a) a Pareto chart from the live dashboard, (b) verified per-concurrency tables, and (c) the upstream PR that drove the change.
+InferenceX blog posts are short, evidence-dense technical writeups that anchor a single headline number (e.g. "29.6% lower cost", "3.13x throughput", "7.7x peak throughput in 25 days") to (a) a Pareto chart from the live dashboard, (b) verified per-concurrency tables, and (c) the upstream PR that drove the change.
 
 Posts live at `packages/app/content/blog/{slug}.mdx`. Images live at `packages/app/public/images/{slug}/`. The slug matches the MDX filename without `.mdx`.
 
@@ -38,6 +38,7 @@ Common gotchas:
 - **Model spec verification**: never invent parameter counts. Always `WebSearch` the model's released specs (total params, active params, expert count, attention type) before writing the architecture paragraph. Cite sources. GLM-5 is _not_ GLM-4.5 — the numbers changed.
 - **TCO values**: use the dashboard's [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) rates, `costh` (owning at hyperscaler volume) in `HW_REGISTRY` (`packages/constants/src/gpu-keys.ts`), so table costs match the chart.
 - **Cost per million tokens formula**: `$/M tok = TCO_$/GPU/hr * 1e6 / (3600 * tput_per_gpu)`. Equivalently in Python: `cost = tco / (3600 * tput / 1e6)`. Throughput is per-GPU, so GPU count cancels out for aggregated configs.
+- **Ratios and reductions have different denominators.** For cost ratio `r = reference cost / candidate cost`, candidate cost saving is `1 - 1/r`, not `r - 1`. Compute ratios and savings from unrounded costs. A 1.421x cost ratio is about 29.6% lower cost; it is not a 42.1% reduction.
 - **Bandwidth units — keep uni-di vs bi-di and GB/s vs Gbit/s consistent.** This is the single most common factor-of-two or factor-of-eight error in scale-up vs scale-out comparisons, and Cursor Bugbot will catch it. NVLink 5 per-GPU is **900 GB/s uni-directional** (1.8 TB/s bi-directional). ConnectX-7 InfiniBand / RoCEv2 Ethernet per-GPU is **400 Gbit/s = 50 GB/s uni-directional** (100 GB/s bi-di). The NVLink-to-IB/RoCE ratio is **18x in either direction**, not 36x. A previous post (gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200.mdx) shipped with 36x because it compared NVLink bi-di against IB uni-di — flag this if you encounter it in older posts. House rule for new posts: always state "uni-directional" or "uni-di" explicitly, and convert Gbit/s to GB/s in the same sentence so readers can audit the math.
 
 ### Iso-interactivity interpolation — match the chart, not your shell script
@@ -100,7 +101,7 @@ Sections, in order:
 
 Lead with the headline number and the workload, both in the first sentence:
 
-> "14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across the entire single-node Pareto frontier on the 8k/1k workload. The peak gap is **1.41x at 18 tok/s/user with MTP** ($0.30/M on B200 vs $0.22/M on MI355X — a 40% reduction)..."
+> "14 weeks after GLM-5's release, AMD MI355X SGLang FP8 undercuts NVIDIA B200 SGLang FP8 on cost per million tokens across much of the shared single-node operating range on the 8k/1k workload. The largest interpolated saving is **about 29.6% near 24.3 tok/s/user with MTP** ($0.3388/M on B200 vs $0.2384/M on MI355X; B200 / MI355X cost is 1.421x)..."
 
 Bold the peak ratio in the lede. Second paragraph: name the upstream PRs that made it happen, then end with a short framing line ("Speed is the moat.", "Software is the moat.", etc.) if it fits — don't force it.
 
