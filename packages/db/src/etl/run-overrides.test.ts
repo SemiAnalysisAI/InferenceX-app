@@ -715,6 +715,16 @@ describe('isRunAttemptPurged', () => {
     }
   });
 
+  it('purges every attempt of the Klaud Cold partial re-sweeps that replaced full curves', () => {
+    for (const runId of [40316025285, 40054839636, 40279236382]) {
+      for (const attempt of [undefined, 1, 2]) {
+        expect(isRunAttemptPurged(runId, attempt)).toBe(true);
+        expect(isRunAttemptPurged(runId - 1, attempt)).toBe(false);
+        expect(isRunAttemptPurged(runId + 1, attempt)).toBe(false);
+      }
+    }
+  });
+
   it('returns true for runs in PURGED_RUNS regardless of attempt', () => {
     const [first] = PURGED_RUNS;
     if (first === undefined) return;
