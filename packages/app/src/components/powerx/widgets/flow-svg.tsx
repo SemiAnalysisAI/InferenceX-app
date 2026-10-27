@@ -3,11 +3,6 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import { inViewAttr, motionVars } from './motion';
 
-/**
- * The measurement-to-model flow as one pure SVG, so the page can mount it live and a script can
- * export the same drawing to `public/images/powerx-tutorial/widgets/flow.svg` for GitHub.
- */
-
 export const FLOW_NODES = [
   'exporter',
   'window',
@@ -90,36 +85,18 @@ export const FLOW_STRINGS = {
   },
 } as const;
 
-export interface FlowPalette {
-  brand: string;
-  foreground: string;
-  background: string;
-  muted: string;
-  /** When set, a filled background rect is drawn (for the static export). */
-  canvas?: string;
-}
-
-export const LIVE_PALETTE: FlowPalette = {
+const COLOR = {
   brand: 'var(--brand)',
   foreground: 'var(--foreground)',
   background: 'var(--background)',
   muted: 'var(--muted-foreground)',
-};
-
-export const STATIC_PALETTE: FlowPalette = {
-  brand: '#0b86d1',
-  foreground: '#131416',
-  background: '#ffffff',
-  muted: '#52525b',
-  canvas: '#ffffff',
-};
+} as const;
 
 const MAIN: FlowNode[] = ['exporter', 'window', 'gpu', 'model', 'it', 'pue', 'facility'];
 
 /**
  * The in-view sequence: each main node lights up 90 ms after the one before it, the arrow to
- * the next node draws just behind it, and the energy branch comes last. Only the live page
- * passes `motion`; the static export keeps markers and no data attributes.
+ * the next node draws just behind it, and the energy branch comes last.
  */
 export const FLOW_MOTION = {
   stepMs: 90,
@@ -187,33 +164,31 @@ export interface FlowSvgProps {
   locale: Locale;
   width: number;
   orientation: 'horizontal' | 'vertical';
-  palette: FlowPalette;
-  active: FlowNode | null;
-  onActivate?: (node: FlowNode) => void;
-  onSelect?: (node: FlowNode) => void;
+  active: FlowNode;
+  onActivate: (node: FlowNode) => void;
+  onSelect: (node: FlowNode) => void;
   /** The id prefix for the description the nodes point at. */
-  describedBy?: string;
-  /** Live page only: nodes and arrows reveal in sequence once `inView` turns true. */
-  motion?: { inView: boolean };
+  describedBy: string;
+  /** Nodes and arrows reveal in sequence once this turns true. */
+  inView: boolean;
 }
 
 export function FlowSvg({
   locale,
   width,
   orientation,
-  palette,
   active,
   onActivate,
   onSelect,
   describedBy,
-  motion,
+  inView,
 }: FlowSvgProps) {
   const t = FLOW_STRINGS[locale];
   const { boxes, height } = flowLayout(width, orientation);
   const edges: [FlowNode, FlowNode][] = [];
   for (let index = 1; index < MAIN.length; index++) edges.push([MAIN[index - 1], MAIN[index]]);
-  const inView = motion ? inViewAttr(motion.inView) : undefined;
-  const delays = motion ? flowDelays() : null;
+  const inViewData = inViewAttr(inView);
+  const delays = flowDelays();
   const edgeDirection = orientation === 'horizontal' ? 'right' : 'down';
 
   function edgePath(a: Box, b: Box): string {
@@ -248,124 +223,86 @@ export function FlowSvg({
       fontFamily="inherit"
       style={{ display: 'block', overflow: 'visible' }}
     >
-      {palette.canvas && (
-        <rect x={-8} y={-8} width={width + 16} height={height + 16} fill={palette.canvas} />
-      )}
-      <defs>
-        <marker
-          id="powerx-flow-arrow"
-          viewBox="0 0 8 8"
-          refX="7"
-          refY="4"
-          markerWidth="7"
-          markerHeight="7"
-          orient="auto-start-reverse"
-        >
-          <path d="M0,0.5 L7,4 L0,7.5" fill="none" stroke={palette.muted} strokeWidth="1.25" />
-        </marker>
-      </defs>
-      {edges.map(([a, b], index) =>
-        delays ? (
-          <g key={`${a}-${b}`}>
-            <path
-              d={edgePath(boxes[a], boxes[b])}
-              pathLength={1}
-              fill="none"
-              stroke={palette.muted}
-              strokeWidth={1.25}
-              data-draw=""
-              data-inview={inView}
-              style={motionVars({ delayMs: delays.edge[index], drawMs: FLOW_MOTION.edgeMs })}
-            />
-            <path
-              d={arrowHead(...edgeEnd(boxes[b]), edgeDirection)}
-              fill="none"
-              stroke={palette.muted}
-              strokeWidth={1.25}
-              data-fade=""
-              data-inview={inView}
-              style={motionVars({
-                delayMs: delays.edge[index] + FLOW_MOTION.edgeMs - 120,
-                fadeMs: FLOW_MOTION.headMs,
-              })}
-            />
-          </g>
-        ) : (
+      {edges.map(([a, b], index) => (
+        <g key={`${a}-${b}`}>
           <path
-            key={`${a}-${b}`}
             d={edgePath(boxes[a], boxes[b])}
-            fill="none"
-            stroke={palette.muted}
-            strokeWidth={1.25}
-            markerEnd="url(#powerx-flow-arrow)"
-          />
-        ),
-      )}
-      {delays ? (
-        <g>
-          <path
-            d={branch}
             pathLength={1}
             fill="none"
-            stroke={palette.muted}
+            stroke={COLOR.muted}
             strokeWidth={1.25}
             data-draw=""
-            data-inview={inView}
-            style={motionVars({ delayMs: delays.branch, drawMs: FLOW_MOTION.branchMs })}
+            data-inview={inViewData}
+            style={motionVars({ delayMs: delays.edge[index], drawMs: FLOW_MOTION.edgeMs })}
           />
           <path
-            d={arrowHead(...branchEnd, 'down')}
+            d={arrowHead(...edgeEnd(boxes[b]), edgeDirection)}
             fill="none"
-            stroke={palette.muted}
+            stroke={COLOR.muted}
             strokeWidth={1.25}
             data-fade=""
-            data-inview={inView}
+            data-inview={inViewData}
             style={motionVars({
-              delayMs: delays.branch + FLOW_MOTION.branchMs - 120,
+              delayMs: delays.edge[index] + FLOW_MOTION.edgeMs - 120,
               fadeMs: FLOW_MOTION.headMs,
             })}
           />
         </g>
-      ) : (
+      ))}
+      <g>
         <path
           d={branch}
+          pathLength={1}
           fill="none"
-          stroke={palette.muted}
+          stroke={COLOR.muted}
           strokeWidth={1.25}
-          markerEnd="url(#powerx-flow-arrow)"
+          data-draw=""
+          data-inview={inViewData}
+          style={motionVars({ delayMs: delays.branch, drawMs: FLOW_MOTION.branchMs })}
         />
-      )}
+        <path
+          d={arrowHead(...branchEnd, 'down')}
+          fill="none"
+          stroke={COLOR.muted}
+          strokeWidth={1.25}
+          data-fade=""
+          data-inview={inViewData}
+          style={motionVars({
+            delayMs: delays.branch + FLOW_MOTION.branchMs - 120,
+            fadeMs: FLOW_MOTION.headMs,
+          })}
+        />
+      </g>
       {FLOW_NODES.map((node) => {
         const box = boxes[node];
         const kind = FLOW_PROVENANCE[node];
         const isActive = active === node;
         const [title, sub] = t.nodes[node];
-        const textColor = kind === 'measured' ? palette.background : palette.foreground;
-        const interactive = Boolean(onActivate || onSelect);
+        const textColor = kind === 'measured' ? COLOR.background : COLOR.foreground;
         return (
           <g
             key={node}
             data-node={node}
             data-active={isActive || undefined}
-            tabIndex={interactive ? 0 : undefined}
-            role={interactive ? 'button' : undefined}
-            aria-pressed={interactive ? isActive : undefined}
+            tabIndex={0}
+            role="button"
+            aria-pressed={isActive}
             aria-describedby={describedBy}
-            data-fade={delays ? '' : undefined}
-            data-inview={inView}
-            onMouseEnter={() => onActivate?.(node)}
-            onFocus={() => onActivate?.(node)}
-            onClick={() => onSelect?.(node)}
+            data-fade=""
+            data-inview={inViewData}
+            onMouseEnter={() => onActivate(node)}
+            onFocus={() => onActivate(node)}
+            onClick={() => onSelect(node)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                onSelect?.(node);
+                onSelect(node);
               }
             }}
             style={{
-              cursor: interactive ? 'pointer' : undefined,
+              cursor: 'pointer',
               outline: 'none',
-              ...(delays ? motionVars({ delayMs: delays[node], fadeMs: FLOW_MOTION.nodeMs }) : {}),
+              ...motionVars({ delayMs: delays[node], fadeMs: FLOW_MOTION.nodeMs }),
             }}
           >
             <rect
@@ -374,11 +311,9 @@ export function FlowSvg({
               width={box.w - 1.5}
               height={box.h - 1.5}
               rx={6}
-              fill={
-                kind === 'measured' ? palette.brand : kind === 'modeled' ? palette.brand : 'none'
-              }
+              fill={kind === 'measured' ? COLOR.brand : kind === 'modeled' ? COLOR.brand : 'none'}
               fillOpacity={kind === 'measured' ? 1 : kind === 'modeled' ? 0.12 : 0}
-              stroke={kind === 'rated' ? palette.muted : palette.brand}
+              stroke={kind === 'rated' ? COLOR.muted : COLOR.brand}
               strokeWidth={isActive ? 2.25 : 1.5}
               strokeDasharray={kind === 'rated' ? '5 3' : undefined}
             />

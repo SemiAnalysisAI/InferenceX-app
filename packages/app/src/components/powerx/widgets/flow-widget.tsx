@@ -5,7 +5,7 @@ import { useId, useState } from 'react';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { track } from '@/lib/analytics/analytics';
 
-import { DEFAULT_FLOW_NODE, FLOW_STRINGS, type FlowNode, FlowSvg, LIVE_PALETTE } from './flow-svg';
+import { DEFAULT_FLOW_NODE, FLOW_STRINGS, type FlowNode, FlowSvg } from './flow-svg';
 import { useInView } from './motion';
 import { GrammarLegend, WidgetFrame, type WidgetProps } from './widget-chrome';
 
@@ -30,7 +30,6 @@ export function FlowWidget({ locale, alt }: WidgetProps) {
               locale={locale}
               width={width}
               orientation={width < VERTICAL_BELOW_PX ? 'vertical' : 'horizontal'}
-              palette={LIVE_PALETTE}
               active={active}
               onActivate={setHovered}
               onSelect={(node) => {
@@ -38,7 +37,7 @@ export function FlowWidget({ locale, alt }: WidgetProps) {
                 track('powerx_tutorial_flow_node', { value: node });
               }}
               describedBy={captionId}
-              motion={{ inView }}
+              inView={inView}
             />
           </div>
         )}
