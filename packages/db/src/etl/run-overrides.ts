@@ -94,6 +94,9 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
   34819961093, // 2026-09-19 | Reason: sibling of 34819578354 — this kimik3-fp4-h200-vllm-agentic-simple sweep (PR #3054, feat/kimik3-h200-simple-power) carries only the TP8/EP32/DPA offload=on arm (c8-c32, 13 points). Once 34819578354 was purged it became the latest H200 Kimi-K3 curve and kept hiding the three-arm 2026-09-13 set (35 points: TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Same vllm/vllm-openai:kimi-k3 image and recipe as the arm it duplicates, so no coverage is lost; re-ingest once the full H200 curve set is collected with measured power
   40065869885, // 2026-10-25 | Reason: Uses skip indexer
+  40316025285, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4515) ingested without append-only, replacing the full curve with three disagg points
+  40054839636, // 2026-10-27 | GLM-5.2 FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4449) ingested without append-only, replacing the full curve with two agg points
+  40279236382, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4529) ingested without append-only, replacing the full curve
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
