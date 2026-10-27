@@ -99,6 +99,9 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   40279236382, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4529) ingested without append-only, replacing the full curve
   40185235651, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4497) ingested without append-only, replacing the full curve
   38953283564, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4196) ingested without append-only. Once 40279236382 was purged it became the latest curve and kept hiding the 8-point agg+disagg 2026-10-12 set (PR #3701)
+  38960572895, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4203) ingested without append-only, hiding the 6-point agg+disagg 2026-09-22 set (PR #3257)
+  38925477096, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4176) ingested without append-only; would become the latest curve once 38960572895 is purged and keep hiding the 2026-09-22 set (PR #3257)
+  39339355047, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 H100 SGLang AgentX | Reason: Klaud Cold image-update partial re-sweep (PR #4324) ingested without append-only, replacing the 10-point 2026-09-24 curve (PR #3345) with four points
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
