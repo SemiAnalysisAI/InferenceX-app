@@ -78,6 +78,29 @@ describe('GET /api/v1/views/options', () => {
     expect(agentic.isl).toBeNull();
   });
 
+  it('returns default models in selector order without changing the selected default', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(
+      body.models
+        .filter((model: { category: string }) => model.category === 'default')
+        .map((model: { name: string }) => model.name),
+    ).toEqual([
+      'Kimi-K3',
+      'DeepSeek-V4.1-Flash',
+      'GLM-5.2',
+      'MiniMax-M3.1-Flash',
+      'Muse-Spark-Open',
+      'DeepSeek-V4-Pro',
+      'Qwen-3.5-397B-A17B',
+      'Qwen3.8-Flash-Next',
+    ]);
+    expect(body.defaults.model).toBe('DeepSeek-V4-Pro');
+    expect(body.models.some((model: { category: string }) => model.category === 'hidden')).toBe(
+      false,
+    );
+  });
+
   it('describes hardware and metrics from the registries', async () => {
     const bodyRes = await GET(request('/api/v1/views/options'));
     const body = await bodyRes.json();
