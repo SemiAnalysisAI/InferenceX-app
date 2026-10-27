@@ -161,7 +161,13 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   badge row's outline-badge style): IT W/GPU,
   GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
   pinned point (`PowerXSurfaceProvider` active-point context, fed by `ScatterGraph`), or the
-  point nearest 80 tok/s/user.
+  point nearest 80 tok/s/user. On a coarse pointer the chart has no hover tooltip: a finger
+  dragged across the plot snaps to the nearest visible point, official or `?unofficialrun=`
+  overlay under the current zoom (`nearestScrubCandidate`, the `powerx-scrub` layer: a rule
+  plus a ring in the chip or run colour), and the row leads with the chart's own y value
+  (`yMetric`, formatted as the tooltip would) for it (`source: 'scrub'`, which replaces a
+  pinned point and survives the compat hover end a tap synthesises); a tap on a point still
+  opens the point sheet as before.
 - **Where the power goes** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip

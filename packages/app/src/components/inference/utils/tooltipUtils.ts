@@ -357,6 +357,9 @@ const WATT_METRICS = new Set([
 const fmtY = (value: number, metric: string): string =>
   WATT_METRICS.has(metric) && Number.isFinite(value) ? fmtWatts(value) : fmt(value);
 
+/** A point's y value as the tooltip prints it for the metric (watts get their own format). */
+export const formatMetricValue = fmtY;
+
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,

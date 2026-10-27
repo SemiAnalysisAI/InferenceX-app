@@ -8,18 +8,19 @@ const MODEL = 'dsv4';
 const DATE = '2026-09-01';
 const COARSE_POINTER_QUERY = '(hover: none) and (pointer: coarse)';
 
-// Four concurrencies per chip, interactivity falling with load; two chips so the rows,
-// the slider and the per-chip pin all have something to read.
-const CONFIGS: [number, number, number][] = [
-  [256, 20, 760],
-  [64, 45, 640],
-  [16, 90, 500],
-  [4, 180, 380],
+// Four concurrencies per chip, interactivity falling with load and J per token rising
+// with it, so every point sits on the Energy view's frontier; two chips so the rows, the
+// slider and the per-chip pin all have something to read.
+const CONFIGS: [number, number, number, number][] = [
+  [256, 20, 760, 1],
+  [64, 45, 640, 1.4],
+  [16, 90, 500, 1.9],
+  [4, 180, 380, 2.6],
 ];
 
 let rowId = 980000;
 const scrubRows = (hardware: 'b200' | 'h200', wattsScale: number) =>
-  CONFIGS.map(([conc, intvty, watts]) => ({
+  CONFIGS.map(([conc, intvty, watts, joules]) => ({
     id: rowId++,
     hardware,
     framework: 'sglang',
@@ -50,8 +51,8 @@ const scrubRows = (hardware: 'b200' | 'h200', wattsScale: number) =>
       power_metric_schema_version: 2,
       avg_power_w: watts * wattsScale,
       avg_total_gpu_power_w: watts * wattsScale * 8,
-      joules_per_output_token: 2,
-      joules_per_input_token: 0.25,
+      joules_per_output_token: joules,
+      joules_per_input_token: joules / 8,
     },
     workers: null,
     date: DATE,
@@ -244,5 +245,63 @@ describe('PowerX touch scrub on a phone', () => {
     cy.document().then((document) => {
       expect(document.documentElement.scrollWidth).to.be.at.most(390);
     });
+  });
+
+  it('scrubs the main chart into the PowerX readout and keeps the tap for the point sheet', () => {
+    visit('');
+    cy.get('[data-testid="scatter-graph"] svg[data-testid="d3-chart-svg"]').should('exist');
+    cy.get('[data-testid="powerx-readout"]')
+      .should('have.attr', 'data-source', 'nearest')
+      .find('[data-testid="powerx-readout-source"]')
+      .should('have.text', 'Near 80 tok/s/user · drag across the chart to change');
+    cy.get('[data-testid="powerx-readout-y"]').should('contain.text', 'J');
+    // A finger lands near the c4 point (the rightmost, 180 tok/s/user) and sweeps left.
+    cy.get('[data-testid="scatter-graph"] .dot-group[data-hw-key="b200_sglang"]')
+      .should('have.length', 4)
+      .each(($dot) => {
+        expect($dot[0].style.opacity).not.to.eq('0');
+      });
+    // A finger lands beside the chip's rightmost point (c4) and sweeps to its leftmost
+    // (c256), following the frontier; the mark snaps to the point nearest the finger.
+    cy.get(
+      '[data-testid="scatter-graph"] .dot-group[data-hw-key="b200_sglang"] .visible-shape',
+    ).then(($shapes) => {
+      const centres = [...$shapes]
+        .map((shape) => {
+          const box = shape.getBoundingClientRect();
+          return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+        })
+        .toSorted((a, b) => a.x - b.x);
+      const right = centres.at(-1)!;
+      const left = centres[0];
+      expect(right.x - left.x).to.be.greaterThan(80);
+      cy.window().then((win) => {
+        const before = win.scrollY;
+        cy.get('[data-testid="scatter-graph"] svg[data-testid="d3-chart-svg"]').as('plot');
+        cy.get('@plot').trigger('pointerdown', finger('pointerdown', right.x + 12, right.y + 6));
+        cy.get('[data-testid="powerx-scrub"]').should('have.attr', 'data-conc', '4');
+        cy.get('[data-testid="powerx-readout"]').should('have.attr', 'data-source', 'scrub');
+        cy.get('[data-testid="powerx-readout-source"]').should(
+          'have.text',
+          'Point under your finger · tap it for details',
+        );
+        cy.get('[data-testid="powerx-readout"]').should('contain.text', 'c4 ·');
+        cy.get('@plot').trigger('pointermove', finger('pointermove', left.x - 8, left.y + 4));
+        cy.get('[data-testid="powerx-scrub"]').should('have.attr', 'data-conc', '256');
+        cy.get('[data-testid="powerx-readout"]').should('contain.text', 'c256 ·');
+        cy.get('@plot').trigger('pointerup', finger('pointerup', left.x - 8, left.y + 4));
+        cy.window().its('scrollY').should('eq', before);
+      });
+    });
+    // The scrub opened no tooltip or sheet.
+    cy.get('[data-chart-tooltip][data-sheet="true"]').should('not.exist');
+    // A tap on a point still opens the provenance sheet, as before.
+    cy.get('[data-testid="scatter-graph"] .dot-group[data-hw-key="b200_sglang"]')
+      .first()
+      .find('circle')
+      .first()
+      .click({ force: true });
+    cy.get('[data-chart-tooltip][data-sheet="true"]').should('be.visible');
+    cy.get('[data-testid="powerx-readout"]').should('have.attr', 'data-source', 'pinned');
   });
 });

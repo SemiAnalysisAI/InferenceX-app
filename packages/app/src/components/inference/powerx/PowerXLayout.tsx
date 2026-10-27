@@ -8,7 +8,7 @@ import { powerCompareAvailable } from '@/components/inference/utils/power-compar
 import { Badge } from '@/components/ui/badge';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -91,7 +91,9 @@ const STRINGS = {
       noModel: 'No IT model for this setup yet',
       pinned: 'Pinned point',
       hovered: 'Hovered point',
+      scrubbed: 'Point under your finger · tap it for details',
       nearest: (x: string) => `Near ${x} tok/s/user · hover a point to change`,
+      nearestTouch: (x: string) => `Near ${x} tok/s/user · drag across the chart to change`,
       at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     },
     includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
@@ -162,7 +164,9 @@ const STRINGS = {
       noModel: '该配置暂无 IT 功耗模型',
       pinned: '已固定的数据点',
       hovered: '悬停的数据点',
+      scrubbed: '手指所在的数据点 · 点按可查看详情',
       nearest: (x: string) => `接近 ${x} tok/s/user · 悬停数据点可切换`,
+      nearestTouch: (x: string) => `接近 ${x} tok/s/user · 在图上拖动可切换`,
       at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     },
     includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
@@ -584,15 +588,30 @@ function ReadoutBadge({ children, testId }: { children: ReactNode; testId: strin
   );
 }
 
+/** The chart's y metric, so the touch readout can state the value a tooltip would. */
+export interface PowerXReadoutMetric {
+  label: string;
+  value: (point: InferenceData) => string;
+}
+
 /**
  * The readout row under the chart caption, in the TCO badge row's style: IT W
  * per GPU, GPUs per MW and the facility figure for the hovered or pinned point
- * (or the point nearest 80 tok/s/user).
+ * (or the point nearest 80 tok/s/user). On a coarse pointer the chart has no
+ * hover tooltip: a finger dragged across it scrubs the nearest point into this
+ * row, which then leads with the chart's own y value.
  */
-export function PowerXReadout({ points }: { points: readonly InferenceData[] }) {
+export function PowerXReadout({
+  points,
+  yMetric,
+}: {
+  points: readonly InferenceData[];
+  yMetric?: PowerXReadoutMetric;
+}) {
   const locale = useLocale();
   const t = STRINGS[locale].readout;
   const active = usePowerXActivePoint();
+  const touch = useIsCoarsePointer();
   const point = active?.point ?? defaultReadoutPoint(points);
   if (!point) return null;
   const it = point.itModeledWatts?.y ?? modeledItWattsPerGpu(point);
@@ -604,20 +623,31 @@ export function PowerXReadout({ points }: { points: readonly InferenceData[] }) 
   const source =
     active?.source === 'pinned'
       ? t.pinned
-      : active?.source === 'hover'
-        ? t.hovered
-        : t.nearest(String(READOUT_INTERACTIVITY));
+      : active?.source === 'scrub'
+        ? t.scrubbed
+        : active?.source === 'hover'
+          ? t.hovered
+          : touch
+            ? t.nearestTouch(String(READOUT_INTERACTIVITY))
+            : t.nearest(String(READOUT_INTERACTIVITY));
   const label = getDisplayLabel(getHardwareConfig(point.hwKey, point.model));
   return (
     <p
       className="mb-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground"
       data-testid="powerx-readout"
+      data-source={active?.source ?? 'nearest'}
       aria-live="polite"
     >
       <span className="min-w-0 truncate font-medium text-foreground">
         {label}{' '}
         <span className="font-normal text-muted-foreground">{t.at(point.conc, rate(point.x))}</span>
       </span>
+      {touch && yMetric && (
+        <ReadoutBadge testId="powerx-readout-y">
+          {yMetric.label}:{' '}
+          <span className="font-medium text-foreground tabular-nums">{yMetric.value(point)}</span>
+        </ReadoutBadge>
+      )}
       {it === null ? (
         <span data-testid="powerx-readout-no-model">{t.noModel}</span>
       ) : (

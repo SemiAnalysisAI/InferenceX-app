@@ -13,6 +13,7 @@ import { selectPowerXCount, type PowerXSelection } from './powerx-views';
 const mocks = vi.hoisted(() => ({
   locale: 'en' as 'en' | 'zh',
   mobile: false,
+  coarse: false,
   track: vi.fn(),
 }));
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
@@ -20,7 +21,7 @@ vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
 // The phone paths key on the md media query; jsdom has no matchMedia, so the hook is stubbed.
 vi.mock('@/hooks/useMediaQuery', () => ({
   useIsMobileViewport: () => mocks.mobile,
-  useIsCoarsePointer: () => false,
+  useIsCoarsePointer: () => mocks.coarse,
   useMediaQuery: () => false,
 }));
 
@@ -454,6 +455,40 @@ describe('PowerXReadout', () => {
       'GPU: 700 WGPU',
     );
     expect(render(<PowerXReadout points={[]} />).innerHTML).toBe('');
+  });
+
+  it('leads with the chart y value and teaches the drag on a coarse pointer, bilingually', () => {
+    const points = [readoutPoint(20), readoutPoint(75), readoutPoint(300)];
+    const yMetric = { label: 'J/output token', value: (point: InferenceData) => `${point.y} J` };
+    // A mouse keeps the readout as it was: no y badge, the hover hint.
+    const mouse = render(<PowerXReadout points={points} yMetric={yMetric} />);
+    expect(mouse.querySelector('[data-testid="powerx-readout-y"]')).toBeNull();
+    expect(mouse.querySelector('[data-testid="powerx-readout-source"]')?.textContent).toBe(
+      'Near 80 tok/s/user · hover a point to change',
+    );
+    expect(mouse.querySelector<HTMLElement>('[data-testid="powerx-readout"]')?.dataset.source).toBe(
+      'nearest',
+    );
+    mocks.coarse = true;
+    try {
+      const touch = render(<PowerXReadout points={points} yMetric={yMetric} />);
+      expect(touch.querySelector('[data-testid="powerx-readout-y"]')?.textContent).toBe(
+        'J/output token: 10 J',
+      );
+      expect(touch.querySelectorAll('[data-slot="badge"]')).toHaveLength(5);
+      expect(touch.querySelector('[data-testid="powerx-readout-source"]')?.textContent).toBe(
+        'Near 80 tok/s/user · drag across the chart to change',
+      );
+      const zh = render(<PowerXReadout points={points} yMetric={yMetric} />, 'zh');
+      expect(zh.querySelector('[data-testid="powerx-readout-source"]')?.textContent).toBe(
+        '接近 80 tok/s/user · 在图上拖动可切换',
+      );
+      expect(zh.querySelector('[data-testid="powerx-readout-y"]')?.textContent).toBe(
+        'J/output token: 10 J',
+      );
+    } finally {
+      mocks.coarse = false;
+    }
   });
 });
 

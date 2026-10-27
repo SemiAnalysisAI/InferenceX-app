@@ -105,6 +105,7 @@ import {
   overlayRunColor,
   overlayRunIndex,
 } from '@/lib/charts/overlay-run-style';
+import { nearestScrubCandidate, type ScrubCandidate } from '@/lib/charts/powerx-scrub';
 import {
   HIT_AREA_RADIUS,
   formatLargeNumber,
@@ -1902,6 +1903,9 @@ const ScatterGraph = React.memo(
     const setActivePoint = useSetPowerXActivePoint();
     const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
     activePointRef.current = setActivePoint;
+    // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
+    const scrubPointerRef = useRef<number | null>(null);
+    const touchScrub = powerXSurface && touchPrimary;
     const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
     compareFollowsHoverRef.current =
       setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
@@ -3574,6 +3578,117 @@ const ScatterGraph = React.memo(
           ),
       };
 
+      // PowerX on a coarse pointer: there is no hover tooltip, so a finger dragged across
+      // the plot snaps to the nearest visible point (official or overlay, under the current
+      // zoom) and the readout above the chart reads it; a tap on a point still opens its
+      // sheet through the point's own click. One-finger touches never reach d3-zoom
+      // (zoomEventFilter), the svg keeps touch-action pan-y so a vertical pan scrolls the
+      // page, and it is none only while a scrub is in progress.
+      const scrubLayer: CustomLayerConfig | null = touchScrub
+        ? {
+            type: 'custom',
+            key: 'powerx-scrub',
+            render: (zoomGroup, ctx) => {
+              // A re-render (the readout's own update re-renders the chart) keeps the mark
+              // where the finger last was; the next finger, or a zoom, moves or drops it.
+              zoomGroup.select('g.powerx-scrub').raise();
+              const svg = ctx.layout.svg;
+              const svgNode = svg.node();
+              const candidates = (): ScrubCandidate<InferenceData>[] => {
+                if (!svgNode) return [];
+                const zoomed = currentZoomRenderContext(svgNode, ctx);
+                const xScale = zoomed.xScale as ContinuousScale;
+                const yScale = zoomed.yScale as ContinuousScale;
+                const ir = interactionRef.current;
+                return [
+                  ...pointsData
+                    .filter((point) => ir.isPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: false,
+                    })),
+                  ...processedOverlayData
+                    .filter((point) => ir.isOverlayPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: true,
+                    })),
+                ];
+              };
+              const snap = (event: PointerEvent) => {
+                const [mx, my] = d3.pointer(event, zoomGroup.node());
+                const best = nearestScrubCandidate(candidates(), mx, my);
+                if (!best) return;
+                const ir = interactionRef.current;
+                const color = best.overlay
+                  ? overlayRunColor(overlayRunIndex(best.point.run_url ?? null, runIndexByUrl))
+                  : ir.getCssColor(ir.resolveColor(best.point.hwKey as string));
+                let mark = zoomGroup.select<SVGGElement>('g.powerx-scrub');
+                if (mark.empty()) {
+                  mark = zoomGroup
+                    .append('g')
+                    .attr('class', 'powerx-scrub')
+                    .attr('data-testid', 'powerx-scrub')
+                    .attr('pointer-events', 'none');
+                  mark
+                    .append('line')
+                    .attr('class', 'powerx-scrub-rule')
+                    .attr('stroke', 'var(--foreground)')
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-opacity', 0.7);
+                  mark
+                    .append('circle')
+                    .attr('class', 'powerx-scrub-ring')
+                    .attr('r', 9)
+                    .attr('fill', 'none')
+                    .attr('stroke-width', 2.5);
+                }
+                mark
+                  .attr('data-hw-key', String(best.point.hwKey))
+                  .attr('data-conc', String(best.point.conc))
+                  .attr('data-overlay', best.overlay ? 'true' : null)
+                  .raise();
+                mark
+                  .select('line.powerx-scrub-rule')
+                  .attr('x1', best.x)
+                  .attr('x2', best.x)
+                  .attr('y1', 0)
+                  .attr('y2', ctx.height);
+                mark
+                  .select('circle.powerx-scrub-ring')
+                  .attr('cx', best.x)
+                  .attr('cy', best.y)
+                  .attr('stroke', color);
+                activePointRef.current?.({ point: best.point, source: 'scrub' });
+              };
+              svg
+                .on('pointerdown.powerxScrub', (event: PointerEvent) => {
+                  if (event.pointerType === 'mouse' || event.isPrimary === false) return;
+                  scrubPointerRef.current = event.pointerId;
+                  snap(event);
+                })
+                .on('pointermove.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  if (svgNode) svgNode.style.touchAction = 'none';
+                  snap(event);
+                })
+                .on('pointerup.powerxScrub pointercancel.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  scrubPointerRef.current = null;
+                  if (svgNode) svgNode.style.touchAction = 'pan-y';
+                });
+            },
+            // The mark's pixel position is stale after a zoom; the next finger redraws it.
+            onZoom: (zoomGroup) => {
+              zoomGroup.selectAll('.powerx-scrub').remove();
+            },
+          }
+        : null;
+
       const result: LayerConfig<InferenceData>[] = headroomShading
         ? [headroomLayer, rooflineLayer, scatterLayer]
         : [rooflineLayer, scatterLayer];
@@ -3585,6 +3700,7 @@ const ScatterGraph = React.memo(
         knownIssueLayer,
         ceilingLayer,
       );
+      if (scrubLayer) result.push(scrubLayer);
       return result;
     }, [
       displayedRooflines,
@@ -3631,6 +3747,7 @@ const ScatterGraph = React.memo(
       powerLabelStyle,
       drawPerfRuler,
       attachPowerTraceAction,
+      touchScrub,
     ]);
 
     const layersRef = useRef(layers);

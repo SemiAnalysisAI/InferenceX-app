@@ -60,6 +60,7 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
+import { formatMetricValue } from '@/components/inference/utils/tooltipUtils';
 import {
   PowerXChartConfig,
   PowerXFacilitySwitch,
@@ -1302,7 +1303,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             powerXMounted &&
                             powerXReadoutPoints &&
                             getViewMode(graphIndex) === 'chart' && (
-                              <PowerXReadout points={powerXReadoutPoints} />
+                              <PowerXReadout
+                                points={powerXReadoutPoints}
+                                yMetric={{
+                                  label: metricLabel(
+                                    graph.chartDefinition,
+                                    selectedYAxisMetric,
+                                    locale,
+                                  ),
+                                  value: (point) => formatMetricValue(point.y, selectedYAxisMetric),
+                                }}
+                              />
                             )}
                           {!powerXSurface && (
                             <>
