@@ -4517,6 +4517,10 @@
       "duration": 4000
     },
     {
+      "spec": "cypress/e2e/powerx-touch-scrub.cy.ts",
+      "duration": 7000
+    },
+    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 42697,
       "tests": [
