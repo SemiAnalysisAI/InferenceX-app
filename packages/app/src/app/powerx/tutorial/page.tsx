@@ -7,6 +7,7 @@ import { extractHeadings } from '@/lib/blog/blog';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
 import { remarkGithubAlerts } from '@/lib/powerx/remark-github-alerts';
 import { remarkGithubHtml } from '@/lib/powerx/remark-github-html';
+import { remarkWidgetImages } from '@/lib/powerx/remark-widget-images';
 import {
   buildPowerXTutorialJsonLd,
   getPowerXTutorial,
@@ -24,7 +25,7 @@ export default async function PowerXTutorialPage() {
   const { content } = await compileBlogMdx(raw, LOCALE, {
     format: 'md',
     components: createPowerXTutorialComponents(LOCALE),
-    remarkPlugins: [remarkGithubAlerts, remarkGithubHtml],
+    remarkPlugins: [remarkGithubAlerts, remarkGithubHtml, remarkWidgetImages],
   });
 
   return (

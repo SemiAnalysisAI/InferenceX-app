@@ -32,6 +32,12 @@ The **Count** control picks the boundary. Pick the one that matches the question
 > [!TIP]
 > If you plan capacity, read **IT (no PUE)** at **P90**. If you compare chips, read **GPU only** on the energy-per-token view.
 
+Pick a chip, a workload, a deployment, and a GPU wattage to see the four counts, GPUs per MW, and every modeled part.
+
+![Power basis explorer](../../public/images/powerx-tutorial/widgets/power-basis.png)
+
+Measured points sit on the [Power draw view](/inference?i_metric=y_measuredAvgPower).
+
 ## Measured and modeled, by platform
 
 | Platform                            | Measured                                                                                                                                         | Modeled                                                                  |
@@ -58,6 +64,12 @@ The model is the open-source `power_model` package in the InferenceX repository,
 > [!NOTE]
 > Watts and joules answer different questions. A configuration can draw more watts and still use fewer joules per token when it serves more tokens per second, for example with speculative decoding or larger batches.
 
+Switch the metric to see the same two chips on live validated points.
+
+![Live chart](../../public/images/powerx-tutorial/widgets/chart.png)
+
+Every control is on [/inference](/inference?i_metric=y_measuredJPerOutputToken).
+
 ## Validated vs Historical
 
 A point is **Validated** when its telemetry passed every check the offline validator re-runs from the raw samples:
@@ -70,6 +82,12 @@ A point is **Validated** when its telemetry passed every check the offline valid
 
 Anything else is **Historical**: the throughput still counts, but the point carries no energy metrics and is excluded from modeled IT and facility power. The audit record on each point lists the failing reason, the sample count, the largest gap, and the window bounds.
 
+Move the sample gap, the GPU count, the window mismatch, the producer pin, and the token count to see the verdict and its reason codes.
+
+![Validity explorer](../../public/images/powerx-tutorial/widgets/validity.png)
+
+Historical points keep their throughput on every other view.
+
 ## Collect power in your own run
 
 Power collection is part of every official InferenceX sweep, so a submitted recipe gets measured automatically. To run it yourself:
@@ -78,6 +96,12 @@ Power collection is part of every official InferenceX sweep, so a submitted reci
 2. Set `require-power` (or `REQUIRE_POWER=1`) if an invalid measurement should fail the job instead of recording an invalid verdict.
 3. Read the result: the aggregate JSON carries `power_valid`, `avg_power_w`, `p90_power_w`, and the `joules_per_*` metrics; the `power_audit_<result>` artifact holds `samples.csv`, the window files, and `power_validation_<result>.json`.
 4. Pull published numbers with the API or the `inferencex powerx export` command from the `@semianalysisai/inferencex-skills` package.
+
+Pick the platform, topology, workload, and strictness to get the matrix rows, the workflow input, and the result keys.
+
+![Run-config generator](../../public/images/powerx-tutorial/widgets/run-config.png)
+
+Field reference: [configs/CONFIGS.md](https://github.com/SemiAnalysisAI/InferenceX/blob/main/inferencex-e2e/configs/CONFIGS.md).
 
 ## FAQ
 

@@ -8,13 +8,20 @@ import remarkGfm from 'remark-gfm';
 import { describe, expect, it } from 'vitest';
 
 import { createPowerXTutorialComponents } from '@/components/powerx/tutorial-mdx-components';
+import { POWERX_TUTORIAL_WIDGETS } from '@/components/powerx/widgets';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
 import { extractHeadings } from '@/lib/blog/blog';
 import { hasZhSibling } from '@/lib/i18n/i18n';
 
 import { remarkGithubAlerts } from './remark-github-alerts';
 import { remarkGithubHtml } from './remark-github-html';
-import { tutorialFilePath, tutorialFrontmatterErrors, tutorialImageSrc } from './tutorial';
+import { remarkWidgetImages } from './remark-widget-images';
+import {
+  tutorialFilePath,
+  tutorialFrontmatterErrors,
+  tutorialImageSrc,
+  tutorialWidgetName,
+} from './tutorial';
 
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..', '..');
 const PUBLIC_DIR = path.join(APP_DIR, 'public');
@@ -80,12 +87,18 @@ async function render(source: string): Promise<string> {
     options: {
       mdxOptions: {
         format: 'md',
-        remarkPlugins: [remarkGfm, remarkGithubAlerts, remarkGithubHtml],
+        remarkPlugins: [remarkGfm, remarkGithubAlerts, remarkGithubHtml, remarkWidgetImages],
       },
     },
   });
   return renderToStaticMarkup(content);
 }
+
+const WIDGET_IMAGE = '../../public/images/powerx-tutorial/widgets/';
+const widgets = (side: Side) =>
+  images(side)
+    .map((src) => tutorialWidgetName(src))
+    .filter((name): name is string => name !== null);
 
 describe('PowerX tutorial front matter', () => {
   it('has exactly title, description and updated on both sides', () => {
@@ -128,6 +141,18 @@ describe('PowerX tutorial EN/ZH parity', () => {
     for (const src of images(en)) {
       expect(src.startsWith('../../public/'), src).toBe(true);
       expect(fs.existsSync(path.join(PUBLIC_DIR, tutorialImageSrc(src))), src).toBe(true);
+    }
+  });
+
+  it('mounts exactly the registered widgets, each once, on both sides', () => {
+    const registered = Object.keys(POWERX_TUTORIAL_WIDGETS).toSorted();
+    expect(widgets(en)).toEqual(registered);
+    expect(widgets(zh)).toEqual(registered);
+    for (const name of registered) {
+      expect(
+        fs.existsSync(path.join(PUBLIC_DIR, 'images/powerx-tutorial/widgets', `${name}.png`)),
+        name,
+      ).toBe(true);
     }
   });
 
@@ -206,6 +231,26 @@ describe('plain-markdown compile', () => {
     expect(html).toContain('<code>power_audit_&lt;result&gt;</code>');
   });
 
+  it('names widgets only from the widgets folder', () => {
+    expect(tutorialWidgetName(`${WIDGET_IMAGE}power-basis.png`)).toBe('power-basis');
+    expect(tutorialWidgetName(`${WIDGET_IMAGE}Power.png`)).toBeNull();
+    expect(tutorialWidgetName(`${WIDGET_IMAGE}nested/chart.png`)).toBeNull();
+    expect(tutorialWidgetName('../../public/images/powerx-tutorial/chart.png')).toBeNull();
+    expect(tutorialWidgetName('/images/powerx-tutorial/widgets/chart.png')).toBeNull();
+  });
+
+  it('lifts a lone widget image out of its paragraph and leaves figures wrapped', async () => {
+    const html = await render(
+      `Knobs.\n\n![Explorer](${WIDGET_IMAGE}power-basis.png)\n\n![Figure](../../public/images/powerx-tutorial/figure.png)\n`,
+    );
+    expect(html).toContain(
+      `<p>Knobs.</p>\n<img src="${WIDGET_IMAGE}power-basis.png" alt="Explorer"/>`,
+    );
+    expect(html).toContain(
+      '<p><img src="../../public/images/powerx-tutorial/figure.png" alt="Figure"/></p>',
+    );
+  });
+
   it('maps GitHub-resolvable public paths to served paths', () => {
     expect(tutorialImageSrc('../../public/images/powerx-tutorial/x.png')).toBe(
       '/images/powerx-tutorial/x.png',
@@ -219,7 +264,7 @@ describe('plain-markdown compile', () => {
       const { content } = await compileBlogMdx(side.body, side.locale, {
         format: 'md',
         components: createPowerXTutorialComponents(side.locale),
-        remarkPlugins: [remarkGithubAlerts, remarkGithubHtml],
+        remarkPlugins: [remarkGithubAlerts, remarkGithubHtml, remarkWidgetImages],
       });
       const html = renderToStaticMarkup(content);
       for (const heading of extractHeadings(side.body)) {
@@ -227,6 +272,13 @@ describe('plain-markdown compile', () => {
       }
       expect(html).toContain('data-callout="tip"');
       expect(html).not.toContain('[!');
+      for (const name of Object.keys(POWERX_TUTORIAL_WIDGETS)) {
+        expect(html, `${side.locale}: ${name}`).toContain(`data-widget="${name}"`);
+        expect(html, `${side.locale}: ${name} in <p>`).not.toMatch(
+          new RegExp(`<p><section[^>]*data-widget="${name}"`, 'u'),
+        );
+      }
+      expect(html).not.toContain('widgets/power-basis.png');
     }
   });
 });

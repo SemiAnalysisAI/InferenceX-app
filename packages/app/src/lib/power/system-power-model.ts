@@ -7,7 +7,7 @@ import type { RackScaleSystem } from './power_model/models/advanced/systems/rack
 export const SYSTEM_POWER_MODEL_REVISION = manifest.modelRevision;
 export const SYSTEM_POWER_MODEL_SOURCE_URL = manifest.sourceUrl;
 
-const CHASSIS_SYSTEMS = {
+export const CHASSIS_SYSTEMS = {
   h100: 'hopper',
   h200: 'hopper',
   b200: 'b200',
@@ -16,7 +16,7 @@ const CHASSIS_SYSTEMS = {
   mi325x: 'mi325',
   mi355x: 'mi355',
 } as const satisfies Record<string, keyof typeof SYSTEMS>;
-const RACK_SYSTEMS = {
+export const RACK_SYSTEMS = {
   gb200: 'gb200-nvl72',
   gb300: 'gb300-nvl72',
 } as const satisfies Record<string, keyof typeof SYSTEMS>;

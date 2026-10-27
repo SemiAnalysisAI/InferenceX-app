@@ -32,6 +32,8 @@ const CONTENT_DIR = path.join(process.cwd(), 'content', 'powerx');
 const FRONTMATTER_FIELDS = ['title', 'description', 'updated'] as const;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const PUBLIC_PREFIX = '../../public/';
+const WIDGET_PREFIX = '../../public/images/powerx-tutorial/widgets/';
+const WIDGET_NAME = /^(?<name>[a-z][a-z0-9-]*)\.png$/u;
 
 function isIsoDate(value: unknown): value is string {
   if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
@@ -74,6 +76,15 @@ export function getPowerXTutorial(locale: Locale = 'en'): PowerXTutorial {
 /** Maps a GitHub-resolvable `../../public/...` image path to the app's served path. */
 export function tutorialImageSrc(src: string): string {
   return src.startsWith(PUBLIC_PREFIX) ? `/${src.slice(PUBLIC_PREFIX.length)}` : src;
+}
+
+/**
+ * The registry key of a widget image (`../../public/images/powerx-tutorial/widgets/<name>.png`),
+ * or null for an ordinary figure. The PNG is the GitHub fallback; the page renders the widget.
+ */
+export function tutorialWidgetName(src: string): string | null {
+  if (!src.startsWith(WIDGET_PREFIX)) return null;
+  return WIDGET_NAME.exec(src.slice(WIDGET_PREFIX.length))?.groups?.name ?? null;
 }
 
 export function powerxTutorialPath(locale: Locale = 'en'): string {

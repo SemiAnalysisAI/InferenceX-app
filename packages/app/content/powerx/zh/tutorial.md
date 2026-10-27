@@ -32,6 +32,12 @@ PowerX 展示每颗加速器在运行基准测试时的功耗，以及每个 tok
 > [!TIP]
 > 做容量规划，看 **IT (no PUE)** 的 **P90**；比较芯片，看每 token 能量视图下的 **GPU only**。
 
+选择芯片、工作负载、部署方式和 GPU 瓦特数，即可看到四种口径、每 MW 可部署的 GPU 数，以及每个建模部件。
+
+![功耗口径探索器](../../public/images/powerx-tutorial/widgets/power-basis.png)
+
+实测数据点见[功耗视图](/zh/inference?i_metric=y_measuredAvgPower)。
+
 ## 各平台的实测与建模范围
 
 | 平台                                 | 实测                                                                                                                            | 建模                                                             |
@@ -58,6 +64,12 @@ PowerX 展示每颗加速器在运行基准测试时的功耗，以及每个 tok
 > [!NOTE]
 > 瓦特和焦耳回答的是不同的问题。一个配置可以消耗更多瓦特，但只要每秒服务的 token 更多，每 token 焦耳数反而更低，例如使用投机解码或更大的 batch。
 
+切换指标，查看同一对芯片在实时、已通过校验的数据点上的表现。
+
+![实时图表](../../public/images/powerx-tutorial/widgets/chart.png)
+
+全部控件都在 [/inference](/zh/inference?i_metric=y_measuredJPerOutputToken) 上。
+
 ## Validated 与 Historical
 
 离线验证器会从原始样本重新执行所有校验，全部通过的数据点才标记为 **Validated**：
@@ -70,6 +82,12 @@ PowerX 展示每颗加速器在运行基准测试时的功耗，以及每个 tok
 
 其余数据点都是 **Historical**：吞吐量照常计入，但该点没有能量指标，也不参与建模的 IT 和设施功耗。每个数据点上的审计记录会列出失败原因、样本数、最大间隔和窗口边界。
 
+调整采样间隔、GPU 数、窗口偏差、采集端版本和 token 数，查看判定结果及其原因代码。
+
+![有效性探索器](../../public/images/powerx-tutorial/widgets/validity.png)
+
+Historical 数据点在其他所有视图中仍保留吞吐量。
+
 ## 在自己的运行中采集功耗
 
 功耗采集是每次官方 InferenceX sweep 的一部分，提交的测试配置会自动被测量。要自行运行：
@@ -78,6 +96,12 @@ PowerX 展示每颗加速器在运行基准测试时的功耗，以及每个 tok
 2. 如果希望无效测量直接让任务失败而不是记录无效判定，设置 `require-power`（或 `REQUIRE_POWER=1`）。
 3. 读取结果：汇总 JSON 包含 `power_valid`、`avg_power_w`、`p90_power_w` 和各 `joules_per_*` 指标；`power_audit_<result>` 产物包含 `samples.csv`、窗口文件和 `power_validation_<result>.json`。
 4. 通过 API 或 `@semianalysisai/inferencex-skills` 包中的 `inferencex powerx export` 命令获取已发布的数据。
+
+选择平台、拓扑、工作负载和严格程度，即可得到 matrix 配置行、workflow 输入和结果字段。
+
+![运行配置生成器](../../public/images/powerx-tutorial/widgets/run-config.png)
+
+字段参考：[configs/CONFIGS.md](https://github.com/SemiAnalysisAI/InferenceX/blob/main/inferencex-e2e/configs/CONFIGS.md)。
 
 ## 常见问题
 
