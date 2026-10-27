@@ -71,7 +71,7 @@ export function coreMemoryProfiles() {
 }
 
 /** One page/API collection, preserving each benchmark's native units and schema. */
-export const CORE_PROFILE_GPU_KEYS = [...Object.keys(SM_L2_RUNS), CORE_PROFILE_GPU];
+export const CORE_PROFILE_GPU_KEYS = [CORE_PROFILE_GPU, ...Object.keys(SM_L2_RUNS)];
 
 export function coreMemoryProfileResults(gpu = 'all') {
   const nvidia = Object.entries(SM_L2_RUNS)
@@ -89,5 +89,5 @@ export function coreMemoryProfileResults(gpu = 'all') {
         ],
       };
     });
-  return [...nvidia, ...(gpu === 'all' || gpu === CORE_PROFILE_GPU ? [coreMemoryProfiles()] : [])];
+  return [...(gpu === 'all' || gpu === CORE_PROFILE_GPU ? [coreMemoryProfiles()] : []), ...nvidia];
 }

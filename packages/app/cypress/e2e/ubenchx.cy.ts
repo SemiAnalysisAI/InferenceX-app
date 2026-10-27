@@ -132,7 +132,43 @@ const dismiss = {
   },
 };
 
+function assertProfileOrder() {
+  cy.get('[data-testid="ascend-core-profiles"], [data-testid="sm-l2-heatmap"]').should(
+    ($profiles) => {
+      expect([...$profiles].map((profile) => profile.dataset.testid)).to.deep.eq([
+        'ascend-core-profiles',
+        'sm-l2-heatmap',
+      ]);
+    },
+  );
+}
+
 describe('Ascend core memory-access profiles', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`shows Huawei before B200 by default and after restoring all hardware at ${prefix || '/'}`, () => {
+      const allHardware = prefix ? '全部硬件' : 'All hardware';
+
+      cy.visit(`${prefix}/ubenchx/core-memory-profiles`, dismiss);
+      cy.get('[data-testid="core-profile-hardware"]').should('contain.text', allHardware);
+      assertProfileOrder();
+      cy.get('[data-testid="core-profile-hardware"]').click();
+      cy.get('[role="listbox"] [role="option"]').should(($options) => {
+        expect([...$options].map((option) => option.textContent?.trim())).to.deep.eq([
+          allHardware,
+          'Huawei 950PR',
+          'B200 SXM',
+        ]);
+      });
+      cy.contains('[role="option"]', 'B200 SXM').click();
+      cy.get('[data-testid="ascend-core-profiles"]').should('not.exist');
+      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+      cy.get('[data-testid="core-profile-hardware"]').click();
+      cy.contains('[role="option"]', allHardware).click();
+      cy.get('[data-testid="core-profile-hardware"]').should('contain.text', allHardware);
+      assertProfileOrder();
+    });
+  }
+
   it('navigates to all four profiles and inspects actual core IDs by keyboard', () => {
     cy.visit('/ubenchx/mem-bw', dismiss);
     cy.get('[data-testid="ubenchx-test-select"]').click();

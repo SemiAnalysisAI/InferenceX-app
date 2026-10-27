@@ -183,23 +183,22 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
     });
 
     for (const intent of ['focus', 'hover']) {
-      it(`prefetches only default GEMM on ${intent} and reuses it after ${prefix || '/'} navigation`, () => {
+      it(`does not fetch OperatorX on Huawei ${intent} or navigation from ${prefix || '/'}`, () => {
         cy.intercept('GET', '/api/v1/operatorx/**', gemm).as('operatorxIntent');
         cy.visit(prefix || '/');
         const link = '[data-testid="landing-huawei-results-link"]';
-        cy.get(link).should('have.attr', 'data-prefetch-ready', 'true');
+        cy.get(link)
+          .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
+          .and('not.have.attr', 'data-prefetch-ready');
         cy.get('@operatorxIntent.all').should('have.length', 0);
         if (intent === 'focus') cy.get(link).focus();
         else cy.get(link).trigger('mouseover');
-        cy.wait('@operatorxIntent')
-          .its('request.url')
-          .should('match', /\/compare\?op=gemm$/);
         cy.location('pathname').should('eq', prefix || '/');
         cy.get(link).trigger('mouseover').focus().click();
-        cy.location('pathname').should('eq', `${prefix}/operatorx`);
-        cy.get('[data-testid="operatorx-coverage"]').should('contain.text', 'Coverage of 2 cases');
-        cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
-        cy.get('@operatorxIntent.all').should('have.length', 1);
+        cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
+        cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
+        cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
+        cy.get('@operatorxIntent.all').should('have.length', 0);
       });
     }
   }

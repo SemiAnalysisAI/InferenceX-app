@@ -128,7 +128,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
         cy.get('[data-testid="landing-huawei-results-link"]')
           .should('match', ':first-child')
-          .and('have.attr', 'href', `${prefix}/operatorx`)
+          .and('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
           .next()
           .should('have.attr', 'data-testid', 'landing-tpu-kimi-k3-results-link')
           .parent()
@@ -446,26 +446,32 @@ describe('landing → full dashboard navigation', () => {
   });
 });
 
-describe('Huawei OperatorX landing navigation', () => {
+describe('Huawei UbenchX landing navigation', () => {
   for (const prefix of ['', '/zh']) {
-    it(`links Huawei results to the localized OperatorX page from ${prefix || '/'}`, () => {
+    it(`links Huawei results to the localized core memory profiles from ${prefix || '/'}`, () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-huawei-results-link"]')
-        .should('have.attr', 'href', `${prefix}/operatorx`)
+        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
         .and('contain.text', prefix ? '华为 Ascend 950PR' : 'Huawei Ascend 950PR')
-        .and('contain.text', 'OperatorX');
+        .and('contain.text', 'UbenchX')
+        .and('not.contain.text', 'OperatorX');
       cy.get('[data-testid="landing-huawei-huawei-logo"] path').should(
         'have.attr',
         'fill',
         '#FF0000',
       );
       cy.get('[data-testid="landing-huawei-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/operatorx`);
-      cy.get('[data-testid="operatorx-page"]').should('contain.text', 'OperatorX');
-      cy.get('[data-testid="tab-trigger-operatorx"]')
-        .should('be.visible')
-        .and('have.attr', 'href', `${prefix}/operatorx`);
-      cy.get('[data-testid="tab-hidden-popover"]').should('not.exist');
+      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
+      cy.get('[data-testid="ubenchx-test-select"]').should(
+        'contain.text',
+        prefix ? '核心访存特征' : 'Core memory-access profiles',
+      );
+      cy.get('[data-testid="core-profile-hardware"]').should(
+        'contain.text',
+        prefix ? '全部硬件' : 'All hardware',
+      );
+      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
+      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
     });
   }
 });

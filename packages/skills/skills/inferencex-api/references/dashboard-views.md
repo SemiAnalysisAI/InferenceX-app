@@ -482,14 +482,16 @@ Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the
 ### Landing-page Huawei link
 
 The English and Chinese landing pages link Huawei Ascend 950PR results to
-`/operatorx` and `/zh/operatorx`, respectively. The logo and result button are
-presentation-only navigation to the existing OperatorX view: they add no data
-selectors, defaults, calculations, or API contracts. Existing OperatorX API
-coverage applies; no additional endpoint or OpenAPI change is needed.
+`/ubenchx/core-memory-profiles` and `/zh/ubenchx/core-memory-profiles`, respectively,
+with the UbenchX subtitle. The logo and result button are presentation-only
+navigation and do not prefetch OperatorX. The existing ubenchX API covers this
+destination: `test=core-memory-profiles&gpu=all` returns Huawei Ascend first,
+followed by B200, matching the page and hardware selector order.
 
-中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
-`/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
-API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
+中文：英文和中文首页的华为 Ascend 950PR 入口显示 UbenchX 副标题，分别链接至
+`/ubenchx/core-memory-profiles` 和 `/zh/ubenchx/core-memory-profiles`。
+Logo 和结果按钮仅用于导航，不再预取 OperatorX 数据。目标页面沿用现有 ubenchX API：
+`test=core-memory-profiles&gpu=all` 先返回 Huawei Ascend，再返回 B200，与页面和硬件选择器顺序一致。
 
 ### Landing-page MiniMax M3.1 Flash link
 

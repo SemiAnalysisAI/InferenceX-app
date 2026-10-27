@@ -365,10 +365,14 @@ export function CoreMemoryProfilesContent() {
           </SelectContent>
         </Select>
       </div>
-      {gpu !== CORE_PROFILE_GPU && <SmL2Content gpu={gpu} />}
       {(gpu === 'all' || gpu === CORE_PROFILE_GPU) && (
-        <section className="border-t pt-8" data-testid="ascend-core-profiles">
+        <section data-testid="ascend-core-profiles">
           <AscendCoreProfiles />
+        </section>
+      )}
+      {gpu !== CORE_PROFILE_GPU && (
+        <section className={gpu === 'all' ? 'border-t pt-8' : undefined}>
+          <SmL2Content gpu={gpu} />
         </section>
       )}
     </div>

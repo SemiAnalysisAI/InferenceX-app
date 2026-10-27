@@ -388,8 +388,8 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Huawei',
     title: 'Huawei Ascend 950PR',
     titleZh: '华为 Ascend 950PR',
-    subtitle: 'OperatorX',
-    href: '/operatorx',
+    subtitle: 'UbenchX',
+    href: '/ubenchx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
   },
@@ -581,7 +581,6 @@ export function AgentXCompareHero({
                       key={result.id}
                       data-testid={`landing-${result.id}-results-link`}
                       href={`${prefix}${result.href}`}
-                      prefetchOperatorX={result.id === 'huawei'}
                       analyticsEvent={result.analyticsEvent}
                       analyticsTarget={result.model}
                       analyticsSurface={surface}
