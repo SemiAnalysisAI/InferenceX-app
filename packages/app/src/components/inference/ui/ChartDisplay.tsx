@@ -126,8 +126,7 @@ import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-le
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { powerxTutorialPath } from '@/lib/powerx/tutorial-path';
-import { PowerXTutorialLink } from '@/components/powerx/powerx-tutorial-link';
+import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
@@ -1566,25 +1565,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <>
                   <DashboardSectionHeader
                     title={powerXSurface ? powerXT.title : t.inferencePerformance}
-                    description={
+                    description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
+                    actions={
                       powerXSurface ? (
-                        <>
-                          {powerXT.description}{' '}
-                          <PowerXTutorialLink
-                            href={powerxTutorialPath(locale)}
-                            analyticsEvent="powerx_tutorial_section_opened"
-                            analyticsTarget="powerx-header"
-                            data-testid="powerx-tutorial-link"
-                            className="whitespace-nowrap text-foreground underline underline-offset-2"
-                          >
-                            {powerXT.tutorial}
-                          </PowerXTutorialLink>
-                        </>
+                        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+                          <PowerXTutorialCta locale={locale} className="min-w-0 flex-1" />
+                          <ShareButton />
+                        </div>
                       ) : (
-                        t.inferencePerformanceDesc
+                        <ShareButton />
                       )
                     }
-                    actions={<ShareButton />}
                   />
                   {powerXLayout && powerXMounted && (
                     <PowerXViewTabs
