@@ -1,6 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
+import { ChevronUp } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -97,7 +98,9 @@ const STRINGS = {
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
     compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
-    sliderAt: (x: string) => `Slider ${x}`,
+    sliderAt: (x: string) => `Slider ${x} tok/s/user`,
+    sliderAbove: (x: string) => `Slider ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← Slider ${x} tok/s/user`,
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -147,7 +150,9 @@ const STRINGS = {
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
     compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
-    sliderAt: (x: string) => `滑块 ${x}`,
+    sliderAt: (x: string) => `滑块 ${x} tok/s/user`,
+    sliderAbove: (x: string) => `滑块 ${x} tok/s/user →`,
+    sliderBelow: (x: string) => `← 滑块 ${x} tok/s/user`,
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
@@ -361,6 +366,20 @@ interface CursorLabel {
  * nor on a column's concurrency label, which protrudes at most ~10 px above it.
  */
 const GUIDE_LABEL_Y = -12;
+/**
+ * Where the slider sits against a chip's points (in interactivity order): past the
+ * last, before the first, or within (`null`), where the guide is drawn at its value.
+ */
+export function sliderGuideRange(
+  guideAt: number | null,
+  interactivities: readonly number[],
+): 'above' | 'below' | null {
+  if (guideAt === null || interactivities.length === 0) return null;
+  if (guideAt > interactivities.at(-1)!) return 'above';
+  if (guideAt < interactivities[0]) return 'below';
+  return null;
+}
+
 /** The compared outline in area view: a slim column around the point, not a bar's width. */
 const AREA_MARKER_PX = 16;
 const GUIDE_HIT_HALF_WIDTH = 5;
@@ -1240,8 +1259,26 @@ function BreakdownChart({
       .attr('stroke-dasharray', '2,3')
       .attr('pointer-events', 'none');
     const guideLabelled = guideX !== null && guideAt !== null && guideNearestIndex !== markedIndex;
-    const guideText = guideAt === null ? '' : t.sliderAt(formatInteractivity(guideAt));
-    const guideHalfWidth = measureLabel(guideText, CURSOR_LABEL_FONT) / 2 + 2;
+    // The guide is clamped to the first or last column when the slider is past this chip's
+    // range, so the label then says where the slider is and points the way, its end (or
+    // start) on the line; inside the range it centres on the line.
+    const offRange = sliderGuideRange(guideAt, interactivities);
+    const guideValue = guideAt === null ? '' : formatInteractivity(guideAt);
+    const guideText =
+      offRange === 'above'
+        ? t.sliderAbove(guideValue)
+        : offRange === 'below'
+          ? t.sliderBelow(guideValue)
+          : t.sliderAt(guideValue);
+    const guideWidth = measureLabel(guideText, CURSOR_LABEL_FONT);
+    const minX = -ctx.layout.margin.left + 2;
+    const maxX = ctx.width + ctx.layout.margin.right - 2;
+    const guideLabelX = (d: number) =>
+      offRange === 'above'
+        ? Math.min(Math.max(x(d) + 6, minX + guideWidth), maxX)
+        : offRange === 'below'
+          ? Math.max(Math.min(x(d) - 6, maxX - guideWidth), minX)
+          : Math.min(Math.max(x(d), minX + guideWidth / 2), maxX - guideWidth / 2);
     // The plot's layers are clipped to the plot; the label sits in the top margin, so it
     // goes in an unclipped group of the chart's own.
     const margin = ctx.layout.g
@@ -1250,15 +1287,30 @@ function BreakdownChart({
       .join('g')
       .attr('class', 'breakdown-margin-labels')
       .attr('pointer-events', 'none');
+    // A short stem joins the label to the guide line across the margin.
+    margin
+      .selectAll<SVGLineElement, number>('line.breakdown-guide-stem')
+      .data(guideLabelled ? guides : [])
+      .join('line')
+      .attr('class', 'breakdown-guide-stem')
+      .attr('x1', (d) => x(d))
+      .attr('x2', (d) => x(d))
+      .attr('y1', GUIDE_LABEL_Y + 3)
+      .attr('y2', 0)
+      .attr('stroke', 'var(--muted-foreground)')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.45)
+      .attr('stroke-dasharray', '2,3');
     margin
       .selectAll<SVGTextElement, number>('text.breakdown-guide-label')
       .data(guideLabelled ? guides : [])
       .join('text')
       .attr('class', 'breakdown-guide-label')
       .attr('data-testid', 'power-breakdown-guide-label')
-      .attr('x', (d) => Math.min(Math.max(guideHalfWidth, x(d)), ctx.width - guideHalfWidth))
+      .attr('x', guideLabelX)
       .attr('y', GUIDE_LABEL_Y)
-      .attr('text-anchor', 'middle')
+      .attr('data-range', offRange ?? 'within')
+      .attr('text-anchor', offRange === 'above' ? 'end' : offRange === 'below' ? 'start' : 'middle')
       .attr('font-size', CHART_TYPE.annotation)
       .attr('fill', 'var(--muted-foreground)')
       .attr('stroke', 'var(--background)')
@@ -1515,18 +1567,24 @@ export default function PowerBreakdownPanel({
 
   return (
     <section id={sectionId} className="min-w-0 space-y-3" data-testid="power-breakdown-panel">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <Heading as="h3" level="card">
-          {heading?.title ?? t.title}
-        </Heading>
-        <p className="text-xs text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
+      {/* Collapse shares the title's row: an icon button on phones, a text button from md. */}
+      <div className="flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <Heading as="h3" level="card">
+            {heading?.title ?? t.title}
+          </Heading>
+          <p className="text-xs text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
+        </div>
         <button
           type="button"
           onClick={onCollapse}
           data-testid="power-breakdown-collapse"
-          className="ml-auto min-h-11 rounded-md border border-border/60 px-3 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-8"
+          aria-label={t.collapse}
+          title={t.collapse}
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border/60 text-xs font-medium text-muted-foreground hover:text-foreground md:h-8 md:w-auto md:px-3"
         >
-          {t.collapse}
+          <ChevronUp className="size-4 md:hidden" aria-hidden />
+          <span className="hidden md:inline">{t.collapse}</span>
         </button>
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>

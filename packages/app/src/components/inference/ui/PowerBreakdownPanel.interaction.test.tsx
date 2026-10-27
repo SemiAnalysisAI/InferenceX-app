@@ -103,7 +103,7 @@ vi.mock('@/lib/d3-chart/D3Chart', async () => {
 });
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
-import { nearestColumnIndex } from './PowerBreakdownPanel';
+import { nearestColumnIndex, sliderGuideRange } from './PowerBreakdownPanel';
 import { COARSE_POINTER_QUERY } from '@/hooks/useMediaQuery';
 
 declare global {
@@ -499,6 +499,18 @@ describe('PowerChipCompare legend highlight', () => {
   });
 });
 
+describe('sliderGuideRange', () => {
+  it("says whether the slider is past, before or within a chip's points", () => {
+    const xs = [2.1, 2.4, 5.2];
+    expect(sliderGuideRange(30, xs)).toBe('above');
+    expect(sliderGuideRange(1, xs)).toBe('below');
+    expect(sliderGuideRange(3, xs)).toBeNull();
+    expect(sliderGuideRange(5.2, xs)).toBeNull();
+    expect(sliderGuideRange(null, xs)).toBeNull();
+    expect(sliderGuideRange(3, [])).toBeNull();
+  });
+});
+
 describe('nearestColumnIndex', () => {
   it('picks the column whose centre is closest to the finger, whatever the hit bands', () => {
     expect(nearestColumnIndex([], 10)).toBeNull();
@@ -657,7 +669,8 @@ describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
       '[data-testid="power-breakdown-guide-label"]',
     );
     expect(label).not.toBeNull();
-    expect(label!.textContent).toMatch(/^Slider \d+\.\d$/);
+    expect(label!.textContent).toMatch(/^Slider \d+\.\d tok\/s\/user$/);
+    expect(label!.dataset.range).toBe('within');
     // In the margin above the plot, outside the clipped plot group the reference labels use.
     expect(Number(label!.getAttribute('y'))).toBeLessThan(0);
     expect(label!.closest('g.zoom')).toBeNull();
