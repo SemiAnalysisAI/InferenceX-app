@@ -89,3 +89,51 @@ describe('BottomToast swipe to dismiss', () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 });
+
+function stubViewport(isPhone: boolean, height: number) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: isPhone,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  );
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    height,
+  } as DOMRect);
+}
+
+describe('BottomToast phone layout', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    document.body.style.paddingBottom = '';
+  });
+
+  it('reserves the docked bar height below the page on phones and releases it on dismiss', () => {
+    stubViewport(true, 56);
+    renderToast(vi.fn());
+    expect(document.body.style.paddingBottom).toBe('56px');
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click();
+    });
+    act(() => vi.advanceTimersByTime(400));
+    expect(document.body.style.paddingBottom).toBe('');
+  });
+
+  it('leaves page spacing alone on wider screens where the toast floats in a corner', () => {
+    stubViewport(false, 120);
+    renderToast(vi.fn());
+    expect(document.body.style.paddingBottom).toBe('');
+  });
+});
