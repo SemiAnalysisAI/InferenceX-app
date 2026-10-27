@@ -40,10 +40,7 @@ export {
   sign,
 };
 
-import {
-  countCurvesByPrecision,
-  resolveEffectivePrecisions,
-} from '@/lib/benchmarks/default-precisions';
+import { resolveEffectivePrecisions } from '@/lib/benchmarks/default-precisions';
 /** Cost per million tokens: costPerHour / (tokPerSec * 3600 / 1_000_000) */
 const computeGpuCost = (costPerHour: number, tps: number) =>
   costPerHour && tps > 0 ? costPerHour / ((tps * 3600) / 1_000_000) : 0;
@@ -280,12 +277,10 @@ export function buildGpuGroups<M extends GroupMeta>(
 /**
  * Server-side mirror of the dashboard's precision resolution
  * (`GlobalFilterContext`): explicit selections are honoured intersected with
- * what official and overlay rows carry; otherwise the official default is
- * auto-picked and overlay precisions are included via `resolveEffectivePrecisions`.
- * Composes the same pure functions the
- * dashboard uses — `countCurvesByPrecision` + `resolveEffectivePrecisions` —
- * over the fetched rows, with the same `['fp4']` fallback when the model has no
- * rows for the sequence.
+ * what official and overlay rows carry; otherwise every official and overlay
+ * precision is selected via `resolveEffectivePrecisions`,
+ * the same pure function the dashboard uses, with the same `['fp4']` fallback
+ * when the model has no rows for the sequence.
  */
 export function resolveRowPrecisions(
   rows: BenchmarkRow[],
@@ -303,8 +298,6 @@ export function resolveRowPrecisions(
   return resolveEffectivePrecisions({
     selectedPrecisions: [...requested],
     availablePrecisions: available.length > 0 ? available : ['fp4'],
-    curveCounts: countCurvesByPrecision(forSequence),
-    unofficialPrecisions,
     explicit: requested.length > 0,
   });
 }

@@ -25,6 +25,8 @@ unresolved request from a settled empty result. Inference fetches are gated on
 
 **"Effective" values and auto-correction**: When a previously valid user selection becomes invalid after a model or sequence change, `effectiveSequence` / `effectivePrecisions` silently switch to the nearest valid option. Components always consume `effectiveSequence` / `effectivePrecisions`, never `selectedSequence` / `selectedPrecisions` directly. This prevents empty-chart states on filter transitions.
 
+**Default precisions**: Without an explicit selection (no `i_prec`, no precision control change), `effectivePrecisions` is every precision available for the model and sequence (`resolveEffectivePrecisions` in `lib/benchmarks/default-precisions.ts`, shared with the read-only APIs and calculator). Optimal Only then ranks each `(hwKey, precision)` curve separately (`bestSeriesByPrecisionPerSku`) and hides a winning config's losing-precision curve, so each chip is shown at its best precision. An explicit selection is honoured as-is.
+
 ---
 
 ### InferenceProvider

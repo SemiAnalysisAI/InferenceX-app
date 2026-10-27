@@ -48,10 +48,7 @@ import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 
-import {
-  countCurvesByPrecision,
-  resolveEffectivePrecisions,
-} from '@/lib/benchmarks/default-precisions';
+import { resolveEffectivePrecisions } from '@/lib/benchmarks/default-precisions';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
@@ -78,7 +75,7 @@ export const dynamic = 'force-dynamic';
  *
  * Query params: model (required), sequence (default 8k/1k), metric (default
  * tokensPerDollarN), target (tok/s/user interactivity, default 35), precisions
- * (default: densest-precision auto-resolution), gpus, vendors, frameworks,
+ * (default: every available precision), gpus, vendors, frameworks,
  * deployment, start, end (YYYY-MM-DD snapshot-date bounds), format (json|csv).
  *
  * Like the dashboard, lines extend to the current UTC date unless extendToDate
@@ -138,12 +135,11 @@ export function GET(request: NextRequest) {
         ? await getCachedAgenticBenchmarkHistory([...dbModelKeys])
         : await getCachedBenchmarkHistory([...dbModelKeys], islOsl?.isl ?? 0, islOsl?.osl ?? 0);
 
-    // Precision auto-resolution mirrors the dashboard's densest-precision default.
+    // Precision auto-resolution mirrors the dashboard default: every available precision.
     const availablePrecisions = [...new Set(allRows.map((row) => row.precision))].toSorted();
     const resolvedPrecisions = resolveEffectivePrecisions({
       selectedPrecisions: [...precisions],
       availablePrecisions,
-      curveCounts: countCurvesByPrecision(allRows),
       explicit: precisions.length > 0,
     });
 

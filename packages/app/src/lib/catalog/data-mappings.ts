@@ -494,20 +494,6 @@ export function getPrecisionLabel(precision: Precision): string {
   return PRECISION_CONFIG[precision]?.label ?? precision;
 }
 
-const MODEL_DEFAULT_PRECISIONS: Partial<
-  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
-> = {
-  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
-  [Model.Qwen3_5]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
-};
-
-export function getModelDefaultPrecisions(
-  model: Model,
-  sequence: Sequence,
-): readonly Precision[] | undefined {
-  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
-}
-
 export enum EvalBenchmark {
   GSM8K = 'gsm8k',
 }

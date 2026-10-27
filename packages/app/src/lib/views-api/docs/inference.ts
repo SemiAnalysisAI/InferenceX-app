@@ -63,8 +63,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Comma-separated precisions. When omitted, the densest available precision is auto-selected, matching the dashboard default.',
-      '逗号分隔的精度列表。省略时按数据最密的精度自动选择，与仪表盘默认行为一致。',
+      'Comma-separated precisions. When omitted, every available precision for the model and sequence is selected, matching the dashboard default; with best=true each SKU is then represented by its best config across precisions. Series are split per (hwKey, precision).',
+      '逗号分隔的精度列表。省略时选择该模型和序列的全部可用精度，与仪表盘默认行为一致；best=true 时每个 SKU 以其跨精度的最佳配置呈现。曲线按 (hwKey, precision) 拆分。',
     ),
     schema: { type: 'string', description: 'Comma-separated list of fp4|fp4fp8|fp8|bf16|int4' },
     example: 'fp8,bf16',
@@ -196,8 +196,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Defaults to true: rank candidate frameworks per SKU within the selected precisions, using the current axes and shared measured range. An unselected precision cannot displace a visible configuration. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
-      '默认为 true：仅在选定精度内，按当前坐标轴和共同实测区间对每个 SKU 的候选框架进行排名。未选中的精度不会挤掉当前可见的配置。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
+      'Defaults to true: rank candidate series per SKU within the selected precisions, using the current axes and shared measured range. Each (hwKey, precision) curve is a separate candidate, so with several precisions selected the SKU keeps only its best config across precisions; an unselected precision cannot displace a visible configuration. best=false returns all selected series, including vLLM and SGLang on the same SKU. Choosing a different model in the dashboard model selector resets manual legend choices to the destination model default; API requests are stateless, so pass best=false explicitly for each model when needed. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：仅在选定精度内，按当前坐标轴和共同实测区间对每个 SKU 的候选曲线进行排名。每条 (hwKey, precision) 曲线单独参与排名，因此选中多个精度时该 SKU 只保留跨精度的最佳配置；未选中的精度不会挤掉当前可见的配置。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。在仪表板的模型选择器中选择另一模型时，手动选择的图例曲线会重置为目标模型的默认选择；API 请求无状态，如需保留所有选定曲线，应在每个模型的请求中显式传入 best=false。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
     schema: { type: 'boolean', default: true },
     example: 'true',
@@ -333,6 +333,7 @@ const pointSchema = objectSchema(
 const seriesSchema = objectSchema(
   {
     hwKey: stringSchema,
+    precision: { ...stringSchema, description: 'Precision of every point in this series.' },
     gpu: stringSchema,
     framework: stringSchema,
     specMethod: stringSchema,
@@ -345,6 +346,7 @@ const seriesSchema = objectSchema(
   },
   [
     'hwKey',
+    'precision',
     'gpu',
     'framework',
     'specMethod',
@@ -771,6 +773,7 @@ const responseExample = {
   series: [
     {
       hwKey: 'h200_trt',
+      precision: 'fp8',
       gpu: 'h200',
       framework: 'trt',
       specMethod: 'none',
@@ -813,7 +816,7 @@ const responses: readonly ApiResponse[] = [
         mediaType: 'text/csv',
         schema: stringSchema,
         example:
-          'hwKey,gpu,framework,specMethod,label,vendor,deployment,kvOffload,x,y,concurrency,topologyKey,tp,date,runId,frontier,bestPerSku,metric_tpPerGpu\r\nh200_trt,h200,trt,none,H200 (TRTLLM),NVIDIA,single-node,false,12.5,450.5,64,Single|GPU=8|DP=?|TP=8|EP=1|PP=?|DCP=?|PCP=?|DPA=0|offload=off,8,2026-08-20,12345678,true,true,450.5',
+          'hwKey,precision,gpu,framework,specMethod,label,vendor,deployment,kvOffload,x,y,concurrency,topologyKey,tp,date,runId,frontier,bestPerSku,metric_tpPerGpu\r\nh200_trt,fp8,h200,trt,none,H200 (TRTLLM),NVIDIA,single-node,false,12.5,450.5,64,Single|GPU=8|DP=?|TP=8|EP=1|PP=?|DCP=?|PCP=?|DPA=0|offload=off,8,2026-08-20,12345678,true,true,450.5',
       },
     ],
   },

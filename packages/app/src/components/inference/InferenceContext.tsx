@@ -120,7 +120,12 @@ import {
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
-import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import {
+  type BestSeriesSelection,
+  bestSeriesByPrecisionPerSku,
+  restrictGraphToBestPrecisions,
+  withUnrankedSkus,
+} from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -1134,10 +1139,13 @@ export function InferenceProvider({
     [hwFilteredPoints, extractHwKey],
   );
 
-  const bestHwTypes = useMemo(() => {
+  const { bestHwTypes, bestSeriesSelection } = useMemo((): {
+    bestHwTypes: Set<string>;
+    bestSeriesSelection: BestSeriesSelection | null;
+  } => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
-    if (!graph) return hwTypesWithData;
+    if (!graph) return { bestHwTypes: hwTypesWithData, bestSeriesSelection: null };
     const tableCandidates = graph.tableData?.filter((point) =>
       effectivePrecisions.includes(point.precision),
     );
@@ -1154,11 +1162,15 @@ export function InferenceProvider({
       direction !== 'lower_left' &&
       direction !== 'lower_right'
     ) {
-      return unrankedHwTypes;
+      return { bestHwTypes: unrankedHwTypes, bestSeriesSelection: null };
     }
-    const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
-    if (best.size === 0) return unrankedHwTypes;
-    return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
+    const selection = bestSeriesByPrecisionPerSku(graph.data, direction, effectivePrecisions);
+    const best = new Set(selection.keys());
+    if (best.size === 0) return { bestHwTypes: unrankedHwTypes, bestSeriesSelection: null };
+    return {
+      bestHwTypes: tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best,
+      bestSeriesSelection: selection,
+    };
   }, [
     graphs,
     hwTypesWithData,
@@ -1713,11 +1725,22 @@ export function InferenceProvider({
     setShowDateRangeDialog(false);
   };
 
+  // Optimal Only ranks each (hwKey, precision) series, so a winning hwKey can
+  // still carry a losing precision's curve. Drop those while the automatic best
+  // selection is active; manual legend choices turn Optimal Only off.
+  const displayedGraphs = useMemo(
+    () =>
+      bestPerSku && bestSeriesSelection && effectivePrecisions.length > 1
+        ? graphs.map((graph) => restrictGraphToBestPrecisions(graph, bestSeriesSelection))
+        : graphs,
+    [bestPerSku, bestSeriesSelection, effectivePrecisions.length, graphs],
+  );
+
   const dataValue = useMemo<InferenceDataContextType>(
     () => ({
       hwTypesWithData,
       hardwareConfig,
-      graphs,
+      graphs: displayedGraphs,
       selectionPoints,
       loading,
       refreshing,
@@ -1735,7 +1758,7 @@ export function InferenceProvider({
     [
       hwTypesWithData,
       hardwareConfig,
-      graphs,
+      displayedGraphs,
       selectionPoints,
       loading,
       refreshing,

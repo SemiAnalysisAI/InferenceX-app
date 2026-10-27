@@ -71,6 +71,13 @@ are stateless: omit `best` for the default ranking, or send `best=false` explici
 for each model to retain all selected series. Do not infer a destination model's
 default from a manual engine selection made on another model.
 
+When `precisions` is omitted (and the dashboard has no explicit `i_prec`), every
+available precision for the model and sequence is selected. Inference `series`
+are split per `(hwKey, precision)` and each carries a `precision` field; CSV rows
+add a `precision` column. Best per SKU ranks each `(hwKey, precision)` curve as a
+separate candidate, so the default view shows each SKU at its best config across
+precisions and drops that config's losing-precision curve.
+
 Best per SKU ranks only points in the selected precisions. For example,
 `precisions=fp8&best=true` selects the best FP8 configuration per SKU; a faster
 FP4 configuration cannot displace it. The dashboard applies the same scope to

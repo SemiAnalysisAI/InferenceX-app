@@ -84,8 +84,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Comma-separated precisions. When omitted, the densest available precision is auto-selected. With multiple precisions, each hardware gets one line per precision (key hwKey__precision).',
-      '逗号分隔的精度列表。省略时按数据最密的精度自动选择。选择多个精度时，每个硬件会按精度分线（键为 hwKey__precision）。',
+      'Comma-separated precisions. When omitted, every available precision is selected, matching the dashboard default. With multiple precisions, each hardware gets one line per precision (key hwKey__precision).',
+      '逗号分隔的精度列表。省略时选择全部可用精度，与仪表盘默认行为一致。选择多个精度时，每个硬件会按精度分线（键为 hwKey__precision）。',
     ),
     schema: { type: 'string', description: 'Comma-separated list of fp4|fp4fp8|fp8|bf16|int4' },
     example: 'fp8,bf16',

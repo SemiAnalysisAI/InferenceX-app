@@ -89,10 +89,7 @@ import {
   getCachedBenchmarksForRun,
 } from '@/lib/benchmarks/benchmark-query-cache.server';
 
-import {
-  countCurvesByPrecision,
-  resolveEffectivePrecisions,
-} from '@/lib/benchmarks/default-precisions';
+import { resolveEffectivePrecisions } from '@/lib/benchmarks/default-precisions';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 
@@ -112,7 +109,7 @@ export const dynamic = 'force-dynamic';
  * executed server-side via `buildInferenceSeries` (lib/views-api/series.ts).
  *
  * Query params: model (required), sequence (default 8k/1k), precisions
- * (default: densest-precision auto-resolution), metric (default
+ * (default: every available precision), metric (default
  * tokensPerDollarN), xmode (default interactivity; the trace-derived
  * e2e-normalized-interactivity mode falls back to interactivity, as the
  * dashboard does for fixed-seq), xmetric (default p90_ttft), percentile
@@ -171,13 +168,12 @@ function buildView(
   derivedMetrics?: DerivedAgenticMetricMap,
 ): InferenceViewData {
   // Precision auto-resolution runs against the sequence-scoped rows, exactly
-  // like the dashboard's densest-precision default.
+  // like the dashboard default: every available precision.
   const seqRows = rows.filter((row) => rowToSequence(row) === params.sequence);
   const availablePrecisions = [...new Set(seqRows.map((row) => row.precision))].toSorted();
   const resolvedPrecisions = resolveEffectivePrecisions({
     selectedPrecisions: [...params.precisions],
     availablePrecisions,
-    curveCounts: countCurvesByPrecision(seqRows),
     explicit: params.precisionsExplicit,
   });
 
@@ -224,6 +220,7 @@ function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRo
   return data.result.series.flatMap((entry) =>
     entry.points.map((point) => ({
       hwKey: entry.hwKey,
+      precision: entry.precision,
       gpu: entry.gpu,
       framework: entry.framework,
       specMethod: entry.specMethod,

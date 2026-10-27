@@ -5,6 +5,9 @@ import {
   buildEqualServiceComparison,
   getEqualServiceSources,
 } from '@/components/inference/utils/equal-service-comparison';
+import { bestSeriesByPrecisionPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { resolveEffectivePrecisions } from '@/lib/benchmarks/default-precisions';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -727,5 +730,114 @@ describe('GET /api/v1/views/inference', () => {
     expect(header).toContain('x');
     expect(header).toContain('y');
     expect(lines).toHaveLength(3);
+  });
+
+  describe('default precision: every available precision (dashboard parity)', () => {
+    const multiPrecisionRows = () => [
+      // h200_trt FP4 dominates its own FP8 curve; mi300x only has FP8.
+      makeRow({
+        precision: 'fp4',
+        conc: 16,
+        metrics: { ...makeRow().metrics, median_intvty: 40, tput_per_gpu: 900 },
+      }),
+      makeRow({
+        precision: 'fp4',
+        conc: 64,
+        metrics: { ...makeRow().metrics, median_intvty: 12.5, tput_per_gpu: 1800 },
+      }),
+      makeRow({
+        conc: 16,
+        metrics: { ...makeRow().metrics, median_intvty: 40, tput_per_gpu: 200 },
+      }),
+      makeRow({ conc: 64 }),
+      makeRow({ hardware: 'mi300x', framework: 'vllm', conc: 32 }),
+    ];
+
+    it('selects every precision when omitted and returns one series per (hwKey, precision)', async () => {
+      const rows = multiPrecisionRows();
+      mockGetLatestBenchmarks.mockResolvedValue(rows);
+      const response = await GET(
+        request('/api/v1/views/inference?model=DeepSeek-R1-0528&best=false'),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      // Same pure resolver the dashboard (GlobalFilterContext) runs with no i_prec.
+      expect(body.params.precisions).toEqual(
+        resolveEffectivePrecisions({
+          selectedPrecisions: ['fp4'],
+          availablePrecisions: ['fp8', 'fp4'],
+          explicit: false,
+        }),
+      );
+      expect(body.params.precisions).toEqual(['fp4', 'fp8']);
+      expect(
+        body.series.map(
+          (entry: { hwKey: string; precision: string }) => `${entry.hwKey}:${entry.precision}`,
+        ),
+      ).toEqual(['h200_trt:fp4', 'h200_trt:fp8', 'mi300x_vllm:fp8']);
+      for (const entry of body.series) {
+        expect(
+          entry.points.every((point: { precision: string }) => point.precision === entry.precision),
+        ).toBe(true);
+      }
+    });
+
+    it('ranks best per SKU across precisions and matches the dashboard selection', async () => {
+      const rows = multiPrecisionRows();
+      mockGetLatestBenchmarks.mockResolvedValue(rows);
+      const response = await GET(request('/api/v1/views/inference?model=DeepSeek-R1-0528'));
+      const body = await response.json();
+
+      const { chartData } = transformBenchmarkRows(rows);
+      const dashboard = bestSeriesByPrecisionPerSku(
+        chartData[0].map((point) => ({
+          ...point,
+          x: point.median_intvty ?? Number.NaN,
+          y: point.tpPerGpu.y,
+        })),
+        'upper_right',
+        ['fp4', 'fp8'],
+      );
+
+      expect(
+        body.series.map(
+          (entry: { hwKey: string; precision: string }) => `${entry.hwKey}:${entry.precision}`,
+        ),
+      ).toEqual(['h200_trt:fp4', 'mi300x_vllm:fp8']);
+      expect(
+        [...dashboard]
+          .flatMap(([hwKey, precisions]) => [...precisions].map((p) => `${hwKey}:${p}`))
+          .toSorted(),
+      ).toEqual(['h200_trt:fp4', 'mi300x_vllm:fp8']);
+    });
+
+    it('keeps an explicit single precision exactly as before', async () => {
+      mockGetLatestBenchmarks.mockResolvedValue(multiPrecisionRows());
+      const response = await GET(
+        request('/api/v1/views/inference?model=DeepSeek-R1-0528&precisions=fp8'),
+      );
+      const body = await response.json();
+
+      expect(body.params.precisions).toEqual(['fp8']);
+      expect(
+        body.series.map(
+          (entry: { hwKey: string; precision: string }) => `${entry.hwKey}:${entry.precision}`,
+        ),
+      ).toEqual(['h200_trt:fp8', 'mi300x_vllm:fp8']);
+    });
+
+    it('adds a precision column to CSV rows', async () => {
+      mockGetLatestBenchmarks.mockResolvedValue(multiPrecisionRows());
+      const response = await GET(
+        request('/api/v1/views/inference?model=DeepSeek-R1-0528&best=false&format=csv'),
+      );
+      const csv = await response.text();
+      const [header, ...lines] = csv.trim().split(/\r?\n/u);
+      const columns = header.split(',');
+
+      expect(columns.slice(0, 3)).toEqual(['source', 'hwKey', 'precision']);
+      expect(new Set(lines.map((line) => line.split(',')[2]))).toEqual(new Set(['fp4', 'fp8']));
+    });
   });
 });

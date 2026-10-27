@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { baseSku, bestSeriesPerSku, withUnrankedSkus } from './best-series-per-sku';
+import {
+  baseSku,
+  bestSeriesByPrecisionPerSku,
+  bestSeriesPerSku,
+  restrictGraphToBestPrecisions,
+  restrictToBestPrecisions,
+  withUnrankedSkus,
+} from './best-series-per-sku';
 
 function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
@@ -17,6 +24,99 @@ function frameworkPoint(
 ): InferenceData {
   return { ...point(hw, hwKey, x, y), framework };
 }
+
+function precisionPoint(hwKey: string, precision: string, x: number, y: number): InferenceData {
+  return { ...point('B200-8', hwKey, x, y), precision };
+}
+
+describe('bestSeriesByPrecisionPerSku', () => {
+  it('ranks the FP4 and FP8 curves of one hwKey as separate candidates', () => {
+    // b200_trt FP4 dominates its own FP8 curve; both share the same hwKey.
+    const rows = [
+      precisionPoint('b200_trt', 'fp4', 10, 1000),
+      precisionPoint('b200_trt', 'fp4', 20, 800),
+      precisionPoint('b200_trt', 'fp8', 10, 600),
+      precisionPoint('b200_trt', 'fp8', 20, 500),
+    ];
+
+    expect(bestSeriesByPrecisionPerSku(rows, 'upper_left', ['fp4', 'fp8'])).toEqual(
+      new Map([['b200_trt', new Set(['fp4'])]]),
+    );
+    // Explicit single-precision selection is unchanged.
+    expect(bestSeriesByPrecisionPerSku(rows, 'upper_left', ['fp8'])).toEqual(
+      new Map([['b200_trt', new Set(['fp8'])]]),
+    );
+  });
+
+  it("picks a chip's best config across precisions, not the default precision", () => {
+    // The best FP8 config (sglang) beats the best FP4 config (trt) on this SKU.
+    const rows = [
+      precisionPoint('b200_trt', 'fp4', 10, 500),
+      precisionPoint('b200_trt', 'fp4', 20, 400),
+      precisionPoint('b200_sglang', 'fp8', 10, 900),
+      precisionPoint('b200_sglang', 'fp8', 20, 700),
+      precisionPoint('b200_sglang', 'fp4', 10, 300),
+      precisionPoint('b200_sglang', 'fp4', 20, 200),
+    ];
+
+    expect(bestSeriesByPrecisionPerSku(rows, 'upper_left', ['fp4', 'fp8'])).toEqual(
+      new Map([['b200_sglang', new Set(['fp8'])]]),
+    );
+    expect(bestSeriesPerSku(rows, 'upper_left', ['fp4'])).toEqual(new Set(['b200_trt']));
+  });
+
+  it('does not merge precisions into one envelope that beats both single curves', () => {
+    // trt FP4 wins low x, trt FP8 wins high x; one merged hwKey front would
+    // beat sglang, but neither single trt curve does.
+    const rows = [
+      precisionPoint('b200_trt', 'fp4', 10, 1000),
+      precisionPoint('b200_trt', 'fp4', 20, 100),
+      precisionPoint('b200_trt', 'fp8', 10, 100),
+      precisionPoint('b200_trt', 'fp8', 20, 1000),
+      precisionPoint('b200_sglang', 'fp4', 10, 700),
+      precisionPoint('b200_sglang', 'fp4', 20, 700),
+    ];
+
+    expect(bestSeriesByPrecisionPerSku(rows, 'upper_right', ['fp4', 'fp8'])).toEqual(
+      new Map([['b200_sglang', new Set(['fp4'])]]),
+    );
+  });
+});
+
+describe('restrictToBestPrecisions', () => {
+  it("drops a winning hwKey's losing precision and keeps unranked hwKeys whole", () => {
+    const rows = [
+      precisionPoint('b200_trt', 'fp4', 10, 1000),
+      precisionPoint('b200_trt', 'fp8', 10, 600),
+      precisionPoint('h200_vllm', 'fp8', 10, 40),
+      precisionPoint('h200_vllm', 'bf16', 10, 30),
+    ];
+    const selection = new Map([['b200_trt', new Set(['fp4'])]]);
+
+    expect(
+      restrictToBestPrecisions(rows, selection).map((p) => `${p.hwKey}:${p.precision}`),
+    ).toEqual(['b200_trt:fp4', 'h200_vllm:fp8', 'h200_vllm:bf16']);
+  });
+
+  it('restricts chart, table and clipped rows of a graph together', () => {
+    const fp4 = precisionPoint('b200_trt', 'fp4', 10, 1000);
+    const fp8 = precisionPoint('b200_trt', 'fp8', 10, 600);
+    const graph = {
+      data: [fp4, fp8],
+      tableData: [fp4, fp8],
+      clippedData: [{ point: fp8, reasons: [] }],
+    };
+    const restricted = restrictGraphToBestPrecisions(
+      graph,
+      new Map([['b200_trt', new Set(['fp4'])]]),
+    );
+
+    expect(restricted.data).toEqual([fp4]);
+    expect(restricted.tableData).toEqual([fp4]);
+    expect(restricted.clippedData).toEqual([]);
+    expect(restrictGraphToBestPrecisions(graph, new Map())).toBe(graph);
+  });
+});
 
 describe('bestSeriesPerSku', () => {
   it('ranks only selected precisions so an FP4 winner cannot hide the FP8 SKU', () => {

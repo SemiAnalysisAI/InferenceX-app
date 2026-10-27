@@ -35,7 +35,6 @@ import { replaceClientPathname } from '@/lib/routing/client-navigation';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
-  getModelDefaultPrecisions,
   isSequenceHiddenForModel,
   Model,
   MODEL_OPTIONS,
@@ -46,10 +45,7 @@ import {
 } from '@/lib/catalog/data-mappings';
 import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
 import { computeAutoSwitchDecision } from '@/lib/benchmarks/unofficial-run-auto-switch';
-import {
-  countCurvesByPrecision,
-  resolveEffectivePrecisions,
-} from '@/lib/benchmarks/default-precisions';
+import { resolveEffectivePrecisions } from '@/lib/benchmarks/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
@@ -409,38 +405,14 @@ export function GlobalFilterProvider({
     return merged.length > 0 ? merged : ['fp4'];
   }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
 
-  const precisionCurveCounts = useMemo(
-    () => countCurvesByPrecision(modelRows.filter((r) => rowToSequence(r) === effectiveSequence)),
-    [modelRows, effectiveSequence],
-  );
-
-  const unofficialPrecisionsForSelection = useMemo(
-    () =>
-      unofficialAvailable
-        .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
-        .flatMap((a) => a.precisions),
-    [unofficialAvailable, selectedModel, effectiveSequence],
-  );
-
   const effectivePrecisions = useMemo(
     () =>
       resolveEffectivePrecisions({
         selectedPrecisions,
         availablePrecisions,
-        curveCounts: precisionCurveCounts,
-        unofficialPrecisions: unofficialPrecisionsForSelection,
         explicit: precisionExplicit,
-        modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, effectiveSequence),
       }),
-    [
-      selectedPrecisions,
-      availablePrecisions,
-      precisionCurveCounts,
-      unofficialPrecisionsForSelection,
-      precisionExplicit,
-      selectedModel,
-      effectiveSequence,
-    ],
+    [selectedPrecisions, availablePrecisions, precisionExplicit],
   );
 
   const availableDates = useMemo(() => {

@@ -40,8 +40,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '正安全整数格式的工作流运行 ID。不填时选择默认运行；GPU 指标必须填写。',
   ],
   precisions: [
-    'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays.',
-    '以逗号分隔的精度键；省略时按可用测试曲线数量选择。计算器扩展视图选择官方数据中曲线最多的精度，并纳入 unofficial-run 叠加数据中的精度。',
+    'Comma-separated precision keys; omit to select every available precision, matching the dashboard default. Calculator extensions also include precisions present in unofficial-run overlays.',
+    '以逗号分隔的精度键；省略时选择全部可用精度，与仪表盘默认行为一致。计算器扩展视图还会纳入 unofficial-run 叠加数据中的精度。',
   ],
   gpus: [
     'Comma-separated hardware/config keys; for gpu-metrics use numeric GPU indices. Omit for all.',

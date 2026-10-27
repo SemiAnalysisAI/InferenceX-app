@@ -26,9 +26,10 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
-  bestSeriesPerSku,
+  bestSeriesByPrecisionPerSku,
   withUnrankedSkus,
 } from '@/components/inference/utils/best-series-per-sku';
+import { sortPrecisions } from '@/lib/benchmarks/default-precisions';
 import {
   allInMeasuredTableData,
   allInMeasuredUnavailableReason,
@@ -117,6 +118,8 @@ export interface InferenceSeriesPoint {
 
 export interface InferenceSeriesEntry {
   readonly hwKey: string;
+  /** One series per (hwKey, precision); the FP4 and FP8 curves of a config are separate lines. */
+  readonly precision: string;
   readonly gpu: string;
   readonly framework: string;
   readonly specMethod: string;
@@ -354,27 +357,41 @@ export function buildInferenceSeries(
     }
   }
 
-  // 8. Best series per SKU over the full mapped point set.
-  const bestHwKeys = direction ? bestSeriesPerSku(mapped, direction) : new Set<string>();
+  // 8. Best series per SKU over the full mapped point set. Each (hwKey,
+  //    precision) curve competes separately, so with several precisions a
+  //    chip is represented by its best config across precisions.
+  const bestSelection = direction
+    ? bestSeriesByPrecisionPerSku(mapped, direction)
+    : new Map<string, Set<string>>();
+  const bestHwKeys = new Set(bestSelection.keys());
+  const isBestSeries = (hwKey: string, precision: string) =>
+    bestSelection.get(hwKey)?.has(precision) ?? false;
 
-  // 9. Group into series by hwKey.
-  const byHwKey = new Map<string, InferenceData[]>();
+  // 9. Group into series by (hwKey, precision).
+  const bySeries = new Map<string, Map<string, InferenceData[]>>();
   for (const point of mapped) {
-    const bucket = byHwKey.get(point.hwKey);
+    let byPrecision = bySeries.get(point.hwKey);
+    if (!byPrecision) {
+      byPrecision = new Map();
+      bySeries.set(point.hwKey, byPrecision);
+    }
+    const bucket = byPrecision.get(point.precision);
     if (bucket) bucket.push(point);
-    else byHwKey.set(point.hwKey, [point]);
+    else byPrecision.set(point.precision, [point]);
   }
 
-  const hwKeys = [...byHwKey.keys()].toSorted(
-    (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-  );
+  const seriesKeys = [...bySeries.keys()]
+    .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+    .flatMap((hwKey) =>
+      sortPrecisions(bySeries.get(hwKey)!.keys()).map((precision) => ({ hwKey, precision })),
+    );
 
   const series: InferenceSeriesEntry[] = [];
-  for (const hwKey of hwKeys) {
-    const seriesIsBest = bestHwKeys.has(hwKey);
+  for (const { hwKey, precision } of seriesKeys) {
+    const seriesIsBest = isBestSeries(hwKey, precision);
     if (best && bestHwKeys.size > 0 && !seriesIsBest) continue;
 
-    const allPoints = byHwKey.get(hwKey)!;
+    const allPoints = bySeries.get(hwKey)!.get(precision)!;
     const kept = optimal ? allPoints.filter((point) => frontierPoints.has(point)) : allPoints;
     if (kept.length === 0) continue;
 
@@ -383,6 +400,7 @@ export function buildInferenceSeries(
 
     series.push({
       hwKey,
+      precision,
       gpu: hwKey.split('_')[0],
       framework: sample.framework ?? '',
       specMethod: sample.spec_decoding ?? 'none',
@@ -430,7 +448,12 @@ export function buildInferenceSeries(
       : undefined;
   const tableRows = allInRows
     ? allInRows
-        .filter((point) => !tableHwKeys || tableHwKeys.has(point.hwKey))
+        .filter(
+          (point) =>
+            !tableHwKeys ||
+            (tableHwKeys.has(point.hwKey) &&
+              (!bestSelection.has(point.hwKey) || isBestSeries(point.hwKey, point.precision))),
+        )
         .map((point): InferenceTableRow => {
           const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
           const x =
@@ -466,7 +489,7 @@ export function buildInferenceSeries(
               ? {}
               : { runId: runIdFromUrl(point.run_url) }),
             frontier: unavailableReason === null && frontierMetrics.has(point[metricKey]),
-            bestPerSku: bestHwKeys.has(point.hwKey),
+            bestPerSku: isBestSeries(point.hwKey, point.precision),
             metrics: pointMetrics(point, metricKey),
             measuredGpuWatts: point.measuredAvgPower!.y,
             status: unavailableReason === null ? 'available' : 'unavailable',

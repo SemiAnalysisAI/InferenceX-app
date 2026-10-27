@@ -55,7 +55,11 @@ import {
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import {
+  bestSeriesByPrecisionPerSku,
+  bestSeriesPerSku,
+  restrictGraphToBestPrecisions,
+} from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
@@ -490,7 +494,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useUnofficialRun();
   const { tcoBasis } = useGlobalFilterSelection();
 
-  const overlayDataByChartType = useMemo(() => {
+  const unrestrictedOverlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
       return { e2e: null, interactivity: null };
     }
@@ -612,6 +616,40 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     tcoBasis,
     tokenBasis,
     compareGpuPair,
+  ]);
+
+  // Optimal Only keeps only each overlay SKU's winning (hwKey, precision) curve,
+  // matching the official graphs restricted in InferenceContext.
+  const overlayDataByChartType = useMemo(() => {
+    if (!bestPerSku || selectedPrecisions.length < 2) return unrestrictedOverlayDataByChartType;
+    const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
+    const ranked = unrestrictedOverlayDataByChartType[wantedType];
+    const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
+    const direction =
+      graph?.chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition];
+    if (
+      !ranked ||
+      (direction !== 'upper_right' &&
+        direction !== 'upper_left' &&
+        direction !== 'lower_left' &&
+        direction !== 'lower_right')
+    ) {
+      return unrestrictedOverlayDataByChartType;
+    }
+    const selection = bestSeriesByPrecisionPerSku(ranked.data, direction, selectedPrecisions);
+    const restrict = (overlay: OverlayData | null) =>
+      overlay ? restrictGraphToBestPrecisions(overlay, selection) : overlay;
+    return {
+      e2e: restrict(unrestrictedOverlayDataByChartType.e2e),
+      interactivity: restrict(unrestrictedOverlayDataByChartType.interactivity),
+    };
+  }, [
+    bestPerSku,
+    graphs,
+    selectedPrecisions,
+    selectedXAxisMode,
+    selectedYAxisMetric,
+    unrestrictedOverlayDataByChartType,
   ]);
 
   const overlayScope = useMemo(() => {

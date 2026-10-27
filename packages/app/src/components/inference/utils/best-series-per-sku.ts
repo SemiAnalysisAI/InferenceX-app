@@ -13,43 +13,71 @@ export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
 }
 
 interface ScoredSeries {
-  key: string;
+  hwKey: string;
+  precision: string;
   points: InferenceData[];
   minX: number;
   maxX: number;
 }
 
-export function bestSeriesPerSku(
+/** Winning series per base SKU: hwKey → the precision(s) whose curve won for it. */
+export type BestSeriesSelection = Map<string, Set<string>>;
+
+function addWinner(selection: BestSeriesSelection, hwKey: string, precision: string): void {
+  const precisions = selection.get(hwKey) ?? new Set<string>();
+  precisions.add(precision);
+  selection.set(hwKey, precisions);
+}
+
+/**
+ * Ranks every (hwKey, precision) series of each base SKU and keeps the winner.
+ *
+ * A series is one hardware/framework/spec config at one precision, so the FP4
+ * and FP8 curves of the same hwKey compete as separate candidates rather than
+ * being merged into one Pareto front. With several precisions selected this
+ * picks each chip's best config across precisions; with one precision selected
+ * it is identical to ranking hwKeys within that precision.
+ */
+export function bestSeriesByPrecisionPerSku(
   points: InferenceData[],
   direction: Direction,
   precisions?: readonly string[],
-): Set<string> {
-  const bySku = new Map<string, Map<string, InferenceData[]>>();
-  const featured = new Set<string>();
+): BestSeriesSelection {
+  const bySku = new Map<string, Map<string, ScoredSeries>>();
+  const selected: BestSeriesSelection = new Map();
   for (const point of points) {
     if (precisions && !precisions.includes(point.precision)) continue;
     if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
-    const key = String(point.hwKey);
-    if (point.framework === 'tilert') featured.add(key);
+    const hwKey = String(point.hwKey);
+    const precision = String(point.precision);
+    if (point.framework === 'tilert') addWinner(selected, hwKey, precision);
     let series = bySku.get(sku);
     if (!series) {
       series = new Map();
       bySku.set(sku, series);
     }
-    const rows = series.get(key) ?? [];
-    rows.push(point);
-    series.set(key, rows);
+    const seriesKey = `${hwKey}\u0000${precision}`;
+    const entry = series.get(seriesKey) ?? {
+      hwKey,
+      precision,
+      points: [],
+      minX: Infinity,
+      maxX: -Infinity,
+    };
+    entry.points.push(point);
+    series.set(seriesKey, entry);
   }
 
-  const selected = new Set(featured);
   const higherYIsBetter = direction.startsWith('upper');
 
   for (const series of bySku.values()) {
-    const candidates: ScoredSeries[] = [...series.entries()].map(([key, rows]) => {
-      const frontier = paretoFrontForDirection(direction)([...rows]).toSorted((a, b) => a.x - b.x);
+    const candidates: ScoredSeries[] = [...series.values()].map((entry) => {
+      const frontier = paretoFrontForDirection(direction)([...entry.points]).toSorted(
+        (a, b) => a.x - b.x,
+      );
       return {
-        key,
+        ...entry,
         points: frontier,
         minX: frontier[0]?.x ?? Infinity,
         maxX: frontier.at(-1)?.x ?? -Infinity,
@@ -58,7 +86,7 @@ export function bestSeriesPerSku(
     const usable = candidates.filter((candidate) => candidate.points.length > 0);
     if (usable.length === 0) continue;
     if (usable.length === 1) {
-      selected.add(usable[0].key);
+      addWinner(selected, usable[0].hwKey, usable[0].precision);
       continue;
     }
 
@@ -73,7 +101,7 @@ export function bestSeriesPerSku(
               candidate.points.length === Math.max(...usable.map((item) => item.points.length)),
           );
     if (scoringPool.length === 1) {
-      selected.add(scoringPool[0].key);
+      addWinner(selected, scoringPool[0].hwKey, scoringPool[0].precision);
       continue;
     }
 
@@ -100,11 +128,63 @@ export function bestSeriesPerSku(
 
     const winner = scoringPool
       .map((candidate) => ({ candidate, score: score(candidate) }))
-      .toSorted((a, b) => b.score - a.score || a.candidate.key.localeCompare(b.candidate.key))[0];
-    selected.add(winner.candidate.key);
+      .toSorted(
+        (a, b) =>
+          b.score - a.score ||
+          a.candidate.hwKey.localeCompare(b.candidate.hwKey) ||
+          a.candidate.precision.localeCompare(b.candidate.precision),
+      )[0];
+    addWinner(selected, winner.candidate.hwKey, winner.candidate.precision);
   }
 
   return selected;
+}
+
+/** hwKeys of the winning series per base SKU (see `bestSeriesByPrecisionPerSku`). */
+export function bestSeriesPerSku(
+  points: InferenceData[],
+  direction: Direction,
+  precisions?: readonly string[],
+): Set<string> {
+  return new Set(bestSeriesByPrecisionPerSku(points, direction, precisions).keys());
+}
+
+/**
+ * Drops the losing precisions of each winning hwKey so Optimal Only renders the
+ * winning curve alone. hwKeys without a ranked winner (unranked or unselected
+ * configs) keep every precision.
+ */
+export function restrictToBestPrecisions<T extends { hwKey: unknown; precision: unknown }>(
+  points: readonly T[],
+  selection: ReadonlyMap<string, ReadonlySet<string>>,
+): T[] {
+  return points.filter((point) => {
+    const winners = selection.get(String(point.hwKey));
+    return !winners || winners.has(String(point.precision));
+  });
+}
+
+/** Applies `restrictToBestPrecisions` to a graph's chart, table and clipped rows. */
+export function restrictGraphToBestPrecisions<
+  G extends {
+    data: InferenceData[];
+    tableData?: InferenceData[];
+    clippedData?: { point: InferenceData }[];
+  },
+>(graph: G, selection: ReadonlyMap<string, ReadonlySet<string>>): G {
+  if (selection.size === 0) return graph;
+  return {
+    ...graph,
+    data: restrictToBestPrecisions(graph.data, selection),
+    ...(graph.tableData ? { tableData: restrictToBestPrecisions(graph.tableData, selection) } : {}),
+    ...(graph.clippedData
+      ? {
+          clippedData: graph.clippedData.filter(
+            (clipped) => restrictToBestPrecisions([clipped.point], selection).length > 0,
+          ),
+        }
+      : {}),
+  };
 }
 
 export function withUnrankedSkus(
