@@ -9,6 +9,7 @@ import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface'
 import type * as MediaQueryHooks from '@/hooks/useMediaQuery';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { getHardwareConfig } from '@/lib/catalog/constants';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
@@ -28,14 +29,21 @@ vi.mock('@/hooks/useUrlState', () => ({
 vi.mock('@/hooks/useThemeColors', () => ({
   useThemeColors: () => ({ resolveColor: (key: string) => `var(--${key})` }),
 }));
-vi.mock('@/providers/unofficial-run-provider', () => ({
-  useUnofficialRun: () => ({ runIndexByUrl: {} }),
+// The overlay-run context, set per test for the `?unofficialrun=` cases.
+const unofficial = vi.hoisted(() => ({
+  runIndexByUrl: {} as Record<string, number>,
+  unofficialRunInfos: [] as { id: number; branch: string }[],
 }));
-// jsdom has no media queries: the pointer type is flipped per test for the touch branch.
-const media = vi.hoisted(() => ({ coarsePointer: false }));
+vi.mock('@/providers/unofficial-run-provider', () => ({
+  useUnofficialRun: () => unofficial,
+}));
+// jsdom has no media queries: the pointer type and the viewport are flipped per test for
+// the touch and phone branches.
+const media = vi.hoisted(() => ({ coarsePointer: false, mobile: false }));
 vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
   ...(await importOriginal<typeof MediaQueryHooks>()),
   useIsCoarsePointer: () => media.coarsePointer,
+  useIsMobileViewport: () => media.mobile,
 }));
 // The breakdown plot is D3 against a measured layout; jsdom has none, so the chart is a stub.
 vi.mock('@/lib/d3-chart/D3Chart', () => ({
@@ -98,6 +106,7 @@ function point(
   conc: number,
   interactivity: number,
   watts: number,
+  runUrl = 'https://example.invalid/runs/900000001',
 ): InferenceData {
   const framework = hwKey === 'b200_vllm' ? 'vllm' : 'sglang';
   return {
@@ -112,7 +121,7 @@ function point(
     decode_tp: 8,
     conc,
     date: '2026-09-23',
-    run_url: 'https://example.invalid/runs/900000001',
+    run_url: runUrl,
     benchmark_type: 'single_turn',
     disagg: false,
     x: interactivity,
@@ -154,7 +163,7 @@ const VLLM_TITLE = `${label('b200_vllm')} FP8 across load`;
 let container: HTMLDivElement;
 let root: Root;
 
-const mount = (data: InferenceData[]) => {
+const mount = (data: InferenceData[], overlayData: InferenceData[] = []) => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -163,6 +172,7 @@ const mount = (data: InferenceData[]) => {
       <PowerXSurfaceProvider>
         <PowerAnalysisPanels
           data={data}
+          overlayData={overlayData}
           xField="mean_tpot_intvty"
           xLabel="Interactivity (output tok/s/user)"
           chartId="chart-0"
@@ -183,6 +193,9 @@ beforeEach(() => {
   urlState.setUrlParams.mockClear();
   track.mockClear();
   media.coarsePointer = false;
+  media.mobile = false;
+  unofficial.runIndexByUrl = {};
+  unofficial.unofficialRunInfos = [];
   mount([...sglang, ...vllm]);
 });
 
@@ -462,5 +475,165 @@ describe('PowerAnalysisPanels per-chip compared point from the share link', () =
     expect(pinnedRows()).toHaveLength(0);
     expect(rowPoint(rowFor(VLLM_TITLE))).toBe('c64 · 30 tok/s/user');
     expect(lastUrlWrite()).toEqual({ i_pbpoint: '' });
+  });
+});
+
+const partRows = () => [
+  ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-part-row"]'),
+];
+const partsToggle = () =>
+  container.querySelector<HTMLButtonElement>('[data-testid="power-parts-toggle"]');
+const cardName = (row: HTMLElement) => row.querySelector('.truncate')?.textContent;
+const segmentsOf = (row: HTMLElement) => [
+  ...row.querySelectorAll<HTMLElement>('[data-testid="power-chip-compare-segment"]'),
+];
+const barOf = (row: HTMLElement) => segmentsOf(row)[0].parentElement!.parentElement!;
+
+describe('PowerAnalysisPanels on a PowerX phone (compact chip cards, folded parts)', () => {
+  const phone = (data = [...sglang, ...vllm], overlayData: InferenceData[] = []) => {
+    unmount();
+    media.mobile = true;
+    media.coarsePointer = true;
+    mount(data, overlayData);
+  };
+
+  it('renders 56 px chip cards with the point, the total, the GPU share and an 8 px bar without numbers', () => {
+    phone();
+    const cards = rows();
+    expect(cards).toHaveLength(2);
+    expect(cards.map(cardName)).toEqual([
+      `${label('b200_sglang')} FP8`,
+      `${label('b200_vllm')} FP8`,
+    ]);
+    for (const card of cards) {
+      expect(card.dataset.layout).toBe('compact');
+      expect(card.className).toContain('min-h-14');
+      expect(card.className).not.toContain('sm:grid-cols');
+      expect(rowPoint(card)).toMatch(/^c\d+ · \d+ tok\/s\/user$/u);
+      expect(card.textContent).toMatch(/\d W/u);
+      expect(card.textContent).toMatch(/GPU \d+%/u);
+      expect(
+        card.querySelector<HTMLElement>('[data-testid="power-basis-pill"]')?.dataset.basis,
+      ).toBe('it');
+      const segments = segmentsOf(card);
+      expect(segments.length).toBeGreaterThan(1);
+      for (const segment of segments) expect(segment.textContent).toBe('');
+      expect(segments.map((segment) => segment.dataset.band)[0]).toBe('gpu');
+      expect(barOf(card).className).toContain('h-2');
+      expect(barOf(card).className).toContain('col-span-2');
+    }
+    // The drill-down still opens under the compared chip and its row says so.
+    expect(expandedRow()).not.toBeNull();
+    expect(cardName(expandedRow()!)).toBe(`${label('b200_vllm')} FP8`);
+    expect(drilldowns()).toHaveLength(1);
+    // From md up the rows keep their 28 px bar with the watt labels.
+    unmount();
+    media.mobile = false;
+    media.coarsePointer = false;
+    mount([...sglang, ...vllm]);
+    const desktop = rows()[0];
+    expect(desktop.dataset.layout).toBeUndefined();
+    expect(desktop.className).toContain('sm:grid-cols');
+    const gpuSegment = segmentsOf(desktop).find((segment) => segment.dataset.band === 'gpu')!;
+    expect(gpuSegment.textContent).toMatch(/^\d+$/u);
+    expect(barOf(desktop).className).toContain('h-7');
+  });
+
+  it('keeps the pin marker and the pinned point on a compact card', () => {
+    unmount();
+    media.mobile = true;
+    media.coarsePointer = true;
+    urlState.params = { i_pbpoint: 'b200_vllm|fp8:64' };
+    mount([...sglang, ...vllm]);
+    const vllmRow = rows()[1];
+    expect(vllmRow.dataset.layout).toBe('compact');
+    expect(vllmRow.dataset.pinned).toBe('true');
+    expect(rowPoint(vllmRow)).toBe('c64 · 30 tok/s/user');
+    const pointLabel = vllmRow.querySelector<HTMLElement>(
+      '[data-testid="power-chip-compare-point"]',
+    )!;
+    expect(pointLabel.parentElement?.className).toContain(PIN_ACCENT_CLASS);
+    const unpin = vllmRow.querySelector<HTMLElement>('[data-testid="power-chip-compare-unpin"]')!;
+    expect(unpin.getAttribute('title')).toBe('Pinned to c64 · click to follow the slider');
+    expect(unpin.className).toContain('max-md:size-8');
+    act(() => unpin.click());
+    expect(pinnedRows()).toHaveLength(0);
+    expect(rowPoint(rows()[1])).toBe('c16 · 60 tok/s/user');
+  });
+
+  it('folds the drill-down parts list to three rows behind an All N parts row', () => {
+    phone();
+    const list = container.querySelector<HTMLElement>('[data-testid="power-parts-list"]')!;
+    expect(list.dataset.folded).toBe('true');
+    expect(partRows()).toHaveLength(3);
+    expect(partRows()[0].dataset.category).toBe('gpu');
+    const toggle = partsToggle()!;
+    expect(toggle.textContent).toMatch(/^All \d+ parts · across load$/u);
+    const count = Number(/\d+/u.exec(toggle.textContent!)![0]);
+    expect(count).toBeGreaterThan(3);
+    act(() => toggle.click());
+    expect(partRows()).toHaveLength(count);
+    expect(track).toHaveBeenCalledWith('powerx_parts_expanded', {
+      expanded: true,
+      hw: 'b200_vllm',
+    });
+    // A pin made in the open list survives the fold.
+    const last = partRows().at(-1)!;
+    const category = last.dataset.category!;
+    act(() => last.click());
+    const pinnedPart = () =>
+      container.querySelector<HTMLElement>(
+        `[data-testid="power-part-row"][data-category="${category}"]`,
+      );
+    expect(pinnedPart()?.getAttribute('aria-pressed')).toBe('true');
+    expect(partRows().at(-1)).toBe(last);
+    act(() => partsToggle()!.click());
+    expect(partRows()).toHaveLength(4);
+    expect(partRows().map((item) => item.dataset.category)).toContain(category);
+    expect(pinnedPart()?.getAttribute('aria-pressed')).toBe('true');
+    // The list follows the slider to the other chip, still folded.
+    moveSlider(0);
+    expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toBe(
+      `${label('b200_sglang')} FP8 · c64 · 20 tok/s/user`,
+    );
+    expect(partRows()).toHaveLength(4);
+  });
+
+  it('colours an overlay run’s compact card and its folded parts with the run colour', () => {
+    const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
+    const overlay = [
+      point(31, 'h200_sglang', 64, 25, 300, RUN_URL),
+      point(32, 'h200_sglang', 16, 50, 250, RUN_URL),
+      point(33, 'h200_sglang', 4, 90, 200, RUN_URL),
+    ];
+    unofficial.runIndexByUrl = { [RUN_URL]: 0 };
+    unofficial.unofficialRunInfos = [{ id: 777, branch: 'phone-rows' }];
+    phone([...sglang, ...vllm, ...overlay], overlay);
+    const cards = rows();
+    // Official chips first, the overlay line after them.
+    expect(cards).toHaveLength(3);
+    const card = cards[2];
+    expect(card.dataset.layout).toBe('compact');
+    expect(cardName(card)).toContain('phone-rows');
+    expect(card.querySelector('span[aria-hidden]')?.getAttribute('style')).toContain(
+      overlayRunColor(0),
+    );
+    for (const segment of segmentsOf(card)) {
+      expect(segment.getAttribute('style')).toContain('--overlay-run-0');
+      expect(segment.textContent).toBe('');
+    }
+    // Its drill-down lists the run's parts in the run colour, folded like an official chip's.
+    if (card.getAttribute('aria-expanded') !== 'true') act(() => card.click());
+    expect(cardName(expandedRow()!)).toContain('phone-rows');
+    expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toContain(
+      'phone-rows',
+    );
+    expect(partRows()).toHaveLength(3);
+    for (const item of partRows()) {
+      expect(
+        item.querySelector<HTMLElement>('[data-testid="power-part-bar"]')?.getAttribute('style'),
+      ).toContain('--overlay-run-0');
+    }
+    expect(partsToggle()!.textContent).toMatch(/^All \d+ parts · across load$/u);
   });
 });

@@ -135,6 +135,17 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   chips at N tok/s/user" button under the plot moves the slider to the readout's
   interactivity (the slider's own action, so every pin drops; `powerx_compare_at_scrub`),
   disabled while the slider already reads it. A mouse keeps the hover label and the click.
+- Phones (PowerX under `md`, `useIsMobileViewport()`): the chip rows are 56 px cards (name
+  and total W with its basis pill on the first line, `c<N> · <interactivity>` with the pin
+  marker and "GPU NN%" on the second, one 8 px stacked bar with the same layer steps and
+  hatches and no in-bar watt labels; `data-layout="compact"`), the parts list folds to its
+  three largest IT parts by watts (the facility row always folds) plus an "All N parts ·
+  across load" row (`power-parts-toggle`, `aria-expanded`/`aria-controls`,
+  `powerx_parts_expanded`) that opens the rest in place, in 56 px rows (name, watts and
+  share above the 8 px bar and the sparkline). Open, the list keeps its order and a tap pins
+  a row where it is; when the list folds, a pinned part that sits in the remainder stays
+  among the visible rows (`foldPowerPartRows`). The CSV export keeps every part. With the touch readout above the plot the drill-down plot is
+  260 px high instead of 380 (`PHONE_PLOT_HEIGHT`). From `md` up nothing changes.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
   is gone, and only the shared /inference footer notes remain. The meaning of the GPU /

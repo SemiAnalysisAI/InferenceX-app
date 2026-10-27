@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
+import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
@@ -199,6 +199,13 @@ const MARGIN = { top: 40, right: 18, bottom: 56, left: 65 };
  * the readout and the plot shrinks from 40 px to 16 px. Mouse charts keep MARGIN.
  */
 const TOUCH_MARGIN = { ...MARGIN, top: 16 };
+const PLOT_HEIGHT = 380;
+/**
+ * PowerX on a phone with the touch readout above the plot: the readout carries the
+ * numbers, so the plot itself sits at 260 px (188 px inside TOUCH_MARGIN), enough for
+ * the stack, the reference lines with their labels, the guide and the scrub rule.
+ */
+const PHONE_PLOT_HEIGHT = 260;
 
 /** Minimum free width around a column before its total label is drawn. */
 const TOTAL_LABEL_MIN_GAP_PX = 46;
@@ -406,11 +413,14 @@ function BreakdownChart({
   onUnpin,
   coarsePointer,
   scrub,
+  plotHeight = PLOT_HEIGHT,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
   color: string;
   view: PowerBreakdownView;
+  /** Plot height in px; PowerX phones with the readout above the plot use `PHONE_PLOT_HEIGHT`. */
+  plotHeight?: number;
   xLabel: string;
   t: (typeof STRINGS)['en'];
   /** What the stack total is called in the tooltip (All in Measured, or IT without PUE). */
@@ -1254,7 +1264,7 @@ function BreakdownChart({
     <D3Chart<Column>
       chartId={`${sectionId}-plot`}
       data={columns}
-      height={380}
+      height={plotHeight}
       testId={`${sectionId}-plot`}
       watermark="logo"
       zoom={{ enabled: false }}
@@ -1431,6 +1441,7 @@ export default function PowerBreakdownPanel({
   const color = series ? colorOf(series) : 'currentColor';
   const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
   const coarsePointer = useIsCoarsePointer();
+  const phone = useIsMobileViewport();
   // PowerX on a touch-primary device: a drag across the plot scrubs the readout above
   // it, a tap holds the column (pins this chip's compared point) and an explicit
   // button moves the slider; with a mouse the plot keeps its hover label and click.
@@ -1677,6 +1688,7 @@ export default function PowerBreakdownPanel({
                 onUnpin={layers.unpin}
                 coarsePointer={coarsePointer}
                 scrub={touchScrub ? { index: scrubIndex, onScrub } : undefined}
+                plotHeight={touchScrub && phone ? PHONE_PLOT_HEIGHT : PLOT_HEIGHT}
               />
               {touchScrub && readoutEntry && setCompareTarget && (
                 <button
