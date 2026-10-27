@@ -1540,7 +1540,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           });
 
   return (
-    <div data-testid="inference-chart-display" className="flex flex-col gap-4">
+    <div
+      data-testid="inference-chart-display"
+      // PowerX phones: globals.css enlarges shared chart chrome under this marker.
+      data-powerx-surface={powerXLayout ? '' : undefined}
+      className="flex flex-col gap-4"
+    >
       {!minimalChrome && (
         <section className="relative z-20">
           <Card>
@@ -1562,12 +1567,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
-                      powerXLayout && powerXMounted ? (
-                        <PowerXChartConfig
-                          selection={powerXSelection}
-                          onSelectionChange={setPowerXSelection}
-                        />
-                      ) : undefined
+                      powerXLayout && powerXMounted
+                        ? (slots) => (
+                            <PowerXChartConfig
+                              selection={powerXSelection}
+                              onSelectionChange={setPowerXSelection}
+                              slots={slots}
+                            />
+                          )
+                        : undefined
                     }
                   />
                 </>

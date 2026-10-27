@@ -86,7 +86,12 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   on the views they apply to, and the Rated boundaries toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
-  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`.
+  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`. Under `md`
+  the view tabs become a 2×2 grid of 48 px buttons, Count and Per (or Show as) render as native
+  selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
+  and the X-Axis Metric, Scope, Power statistic and Rated boundaries sit behind one "More" row
+  (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
+  off there and the pinned point sheet says Tap. From `md` up nothing changes.
 - The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
   `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
   line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and

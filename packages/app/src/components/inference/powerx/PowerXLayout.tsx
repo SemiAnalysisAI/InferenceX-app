@@ -1,12 +1,14 @@
 'use client';
 
-import { type ReactNode, useId } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { type ReactNode, useId, useState } from 'react';
 
 import { MeasuredMetricControls } from '@/components/inference/ui/MeasuredMetricControls';
 import { powerCompareAvailable } from '@/components/inference/utils/power-compare';
 import { Badge } from '@/components/ui/badge';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -35,6 +37,7 @@ import {
   powerXMetricFields,
   powerXRatedAvailable,
   powerXRatedOn,
+  powerXSecondaryChangedCount,
   powerXShowAsFor,
   powerXViewFor,
   selectPowerXCount,
@@ -120,6 +123,8 @@ const STRINGS = {
     roles: 'Prefill vs decode',
     rolesUnavailable: 'Needs disaggregated prefill/decode results',
     rolesNoData: 'No validated prefill/decode telemetry for this model and scenario',
+    more: 'More',
+    moreChanged: (count: number) => `More · ${count} changed`,
   },
   zh: {
     title: 'PowerX 功耗',
@@ -187,6 +192,8 @@ const STRINGS = {
     roles: '预填充 vs 解码',
     rolesUnavailable: '需要预填充/解码分离部署的结果',
     rolesNoData: '该模型与场景暂无经过验证的预填充/解码遥测数据',
+    more: '更多',
+    moreChanged: (count: number) => `更多 · 已更改 ${count} 项`,
   },
 } as const;
 
@@ -194,7 +201,11 @@ export function usePowerXStrings() {
   return STRINGS[useLocale()];
 }
 
-/** The four views as a tab strip under the section header, where /inference has no equivalent. */
+/**
+ * The four views as a tab strip under the section header, where /inference has no
+ * equivalent. Under md the strip is a 2×2 grid of 48 px buttons, so Over time is
+ * on screen without a sideways scroll; from md up it is the underlined row.
+ */
 export function PowerXViewTabs({
   selection,
   onSelectionChange,
@@ -209,7 +220,7 @@ export function PowerXViewTabs({
       role="tablist"
       aria-label={t.viewsLabel}
       data-testid="powerx-tabs"
-      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60"
+      className="-mt-1 flex min-w-0 max-w-full gap-1 overflow-x-auto border-b border-border/60 max-md:grid max-md:grid-cols-2 max-md:gap-1.5 max-md:border-b-0 max-md:pb-1"
     >
       {POWERX_VIEWS.map((value) => {
         const selected = value === view;
@@ -228,7 +239,9 @@ export function PowerXViewTabs({
             }}
             className={cn(
               '-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors hover:border-muted-foreground/30 md:min-h-9',
-              selected && 'border-secondary text-secondary dark:border-primary dark:text-primary',
+              'max-md:mb-0 max-md:min-h-12 max-md:justify-center max-md:rounded-md max-md:border max-md:bg-muted/30 max-md:px-2',
+              selected &&
+                'border-secondary text-secondary max-md:bg-secondary/10 dark:border-primary dark:text-primary dark:max-md:bg-primary/10',
             )}
           >
             {t.views[value]}
@@ -276,6 +289,8 @@ export function PowerXCountControls({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // Phones get one native select per group, with each segment's hint in its option.
+  const variant = useIsMobileViewport() ? 'select' : 'segments';
   const view = powerXViewFor(selection.metric, selection.compare);
   if (view !== 'energy' && view !== 'draw') return null;
   const energyPer = energyPerFor(selection.metric);
@@ -292,6 +307,7 @@ export function PowerXCountControls({
           role="group"
           testId="powerx-boundary"
           size="default"
+          variant={variant}
           className={CELL_TOGGLE_CLASS}
           buttonClassName={CELL_SEGMENT_CLASS}
           onValueChange={(next) => {
@@ -329,6 +345,7 @@ export function PowerXCountControls({
             role="group"
             testId="powerx-energy-per"
             size="default"
+            variant={variant}
             className={CELL_TOGGLE_CLASS}
             buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) => {
@@ -350,6 +367,7 @@ export function PowerXCountControls({
             role="group"
             testId="powerx-unit"
             size="default"
+            variant={variant}
             className={CELL_TOGGLE_CLASS}
             buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) =>
@@ -372,6 +390,12 @@ export function PowerXCountControls({
   );
 }
 
+/** The X-Axis Metric cell ChartControls hands PowerX, with whether it is off its default. */
+export interface PowerXChartConfigSlots {
+  xAxisSelector: ReactNode;
+  xAxisChanged: boolean;
+}
+
 /**
  * The PowerX part of the Chart Config fieldset. It renders as `contents`, so
  * every control is a cell of the same grid /inference lays its Chart Config
@@ -379,51 +403,99 @@ export function PowerXCountControls({
  * and Count, row two Per or Show as, then Scope, Power statistic and Rated
  * boundaries on the views they apply to, flowing left to right with no gaps.
  * Split by lives in the Where the power goes card.
+ *
+ * Under md, Count and Per (or Show as) stay in front and everything else (the
+ * X-Axis Metric, Scope, Power statistic, Rated boundaries) sits behind one
+ * 44 px "More" row that names how many of them are off their default.
  */
 export function PowerXChartConfig({
   selection,
   onSelectionChange,
+  slots,
 }: {
   selection: PowerXSelection;
   onSelectionChange: (next: PowerXSelection) => void;
+  slots?: PowerXChartConfigSlots;
 }) {
   const t = usePowerXStrings();
+  const phone = useIsMobileViewport();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreId = useId();
   const fields = powerXMetricFields(selection.metric, selection.compare);
+  const ratedAvailable = powerXRatedAvailable(selection.metric);
   // On: measured GPU power against the all-in provisioned bound, two lines per chip.
   const ratedMode: 'none' | 'provisioned' = powerXRatedOn(selection.compare)
     ? 'provisioned'
     : 'none';
+  const measuredControls = fields.length > 0 && (
+    <MeasuredMetricControls
+      metric={selection.metric}
+      onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
+      fields={fields}
+      className="contents"
+    />
+  );
+  const ratedControl = ratedAvailable && (
+    <Field label={t.compareBoundaries} tooltip={t.compareAllHelp}>
+      <SegmentedToggle<'none' | 'provisioned'>
+        value={ratedMode}
+        ariaLabel={t.compareBoundaries}
+        role="group"
+        testId="powerx-compare-boundaries"
+        size="default"
+        className={CELL_TOGGLE_CLASS}
+        buttonClassName={CELL_SEGMENT_CLASS}
+        onValueChange={(mode) => {
+          track('inference_power_compare_changed', { mode, family: 'powerx' });
+          onSelectionChange(selectPowerXRated(mode === 'provisioned', selection));
+        }}
+        options={[
+          { value: 'none', label: t.compareOff },
+          { value: 'provisioned', label: t.compareAll, title: t.compareAllHelp },
+        ]}
+      />
+    </Field>
+  );
+  if (!phone) {
+    return (
+      <div className="contents" data-testid="powerx-chart-config">
+        {slots?.xAxisSelector}
+        <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
+        {measuredControls}
+        {ratedControl}
+      </div>
+    );
+  }
+  const secondary = Boolean(slots?.xAxisSelector) || fields.length > 0 || ratedAvailable;
+  const changed = powerXSecondaryChangedCount(selection) + (slots?.xAxisChanged ? 1 : 0);
   return (
     <div className="contents" data-testid="powerx-chart-config">
       <PowerXCountControls selection={selection} onSelectionChange={onSelectionChange} />
-      {fields.length > 0 && (
-        <MeasuredMetricControls
-          metric={selection.metric}
-          onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
-          fields={fields}
-          className="contents"
-        />
-      )}
-      {powerXRatedAvailable(selection.metric) && (
-        <Field label={t.compareBoundaries} tooltip={t.compareAllHelp}>
-          <SegmentedToggle<'none' | 'provisioned'>
-            value={ratedMode}
-            ariaLabel={t.compareBoundaries}
-            role="group"
-            testId="powerx-compare-boundaries"
-            size="default"
-            className={CELL_TOGGLE_CLASS}
-            buttonClassName={CELL_SEGMENT_CLASS}
-            onValueChange={(mode) => {
-              track('inference_power_compare_changed', { mode, family: 'powerx' });
-              onSelectionChange(selectPowerXRated(mode === 'provisioned', selection));
-            }}
-            options={[
-              { value: 'none', label: t.compareOff },
-              { value: 'provisioned', label: t.compareAll, title: t.compareAllHelp },
-            ]}
+      {secondary && (
+        <button
+          type="button"
+          aria-expanded={moreOpen}
+          aria-controls={moreId}
+          data-testid="powerx-more"
+          onClick={() => {
+            setMoreOpen((open) => !open);
+            track('powerx_more_toggled', { expanded: !moreOpen, changed });
+          }}
+          className="col-span-full flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
+        >
+          <span>{changed > 0 ? t.moreChanged(changed) : t.more}</span>
+          <ChevronDown
+            aria-hidden="true"
+            className={cn('size-4 shrink-0 transition-transform', moreOpen && 'rotate-180')}
           />
-        </Field>
+        </button>
+      )}
+      {secondary && moreOpen && (
+        <div id={moreId} className="contents" data-testid="powerx-more-content">
+          {slots?.xAxisSelector}
+          {measuredControls}
+          {ratedControl}
+        </div>
       )}
     </div>
   );

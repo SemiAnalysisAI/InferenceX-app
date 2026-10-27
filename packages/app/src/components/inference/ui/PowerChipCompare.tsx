@@ -9,6 +9,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
 import { swatchStyle } from './PowerBreakdownPanel';
@@ -38,6 +39,7 @@ import { IT_NOT_MODELED_NOTE } from '@/lib/power/power-basis';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
+  usePowerXSurface,
   useSetPowerXCompareTarget,
 } from './powerx-surface';
 
@@ -184,6 +186,8 @@ export default function PowerChipCompare({
   const locale = useLocale();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
+  // PowerX phones: 44 px legend and chip rows, a 28 px slider thumb (globals.css).
+  const powerX = usePowerXSurface();
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
@@ -307,7 +311,10 @@ export default function PowerChipCompare({
               onTargetChange?.();
             }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
-            className="min-w-0 flex-1 accent-secondary dark:accent-primary"
+            className={cn(
+              'min-w-0 flex-1 accent-secondary dark:accent-primary',
+              powerX && 'powerx-range text-secondary dark:text-primary',
+            )}
             data-testid="power-chip-compare-target"
             aria-valuetext={`${rate(value)} ${t.unit}`}
           />
@@ -345,9 +352,11 @@ export default function PowerChipCompare({
                 onFocus={() => layers.hover(bandTarget(band))}
                 onBlur={() => layers.hover(null)}
                 onClick={() => layers.togglePin(bandTarget(band))}
-                className={`flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
-                  pinned ? 'bg-muted ring-1 ring-border' : ''
-                }`}
+                className={cn(
+                  'flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60',
+                  powerX && 'max-md:min-h-11',
+                  pinned && 'bg-muted ring-1 ring-border',
+                )}
               >
                 <span
                   aria-hidden
@@ -406,9 +415,11 @@ export default function PowerChipCompare({
                   aria-expanded={renderExpanded ? expanded : undefined}
                   data-testid="power-chip-compare-row"
                   data-pinned={pinnedPoint ? 'true' : undefined}
-                  className={`grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem] ${
-                    active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40'
-                  }`}
+                  className={cn(
+                    'grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem]',
+                    powerX && 'max-md:min-h-11',
+                    active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40',
+                  )}
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
@@ -430,7 +441,10 @@ export default function PowerChipCompare({
                         <span
                           data-testid="power-chip-compare-unpin"
                           title={t.pinnedPoint(point.concurrency)}
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted hover:text-foreground"
+                          className={cn(
+                            'inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted hover:text-foreground',
+                            powerX && 'max-md:-m-2 max-md:size-8',
+                          )}
                         >
                           <Pin className="size-3" fill="currentColor" aria-hidden />
                         </span>

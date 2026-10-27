@@ -205,6 +205,21 @@ export function powerXChangedCount(selection: PowerXSelection): number {
 }
 
 /**
+ * How many of the controls behind the phone "More" row are off their default:
+ * Scope (all GPUs), Power statistic (average) and Rated boundaries (off). Count,
+ * Per and Show as stay in front of the row, so they are not counted here; the
+ * X-Axis Metric, which the row also holds, is counted by its owner.
+ */
+export function powerXSecondaryChangedCount(selection: PowerXSelection): number {
+  const config = getMeasuredMetricConfig(selection.metric);
+  let changed = 0;
+  if (config?.scope !== undefined && config.scope !== 'all') changed += 1;
+  if (config?.family === 'power' && config.statistic !== 'average') changed += 1;
+  if (powerXRatedAvailable(selection.metric) && powerXRatedOn(selection.compare)) changed += 1;
+  return changed;
+}
+
+/**
  * Which of the measured-metric controls still mean something on a view:
  * Scope (All / Prefill / Decode GPUs) for GPU-only power and for per-token
  * energy, plus the Power statistic (Average / P75 / P90) for power. Timelines,

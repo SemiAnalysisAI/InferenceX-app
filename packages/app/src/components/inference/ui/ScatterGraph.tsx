@@ -5,6 +5,7 @@ import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
@@ -607,6 +608,9 @@ const ScatterGraph = React.memo(
     // PowerX names the measured boundaries the way its Count control does.
     const powerXSurface = usePowerXSurface();
     const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
+    // PowerX on a touch-primary device: the pinned point sheet says Tap, not Click.
+    const touchPrimary = useIsCoarsePointer();
+    const touchCopy = powerXSurface && touchPrimary;
     // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
     const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
@@ -2234,6 +2238,7 @@ const ScatterGraph = React.memo(
               : false,
             locale,
             powerLabelStyle,
+            touch: touchCopy,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
@@ -2320,6 +2325,7 @@ const ScatterGraph = React.memo(
         hardwareConfig,
         locale,
         powerLabelStyle,
+        touchCopy,
       ],
     );
 
@@ -3160,6 +3166,7 @@ const ScatterGraph = React.memo(
                     overlayData,
                     locale,
                     powerLabelStyle,
+                    touch: touchCopy,
                   }),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);

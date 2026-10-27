@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
@@ -28,16 +29,18 @@ import {
   type PowerLayerHighlight,
 } from '../utils/power-breakdown';
 import PowerRoleGroup from './PowerRoleGroup';
-import { usePowerXCompareTarget } from './powerx-surface';
+import { usePowerXCompareTarget, usePowerXSurface } from './powerx-surface';
 
 const STRINGS = {
   en: {
     drillTitle: (chip: string) => `${chip} across load`,
     drillSubtitle: 'Click a point to compare it; the dashed outline marks the compared point.',
+    drillSubtitleTouch: 'Tap a point to compare it; the dashed outline marks the compared point.',
   },
   zh: {
     drillTitle: (name: string) => `${name} 随负载的变化`,
     drillSubtitle: '点击任一数据点即可对比；虚线框标出上方对比所用的点。',
+    drillSubtitleTouch: '点按任一数据点即可对比；虚线框标出上方对比所用的点。',
   },
 };
 
@@ -83,6 +86,11 @@ export default function PowerAnalysisPanels({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // PowerX on a touch-primary device reads "Tap a point", everywhere else "Click".
+  const powerX = usePowerXSurface();
+  const coarsePointer = useIsCoarsePointer();
+  const touchCopy = powerX && coarsePointer;
+  const drillSubtitle = touchCopy ? t.drillSubtitleTouch : t.drillSubtitle;
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   // Panels reuse the main chart's hardware colors; several configs on one GPU get shades of it.
@@ -266,7 +274,7 @@ export default function PowerAnalysisPanels({
                 onCollapse={() => setCollapsed(true)}
                 heading={
                   series
-                    ? { title: t.drillTitle(series.label), subtitle: t.drillSubtitle }
+                    ? { title: t.drillTitle(series.label), subtitle: drillSubtitle }
                     : undefined
                 }
               />
@@ -303,7 +311,7 @@ export default function PowerAnalysisPanels({
             onUnpinComparedPoint={unpinComparedPoint}
             heading={
               breakdownSeriesLabel
-                ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: t.drillSubtitle }
+                ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: drillSubtitle }
                 : undefined
             }
           />
