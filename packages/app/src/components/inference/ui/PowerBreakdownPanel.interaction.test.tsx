@@ -49,6 +49,10 @@ vi.mock('@/lib/d3-chart/D3Chart', async () => {
     yScale: { domain: [number, number] };
     layers: { render?: (group: unknown, ctx: unknown) => unknown }[];
     tooltip?: { content: (d: unknown, pinned: boolean) => string };
+    xAxis?: {
+      tickValues?: (scale: unknown) => number[];
+      tickFormat?: (d: number) => string;
+    };
   }) {
     const svgRef = ReactModule.useRef<SVGSVGElement>(null);
     const tooltipRef = ReactModule.useRef<HTMLDivElement>(null);
@@ -73,6 +77,17 @@ vi.mock('@/lib/d3-chart/D3Chart', async () => {
         height,
       };
       for (const layer of props.layers) layer.render?.(zoomGroup, ctx);
+      // The x axis as D3Chart draws it: the tick values for this scale, then their format.
+      const ticks = props.xAxis?.tickValues?.(xScale) ?? [];
+      g.selectAll('g.x-axis-stub')
+        .data([null])
+        .join('g')
+        .attr('class', 'x-axis-stub')
+        .selectAll('text')
+        .data(ticks)
+        .join('text')
+        .attr('data-testid', 'x-tick')
+        .text((d) => props.xAxis?.tickFormat?.(d) ?? String(d));
       if (props.tooltip && tooltipRef.current) {
         tooltipRef.current.innerHTML = props.tooltip.content(props.data[0], false);
       }
@@ -582,5 +597,116 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
     expect(rule()).toBeNull();
     expect(compareButton()?.disabled).toBe(true);
+  });
+});
+
+describe('PowerAnalysisPanels on a single-digit tok/s/user sweep', () => {
+  // An agentic sweep that never leaves 2-5 tok/s/user: ten points whose whole-number
+  // labels were 2, 2, 2, 3, 3, 3, 3, 5, 5, 5.
+  const INTERACTIVITY = [2.06, 2.08, 2.4, 2.66, 2.99, 3.06, 3.32, 4.75, 5.11, 5.16];
+  const CONCURRENCY = [12, 10, 8, 7, 6, 4, 5, 3, 2, 1];
+  const sweep = INTERACTIVITY.map((x, index) =>
+    point(40 + index, 'b200_vllm', CONCURRENCY[index], x, 300 - index * 10),
+  );
+  const renderInline = () =>
+    render(
+      <PowerXSurfaceProvider>
+        <PowerAnalysisPanels
+          data={sweep}
+          xField="mean_tpot_intvty"
+          xLabel="Interactivity (output tok/s/user)"
+          chartId="chart-6"
+          placement="before"
+        />
+      </PowerXSurfaceProvider>,
+    );
+  const drilldown = () =>
+    container.querySelector<HTMLElement>('[data-testid="power-chip-compare-drilldown"]')!;
+  const tickLabels = () =>
+    [...drilldown().querySelectorAll('[data-testid="x-tick"]')].map((tick) => tick.textContent);
+  const readout = () =>
+    drilldown().querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
+  const tiles = () => [
+    ...drilldown().querySelectorAll<HTMLButtonElement>(
+      '[data-testid="power-breakdown-readout-part"]',
+    ),
+  ];
+
+  beforeEach(() => track.mockClear());
+
+  it('labels the x axis with distinct values that name real points', () => {
+    renderInline();
+    const labels = tickLabels();
+    expect(labels.length).toBeGreaterThan(4);
+    expect(new Set(labels).size).toBe(labels.length);
+    for (const label of labels) {
+      const value = Number(label);
+      expect(INTERACTIVITY.some((x) => Math.abs(x - value) <= 0.05)).toBe(true);
+    }
+  });
+
+  it('keeps the slider guide value above the plot, clear of the reference labels', () => {
+    env.coarsePointer = true;
+    renderInline();
+    const hits = drilldown().querySelectorAll('[data-testid="power-breakdown-hit"]');
+    // Hold the lowest-interactivity column, so the slider guide sits off it and is labelled.
+    act(() =>
+      (hits[0] as SVGRectElement).dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    );
+    const label = drilldown().querySelector<SVGTextElement>(
+      '[data-testid="power-breakdown-guide-label"]',
+    );
+    expect(label).not.toBeNull();
+    expect(label!.textContent).toMatch(/^Slider \d+\.\d$/);
+    // In the margin above the plot, outside the clipped plot group the reference labels use.
+    expect(Number(label!.getAttribute('y'))).toBeLessThan(0);
+    expect(label!.closest('g.zoom')).toBeNull();
+  });
+
+  it('reads the held point as an even grid of layer tiles and lets it follow the slider again', () => {
+    env.coarsePointer = true;
+    renderInline();
+    const hits = drilldown().querySelectorAll('[data-testid="power-breakdown-hit"]');
+    act(() =>
+      (hits[0] as SVGRectElement).dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    );
+    expect(readout()?.dataset.source).toBe('pinned');
+    expect(
+      readout()?.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent,
+    ).toBe('c12 · 2.1 tok/s/user');
+    // One tile per layer, each with its W/GPU and its share, and the shares add up.
+    const shares = tiles().map((tile) =>
+      Number(
+        tile
+          .querySelector('[data-testid="power-breakdown-readout-part-share"]')!
+          .textContent!.replace('%', ''),
+      ),
+    );
+    expect(tiles().length).toBeGreaterThanOrEqual(3);
+    for (const tile of tiles()) {
+      expect(
+        tile.querySelector('[data-testid="power-breakdown-readout-part-watts"]')?.textContent,
+      ).toMatch(/^\d[\d,]* W$/);
+    }
+    expect(Math.abs(shares.reduce((sum, share) => sum + share, 0) - 100)).toBeLessThanOrEqual(
+      tiles().length,
+    );
+    expect(
+      drilldown().querySelectorAll('[data-testid="power-breakdown-readout-bar"] [data-band]'),
+    ).toHaveLength(tiles().length);
+    // Isolating a layer marks exactly that tile pressed; the others read faded.
+    act(() => tiles()[1].click());
+    expect(tiles().map((tile) => tile.getAttribute('aria-pressed'))).toEqual(
+      tiles().map((_, index) => String(index === 1)),
+    );
+    expect(tiles()[0].dataset.emphasis).toBe('faded');
+    // The held point names itself and offers the way back to the slider.
+    const follow = drilldown().querySelector<HTMLButtonElement>(
+      '[data-testid="power-breakdown-readout-follow"]',
+    );
+    expect(follow?.textContent).toBe('Follow slider');
+    act(() => follow!.click());
+    expect(readout()?.dataset.source).toBe('compared');
+    expect(drilldown().querySelector('[data-testid="power-breakdown-readout-follow"]')).toBeNull();
   });
 });

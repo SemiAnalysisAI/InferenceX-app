@@ -34,6 +34,7 @@ import {
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
+import { formatInteractivity } from '../utils/interactivity-format';
 import { PowerBasisPill } from '../powerx/PowerBasisPill';
 import { IT_NOT_MODELED_NOTE } from '@/lib/power/power-basis';
 import {
@@ -131,7 +132,8 @@ const STRINGS = {
 
 const watts = d3.format(',.0f');
 const pct = d3.format('.0%');
-const rate = d3.format(',.0f');
+/** The slider, the rows and the drill-down print interactivity alike. */
+const rate = formatInteractivity;
 const SLIDER_STEPS = 200;
 const MIN_LABEL_SHARE = 0.08;
 

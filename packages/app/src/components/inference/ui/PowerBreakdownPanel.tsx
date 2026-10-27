@@ -41,6 +41,7 @@ import {
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
+import { formatInteractivity, interactivityAxisTicks } from '../utils/interactivity-format';
 import {
   bandAtWatts,
   bandPartsAt,
@@ -96,6 +97,7 @@ const STRINGS = {
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
     compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
+    sliderAt: (x: string) => `Slider ${x}`,
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -145,6 +147,7 @@ const STRINGS = {
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
     compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
+    sliderAt: (x: string) => `滑块 ${x}`,
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
@@ -190,9 +193,10 @@ const MARGIN = { top: 40, right: 18, bottom: 56, left: 65 };
  * Touch scrub: the readout above the plot carries the numbers, and the column labels
  * that the top margin keeps room for protrude at most ~10 px above the plot's top
  * (concurrency label at y(total) − 20 with an 8 % y headroom), so the band between
- * the readout and the plot shrinks from 40 px to 16 px. Mouse charts keep MARGIN.
+ * the readout and the plot shrinks from 40 px to 24 px, still room for the slider
+ * guide's value above the plot (`GUIDE_LABEL_Y`). Mouse charts keep MARGIN.
  */
-const TOUCH_MARGIN = { ...MARGIN, top: 16 };
+const TOUCH_MARGIN = { ...MARGIN, top: 24 };
 const PLOT_HEIGHT = 380;
 /**
  * PowerX on a phone with the touch readout above the plot: the readout carries the
@@ -230,8 +234,6 @@ const CSV_COLUMNS: Record<SystemPowerCategory, string> = {
 const watts = d3.format(',.0f');
 const percent = d3.format('.0%');
 const interactivityFormat = d3.format(',.1f');
-/** The slider's own rounding, so the button names the value the slider will show. */
-const interactivityRate = d3.format(',.0f');
 
 interface Column {
   key: string;
@@ -353,9 +355,15 @@ interface CursorLabel {
   hint: string | null;
 }
 
-const GUIDE_LABEL_Y = 8;
+/**
+ * The slider guide's value sits above the plot, in the top margin, so it can never
+ * land on a reference line's label (All in Provisioned runs along the plot's top)
+ * nor on a column's concurrency label, which protrudes at most ~10 px above it.
+ */
+const GUIDE_LABEL_Y = -12;
+/** The compared outline in area view: a slim column around the point, not a bar's width. */
+const AREA_MARKER_PX = 16;
 const GUIDE_HIT_HALF_WIDTH = 5;
-const guideFormat = d3.format(',.0f');
 const SCRUB_DOT_RADIUS = 5;
 
 /** A finger landed, moved to another column, or the gesture became a page scroll. */
@@ -458,6 +466,8 @@ function BreakdownChart({
   // slider (log-interpolated), else at its own interactivity; its nearest column is the
   // one the chip comparison reads when the chip is not pinned.
   const interactivities = columns.map((column) => column.entry.interactivity);
+  // Filled by the axis's `tickValues` for its `tickFormat`, which D3 calls right after.
+  let tickLabels = new Map<number, string>();
   const guideNearestIndex =
     guideAt === null || !(guideAt > 0)
       ? null
@@ -658,16 +668,13 @@ function BreakdownChart({
     pattern.select('.hatch-line').attr('stroke', color);
   };
 
-  const drawStack: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
-    const x = ctx.xScale as ContinuousScale;
+  /** Concurrency + total labels for a column, unless they would sit under a reference label. */
+  const labelledColumnsFor = (ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1]) => {
+    const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
-    tooltipElement.current = ctx.tooltipElement;
-    const layout = layoutFor(x, ctx.width);
-    const barWidth = (key: string) => layout[Number(key)].barWidth;
     const center = (key: string) => layout[Number(key)].center;
     const referenceBoxes = [...placeReferenceLabels(ctx).values()].map(({ box }) => box);
-    // Concurrency + total labels for a column, unless they would sit under a reference label.
-    const labelledColumns = columns.filter((column) => {
+    return columns.filter((column) => {
       const { room } = layout[Number(column.key)];
       if (room < TOTAL_LABEL_MIN_GAP_PX) return false;
       const top = y(column.entry.totalWattsPerGpu);
@@ -685,6 +692,16 @@ function BreakdownChart({
           other.top < box.bottom,
       );
     });
+  };
+
+  const drawStack: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
+    const x = ctx.xScale as ContinuousScale;
+    const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    tooltipElement.current = ctx.tooltipElement;
+    const layout = layoutFor(x, ctx.width);
+    const barWidth = (key: string) => layout[Number(key)].barWidth;
+    const center = (key: string) => layout[Number(key)].center;
+    const labelledColumns = labelledColumnsFor(ctx);
     const segments = columns.flatMap((column) =>
       stackPowerBands(column.entry, bands)
         .filter((segment) => segment.watts > 0)
@@ -1177,16 +1194,25 @@ function BreakdownChart({
     const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
     const y = ctx.yScale as ContinuousScale;
     const marked = markedIndex === null ? [] : columns.filter((c) => Number(c.key) === markedIndex);
+    // The outline wraps what the column draws: its bar (or, on the area, a slim band
+    // around its point) and, when they are drawn, its concurrency and total labels.
+    // It stops at the x axis rather than crossing it.
+    const labelled = new Set(labelledColumnsFor(ctx).map((column) => column.key));
+    const markerWidth = (key: string) =>
+      view === 'bars'
+        ? layout[Number(key)].barWidth
+        : Math.min(AREA_MARKER_PX, layout[Number(key)].barWidth);
+    const markerTop = (d: Column) => y(d.entry.totalWattsPerGpu) - (labelled.has(d.key) ? 30 : 8);
     group
       .selectAll<SVGRectElement, Column>('rect.breakdown-compared')
       .data(marked, (d) => d.key)
       .join('rect')
       .attr('class', 'breakdown-compared')
       .attr('data-testid', 'power-breakdown-compared')
-      .attr('x', (d) => layout[Number(d.key)].center - layout[Number(d.key)].barWidth / 2 - 4)
-      .attr('width', (d) => layout[Number(d.key)].barWidth + 8)
-      .attr('y', (d) => y(d.entry.totalWattsPerGpu) - 30)
-      .attr('height', (d) => Math.max(0, ctx.height - y(d.entry.totalWattsPerGpu) + 34))
+      .attr('x', (d) => layout[Number(d.key)].center - markerWidth(d.key) / 2 - 4)
+      .attr('width', (d) => markerWidth(d.key) + 8)
+      .attr('y', markerTop)
+      .attr('height', (d) => Math.max(0, ctx.height - markerTop(d)))
       .attr('rx', 4)
       .attr('fill', 'none')
       .attr('stroke', 'var(--foreground)')
@@ -1213,14 +1239,24 @@ function BreakdownChart({
       .attr('stroke-opacity', 0.45)
       .attr('stroke-dasharray', '2,3')
       .attr('pointer-events', 'none');
-    const labelled = guideX !== null && guideAt !== null && guideNearestIndex !== markedIndex;
-    group
+    const guideLabelled = guideX !== null && guideAt !== null && guideNearestIndex !== markedIndex;
+    const guideText = guideAt === null ? '' : t.sliderAt(formatInteractivity(guideAt));
+    const guideHalfWidth = measureLabel(guideText, CURSOR_LABEL_FONT) / 2 + 2;
+    // The plot's layers are clipped to the plot; the label sits in the top margin, so it
+    // goes in an unclipped group of the chart's own.
+    const margin = ctx.layout.g
+      .selectAll<SVGGElement, null>('g.breakdown-margin-labels')
+      .data([null])
+      .join('g')
+      .attr('class', 'breakdown-margin-labels')
+      .attr('pointer-events', 'none');
+    margin
       .selectAll<SVGTextElement, number>('text.breakdown-guide-label')
-      .data(labelled ? guides : [])
+      .data(guideLabelled ? guides : [])
       .join('text')
       .attr('class', 'breakdown-guide-label')
       .attr('data-testid', 'power-breakdown-guide-label')
-      .attr('x', (d) => Math.min(Math.max(12, x(d)), ctx.width - 12))
+      .attr('x', (d) => Math.min(Math.max(guideHalfWidth, x(d)), ctx.width - guideHalfWidth))
       .attr('y', GUIDE_LABEL_Y)
       .attr('text-anchor', 'middle')
       .attr('font-size', CHART_TYPE.annotation)
@@ -1229,7 +1265,7 @@ function BreakdownChart({
       .attr('stroke-width', 3)
       .attr('paint-order', 'stroke')
       .attr('pointer-events', 'none')
-      .text(guideAt === null ? '' : guideFormat(guideAt));
+      .text(guideText);
   };
 
   const layers: LayerConfig<Column>[] = [
@@ -1255,13 +1291,15 @@ function BreakdownChart({
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{
         label: xLabel,
-        // Each slot is labelled with its point's interactivity; thin out on narrow plots.
-        tickFormat: (d: d3.AxisDomain) => watts(columns[Number(d)]?.entry.interactivity ?? 0),
+        // Each slot is labelled with its point's interactivity, thinned to fit the plot,
+        // at the precision that keeps every shown label distinct.
+        tickFormat: (d: d3.AxisDomain) =>
+          tickLabels.get(Number(d)) ?? formatInteractivity(interactivities[Number(d)] ?? 0),
         tickValues: (scale) => {
           const [start, end] = (scale as d3.ScaleLinear<number, number>).range();
-          const room = Math.abs(end - start) / Math.max(1, columns.length);
-          const step = Math.max(1, Math.ceil(44 / Math.max(1, room)));
-          return columns.map((_, index) => index).filter((index) => index % step === 0);
+          const ticks = interactivityAxisTicks(interactivities, end - start);
+          tickLabels = new Map(ticks.map((tick) => [tick.index, tick.label]));
+          return ticks.map((tick) => tick.index);
         },
       }}
       yAxis={{ label: t.yAxis, tickCount: 5 }}
@@ -1561,6 +1599,9 @@ export default function PowerBreakdownPanel({
                   source={readoutSource}
                   highlight={layers.highlight}
                   onTogglePin={layers.togglePin}
+                  onFollowSlider={
+                    onUnpinComparedPoint ? () => onUnpinComparedPoint(series) : undefined
+                  }
                 />
               )}
               <BreakdownChart
@@ -1595,7 +1636,7 @@ export default function PowerBreakdownPanel({
                   onClick={compareAtScrub}
                   className="no-export mt-2 flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium text-foreground disabled:opacity-50"
                 >
-                  {t.compareAt(interactivityRate(readoutEntry.interactivity))}
+                  {t.compareAt(formatInteractivity(readoutEntry.interactivity))}
                 </button>
               )}
             </div>
