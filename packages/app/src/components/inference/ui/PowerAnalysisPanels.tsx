@@ -15,7 +15,11 @@ import {
 } from '../utils/equal-service-comparison';
 import PowerBreakdownPanel from './PowerBreakdownPanel';
 import PowerChipCompare from './PowerChipCompare';
-import { buildPowerBreakdowns, powerBreakdownInteractivity } from '../utils/power-breakdown';
+import {
+  buildPowerBreakdownsWithOverlays,
+  powerBreakdownInteractivity,
+  type PowerLayerHighlight,
+} from '../utils/power-breakdown';
 import PowerRoleGroup from './PowerRoleGroup';
 
 const STRINGS = {
@@ -71,7 +75,7 @@ export default function PowerAnalysisPanels({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { runIndexByUrl } = useUnofficialRun();
+  const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   // Panels reuse the main chart's hardware colors; several configs on one GPU get shades of it.
   const sourceShade = useMemo(() => {
@@ -130,9 +134,19 @@ export default function PowerAnalysisPanels({
     [nearestKey],
   );
   const breakdownSeries = useMemo(
-    () => buildPowerBreakdowns(data, locale, powerBreakdownInteractivity(xField)),
-    [data, locale, xField],
+    () =>
+      buildPowerBreakdownsWithOverlays(
+        data,
+        overlayData.length > 0
+          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          : undefined,
+        locale,
+        powerBreakdownInteractivity(xField),
+      ),
+    [data, overlayData, runIndexByUrl, unofficialRunInfos, locale, xField],
   );
+  // The part being told apart, shared by the comparison legend and the drill-down plot.
+  const [layerHighlight, setLayerHighlight] = useState<PowerLayerHighlight | null>(null);
   // The drill-down follows the chip picked in the comparison, else its first chip.
   const drillSeries =
     breakdownSeries.find((entry) => entry.key === compareKey) ?? breakdownSeries[0] ?? null;
@@ -159,8 +173,11 @@ export default function PowerAnalysisPanels({
       ) : layout === 'inline' ? (
         <PowerChipCompare
           data={data}
+          overlayData={overlayData}
           xField={xField}
           compact
+          layerHighlight={layerHighlight}
+          onLayerHighlight={setLayerHighlight}
           selectedKey={drillSeries?.key ?? null}
           expandedKey={expandedKey}
           onNearestKeyChange={setNearestKey}
@@ -179,12 +196,15 @@ export default function PowerAnalysisPanels({
               <PowerBreakdownPanel
                 chartId={chartId}
                 data={data}
+                overlayData={overlayData}
                 contextLabel={contextLabel}
                 xField={xField}
                 xLabel={xLabel}
                 selectedKey={key}
                 onSelectKey={openDrilldown}
                 compact
+                layerHighlight={layerHighlight}
+                onLayerHighlight={setLayerHighlight}
                 onCollapse={() => setCollapsed(true)}
                 heading={
                   series
@@ -199,14 +219,20 @@ export default function PowerAnalysisPanels({
         <>
           <PowerChipCompare
             data={data}
+            overlayData={overlayData}
             xField={xField}
             selectedKey={drillSeries?.key ?? null}
             onSelectKey={setCompareKey}
+            layerHighlight={layerHighlight}
+            onLayerHighlight={setLayerHighlight}
           />
           <PowerBreakdownPanel
             chartId={chartId}
             data={data}
+            overlayData={overlayData}
             contextLabel={contextLabel}
+            layerHighlight={layerHighlight}
+            onLayerHighlight={setLayerHighlight}
             xField={xField}
             xLabel={xLabel}
             selectedKey={drillSeries?.key ?? null}

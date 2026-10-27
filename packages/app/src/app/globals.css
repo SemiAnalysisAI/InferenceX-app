@@ -272,19 +272,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.55 0.22 330);
   --overlay-run-6: oklch(0.55 0.2 230);
   --overlay-run-7: oklch(0.6 0.17 60);
-
-  /* PowerX breakdown parts: one hue per component class, shared by every chip. */
-  --power-part-gpu: oklch(0.55 0.17 155);
-  --power-part-cpu: oklch(0.5 0.21 268);
-  --power-part-memory: oklch(0.55 0.22 345);
-  --power-part-nic: oklch(0.62 0.17 62);
-  --power-part-nvswitch: oklch(0.55 0.12 185);
-  --power-part-storage: oklch(0.52 0.22 310);
-  --power-part-other: oklch(0.5 0.04 250);
-  --power-part-fans: oklch(0.66 0.16 100);
-  --power-part-psu-loss: oklch(0.55 0.22 25);
-  --power-part-network: oklch(0.6 0.16 235);
-  --power-part-facility: oklch(0.45 0.01 250);
 }
 
 .dark,
@@ -329,18 +316,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
-
-  --power-part-gpu: oklch(0.75 0.19 155);
-  --power-part-cpu: oklch(0.72 0.18 268);
-  --power-part-memory: oklch(0.74 0.2 345);
-  --power-part-nic: oklch(0.78 0.17 62);
-  --power-part-nvswitch: oklch(0.76 0.14 185);
-  --power-part-storage: oklch(0.72 0.2 310);
-  --power-part-other: oklch(0.7 0.04 250);
-  --power-part-fans: oklch(0.82 0.17 100);
-  --power-part-psu-loss: oklch(0.7 0.2 25);
-  --power-part-network: oklch(0.74 0.16 235);
-  --power-part-facility: oklch(0.72 0.01 250);
 }
 
 .doom {
@@ -504,18 +479,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
-
-  --power-part-gpu: oklch(0.75 0.19 155);
-  --power-part-cpu: oklch(0.72 0.18 268);
-  --power-part-memory: oklch(0.74 0.2 345);
-  --power-part-nic: oklch(0.78 0.17 62);
-  --power-part-nvswitch: oklch(0.76 0.14 185);
-  --power-part-storage: oklch(0.72 0.2 310);
-  --power-part-other: oklch(0.7 0.04 250);
-  --power-part-fans: oklch(0.82 0.17 100);
-  --power-part-psu-loss: oklch(0.7 0.2 25);
-  --power-part-network: oklch(0.74 0.16 235);
-  --power-part-facility: oklch(0.72 0.01 250);
 }
 .minecraft .circuit-bg,
 .csgo .circuit-bg,

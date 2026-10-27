@@ -259,13 +259,16 @@ axis (including the AgentX P90/P75 trace-derived axes), or median interactivity 
 plots something else, so a bar sits where its point sits in the scatter. Each point gets a
 stacked bar, or a point on a stacked area, of its All in Measured W/GPU split by
 `deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
-Each part has its own colour, shared by every chip (`--power-part-*` tokens in `globals.css`,
-next to the `--overlay-run-*` palette, with light and dark values; `powerCategoryColor` in
-`utils/power-breakdown.ts`): measured parts (GPU, Grace socket) are solid, modeled parts
-(CPU, memory, NICs, NVSwitch, storage, PCIe & misc, fans, PSU loss, network share) are hatched
-over a lighter fill of the same colour, and facility overhead is the lightest hatch. Measured
-and modeled CPU share a hue and differ by the hatch. Measured parts sit at the bottom; the chip
-comparison's segments and legend use the same swatches. TDP and All in Provisioned are
+Every part is a lightness step of the chip's own colour (`powerLayerOpacity` in
+`utils/power-breakdown.ts`: the measured GPU base most opaque, the facility top lightest, the
+ramp spread over the parts that series has, with a 1 px chip-colour edge between bands);
+there is no per-part palette or hatch. Which band is which comes from interaction: hovering a
+layer, its legend row or its edge label raises it to full opacity and fades the others, a click
+on a legend row (or a tap on a band) pins that, Escape or a click on the plot unpins, and the
+area view labels every band by name and W at its right edge. "Modeled" survives as a dashed
+swatch outline and the tooltip's basis column. Measured parts sit at the bottom; the chip
+comparison's segments use the same ramp on each chip's colour and share the highlight.
+Unofficial-run series take the run colour (`overlayRunColor`) for the whole ramp. TDP and All in Provisioned are
 dashed reference lines, not stacked values. Bar width comes from the room to the neighboring
 points and carries no data; the concurrency label sits above each total and both are hidden
 when bars are too close to read.

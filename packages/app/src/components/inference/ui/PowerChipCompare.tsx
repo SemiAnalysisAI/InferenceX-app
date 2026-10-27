@@ -6,18 +6,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Heading } from '@/components/ui/heading';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
-import { swatchStyle } from './PowerBreakdownPanel';
+import { segmentStyle, swatchStyle } from './PowerBreakdownPanel';
+import { usePowerLayerHighlight } from './power-layer-highlight';
 import {
   breakdownItWattsPerGpu,
   breakdownSeriesAtBoundary,
-  buildPowerBreakdowns,
+  buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
   MEASURED_POWER_CATEGORIES,
   POWER_BREAKDOWN_STACK_ORDER,
   powerBreakdownInteractivity,
+  powerLayerEmphasis,
+  type PowerBreakdownDisplaySeries,
+  type PowerLayerHighlight,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
@@ -39,7 +45,9 @@ const STRINGS = {
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `Not benchmarked near this interactivity: ${labels}`,
     measured: 'Measured',
-    modeled: 'Modeled (hatched)',
+    modeled: 'Modeled',
+    pinned: 'Pinned',
+    legend: 'Power parts',
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -70,7 +78,9 @@ const STRINGS = {
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `未在该交互性附近测试：${labels}`,
     measured: '实测',
-    modeled: '建模（斜线）',
+    modeled: '建模',
+    pinned: '已固定',
+    legend: '功耗部件',
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -99,8 +109,12 @@ const rate = d3.format(',.0f');
 const SLIDER_STEPS = 200;
 const MIN_LABEL_SHARE = 0.08;
 
+/** One hue for the shared legend: the stack's lightness steps on the foreground colour. */
+const LEGEND_COLOR = 'var(--foreground)';
+
 export default function PowerChipCompare({
   data,
+  overlayData = [],
   xField,
   selectedKey,
   onSelectKey,
@@ -108,8 +122,12 @@ export default function PowerChipCompare({
   expandedKey = null,
   renderExpanded,
   onNearestKeyChange,
+  layerHighlight,
+  onLayerHighlight,
 }: {
   data: InferenceData[];
+  /** Unofficial-run overlay points within `data`: their bars take the run's colour. */
+  overlayData?: readonly InferenceData[];
   xField?: keyof AggDataEntry;
   selectedKey: string | null;
   onSelectKey: (key: string) => void;
@@ -120,19 +138,32 @@ export default function PowerChipCompare({
   renderExpanded?: (key: string) => React.ReactNode;
   /** Reports the chip whose point sits nearest the slider; the drill-down opens under it. */
   onNearestKeyChange?: (key: string | null) => void;
+  /** Shared with the drill-down's plot on the Where view; own state when omitted. */
+  layerHighlight?: PowerLayerHighlight | null;
+  onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
+  const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
   const series = useMemo(
     () =>
-      buildPowerBreakdowns(data, locale, interactivity).map((entry) =>
-        breakdownSeriesAtBoundary(entry, includeFacility),
-      ),
-    [data, locale, interactivity, includeFacility],
+      buildPowerBreakdownsWithOverlays(
+        data,
+        overlayData.length > 0
+          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          : undefined,
+        locale,
+        interactivity,
+      ).map((entry): PowerBreakdownDisplaySeries => ({
+        ...breakdownSeriesAtBoundary(entry, includeFacility),
+        overlayRunIndex: entry.overlayRunIndex,
+      })),
+    [data, overlayData, runIndexByUrl, unofficialRunInfos, locale, interactivity, includeFacility],
   );
+  const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
   const unmodeled = useMemo(() => chipsWithoutSystemModel(data, series), [data, series]);
   const hwKeys = useMemo(() => [...new Set(series.map((entry) => entry.hwKey))], [series]);
   const { resolveColor } = useThemeColors({
@@ -234,16 +265,48 @@ export default function PowerChipCompare({
         </label>
       </div>
 
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-hidden>
-        {categories.map((key) => (
-          <li key={key} className="flex items-center gap-1.5">
-            <span className="inline-block size-3 rounded-[2px]" style={swatchStyle(key)} />
-            {t.categories[key]}
-            <span className="opacity-70">
-              · {MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}
-            </span>
-          </li>
-        ))}
+      <ul
+        className="flex flex-wrap gap-x-1 gap-y-1 text-xs"
+        aria-label={t.legend}
+        data-testid="power-chip-compare-legend"
+      >
+        {categories.map((key, index) => {
+          const pinned = layers.highlight?.pinned === true && layers.highlight.category === key;
+          const emphasis = powerLayerEmphasis(key, layers.highlight);
+          return (
+            <li key={key} className="flex min-w-0">
+              <button
+                type="button"
+                data-testid="power-chip-compare-legend-item"
+                data-category={key}
+                data-emphasis={emphasis}
+                aria-pressed={pinned}
+                onMouseEnter={() => layers.hover(key)}
+                onMouseLeave={() => layers.hover(null)}
+                onFocus={() => layers.hover(key)}
+                onBlur={() => layers.hover(null)}
+                onClick={() => layers.togglePin(key)}
+                className={`flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
+                  pinned ? 'bg-muted ring-1 ring-border' : ''
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className="inline-block size-3 shrink-0 rounded-[2px]"
+                  title={`${MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}${pinned ? ` · ${t.pinned}` : ''}`}
+                  style={swatchStyle(key, LEGEND_COLOR, index, categories.length, layers.highlight)}
+                />
+                <span
+                  className={`whitespace-nowrap ${
+                    emphasis === 'faded' ? 'text-muted-foreground' : 'font-medium'
+                  }`}
+                >
+                  {t.categories[key]}
+                </span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
 
       {rows.length === 0 ? (
@@ -251,7 +314,12 @@ export default function PowerChipCompare({
       ) : (
         <ol className="space-y-1.5" data-testid="power-chip-compare-rows">
           {rows.map(({ series: entry, entry: point }) => {
-            const color = resolveColor(entry.hwKey);
+            const color =
+              entry.overlayRunIndex === undefined
+                ? resolveColor(entry.hwKey)
+                : overlayRunColor(entry.overlayRunIndex);
+            // The ramp spreads over the parts this chip has (an AMD chassis has no NVSwitch).
+            const rowCategories = categories.filter((key) => point.wattsPerGpu[key] > 0);
             const expanded = renderExpanded !== undefined && entry.key === expandedKey;
             // Inline layout: the bar whose drill-down is open is the active one.
             const active =
@@ -290,18 +358,28 @@ export default function PowerChipCompare({
                       className="flex h-full"
                       style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
                     >
-                      {categories.map((key) => {
+                      {rowCategories.map((key, index) => {
                         const w = point.wattsPerGpu[key];
-                        if (!(w > 0)) return null;
                         const share = w / maxTotal;
                         return (
                           <span
                             key={key}
                             title={`${t.categories[key]}: ${watts(w)} W`}
-                            className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
+                            data-testid="power-chip-compare-segment"
+                            data-category={key}
+                            data-emphasis={powerLayerEmphasis(key, layers.highlight)}
+                            onMouseEnter={() => layers.hover(key)}
+                            onMouseLeave={() => layers.hover(null)}
+                            className="flex h-full items-center justify-center text-2xs font-medium tabular-nums text-foreground"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
-                              ...swatchStyle(key),
+                              ...segmentStyle(
+                                key,
+                                color,
+                                index,
+                                rowCategories.length,
+                                layers.highlight,
+                              ),
                             }}
                           >
                             {share >= MIN_LABEL_SHARE ? watts(w) : ''}

@@ -4,16 +4,24 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { InferenceData } from '../types';
 import {
+  bandAtWatts,
   breakdownItWattsPerGpu,
   breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
+  buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
+  placeEndLabels,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
   POWER_BREAKDOWN_STACK_ORDER,
+  POWER_LAYER_OPACITY_RANGE,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
+  powerLayerEmphasis,
+  powerLayerFill,
+  powerLayerOpacity,
+  stackedBandsAt,
   stackPowerBreakdown,
 } from './power-breakdown';
 
@@ -269,5 +277,150 @@ describe('cross-chip comparison', () => {
     expect(rows.map((r) => r.series.label)).toEqual(['A']);
     expect(outOfRange.map((s) => s.label)).toEqual(['B']);
     expect(compareBreakdownsAt([a], 0).outOfRange).toHaveLength(1);
+  });
+});
+
+describe('single-hue layer ramp', () => {
+  it('steps opacity strictly down from the measured base to the facility top, 12 and 9 deep', () => {
+    for (const count of [12, 9]) {
+      const ramp = Array.from({ length: count }, (_, index) => powerLayerOpacity(index, count));
+      expect(ramp[0]).toBe(POWER_LAYER_OPACITY_RANGE[0]);
+      expect(ramp.at(-1)).toBe(POWER_LAYER_OPACITY_RANGE[1]);
+      for (let index = 1; index < count; index += 1) {
+        expect(ramp[index]).toBeLessThan(ramp[index - 1]);
+        // Neighbours stay tellable: at least a 7-point step even 12 deep.
+        expect(ramp[index - 1] - ramp[index]).toBeGreaterThanOrEqual(0.069);
+      }
+      expect(new Set(ramp).size).toBe(count);
+    }
+    expect(powerLayerOpacity(0, 1)).toBe(POWER_LAYER_OPACITY_RANGE[0]);
+    expect(powerLayerFill('var(--chip)', 0.5)).toBe(
+      'color-mix(in oklab, var(--chip) 50%, transparent)',
+    );
+  });
+
+  it('spreads the ramp over the parts a series actually has', () => {
+    // An IT-only stack of 10 parts ends at the lightest step as a full 12-part one does.
+    expect(powerLayerOpacity(9, 10)).toBe(POWER_LAYER_OPACITY_RANGE[1]);
+    expect(powerLayerOpacity(11, 12)).toBe(POWER_LAYER_OPACITY_RANGE[1]);
+  });
+
+  it('tells highlighted, faded and plain layers apart', () => {
+    expect(powerLayerEmphasis('nic', null)).toBe('plain');
+    expect(powerLayerEmphasis('nic', { category: 'nic', pinned: false })).toBe('highlighted');
+    expect(powerLayerEmphasis('gpu', { category: 'nic', pinned: true })).toBe('faded');
+  });
+});
+
+describe('stackedBandsAt', () => {
+  const categories = ['gpu', 'cpu', 'facility'] as const;
+  const entry = (gpu: number, cpu: number, facility: number): PowerBreakdownPoint => ({
+    point: point(gpu),
+    concurrency: 1,
+    interactivity: 1,
+    configKey: '',
+    configLabel: '',
+    wattsPerGpu: {
+      gpu,
+      measuredCpu: 0,
+      cpu,
+      memory: 0,
+      nic: 0,
+      nvswitch: 0,
+      storage: 0,
+      other: 0,
+      fans: 0,
+      psuLoss: 0,
+      network: 0,
+      facility,
+    },
+    totalWattsPerGpu: gpu + cpu + facility,
+    pue: 1.2,
+    cpuBasis: null,
+    chassisBasis: 'full',
+  });
+  const points = [
+    { x: 0, entry: entry(100, 20, 30) },
+    { x: 100, entry: entry(200, 40, 30) },
+  ];
+
+  it('interpolates every band linearly between the neighbouring points', () => {
+    const bands = stackedBandsAt(points, 50, categories);
+    expect(bands.map((band) => [band.key, band.y0, band.y1, band.watts])).toEqual([
+      ['gpu', 0, 150, 150],
+      ['cpu', 150, 180, 30],
+      ['facility', 180, 210, 30],
+    ]);
+  });
+
+  it('clamps to the ends outside the points', () => {
+    expect(stackedBandsAt(points, -10, categories)[0].watts).toBe(100);
+    expect(stackedBandsAt(points, 500, categories)[0].watts).toBe(200);
+  });
+
+  it('names the band under a watts value and nothing above the stack', () => {
+    const bands = stackedBandsAt(points, 50, categories);
+    expect(bandAtWatts(bands, 160)?.key).toBe('cpu');
+    expect(bandAtWatts(bands, 0)?.key).toBe('gpu');
+    expect(bandAtWatts(bands, 300)).toBeNull();
+    expect(bandAtWatts(bands, -1)).toBeNull();
+  });
+});
+
+describe('placeEndLabels', () => {
+  it('leaves well-spaced labels where they are', () => {
+    expect(placeEndLabels([300, 200, 100], 12, { top: 0, bottom: 320 })).toEqual([300, 200, 100]);
+  });
+
+  it('pushes crowded labels apart upward in stack order', () => {
+    const placed = placeEndLabels([300, 296, 295, 100], 12, { top: 0, bottom: 320 });
+    expect(placed).toEqual([300, 288, 276, 100]);
+    for (let index = 1; index < placed.length; index += 1) {
+      expect(placed[index - 1] - placed[index]).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('slides a run that reaches the plot top back down, keeping the spacing', () => {
+    const placed = placeEndLabels([20, 15, 12, 10], 12, { top: 6, bottom: 320 });
+    expect(placed).toEqual([42, 30, 18, 6]);
+  });
+
+  it('never lets a label leave the plot bottom', () => {
+    expect(placeEndLabels([400, 390], 12, { top: 0, bottom: 320 })).toEqual([320, 308]);
+  });
+});
+
+describe('buildPowerBreakdownsWithOverlays', () => {
+  const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/999/attempts/1';
+  const official = [point(500), point(400, { conc: 4, x: 200, median_intvty: 200 }, { conc: 4 })];
+  const overlay = [
+    point(520, { run_url: runUrl }),
+    point(410, { run_url: runUrl, conc: 4, x: 200, median_intvty: 200 }, { conc: 4 }),
+  ];
+  const runInfos = [
+    { id: 1, branch: 'main', url: 'u1' },
+    { id: 2, branch: 'powerx', url: 'u2' },
+    { id: 999, branch: 'single-hue', url: runUrl },
+  ];
+
+  it('keeps an unofficial run as its own series in the run colour slot, after the official line', () => {
+    const series = buildPowerBreakdownsWithOverlays([...official, ...overlay], {
+      points: overlay,
+      runIndexByUrl: { [runUrl]: 2 },
+      runInfos,
+    });
+    expect(series.map((entry) => entry.key)).toEqual(['b200_sglang|fp8', 'b200_sglang|fp8|run2']);
+    expect(series[0].overlayRunIndex).toBeUndefined();
+    expect(series[0].points).toHaveLength(2);
+    expect(series[1].overlayRunIndex).toBe(2);
+    expect(series[1].points.map((entry) => entry.wattsPerGpu.gpu)).toEqual([520, 410]);
+    expect(series[1].label).toContain(series[0].label);
+    expect(series[1].label).not.toBe(series[0].label);
+  });
+
+  it('is the plain breakdown without overlay points', () => {
+    expect(buildPowerBreakdownsWithOverlays(official, undefined)).toEqual(
+      buildPowerBreakdowns(official),
+    );
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   usePowerXCompareTarget,
@@ -9,6 +9,7 @@ import {
   usePowerXSurface,
   useSetPowerXCompareTarget,
 } from './powerx-surface';
+import { usePowerLayerHighlight } from './power-layer-highlight';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
@@ -20,9 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { useIsCoarsePointer, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
@@ -30,19 +33,29 @@ import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
+  bandAtWatts,
   breakdownSeriesAtBoundary,
-  buildPowerBreakdowns,
+  buildPowerBreakdownsWithOverlays,
   MEASURED_POWER_CATEGORIES,
+  placeEndLabels,
+  POWER_LAYER_FADED_OPACITY,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
-  powerCategoryColor,
+  powerLayerEmphasis,
+  powerLayerFill,
+  powerLayerOpacity,
+  stackedBandsAt,
   stackPowerBreakdown,
   SYSTEM_POWER_CATEGORIES,
+  type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
+  type PowerLayerEmphasis,
+  type PowerLayerHighlight,
   type SystemPowerCategory,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
@@ -66,6 +79,7 @@ const STRINGS = {
     share: 'Share',
     measured: 'Measured',
     modeled: 'Modeled',
+    pinned: 'Pinned',
     tdp: 'TDP',
     provisioned: 'All in Provisioned',
     pue: 'PUE',
@@ -105,6 +119,7 @@ const STRINGS = {
     share: '占比',
     measured: '实测',
     modeled: '建模',
+    pinned: '已固定',
     tdp: 'TDP',
     provisioned: 'All in Provisioned',
     pue: 'PUE',
@@ -131,16 +146,16 @@ const STRINGS = {
 };
 
 /**
- * Each part has its own colour (`powerCategoryColor`, shared by every chip),
- * so the layers of one hardware line stay tellable apart; the chip's vendor
- * colour marks only its total (area top edge and dots) and its legend dot.
- * Measured parts are solid; modeled parts are hatched over a lighter fill,
- * like the Profit Estimator's loss segment, and the facility overhead is the
- * lightest since it is PUE, not a component.
+ * One hue per chip. Every layer is a lightness step of the chip's own colour
+ * (`powerLayerOpacity`: the measured GPU base most opaque, the facility top
+ * lightest, spread over the parts the series has), with a 1 px stroke in the
+ * chip colour between neighbours so thin bands keep an edge. Which band is
+ * which comes from interaction: hovering a layer, its legend row or its edge
+ * label raises it to full opacity and fades the rest; a click pins that.
+ * "Modeled" survives as a dashed swatch outline and the tooltip's basis column.
  */
-const MEASURED_FILL_OPACITY = 0.85;
-const MODELED_BG_OPACITY = 0.32;
-const FACILITY_BG_OPACITY = 0.14;
+const LAYER_STROKE_OPACITY = 0.6;
+const HIGHLIGHT_STROKE_WIDTH = 1.5;
 const SEGMENT_LABEL_MIN_PX = 15;
 const SEGMENT_LABEL_MIN_BAND = 30;
 const MAX_BAR_PX = 48;
@@ -153,6 +168,14 @@ const X_TICK_SPACING_PX = 70;
 const REFERENCE_LABEL_CHAR_PX = 6.5;
 const REFERENCE_LABEL_CLEARANCE_PX = 34;
 const BAR_GAP_FRACTION = 0.72;
+/** Edge labels: leader from the last point into the right margin, one line each. */
+export const END_LABEL_LINE_HEIGHT = 12;
+const END_LABEL_LEADER_PX = 8;
+const END_LABEL_PAD_PX = 4;
+const END_LABEL_FONT = `${CHART_TYPE.annotation}px sans-serif`;
+const END_LABEL_CHAR_PX = 6.2;
+/** Below Tailwind's `sm`, the legend and tap-to-identify carry the names; the plot keeps its width. */
+const END_LABELS_QUERY = '(min-width: 640px)';
 
 const CSV_COLUMNS: Record<SystemPowerCategory, string> = {
   gpu: 'measured_gpu_w_per_gpu',
@@ -202,72 +225,118 @@ export function interactivityColumnLayout(positions: readonly number[], plotWidt
   });
 }
 
-function hatchId(sectionId: string, category: SystemPowerCategory = 'facility') {
-  return `${sectionId}-${category}-hatch`.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
+export interface LayerStyle {
+  emphasis: PowerLayerEmphasis;
+  fillOpacity: number;
+  /** Whole-element opacity: faded siblings of a highlighted layer. */
+  opacity: number;
+  strokeWidth: number;
+  strokeOpacity: number;
 }
 
-/** Modeled parts are hatched (estimates), measured parts solid. */
-const isHatched = (category: SystemPowerCategory) => !MEASURED_POWER_CATEGORIES.has(category);
-const hatchBgOpacity = (category: SystemPowerCategory) =>
-  category === 'facility' ? FACILITY_BG_OPACITY : MODELED_BG_OPACITY;
-
-/**
- * Neighbouring modeled parts alternate stripe angles, so two estimates stay
- * distinguishable even where their hues are close. Degrees, SVG convention:
- * the rotation applied to a vertical stripe (0 = vertical, 90 = horizontal).
- */
-export const HATCH_ANGLE: Record<SystemPowerCategory, number> = {
-  gpu: 45,
-  measuredCpu: 45,
-  cpu: 45,
-  memory: 135,
-  nic: 45,
-  nvswitch: 135,
-  storage: 45,
-  other: 135,
-  fans: 45,
-  psuLoss: 135,
-  network: 0,
-  facility: 90,
-};
-
-/** CSS `repeating-linear-gradient` angle that draws the same stripes as the SVG pattern. */
-export const cssHatchAngle = (category: SystemPowerCategory) => (HATCH_ANGLE[category] + 90) % 360;
-
-/** The part's own colour as a legend swatch or a comparison-bar segment. */
-export function swatchStyle(category: SystemPowerCategory): React.CSSProperties {
-  const color = powerCategoryColor(category);
-  if (isHatched(category)) {
+/** How layer `index` of `count` (stack order, bottom first) is drawn under a highlight. */
+export function layerStyle(
+  category: SystemPowerCategory,
+  index: number,
+  count: number,
+  highlight: PowerLayerHighlight | null | undefined,
+): LayerStyle {
+  const emphasis = powerLayerEmphasis(category, highlight);
+  if (emphasis === 'highlighted') {
     return {
-      backgroundColor: `color-mix(in oklab, ${color} ${hatchBgOpacity(category) * 100}%, transparent)`,
-      backgroundImage: `repeating-linear-gradient(${cssHatchAngle(category)}deg, ${color} 0 2px, transparent 2px 6px)`,
-      border: `1px solid ${color}`,
+      emphasis,
+      fillOpacity: 1,
+      opacity: 1,
+      strokeWidth: HIGHLIGHT_STROKE_WIDTH,
+      strokeOpacity: 1,
     };
   }
   return {
-    backgroundColor: `color-mix(in oklab, ${color} ${MEASURED_FILL_OPACITY * 100}%, transparent)`,
-    border: `1px solid ${color}`,
+    emphasis,
+    fillOpacity: powerLayerOpacity(index, count),
+    opacity: emphasis === 'faded' ? POWER_LAYER_FADED_OPACITY : 1,
+    strokeWidth: 1,
+    strokeOpacity: LAYER_STROKE_OPACITY,
   };
+}
+
+/**
+ * The layer's ramp step as a legend swatch or a comparison-bar segment: the
+ * chip colour at that opacity, outlined solid when measured and dashed when
+ * modeled.
+ */
+export function swatchStyle(
+  category: SystemPowerCategory,
+  color: string,
+  index: number,
+  count: number,
+  highlight: PowerLayerHighlight | null = null,
+): React.CSSProperties {
+  const style = layerStyle(category, index, count, highlight);
+  return {
+    backgroundColor: powerLayerFill(color, style.fillOpacity),
+    border: `1px ${MEASURED_POWER_CATEGORIES.has(category) ? 'solid' : 'dashed'} ${color}`,
+    opacity: style.opacity,
+  };
+}
+
+/** A comparison-bar segment: the same ramp step, with the plot's 1 px chip-colour edge. */
+export function segmentStyle(
+  category: SystemPowerCategory,
+  color: string,
+  index: number,
+  count: number,
+  highlight: PowerLayerHighlight | null = null,
+): React.CSSProperties {
+  const style = layerStyle(category, index, count, highlight);
+  return {
+    backgroundColor: powerLayerFill(color, style.fillOpacity),
+    boxShadow: `inset ${style.strokeWidth}px 0 0 ${powerLayerFill(color, style.strokeOpacity)}`,
+    opacity: style.opacity,
+  };
+}
+
+let textMeasurer: CanvasRenderingContext2D | null | undefined;
+/** Pixel width of a label; a per-character estimate where canvas text is unavailable. */
+function measureLabel(text: string, font: string): number {
+  try {
+    if (textMeasurer === undefined) {
+      textMeasurer =
+        typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+    }
+    if (textMeasurer) {
+      textMeasurer.font = font;
+      const width = textMeasurer.measureText(text).width;
+      if (Number.isFinite(width) && width > 0) return width;
+    }
+  } catch {
+    textMeasurer = null;
+  }
+  return text.length * END_LABEL_CHAR_PX;
 }
 
 function tooltipHtml(
   series: PowerBreakdownSeries,
   column: Column,
+  color: string,
   xLabel: string,
   t: (typeof STRINGS)['en'],
   totalLabel: string = t.total,
+  highlight: PowerLayerHighlight | null = null,
 ) {
   const { entry } = column;
+  const count = series.categories.length;
   const rows = series.categories
-    .toReversed()
-    .map((key) => {
+    .map((key, index) => {
       const value = entry.wattsPerGpu[key];
       const [label] = t.categories[key];
       const suffix = key === 'facility' ? ` (${t.pue} ${entry.pue})` : '';
-      const basis = MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled;
-      const color = powerCategoryColor(key);
-      return `<tr><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${isHatched(key) ? `color-mix(in oklab, ${color} ${hatchBgOpacity(key) * 100}%, transparent)` : color};border:1px ${isHatched(key) ? 'dashed' : 'solid'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
+      const measured = MEASURED_POWER_CATEGORIES.has(key);
+      const basis = measured ? t.measured : t.modeled;
+      const emphasis = powerLayerEmphasis(key, highlight);
+      return `<tr data-category="${key}" class="${emphasis === 'highlighted' ? 'font-semibold' : ''}"><td class="pr-2"><span style="display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:4px;vertical-align:middle;background:${powerLayerFill(color, powerLayerOpacity(index, count))};border:1px ${measured ? 'solid' : 'dashed'} ${color}"></span>${escapeHtml(label)}${escapeHtml(suffix)}</td><td class="pr-2 text-muted-foreground">${basis}</td><td class="pr-2 text-right tabular-nums">${watts(value)} W</td><td class="text-right tabular-nums text-muted-foreground">${percent(value / entry.totalWattsPerGpu)}</td></tr>`;
     })
+    .toReversed()
     .join('');
   // The model revision and the rated-reference caveat live here rather than
   // under the chart, so the panel reads as data first.
@@ -288,6 +357,13 @@ function tooltipHtml(
     </tbody></table>${notes}</div>`;
 }
 
+interface CursorLabel {
+  category: SystemPowerCategory;
+  x: number;
+  y: number;
+  watts: number;
+}
+
 function BreakdownChart({
   sectionId,
   series,
@@ -299,6 +375,12 @@ function BreakdownChart({
   markedIndex = null,
   onColumnClick,
   totalLabel,
+  highlight,
+  onHover,
+  onTogglePin,
+  onUnpin,
+  showEndLabels,
+  coarsePointer,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
@@ -317,6 +399,15 @@ function BreakdownChart({
   markedIndex?: number | null;
   /** Clicking a column moves the chip comparison to that point's interactivity. */
   onColumnClick?: (entry: PowerBreakdownPoint) => void;
+  /** The layer being told apart (legend, plot or edge label), hovered or pinned. */
+  highlight: PowerLayerHighlight | null;
+  onHover: (category: SystemPowerCategory | null) => void;
+  onTogglePin: (category: SystemPowerCategory) => void;
+  onUnpin: () => void;
+  /** Direct labels in the right margin (area view, `sm` and up). */
+  showEndLabels: boolean;
+  /** Touch: a tap on a layer hovers and pins it in one go. */
+  coarsePointer: boolean;
 }) {
   const labels = powerBreakdownPointLabels(series.points);
   const columns: Column[] = series.points.map((entry, index) => ({
@@ -356,46 +447,123 @@ function BreakdownChart({
       ...columns.map((column) => column.entry.totalWattsPerGpu),
       ...references.map((reference) => reference.value),
     ) * 1.08;
-  const fill = (category: SystemPowerCategory) =>
-    isHatched(category) ? `url(#${hatchId(sectionId, category)})` : powerCategoryColor(category);
-  const fillOpacity = (category: SystemPowerCategory) =>
-    isHatched(category) ? 1 : MEASURED_FILL_OPACITY;
-  const hatchedCategories = series.categories.filter(isHatched);
+  const count = series.categories.length;
+  const indexOf = (category: SystemPowerCategory) => series.categories.indexOf(category);
+  const nameOf = (category: SystemPowerCategory) => t.categories[category][0];
+  const lastEntry = series.points.at(-1)!;
+  const endLabels = view === 'area' && showEndLabels;
+  const endLabelText = (category: SystemPowerCategory) =>
+    `${nameOf(category)} ${watts(lastEntry.wattsPerGpu[category])} W`;
+  // The right margin fits the longest edge label, leader included.
+  const margin = endLabels
+    ? {
+        ...MARGIN,
+        right: Math.max(
+          MARGIN.right,
+          Math.ceil(
+            END_LABEL_LEADER_PX +
+              END_LABEL_PAD_PX +
+              6 +
+              Math.max(
+                ...series.categories.map((category) =>
+                  measureLabel(endLabelText(category), END_LABEL_FONT),
+                ),
+              ),
+          ),
+        ),
+      }
+    : MARGIN;
 
-  const drawDefs: NonNullable<CustomLayerConfig['render']> = (group) => {
-    const pattern = group
-      .selectAll<SVGPatternElement, SystemPowerCategory>('pattern.breakdown-hatch')
-      .data(hatchedCategories)
-      .join((enter) => {
-        const created = enter
-          .append('pattern')
-          .attr('class', 'breakdown-hatch')
-          .attr('patternUnits', 'userSpaceOnUse')
-          .attr('width', 6)
-          .attr('height', 6);
-        created.append('rect').attr('class', 'hatch-bg').attr('width', 6).attr('height', 6);
-        created
-          .append('line')
-          .attr('class', 'hatch-line')
-          .attr('x1', 0)
-          .attr('y1', 0)
-          .attr('x2', 0)
-          .attr('y2', 6)
-          .attr('stroke-width', 2);
-        return created;
-      })
-      .attr('id', (category) => hatchId(sectionId, category))
-      .attr('patternTransform', (category) => `rotate(${HATCH_ANGLE[category]})`);
-    pattern
-      .select('.hatch-bg')
-      .attr('fill', (category) => powerCategoryColor(category))
-      .attr('fill-opacity', (category) => hatchBgOpacity(category));
-    pattern.select('.hatch-line').attr('stroke', (category) => powerCategoryColor(category));
+  // The latest highlight the plot shows, hovered from the plot or set from outside, so
+  // the hit handlers can style layers before React has re-rendered.
+  const liveHighlight = useRef<PowerLayerHighlight | null>(highlight);
+  liveHighlight.current = highlight;
+  const cursor = useRef<CursorLabel | null>(null);
+  const tooltipElement = useRef<HTMLDivElement | null>(null);
+
+  const applyEmphasis = (
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    current: PowerLayerHighlight | null,
+  ) => {
+    const styleOf = (category: SystemPowerCategory) =>
+      layerStyle(category, indexOf(category), count, current);
+    group
+      .selectAll<SVGElement, { key: SystemPowerCategory }>('.breakdown-area, .breakdown-bar')
+      .each(function (d) {
+        const style = styleOf(d.key);
+        d3.select(this)
+          .attr('data-emphasis', style.emphasis)
+          .attr('fill-opacity', style.fillOpacity)
+          .attr('opacity', style.opacity)
+          .attr('stroke-width', style.strokeWidth)
+          .attr('stroke-opacity', style.strokeOpacity);
+      });
+    group
+      .selectAll<SVGPathElement, { key: SystemPowerCategory }>('.breakdown-edge')
+      .each(function (d) {
+        const style = styleOf(d.key);
+        const top = d.key === series.categories.at(-1);
+        d3.select(this)
+          .attr('opacity', style.opacity)
+          .attr('stroke-width', top ? Math.max(2, style.strokeWidth) : style.strokeWidth)
+          .attr('stroke-opacity', top ? 0.9 : style.strokeOpacity);
+      });
+    group
+      .selectAll<SVGTextElement, { key: SystemPowerCategory }>('.breakdown-segment-label')
+      .attr('opacity', (d) => styleOf(d.key).opacity);
+    d3.select(group.node()?.ownerSVGElement ?? null)
+      .selectAll<SVGGElement, { key: SystemPowerCategory }>('.breakdown-end-label')
+      .each(function (d) {
+        const style = styleOf(d.key);
+        d3.select(this)
+          .attr('data-emphasis', style.emphasis)
+          .attr('opacity', style.emphasis === 'faded' ? 0.45 : 1)
+          .select('.breakdown-end-label-name')
+          .attr('font-weight', style.emphasis === 'highlighted' ? 700 : 500);
+      });
+    if (tooltipElement.current) {
+      d3.select(tooltipElement.current)
+        .selectAll<HTMLTableRowElement, unknown>('tr[data-category]')
+        .classed('font-semibold', function () {
+          return this.dataset.category === current?.category;
+        });
+    }
+  };
+
+  const drawCursorLabel = (
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    width: number,
+    height: number,
+  ) => {
+    const label = cursor.current;
+    const text = label ? `${nameOf(label.category)} · ${watts(label.watts)} W` : '';
+    const textWidth = measureLabel(text, END_LABEL_FONT);
+    const x = label ? Math.min(Math.max(0, label.x), Math.max(0, width - textWidth)) : 0;
+    const y = label ? Math.min(Math.max(END_LABEL_LINE_HEIGHT, label.y), height - 2) : 0;
+    group
+      .selectAll<SVGTextElement, CursorLabel>('text.breakdown-cursor-label')
+      .data(label ? [label] : [])
+      .join('text')
+      .attr('class', 'breakdown-cursor-label')
+      .attr('data-testid', 'power-breakdown-cursor-label')
+      .attr('data-category', (d) => d.category)
+      .attr('x', x)
+      .attr('y', y)
+      .attr('font-size', CHART_TYPE.annotation)
+      .attr('font-weight', 600)
+      .attr('fill', 'var(--foreground)')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .attr('pointer-events', 'none')
+      .text(text)
+      .raise();
   };
 
   const drawStack: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
     const x = ctx.xScale as ContinuousScale;
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    tooltipElement.current = ctx.tooltipElement;
     const layout = layoutFor(x, ctx.width);
     const barWidth = (key: string) => layout[Number(key)].barWidth;
     const center = (key: string) => layout[Number(key)].center;
@@ -437,11 +605,8 @@ function BreakdownChart({
       .attr('y', (d) => y(d.y1))
       .attr('height', (d) => Math.max(0, y(d.y0) - y(d.y1)))
       .attr('rx', 1)
-      .attr('fill', (d) => fill(d.key))
-      .attr('fill-opacity', (d) => fillOpacity(d.key))
-      .attr('stroke', (d) => powerCategoryColor(d.key))
-      .attr('stroke-opacity', 0.9)
-      .attr('stroke-width', 1);
+      .attr('fill', color)
+      .attr('stroke', color);
 
     const areas = series.categories.map((key) => ({
       key,
@@ -471,21 +636,19 @@ function BreakdownChart({
       .attr('data-testid', 'power-breakdown-area')
       .attr('data-category', (d) => d.key)
       .attr('d', (d) => area(d.values))
-      .attr('fill', (d) => fill(d.key))
-      .attr('fill-opacity', (d) => fillOpacity(d.key));
+      .attr('fill', color)
+      .attr('stroke', 'none');
+    // Each band's top edge, 1 px in the chip colour; the stack's top edge is the chip's total.
     group
       .selectAll<SVGPathElement, (typeof areas)[number]>('path.breakdown-edge')
       .data(view === 'area' ? areas : [], (d) => d.key)
       .join('path')
       .attr('class', 'breakdown-edge')
+      .attr('data-category', (d) => d.key)
       .attr('d', (d) => edge(d.values))
       .attr('fill', 'none')
-      // The top edge is the chip's total, in its vendor colour; inner edges outline each part.
-      .attr('stroke', (d) =>
-        d.key === series.categories.at(-1) ? color : powerCategoryColor(d.key),
-      )
-      .attr('stroke-opacity', 0.9)
-      .attr('stroke-width', (d) => (d.key === series.categories.at(-1) ? 2 : 1));
+      .attr('stroke', color)
+      .attr('pointer-events', 'none');
     group
       .selectAll<SVGCircleElement, Column>('circle.breakdown-total-dot')
       .data(view === 'area' ? columns : [], (d) => d.key)
@@ -557,6 +720,98 @@ function BreakdownChart({
       .attr('paint-order', 'stroke')
       .attr('pointer-events', 'none')
       .text((d) => d.label);
+
+    drawEndLabels(group, ctx, y, center(columns.at(-1)!.key));
+    applyEmphasis(group, liveHighlight.current);
+    drawCursorLabel(group, ctx.width, ctx.height);
+  };
+
+  /**
+   * Direct labels at the right edge: every layer's name and its W at the last
+   * point, in the right margin, with a leader to the band's centre there.
+   * Collisions push labels apart in stack order (`placeEndLabels`). They live
+   * outside the clipped plot group, so they are drawn into the chart's root.
+   */
+  const drawEndLabels = (
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1],
+    y: ContinuousScale,
+    lastX: number,
+  ) => {
+    const root = ctx.layout.g;
+    const bands = endLabels ? stackPowerBreakdown(lastEntry, series.categories) : [];
+    const centers = bands.map((band) => (y(band.y0) + y(band.y1)) / 2);
+    const placed = placeEndLabels(centers, END_LABEL_LINE_HEIGHT, {
+      top: END_LABEL_LINE_HEIGHT / 2,
+      bottom: ctx.height,
+    });
+    const items = bands.map((band, index) => ({
+      key: band.key,
+      anchorY: centers[index],
+      y: placed[index],
+    }));
+    const labelX = ctx.width + END_LABEL_LEADER_PX + END_LABEL_PAD_PX;
+    const item = root
+      .selectAll<SVGGElement, (typeof items)[number]>('g.breakdown-end-label')
+      .data(items, (d) => d.key)
+      .join((enter) => {
+        const created = enter.append('g').attr('class', 'breakdown-end-label');
+        created.append('line').attr('class', 'breakdown-end-label-leader');
+        const text = created
+          .append('text')
+          .attr('class', 'breakdown-end-label-text')
+          .attr('dy', '0.35em')
+          .attr('font-size', CHART_TYPE.annotation)
+          .attr('paint-order', 'stroke')
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 3);
+        text
+          .append('tspan')
+          .attr('class', 'breakdown-end-label-name')
+          .attr('fill', 'var(--foreground)');
+        text
+          .append('tspan')
+          .attr('class', 'breakdown-end-label-watts')
+          .attr('fill', 'var(--muted-foreground)')
+          .attr('dx', 4);
+        return created;
+      })
+      .attr('data-testid', 'power-breakdown-end-label')
+      .attr('data-category', (d) => d.key)
+      .style('cursor', 'default')
+      .on('mouseenter.layer', (_event, d) => {
+        if (liveHighlight.current?.pinned) return;
+        liveHighlight.current = { category: d.key, pinned: false };
+        applyEmphasis(group, liveHighlight.current);
+        onHover(d.key);
+      })
+      .on('mouseleave.layer', () => {
+        if (liveHighlight.current?.pinned) return;
+        liveHighlight.current = null;
+        applyEmphasis(group, null);
+        onHover(null);
+      })
+      .on('click.layer', (event: MouseEvent, d) => {
+        event.stopPropagation();
+        onTogglePin(d.key);
+      });
+    item
+      .select<SVGLineElement>('.breakdown-end-label-leader')
+      .attr('x1', lastX)
+      .attr('y1', (d) => d.anchorY)
+      .attr('x2', ctx.width + END_LABEL_LEADER_PX)
+      .attr('y2', (d) => d.y)
+      .attr('stroke', color)
+      .attr('stroke-opacity', LAYER_STROKE_OPACITY)
+      .attr('stroke-width', 1);
+    item
+      .select<SVGTextElement>('.breakdown-end-label-text')
+      .attr('x', labelX)
+      .attr('y', (d) => d.y);
+    item.select('.breakdown-end-label-name').text((d) => nameOf(d.key));
+    item
+      .select('.breakdown-end-label-watts')
+      .text((d) => `${watts(lastEntry.wattsPerGpu[d.key])} W`);
   };
 
   const referenceText = (reference: (typeof references)[number]) =>
@@ -652,8 +907,87 @@ function BreakdownChart({
       .text(referenceText);
   };
 
+  /**
+   * The band under a plot position: the hovered column's segment on bars, or
+   * the stack interpolated at that x on the area, plus where its label goes.
+   */
+  const bandAt = (
+    ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1],
+    column: Column,
+    mx: number,
+    my: number,
+  ): CursorLabel | null => {
+    const x = ctx.xScale as ContinuousScale;
+    const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const layout = layoutFor(x, ctx.width);
+    const value = y.invert(my);
+    if (view === 'bars') {
+      const { center, barWidth } = layout[Number(column.key)];
+      const band = bandAtWatts(stackPowerBreakdown(column.entry, series.categories), value);
+      return band
+        ? {
+            category: band.key,
+            x: center + barWidth / 2 + 6,
+            y: (y(band.y0) + y(band.y1)) / 2,
+            watts: band.watts,
+          }
+        : null;
+    }
+    const bands = stackedBandsAt(
+      columns.map((entry) => ({ x: layout[Number(entry.key)].center, entry: entry.entry })),
+      mx,
+      series.categories,
+    );
+    const band = bandAtWatts(bands, value);
+    return band ? { category: band.key, x: mx + 12, y: my - 10, watts: band.watts } : null;
+  };
+
   const drawHitAreas: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
     const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
+    const showLabel = (label: CursorLabel | null) => {
+      cursor.current = label;
+      drawCursorLabel(group, ctx.width, ctx.height);
+    };
+    const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const hoverBand = (event: MouseEvent, column: Column) => {
+      const [mx, my] = d3.pointer(event, group.node());
+      const pinned = liveHighlight.current?.pinned ? liveHighlight.current : null;
+      if (pinned) {
+        // The pinned part keeps the highlight; its label tracks the pointer's x along the band.
+        const { center, barWidth } = layout[Number(column.key)];
+        const bands =
+          view === 'bars'
+            ? stackPowerBreakdown(column.entry, series.categories)
+            : stackedBandsAt(
+                columns.map((entry) => ({
+                  x: layout[Number(entry.key)].center,
+                  entry: entry.entry,
+                })),
+                mx,
+                series.categories,
+              );
+        const band = bands.find((candidate) => candidate.key === pinned.category);
+        showLabel(
+          band && band.watts > 0
+            ? {
+                category: band.key,
+                x: view === 'bars' ? center + barWidth / 2 + 6 : mx + 12,
+                y: (y(band.y0) + y(band.y1)) / 2,
+                watts: band.watts,
+              }
+            : null,
+        );
+        return;
+      }
+      const found = bandAt(ctx, column, mx, my);
+      const next = found ? { category: found.category, pinned: false } : null;
+      if (next?.category !== liveHighlight.current?.category) {
+        liveHighlight.current = next;
+        applyEmphasis(group, next);
+        onHover(next?.category ?? null);
+      }
+      showLabel(found);
+    };
     return group
       .selectAll<SVGRectElement, Column>('rect.breakdown-hit')
       .data(columns, (d) => d.key)
@@ -667,6 +1001,31 @@ function BreakdownChart({
       .attr('fill', 'var(--foreground)')
       .attr('fill-opacity', 0)
       .style('cursor', onColumnClick ? 'pointer' : 'default')
+      .on('mousemove.layer', (event: MouseEvent, d) => hoverBand(event, d))
+      .on('mouseleave.layer', (event: MouseEvent) => {
+        // Crossing into the next column is not leaving the plot.
+        const next = event.relatedTarget;
+        if (next instanceof Element && next.classList.contains('breakdown-hit')) return;
+        showLabel(null);
+        if (liveHighlight.current?.pinned) return;
+        if (liveHighlight.current !== null) {
+          liveHighlight.current = null;
+          applyEmphasis(group, null);
+          onHover(null);
+        }
+      })
+      .on('click.layer', (event: MouseEvent, d) => {
+        // Touch: a tap on a band hovers and pins it; a tap above the stack, or any
+        // mouse click on the plot, drops a pinned band.
+        const [mx, my] = d3.pointer(event, group.node());
+        const found = coarsePointer ? bandAt(ctx, d, mx, my) : null;
+        if (found) {
+          showLabel(found);
+          onTogglePin(found.category);
+        } else {
+          onUnpin();
+        }
+      })
       .on('click.compare', (_event, d) => onColumnClick?.(d.entry));
   };
 
@@ -693,7 +1052,6 @@ function BreakdownChart({
   };
 
   const layers: LayerConfig<Column>[] = [
-    { type: 'custom', key: 'defs', render: drawDefs },
     { type: 'custom', key: `stack-${view}`, render: drawStack },
     { type: 'custom', key: 'references', render: drawReferences },
     { type: 'custom', key: 'marker', render: drawMarker },
@@ -710,7 +1068,7 @@ function BreakdownChart({
       zoom={{ enabled: false }}
       grabCursor={false}
       instructions=""
-      margin={MARGIN}
+      margin={margin}
       xScale={{ type: 'linear', domain: xDomain }}
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{
@@ -736,8 +1094,9 @@ function BreakdownChart({
       layers={layers}
       tooltip={{
         rulerType: 'none',
-        content: (column) => tooltipHtml(series, column, xLabel, t, totalLabel),
-        attachToLayer: 4,
+        content: (column) =>
+          tooltipHtml(series, column, color, xLabel, t, totalLabel, liveHighlight.current),
+        attachToLayer: 3,
         onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
         onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
       }}
@@ -748,6 +1107,7 @@ function BreakdownChart({
 export default function PowerBreakdownPanel({
   chartId,
   data,
+  overlayData = [],
   contextLabel,
   xField,
   xLabel,
@@ -756,9 +1116,13 @@ export default function PowerBreakdownPanel({
   heading,
   compact = false,
   onCollapse,
+  layerHighlight,
+  onLayerHighlight,
 }: {
   chartId: string;
   data: InferenceData[];
+  /** Unofficial-run overlay points within `data`: their series take the run's colour. */
+  overlayData?: readonly InferenceData[];
   contextLabel?: string;
   /**
    * Inline drill-down under a chip-compare bar (PowerX v2): the compare legend above the
@@ -776,6 +1140,9 @@ export default function PowerBreakdownPanel({
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
+  /** Shared with the chip comparison's legend on the Where view; own state when omitted. */
+  layerHighlight?: PowerLayerHighlight | null;
+  onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -792,12 +1159,21 @@ export default function PowerBreakdownPanel({
   }, [view, setUrlParams]);
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
+  const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
   const breakdowns = useMemo(
     () =>
-      buildPowerBreakdowns(data, locale, interactivity).map((entry) =>
-        breakdownSeriesAtBoundary(entry, includeFacility),
-      ),
-    [data, locale, interactivity, includeFacility],
+      buildPowerBreakdownsWithOverlays(
+        data,
+        overlayData.length > 0
+          ? { points: overlayData, runIndexByUrl, runInfos: unofficialRunInfos ?? [] }
+          : undefined,
+        locale,
+        interactivity,
+      ).map((entry): PowerBreakdownDisplaySeries => ({
+        ...breakdownSeriesAtBoundary(entry, includeFacility),
+        overlayRunIndex: entry.overlayRunIndex,
+      })),
+    [data, overlayData, runIndexByUrl, unofficialRunInfos, locale, interactivity, includeFacility],
   );
   const [ownKey, setOwnKey] = useState<string | null>(null);
   const selectedKey = controlledKey === undefined ? ownKey : controlledKey;
@@ -819,15 +1195,22 @@ export default function PowerBreakdownPanel({
   const markedIndex = series && comparedEntry ? series.points.indexOf(comparedEntry) : -1;
   const sectionId = `${chartId}-power-breakdown`;
   // The main chart's vendor color for each hardware line, so a bar here reads
-  // as the same series as its line and legend chip above.
+  // as the same series as its line and legend chip above; overlay lines keep
+  // their run colour.
   const hwKeys = useMemo(() => [...new Set(data.map((point) => point.hwKey))], [data]);
   const { resolveColor } = useThemeColors({
     highContrast: false,
     identifiers: hwKeys,
     activeKeys: hwKeys,
   });
-  const colorOf = (entry: PowerBreakdownSeries) => resolveColor(entry.hwKey);
+  const colorOf = (entry: PowerBreakdownDisplaySeries) =>
+    entry.overlayRunIndex === undefined
+      ? resolveColor(entry.hwKey)
+      : overlayRunColor(entry.overlayRunIndex);
   const color = series ? colorOf(series) : 'currentColor';
+  const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
+  const showEndLabels = useMediaQuery(END_LABELS_QUERY);
+  const coarsePointer = useIsCoarsePointer();
 
   const exportCsv = () => {
     exportToCsv(
@@ -942,24 +1325,52 @@ export default function PowerBreakdownPanel({
           </div>
           {!compact && (
             <ul
-              className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs"
+              className="flex flex-wrap gap-x-1 gap-y-1 text-xs"
               data-testid="power-breakdown-legend"
             >
-              {series.categories.toReversed().map((key) => {
+              {series.categories.map((key, index) => {
                 const [label, description] = t.categories[key];
-                const detail =
-                  key === 'facility' ? `${description} ${series.points[0].pue}` : description;
+                const measured = MEASURED_POWER_CATEGORIES.has(key);
+                const pinned =
+                  layers.highlight?.pinned === true && layers.highlight.category === key;
+                const emphasis = powerLayerEmphasis(key, layers.highlight);
                 return (
-                  <li key={key} className="flex min-w-0 items-baseline gap-1.5">
-                    <span
-                      aria-hidden
-                      className="inline-block size-3 shrink-0 translate-y-0.5 rounded-[2px]"
-                      style={swatchStyle(key)}
-                    />
-                    <span className="shrink-0 font-medium whitespace-nowrap">{label}</span>
-                    <span className="min-w-0 text-muted-foreground">
-                      {detail} · {MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}
-                    </span>
+                  <li key={key} className="flex min-w-0">
+                    <button
+                      type="button"
+                      data-testid="power-breakdown-legend-item"
+                      data-category={key}
+                      data-emphasis={emphasis}
+                      aria-pressed={pinned}
+                      onMouseEnter={() => layers.hover(key)}
+                      onMouseLeave={() => layers.hover(null)}
+                      onFocus={() => layers.hover(key)}
+                      onBlur={() => layers.hover(null)}
+                      onClick={() => layers.togglePin(key)}
+                      className={`flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
+                        pinned ? 'bg-muted ring-1 ring-border' : ''
+                      }`}
+                    >
+                      <span
+                        aria-hidden
+                        className="inline-block size-3 shrink-0 rounded-[2px]"
+                        title={`${description}${key === 'facility' ? ` ${series.points[0].pue}` : ''} · ${measured ? t.measured : t.modeled}${pinned ? ` · ${t.pinned}` : ''}`}
+                        style={swatchStyle(
+                          key,
+                          color,
+                          index,
+                          series.categories.length,
+                          layers.highlight,
+                        )}
+                      />
+                      <span
+                        className={`whitespace-nowrap ${
+                          emphasis === 'faded' ? 'text-muted-foreground' : 'font-medium'
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    </button>
                   </li>
                 );
               })}
@@ -979,6 +1390,12 @@ export default function PowerBreakdownPanel({
             onColumnClick={
               setCompareTarget ? (entry) => setCompareTarget(entry.interactivity) : undefined
             }
+            highlight={layers.highlight}
+            onHover={layers.hover}
+            onTogglePin={layers.togglePin}
+            onUnpin={layers.unpin}
+            showEndLabels={showEndLabels}
+            coarsePointer={coarsePointer}
           />
           <div className="max-h-0 overflow-hidden">
             <div id={`${sectionId}-export`} className="p-4" />

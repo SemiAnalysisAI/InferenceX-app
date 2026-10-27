@@ -2,6 +2,8 @@ import type { AggDataEntry, InferenceData } from '../types';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
 import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
+import { getOverlayLineLabel, type OverlayRunIdentity } from '@/lib/benchmarks/inference-labels';
+import { overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { isPositive, modeledFacilityWattsPerGpu } from '@/lib/power/power-basis';
 import {
   MEASURED_SYSTEM_POWER_CATEGORIES,
@@ -35,28 +37,43 @@ export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = SYSTE
 export const MEASURED_POWER_CATEGORIES = MEASURED_SYSTEM_POWER_CATEGORIES;
 
 /**
- * One colour per part, shared by every chip, so the layers of a single
- * hardware line stay tellable apart. The tokens live next to the
- * `--overlay-run-*` palette in `globals.css` with light and dark values;
- * measured and modeled CPU share a hue and differ by the modeled hatch.
+ * One hue per chip: every part is a lightness step of the chip's own colour,
+ * most opaque at the measured GPU base and lightest at the facility top. The
+ * ramp spreads over the parts a series actually has, so an AMD chassis without
+ * NVSwitch or an IT-only stack still gets evenly spaced, tellable steps. A 1 px
+ * stroke in the chip colour separates neighbours; hover and pin do the rest.
  */
-export const POWER_CATEGORY_COLOR_TOKEN: Record<SystemPowerCategory, string> = {
-  gpu: '--power-part-gpu',
-  measuredCpu: '--power-part-cpu',
-  cpu: '--power-part-cpu',
-  memory: '--power-part-memory',
-  nic: '--power-part-nic',
-  nvswitch: '--power-part-nvswitch',
-  storage: '--power-part-storage',
-  other: '--power-part-other',
-  fans: '--power-part-fans',
-  psuLoss: '--power-part-psu-loss',
-  network: '--power-part-network',
-  facility: '--power-part-facility',
-};
+export const POWER_LAYER_OPACITY_RANGE: readonly [number, number] = [0.92, 0.14];
 
-export const powerCategoryColor = (category: SystemPowerCategory): string =>
-  `var(${POWER_CATEGORY_COLOR_TOKEN[category]})`;
+export function powerLayerOpacity(index: number, count: number): number {
+  const [base, top] = POWER_LAYER_OPACITY_RANGE;
+  if (count <= 1) return base;
+  const step = Math.min(Math.max(index, 0), count - 1) / (count - 1);
+  return Math.round((base - (base - top) * step) * 1000) / 1000;
+}
+
+/** The chip colour at a ramp step, for CSS backgrounds (legend swatches, comparison segments). */
+export const powerLayerFill = (color: string, opacity: number): string =>
+  `color-mix(in oklab, ${color} ${Math.round(opacity * 100)}%, transparent)`;
+
+/** The part a viewer is telling apart: hovered (transient) or pinned by a click. */
+export interface PowerLayerHighlight {
+  category: SystemPowerCategory;
+  pinned: boolean;
+}
+
+/** Faded siblings of a highlighted layer keep this much of their opacity. */
+export const POWER_LAYER_FADED_OPACITY = 0.25;
+
+export type PowerLayerEmphasis = 'highlighted' | 'faded' | 'plain';
+
+export function powerLayerEmphasis(
+  category: SystemPowerCategory,
+  highlight: PowerLayerHighlight | null | undefined,
+): PowerLayerEmphasis {
+  if (!highlight) return 'plain';
+  return highlight.category === category ? 'highlighted' : 'faded';
+}
 
 export interface PowerBreakdownPoint {
   point: InferenceData;
@@ -212,6 +229,59 @@ export function buildPowerBreakdowns(
     .toSorted((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key));
 }
 
+/** A series drawn from an unofficial-run overlay: coloured by `overlayRunColor(overlayRunIndex)`. */
+export interface PowerBreakdownDisplaySeries extends PowerBreakdownSeries {
+  overlayRunIndex?: number;
+}
+
+export interface PowerBreakdownOverlayInput {
+  points: readonly InferenceData[];
+  runIndexByUrl: Record<string, number>;
+  runInfos: readonly OverlayRunIdentity[];
+}
+
+/**
+ * The official series followed by one series per unofficial run and hardware
+ * line, keyed `hwKey|precision|run<N>` and labelled with the run tag the chart's
+ * line pills use, so an overlay never merges into the official line it shadows.
+ * Only the dashboard uses this; the read-only API keeps `buildPowerBreakdowns`.
+ */
+export function buildPowerBreakdownsWithOverlays(
+  points: readonly InferenceData[],
+  overlay: PowerBreakdownOverlayInput | undefined,
+  locale: 'en' | 'zh' = 'en',
+  interactivity: PowerBreakdownInteractivity = powerBreakdownInteractivity(),
+): PowerBreakdownDisplaySeries[] {
+  const overlayPoints = new Set(overlay?.points);
+  const official: PowerBreakdownDisplaySeries[] = buildPowerBreakdowns(
+    points.filter((point) => !overlayPoints.has(point)),
+    locale,
+    interactivity,
+  );
+  if (!overlay || overlay.points.length === 0) return official;
+  const byRun = new Map<number, InferenceData[]>();
+  for (const point of overlay.points) {
+    const runIndex = overlayRunIndex(point.run_url ?? null, overlay.runIndexByUrl);
+    byRun.set(runIndex, [...(byRun.get(runIndex) ?? []), point]);
+  }
+  const overlays = [...byRun]
+    .toSorted(([a], [b]) => a - b)
+    .flatMap(([runIndex, group]) =>
+      buildPowerBreakdowns(group, locale, interactivity).map(
+        (series): PowerBreakdownDisplaySeries => {
+          const run = overlay.runInfos[runIndex];
+          return {
+            ...series,
+            key: `${series.key}|run${runIndex}`,
+            label: run ? getOverlayLineLabel(series.label, run, true) : series.label,
+            overlayRunIndex: runIndex,
+          };
+        },
+      ),
+    );
+  return [...official, ...overlays];
+}
+
 /**
  * Category labels for x ticks: `c16`, disambiguated as `c16 · 2` when a source
  * has more than one point at one concurrency.
@@ -281,8 +351,10 @@ export function stackPowerBreakdown(
   });
 }
 
-export interface PowerBreakdownComparisonRow {
-  series: PowerBreakdownSeries;
+export interface PowerBreakdownComparisonRow<
+  S extends PowerBreakdownSeries = PowerBreakdownSeries,
+> {
+  series: S;
   /** The series' benchmark point closest to the target interactivity (log distance). */
   entry: PowerBreakdownPoint;
 }
@@ -313,13 +385,13 @@ export function defaultComparisonInteractivity(
  * its closest point is more than `maxRatio`× away, so a chip is never compared
  * at a load it was not benchmarked near.
  */
-export function compareBreakdownsAt(
-  series: readonly PowerBreakdownSeries[],
+export function compareBreakdownsAt<S extends PowerBreakdownSeries>(
+  series: readonly S[],
   target: number,
   maxRatio = 1.5,
-): { rows: PowerBreakdownComparisonRow[]; outOfRange: PowerBreakdownSeries[] } {
-  const rows: PowerBreakdownComparisonRow[] = [];
-  const outOfRange: PowerBreakdownSeries[] = [];
+): { rows: PowerBreakdownComparisonRow<S>[]; outOfRange: S[] } {
+  const rows: PowerBreakdownComparisonRow<S>[] = [];
+  const outOfRange: S[] = [];
   if (!(target > 0)) return { rows, outOfRange: [...series] };
   for (const entry of series) {
     let best: PowerBreakdownPoint | null = null;
@@ -340,4 +412,72 @@ export function compareBreakdownsAt(
       a.series.label.localeCompare(b.series.label),
   );
   return { rows, outOfRange };
+}
+
+/**
+ * Every part's stacked band at an arbitrary x, linearly interpolated between
+ * the two neighbouring points (clamped to the ends), so a hover between
+ * columns can name the layer under the cursor and its W/GPU there.
+ */
+export function stackedBandsAt(
+  points: readonly { x: number; entry: PowerBreakdownPoint }[],
+  x: number,
+  categories: readonly SystemPowerCategory[],
+): StackedSegment[] {
+  if (points.length === 0) return [];
+  const sorted = points.toSorted((a, b) => a.x - b.x);
+  let right = sorted.findIndex((point) => point.x >= x);
+  if (right === -1) right = sorted.length - 1;
+  const left = Math.max(0, right - 1);
+  const a = sorted[left];
+  const b = sorted[right];
+  const span = b.x - a.x;
+  const mix = span > 0 ? Math.min(1, Math.max(0, (x - a.x) / span)) : 0;
+  const stackA = stackPowerBreakdown(a.entry, categories);
+  const stackB = stackPowerBreakdown(b.entry, categories);
+  return stackA.map((segment, index) => {
+    const other = stackB[index];
+    const lerp = (from: number, to: number) => from + (to - from) * mix;
+    return {
+      key: segment.key,
+      y0: lerp(segment.y0, other.y0),
+      y1: lerp(segment.y1, other.y1),
+      watts: lerp(segment.watts, other.watts),
+    };
+  });
+}
+
+/** The band (in stack order) that contains `watts`; null above the stack or below zero. */
+export function bandAtWatts(
+  bands: readonly StackedSegment[],
+  watts: number,
+): StackedSegment | null {
+  if (!(watts >= 0)) return null;
+  return bands.find((band) => band.watts > 0 && watts >= band.y0 && watts <= band.y1) ?? null;
+}
+
+/**
+ * Direct labels at the right edge of the area: one per layer at its band
+ * centre, pushed apart to `lineHeight` so none overlap. Labels keep their
+ * stack order (`centers` runs bottom to top, in pixel y, so descending);
+ * the greedy pass walks the stack upward, then slides the whole run down if it
+ * ran past the plot top. Returns a pixel y per label, in the input order.
+ */
+export function placeEndLabels(
+  centers: readonly number[],
+  lineHeight: number,
+  bounds: { top: number; bottom: number },
+): number[] {
+  const placed = [...centers];
+  // Bottom layer first: each label sits at its centre or above the one below it.
+  for (let index = 0; index < placed.length; index += 1) {
+    placed[index] = Math.min(placed[index], bounds.bottom);
+    if (index > 0) placed[index] = Math.min(placed[index], placed[index - 1] - lineHeight);
+  }
+  // Ran above the plot: slide down from the top, keeping the spacing.
+  for (let index = placed.length - 1; index >= 0; index -= 1) {
+    const limit = index === placed.length - 1 ? bounds.top : placed[index + 1] + lineHeight;
+    placed[index] = Math.max(placed[index], limit);
+  }
+  return placed;
 }
