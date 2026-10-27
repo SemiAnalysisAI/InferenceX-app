@@ -27,6 +27,7 @@ import {
   powerLayerEmphasis,
   type PowerBand,
   type PowerBreakdownDisplaySeries,
+  type PowerComparedPoints,
   type PowerLayerHighlight,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
@@ -51,6 +52,7 @@ const STRINGS = {
     measured: 'Measured',
     modeled: 'Modeled (hatched)',
     pinned: 'Pinned',
+    pinnedPoint: (conc: number) => `Pinned to c${conc} · click to follow the slider`,
     legend: 'Power layers',
     bands: {
       gpu: 'GPU',
@@ -92,6 +94,7 @@ const STRINGS = {
     measured: '实测',
     modeled: '建模（斜线）',
     pinned: '已固定',
+    pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随滑块`,
     legend: '功耗分层',
     bands: {
       gpu: 'GPU',
@@ -144,6 +147,9 @@ export default function PowerChipCompare({
   onNearestKeyChange,
   layerHighlight,
   onLayerHighlight,
+  comparedPoints = {},
+  onUnpinComparedPoint,
+  onTargetChange,
 }: {
   data: InferenceData[];
   /** Unofficial-run overlay points within `data`: their bars take the run's colour. */
@@ -161,6 +167,12 @@ export default function PowerChipCompare({
   /** Shared with the drill-down's plot on the Where view; own state when omitted. */
   layerHighlight?: PowerLayerHighlight | null;
   onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
+  /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
+  comparedPoints?: PowerComparedPoints;
+  /** The row's pin marker was clicked: that chip follows the slider again. */
+  onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
+  /** The slider moved (the global control): the owner drops every pinned point. */
+  onTargetChange?: () => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -207,16 +219,22 @@ export default function PowerChipCompare({
   useEffect(() => setTarget(null), [lo, hi, setTarget]);
   const value = target ?? fallback;
 
+  // Rows keep the series order (registry order, overlays last) whatever the slider reads.
   const { rows, outOfRange } = useMemo(
-    () => (value ? compareBreakdownsAt(series, value) : { rows: [], outOfRange: [] }),
-    [series, value],
+    () =>
+      value
+        ? compareBreakdownsAt(series, value, undefined, comparedPoints)
+        : { rows: [], outOfRange: [] },
+    [series, value, comparedPoints],
   );
-  // The compared chip: the one whose point is closest to the slider interactivity.
+  // The compared chip: the one whose point is closest to the slider interactivity. A
+  // pinned chip counts by its slider-nearest point, not its pin, so pinning never moves
+  // the drill-down to another chip.
   const nearestKey = useMemo(() => {
     if (value === null) return null;
     let best: string | null = null;
     let bestDistance = Infinity;
-    for (const row of rows) {
+    for (const row of compareBreakdownsAt(series, value).rows) {
       const distance = Math.abs(Math.log(row.entry.interactivity / value));
       if (distance < bestDistance) {
         best = row.series.key;
@@ -224,7 +242,7 @@ export default function PowerChipCompare({
       }
     }
     return best;
-  }, [rows, value]);
+  }, [series, value]);
   useEffect(() => onNearestKeyChange?.(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
   const bands = POWER_BANDS.filter((band) =>
@@ -277,7 +295,10 @@ export default function PowerChipCompare({
             min={0}
             max={SLIDER_STEPS}
             value={toStep(value)}
-            onChange={(event) => setTarget(fromStep(Number(event.target.value)))}
+            onChange={(event) => {
+              setTarget(fromStep(Number(event.target.value)));
+              onTargetChange?.();
+            }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
             className="min-w-0 flex-1 accent-secondary dark:accent-primary"
             data-testid="power-chip-compare-target"
@@ -345,7 +366,7 @@ export default function PowerChipCompare({
         <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
       ) : (
         <ol className="space-y-1.5" data-testid="power-chip-compare-rows">
-          {rows.map(({ series: entry, entry: point }) => {
+          {rows.map(({ series: entry, entry: point, pinned: pinnedPoint }) => {
             const color =
               entry.overlayRunIndex === undefined
                 ? resolveColor(entry.hwKey)
@@ -360,13 +381,24 @@ export default function PowerChipCompare({
               <li key={entry.key}>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    // The pin marker sits inside the row: a click on it unpins, nothing else.
+                    if (
+                      pinnedPoint &&
+                      onUnpinComparedPoint &&
+                      event.target instanceof Element &&
+                      event.target.closest('[data-testid="power-chip-compare-unpin"]')
+                    ) {
+                      onUnpinComparedPoint(entry);
+                      return;
+                    }
                     onSelectKey(entry.key);
                     track('inference_power_compare_chip_selected');
                   }}
                   aria-pressed={active}
                   aria-expanded={renderExpanded ? expanded : undefined}
                   data-testid="power-chip-compare-row"
+                  data-pinned={pinnedPoint ? 'true' : undefined}
                   className={`grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem] ${
                     active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40'
                   }`}
@@ -380,8 +412,19 @@ export default function PowerChipCompare({
                       />
                       <span className="truncate">{entry.label}</span>
                     </span>
-                    <span className="pl-4.5 text-xs text-muted-foreground">
-                      {t.at(point.concurrency, rate(point.interactivity))}
+                    <span className="flex items-center gap-1.5 pl-4.5 text-xs text-muted-foreground">
+                      <span data-testid="power-chip-compare-point">
+                        {t.at(point.concurrency, rate(point.interactivity))}
+                      </span>
+                      {pinnedPoint && onUnpinComparedPoint && (
+                        <span
+                          data-testid="power-chip-compare-unpin"
+                          title={t.pinnedPoint(point.concurrency)}
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-2xs leading-none text-foreground hover:bg-muted"
+                        >
+                          ×
+                        </span>
+                      )}
                     </span>
                   </span>
                   <span className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-sm">

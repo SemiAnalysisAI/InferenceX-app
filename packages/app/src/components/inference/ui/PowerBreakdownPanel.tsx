@@ -7,7 +7,6 @@ import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
   usePowerXSurface,
-  useSetPowerXCompareTarget,
 } from './powerx-surface';
 import { usePowerLayerHighlight } from './power-layer-highlight';
 import PowerPartsList from './PowerPartsList';
@@ -41,6 +40,7 @@ import {
   bandAtWatts,
   bandPartsAt,
   bandTarget,
+  breakdownPointAtConcurrency,
   breakdownSeriesAtBoundary,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
@@ -65,6 +65,7 @@ import {
   type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
+  type PowerComparedPoints,
   type PowerLayerEmphasis,
   type PowerLayerHighlight,
   type PowerLayerTarget,
@@ -426,7 +427,7 @@ function BreakdownChart({
   evenSpacing?: boolean;
   /** Column the chip comparison above is reading; outlined so the two views line up. */
   markedIndex?: number | null;
-  /** Clicking a column moves the chip comparison to that point's interactivity. */
+  /** Clicking a column pins the chip comparison's row for this chip to that point. */
   onColumnClick?: (entry: PowerBreakdownPoint) => void;
   /** The layer being told apart (legend, plot or parts list), hovered or pinned. */
   highlight: PowerLayerHighlight | null;
@@ -1067,6 +1068,8 @@ export default function PowerBreakdownPanel({
   onCollapse,
   layerHighlight,
   onLayerHighlight,
+  comparedPoints,
+  onPinComparedPoint,
 }: {
   chartId: string;
   data: InferenceData[];
@@ -1092,6 +1095,10 @@ export default function PowerBreakdownPanel({
   /** Shared with the chip comparison's legend on the Where view; own state when omitted. */
   layerHighlight?: PowerLayerHighlight | null;
   onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
+  /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
+  comparedPoints?: PowerComparedPoints;
+  /** A column was clicked: the owner pins this chip's compared point to it. */
+  onPinComparedPoint?: (series: PowerBreakdownDisplaySeries, entry: PowerBreakdownPoint) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -1131,16 +1138,22 @@ export default function PowerBreakdownPanel({
     onSelectKey?.(key);
   };
   const series = breakdowns.find((entry) => entry.key === selectedKey) ?? breakdowns[0] ?? null;
-  // PowerX: outline the point the chip comparison reads, and let a click move it.
+  // The point the chip comparison reads for this chip: its pinned point, else (PowerX)
+  // the one nearest the shared slider. Outlined in the plot; a click pins another.
   const compareTarget = usePowerXCompareTarget();
-  const setCompareTarget = useSetPowerXCompareTarget();
-  const comparedAt = setCompareTarget
+  const comparedAt = powerXSurface
     ? (compareTarget ?? defaultComparisonInteractivity(breakdowns))
     : null;
-  const comparedEntry =
-    series && comparedAt
-      ? (compareBreakdownsAt([series], comparedAt).rows[0]?.entry ?? null)
+  const pinnedConcurrency = series ? comparedPoints?.[series.key] : undefined;
+  const pinnedEntry =
+    series && pinnedConcurrency !== undefined
+      ? breakdownPointAtConcurrency(series, pinnedConcurrency, comparedAt)
       : null;
+  const comparedEntry =
+    pinnedEntry ??
+    (series && comparedAt
+      ? (compareBreakdownsAt([series], comparedAt).rows[0]?.entry ?? null)
+      : null);
   const markedIndex = series && comparedEntry ? series.points.indexOf(comparedEntry) : -1;
   // The parts list reads the compared point; off the comparison's range (a chip picked
   // in the Hardware select that has no bar near the slider) it reads the nearest point.
@@ -1351,7 +1364,7 @@ export default function PowerBreakdownPanel({
                 totalLabel={includeFacility ? t.total : t.totalIt}
                 markedIndex={markedIndex >= 0 ? markedIndex : null}
                 onColumnClick={
-                  setCompareTarget ? (entry) => setCompareTarget(entry.interactivity) : undefined
+                  onPinComparedPoint ? (entry) => onPinComparedPoint(series, entry) : undefined
                 }
                 highlight={layers.highlight}
                 onHover={layers.hover}

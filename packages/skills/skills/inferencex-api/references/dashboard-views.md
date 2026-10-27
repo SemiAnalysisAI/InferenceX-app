@@ -420,7 +420,12 @@ chip comparison stacks IT only by default; an Include facility switch (presentat
 API selector) appends the PUE part; the compared chip's across-load drill-down (stacked bars or
 stacked area, `i_pbview`, stacked area by default) is open inline under its bar and follows the slider, and the view
 itself is `i_pcompare=breakdown` (no boundary line chart; the boundaries are compared on Power
-draw under Count: All). Over time adds a load-swing table per
+draw under Count: All). Chip rows keep a fixed order (registry hardware order, unofficial-run
+lines after) whatever the slider reads. Clicking a column of the open drill-down pins that chip's
+compared point to that column (`i_pbpoint`, `seriesKey:concurrency` pairs joined by commas,
+only for pinned chips); the slider does not move and the other chips keep their slider-derived
+point, moving the slider drops every pin, and a `×` marker on the row unpins one chip. This is
+presentation over the `powerBreakdowns` rows the API already returns, not a selector. Over time adds a load-swing table per
 trace (peak, min, idle floor, mean, P5/P95, max 1 s and 5 s change, ramp up/down, volatility),
 a × 72 per NVL72 rack switch, and per-point CSV / JSON downloads served by
 `/api/v1/gpu-metrics-point/stats` (`format=csv|json`, `scale=gpu|nvl72`), which computes the
@@ -430,7 +435,7 @@ measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` 
 filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
 芯片对比与单芯片下钻读取 `powerBreakdowns`；下钻图与对比横条把十二个部件合并为六层带斜线填充的分层（`gpu`；`measuredCpu`；服务器部件 `cpu` + `memory` + `nic` + `nvswitch` + `storage` + `other`；`fans` + `psuLoss`；`network`；`facility`），图旁的部件列表逐项列出对比点的各部件，API 仍返回十二个部件。没有受支持系统功耗模型的芯片会标注为未显示。
-统计口径控件命名三个实测边界：仅 GPU（`gpu-measured`）、IT（不含 PUE）（`it-modeled`）与数据中心（`utility-modeled`），外加“全部”；“全部”（`i_pcompare=boundaries`）在功耗或能耗散点图上按芯片绘制这三条（仅 GPU 实线、IT 虚线、数据中心点划线），图例、曲线标签、提示框、表格与 CSV 也沿用这一叫法；页面不再有第二层控件。页面上每个功耗数值都带有 GPU / IT / 数据中心标签，含义见标签自身的提示框；标题行下方的读数行给出悬停或固定数据点的每 GPU IT 功耗、每 MW 可支持的 GPU 数（1e6 ÷ 每 GPU IT 功耗）以及按模型 PUE 计的每 GPU 数据中心功耗。四个视图为图表上方的标签页；统计口径、计量单位与显示方式，以及 GPU 范围、功耗统计量和额定边界（关闭 | 整体预配，`i_pcompare=provisioned`：每芯片仅绘制 GPU 实测功耗实线与整体预配功耗虚线两条线）都是图表配置中的普通控件，仅在适用的视图上显示；拆分方式位于“功耗去向”卡片中。“功耗”视图按 TDP 占比显示时，会在各芯片 P90 功耗与 100% 之间填充余量，并附带余量表（`headroom=true`）与 CSV 下载。“功耗去向”中芯片对比默认只堆叠 IT 部分；“计入数据中心开销”开关（仅为展示，不新增 API 选择项）追加 PUE 部分；所对比芯片的“随负载变化”下钻图（堆叠柱状图或堆叠面积图，`i_pbview`）默认即在其横条下方内联展开并随滑块切换芯片，该视图本身为 `i_pcompare=breakdown`（不再有功耗边界曲线图；边界对比位于“功耗”视图的“统计口径：全部”）。“随时间变化”新增每条曲线的负载波动表（峰值、最小值、空闲底线、均值、P5/P95、最大 1 秒与 5 秒变化、上升/下降速率、波动率）、“× 72（每 NVL72 机架）”开关，以及由 `/api/v1/gpu-metrics-point/stats`（`format=csv|json`、`scale=gpu|nvl72`）提供的逐点 CSV / JSON 下载，该接口用同一函数基于同一已存数据桶计算统计。这些都不新增 `inference` 视图的选择项。分享链接带 `i_pcompare=all`（界面不提供）时，会在三个实测边界之上加入两个额定边界。
+统计口径控件命名三个实测边界：仅 GPU（`gpu-measured`）、IT（不含 PUE）（`it-modeled`）与数据中心（`utility-modeled`），外加“全部”；“全部”（`i_pcompare=boundaries`）在功耗或能耗散点图上按芯片绘制这三条（仅 GPU 实线、IT 虚线、数据中心点划线），图例、曲线标签、提示框、表格与 CSV 也沿用这一叫法；页面不再有第二层控件。页面上每个功耗数值都带有 GPU / IT / 数据中心标签，含义见标签自身的提示框；标题行下方的读数行给出悬停或固定数据点的每 GPU IT 功耗、每 MW 可支持的 GPU 数（1e6 ÷ 每 GPU IT 功耗）以及按模型 PUE 计的每 GPU 数据中心功耗。四个视图为图表上方的标签页；统计口径、计量单位与显示方式，以及 GPU 范围、功耗统计量和额定边界（关闭 | 整体预配，`i_pcompare=provisioned`：每芯片仅绘制 GPU 实测功耗实线与整体预配功耗虚线两条线）都是图表配置中的普通控件，仅在适用的视图上显示；拆分方式位于“功耗去向”卡片中。“功耗”视图按 TDP 占比显示时，会在各芯片 P90 功耗与 100% 之间填充余量，并附带余量表（`headroom=true`）与 CSV 下载。“功耗去向”中芯片对比默认只堆叠 IT 部分；“计入数据中心开销”开关（仅为展示，不新增 API 选择项）追加 PUE 部分；所对比芯片的“随负载变化”下钻图（堆叠柱状图或堆叠面积图，`i_pbview`）默认即在其横条下方内联展开并随滑块切换芯片，该视图本身为 `i_pcompare=breakdown`（不再有功耗边界曲线图；边界对比位于“功耗”视图的“统计口径：全部”）。芯片行的顺序固定（按硬件注册表顺序，非官方运行的曲线排在其后），不随滑块变化。点击已展开下钻图中的某一列，会把该芯片的对比点固定在该列（`i_pbpoint`，以逗号分隔的 `seriesKey:concurrency`，仅包含已固定的芯片）；滑块不会移动，其他芯片仍按滑块取点，移动滑块会清除所有固定点，行上的 `×` 标记可单独取消该芯片的固定。这只是对 API 已返回的 `powerBreakdowns` 数据的展示方式，并非新的选择项。“随时间变化”新增每条曲线的负载波动表（峰值、最小值、空闲底线、均值、P5/P95、最大 1 秒与 5 秒变化、上升/下降速率、波动率）、“× 72（每 NVL72 机架）”开关，以及由 `/api/v1/gpu-metrics-point/stats`（`format=csv|json`、`scale=gpu|nvl72`）提供的逐点 CSV / JSON 下载，该接口用同一函数基于同一已存数据桶计算统计。这些都不新增 `inference` 视图的选择项。分享链接带 `i_pcompare=all`（界面不提供）时，会在三个实测边界之上加入两个额定边界。
 Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
 These analytical results (`serviceCompare`, `roleShare`, `powerFit`, `powerBreakdown`, `headroom`) require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured and its IT boundary, which export `tableRows`.

@@ -100,6 +100,22 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   Collapse hides it for the session (`PowerAnalysisPanels` `layout="inline"`). The stack
   legend above the bars is the only one. There is no boundary line chart on this view: the
   three measured boundaries are compared on Power draw under Count: All.
+- Chip rows keep a fixed order: official lines in `HW_REGISTRY` order (the chart legend's,
+  `orderBreakdownSeriesForDisplay`), unofficial-run lines after them in run order. A row
+  never changes place when the slider moves or a chip is pinned; a chip with no point
+  within 1.5× of the slider is named in the "Not benchmarked near" note as before.
+- Per-chip compared point (`i_pbpoint`): clicking a column of the open drill-down (stacked
+  bars or stacked area) pins that chip's compared point to that column. Only that chip
+  changes: its row (bar, watts, `c<N> · <interactivity>` label, a `×` marker whose `title`
+  reads "Pinned to c<N> · click to follow the slider"), the dashed outline in its drill-down
+  and the parts list; the slider does not move and the other chips keep their
+  slider-derived point. The slider is the global control: moving it drops every pin.
+  The Hardware select and Collapse keep the pins. The `×` marker unpins that chip alone.
+  `i_pbpoint` carries `seriesKey:concurrency` pairs joined by commas (`b200_vllm|fp8:64`;
+  `|run<N>` keys for `?unofficialrun=` lines), only for pinned chips, and is read once on
+  load; a pair naming a chip or a concurrency the view does not have applies to nothing.
+  This is a presentation-only selector over data the views API already returns
+  (`powerBreakdown=true` rows carry every point), so it adds no API selector.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
   is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
@@ -283,7 +299,9 @@ Measured, Modeled · fixed or Modeled · moves with load (`POWER_PART_BEHAVIOUR`
 pins, Escape or a click on the plot unpins. Measured sits at the bottom; the chip comparison's
 segments are the same six layers on each chip's colour (a folded layer's `title` lists its
 parts) and share the highlight. The list follows the slider and the Hardware select exactly as
-the plot's dashed outline does. Unofficial-run series take the run colour (`overlayRunColor`)
+the plot's dashed outline does; a column click pins that chip's compared point for the row,
+the outline and the list (`i_pbpoint`, see [PowerX layout](#powerx-layout)) without moving the
+slider. Unofficial-run series take the run colour (`overlayRunColor`)
 for the layers, the hatches, the list and the sparklines. TDP and All in Provisioned are
 dashed reference lines, not stacked values. Bar width comes from the room to the neighboring
 points and carries no data; the concurrency label sits above each total and both are hidden

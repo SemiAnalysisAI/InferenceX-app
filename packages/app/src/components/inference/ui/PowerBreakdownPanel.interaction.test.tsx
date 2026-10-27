@@ -12,8 +12,9 @@ import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
 
+const track = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track }));
 vi.mock('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: () => null, setUrlParams: () => {} }),
 }));
@@ -239,6 +240,8 @@ const partRow = (category: string) =>
   container.querySelector<HTMLButtonElement>(
     `[data-testid="power-part-row"][data-category="${category}"]`,
   )!;
+const rowPoint = (row: HTMLElement) =>
+  row.querySelector('[data-testid="power-chip-compare-point"]')?.textContent;
 
 /** The B200 fixture's layers: no Grace socket on HGX; the facility counted off PowerX. */
 const LAYERS = ['gpu', 'server', 'fansPsu', 'network', 'facility'];
@@ -607,6 +610,148 @@ describe('PowerBreakdownPanel unofficial-run overlays', () => {
     // The official line is still its own, vendor-coloured series.
     const select = container.querySelector('[data-testid="power-breakdown-source"]');
     expect(select?.textContent).toContain('single-hue');
+  });
+});
+
+describe('PowerAnalysisPanels per-chip compared point', () => {
+  const drilldownHits = () => [
+    ...container.querySelectorAll<SVGRectElement>(
+      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
+    ),
+  ];
+  const drilldownTitle = () =>
+    container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
+  const marker = () =>
+    container.querySelector<SVGRectElement>('[data-testid="power-breakdown-compared"]');
+  const partsHeading = () =>
+    container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
+  const chipRows = () => [
+    ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+  ];
+  const chipRow = (name: string) =>
+    chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
+  const sliderValue = () =>
+    container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
+  const moveSlider = (step: number) => {
+    const slider = container.querySelector<HTMLInputElement>(
+      '[data-testid="power-chip-compare-target"]',
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        slider,
+        String(step),
+      );
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  const renderInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
+    render(
+      <PowerXSurfaceProvider>
+        <PowerAnalysisPanels
+          data={data}
+          overlayData={overlayData}
+          xField="mean_tpot_intvty"
+          xLabel="Interactivity (output tok/s/user)"
+          chartId="chart-4"
+          placement="before"
+          layout="inline"
+        />
+      </PowerXSurfaceProvider>,
+    );
+
+  beforeEach(() => track.mockClear());
+
+  it('pins the clicked column for that chip only and keeps the drill-down on it', () => {
+    renderInline([...sglang, ...vllm]);
+    // The slider lands on vLLM c16 at 60 tok/s/user; the SGLang row reads its own nearest point.
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+    const sglangBefore = rowPoint(chipRow('B200 (SGLang) FP8'));
+    expect(marker()).not.toBeNull();
+    const markerBefore = marker()!.getAttribute('x');
+    // Columns sit in interactivity order: c64 (30), c16 (60), c4 (100), c1 (150).
+    const hits = drilldownHits();
+    expect(hits).toHaveLength(4);
+    mouse(hits[0], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(
+      chipRow('B200 (vLLM) FP8')
+        .querySelector('[data-testid="power-chip-compare-unpin"]')
+        ?.getAttribute('title'),
+    ).toBe('Pinned to c64 · click to follow the slider');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(sglangBefore);
+    expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
+    expect(sliderValue()).toBe('60 tok/s/user');
+    // The drill-down stays on the clicked chip; its outline and list move to the column.
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c64 · 30 tok/s/user');
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
+      hw: 'b200_vllm',
+      concurrency: 64,
+    });
+    // A second column replaces the pin; still one pinned chip.
+    mouse(drilldownHits()[2], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c4 · 100 tok/s/user');
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(1);
+  });
+
+  it('keeps the pin through opening another chip and collapsing, drops it when the slider moves', () => {
+    renderInline([...sglang, ...vllm]);
+    const order = chipRows().map(
+      (row) => row.querySelector('span span span.truncate')?.textContent,
+    );
+    mouse(drilldownHits()[2], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    // Another chip's drill-down: the vLLM pin stays on its row.
+    mouse(chipRow('B200 (SGLang) FP8'), 'click');
+    expect(drilldownTitle()).toBe('B200 (SGLang) FP8 across load');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    // Collapsed: still pinned; reopened: the outline and the list are back on c4.
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="power-breakdown-collapse"]')!
+        .click(),
+    );
+    expect(container.querySelector('[data-testid="power-chip-compare-drilldown"]')).toBeNull();
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    mouse(chipRow('B200 (vLLM) FP8'), 'click');
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c4 · 100 tok/s/user');
+    expect(marker()).not.toBeNull();
+    // The slider is the global control: every pin goes, the rows keep their order.
+    moveSlider(0);
+    expect(sliderValue()).toBe('20 tok/s/user');
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    expect(
+      chipRows().map((row) => row.querySelector('span span span.truncate')?.textContent),
+    ).toEqual(order);
+  });
+
+  it('pins a point of an unofficial-run series by its own key', () => {
+    renderInline([...sglang, ...overlay], overlay);
+    const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
+    const overlayName = overlayRow.querySelector('span span span.truncate')!.textContent!;
+    expect(chipRows().map((row) => row.dataset.pinned)).toEqual([undefined, undefined]);
+    mouse(overlayRow, 'click');
+    expect(drilldownTitle()).toContain('single-hue');
+    const officialBefore = rowPoint(chipRow('B200 (SGLang) FP8'));
+    // The overlay's columns: c64 (22), c16 (48), c4 (85).
+    mouse(drilldownHits()[0], 'click');
+    expect(rowPoint(chipRow(overlayName))).toBe('c64 · 22 tok/s/user');
+    expect(chipRow(overlayName).dataset.pinned).toBe('true');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(officialBefore);
+    expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
+    expect(partsHeading()).toContain('single-hue');
+    expect(partsHeading()).toMatch(/c64 · 22 tok\/s\/user$/u);
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
+      hw: 'b200_sglang',
+      concurrency: 64,
+    });
   });
 });
 

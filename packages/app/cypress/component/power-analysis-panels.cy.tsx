@@ -300,4 +300,38 @@ describe('PowerAnalysisPanels', () => {
       });
     });
   }
+
+  it('pins the compared point of one chip from a drill-down column until the slider moves', () => {
+    cy.viewport(1280, 900);
+    mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
+    // The slider starts at the geometric middle (49 tok/s/user): the c16 point at 45.
+    cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c16 · 45');
+    cy.get('[data-testid="power-chip-compare-row"]').should('not.have.attr', 'data-pinned');
+    cy.get('[data-testid="power-breakdown-compared"]').should('not.exist');
+    // Columns sit in interactivity order: c64 (20), c16 (45), c4 (80), c1 (120).
+    cy.get('[data-testid="power-breakdown-hit"]').eq(2).click({ force: true });
+    cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c4 · 80');
+    cy.get('[data-testid="power-chip-compare-row"]').should('have.attr', 'data-pinned', 'true');
+    cy.get('[data-testid="power-chip-compare-unpin"]').should(
+      'have.attr',
+      'title',
+      'Pinned to c4 · click to follow the slider',
+    );
+    cy.get('[data-testid="power-breakdown-compared"]').should('have.length', 1);
+    cy.get('[data-testid="power-parts-heading"]').should('contain.text', 'c4 · 80 tok/s/user');
+    // The slider did not move.
+    cy.get('[data-testid="power-chip-compare-value"]').should('contain.text', '49 tok/s/user');
+    // The marker unpins the chip; a column click pins again; the slider clears it.
+    cy.get('[data-testid="power-chip-compare-unpin"]').click();
+    cy.get('[data-testid="power-chip-compare-row"]').should('not.have.attr', 'data-pinned');
+    cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c16 · 45');
+    cy.get('[data-testid="power-breakdown-hit"]').eq(0).click({ force: true });
+    cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c64 · 20');
+    cy.get('[data-testid="power-chip-compare-target"]')
+      .invoke('val', 200)
+      .trigger('input', { force: true });
+    cy.get('[data-testid="power-chip-compare-row"]').should('not.have.attr', 'data-pinned');
+    cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c1 · 120');
+    cy.get('[data-testid="power-chip-compare-unpin"]').should('not.exist');
+  });
 });

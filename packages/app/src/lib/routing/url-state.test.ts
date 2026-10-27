@@ -113,6 +113,19 @@ describe('PARAM_DEFAULTS', () => {
     }
   });
 
+  it('round-trips the per-chip compared points of the power breakdown', async () => {
+    const pins = 'b200_sglang|fp8|run0:16,b200_vllm|fp8:64';
+    setupWindow(`?i_pbpoint=${encodeURIComponent(pins)}`);
+    const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
+      await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.i_pbpoint).toBe('');
+    expect(readUrlParams()).toMatchObject({ i_pbpoint: pins });
+    expect(new URL(buildShareUrl()).searchParams.get('i_pbpoint')).toBe(pins);
+    // No pins left (the slider moved): the parameter leaves the link.
+    writeUrlParams({ i_pbpoint: '' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_pbpoint')).toBe(false);
+  });
+
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');

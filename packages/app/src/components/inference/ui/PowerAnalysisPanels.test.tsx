@@ -11,10 +11,18 @@ import { getHardwareConfig } from '@/lib/catalog/constants';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import { getDisplayLabel } from '@/lib/shared/utils';
 
+const urlState = vi.hoisted(() => ({
+  params: {} as Record<string, string | undefined>,
+  setUrlParams: vi.fn(),
+}));
+const track = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track }));
 vi.mock('@/hooks/useUrlState', () => ({
-  useUrlState: () => ({ getUrlParam: () => null, setUrlParams: () => {} }),
+  useUrlState: () => ({
+    getUrlParam: (key: string) => urlState.params[key],
+    setUrlParams: urlState.setUrlParams,
+  }),
 }));
 vi.mock('@/hooks/useThemeColors', () => ({
   useThemeColors: () => ({ resolveColor: (key: string) => `var(--${key})` }),
@@ -78,16 +86,16 @@ const breakdownRow = (gpuWatts: number, framework: string) =>
 
 function point(
   id: number,
-  hwKey: 'b200_sglang' | 'b200_vllm',
+  hwKey: 'b200_sglang' | 'b200_vllm' | 'h200_sglang',
   conc: number,
   interactivity: number,
   watts: number,
 ): InferenceData {
-  const framework = hwKey === 'b200_sglang' ? 'sglang' : 'vllm';
+  const framework = hwKey === 'b200_vllm' ? 'vllm' : 'sglang';
   return {
     id,
     hwKey,
-    hw: 'B200',
+    hw: hwKey.startsWith('h200') ? 'H200' : 'B200',
     framework,
     model: MODEL,
     precision: 'fp8',
@@ -125,6 +133,12 @@ const vllm = [
   point(13, 'b200_vllm', 4, 100, 420),
   point(14, 'b200_vllm', 1, 150, 300),
 ];
+// A lighter chip that the registry lists after B200: the old watts order put it first.
+const h200 = [
+  point(21, 'h200_sglang', 64, 25, 300),
+  point(22, 'h200_sglang', 16, 50, 250),
+  point(23, 'h200_sglang', 4, 90, 200),
+];
 const label = (hwKey: string) => getDisplayLabel(getHardwareConfig(hwKey, MODEL));
 const SGLANG_TITLE = `${label('b200_sglang')} FP8 across load`;
 const VLLM_TITLE = `${label('b200_vllm')} FP8 across load`;
@@ -132,7 +146,7 @@ const VLLM_TITLE = `${label('b200_vllm')} FP8 across load`;
 let container: HTMLDivElement;
 let root: Root;
 
-beforeEach(() => {
+const mount = (data: InferenceData[]) => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -140,7 +154,7 @@ beforeEach(() => {
     root.render(
       <PowerXSurfaceProvider>
         <PowerAnalysisPanels
-          data={[...sglang, ...vllm]}
+          data={data}
           xField="mean_tpot_intvty"
           xLabel="Interactivity (output tok/s/user)"
           chartId="chart-0"
@@ -150,12 +164,20 @@ beforeEach(() => {
       </PowerXSurfaceProvider>,
     );
   });
-});
-
-afterEach(() => {
+};
+const unmount = () => {
   act(() => root.unmount());
   container.remove();
+};
+
+beforeEach(() => {
+  urlState.params = {};
+  urlState.setUrlParams.mockClear();
+  track.mockClear();
+  mount([...sglang, ...vllm]);
 });
+
+afterEach(unmount);
 
 const drilldowns = () => container.querySelectorAll('[data-testid="power-chip-compare-drilldown"]');
 const drilldownTitle = () =>
@@ -277,5 +299,98 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     expect(rowFor(SGLANG_TITLE)?.getAttribute('aria-expanded')).toBe('true');
     act(() => rowFor(SGLANG_TITLE)!.click());
     expect(drilldowns()).toHaveLength(0);
+  });
+});
+
+const rows = () => [
+  ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+];
+const rowLabels = () =>
+  rows().map((row) => row.querySelector('span span span.truncate')?.textContent);
+const rowPoint = (row: HTMLElement | undefined) =>
+  row?.querySelector('[data-testid="power-chip-compare-point"]')?.textContent;
+const pinnedRows = () => rows().filter((row) => row.dataset.pinned === 'true');
+// The drill-down writes `i_pbview` through the same hook; only the pins are of interest.
+const lastUrlWrite = () =>
+  urlState.setUrlParams.mock.calls
+    .map((call) => call[0] as Record<string, string>)
+    .filter((params) => 'i_pbpoint' in params)
+    .at(-1);
+
+describe('PowerAnalysisPanels chip rows', () => {
+  it('lists chips in registry order and keeps it when the slider moves', () => {
+    unmount();
+    mount([...sglang, ...vllm, ...h200]);
+    const expected = [label('b200_sglang'), label('b200_vllm'), label('h200_sglang')].map(
+      (name) => `${name} FP8`,
+    );
+    expect(rowLabels()).toEqual(expected);
+    // At 60 tok/s/user the H200 row is the lightest (250 W) and vLLM the heaviest; the
+    // order does not follow watts, at 20 or at 55 tok/s/user either.
+    moveSlider(0);
+    expect(rowLabels()).toEqual(expected);
+    moveSlider(100);
+    expect(rowLabels()).toEqual(expected);
+  });
+});
+
+describe('PowerAnalysisPanels per-chip compared point from the share link', () => {
+  const PINS = 'b200_vllm|fp8:64,b200_sglang|fp8:999,ghost|fp8:4';
+  const remountWithPins = () => {
+    unmount();
+    urlState.params = { i_pbpoint: PINS };
+    urlState.setUrlParams.mockClear();
+    mount([...sglang, ...vllm]);
+  };
+
+  it('applies i_pbpoint to the chips that have the point and leaves the slider alone', () => {
+    remountWithPins();
+    const vllmRow = rowFor(VLLM_TITLE)!;
+    const sglangRow = rowFor(SGLANG_TITLE)!;
+    expect(vllmRow.dataset.pinned).toBe('true');
+    expect(rowPoint(vllmRow)).toBe('c64 · 30 tok/s/user');
+    expect(
+      vllmRow.querySelector('[data-testid="power-chip-compare-unpin"]')?.getAttribute('title'),
+    ).toBe('Pinned to c64 · click to follow the slider');
+    // c999 is not a point of the SGLang chip and `ghost` is no chip: both apply to nothing.
+    expect(sglangRow.dataset.pinned).toBeUndefined();
+    expect(sglangRow.querySelector('[data-testid="power-chip-compare-unpin"]')).toBeNull();
+    expect(container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent).toBe(
+      '60 tok/s/user',
+    );
+    // The drill-down still opens under the chip nearest the slider and reads its pin.
+    expect(drilldownTitle()).toBe(VLLM_TITLE);
+    expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toBe(
+      `${label('b200_vllm')} FP8 · c64 · 30 tok/s/user`,
+    );
+    // The parameter is written back as read, keys sorted, so the link keeps its pins.
+    expect(lastUrlWrite()).toEqual({
+      i_pbpoint: 'b200_sglang|fp8:999,b200_vllm|fp8:64,ghost|fp8:4',
+    });
+  });
+
+  it('unpins one chip from its row marker and every chip from the slider', () => {
+    remountWithPins();
+    act(() =>
+      rowFor(VLLM_TITLE)!
+        .querySelector<HTMLElement>('[data-testid="power-chip-compare-unpin"]')!
+        .click(),
+    );
+    expect(pinnedRows()).toHaveLength(0);
+    expect(rowPoint(rowFor(VLLM_TITLE))).toBe('c16 · 60 tok/s/user');
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_unpinned', {
+      hw: 'b200_vllm',
+      concurrency: 64,
+    });
+    // The marker click is not a row click: the drill-down stays where it was.
+    expect(drilldownTitle()).toBe(VLLM_TITLE);
+    expect(lastUrlWrite()).toEqual({ i_pbpoint: 'b200_sglang|fp8:999,ghost|fp8:4' });
+
+    remountWithPins();
+    expect(pinnedRows()).toHaveLength(1);
+    moveSlider(0);
+    expect(pinnedRows()).toHaveLength(0);
+    expect(rowPoint(rowFor(VLLM_TITLE))).toBe('c64 · 30 tok/s/user');
+    expect(lastUrlWrite()).toEqual({ i_pbpoint: '' });
   });
 });
