@@ -13,6 +13,27 @@ const SWIPE_DISMISS_PX = 80;
 const PHONE_QUERY = '(max-width: 639px)';
 
 /**
+ * Heights reserved by every docked toast currently mounted. A replacement toast mounts
+ * while the outgoing one is still animating out, so reservations are shared: body padding
+ * is the largest active reservation, and the original padding is restored only when the
+ * last one is released.
+ */
+const reservations = new Map<symbol, number>();
+let paddingBeforeReservations: string | null = null;
+
+function syncBodyPadding() {
+  const { body } = document;
+  if (reservations.size === 0) {
+    if (paddingBeforeReservations !== null) body.style.paddingBottom = paddingBeforeReservations;
+    paddingBeforeReservations = null;
+    return;
+  }
+  if (paddingBeforeReservations === null) paddingBeforeReservations = body.style.paddingBottom;
+  const height = Math.max(...reservations.values());
+  body.style.paddingBottom = height > 0 ? `${height}px` : paddingBeforeReservations;
+}
+
+/**
  * On phones the toast is docked to the bottom edge, so reserve its height as body padding
  * while it is visible: the end of the page can always scroll clear of it.
  */
@@ -22,12 +43,10 @@ function useReserveBottomSpace(ref: React.RefObject<HTMLElement | null>, active:
     if (!active || !el || typeof window === 'undefined') return;
     if (typeof window.matchMedia !== 'function' || typeof ResizeObserver === 'undefined') return;
     const media = window.matchMedia(PHONE_QUERY);
-    const { body } = document;
-    const previous = body.style.paddingBottom;
+    const key = Symbol('bottom-toast');
     const apply = () => {
-      body.style.paddingBottom = media.matches
-        ? `${el.getBoundingClientRect().height}px`
-        : previous;
+      reservations.set(key, media.matches ? el.getBoundingClientRect().height : 0);
+      syncBodyPadding();
     };
     apply();
     const observer = new ResizeObserver(apply);
@@ -36,7 +55,8 @@ function useReserveBottomSpace(ref: React.RefObject<HTMLElement | null>, active:
     return () => {
       observer.disconnect();
       media.removeEventListener('change', apply);
-      body.style.paddingBottom = previous;
+      reservations.delete(key);
+      syncBodyPadding();
     };
   }, [ref, active]);
 }

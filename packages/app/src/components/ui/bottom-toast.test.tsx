@@ -131,6 +131,33 @@ describe('BottomToast phone layout', () => {
     expect(document.body.style.paddingBottom).toBe('');
   });
 
+  it('keeps the space reserved when a new toast replaces the one on screen', () => {
+    stubViewport(true, 56);
+    renderToast(vi.fn());
+
+    const nextContainer = document.createElement('div');
+    document.body.append(nextContainer);
+    const nextRoot = createRoot(nextContainer);
+    act(() =>
+      nextRoot.render(
+        <BottomToast icon={null} title="Star us" description="On GitHub." testId="next-toast" />,
+      ),
+    );
+    // The outgoing toast finishes its exit animation after the replacement mounted.
+    act(() => vi.advanceTimersByTime(400));
+    expect(container.querySelector('[data-testid="toast"]')).toBeNull();
+    expect(document.body.style.paddingBottom).toBe('56px');
+
+    act(() => {
+      nextContainer.querySelector<HTMLButtonElement>('button[aria-label="Dismiss"]')!.click();
+    });
+    act(() => vi.advanceTimersByTime(400));
+    expect(document.body.style.paddingBottom).toBe('');
+
+    act(() => nextRoot.unmount());
+    nextContainer.remove();
+  });
+
   it('leaves page spacing alone on wider screens where the toast floats in a corner', () => {
     stubViewport(false, 120);
     renderToast(vi.fn());
