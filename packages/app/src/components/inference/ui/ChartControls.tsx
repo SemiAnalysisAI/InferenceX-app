@@ -532,7 +532,10 @@ export default function ChartControls({
             >
               {powerXSurface && powerXControls
                 ? powerXControls({
-                    xAxisSelector: showXAxisMode ? <XAxisModeSelector /> : null,
+                    // The More fold is one column: the cell fills it like Count and Per do.
+                    xAxisSelector: showXAxisMode ? (
+                      <XAxisModeSelector className="max-md:max-w-none" />
+                    ) : null,
                     xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
                   })
                 : showXAxisMode && <XAxisModeSelector />}
