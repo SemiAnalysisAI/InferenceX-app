@@ -881,7 +881,7 @@ describe('VR default date preference', () => {
     interceptVrPublicationData(true);
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_FIXTURE_DATE);
-    cy.contains('button', 'Run Date:').click();
+    cy.contains('[data-slot="date-field"]', 'Run date').find('button[aria-labelledby]').click();
     cy.get('[role="dialog"]').contains('button', 'Apply').click();
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });
