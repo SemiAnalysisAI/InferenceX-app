@@ -1177,7 +1177,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/ubenchx/core-memory-profiles.ts',
-    sourceSha256: 'e616d19a91e814a414ddcfef871fb89b79b62d81b76b6ace3454a563d48054c8',
+    sourceSha256: '96c51ab39b475653dac1e9c5d5dd42eb23c595b4e5e7f485d59a72a44afd99a4',
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',

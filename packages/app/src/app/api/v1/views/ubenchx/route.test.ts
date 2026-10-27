@@ -190,14 +190,14 @@ it('combines both hardware profiles without converting or pooling their units', 
   const body = await response.json();
   expect(body.params).toEqual({ test: 'core-memory-profiles', gpu: 'all' });
   expect(body.gpus.map((run: { gpu: string }) => run.gpu)).toEqual([
-    'B200 SXM',
     'Ascend 950PR_9579',
+    'B200 SXM',
   ]);
-  const b200 = body.gpus[0];
+  const b200 = body.gpus[1];
   expect(b200).toMatchObject(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
   expect(b200.unit).toBe('clock64 cycles');
   expect(b200.colorLimits).toEqual([0, b200.stats.max]);
-  expect(body.gpus[1].panels[0].unit).toBe('SYS_CNT ticks');
+  expect(body.gpus[0].panels[0].unit).toBe('SYS_CNT ticks');
   const filteredResponse = await GET(request({ test: 'core-memory-profiles', gpu: 'b200 sxm' }));
   const filtered = await filteredResponse.json();
   expect(filtered.params.gpu).toBe('B200 SXM');

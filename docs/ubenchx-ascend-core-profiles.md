@@ -2,6 +2,8 @@
 
 The `/ubenchx/core-memory-profiles` page combines B200 and Huawei 950PR, showing both by default. Its hardware selector can focus on either device. The B200 SM matrix keeps its `clock64` cycle units, GPC/die grouping, statistics and independent color domain; the 950PR retains SYS_CNT ticks and a shared scale across its four panels. Colors and values across devices are not comparable absolute latency. Both matrices measure differences between matched-address latency profiles, not direct core-to-core communication time.
 
+The English and Chinese pages show Huawei before B200 in All hardware and in the hardware selector. The API uses the same order for `test=core-memory-profiles&gpu=all` and the combined `test=all` profile collection; single-device filters retain their original data. The landing Huawei card displays UbenchX and links directly to the localized core-memory-profiles page.
+
 The legacy `/ubenchx/sm-l2-distance` page and its Chinese sibling redirect to the combined page; the existing `test=sm-l2-distance` API remains compatible.
 
 The Ascend portion of the `core-memory-profiles` view preserves the four 128 MiB matrices from the 6–7 October 2026 (Singapore time) Cube/Vector locality rerun: 28 Cube scalar controllers and 56 Vector scalar controllers, each tested with one active core and with concurrent launches. Both core types use identical scalar pointer-chase instructions on the same allocation. Each address is averaged over six passes before computing the mean absolute difference between two cores' address profiles.
