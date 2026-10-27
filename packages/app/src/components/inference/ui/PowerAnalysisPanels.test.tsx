@@ -39,6 +39,7 @@ vi.mock('@/components/ui/chart-buttons', () => ({
 }));
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
+import { PIN_ACCENT_CLASS } from './PowerChipCompare';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -352,6 +353,20 @@ describe('PowerAnalysisPanels per-chip compared point from the share link', () =
     expect(
       vllmRow.querySelector('[data-testid="power-chip-compare-unpin"]')?.getAttribute('title'),
     ).toBe('Pinned to c64 · click to follow the slider');
+    // The pinned row's point reads in the pin's accent and says where the slider is.
+    const vllmPoint = vllmRow.querySelector<HTMLElement>(
+      '[data-testid="power-chip-compare-point"]',
+    )!;
+    expect(vllmPoint.parentElement?.className).toContain(PIN_ACCENT_CLASS);
+    expect(vllmPoint.getAttribute('title')).toBe(
+      'Compared at 30 tok/s/user · slider at 60 tok/s/user',
+    );
+    const sglangPoint = sglangRow.querySelector<HTMLElement>(
+      '[data-testid="power-chip-compare-point"]',
+    )!;
+    expect(sglangPoint.parentElement?.className).toContain('text-muted-foreground');
+    expect(sglangPoint.parentElement?.className).not.toContain(PIN_ACCENT_CLASS);
+    expect(sglangPoint.getAttribute('title')).toBeNull();
     // c999 is not a point of the SGLang chip and `ghost` is no chip: both apply to nothing.
     expect(sglangRow.dataset.pinned).toBeUndefined();
     expect(sglangRow.querySelector('[data-testid="power-chip-compare-unpin"]')).toBeNull();

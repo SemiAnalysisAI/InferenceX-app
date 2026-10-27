@@ -96,6 +96,8 @@ const STRINGS = {
     pue: 'PUE',
     extrapolated: 'Partial chassis: the modeled chassis is shared by its measured GPUs.',
     graceModeled: 'Grace sockets are modeled (no validated socket telemetry).',
+    clickToCompare: (label: string) => `Click to compare at ${label}`,
+    comparedHere: 'Compared here',
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -144,6 +146,8 @@ const STRINGS = {
     pue: 'PUE',
     extrapolated: '部分机箱：建模的整机箱功耗按实测 GPU 数分摊。',
     graceModeled: 'Grace 插槽功耗为建模值（无有效插槽遥测）。',
+    clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
+    comparedHere: '当前对比点',
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
@@ -393,7 +397,13 @@ interface CursorLabel {
   x: number;
   y: number;
   watts: number;
+  /** Second line: what a click here does (compare at this column, or it is the compared one). */
+  hint: string | null;
 }
+
+const GUIDE_LABEL_Y = 8;
+const GUIDE_HIT_HALF_WIDTH = 5;
+const guideFormat = d3.format(',.0f');
 
 function BreakdownChart({
   sectionId,
@@ -405,6 +415,9 @@ function BreakdownChart({
   evenSpacing = false,
   markedIndex = null,
   onColumnClick,
+  guideAt = null,
+  pinned = false,
+  onGuideClick,
   totalLabel,
   highlight,
   onHover,
@@ -429,6 +442,12 @@ function BreakdownChart({
   markedIndex?: number | null;
   /** Clicking a column pins the chip comparison's row for this chip to that point. */
   onColumnClick?: (entry: PowerBreakdownPoint) => void;
+  /** The slider's interactivity: a faint vertical guide, labelled when it is off the compared column. */
+  guideAt?: number | null;
+  /** True when the compared column is a pin rather than the slider's nearest point. */
+  pinned?: boolean;
+  /** The guide, or the column under it, was clicked while pinned: back to the slider. */
+  onGuideClick?: () => void;
   /** The layer being told apart (legend, plot or parts list), hovered or pinned. */
   highlight: PowerLayerHighlight | null;
   onHover: (target: PowerLayerTarget | null) => void;
@@ -457,6 +476,37 @@ function BreakdownChart({
       columns.map((column) => x(positionOf(column))),
       width,
     );
+  // The slider's guide: on even spacing it sits between the two columns that bracket the
+  // slider (log-interpolated), else at its own interactivity; its nearest column is the
+  // one the chip comparison reads when the chip is not pinned.
+  const interactivities = columns.map((column) => column.entry.interactivity);
+  const guideNearestIndex =
+    guideAt === null || !(guideAt > 0)
+      ? null
+      : interactivities.reduce(
+          (best, value, index) =>
+            Math.abs(Math.log(value / guideAt)) <
+            Math.abs(Math.log(interactivities[best] / guideAt))
+              ? index
+              : best,
+          0,
+        );
+  const guidePosition = (): number | null => {
+    if (guideAt === null || !(guideAt > 0) || columns.length === 0) return null;
+    if (!evenSpacing) return Math.min(xDomain[1], Math.max(xDomain[0], guideAt));
+    if (guideAt <= interactivities[0]) return 0;
+    if (guideAt >= interactivities.at(-1)!) return columns.length - 1;
+    const right = interactivities.findIndex((value) => value >= guideAt);
+    const a = interactivities[right - 1];
+    const b = interactivities[right];
+    return right - 1 + (b > a ? Math.log(guideAt / a) / Math.log(b / a) : 0);
+  };
+  const hintFor = (column: Column): string | null =>
+    onColumnClick
+      ? Number(column.key) === markedIndex
+        ? t.comparedHere
+        : t.clickToCompare(column.label)
+      : null;
   const references = [
     series.tdpWattsPerGpu === null
       ? null
@@ -541,9 +591,19 @@ function BreakdownChart({
   ) => {
     const label = cursor.current;
     const text = label ? `${nameOf(label.band)} · ${watts(label.watts)} W` : '';
-    const textWidth = measureLabel(text, CURSOR_LABEL_FONT);
+    const hint = label?.hint ?? '';
+    const textWidth = Math.max(
+      measureLabel(text, CURSOR_LABEL_FONT),
+      measureLabel(hint, CURSOR_LABEL_FONT),
+    );
+    const lines = hint ? 2 : 1;
     const x = label ? Math.min(Math.max(0, label.x), Math.max(0, width - textWidth)) : 0;
-    const y = label ? Math.min(Math.max(CURSOR_LABEL_LINE_HEIGHT, label.y), height - 2) : 0;
+    const y = label
+      ? Math.min(
+          Math.max(CURSOR_LABEL_LINE_HEIGHT, label.y),
+          height - 2 - (lines - 1) * CURSOR_LABEL_LINE_HEIGHT,
+        )
+      : 0;
     group
       .selectAll<SVGTextElement, CursorLabel>('text.breakdown-cursor-label')
       .data(label ? [label] : [])
@@ -561,6 +621,24 @@ function BreakdownChart({
       .attr('paint-order', 'stroke')
       .attr('pointer-events', 'none')
       .text(text)
+      .raise();
+    // The second line teaches the click where it happens: at this column, or that this is
+    // the compared one.
+    group
+      .selectAll<SVGTextElement, CursorLabel>('text.breakdown-cursor-hint')
+      .data(label && hint ? [label] : [])
+      .join('text')
+      .attr('class', 'breakdown-cursor-hint')
+      .attr('data-testid', 'power-breakdown-cursor-hint')
+      .attr('x', x)
+      .attr('y', y + CURSOR_LABEL_LINE_HEIGHT)
+      .attr('font-size', CHART_TYPE.annotation)
+      .attr('fill', 'var(--muted-foreground)')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .attr('pointer-events', 'none')
+      .text(hint)
       .raise();
   };
 
@@ -879,6 +957,7 @@ function BreakdownChart({
             x: center + barWidth / 2 + 6,
             y: (y(band.y0) + y(band.y1)) / 2,
             watts: band.watts,
+            hint: hintFor(column),
           }
         : null;
     }
@@ -888,7 +967,9 @@ function BreakdownChart({
       bands,
     );
     const band = bandAtWatts(stack, value);
-    return band ? { band: band.key, x: mx + 12, y: my - 10, watts: band.watts } : null;
+    return band
+      ? { band: band.key, x: mx + 12, y: my - 10, watts: band.watts, hint: hintFor(column) }
+      : null;
   };
 
   const drawHitAreas: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
@@ -900,8 +981,8 @@ function BreakdownChart({
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
     const hoverBand = (event: MouseEvent, column: Column) => {
       const [mx, my] = d3.pointer(event, group.node());
-      const pinned = liveHighlight.current?.pinned ? liveHighlight.current : null;
-      if (pinned) {
+      const pinnedLayer = liveHighlight.current?.pinned ? liveHighlight.current : null;
+      if (pinnedLayer) {
         // The pinned layer keeps the highlight; its label tracks the pointer's x along it.
         const { center, barWidth } = layout[Number(column.key)];
         const stack =
@@ -915,7 +996,7 @@ function BreakdownChart({
                 mx,
                 bands,
               );
-        const band = stack.find((candidate) => candidate.key === pinned.band);
+        const band = stack.find((candidate) => candidate.key === pinnedLayer.band);
         showLabel(
           band && band.watts > 0
             ? {
@@ -923,6 +1004,7 @@ function BreakdownChart({
                 x: view === 'bars' ? center + barWidth / 2 + 6 : mx + 12,
                 y: (y(band.y0) + y(band.y1)) / 2,
                 watts: band.watts,
+                hint: hintFor(column),
               }
             : null,
         );
@@ -937,7 +1019,7 @@ function BreakdownChart({
       }
       showLabel(found);
     };
-    return group
+    const hits = group
       .selectAll<SVGRectElement, Column>('rect.breakdown-hit')
       .data(columns, (d) => d.key)
       .join('rect')
@@ -975,7 +1057,29 @@ function BreakdownChart({
           onUnpin();
         }
       })
-      .on('click.compare', (_event, d) => onColumnClick?.(d.entry));
+      .on('click.compare', (_event, d) => {
+        // While pinned, the column under the slider's guide is the way back to the slider.
+        if (pinned && onGuideClick && Number(d.key) === guideNearestIndex) onGuideClick();
+        else onColumnClick?.(d.entry);
+      });
+    const guides: number[] = guidePosition() === null ? [] : [guidePosition()!];
+    group
+      .selectAll<SVGRectElement, number>('rect.breakdown-guide-hit')
+      .data(guides)
+      .join('rect')
+      .attr('class', 'breakdown-guide-hit')
+      .attr('data-testid', 'power-breakdown-guide-hit')
+      .attr('x', (d) => (ctx.xScale as ContinuousScale)(d) - GUIDE_HIT_HALF_WIDTH)
+      .attr('width', GUIDE_HIT_HALF_WIDTH * 2)
+      .attr('y', 0)
+      .attr('height', ctx.height)
+      .attr('fill', 'transparent')
+      // Only a pinned chip has somewhere to go back to; otherwise the column takes the click.
+      .attr('pointer-events', pinned && onGuideClick ? 'all' : 'none')
+      .style('cursor', 'pointer')
+      .on('click.guide', () => onGuideClick?.())
+      .raise();
+    return hits;
   };
 
   const drawMarker: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
@@ -998,6 +1102,43 @@ function BreakdownChart({
       .attr('stroke-opacity', 0.55)
       .attr('stroke-dasharray', '4,3')
       .attr('pointer-events', 'none');
+    // One mental model: the slider is the global guide, the dashed outline this chip's point.
+    // The guide's value is labelled only when it is off the compared column.
+    const guideX = guidePosition();
+    const guides: number[] = guideX === null ? [] : [guideX];
+    const x = ctx.xScale as ContinuousScale;
+    group
+      .selectAll<SVGLineElement, number>('line.breakdown-guide')
+      .data(guides)
+      .join('line')
+      .attr('class', 'breakdown-guide')
+      .attr('data-testid', 'power-breakdown-guide')
+      .attr('x1', (d) => x(d))
+      .attr('x2', (d) => x(d))
+      .attr('y1', 0)
+      .attr('y2', ctx.height)
+      .attr('stroke', 'var(--muted-foreground)')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.45)
+      .attr('stroke-dasharray', '2,3')
+      .attr('pointer-events', 'none');
+    const labelled = guideX !== null && guideAt !== null && guideNearestIndex !== markedIndex;
+    group
+      .selectAll<SVGTextElement, number>('text.breakdown-guide-label')
+      .data(labelled ? guides : [])
+      .join('text')
+      .attr('class', 'breakdown-guide-label')
+      .attr('data-testid', 'power-breakdown-guide-label')
+      .attr('x', (d) => Math.min(Math.max(12, x(d)), ctx.width - 12))
+      .attr('y', GUIDE_LABEL_Y)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', CHART_TYPE.annotation)
+      .attr('fill', 'var(--muted-foreground)')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .attr('pointer-events', 'none')
+      .text(guideAt === null ? '' : guideFormat(guideAt));
   };
 
   const layers: LayerConfig<Column>[] = [
@@ -1070,6 +1211,7 @@ export default function PowerBreakdownPanel({
   onLayerHighlight,
   comparedPoints,
   onPinComparedPoint,
+  onUnpinComparedPoint,
 }: {
   chartId: string;
   data: InferenceData[];
@@ -1099,6 +1241,8 @@ export default function PowerBreakdownPanel({
   comparedPoints?: PowerComparedPoints;
   /** A column was clicked: the owner pins this chip's compared point to it. */
   onPinComparedPoint?: (series: PowerBreakdownDisplaySeries, entry: PowerBreakdownPoint) => void;
+  /** The slider's guide (or the column under it) was clicked: this chip follows the slider again. */
+  onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -1366,6 +1510,9 @@ export default function PowerBreakdownPanel({
                 onColumnClick={
                   onPinComparedPoint ? (entry) => onPinComparedPoint(series, entry) : undefined
                 }
+                guideAt={comparedAt}
+                pinned={pinnedEntry !== null}
+                onGuideClick={onUnpinComparedPoint ? () => onUnpinComparedPoint(series) : undefined}
                 highlight={layers.highlight}
                 onHover={layers.hover}
                 onTogglePin={layers.togglePin}

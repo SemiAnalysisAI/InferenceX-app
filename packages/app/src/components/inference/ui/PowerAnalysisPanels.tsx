@@ -259,6 +259,7 @@ export default function PowerAnalysisPanels({
                 onSelectKey={openDrilldown}
                 comparedPoints={comparedPoints}
                 onPinComparedPoint={pinComparedPoint}
+                onUnpinComparedPoint={unpinComparedPoint}
                 compact
                 layerHighlight={layerHighlight}
                 onLayerHighlight={setLayerHighlight}
@@ -299,6 +300,7 @@ export default function PowerAnalysisPanels({
             onSelectKey={setCompareKey}
             comparedPoints={comparedPoints}
             onPinComparedPoint={pinComparedPoint}
+            onUnpinComparedPoint={unpinComparedPoint}
             heading={
               breakdownSeriesLabel
                 ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: t.drillSubtitle }

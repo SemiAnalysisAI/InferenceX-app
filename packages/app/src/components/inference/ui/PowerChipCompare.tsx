@@ -54,6 +54,8 @@ const STRINGS = {
     modeled: 'Modeled (hatched)',
     pinned: 'Pinned',
     pinnedPoint: (conc: number) => `Pinned to c${conc} · click to follow the slider`,
+    comparedAt: (x: string, slider: string) =>
+      `Compared at ${x} tok/s/user · slider at ${slider} tok/s/user`,
     legend: 'Power layers',
     bands: {
       gpu: 'GPU',
@@ -96,6 +98,8 @@ const STRINGS = {
     modeled: '建模（斜线）',
     pinned: '已固定',
     pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随滑块`,
+    comparedAt: (x: string, slider: string) =>
+      `对比点 ${x} tok/s/user · 滑块位于 ${slider} tok/s/user`,
     legend: '功耗分层',
     bands: {
       gpu: 'GPU',
@@ -135,6 +139,8 @@ const MIN_LABEL_SHARE = 0.08;
 
 /** One hue for the shared legend: the stack's steps and hatches on the muted foreground. */
 const LEGEND_COLOR = 'var(--muted-foreground)';
+/** The slider's accent, on the pin glyph and the pinned row's point so both read as "off the slider". */
+export const PIN_ACCENT_CLASS = 'text-secondary dark:text-primary';
 
 export default function PowerChipCompare({
   data,
@@ -413,7 +419,13 @@ export default function PowerChipCompare({
                       />
                       <span className="truncate">{entry.label}</span>
                     </span>
-                    <span className="flex items-center gap-1 pl-4.5 text-xs text-muted-foreground">
+                    {/* A pinned row is off the slider: its point reads in the pin's accent and
+                        its title says where the slider is. */}
+                    <span
+                      className={`flex items-center gap-1 pl-4.5 text-xs ${
+                        pinnedPoint ? PIN_ACCENT_CLASS : 'text-muted-foreground'
+                      }`}
+                    >
                       {pinnedPoint && onUnpinComparedPoint && (
                         <span
                           data-testid="power-chip-compare-unpin"
@@ -423,7 +435,14 @@ export default function PowerChipCompare({
                           <Pin className="size-3" fill="currentColor" aria-hidden />
                         </span>
                       )}
-                      <span data-testid="power-chip-compare-point">
+                      <span
+                        data-testid="power-chip-compare-point"
+                        title={
+                          pinnedPoint
+                            ? t.comparedAt(rate(point.interactivity), rate(value))
+                            : undefined
+                        }
+                      >
                         {t.at(point.concurrency, rate(point.interactivity))}
                       </span>
                     </span>

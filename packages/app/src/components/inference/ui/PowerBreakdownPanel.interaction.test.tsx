@@ -732,6 +732,64 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     ).toEqual(order);
   });
 
+  it('draws the slider as a guide, labels it only off the compared column, and unpins from it', () => {
+    renderInline([...sglang, ...vllm]);
+    const guide = () =>
+      container.querySelector<SVGLineElement>('[data-testid="power-breakdown-guide"]');
+    const guideLabel = () =>
+      container.querySelector<SVGTextElement>('[data-testid="power-breakdown-guide-label"]');
+    const guideHit = () =>
+      container.querySelector<SVGRectElement>('[data-testid="power-breakdown-guide-hit"]');
+    // Not pinned: the guide sits on the compared column (vLLM c16 at 60), so no label.
+    expect(guide()).not.toBeNull();
+    expect(guideLabel()).toBeNull();
+    expect(guideHit()?.getAttribute('pointer-events')).toBe('none');
+    const guideX = Number(guide()!.getAttribute('x1'));
+    const markerX = Number(marker()!.getAttribute('x'));
+    const markerWidth = Number(marker()!.getAttribute('width'));
+    expect(guideX).toBeGreaterThan(markerX);
+    expect(guideX).toBeLessThan(markerX + markerWidth);
+    // Pinned to c1 (150): the outline moves, the guide stays at the slider and says so.
+    mouse(drilldownHits()[3], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c1 · 150 tok/s/user');
+    expect(Number(guide()!.getAttribute('x1'))).toBe(guideX);
+    expect(guideLabel()?.textContent).toBe('60');
+    expect(guideHit()?.getAttribute('pointer-events')).toBe('all');
+    // The guide is the way back: a click on it follows the slider again.
+    mouse(guideHit()!, 'click');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBeUndefined();
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+    expect(guideLabel()).toBeNull();
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_unpinned', {
+      hw: 'b200_vllm',
+      concurrency: 1,
+    });
+    // So is the column under it while pinned; a column click elsewhere pins again.
+    mouse(drilldownHits()[0], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    mouse(drilldownHits()[1], 'click');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBeUndefined();
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+  });
+
+  it('teaches the click in the cursor label: compare here, or this is the compared column', () => {
+    renderInline([...sglang, ...vllm]);
+    const hint = () =>
+      container.querySelector('[data-testid="power-breakdown-cursor-hint"]')?.textContent;
+    const hits = drilldownHits();
+    // Hovering the GPU band of the compared column (c16): the second line says so.
+    mouse(hits[1], 'mousemove', { clientX: 200, clientY: 380 - 40 - 56 - 2 });
+    expect(
+      container.querySelector('[data-testid="power-breakdown-cursor-label"]')?.textContent,
+    ).toMatch(/^Measured GPU · /u);
+    expect(hint()).toBe('Compared here');
+    // Another column invites the click at its concurrency.
+    mouse(hits[0], 'mousemove', { clientX: 40, clientY: 380 - 40 - 56 - 2 });
+    expect(hint()).toBe('Click to compare at c64');
+    mouse(hits[0], 'mouseleave');
+    expect(container.querySelector('[data-testid="power-breakdown-cursor-hint"]')).toBeNull();
+  });
+
   it('pins a point of an unofficial-run series by its own key', () => {
     renderInline([...sglang, ...overlay], overlay);
     const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
