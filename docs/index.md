@@ -32,4 +32,5 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [Chinese Copy Editorial Guide](./chinese-copy.md) covers audience, register, terminology, the review workflow, and the PR checklist for Chinese copy.
 
 - [Agentic Workload Explorer](./agentic-workload-explorer.md) covers the feature-gated explorer over a frozen, anonymized ProxyTrace snapshot and its separate read replica.
+- [Huawei SKU configurations](./ubenchx-huawei-skus.md) documents the 950PR table on TPC Skyline, source limitations and API coverage.
 - [OperatorX](./operatorx.md) covers the GEMM and routed MoE explorer, compact comparison reads, artifact persistence, deployment, and local verification.
