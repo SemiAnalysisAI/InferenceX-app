@@ -4,16 +4,44 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { InferenceData } from '../types';
 import {
+  bandAtWatts,
+  bandPartsAt,
+  bandTarget,
+  bandWattsPerGpu,
+  breakdownItWattsPerGpu,
+  breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
+  buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
+  cssHatchAngle,
   defaultComparisonInteractivity,
-  type PowerBreakdownPoint,
-  type PowerBreakdownSeries,
+  HATCH_ANGLE,
+  isHatchedBand,
+  MEASURED_POWER_BANDS,
+  nearestBreakdownPoint,
+  partTarget,
+  POWER_BAND_CATEGORIES,
+  POWER_BAND_OPACITY,
+  POWER_BANDS,
   POWER_BREAKDOWN_STACK_ORDER,
+  POWER_PART_BEHAVIOUR,
+  powerBandFillOpacity,
+  powerBandOf,
+  powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
-  stackPowerBreakdown,
+  powerLayerEmphasis,
+  powerLayerFill,
+  powerPartEmphasis,
+  powerPartRows,
+  sameLayerTarget,
+  sparklineGeometry,
+  stackedBandsAt,
+  stackPowerBands,
+  type PowerBreakdownPoint,
+  type PowerBreakdownSeries,
 } from './power-breakdown';
+import { estimateChassisPower, SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 
 const metric = (y: number) => ({ y, roof: false });
 
@@ -172,15 +200,30 @@ describe('powerBreakdownPointLabels', () => {
   });
 });
 
-describe('stackPowerBreakdown', () => {
-  it('stacks contiguous segments ending at the total', () => {
+describe('breakdownSeriesAtBoundary', () => {
+  it('counts IT only by dropping the facility part from categories and totals', () => {
     const [series] = buildPowerBreakdowns([point(500)]);
-    const segments = stackPowerBreakdown(series.points[0], series.categories);
-    expect(segments[0].y0).toBe(0);
-    for (let index = 1; index < segments.length; index++) {
-      expect(segments[index].y0).toBe(segments[index - 1].y1);
-    }
-    expect(segments.at(-1)!.y1).toBeCloseTo(series.points[0].totalWattsPerGpu, 9);
+    const entry = series.points[0];
+    expect(series.categories).toContain('facility');
+    expect(entry.wattsPerGpu.facility).toBeGreaterThan(0);
+    const itSeries = breakdownSeriesAtBoundary(series, false);
+    expect(itSeries.categories).not.toContain('facility');
+    expect(itSeries.categories).toEqual(series.categories.filter((key) => key !== 'facility'));
+    expect(itSeries.points[0].wattsPerGpu.facility).toBe(0);
+    expect(itSeries.points[0].totalWattsPerGpu).toBeCloseTo(
+      entry.totalWattsPerGpu - entry.wattsPerGpu.facility,
+      9,
+    );
+    expect(itSeries.points[0].totalWattsPerGpu).toBeCloseTo(breakdownItWattsPerGpu(entry), 9);
+    // The IT stack still sums to its total exactly, without the facility layer.
+    const bands = powerBandsOf(itSeries.categories);
+    expect(bands).toEqual(['gpu', 'server', 'fansPsu', 'network']);
+    const segments = stackPowerBands(itSeries.points[0], bands);
+    expect(segments.at(-1)!.y1).toBeCloseTo(itSeries.points[0].totalWattsPerGpu, 9);
+    // Facility × PUE identity: IT × PUE = facility total.
+    expect(itSeries.points[0].totalWattsPerGpu * entry.pue).toBeCloseTo(entry.totalWattsPerGpu, 6);
+    // Including the facility returns the series untouched.
+    expect(breakdownSeriesAtBoundary(series, true)).toBe(series);
   });
 });
 
@@ -242,5 +285,323 @@ describe('cross-chip comparison', () => {
     expect(rows.map((r) => r.series.label)).toEqual(['A']);
     expect(outOfRange.map((s) => s.label)).toEqual(['B']);
     expect(compareBreakdownsAt([a], 0).outOfRange).toHaveLength(1);
+  });
+});
+
+describe('six-layer overview', () => {
+  it('folds the twelve parts into six layers, in stack order', () => {
+    expect(POWER_BANDS).toEqual(['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility']);
+    expect(POWER_BANDS.flatMap((band) => POWER_BAND_CATEGORIES[band])).toEqual([
+      ...SYSTEM_POWER_CATEGORIES,
+    ]);
+    expect(powerBandOf('gpu')).toBe('gpu');
+    expect(powerBandOf('measuredCpu')).toBe('measuredCpu');
+    expect(powerBandOf('cpu')).toBe('server');
+    expect(powerBandOf('nic')).toBe('server');
+    expect(powerBandOf('nvswitch')).toBe('server');
+    expect(powerBandOf('other')).toBe('server');
+    expect(powerBandOf('fans')).toBe('fansPsu');
+    expect(powerBandOf('psuLoss')).toBe('fansPsu');
+    expect(powerBandOf('network')).toBe('network');
+    expect(powerBandOf('facility')).toBe('facility');
+    expect([...MEASURED_POWER_BANDS]).toEqual(['gpu', 'measuredCpu']);
+    // The layers a series draws are those with a non-empty part: HGX has no Grace layer,
+    // a single-node run no network share, an IT-only stack no facility.
+    expect(powerBandsOf(['gpu', 'cpu', 'fans', 'facility'])).toEqual([
+      'gpu',
+      'server',
+      'fansPsu',
+      'facility',
+    ]);
+    expect(powerBandsOf(['gpu', 'measuredCpu', 'nic', 'network'])).toEqual([
+      'gpu',
+      'measuredCpu',
+      'server',
+      'network',
+    ]);
+    expect(powerBandsOf(['gpu'])).toEqual(['gpu']);
+  });
+
+  it('stacks the layers so they sum to the total and each layer to its parts', () => {
+    const [series] = buildPowerBreakdowns([point(500)]);
+    const entry = series.points[0];
+    const bands = powerBandsOf(series.categories);
+    expect(bands).toEqual(['gpu', 'server', 'fansPsu', 'network', 'facility']);
+    const stack = stackPowerBands(entry, bands);
+    expect(stack.map((band) => band.key)).toEqual(bands);
+    expect(stack[0].y0).toBe(0);
+    for (let index = 1; index < stack.length; index++) {
+      expect(stack[index].y0).toBe(stack[index - 1].y1);
+    }
+    expect(stack.at(-1)!.y1).toBeCloseTo(entry.totalWattsPerGpu, 9);
+    expect(bandWattsPerGpu(entry, 'gpu')).toBeCloseTo(500, 9);
+    expect(bandWattsPerGpu(entry, 'measuredCpu')).toBe(0);
+    expect(
+      bandWattsPerGpu(entry, 'server') +
+        bandWattsPerGpu(entry, 'fansPsu') +
+        bandWattsPerGpu(entry, 'network'),
+    ).toBeCloseTo(breakdownItWattsPerGpu(entry) - entry.wattsPerGpu.gpu, 9);
+    expect(bandWattsPerGpu(entry, 'facility')).toBeCloseTo(entry.wattsPerGpu.facility, 9);
+    const parts = bandPartsAt(entry, 'server');
+    expect(parts.map((part) => part.category)).toEqual(
+      series.categories.filter((key) => powerBandOf(key) === 'server'),
+    );
+    expect(parts.map((part) => part.category)).toEqual([
+      'cpu',
+      'memory',
+      'nic',
+      'nvswitch',
+      'storage',
+      'other',
+    ]);
+    expect(parts.reduce((sum, part) => sum + part.watts, 0)).toBeCloseTo(
+      bandWattsPerGpu(entry, 'server'),
+      9,
+    );
+    expect(bandPartsAt(entry, 'fansPsu').map((part) => part.category)).toEqual(['fans', 'psuLoss']);
+    expect(bandPartsAt(entry, 'gpu')).toEqual([{ category: 'gpu', watts: 500 }]);
+    expect(bandPartsAt(entry, 'measuredCpu')).toEqual([]);
+  });
+
+  it('steps opacity down from the measured base and hatches each modeled layer at its own angle', () => {
+    expect(POWER_BANDS.map((band) => POWER_BAND_OPACITY[band])).toEqual([
+      0.9, 0.72, 0.5, 0.34, 0.2, 0,
+    ]);
+    expect(POWER_BANDS.map(isHatchedBand)).toEqual([false, false, true, true, true, true]);
+    // The facility's stripes sit on a tint; every other layer's tint is its own step.
+    expect(powerBandFillOpacity('facility')).toBe(0.18);
+    expect(powerBandFillOpacity('server')).toBe(0.5);
+    expect(powerBandFillOpacity('gpu')).toBe(0.9);
+    expect(POWER_BANDS.map((band) => HATCH_ANGLE[band])).toEqual([45, 45, 45, 135, 0, 90]);
+    expect(cssHatchAngle('server')).toBe(135);
+    expect(cssHatchAngle('fansPsu')).toBe(225);
+    expect(cssHatchAngle('network')).toBe(90);
+    expect(cssHatchAngle('facility')).toBe(180);
+    expect(powerLayerFill('var(--chip)', 0.5)).toBe(
+      'color-mix(in oklab, var(--chip) 50%, transparent)',
+    );
+  });
+
+  it('tells highlighted, faded and plain layers apart, by layer or by part', () => {
+    expect(powerLayerEmphasis('server', null)).toBe('plain');
+    expect(powerLayerEmphasis('server', { ...bandTarget('server'), pinned: false })).toBe(
+      'highlighted',
+    );
+    expect(powerLayerEmphasis('gpu', { ...bandTarget('server'), pinned: true })).toBe('faded');
+    // A part target raises its layer.
+    expect(partTarget('nic')).toEqual({ band: 'server', category: 'nic' });
+    expect(partTarget('fans')).toEqual({ band: 'fansPsu', category: 'fans' });
+    expect(powerLayerEmphasis('server', { ...partTarget('nic'), pinned: false })).toBe(
+      'highlighted',
+    );
+    expect(powerLayerEmphasis('fansPsu', { ...partTarget('nic'), pinned: false })).toBe('faded');
+    expect(powerLayerEmphasis('facility', { ...partTarget('nic'), pinned: false })).toBe('faded');
+    expect(sameLayerTarget(bandTarget('server'), partTarget('nic'))).toBe(false);
+    expect(sameLayerTarget(partTarget('nic'), { band: 'server', category: 'nic' })).toBe(true);
+    expect(sameLayerTarget(null, null)).toBe(true);
+    // List rows: the hovered part, siblings of a layer hovered in the plot, or plain.
+    expect(powerPartEmphasis('nic', null)).toBe('plain');
+    expect(powerPartEmphasis('nic', { ...partTarget('nic'), pinned: false })).toBe('highlighted');
+    expect(powerPartEmphasis('cpu', { ...partTarget('nic'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('cpu', { ...bandTarget('server'), pinned: false })).toBe('band');
+    expect(powerPartEmphasis('fans', { ...bandTarget('server'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('gpu', { ...bandTarget('server'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('gpu', { ...bandTarget('gpu'), pinned: false })).toBe('band');
+  });
+
+  it('knows which parts are measured, move with load or stay fixed, as the model does', () => {
+    const state = { workload: 'agentic', scaleOut: true } as const;
+    const low = estimateChassisPower('h200', 8 * 226, state)!.breakdown;
+    const high = estimateChassisPower('h200', 8 * 474, state)!.breakdown;
+    for (const key of SYSTEM_POWER_CATEGORIES) {
+      if (key === 'measuredCpu') continue;
+      const behaviour = POWER_PART_BEHAVIOUR[key];
+      if (behaviour === 'fixed') expect(high[key]).toBeCloseTo(low[key], 6);
+      else expect(high[key]).toBeGreaterThan(low[key]);
+    }
+    expect(POWER_PART_BEHAVIOUR.gpu).toBe('measured');
+    expect(POWER_PART_BEHAVIOUR.measuredCpu).toBe('measured');
+    expect(POWER_PART_BEHAVIOUR.fans).toBe('load');
+    expect(POWER_PART_BEHAVIOUR.psuLoss).toBe('load');
+    expect(POWER_PART_BEHAVIOUR.facility).toBe('load');
+  });
+});
+
+describe('powerPartRows', () => {
+  const [series] = buildPowerBreakdowns([
+    point(600, { conc: 64, median_intvty: 20 }),
+    point(400, { conc: 8, median_intvty: 70 }),
+    point(250, { conc: 1, median_intvty: 140 }),
+  ]);
+  const selected = series.points[1];
+  const rows = powerPartRows(series, selected);
+
+  it('lists every non-empty part heaviest first, the facility overhead last', () => {
+    expect(rows[0].category).toBe('gpu');
+    expect(rows.at(-1)!.category).toBe('facility');
+    expect(rows.map((part) => part.category)).not.toContain('measuredCpu');
+    expect(rows.map((part) => part.category).toSorted()).toEqual([...series.categories].toSorted());
+    const itRows = rows.slice(0, -1);
+    for (let index = 1; index < itRows.length; index += 1) {
+      expect(itRows[index].watts).toBeLessThanOrEqual(itRows[index - 1].watts);
+    }
+    expect(rows[0]).toMatchObject({ band: 'gpu', behaviour: 'measured', selectedIndex: 1 });
+    expect(rows.find((part) => part.category === 'fans')).toMatchObject({
+      band: 'fansPsu',
+      behaviour: 'load',
+    });
+    expect(rows.find((part) => part.category === 'nic')).toMatchObject({
+      band: 'server',
+      behaviour: 'fixed',
+    });
+  });
+
+  it('shares of IT sum to 1 and the facility row is its share of the facility total', () => {
+    const itRows = rows.slice(0, -1);
+    expect(itRows.reduce((sum, part) => sum + part.share, 0)).toBeCloseTo(1, 9);
+    expect(rows[0].share).toBeCloseTo(400 / breakdownItWattsPerGpu(selected), 9);
+    expect(rows.at(-1)!.share).toBeCloseTo(
+      selected.wattsPerGpu.facility / selected.totalWattsPerGpu,
+      9,
+    );
+  });
+
+  it('gives each row its own history and scale across the series', () => {
+    expect(rows[0].history).toEqual([600, 400, 250]);
+    expect(rows[0].max).toBe(600);
+    const fans = rows.find((part) => part.category === 'fans')!;
+    expect(fans.history).toHaveLength(3);
+    expect(fans.max).toBe(Math.max(...fans.history));
+    expect(fans.max).toBeLessThan(rows[0].max);
+  });
+
+  it('omits the facility row at the IT boundary', () => {
+    const itSeries = breakdownSeriesAtBoundary(series, false);
+    const itRows = powerPartRows(itSeries, itSeries.points[1]);
+    expect(itRows.map((part) => part.category)).not.toContain('facility');
+    expect(itRows.reduce((sum, part) => sum + part.share, 0)).toBeCloseTo(1, 9);
+  });
+});
+
+describe('sparklineGeometry', () => {
+  it('scales each sparkline to its own max with the dot on the selected point', () => {
+    const spark = sparklineGeometry([10, 40, 20], 1, 72, 18);
+    // 18 px high, 1 px inset: 10 of 40 sits at 17 − 4, 40 at the top, 20 at 17 − 8.
+    expect(spark.line).toBe('M1,13L36,1L71,9');
+    expect(spark.area).toBe('M1,13L36,1L71,9L71,17L1,17Z');
+    expect(spark.dot).toEqual({ x: 36, y: 1 });
+    // A different row with a smaller max still reaches the top of its own box.
+    expect(sparklineGeometry([2, 4], 0, 72, 18).line).toBe('M1,9L71,1');
+  });
+
+  it('draws a single value as a flat mid-line and clamps the selected index', () => {
+    expect(sparklineGeometry([5], 0, 72, 18).line).toBe('M36,1');
+    expect(sparklineGeometry([0, 0], 5, 72, 18).dot).toEqual({ x: 71, y: 17 });
+    expect(sparklineGeometry([], 0, 72, 18).line).toBe('M36,17');
+  });
+});
+
+describe('nearestBreakdownPoint', () => {
+  const series = fakeSeries('A', [
+    [10, 1500],
+    [40, 1200],
+    [160, 900],
+  ]);
+
+  it('returns the point nearest the target on a log scale, however far', () => {
+    expect(nearestBreakdownPoint(series, 56)?.interactivity).toBe(40);
+    expect(nearestBreakdownPoint(series, 5000)?.interactivity).toBe(160);
+    expect(nearestBreakdownPoint(series, 0)?.interactivity).toBe(10);
+    expect(nearestBreakdownPoint(fakeSeries('E', []), 10)).toBeNull();
+  });
+});
+
+describe('stackedBandsAt', () => {
+  const bands = ['gpu', 'server', 'facility'] as const;
+  const entry = (gpu: number, cpu: number, facility: number): PowerBreakdownPoint => ({
+    point: point(gpu),
+    concurrency: 1,
+    interactivity: 1,
+    configKey: '',
+    configLabel: '',
+    wattsPerGpu: {
+      gpu,
+      measuredCpu: 0,
+      cpu,
+      memory: 0,
+      nic: 0,
+      nvswitch: 0,
+      storage: 0,
+      other: 0,
+      fans: 0,
+      psuLoss: 0,
+      network: 0,
+      facility,
+    },
+    totalWattsPerGpu: gpu + cpu + facility,
+    pue: 1.2,
+    cpuBasis: null,
+    chassisBasis: 'full',
+  });
+  const points = [
+    { x: 0, entry: entry(100, 20, 30) },
+    { x: 100, entry: entry(200, 40, 30) },
+  ];
+
+  it('interpolates every band linearly between the neighbouring points', () => {
+    const stack = stackedBandsAt(points, 50, bands);
+    expect(stack.map((band) => [band.key, band.y0, band.y1, band.watts])).toEqual([
+      ['gpu', 0, 150, 150],
+      ['server', 150, 180, 30],
+      ['facility', 180, 210, 30],
+    ]);
+  });
+
+  it('clamps to the ends outside the points', () => {
+    expect(stackedBandsAt(points, -10, bands)[0].watts).toBe(100);
+    expect(stackedBandsAt(points, 500, bands)[0].watts).toBe(200);
+  });
+
+  it('names the band under a watts value and nothing above the stack', () => {
+    const stack = stackedBandsAt(points, 50, bands);
+    expect(bandAtWatts(stack, 160)?.key).toBe('server');
+    expect(bandAtWatts(stack, 0)?.key).toBe('gpu');
+    expect(bandAtWatts(stack, 300)).toBeNull();
+    expect(bandAtWatts(stack, -1)).toBeNull();
+  });
+});
+
+describe('buildPowerBreakdownsWithOverlays', () => {
+  const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/999/attempts/1';
+  const official = [point(500), point(400, { conc: 4, x: 200, median_intvty: 200 }, { conc: 4 })];
+  const overlay = [
+    point(520, { run_url: runUrl }),
+    point(410, { run_url: runUrl, conc: 4, x: 200, median_intvty: 200 }, { conc: 4 }),
+  ];
+  const runInfos = [
+    { id: 1, branch: 'main', url: 'u1' },
+    { id: 2, branch: 'powerx', url: 'u2' },
+    { id: 999, branch: 'single-hue', url: runUrl },
+  ];
+
+  it('keeps an unofficial run as its own series in the run colour slot, after the official line', () => {
+    const series = buildPowerBreakdownsWithOverlays([...official, ...overlay], {
+      points: overlay,
+      runIndexByUrl: { [runUrl]: 2 },
+      runInfos,
+    });
+    expect(series.map((entry) => entry.key)).toEqual(['b200_sglang|fp8', 'b200_sglang|fp8|run2']);
+    expect(series[0].overlayRunIndex).toBeUndefined();
+    expect(series[0].points).toHaveLength(2);
+    expect(series[1].overlayRunIndex).toBe(2);
+    expect(series[1].points.map((entry) => entry.wattsPerGpu.gpu)).toEqual([520, 410]);
+    expect(series[1].label).toContain(series[0].label);
+    expect(series[1].label).not.toBe(series[0].label);
+  });
+
+  it('is the plain breakdown without overlay points', () => {
+    expect(buildPowerBreakdownsWithOverlays(official, undefined)).toEqual(
+      buildPowerBreakdowns(official),
+    );
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '../types';
-import { chipsWithoutSystemModel } from './power-chip-coverage';
+import { chipsWithoutSystemModel, hasRoleTelemetry } from './power-chip-coverage';
 
 const metric = (y: number) => ({ y, roof: false });
 
@@ -31,5 +31,23 @@ describe('chipsWithoutSystemModel', () => {
       point('mi355x_sglang', { measuredAvgPower: undefined }),
     ];
     expect(chipsWithoutSystemModel(points, [])).toEqual([]);
+  });
+});
+
+describe('hasRoleTelemetry', () => {
+  const disagg = (overrides: Partial<InferenceData> = {}) =>
+    point('b200_dynamo-sglang', { disagg: true, median_intvty: 40, ...overrides });
+
+  it('is false when disaggregated results carry no prefill/decode power', () => {
+    expect(hasRoleTelemetry([disagg(), point('h200_sglang')], 'median_intvty')).toBe(false);
+  });
+
+  it('is true once one disaggregated point has a validated role reading', () => {
+    expect(
+      hasRoleTelemetry(
+        [disagg(), disagg({ measuredDecodeAvgPower: metric(420) })],
+        'median_intvty',
+      ),
+    ).toBe(true);
   });
 });

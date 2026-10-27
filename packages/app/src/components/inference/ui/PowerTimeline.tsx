@@ -40,6 +40,7 @@ import {
 } from '../InferenceContext';
 import type { InferenceData, OverlayData } from '../types';
 import { powerVariantDash } from '../utils/power-compare';
+import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
 import PowerTimelineSummary from './PowerTimelineSummary';
 import {
   allGpuPool,
@@ -787,8 +788,12 @@ export default function PowerTimeline({
     [measuredData, overlayPoints],
   );
   // PowerX tab: first view compares chips at one shared load rather than every concurrency.
+  // A shared or requested focus keeps every load so the focused trace stays drawn.
   const autoConcurrencyRef = useRef(
-    !powerXSurface || initialView.concurrency !== null || Boolean(requestedFocusRef.current),
+    !powerXSurface ||
+      initialView.concurrency !== null ||
+      Boolean(initialView.focus) ||
+      Boolean(requestedFocusRef.current),
   );
   useEffect(() => {
     if (autoConcurrencyRef.current || measuredData.length === 0) return;
@@ -1587,7 +1592,7 @@ export default function PowerTimeline({
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
         testId="power-timeline-chart-svg"
         grabCursor
-        instructions={t.instructions}
+        instructions={powerXSurface ? '' : t.instructions}
         xScale={
           xMode === 'wall'
             ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
@@ -1637,6 +1642,13 @@ export default function PowerTimeline({
           <>
             {caption}
             {toolbar}
+            {powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
+              <PowerLoadSwings
+                traces={focusedTrace ? [focusedTrace] : visibleTraces}
+                colorOf={(trace) => colorForTrace(trace).color}
+                labelOf={seriesLabel}
+              />
+            )}
           </>
         }
         noDataOverlay={
@@ -1651,6 +1663,7 @@ export default function PowerTimeline({
           ) : undefined
         }
       />
+      {powerXSurface && <PowerLoadSwingsCaveat />}
       <div
         className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
         data-testid="power-timeline-status"

@@ -1,5 +1,6 @@
 import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import {
   text,
   stringSchema,
@@ -279,8 +280,20 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), modeled server parts, fans + PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
-      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时）、建模的服务器部件、风扇 + 电源损耗、Scale-out 网络分摊以及 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+      'Include powerBreakdowns: per hardware line (hwKey + precision, as in the chart legend), each point’s All in Measured W/GPU split into measured GPU, measured Grace CPU (NVL72 with valid socket telemetry), and the modeled host CPU, memory, NICs, NVSwitch, storage, PCIe and misc parts, fans, PSU loss, scale-out network share and PUE facility overhead. Parts are the deployment share ÷ allocated GPUs and sum to totalWattsPerGpu. Points without validated GPU telemetry or a supported system model are omitted. JSON only.',
+      '返回 powerBreakdowns：按硬件曲线（hwKey + 精度，与图例一致）将每个点的 All in Measured W/GPU 拆分为实测 GPU、实测 Grace CPU（NVL72 且插槽遥测有效时），以及建模的主机 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他部件、风扇、电源损耗、Scale-out 网络分摊和 PUE 机房开销。各部分为部署分摊值 ÷ 已分配 GPU 数，总和等于 totalWattsPerGpu。缺少有效 GPU 遥测或系统模型不支持的点会被省略。仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
+    name: 'headroom',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include headroom: the PowerX measured-vs-TDP table. Per hardware line (hwKey + precision), measured average and P90 W per chip, P90 as % of registry TDP and headroom = 100 − that, read at 25 / 50 / 100 / 300 tok/s/user on interactivityField by the chart’s own interpolation (throughput Pareto front, monotone Steffen spline). A cell outside a line’s measured range is null, never extrapolated; lines without P90 power, throughput, a registry TDP or two points are omitted. GPU board power only. JSON only.',
+      '返回 headroom：PowerX 的实测功耗 vs TDP 余量表。按硬件曲线（hwKey + 精度）给出每芯片实测平均与 P90 功耗、P90 占注册表 TDP 的百分比以及余量 = 100 − 该百分比，在 interactivityField 上的 25 / 50 / 100 / 300 tok/s/user 处用图表自身的插值（吞吐 Pareto 前沿、单调 Steffen 样条）读取。超出曲线实测范围的单元为 null，不做外推；缺少 P90 功耗、吞吐、注册表 TDP 或不足两个点的曲线会被省略。仅 GPU 板卡功耗。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -291,8 +304,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit and powerBreakdown analytical results require JSON and return 400 with CSV.',
-      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit 和 powerBreakdown 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns plotted points, or tableRows for All in Measured with unavailable y cells blank. serviceCompare, roleShare, powerFit, powerBreakdown and headroom analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 返回图表数据点；整体实测指标则导出 tableRows，不可用的 y 留空。serviceCompare、roleShare、powerFit、powerBreakdown 和 headroom 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -617,7 +630,9 @@ const responseSchema = objectSchema(
         label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
         categories: arraySchema({
           type: 'string',
-          enum: ['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility'],
+          enum: [...SYSTEM_POWER_CATEGORIES],
+          description:
+            'Parts with watts on at least one point, in stack order. gpu and measuredCpu are measured; the rest are modeled.',
         }),
         tdpWattsPerGpu: nullableNumber('Rated board TDP per GPU (reference, not a measurement).'),
         allInProvisionedWattsPerGpu: nullableNumber(
@@ -637,14 +652,9 @@ const responseSchema = objectSchema(
               description: 'tok/s/user on interactivityField; points are sorted by it.',
             },
             configLabel: { type: 'string', description: 'Date, topology and recipe of the point.' },
-            wattsPerGpu: objectSchema({
-              gpu: numberSchema,
-              measuredCpu: numberSchema,
-              server: numberSchema,
-              fansPsu: numberSchema,
-              network: numberSchema,
-              facility: numberSchema,
-            }),
+            wattsPerGpu: objectSchema(
+              Object.fromEntries(SYSTEM_POWER_CATEGORIES.map((key) => [key, numberSchema])),
+            ),
             totalWattsPerGpu: { ...numberSchema, description: 'All in Measured W/GPU.' },
             pue: numberSchema,
             cpuBasis: {
@@ -657,6 +667,43 @@ const responseSchema = objectSchema(
         ),
       }),
     ),
+    headroom: objectSchema({
+      interactivities: arraySchema(numberSchema),
+      interactivityField: {
+        type: 'string',
+        description:
+          'Interactivity field the cells are read on: the chart x-axis when it is an interactivity axis, otherwise median_intvty.',
+      },
+      rows: arraySchema(
+        objectSchema({
+          key: { type: 'string', description: 'hwKey|precision.' },
+          hwKey: { type: 'string' },
+          precision: { type: 'string' },
+          label: { type: 'string', description: 'Chart legend label, e.g. B200 (vLLM) FP4.' },
+          tdpWatts: { ...numberSchema, description: 'Rated board TDP per GPU from the registry.' },
+          interactivityMin: numberSchema,
+          interactivityMax: numberSchema,
+          cells: arraySchema({
+            oneOf: [
+              objectSchema({
+                interactivity: numberSchema,
+                avgWatts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured average W per chip.',
+                },
+                p90Watts: {
+                  ...numberSchema,
+                  description: 'Interpolated measured P90 fleet W per chip.',
+                },
+                percentTdpP90: { ...numberSchema, description: 'P90 ÷ TDP × 100.' },
+                headroomPercent: { ...numberSchema, description: '100 − percentTdpP90.' },
+              }),
+              { type: 'null' },
+            ],
+          }),
+        }),
+      ),
+    }),
     pricing: { type: ['object', 'null'], additionalProperties: true },
     comparisons: arraySchema({
       type: 'object',
@@ -702,6 +749,7 @@ const responseExample = {
     roleShare: false,
     powerFit: false,
     powerBreakdown: false,
+    headroom: false,
   },
   metric: {
     key: 'tpPerGpu',

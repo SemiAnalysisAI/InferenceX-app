@@ -43,6 +43,7 @@ import {
   PERCENTILE_OPTIONS,
   Sequence,
 } from '@/lib/catalog/data-mappings';
+import { buildHeadroomRows, HEADROOM_INTERACTIVITIES } from '@/lib/power/headroom';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
@@ -353,6 +354,7 @@ export function GET(request: NextRequest) {
     const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
     const powerFit = parseBoolParam(search.get('powerFit'), 'powerFit', false);
     const powerBreakdown = parseBoolParam(search.get('powerBreakdown'), 'powerBreakdown', false);
+    const headroom = parseBoolParam(search.get('headroom'), 'headroom', false);
     const requestedServiceBaseline = search.get('serviceBaseline');
     const requestedServiceComparator = search.get('serviceComparator');
     const serviceTarget = search.has('serviceTarget')
@@ -360,10 +362,10 @@ export function GET(request: NextRequest) {
       : null;
     if (serviceTarget !== null && serviceTarget <= 0)
       throw new ViewsApiParamError('serviceTarget', 'serviceTarget must be positive');
-    if (format === 'csv' && (serviceCompare || roleShare || powerFit || powerBreakdown))
+    if (format === 'csv' && (serviceCompare || roleShare || powerFit || powerBreakdown || headroom))
       throw new ViewsApiParamError(
         'format',
-        'Equal-service, role-share, power-fit and power-breakdown panels require format=json',
+        'Equal-service, role-share, power-fit, power-breakdown and headroom panels require format=json',
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
@@ -566,6 +568,18 @@ export function GET(request: NextRequest) {
         }
       : {};
 
+    // PowerX headroom table: avg and P90 W per chip, % TDP and headroom at four
+    // interactivities, read along each chip's frontier with the chart's interpolation.
+    const headroomPanel = headroom
+      ? {
+          headroom: {
+            interactivities: [...HEADROOM_INTERACTIVITIES],
+            interactivityField: breakdownInteractivity.field,
+            rows: buildHeadroomRows(observedPoints),
+          },
+        }
+      : {};
+
     const resolvedParams = {
       model: displayName,
       sequence: sequence as string,
@@ -601,6 +615,7 @@ export function GET(request: NextRequest) {
       roleShare,
       powerFit,
       powerBreakdown,
+      headroom,
     };
 
     if (format === 'csv') {
@@ -633,6 +648,7 @@ export function GET(request: NextRequest) {
       ...rolePanel,
       ...fitPanel,
       ...breakdownPanel,
+      ...headroomPanel,
     });
   });
 }

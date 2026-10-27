@@ -182,6 +182,7 @@ const responseExample = {
     roleShare: false,
     powerFit: false,
     powerBreakdown: false,
+    headroom: false,
   },
 };
 
