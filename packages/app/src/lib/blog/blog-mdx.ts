@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
 import remarkGfm from 'remark-gfm';
@@ -37,15 +38,37 @@ function getHighlighter() {
   return highlighterPromise;
 }
 
-export async function compileBlogMdx(source: string, locale: BlogLocale = 'en') {
+type MdxOptions = NonNullable<
+  NonNullable<Parameters<typeof compileMDX>[0]['options']>['mdxOptions']
+>;
+
+export interface CompileBlogMdxOptions {
+  /** `'md'` compiles plain markdown: no JSX, imports or `{}` expressions (default `'mdx'`). */
+  format?: NonNullable<MdxOptions['format']>;
+  /** Replaces the default `createMdxComponents(locale)` map. */
+  components?: Record<string, ComponentType<any>>;
+  /** Extra remark plugins, run after GFM and math. */
+  remarkPlugins?: NonNullable<MdxOptions['remarkPlugins']>;
+}
+
+export async function compileBlogMdx(
+  source: string,
+  locale: BlogLocale = 'en',
+  options: CompileBlogMdxOptions = {},
+) {
   const highlighter = await getHighlighter();
 
   return compileMDX({
     source,
-    components: createMdxComponents(locale),
+    components: options.components ?? createMdxComponents(locale),
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
+        ...(options.format && { format: options.format }),
+        remarkPlugins: [
+          remarkGfm,
+          [remarkMath, { singleDollarTextMath: false }],
+          ...(options.remarkPlugins ?? []),
+        ],
         rehypePlugins: [
           [rehypeKatex, { strict: false }],
           [
