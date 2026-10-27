@@ -91,6 +91,44 @@ function options(
 }
 
 describe('selectHistoricalBest', () => {
+  it('never merges FP4 and FP8 sweeps of one config into a chimeric frontier', () => {
+    // FP4 only reaches 40 tok/s/user and FP8 only starts at 60, so neither
+    // measures the 50 target; a merged frontier would interpolate one anyway.
+    const rows = [
+      sweep('2026-06-01', 20, 1500, { precision: 'fp4' }),
+      sweep('2026-06-01', 40, 1300, { precision: 'fp4' }),
+      sweep('2026-06-01', 60, 1000, { precision: 'fp8' }),
+      sweep('2026-06-01', 80, 200, { precision: 'fp8' }),
+    ];
+
+    const outcome = selectHistoricalBest(options(rows, { precisions: ['fp4', 'fp8'] }));
+    expect(outcome.best).toEqual([]);
+    expect(outcome.unmeasured).toHaveLength(1);
+    expect(outcome.unmeasured[0]!.datesConsidered).toBe(1);
+  });
+
+  it("picks a config's best precision and reports it, counting dates once", () => {
+    const rows = [
+      sweep('2026-06-01', 20, 800, { precision: 'fp8' }),
+      sweep('2026-06-01', 80, 400, { precision: 'fp8' }),
+      sweep('2026-06-01', 20, 1600, { precision: 'fp4' }),
+      sweep('2026-06-01', 80, 1000, { precision: 'fp4' }),
+    ];
+
+    const entry = selectHistoricalBest(options(rows, { precisions: ['fp4', 'fp8'] })).best[0]!;
+    expect(entry.precision).toBe('fp4');
+    expect(entry.datesConsidered).toBe(1);
+    expect(entry.datesMeasured).toBe(1);
+    expect(entry.latestRankValue).toBeCloseTo(entry.rankValue, 6);
+
+    const groups = groupHistoryByHwKeyAndDate(options(rows, { precisions: ['fp4', 'fp8'] }));
+    const [progression] = bestSoFarProgression(groups, options(rows));
+    expect(progression!.steps.map((step) => [step.date, step.precision])).toEqual([
+      ['2026-06-01', 'fp4'],
+    ]);
+    expect(progression!.datesConsidered).toBe(1);
+  });
+
   it('returns empty results for empty input', () => {
     expect(selectHistoricalBest(options([]))).toEqual({ best: [], unmeasured: [], datesSeen: 0 });
     expect(selectHistoricalBest(options([makeRow()], { precisions: [] })).best).toEqual([]);

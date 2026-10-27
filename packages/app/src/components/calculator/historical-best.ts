@@ -16,11 +16,19 @@ const KEY_SEP = '|';
 
 interface DatedGroupMeta extends GroupMeta {
   date: string;
+  precision: string;
+}
+
+/** Distinct dates across a hwKey's sweeps (one sweep per precision per date). */
+function countDates(dated: readonly DatedSweep[]): number {
+  return new Set(dated.map((sweep) => sweep.date)).size;
 }
 
 export interface HistoricalBestEntry {
   hwKey: string;
   date: string;
+  /** Precision of the winning sweep. */
+  precision: string;
   runUrls: string[];
   result: InterpolatedResult;
   rankValue: number;
@@ -46,6 +54,12 @@ export interface HistoricalBestOutcome {
 
 export interface DatedSweep {
   date: string;
+  /**
+   * Precision of every point in the sweep. Each (hwKey, precision, date) is its
+   * own sweep, so a config's FP4 and FP8 rows never merge into one frontier
+   * that no single precision achieves.
+   */
+  precision: string;
   points: GPUDataPoint[];
   runUrls: string[];
 }
@@ -90,13 +104,13 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     classify: (hwKey, row) => {
       if (visibleHwKeys && !visibleHwKeys.has(hwKey)) return null;
       if (!row.date) return null;
-      const key = `${hwKey}${KEY_SEP}${row.date}`;
+      const key = `${hwKey}${KEY_SEP}${row.precision}${KEY_SEP}${row.date}`;
       if (row.run_url) {
         const urls = runUrlsByGroup.get(key) ?? new Set<string>();
         urls.add(row.run_url);
         runUrlsByGroup.set(key, urls);
       }
-      return { key, meta: { hwKey, date: row.date } };
+      return { key, meta: { hwKey, date: row.date, precision: row.precision } };
     },
   });
 
@@ -109,6 +123,7 @@ export function groupHistoryByHwKeyAndDate(options: GroupHistoryOptions): Histor
     const list = byHwKey.get(meta.hwKey) ?? [];
     list.push({
       date: meta.date,
+      precision: meta.precision,
       points,
       runUrls: [...(runUrlsByGroup.get(groupKey) ?? [])],
     });
@@ -145,16 +160,19 @@ export function selectBestFromGroups(
 
     let winner: { sweep: DatedSweep; result: InterpolatedResult; rankValue: number } | null = null;
     let latestRankValue: number | null = null;
-    let datesMeasured = 0;
+    const measuredDates = new Set<string>();
 
     for (const sweep of dated) {
       const result = interpolateForGPU(sweep.points, targetValue, mode, costProvider);
       if (!result || result.clamped || !(result.value > 0)) continue;
 
-      datesMeasured += 1;
+      measuredDates.add(sweep.date);
       const rankValue = rank(result);
       if (!Number.isFinite(rankValue)) continue;
-      if (sweep.date === latestDate) latestRankValue = rankValue;
+      if (sweep.date === latestDate) {
+        latestRankValue =
+          latestRankValue === null ? rankValue : Math.max(latestRankValue, rankValue);
+      }
       if (!winner || rankValue > winner.rankValue) winner = { sweep, result, rankValue };
     }
 
@@ -174,7 +192,7 @@ export function selectBestFromGroups(
         hwKey,
         nearestBelow,
         nearestAbove,
-        datesConsidered: dated.length,
+        datesConsidered: countDates(dated),
       });
       continue;
     }
@@ -184,9 +202,10 @@ export function selectBestFromGroups(
       date: winner.sweep.date,
       runUrls: winner.sweep.runUrls,
       result: { ...winner.result, hwKey, resultKey: hwKey },
+      precision: winner.sweep.precision,
       rankValue: winner.rankValue,
-      datesConsidered: dated.length,
-      datesMeasured,
+      datesConsidered: countDates(dated),
+      datesMeasured: measuredDates.size,
       latestDate,
       supersededLatest: winner.sweep.date !== latestDate,
       latestRankValue,
@@ -207,6 +226,8 @@ export function selectHistoricalBest(
 
 export interface ProgressionStep {
   date: string;
+  /** Precision of the sweep that set this step. */
+  precision: string;
   runUrls: string[];
   result: InterpolatedResult;
   rankValue: number;
@@ -231,7 +252,7 @@ export function bestSoFarProgression(
     const chronological = [...dated].toSorted((a, b) => a.date.localeCompare(b.date));
     const steps: ProgressionStep[] = [];
     let best = -Infinity;
-    let datesMeasured = 0;
+    const measuredDates = new Set<string>();
 
     for (const sweep of chronological) {
       const result = interpolateForGPU(sweep.points, targetValue, mode, costProvider);
@@ -239,11 +260,15 @@ export function bestSoFarProgression(
       const rankValue = rank(result);
       if (!Number.isFinite(rankValue) || rankValue <= 0) continue;
 
-      datesMeasured += 1;
+      measuredDates.add(sweep.date);
       if (rankValue <= best) continue;
       best = rankValue;
+      // Same-date sweeps at another precision replace that date's step instead
+      // of adding a second one, so the staircase stays one step per date.
+      if (steps.at(-1)?.date === sweep.date) steps.pop();
       steps.push({
         date: sweep.date,
+        precision: sweep.precision,
         runUrls: sweep.runUrls,
         result: { ...result, hwKey, resultKey: hwKey },
         rankValue,
@@ -258,8 +283,8 @@ export function bestSoFarProgression(
     progressions.push({
       hwKey,
       steps,
-      datesMeasured,
-      datesConsidered: dated.length,
+      datesMeasured: measuredDates.size,
+      datesConsidered: countDates(dated),
     });
   }
 

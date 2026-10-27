@@ -29,9 +29,9 @@ const replayAxisExtentFrom = (svg: Element) => {
   return `${lastTick('g.x-axis text')}|${lastTick('g.y-axis text')}`;
 };
 
-const visitChineseReplay = () => {
+const visitChineseReplay = (query = '') => {
   cy.viewport(390, 900);
-  cy.visit('/zh/inference?g_model=DeepSeek-R1-0528', {
+  cy.visit(`/zh/inference?g_model=DeepSeek-R1-0528${query}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -256,7 +256,9 @@ describe('Inference Replay — Simplified Chinese', () => {
       const firstDate = (history[0] as { date: string }).date;
       const oneDate = history.filter((row) => (row as { date: string }).date === firstDate);
       cy.intercept('GET', '/api/v1/benchmarks/history*', { statusCode: 200, body: oneDate });
-      visitChineseReplay();
+      // Pin FP8: the default now selects every precision, and DeepSeek R1's
+      // bundled supplemental FP4 history rows would add later replay dates.
+      visitChineseReplay('&i_prec=fp8');
       cy.contains('历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。').should(
         'be.visible',
       );
