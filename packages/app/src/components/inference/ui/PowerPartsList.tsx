@@ -6,8 +6,9 @@ import { useMemo } from 'react';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
+  isHatchedBand,
   partTarget,
-  powerBandOpacity,
+  powerBandFillOpacity,
   powerLayerFill,
   powerPartEmphasis,
   powerPartRows,
@@ -83,11 +84,11 @@ export const SPARKLINE_HEIGHT = 18;
 const behaviourLabel = (behaviour: PowerPartBehaviour, t: (typeof STRINGS)['en']) =>
   behaviour === 'measured' ? t.measured : behaviour === 'load' ? t.modeledLoad : t.modeledFixed;
 
-/** The row's bar: the chip colour at the band's ramp step; modeled bars get a dashed left edge. */
+/** The row's bar: the chip colour at its layer's step; modeled bars get a dashed left edge. */
 export function partBarStyle(row: PowerPartRow, color: string): React.CSSProperties {
   return {
-    backgroundColor: powerLayerFill(color, powerBandOpacity(row.band)),
-    borderLeft: row.band === 'measured' ? undefined : `2px dashed ${color}`,
+    backgroundColor: powerLayerFill(color, powerBandFillOpacity(row.band)),
+    borderLeft: isHatchedBand(row.band) ? `2px dashed ${color}` : undefined,
   };
 }
 
@@ -95,7 +96,7 @@ export function partBarStyle(row: PowerPartRow, color: string): React.CSSPropert
  * The detail beside the overview: every non-empty part of the selected chip at
  * the compared point, heaviest first, each with its watts, its share and a
  * sparkline of that part across the chip's points. Hovering a row raises its
- * band in the chart; a click pins it, Escape unpins.
+ * layer in the chart; a click pins it, Escape unpins.
  */
 export default function PowerPartsList({
   series,

@@ -37,25 +37,45 @@ export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = SYSTE
 export const MEASURED_POWER_CATEGORIES = MEASURED_SYSTEM_POWER_CATEGORIES;
 
 /**
- * The overview draws three bands, not twelve parts: what the meter measured
- * (GPU boards, plus Grace sockets on NVL72), what the model adds for the rest
- * of the server (host CPUs, memory, NICs, NVSwitch, storage, PCIe, fans, PSU
- * loss and the scale-out network share) and the facility overhead PUE adds.
- * The parts list beside the chart carries the per-component detail.
+ * The plot draws six layers, not twelve parts (PowerX Figure 1's boxes):
+ * measured GPU boards, measured Grace sockets (NVL72 only), the modeled server
+ * parts (host CPUs, memory, NICs, NVSwitch, storage, PCIe), fans + PSU loss,
+ * the scale-out network share and the facility overhead PUE adds. The parts
+ * list beside the chart carries the per-component detail.
  */
-export const POWER_BANDS = ['measured', 'modeled', 'facility'] as const;
+export const POWER_BANDS = [
+  'gpu',
+  'measuredCpu',
+  'server',
+  'fansPsu',
+  'network',
+  'facility',
+] as const;
 export type PowerBand = (typeof POWER_BANDS)[number];
 
 export const POWER_BAND_CATEGORIES: Record<PowerBand, readonly SystemPowerCategory[]> = {
-  measured: ['gpu', 'measuredCpu'],
-  modeled: ['cpu', 'memory', 'nic', 'nvswitch', 'storage', 'other', 'fans', 'psuLoss', 'network'],
+  gpu: ['gpu'],
+  measuredCpu: ['measuredCpu'],
+  server: ['cpu', 'memory', 'nic', 'nvswitch', 'storage', 'other'],
+  fansPsu: ['fans', 'psuLoss'],
+  network: ['network'],
   facility: ['facility'],
 };
 
+const BAND_OF_CATEGORY = Object.fromEntries(
+  POWER_BANDS.flatMap((band) => POWER_BAND_CATEGORIES[band].map((category) => [category, band])),
+) as Record<SystemPowerCategory, PowerBand>;
+
 export function powerBandOf(category: SystemPowerCategory): PowerBand {
-  if (category === 'facility') return 'facility';
-  return MEASURED_POWER_CATEGORIES.has(category) ? 'measured' : 'modeled';
+  return BAND_OF_CATEGORY[category];
 }
+
+/** The layers read from telemetry; every other layer is the model's estimate. */
+export const MEASURED_POWER_BANDS: ReadonlySet<PowerBand> = new Set(
+  POWER_BANDS.filter((band) =>
+    POWER_BAND_CATEGORIES[band].every((category) => MEASURED_POWER_CATEGORIES.has(category)),
+  ),
+);
 
 /** The bands a series draws, in stack order: those with at least one non-empty part. */
 export function powerBandsOf(categories: readonly SystemPowerCategory[]): PowerBand[] {
@@ -85,31 +105,56 @@ export const POWER_PART_BEHAVIOUR: Record<SystemPowerCategory, PowerPartBehaviou
 };
 
 /**
- * One hue per chip: every band is a lightness step of the chip's own colour,
- * most opaque at the measured base and lightest at the facility top. A 1 px
- * stroke in the chip colour separates neighbours; hover and pin do the rest.
+ * One color per hardware line (the same vendor color as the main chart legend);
+ * layers step down in opacity like the Profit Estimator's stacked bars, and the
+ * facility overhead is hatched like its loss segment. Measured layers are the
+ * most opaque so the metered base reads first. A layer's step is fixed, so it
+ * reads the same with or without the facility on top.
  */
-export const POWER_LAYER_OPACITY_RANGE: readonly [number, number] = [0.92, 0.14];
+export const POWER_BAND_OPACITY: Record<PowerBand, number> = {
+  gpu: 0.9,
+  measuredCpu: 0.72,
+  server: 0.5,
+  fansPsu: 0.34,
+  network: 0.2,
+  facility: 0,
+};
 
-export function powerLayerOpacity(index: number, count: number): number {
-  const [base, top] = POWER_LAYER_OPACITY_RANGE;
-  if (count <= 1) return base;
-  const step = Math.min(Math.max(index, 0), count - 1) / (count - 1);
-  return Math.round((base - (base - top) * step) * 1000) / 1000;
-}
+/** Background behind the facility hatch, so the stripes sit on a tint of the chip colour. */
+export const HATCH_OPACITY = 0.18;
 
-/** A band's step is fixed, so the modeled band reads the same with or without the facility. */
-export const powerBandOpacity = (band: PowerBand): number =>
-  powerLayerOpacity(POWER_BANDS.indexOf(band), POWER_BANDS.length);
+/** Modeled layers are hatched (estimates), measured layers solid. */
+export const isHatchedBand = (band: PowerBand) => !MEASURED_POWER_BANDS.has(band);
 
-/** The chip colour at a ramp step, for CSS backgrounds (legend swatches, comparison segments). */
+/** The chip-colour tint under a layer: its step, or the hatch tint for the facility. */
+export const powerBandFillOpacity = (band: PowerBand): number =>
+  band === 'facility' ? HATCH_OPACITY : POWER_BAND_OPACITY[band];
+
+/**
+ * Each modeled layer gets its own stripe angle, so neighbouring estimates stay
+ * distinguishable without relying on opacity alone. Degrees, SVG convention:
+ * the rotation applied to a vertical stripe (0 = vertical, 90 = horizontal).
+ */
+export const HATCH_ANGLE: Record<PowerBand, number> = {
+  gpu: 45,
+  measuredCpu: 45,
+  server: 45,
+  fansPsu: 135,
+  network: 0,
+  facility: 90,
+};
+
+/** CSS `repeating-linear-gradient` angle that draws the same stripes as the SVG pattern. */
+export const cssHatchAngle = (band: PowerBand) => (HATCH_ANGLE[band] + 90) % 360;
+
+/** The chip colour at a layer's step, for CSS backgrounds (legend swatches, comparison segments). */
 export const powerLayerFill = (color: string, opacity: number): string =>
   `color-mix(in oklab, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 
 /**
- * The band a viewer is telling apart: hovered (transient) or pinned by a click.
- * A parts-list row drives it through its component, so the row and its band
- * light together; the plot and the legends drive it by band alone.
+ * The layer a viewer is telling apart: hovered (transient) or pinned by a click.
+ * A parts-list row drives it through its component, so the row and its layer
+ * light together; the plot and the legends drive it by layer alone.
  */
 export interface PowerLayerHighlight {
   band: PowerBand;
@@ -424,7 +469,7 @@ export function bandWattsPerGpu(entry: Pick<PowerBreakdownPoint, 'wattsPerGpu'>,
   return POWER_BAND_CATEGORIES[band].reduce((sum, key) => sum + entry.wattsPerGpu[key], 0);
 }
 
-/** The three-band stack of a point, bottom up, in the given band order. */
+/** The layer stack of a point, bottom up, in the given band order. */
 export function stackPowerBands(
   entry: PowerBreakdownPoint,
   bands: readonly PowerBand[],
@@ -664,30 +709,4 @@ export function bandAtWatts<K extends string>(
 ): StackedSegment<K> | null {
   if (!(watts >= 0)) return null;
   return bands.find((band) => band.watts > 0 && watts >= band.y0 && watts <= band.y1) ?? null;
-}
-
-/**
- * Direct labels at the right edge of the area: one per band at its centre,
- * pushed apart to `lineHeight` so none overlap. Labels keep their
- * stack order (`centers` runs bottom to top, in pixel y, so descending);
- * the greedy pass walks the stack upward, then slides the whole run down if it
- * ran past the plot top. Returns a pixel y per label, in the input order.
- */
-export function placeEndLabels(
-  centers: readonly number[],
-  lineHeight: number,
-  bounds: { top: number; bottom: number },
-): number[] {
-  const placed = [...centers];
-  // Bottom layer first: each label sits at its centre or above the one below it.
-  for (let index = 0; index < placed.length; index += 1) {
-    placed[index] = Math.min(placed[index], bounds.bottom);
-    if (index > 0) placed[index] = Math.min(placed[index], placed[index - 1] - lineHeight);
-  }
-  // Ran above the plot: slide down from the top, keeping the spacing.
-  for (let index = placed.length - 1; index >= 0; index -= 1) {
-    const limit = index === placed.length - 1 ? bounds.top : placed[index + 1] + lineHeight;
-    placed[index] = Math.max(placed[index], limit);
-  }
-  return placed;
 }

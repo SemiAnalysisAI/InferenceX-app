@@ -86,7 +86,7 @@ vi.mock('@/lib/d3-chart/D3Chart', async () => {
 });
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
-import PowerBreakdownPanel, { layerStyle } from './PowerBreakdownPanel';
+import PowerBreakdownPanel, { layerStyle, swatchStyle } from './PowerBreakdownPanel';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -189,9 +189,9 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  // The edge labels need a `sm` viewport; jsdom has no media queries or canvas text.
+  // jsdom has no media queries (pointer type) or canvas text (the cursor label's width).
   window.matchMedia = ((query: string) => ({
-    matches: query === '(min-width: 640px)',
+    matches: false,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -219,6 +219,7 @@ const legendItem = (band: string) =>
   container.querySelector<HTMLButtonElement>(
     `[data-testid="power-breakdown-legend-item"][data-band="${band}"]`,
   )!;
+const swatch = (item: HTMLElement) => item.querySelector('span[title]') as HTMLElement;
 const areas = () => [
   ...container.querySelectorAll<SVGPathElement>('[data-testid="power-breakdown-area"]'),
 ];
@@ -226,6 +227,8 @@ const area = (band: string) =>
   container.querySelector<SVGPathElement>(
     `[data-testid="power-breakdown-area"][data-band="${band}"]`,
   )!;
+const pattern = (band: string) =>
+  container.querySelector<SVGPatternElement>(`pattern.breakdown-hatch[data-band="${band}"]`);
 const endLabels = () => [
   ...container.querySelectorAll<SVGGElement>('[data-testid="power-breakdown-end-label"]'),
 ];
@@ -237,7 +240,10 @@ const partRow = (category: string) =>
     `[data-testid="power-part-row"][data-category="${category}"]`,
   )!;
 
-describe('PowerBreakdownPanel three-band overview', () => {
+/** The B200 fixture's layers: no Grace socket on HGX; the facility counted off PowerX. */
+const LAYERS = ['gpu', 'server', 'fansPsu', 'network', 'facility'];
+
+describe('PowerBreakdownPanel six-layer breakdown', () => {
   beforeEach(() => {
     render(
       <PowerBreakdownPanel
@@ -249,165 +255,189 @@ describe('PowerBreakdownPanel three-band overview', () => {
     );
   });
 
-  it('draws three bands in the chip colour at fixed opacity steps with a 1 px edge', () => {
+  it('draws the layers in the chip colour at fixed opacity steps, modeled layers hatched', () => {
     const paths = areas();
-    expect(paths.map((path) => path.dataset.band)).toEqual(['measured', 'modeled', 'facility']);
-    expect(paths.map((path) => Number(path.getAttribute('fill-opacity')))).toEqual([
-      0.92, 0.53, 0.14,
-    ]);
+    expect(paths.map((path) => path.dataset.band)).toEqual(LAYERS);
+    // Measured: the chip colour at its step. Modeled: that layer's own hatch pattern.
+    expect(area('gpu').getAttribute('fill')).toBe('var(--b200_sglang)');
+    expect(area('gpu').getAttribute('fill-opacity')).toBe('0.9');
+    for (const band of ['server', 'fansPsu', 'network', 'facility']) {
+      expect(area(band).getAttribute('fill')).toBe(`url(#chart-0-power-breakdown-${band}-hatch)`);
+      expect(area(band).getAttribute('fill-opacity')).toBe('1');
+    }
     for (const path of paths) {
-      expect(path.getAttribute('fill')).toBe('var(--b200_sglang)');
       expect(path.dataset.emphasis).toBe('plain');
       expect(path.getAttribute('opacity')).toBe('1');
     }
+    // One pattern per modeled layer: stripes at its angle on the chip colour's tint.
+    expect(pattern('gpu')).toBeNull();
+    expect(pattern('server')?.getAttribute('patternTransform')).toBe('rotate(45)');
+    expect(pattern('fansPsu')?.getAttribute('patternTransform')).toBe('rotate(135)');
+    expect(pattern('network')?.getAttribute('patternTransform')).toBe('rotate(0)');
+    expect(pattern('facility')?.getAttribute('patternTransform')).toBe('rotate(90)');
+    expect(pattern('server')?.querySelector('.hatch-bg')?.getAttribute('fill')).toBe(
+      'var(--b200_sglang)',
+    );
+    expect(pattern('server')?.querySelector('.hatch-bg')?.getAttribute('fill-opacity')).toBe('0.5');
+    expect(pattern('facility')?.querySelector('.hatch-bg')?.getAttribute('fill-opacity')).toBe(
+      '0.18',
+    );
+    expect(pattern('server')?.querySelector('.hatch-line')?.getAttribute('stroke')).toBe(
+      'var(--b200_sglang)',
+    );
     const edges = [...container.querySelectorAll<SVGPathElement>('.breakdown-edge')];
-    expect(edges).toHaveLength(3);
+    expect(edges).toHaveLength(LAYERS.length);
     expect(edges[0].getAttribute('stroke')).toBe('var(--b200_sglang)');
     expect(edges[0].getAttribute('stroke-width')).toBe('1');
-    expect(edges[0].getAttribute('stroke-opacity')).toBe('0.6');
+    expect(edges[0].getAttribute('stroke-opacity')).toBe('0.9');
     // The chip's total is the top edge, drawn heavier.
-    expect(edges[2].getAttribute('stroke-width')).toBe('2');
-    expect(container.querySelector('pattern')).toBeNull();
+    expect(edges.at(-1)!.getAttribute('stroke-width')).toBe('2');
     expect(container.querySelector('[data-category].breakdown-area')).toBeNull();
   });
 
-  it('lists one legend row per band, swatch and name only, measured solid and modeled dashed', () => {
-    const items = legendItems();
-    expect(items.map((item) => item.dataset.band)).toEqual(['measured', 'modeled', 'facility']);
-    expect(items.map((item) => item.textContent)).toEqual([
-      'Measured GPU',
-      'Modeled server',
-      'Facility overhead',
-    ]);
-    expect(items[0].querySelector('span[title]')?.getAttribute('title')).toContain('Measured');
-    expect(items[1].querySelector('span[title]')?.getAttribute('title')).toContain('Modeled');
-    expect((items[0].querySelector('span[title]') as HTMLElement).style.border).toContain('solid');
-    expect((items[1].querySelector('span[title]') as HTMLElement).style.border).toContain('dashed');
-    for (const item of items) expect(item.getAttribute('aria-pressed')).toBe('false');
+  it('draws no labels at the right edge and keeps the fixed margin', () => {
+    expect(endLabels()).toHaveLength(0);
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="d3-chart-stub"]')?.dataset.marginRight,
+    ).toBe('18');
   });
 
-  it('keeps every part in the tooltip under its band subtotal', () => {
+  it('lists one legend row per layer, top first, with its description and basis', () => {
+    const items = legendItems();
+    expect(items.map((item) => item.dataset.band)).toEqual([...LAYERS].toReversed());
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Facility overheadPUE 1.3 · Modeled',
+      'Network shareScale-out switch + its optics · Modeled',
+      'Fans + PSU lossMoves with load · Modeled',
+      'Server partsCPUs, memory, NICs, NVSwitch, drives · Modeled',
+      'Measured GPUGPU board power from telemetry · Measured',
+    ]);
+    expect(swatch(legendItem('gpu')).getAttribute('title')).toBe('Measured');
+    expect(swatch(legendItem('server')).getAttribute('title')).toBe('Modeled');
+    // Swatches repeat the plot: a solid step when measured, stripes at the layer's angle when modeled.
+    expect(swatch(legendItem('gpu')).style.backgroundColor).toBe(
+      'color-mix(in oklab, var(--b200_sglang) 90%, transparent)',
+    );
+    expect(swatch(legendItem('gpu')).style.backgroundImage).toBe('');
+    expect(swatch(legendItem('server')).style.backgroundImage).toContain(
+      'repeating-linear-gradient(135deg',
+    );
+    expect(swatch(legendItem('fansPsu')).style.backgroundImage).toContain(
+      'repeating-linear-gradient(225deg',
+    );
+    expect(swatch(legendItem('facility')).style.backgroundColor).toBe(
+      'color-mix(in oklab, var(--b200_sglang) 18%, transparent)',
+    );
+    for (const item of items) {
+      expect(swatch(item).style.border).toBe('1px solid var(--b200_sglang)');
+      expect(item.getAttribute('aria-pressed')).toBe('false');
+    }
+  });
+
+  it('keeps every part in the tooltip under its layer subtotal', () => {
     const probe = container.querySelector('[data-testid="tooltip-probe"]')!;
     const rows = [...probe.querySelectorAll('tr')].map((row) => ({
       band: (row as HTMLElement).dataset.band ?? null,
       category: (row as HTMLElement).dataset.category ?? null,
       text: row.textContent ?? '',
     }));
-    // Top band first; its parts follow it, as the stack reads.
+    // Top layer first, as the stack reads; a single-part layer is its own row.
+    expect(rows.map((row) => row.band).filter(Boolean)).toEqual([...LAYERS].toReversed());
     expect(rows[0]).toMatchObject({ band: 'facility', category: null });
-    expect(rows[0].text).toContain('Facility overhead');
+    expect(rows[0].text).toContain('Facility overhead (PUE 1.3)');
     expect(rows[0].text).toContain('Modeled');
-    expect(rows[1]).toMatchObject({ band: null, category: 'facility' });
-    expect(rows[1].text).toContain('PUE');
-    const modeled = rows.findIndex((row) => row.band === 'modeled');
-    const measured = rows.findIndex((row) => row.band === 'measured');
-    expect(modeled).toBeGreaterThan(1);
-    expect(measured).toBeGreaterThan(modeled);
-    const modeledParts = rows.slice(modeled + 1, measured).map((row) => row.category);
-    expect(modeledParts).toContain('nic');
-    expect(modeledParts).toContain('psuLoss');
-    expect(modeledParts).not.toContain('gpu');
-    expect(rows[measured].text).toContain('Measured');
-    expect(rows[measured + 1].category).toBe('gpu');
+    expect(rows[1]).toMatchObject({ band: 'network', category: null });
+    // A layer made of several parts lists them under its subtotal.
+    const fansPsu = rows.findIndex((row) => row.band === 'fansPsu');
+    const server = rows.findIndex((row) => row.band === 'server');
+    const gpu = rows.findIndex((row) => row.band === 'gpu');
+    expect(rows.slice(fansPsu + 1, server).map((row) => row.category)).toEqual(['psuLoss', 'fans']);
+    const serverParts = rows.slice(server + 1, gpu).map((row) => row.category);
+    expect(serverParts).toContain('nic');
+    expect(serverParts).toContain('nvswitch');
+    expect(serverParts).not.toContain('gpu');
+    expect(serverParts).not.toContain('fans');
+    expect(rows[gpu].text).toContain('Measured GPU');
+    expect(rows[gpu].text).toContain('Measured');
+    expect(rows[gpu + 1].text).toContain('All in Measured');
     expect(rows.at(-1)!.text).toContain('All in Measured');
     for (const row of rows.filter((entry) => entry.band)) {
       expect(row.text).toMatch(/\d+ W\d+%$/u);
     }
   });
 
-  it('raises the hovered legend band and fades the rest, in the plot and the tooltip', () => {
-    mouse(legendItem('modeled'), 'mouseover');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    expect(area('modeled').getAttribute('fill-opacity')).toBe('1');
-    expect(area('modeled').getAttribute('opacity')).toBe('1');
+  it('raises the hovered legend layer and fades the rest, in the plot and the tooltip', () => {
+    mouse(legendItem('server'), 'mouseover');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    // The layer keeps its own step and hatch; only its edge thickens.
+    expect(area('server').getAttribute('fill')).toBe('url(#chart-0-power-breakdown-server-hatch)');
+    expect(area('server').getAttribute('fill-opacity')).toBe('1');
+    expect(area('server').getAttribute('opacity')).toBe('1');
     expect(
-      container.querySelector('.breakdown-edge[data-band="modeled"]')?.getAttribute('stroke-width'),
+      container.querySelector('.breakdown-edge[data-band="server"]')?.getAttribute('stroke-width'),
     ).toBe('1.5');
-    for (const band of ['measured', 'facility']) {
+    for (const band of ['gpu', 'fansPsu', 'network', 'facility']) {
       expect(area(band).dataset.emphasis).toBe('faded');
       expect(area(band).getAttribute('opacity')).toBe('0.25');
     }
-    expect(legendItem('measured').dataset.emphasis).toBe('faded');
+    expect(area('gpu').getAttribute('fill-opacity')).toBe('0.9');
+    expect(legendItem('gpu').dataset.emphasis).toBe('faded');
+    expect(swatch(legendItem('gpu')).style.opacity).toBe('0.25');
+    expect(swatch(legendItem('server')).style.opacity).toBe('1');
     expect(
-      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="modeled"]')?.className,
+      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="server"]')?.className,
     ).toContain('bg-muted/60');
     expect(
-      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="measured"]')?.className,
+      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="gpu"]')?.className,
     ).not.toContain('bg-muted/60');
-    // The list marks the band's rows as siblings, without fading anything.
+    // The list marks the layer's rows as siblings, without fading anything.
     expect(partRow('nic').dataset.emphasis).toBe('band');
+    expect(partRow('fans').dataset.emphasis).toBe('plain');
     expect(partRow('gpu').dataset.emphasis).toBe('plain');
-    mouse(legendItem('modeled'), 'mouseout');
+    mouse(legendItem('server'), 'mouseout');
     for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
   });
 
   it('pins on click, keeps the pin through hover-out, unpins on a second click or Escape', () => {
-    mouse(legendItem('modeled'), 'click');
-    expect(legendItem('modeled').getAttribute('aria-pressed')).toBe('true');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    mouse(legendItem('modeled'), 'mouseout');
+    mouse(legendItem('server'), 'click');
+    expect(legendItem('server').getAttribute('aria-pressed')).toBe('true');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    mouse(legendItem('server'), 'mouseout');
     mouse(legendItem('facility'), 'mouseover');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
     expect(area('facility').dataset.emphasis).toBe('faded');
-    mouse(legendItem('modeled'), 'click');
-    expect(legendItem('modeled').getAttribute('aria-pressed')).toBe('false');
-    expect(area('modeled').dataset.emphasis).toBe('plain');
+    mouse(legendItem('server'), 'click');
+    expect(legendItem('server').getAttribute('aria-pressed')).toBe('false');
+    expect(area('server').dataset.emphasis).toBe('plain');
 
-    mouse(legendItem('measured'), 'click');
-    expect(legendItem('measured').getAttribute('aria-pressed')).toBe('true');
+    mouse(legendItem('gpu'), 'click');
+    expect(legendItem('gpu').getAttribute('aria-pressed')).toBe('true');
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
-    expect(legendItem('measured').getAttribute('aria-pressed')).toBe('false');
+    expect(legendItem('gpu').getAttribute('aria-pressed')).toBe('false');
     for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
   });
 
-  it('labels the three bands at the right edge with their watts at the last point', () => {
-    const labels = endLabels();
-    expect(labels.map((label) => label.dataset.band)).toEqual(['measured', 'modeled', 'facility']);
-    expect(labels[0].querySelector('.breakdown-end-label-name')?.textContent).toBe('Measured GPU');
-    expect(labels[1].querySelector('.breakdown-end-label-name')?.textContent).toBe(
-      'Modeled server',
-    );
-    // The last point (c1, 250 W GPU) is the top of the interactivity order.
-    expect(labels[0].querySelector('.breakdown-end-label-watts')?.textContent).toBe('250 W');
-    expect(labels[1].querySelector('.breakdown-end-label-watts')?.textContent).toMatch(/^\d+ W$/u);
-    const ys = labels.map((label) => Number(label.querySelector('text')?.getAttribute('y')));
-    for (let index = 1; index < ys.length; index += 1) {
-      expect(ys[index - 1] - ys[index]).toBeGreaterThanOrEqual(12);
-    }
-    const marginRight = Number(
-      container.querySelector<HTMLElement>('[data-testid="d3-chart-stub"]')?.dataset.marginRight,
-    );
-    expect(marginRight).toBeGreaterThan(18);
-    const textX = Number(labels[0].querySelector('text')?.getAttribute('x'));
-    expect(textX + 'Facility overhead 999 W'.length * 6.2).toBeLessThanOrEqual(600 - 65 + 1);
-    // Hovering an edge label highlights its band like the legend does.
-    mouse(labels[1], 'mouseenter');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    mouse(labels[1], 'mouseleave');
-    expect(area('modeled').dataset.emphasis).toBe('plain');
-  });
-
-  it('names the band under the pointer in the plot and labels it with its W/GPU', () => {
+  it('names the layer under the pointer in the plot and labels it with its W/GPU', () => {
     const hit = container.querySelector<SVGRectElement>('[data-testid="power-breakdown-hit"]')!;
     // jsdom has no layout: the pointer reads as client coordinates in plot space.
     mouse(hit, 'mousemove', { clientX: 40, clientY: 380 - 40 - 56 - 2 });
     const label = container.querySelector<SVGElement>(
       '[data-testid="power-breakdown-cursor-label"]',
     );
-    expect(label?.dataset.band).toBe('measured');
+    expect(label?.dataset.band).toBe('gpu');
     expect(label?.textContent).toMatch(/^Measured GPU · \d+ W$/u);
-    expect(area('measured').dataset.emphasis).toBe('highlighted');
-    expect(legendItem('measured').dataset.emphasis).toBe('highlighted');
+    expect(area('gpu').dataset.emphasis).toBe('highlighted');
+    expect(legendItem('gpu').dataset.emphasis).toBe('highlighted');
     expect(partRow('gpu').dataset.emphasis).toBe('band');
-    // Above the stack there is no band: nothing is highlighted.
+    // Above the stack there is no layer: nothing is highlighted.
     mouse(hit, 'mousemove', { clientX: 40, clientY: 1 });
     expect(container.querySelector('[data-testid="power-breakdown-cursor-label"]')).toBeNull();
-    expect(area('measured').dataset.emphasis).toBe('plain');
+    expect(area('gpu').dataset.emphasis).toBe('plain');
   });
 
-  it('lists the parts of the compared point beside the plot and lights a band from a row', () => {
+  it('lists the parts of the compared point beside the plot and lights a layer from a row', () => {
     const rows = partRows();
     expect(rows.length).toBeGreaterThanOrEqual(9);
     expect(rows[0].dataset.category).toBe('gpu');
@@ -420,85 +450,119 @@ describe('PowerBreakdownPanel three-band overview', () => {
     expect(rows[0].querySelector('[data-testid="power-part-watts"]')?.textContent).toBe('380 W');
     mouse(partRow('fans'), 'mouseover');
     expect(partRow('fans').dataset.emphasis).toBe('highlighted');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    expect(area('measured').dataset.emphasis).toBe('faded');
-    expect(legendItem('modeled').dataset.emphasis).toBe('highlighted');
-    // The hovered part is bold in the tooltip; its band subtotal is not the hovered thing.
+    expect(area('fansPsu').dataset.emphasis).toBe('highlighted');
+    expect(area('gpu').dataset.emphasis).toBe('faded');
+    expect(area('server').dataset.emphasis).toBe('faded');
+    expect(legendItem('fansPsu').dataset.emphasis).toBe('highlighted');
+    // The hovered part is bold in the tooltip; its layer subtotal is not the hovered thing.
     expect(
       container.querySelector('[data-testid="tooltip-probe"] tr[data-category="fans"]')?.className,
     ).toContain('font-semibold');
     expect(
-      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="modeled"]')?.className,
+      container.querySelector('[data-testid="tooltip-probe"] tr[data-band="fansPsu"]')?.className,
     ).not.toContain('bg-muted/60');
     mouse(partRow('fans'), 'mouseout');
-    expect(area('modeled').dataset.emphasis).toBe('plain');
+    expect(area('fansPsu').dataset.emphasis).toBe('plain');
     // A click pins the row; Escape unpins.
     mouse(partRow('psuLoss'), 'click');
     expect(partRow('psuLoss').getAttribute('aria-pressed')).toBe('true');
     mouse(partRow('psuLoss'), 'mouseout');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
+    expect(area('fansPsu').dataset.emphasis).toBe('highlighted');
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     });
     expect(partRow('psuLoss').getAttribute('aria-pressed')).toBe('false');
-    expect(area('modeled').dataset.emphasis).toBe('plain');
+    expect(area('fansPsu').dataset.emphasis).toBe('plain');
   });
 
-  it('skips the edge labels below the sm breakpoint', () => {
-    window.matchMedia = ((query: string) => ({
-      matches: false,
-      media: query,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    })) as unknown as typeof window.matchMedia;
-    act(() => root.unmount());
-    root = createRoot(container);
-    render(
-      <PowerBreakdownPanel
-        chartId="chart-1"
-        data={[...sglang, ...vllm]}
-        xField="mean_tpot_intvty"
-        xLabel="Interactivity (output tok/s/user)"
-      />,
+  it('switches to stacked bars with the same hatched segments per column', () => {
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="power-breakdown-view-bars"]')!
+        .click(),
     );
-    expect(endLabels()).toHaveLength(0);
-    expect(
-      container.querySelector<HTMLElement>('[data-testid="d3-chart-stub"]')?.dataset.marginRight,
-    ).toBe('18');
-    // The parts list still renders, under the plot.
-    expect(partRows().length).toBeGreaterThanOrEqual(9);
+    expect(areas()).toHaveLength(0);
+    const bars = [
+      ...container.querySelectorAll<SVGRectElement>('[data-testid="power-breakdown-bar"]'),
+    ];
+    expect(bars).toHaveLength(LAYERS.length * sglang.length);
+    const bar = (band: string) => bars.find((item) => item.dataset.band === band)!;
+    expect(bar('gpu').getAttribute('fill')).toBe('var(--b200_sglang)');
+    expect(bar('gpu').getAttribute('fill-opacity')).toBe('0.9');
+    expect(bar('gpu').getAttribute('stroke')).toBe('var(--b200_sglang)');
+    expect(bar('gpu').getAttribute('stroke-opacity')).toBe('0.9');
+    expect(bar('server').getAttribute('fill')).toBe('url(#chart-0-power-breakdown-server-hatch)');
+    expect(bar('facility').getAttribute('fill')).toBe(
+      'url(#chart-0-power-breakdown-facility-hatch)',
+    );
+    expect(pattern('facility')).not.toBeNull();
+    mouse(legendItem('network'), 'mouseover');
+    expect(bar('network').dataset.emphasis).toBe('highlighted');
+    expect(bar('network').getAttribute('stroke-width')).toBe('1.5');
+    expect(bar('gpu').dataset.emphasis).toBe('faded');
+    expect(bar('gpu').getAttribute('opacity')).toBe('0.25');
+    expect(bar('gpu').getAttribute('fill-opacity')).toBe('0.9');
   });
 });
 
 describe('layerStyle', () => {
-  it('describes the highlighted, faded and plain states', () => {
-    expect(layerStyle('modeled', { band: 'modeled', category: 'nic', pinned: true })).toEqual({
+  it('describes the highlighted, faded and plain states, keeping each layer its own step', () => {
+    expect(layerStyle('server', { band: 'server', category: 'nic', pinned: true })).toEqual({
       emphasis: 'highlighted',
       fillOpacity: 1,
       opacity: 1,
       strokeWidth: 1.5,
       strokeOpacity: 1,
     });
-    expect(
-      layerStyle('measured', { band: 'modeled', category: null, pinned: false }),
-    ).toMatchObject({
+    expect(layerStyle('gpu', { band: 'server', category: null, pinned: false })).toMatchObject({
       emphasis: 'faded',
-      fillOpacity: 0.92,
+      fillOpacity: 0.9,
       opacity: 0.25,
       strokeWidth: 1,
     });
-    expect(layerStyle('measured', null)).toMatchObject({
+    expect(layerStyle('gpu', null)).toMatchObject({
       emphasis: 'plain',
-      fillOpacity: 0.92,
+      fillOpacity: 0.9,
       opacity: 1,
-      strokeOpacity: 0.6,
+      strokeOpacity: 0.9,
     });
-    expect(layerStyle('facility', null).fillOpacity).toBe(0.14);
+    expect(layerStyle('measuredCpu', null).fillOpacity).toBe(0.72);
+    // Hatched layers carry their tint in the pattern, so the element itself is opaque.
+    expect(layerStyle('facility', null).fillOpacity).toBe(1);
+    expect(layerStyle('fansPsu', null).fillOpacity).toBe(1);
+  });
+});
+
+describe('swatchStyle', () => {
+  it('repeats a layer as a CSS box: solid step when measured, striped at its angle when modeled', () => {
+    expect(swatchStyle('gpu', 'red')).toEqual({
+      backgroundColor: 'color-mix(in oklab, red 90%, transparent)',
+      border: '1px solid red',
+      opacity: 1,
+    });
+    expect(swatchStyle('measuredCpu', 'red').backgroundColor).toBe(
+      'color-mix(in oklab, red 72%, transparent)',
+    );
+    expect(swatchStyle('server', 'red')).toEqual({
+      backgroundColor: 'color-mix(in oklab, red 50%, transparent)',
+      backgroundImage: 'repeating-linear-gradient(135deg, red 0 2px, transparent 2px 6px)',
+      border: '1px solid red',
+      opacity: 1,
+    });
+    expect(swatchStyle('fansPsu', 'red').backgroundImage).toContain('225deg');
+    expect(swatchStyle('network', 'red').backgroundImage).toContain('90deg');
+    expect(swatchStyle('facility', 'red')).toMatchObject({
+      backgroundColor: 'color-mix(in oklab, red 18%, transparent)',
+      backgroundImage: 'repeating-linear-gradient(180deg, red 0 2px, transparent 2px 6px)',
+    });
+    expect(
+      swatchStyle('gpu', 'red', { band: 'server', category: null, pinned: false }).opacity,
+    ).toBe(0.25);
   });
 });
 
 describe('PowerBreakdownPanel unofficial-run overlays', () => {
-  it('draws an overlay series in its run colour with the same bands, list, pin and edge labels', () => {
+  it('draws an overlay series in its run colour with the same layers, hatches, list and pin', () => {
     render(
       <PowerBreakdownPanel
         chartId="chart-2"
@@ -510,17 +574,22 @@ describe('PowerBreakdownPanel unofficial-run overlays', () => {
       />,
     );
     const paths = areas();
-    expect(paths.map((path) => path.dataset.band)).toEqual(['measured', 'modeled', 'facility']);
-    for (const path of paths) expect(path.getAttribute('fill')).toBe(overlayRunColor(2));
-    expect(Number(paths[0].getAttribute('fill-opacity'))).toBe(0.92);
+    expect(paths.map((path) => path.dataset.band)).toEqual(LAYERS);
+    expect(area('gpu').getAttribute('fill')).toBe(overlayRunColor(2));
+    expect(area('gpu').getAttribute('fill-opacity')).toBe('0.9');
+    expect(area('server').getAttribute('fill')).toBe('url(#chart-2-power-breakdown-server-hatch)');
+    expect(pattern('server')?.querySelector('.hatch-bg')?.getAttribute('fill')).toBe(
+      overlayRunColor(2),
+    );
+    expect(pattern('server')?.querySelector('.hatch-line')?.getAttribute('stroke')).toBe(
+      overlayRunColor(2),
+    );
     expect(container.querySelector('.breakdown-edge')?.getAttribute('stroke')).toBe(
       overlayRunColor(2),
     );
-    expect(endLabels()).toHaveLength(3);
-    expect(endLabels()[0].querySelector('line')?.getAttribute('stroke')).toBe(overlayRunColor(2));
-    expect(
-      (legendItem('measured').querySelector('span[title]') as HTMLElement).style.backgroundColor,
-    ).toContain('--overlay-run-2');
+    expect(endLabels()).toHaveLength(0);
+    expect(swatch(legendItem('gpu')).style.backgroundColor).toContain('--overlay-run-2');
+    expect(swatch(legendItem('server')).style.backgroundImage).toContain('--overlay-run-2');
     // The parts list is the overlay run's, in the run colour, with the run tag in its heading.
     const heading = container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
     expect(heading).toContain('single-hue');
@@ -532,9 +601,9 @@ describe('PowerBreakdownPanel unofficial-run overlays', () => {
         .querySelector('[data-testid="power-part-sparkline"] circle')
         ?.getAttribute('fill'),
     ).toBe(overlayRunColor(2));
-    mouse(legendItem('modeled'), 'click');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    expect(legendItem('modeled').getAttribute('aria-pressed')).toBe('true');
+    mouse(legendItem('server'), 'click');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    expect(legendItem('server').getAttribute('aria-pressed')).toBe('true');
     // The official line is still its own, vendor-coloured series.
     const select = container.querySelector('[data-testid="power-breakdown-source"]');
     expect(select?.textContent).toContain('single-hue');
@@ -542,7 +611,7 @@ describe('PowerBreakdownPanel unofficial-run overlays', () => {
 });
 
 describe('PowerChipCompare legend highlight', () => {
-  it('lights the hovered band on every chip bar and in the open drill-down, and pins on click', () => {
+  it('lights the hovered layer on every chip bar and in the open drill-down, and pins on click', () => {
     render(
       <PowerXSurfaceProvider>
         <PowerAnalysisPanels
@@ -560,57 +629,84 @@ describe('PowerChipCompare legend highlight', () => {
         '[data-testid="power-chip-compare-legend-item"]',
       ),
     ];
-    // PowerX counts IT only by default: two bands.
-    expect(legend.map((item) => item.dataset.band)).toEqual(['measured', 'modeled']);
+    // PowerX counts IT only by default: no facility layer.
+    expect(legend.map((item) => item.dataset.band)).toEqual([
+      'gpu',
+      'server',
+      'fansPsu',
+      'network',
+    ]);
+    expect(legend.map((item) => item.textContent)).toEqual([
+      'GPU· Measured',
+      'Server parts· Modeled (hatched)',
+      'Fans + PSU loss· Modeled (hatched)',
+      'Network share· Modeled (hatched)',
+    ]);
     const item = legend[1];
-    expect(item.textContent).toBe('Modeled server');
-    expect(item.querySelector('span[title]')?.getAttribute('title')).toBe('Modeled');
+    expect(item.querySelector('span[title]')?.getAttribute('title')).toBe('Modeled (hatched)');
+    // The shared legend's swatches are the stack's steps and hatches on the muted foreground.
+    const legendSwatch = (index: number) =>
+      legend[index].querySelector('span[title]') as HTMLElement;
+    expect(legendSwatch(0).style.backgroundColor).toBe(
+      'color-mix(in oklab, var(--muted-foreground) 90%, transparent)',
+    );
+    expect(legendSwatch(1).style.backgroundImage).toContain('repeating-linear-gradient(135deg');
+    expect(legendSwatch(2).style.backgroundImage).toContain('repeating-linear-gradient(225deg');
     const segments = (band: string) => [
       ...container.querySelectorAll<HTMLElement>(
         `[data-testid="power-chip-compare-segment"][data-band="${band}"]`,
       ),
     ];
-    expect(segments('modeled')).toHaveLength(2);
+    expect(segments('server')).toHaveLength(2);
     expect(segments('facility')).toHaveLength(0);
-    // Each chip's measured segment is most opaque, in that chip's colour; the modeled
-    // segment's title lists its parts.
-    const gpuSegment = segments('measured')[0];
-    expect(gpuSegment.style.backgroundColor).toContain('92%');
+    // Each chip's segments repeat the plot in that chip's colour; a layer made of several
+    // parts lists them in its title.
+    const gpuSegment = segments('gpu')[0];
+    expect(gpuSegment.style.backgroundColor).toContain('90%');
     expect(gpuSegment.style.backgroundColor).toContain('var(--b200_');
-    expect(gpuSegment.getAttribute('title')).toMatch(/^Measured GPU: \d+ W$/u);
-    const modeledTitle = segments('modeled')[0].getAttribute('title') ?? '';
-    expect(modeledTitle).toMatch(/^Modeled server: \d+ W · /u);
-    expect(modeledTitle).toContain('NICs');
-    expect(modeledTitle).toContain('PSU loss');
+    expect(gpuSegment.style.backgroundImage).toBe('');
+    expect(gpuSegment.getAttribute('title')).toMatch(/^GPU: \d+ W$/u);
+    const serverSegment = segments('server')[0];
+    expect(serverSegment.style.backgroundImage).toContain('repeating-linear-gradient(135deg');
+    expect(serverSegment.style.backgroundImage).toContain('var(--b200_');
+    const serverTitle = serverSegment.getAttribute('title') ?? '';
+    expect(serverTitle).toMatch(/^Server parts: \d+ W · /u);
+    expect(serverTitle).toContain('NICs');
+    expect(serverTitle).toContain('NVSwitch');
+    expect(serverTitle).not.toContain('PSU loss');
+    expect(segments('fansPsu')[0].getAttribute('title')).toContain('PSU loss');
+    expect(segments('network')[0].getAttribute('title')).toMatch(/^Network share: \d+ W$/u);
     mouse(item, 'mouseover');
-    for (const segment of segments('modeled')) {
+    for (const segment of segments('server')) {
       expect(segment.dataset.emphasis).toBe('highlighted');
-      expect(segment.style.backgroundColor).toContain('100%');
+      expect(segment.style.opacity).toBe('1');
+      expect(segment.style.backgroundColor).toContain('50%');
     }
-    for (const segment of segments('measured')) {
+    for (const segment of segments('gpu')) {
       expect(segment.dataset.emphasis).toBe('faded');
       expect(segment.style.opacity).toBe('0.25');
     }
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    expect(area('measured').dataset.emphasis).toBe('faded');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    expect(area('gpu').dataset.emphasis).toBe('faded');
     mouse(item, 'click');
     expect(item.getAttribute('aria-pressed')).toBe('true');
     mouse(item, 'mouseout');
-    expect(area('modeled').dataset.emphasis).toBe('highlighted');
-    // Hovering a segment itself does not steal a pin; unpinning restores every band.
-    mouse(segments('measured')[0], 'mouseover');
-    expect(segments('measured')[0].dataset.emphasis).toBe('faded');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    // Hovering a segment itself does not steal a pin; unpinning restores every layer.
+    mouse(segments('gpu')[0], 'mouseover');
+    expect(segments('gpu')[0].dataset.emphasis).toBe('faded');
     mouse(item, 'click');
     expect(item.getAttribute('aria-pressed')).toBe('false');
-    for (const segment of segments('measured')) expect(segment.dataset.emphasis).toBe('plain');
-    expect(area('measured').dataset.emphasis).toBe('plain');
+    for (const segment of segments('gpu')) expect(segment.dataset.emphasis).toBe('plain');
+    expect(area('gpu').dataset.emphasis).toBe('plain');
     // The drill-down's list follows the slider's chip and point: vLLM c16 at 60 tok/s/user.
     expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toBe(
       'B200 (vLLM) FP8 · c16 · 60 tok/s/user',
     );
-    // A part row hovered in the list raises its band on every chip bar too.
+    // A part row hovered in the list raises its layer on every chip bar too.
     mouse(partRow('fans'), 'mouseover');
-    for (const segment of segments('modeled')) expect(segment.dataset.emphasis).toBe('highlighted');
+    for (const segment of segments('fansPsu')) expect(segment.dataset.emphasis).toBe('highlighted');
+    for (const segment of segments('server')) expect(segment.dataset.emphasis).toBe('faded');
     expect(partRow('fans').dataset.emphasis).toBe('highlighted');
     mouse(partRow('fans'), 'mouseout');
   });

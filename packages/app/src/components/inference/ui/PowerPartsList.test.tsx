@@ -175,7 +175,9 @@ describe('PowerPartsList', () => {
     expect(items[0].dataset.category).toBe('gpu');
     expect(items[0].querySelector('span')?.textContent).toBe('GPU');
     expect(row('facility').querySelector('span')?.textContent).toBe('Facility (PUE)');
-    expect(items[0].dataset.band).toBe('measured');
+    expect(items[0].dataset.band).toBe('gpu');
+    expect(row('nic').dataset.band).toBe('server');
+    expect(row('fans').dataset.band).toBe('fansPsu');
     expect(text(items[0], 'power-part-watts')).toBe('520 W');
     expect(items.at(-1)!.dataset.category).toBe('facility');
     expect(items.at(-1)!.closest('li')?.className).toContain('border-t');
@@ -238,13 +240,16 @@ describe('PowerPartsList', () => {
     const measured = row('gpu').querySelector<HTMLElement>('[data-testid="power-part-bar"]')!;
     const modeled = row('fans').querySelector<HTMLElement>('[data-testid="power-part-bar"]')!;
     expect(measured.style.width).toBe('100%');
-    expect(measured.style.backgroundColor).toContain('92%');
+    expect(measured.style.backgroundColor).toContain('90%');
     expect(measured.style.borderLeft).toBe('');
-    expect(modeled.style.backgroundColor).toContain('53%');
+    expect(modeled.style.backgroundColor).toContain('34%');
     expect(modeled.style.borderLeft).toContain('dashed');
     expect(Number.parseFloat(modeled.style.width)).toBeLessThan(100);
+    const server = row('nic').querySelector<HTMLElement>('[data-testid="power-part-bar"]')!;
+    expect(server.style.backgroundColor).toContain('50%');
+    // The facility bar sits on the hatch tint, not its (transparent) step.
     expect(partBarStyle(powerPartRows(series, series.points[1]).at(-1)!, 'red')).toMatchObject({
-      backgroundColor: 'color-mix(in oklab, red 14%, transparent)',
+      backgroundColor: 'color-mix(in oklab, red 18%, transparent)',
       borderLeft: '2px dashed red',
     });
   });
@@ -263,7 +268,7 @@ describe('PowerPartsList', () => {
     render();
     mouse(row('fans'), 'mouseover');
     expect(onHover).toHaveBeenLastCalledWith(partTarget('fans'));
-    expect(onHover).toHaveBeenLastCalledWith({ band: 'modeled', category: 'fans' });
+    expect(onHover).toHaveBeenLastCalledWith({ band: 'fansPsu', category: 'fans' });
     expect(track).toHaveBeenCalledWith('powerx_breakdown_part_hovered', { category: 'fans' });
     mouse(row('fans'), 'mouseout');
     expect(onHover).toHaveBeenLastCalledWith(null);
@@ -280,10 +285,15 @@ describe('PowerPartsList', () => {
     expect(row('fans').getAttribute('title')).toBe('Modeled · moves with load · Pinned');
     expect(row('cpu').dataset.emphasis).toBe('plain');
     expect(row('gpu').dataset.emphasis).toBe('plain');
-    render({ highlight: { band: 'modeled', category: null, pinned: false } });
+    render({ highlight: { band: 'fansPsu', category: null, pinned: false } });
     expect(row('fans').dataset.emphasis).toBe('band');
-    expect(row('cpu').dataset.emphasis).toBe('band');
+    expect(row('psuLoss').dataset.emphasis).toBe('band');
+    expect(row('cpu').dataset.emphasis).toBe('plain');
     expect(row('gpu').dataset.emphasis).toBe('plain');
+    render({ highlight: { band: 'server', category: null, pinned: false } });
+    expect(row('cpu').dataset.emphasis).toBe('band');
+    expect(row('nic').dataset.emphasis).toBe('band');
+    expect(row('fans').dataset.emphasis).toBe('plain');
     expect(row('fans').getAttribute('aria-pressed')).toBe('false');
   });
 

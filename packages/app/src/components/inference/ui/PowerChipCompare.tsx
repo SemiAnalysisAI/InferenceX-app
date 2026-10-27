@@ -10,7 +10,7 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
-import { segmentStyle, swatchStyle } from './PowerBreakdownPanel';
+import { swatchStyle } from './PowerBreakdownPanel';
 import { usePowerLayerHighlight } from './power-layer-highlight';
 import {
   bandPartsAt,
@@ -21,6 +21,7 @@ import {
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
+  MEASURED_POWER_BANDS,
   POWER_BANDS,
   powerBreakdownInteractivity,
   powerLayerEmphasis,
@@ -48,12 +49,15 @@ const STRINGS = {
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `Not benchmarked near this interactivity: ${labels}`,
     measured: 'Measured',
-    modeled: 'Modeled',
+    modeled: 'Modeled (hatched)',
     pinned: 'Pinned',
-    legend: 'Power bands',
+    legend: 'Power layers',
     bands: {
-      measured: 'Measured GPU',
-      modeled: 'Modeled server',
+      gpu: 'GPU',
+      measuredCpu: 'Grace CPU',
+      server: 'Server parts',
+      fansPsu: 'Fans + PSU loss',
+      network: 'Network share',
       facility: 'Facility (PUE)',
     } satisfies Record<PowerBand, string>,
     perGpu: 'W per GPU, all-in',
@@ -86,12 +90,15 @@ const STRINGS = {
     gpuShare: (pct: string) => `GPU ${pct}`,
     outOfRange: (labels: string) => `未在该交互性附近测试：${labels}`,
     measured: '实测',
-    modeled: '建模',
+    modeled: '建模（斜线）',
     pinned: '已固定',
-    legend: '功耗分段',
+    legend: '功耗分层',
     bands: {
-      measured: '实测 GPU',
-      modeled: '建模服务器',
+      gpu: 'GPU',
+      measuredCpu: 'Grace CPU',
+      server: '服务器部件',
+      fansPsu: '风扇 + 电源损耗',
+      network: '网络分摊',
       facility: '机房开销（PUE）',
     } satisfies Record<PowerBand, string>,
     perGpu: '每 GPU 整体功耗（W）',
@@ -122,8 +129,8 @@ const rate = d3.format(',.0f');
 const SLIDER_STEPS = 200;
 const MIN_LABEL_SHARE = 0.08;
 
-/** One hue for the shared legend: the stack's lightness steps on the foreground colour. */
-const LEGEND_COLOR = 'var(--foreground)';
+/** One hue for the shared legend: the stack's steps and hatches on the muted foreground. */
+const LEGEND_COLOR = 'var(--muted-foreground)';
 
 export default function PowerChipCompare({
   data,
@@ -223,11 +230,11 @@ export default function PowerChipCompare({
   const bands = POWER_BANDS.filter((band) =>
     rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
   );
-  /** A segment's hover text: the band, its watts and (for a modeled band) its parts. */
+  /** A segment's hover text: the layer, its watts and, when it folds several parts, each part. */
   const segmentTitle = (entry: (typeof rows)[number]['entry'], band: PowerBand) => {
     const parts = bandPartsAt(entry, band);
     const head = `${t.bands[band]}: ${watts(bandWattsPerGpu(entry, band))} W`;
-    if (band === 'measured' && parts.length === 1) return head;
+    if (parts.length <= 1) return head;
     return `${head} · ${parts.map((part) => `${t.categories[part.category]} ${watts(part.watts)} W`).join(' · ')}`;
   };
   // No chip in this selection has a whole-system model: say so instead of leaving a gap.
@@ -286,7 +293,7 @@ export default function PowerChipCompare({
       </div>
 
       <ul
-        className="flex flex-wrap gap-x-1 gap-y-1 text-xs"
+        className="flex flex-wrap gap-x-1 gap-y-0.5 text-xs text-muted-foreground"
         aria-label={t.legend}
         data-testid="power-chip-compare-legend"
       >
@@ -296,6 +303,7 @@ export default function PowerChipCompare({
             layers.highlight.band === band &&
             layers.highlight.category === null;
           const emphasis = powerLayerEmphasis(band, layers.highlight);
+          const basis = MEASURED_POWER_BANDS.has(band) ? t.measured : t.modeled;
           return (
             <li key={band} className="flex min-w-0">
               <button
@@ -316,16 +324,17 @@ export default function PowerChipCompare({
                 <span
                   aria-hidden
                   className="inline-block size-3 shrink-0 rounded-[2px]"
-                  title={`${band === 'measured' ? t.measured : t.modeled}${pinned ? ` · ${t.pinned}` : ''}`}
+                  title={`${basis}${pinned ? ` · ${t.pinned}` : ''}`}
                   style={swatchStyle(band, LEGEND_COLOR, layers.highlight)}
                 />
                 <span
                   className={`whitespace-nowrap ${
-                    emphasis === 'faded' ? 'text-muted-foreground' : 'font-medium'
+                    emphasis === 'faded' ? '' : 'font-medium text-foreground'
                   }`}
                 >
                   {t.bands[band]}
                 </span>
+                <span className="whitespace-nowrap opacity-70">· {basis}</span>
               </button>
             </li>
           );
@@ -392,10 +401,10 @@ export default function PowerChipCompare({
                             data-emphasis={powerLayerEmphasis(band, layers.highlight)}
                             onMouseEnter={() => layers.hover(bandTarget(band))}
                             onMouseLeave={() => layers.hover(null)}
-                            className="flex h-full items-center justify-center text-2xs font-medium tabular-nums text-foreground"
+                            className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
-                              ...segmentStyle(band, color, layers.highlight),
+                              ...swatchStyle(band, color, layers.highlight),
                             }}
                           >
                             {share >= MIN_LABEL_SHARE ? watts(w) : ''}

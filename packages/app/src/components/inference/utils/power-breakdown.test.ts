@@ -13,23 +13,25 @@ import {
   buildPowerBreakdowns,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
+  cssHatchAngle,
   defaultComparisonInteractivity,
+  HATCH_ANGLE,
+  isHatchedBand,
+  MEASURED_POWER_BANDS,
   nearestBreakdownPoint,
   partTarget,
-  placeEndLabels,
   POWER_BAND_CATEGORIES,
+  POWER_BAND_OPACITY,
   POWER_BANDS,
   POWER_BREAKDOWN_STACK_ORDER,
-  POWER_LAYER_OPACITY_RANGE,
   POWER_PART_BEHAVIOUR,
+  powerBandFillOpacity,
   powerBandOf,
-  powerBandOpacity,
   powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
   powerLayerEmphasis,
   powerLayerFill,
-  powerLayerOpacity,
   powerPartEmphasis,
   powerPartRows,
   sameLayerTarget,
@@ -213,9 +215,9 @@ describe('breakdownSeriesAtBoundary', () => {
       9,
     );
     expect(itSeries.points[0].totalWattsPerGpu).toBeCloseTo(breakdownItWattsPerGpu(entry), 9);
-    // The IT stack still sums to its total exactly, in two bands.
+    // The IT stack still sums to its total exactly, without the facility layer.
     const bands = powerBandsOf(itSeries.categories);
-    expect(bands).toEqual(['measured', 'modeled']);
+    expect(bands).toEqual(['gpu', 'server', 'fansPsu', 'network']);
     const segments = stackPowerBands(itSeries.points[0], bands);
     expect(segments.at(-1)!.y1).toBeCloseTo(itSeries.points[0].totalWattsPerGpu, 9);
     // Facility × PUE identity: IT × PUE = facility total.
@@ -286,93 +288,125 @@ describe('cross-chip comparison', () => {
   });
 });
 
-describe('three-band overview', () => {
-  it('folds the twelve parts into measured, modeled server and facility, in stack order', () => {
-    expect(POWER_BANDS).toEqual(['measured', 'modeled', 'facility']);
+describe('six-layer overview', () => {
+  it('folds the twelve parts into six layers, in stack order', () => {
+    expect(POWER_BANDS).toEqual(['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility']);
     expect(POWER_BANDS.flatMap((band) => POWER_BAND_CATEGORIES[band])).toEqual([
       ...SYSTEM_POWER_CATEGORIES,
     ]);
-    expect(powerBandOf('gpu')).toBe('measured');
-    expect(powerBandOf('measuredCpu')).toBe('measured');
-    expect(powerBandOf('nic')).toBe('modeled');
-    expect(powerBandOf('psuLoss')).toBe('modeled');
+    expect(powerBandOf('gpu')).toBe('gpu');
+    expect(powerBandOf('measuredCpu')).toBe('measuredCpu');
+    expect(powerBandOf('cpu')).toBe('server');
+    expect(powerBandOf('nic')).toBe('server');
+    expect(powerBandOf('nvswitch')).toBe('server');
+    expect(powerBandOf('other')).toBe('server');
+    expect(powerBandOf('fans')).toBe('fansPsu');
+    expect(powerBandOf('psuLoss')).toBe('fansPsu');
+    expect(powerBandOf('network')).toBe('network');
     expect(powerBandOf('facility')).toBe('facility');
-    // The bands a series draws are those with a non-empty part; an IT-only stack has two.
+    expect([...MEASURED_POWER_BANDS]).toEqual(['gpu', 'measuredCpu']);
+    // The layers a series draws are those with a non-empty part: HGX has no Grace layer,
+    // a single-node run no network share, an IT-only stack no facility.
     expect(powerBandsOf(['gpu', 'cpu', 'fans', 'facility'])).toEqual([
-      'measured',
-      'modeled',
+      'gpu',
+      'server',
+      'fansPsu',
       'facility',
     ]);
-    expect(powerBandsOf(['gpu', 'cpu'])).toEqual(['measured', 'modeled']);
-    expect(powerBandsOf(['gpu'])).toEqual(['measured']);
+    expect(powerBandsOf(['gpu', 'measuredCpu', 'nic', 'network'])).toEqual([
+      'gpu',
+      'measuredCpu',
+      'server',
+      'network',
+    ]);
+    expect(powerBandsOf(['gpu'])).toEqual(['gpu']);
   });
 
-  it('stacks the bands so they sum to the total and each band to its parts', () => {
+  it('stacks the layers so they sum to the total and each layer to its parts', () => {
     const [series] = buildPowerBreakdowns([point(500)]);
     const entry = series.points[0];
     const bands = powerBandsOf(series.categories);
+    expect(bands).toEqual(['gpu', 'server', 'fansPsu', 'network', 'facility']);
     const stack = stackPowerBands(entry, bands);
-    expect(stack.map((band) => band.key)).toEqual(['measured', 'modeled', 'facility']);
+    expect(stack.map((band) => band.key)).toEqual(bands);
     expect(stack[0].y0).toBe(0);
     for (let index = 1; index < stack.length; index++) {
       expect(stack[index].y0).toBe(stack[index - 1].y1);
     }
     expect(stack.at(-1)!.y1).toBeCloseTo(entry.totalWattsPerGpu, 9);
-    expect(bandWattsPerGpu(entry, 'measured')).toBeCloseTo(500, 9);
-    expect(bandWattsPerGpu(entry, 'modeled')).toBeCloseTo(
-      breakdownItWattsPerGpu(entry) - entry.wattsPerGpu.gpu,
-      9,
-    );
+    expect(bandWattsPerGpu(entry, 'gpu')).toBeCloseTo(500, 9);
+    expect(bandWattsPerGpu(entry, 'measuredCpu')).toBe(0);
+    expect(
+      bandWattsPerGpu(entry, 'server') +
+        bandWattsPerGpu(entry, 'fansPsu') +
+        bandWattsPerGpu(entry, 'network'),
+    ).toBeCloseTo(breakdownItWattsPerGpu(entry) - entry.wattsPerGpu.gpu, 9);
     expect(bandWattsPerGpu(entry, 'facility')).toBeCloseTo(entry.wattsPerGpu.facility, 9);
-    const parts = bandPartsAt(entry, 'modeled');
+    const parts = bandPartsAt(entry, 'server');
     expect(parts.map((part) => part.category)).toEqual(
-      series.categories.filter((key) => powerBandOf(key) === 'modeled'),
+      series.categories.filter((key) => powerBandOf(key) === 'server'),
     );
+    expect(parts.map((part) => part.category)).toEqual([
+      'cpu',
+      'memory',
+      'nic',
+      'nvswitch',
+      'storage',
+      'other',
+    ]);
     expect(parts.reduce((sum, part) => sum + part.watts, 0)).toBeCloseTo(
-      bandWattsPerGpu(entry, 'modeled'),
+      bandWattsPerGpu(entry, 'server'),
       9,
     );
-    expect(bandPartsAt(entry, 'measured')).toEqual([{ category: 'gpu', watts: 500 }]);
+    expect(bandPartsAt(entry, 'fansPsu').map((part) => part.category)).toEqual(['fans', 'psuLoss']);
+    expect(bandPartsAt(entry, 'gpu')).toEqual([{ category: 'gpu', watts: 500 }]);
+    expect(bandPartsAt(entry, 'measuredCpu')).toEqual([]);
   });
 
-  it('steps opacity from the measured base to the facility top, three fixed steps', () => {
-    expect(POWER_BANDS.map(powerBandOpacity)).toEqual([0.92, 0.53, 0.14]);
-    expect(powerBandOpacity('measured')).toBe(POWER_LAYER_OPACITY_RANGE[0]);
-    expect(powerBandOpacity('facility')).toBe(POWER_LAYER_OPACITY_RANGE[1]);
-    // The generic ramp still works at any depth, strictly descending.
-    const ramp = Array.from({ length: 5 }, (_, index) => powerLayerOpacity(index, 5));
-    for (let index = 1; index < ramp.length; index += 1) {
-      expect(ramp[index]).toBeLessThan(ramp[index - 1]);
-    }
-    expect(powerLayerOpacity(0, 1)).toBe(POWER_LAYER_OPACITY_RANGE[0]);
+  it('steps opacity down from the measured base and hatches each modeled layer at its own angle', () => {
+    expect(POWER_BANDS.map((band) => POWER_BAND_OPACITY[band])).toEqual([
+      0.9, 0.72, 0.5, 0.34, 0.2, 0,
+    ]);
+    expect(POWER_BANDS.map(isHatchedBand)).toEqual([false, false, true, true, true, true]);
+    // The facility's stripes sit on a tint; every other layer's tint is its own step.
+    expect(powerBandFillOpacity('facility')).toBe(0.18);
+    expect(powerBandFillOpacity('server')).toBe(0.5);
+    expect(powerBandFillOpacity('gpu')).toBe(0.9);
+    expect(POWER_BANDS.map((band) => HATCH_ANGLE[band])).toEqual([45, 45, 45, 135, 0, 90]);
+    expect(cssHatchAngle('server')).toBe(135);
+    expect(cssHatchAngle('fansPsu')).toBe(225);
+    expect(cssHatchAngle('network')).toBe(90);
+    expect(cssHatchAngle('facility')).toBe(180);
     expect(powerLayerFill('var(--chip)', 0.5)).toBe(
       'color-mix(in oklab, var(--chip) 50%, transparent)',
     );
   });
 
-  it('tells highlighted, faded and plain bands apart, by band or by part', () => {
-    expect(powerLayerEmphasis('modeled', null)).toBe('plain');
-    expect(powerLayerEmphasis('modeled', { ...bandTarget('modeled'), pinned: false })).toBe(
+  it('tells highlighted, faded and plain layers apart, by layer or by part', () => {
+    expect(powerLayerEmphasis('server', null)).toBe('plain');
+    expect(powerLayerEmphasis('server', { ...bandTarget('server'), pinned: false })).toBe(
       'highlighted',
     );
-    expect(powerLayerEmphasis('measured', { ...bandTarget('modeled'), pinned: true })).toBe(
-      'faded',
-    );
-    // A part target raises its band.
-    expect(partTarget('nic')).toEqual({ band: 'modeled', category: 'nic' });
-    expect(powerLayerEmphasis('modeled', { ...partTarget('nic'), pinned: false })).toBe(
+    expect(powerLayerEmphasis('gpu', { ...bandTarget('server'), pinned: true })).toBe('faded');
+    // A part target raises its layer.
+    expect(partTarget('nic')).toEqual({ band: 'server', category: 'nic' });
+    expect(partTarget('fans')).toEqual({ band: 'fansPsu', category: 'fans' });
+    expect(powerLayerEmphasis('server', { ...partTarget('nic'), pinned: false })).toBe(
       'highlighted',
     );
+    expect(powerLayerEmphasis('fansPsu', { ...partTarget('nic'), pinned: false })).toBe('faded');
     expect(powerLayerEmphasis('facility', { ...partTarget('nic'), pinned: false })).toBe('faded');
-    expect(sameLayerTarget(bandTarget('modeled'), partTarget('nic'))).toBe(false);
-    expect(sameLayerTarget(partTarget('nic'), { band: 'modeled', category: 'nic' })).toBe(true);
+    expect(sameLayerTarget(bandTarget('server'), partTarget('nic'))).toBe(false);
+    expect(sameLayerTarget(partTarget('nic'), { band: 'server', category: 'nic' })).toBe(true);
     expect(sameLayerTarget(null, null)).toBe(true);
-    // List rows: the hovered part, siblings of a band hovered in the plot, or plain.
+    // List rows: the hovered part, siblings of a layer hovered in the plot, or plain.
     expect(powerPartEmphasis('nic', null)).toBe('plain');
     expect(powerPartEmphasis('nic', { ...partTarget('nic'), pinned: false })).toBe('highlighted');
     expect(powerPartEmphasis('cpu', { ...partTarget('nic'), pinned: false })).toBe('plain');
-    expect(powerPartEmphasis('cpu', { ...bandTarget('modeled'), pinned: false })).toBe('band');
-    expect(powerPartEmphasis('gpu', { ...bandTarget('modeled'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('cpu', { ...bandTarget('server'), pinned: false })).toBe('band');
+    expect(powerPartEmphasis('fans', { ...bandTarget('server'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('gpu', { ...bandTarget('server'), pinned: false })).toBe('plain');
+    expect(powerPartEmphasis('gpu', { ...bandTarget('gpu'), pinned: false })).toBe('band');
   });
 
   it('knows which parts are measured, move with load or stay fixed, as the model does', () => {
@@ -411,10 +445,14 @@ describe('powerPartRows', () => {
     for (let index = 1; index < itRows.length; index += 1) {
       expect(itRows[index].watts).toBeLessThanOrEqual(itRows[index - 1].watts);
     }
-    expect(rows[0]).toMatchObject({ band: 'measured', behaviour: 'measured', selectedIndex: 1 });
+    expect(rows[0]).toMatchObject({ band: 'gpu', behaviour: 'measured', selectedIndex: 1 });
     expect(rows.find((part) => part.category === 'fans')).toMatchObject({
-      band: 'modeled',
+      band: 'fansPsu',
       behaviour: 'load',
+    });
+    expect(rows.find((part) => part.category === 'nic')).toMatchObject({
+      band: 'server',
+      behaviour: 'fixed',
     });
   });
 
@@ -479,7 +517,7 @@ describe('nearestBreakdownPoint', () => {
 });
 
 describe('stackedBandsAt', () => {
-  const bands = ['measured', 'modeled', 'facility'] as const;
+  const bands = ['gpu', 'server', 'facility'] as const;
   const entry = (gpu: number, cpu: number, facility: number): PowerBreakdownPoint => ({
     point: point(gpu),
     concurrency: 1,
@@ -513,8 +551,8 @@ describe('stackedBandsAt', () => {
   it('interpolates every band linearly between the neighbouring points', () => {
     const stack = stackedBandsAt(points, 50, bands);
     expect(stack.map((band) => [band.key, band.y0, band.y1, band.watts])).toEqual([
-      ['measured', 0, 150, 150],
-      ['modeled', 150, 180, 30],
+      ['gpu', 0, 150, 150],
+      ['server', 150, 180, 30],
       ['facility', 180, 210, 30],
     ]);
   });
@@ -526,33 +564,10 @@ describe('stackedBandsAt', () => {
 
   it('names the band under a watts value and nothing above the stack', () => {
     const stack = stackedBandsAt(points, 50, bands);
-    expect(bandAtWatts(stack, 160)?.key).toBe('modeled');
-    expect(bandAtWatts(stack, 0)?.key).toBe('measured');
+    expect(bandAtWatts(stack, 160)?.key).toBe('server');
+    expect(bandAtWatts(stack, 0)?.key).toBe('gpu');
     expect(bandAtWatts(stack, 300)).toBeNull();
     expect(bandAtWatts(stack, -1)).toBeNull();
-  });
-});
-
-describe('placeEndLabels', () => {
-  it('leaves well-spaced labels where they are', () => {
-    expect(placeEndLabels([300, 200, 100], 12, { top: 0, bottom: 320 })).toEqual([300, 200, 100]);
-  });
-
-  it('pushes crowded labels apart upward in stack order', () => {
-    const placed = placeEndLabels([300, 296, 295, 100], 12, { top: 0, bottom: 320 });
-    expect(placed).toEqual([300, 288, 276, 100]);
-    for (let index = 1; index < placed.length; index += 1) {
-      expect(placed[index - 1] - placed[index]).toBeGreaterThanOrEqual(12);
-    }
-  });
-
-  it('slides a run that reaches the plot top back down, keeping the spacing', () => {
-    const placed = placeEndLabels([20, 15, 12, 10], 12, { top: 6, bottom: 320 });
-    expect(placed).toEqual([42, 30, 18, 6]);
-  });
-
-  it('never lets a label leave the plot bottom', () => {
-    expect(placeEndLabels([400, 390], 12, { top: 0, bottom: 320 })).toEqual([320, 308]);
   });
 });
 

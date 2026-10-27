@@ -200,15 +200,44 @@ describe('PowerAnalysisPanels', () => {
       writeUrlParams({ i_pbview: 'bars' });
       mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
       cy.get('[data-testid="power-breakdown-panel"]').should('be.visible');
+      // Six layers less the empty Grace socket of an HGX chassis: five legend rows, top first.
       cy.get('[data-testid="power-breakdown-legend"]')
         .should('contain.text', 'Measured GPU')
-        .and('contain.text', 'Modeled server')
+        .and('contain.text', 'Server parts')
+        .and('contain.text', 'Fans + PSU loss')
+        .and('contain.text', 'Network share')
         .and('contain.text', 'Facility overhead')
-        .and('not.contain.text', 'Grace');
-      cy.get('[data-testid="power-breakdown-legend-item"]').should('have.length', 3);
-      // One stacked column per concurrency, each with a measured base and a facility top.
-      cy.get('[data-testid="power-breakdown-bar"][data-band="measured"]').should('have.length', 4);
+        .and('contain.text', 'Modeled')
+        .and('not.contain.text', 'Grace')
+        .and('not.contain.text', 'Modeled server');
+      cy.get('[data-testid="power-breakdown-legend-item"]').should('have.length', 5);
+      cy.get('[data-testid="power-breakdown-legend-item"]')
+        .first()
+        .should('have.attr', 'data-band', 'facility');
+      cy.get('[data-testid="power-breakdown-end-label"]').should('not.exist');
+      // One stacked column per concurrency, each with a measured GPU base and a facility top.
+      cy.get('[data-testid="power-breakdown-bar"][data-band="gpu"]').should('have.length', 4);
       cy.get('[data-testid="power-breakdown-bar"][data-band="facility"]').should('have.length', 4);
+      // Modeled layers are hatched with their own pattern; measured layers are solid.
+      cy.get('pattern.breakdown-hatch[data-band="server"]').should(
+        'have.attr',
+        'patternTransform',
+        'rotate(45)',
+      );
+      cy.get('pattern.breakdown-hatch[data-band="fansPsu"]').should(
+        'have.attr',
+        'patternTransform',
+        'rotate(135)',
+      );
+      cy.get('pattern.breakdown-hatch[data-band="gpu"]').should('not.exist');
+      cy.get('[data-testid="power-breakdown-bar"][data-band="server"]')
+        .first()
+        .invoke('attr', 'fill')
+        .should('match', /^url\(#.*-server-hatch\)$/u);
+      cy.get('[data-testid="power-breakdown-bar"][data-band="gpu"]')
+        .first()
+        .invoke('attr', 'fill')
+        .should('not.match', /^url/u);
       // The parts list beside the plot reads the compared point, heaviest part first.
       cy.get('[data-testid="power-parts-heading"]').should('contain.text', 'tok/s/user');
       cy.get('[data-testid="power-part-row"]').should('have.length.at.least', 9);
@@ -222,7 +251,7 @@ describe('PowerAnalysisPanels', () => {
         'contain.text',
         'Interactivity (output tok/s/user)',
       );
-      cy.get('[data-testid="power-breakdown-bar"][data-band="measured"]').then(($bars) => {
+      cy.get('[data-testid="power-breakdown-bar"][data-band="gpu"]').then(($bars) => {
         const xs = [...$bars].map((bar) => Number(bar.getAttribute('x')));
         expect(xs).to.deep.equal(xs.toSorted((a, b) => a - b));
       });
@@ -233,8 +262,9 @@ describe('PowerAnalysisPanels', () => {
         .should('contain.text', 'c64')
         .and('contain.text', '640')
         .and('contain.text', 'Interactivity (output tok/s/user): 20.0')
-        .and('contain.text', 'Modeled server')
+        .and('contain.text', 'Server parts')
         .and('contain.text', 'NICs')
+        .and('contain.text', 'Fans + PSU loss')
         .and('contain.text', 'All in Measured');
       cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseleave', { force: true });
 
@@ -245,15 +275,21 @@ describe('PowerAnalysisPanels', () => {
         'true',
       );
       cy.get('[data-testid="power-breakdown-bar"]').should('not.exist');
-      cy.get('[data-testid="power-breakdown-area"]').should('have.length', 3);
-      // Hovering a list row raises its band in the plot.
+      cy.get('[data-testid="power-breakdown-area"]').should('have.length', 5);
+      cy.get('[data-testid="power-breakdown-end-label"]').should('not.exist');
+      // Hovering a list row raises its layer in the plot and fades the others.
       cy.get('[data-testid="power-part-row"][data-category="fans"]').trigger('mouseover');
-      cy.get('[data-testid="power-breakdown-area"][data-band="modeled"]').should(
+      cy.get('[data-testid="power-breakdown-area"][data-band="fansPsu"]').should(
         'have.attr',
         'data-emphasis',
         'highlighted',
       );
-      cy.get('[data-testid="power-breakdown-area"][data-band="measured"]').should(
+      cy.get('[data-testid="power-breakdown-area"][data-band="gpu"]').should(
+        'have.attr',
+        'data-emphasis',
+        'faded',
+      );
+      cy.get('[data-testid="power-breakdown-area"][data-band="server"]').should(
         'have.attr',
         'data-emphasis',
         'faded',

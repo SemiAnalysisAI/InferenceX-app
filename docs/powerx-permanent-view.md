@@ -259,28 +259,32 @@ axis (including the AgentX P90/P75 trace-derived axes), or median interactivity 
 plots something else, so a bar sits where its point sits in the scatter. Each point gets a
 stacked bar, or a point on a stacked area, of its All in Measured W/GPU split by
 `deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
-The plot is an overview of three bands, not twelve parts (`powerBandsOf` in
-`utils/power-breakdown.ts`): Measured GPU (`gpu` + `measuredCpu`), Modeled server (`cpu`,
-`memory`, `nic`, `nvswitch`, `storage`, `other`, `fans`, `psuLoss`, `network`) and Facility
-overhead (`facility`, only when the facility is counted). Every band is a fixed lightness step
-of the chip's own colour (`powerBandOpacity`: measured most opaque, facility lightest) with a
-1 px chip-colour edge between bands; there is no per-part palette or hatch. The area view
-labels each band by name and W at its right edge, and the per-column tooltip keeps every
-part listed under its band's bold subtotal. The per-component detail lives in the parts list
+The plot draws six layers, not twelve parts (`POWER_BANDS` and `powerBandsOf` in
+`utils/power-breakdown.ts`, in stack order): Measured GPU (`gpu`), Measured Grace CPU
+(`measuredCpu`, NVL72 with socket telemetry only), Server parts (`cpu`, `memory`, `nic`,
+`nvswitch`, `storage`, `other`), Fans + PSU loss (`fans`, `psuLoss`), Network share (`network`)
+and Facility overhead (`facility`, only when the facility is counted); an empty layer is left
+out. Layers step down in opacity of the hardware color like the Profit Estimator's stacked
+bars (`POWER_BAND_OPACITY`: 0.9, 0.72, 0.5, 0.34, 0.2, hatch tint 0.18), and every modeled
+layer is hatched at its own stripe angle (`HATCH_ANGLE`: 45°, 135°, vertical, horizontal for
+the facility) like its loss segment, while measured layers are solid; the legend repeats each
+layer's swatch with its description and Measured or Modeled. The per-column tooltip lists the
+layers top first with their subtotal in bold, and the parts of a layer that folds several
+(Server parts, Fans + PSU loss) under it. The per-component detail lives in the parts list
 (`ui/PowerPartsList.tsx`) beside the plot (under it below `lg`): one row per non-empty part of
 the chip at the compared point, heaviest first and the facility overhead last under a rule,
-with a bar in the band's step (dashed left edge when modeled), the watts, the share of IT
+with a bar in its layer's tint (dashed left edge when modeled), the watts, the share of IT
 (the facility row: its share of the facility total) and a 72×18 sparkline of that part across
 the chip's points on its own 0..max scale, the compared point dotted. The row's `title` says
 Measured, Modeled · fixed or Modeled · moves with load (`POWER_PART_BEHAVIOUR`, pinned by
-`system-power-model.test.ts`). Hovering a band, a legend row, an edge label or a list row
-raises that band and fades the others (`usePowerLayerHighlight`, a band target or a part
-target that carries its band); a click pins, Escape or a click on the plot unpins. "Modeled"
-survives as a dashed swatch outline and the tooltip's basis word. Measured sits at the bottom;
-the chip comparison's segments are the same three bands on each chip's colour (the modeled
-segment's `title` lists its parts) and share the highlight. The list follows the slider and
-the Hardware select exactly as the plot's dashed outline does. Unofficial-run series take the
-run colour (`overlayRunColor`) for the bands, the list and the sparklines. TDP and All in Provisioned are
+`system-power-model.test.ts`). Hovering a layer, a legend row or a list row raises that layer
+(its step and hatch stay, its edge thickens) and fades the others to 0.25
+(`usePowerLayerHighlight`, a layer target or a part target that carries its layer); a click
+pins, Escape or a click on the plot unpins. Measured sits at the bottom; the chip comparison's
+segments are the same six layers on each chip's colour (a folded layer's `title` lists its
+parts) and share the highlight. The list follows the slider and the Hardware select exactly as
+the plot's dashed outline does. Unofficial-run series take the run colour (`overlayRunColor`)
+for the layers, the hatches, the list and the sparklines. TDP and All in Provisioned are
 dashed reference lines, not stacked values. Bar width comes from the room to the neighboring
 points and carries no data; the concurrency label sits above each total and both are hidden
 when bars are too close to read.
