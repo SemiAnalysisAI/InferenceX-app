@@ -3,7 +3,7 @@
 import { ArrowDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { type CSSProperties, useMemo, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useState } from 'react';
 
 import type {
   ComparisonOp,
@@ -34,10 +34,9 @@ import {
 import { prefetchOperatorXTimelines, useOperatorXModel } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
-import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
 import { CaseDetail } from '../CaseDetail';
-import { hardwareLabel, sortHardware } from '../compare/hardware';
+import { hardwareLabel, operatorXColors, sortHardware } from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { metricVsSize } from '../viz/metric-vs-size';
@@ -649,14 +648,22 @@ export function ModelView() {
     () => [gemm.data, moe.data, attention.data].filter((v): v is ComparisonView => Boolean(v)),
     [gemm.data, moe.data, attention.data],
   );
+  // GPUs with results at the selected device split
+  const atSplitViews = useMemo(() => views.filter((v) => v.parallel === split), [views, split]);
   const modelOptions = useMemo(() => [...new Set(views.flatMap((v) => v.modelOptions))], [views]);
+  // a link to a model without results (such as a deprecated one) opens on one with results
+  const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
+  useEffect(() => {
+    if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
+      setParam('model', modelOptions.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : modelOptions[0]);
+  }, [loaded, modelOptions, requested]);
   const available = useMemo(
-    () => sortHardware([...new Set(views.flatMap((v) => Object.keys(v.measurements)))]),
-    [views],
+    () => sortHardware([...new Set(atSplitViews.flatMap((v) => Object.keys(v.measurements)))]),
+    [atSplitViews],
   );
   const colors = useMemo(
     () =>
-      generateVendorColors(
+      operatorXColors(
         [...new Set(views.flatMap((v) => v.hardware.map((h) => h.id)))],
         isDark ? 'dark' : 'light',
       ),

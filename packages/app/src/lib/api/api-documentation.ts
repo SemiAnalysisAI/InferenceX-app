@@ -1241,8 +1241,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/workflow-info',
     summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
-      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
+      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage for one date. date is required.',
+      '返回指定日期的工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。date 为必填参数。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1250,10 +1250,10 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'date',
         'query',
-        false,
+        true,
         'date',
-        'Optional YYYY-MM-DD filter.',
-        '可选的 YYYY-MM-DD 筛选条件。',
+        'Required YYYY-MM-DD date.',
+        '必填的 YYYY-MM-DD 日期。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1293,8 +1293,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'date is not YYYY-MM-DD.',
-        'date 不是 YYYY-MM-DD。',
+        'date is missing or not YYYY-MM-DD.',
+        '缺少 date，或 date 不是 YYYY-MM-DD。',
         PUBLIC_API_ERRORS.invalidDate,
       ),
       errorResponse(
@@ -1531,7 +1531,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '400',
         'A model, date, view, format, workload, tier, weight, or alpha value is invalid.',
-        '模型、日期、视图、格式、负载、档位、权重或 alpha 值无效。',
+        '模型、日期、视图、格式、工作负载、档位、权重或 alpha 值无效。',
         'Invalid tiers: expected comma-separated positive numbers',
       ),
       errorResponse(
@@ -1601,18 +1601,37 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease engine release (tag starting with v) among the 20 most recent GitHub releases for vLLM and SGLang, with its publish time. commits maps each unversioned nightly commit in an active benchmark image to its GitHub compare status against that release; behind means the commit is an ancestor of the release. Commits GitHub cannot resolve are omitted. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布引擎版本（标签以 v 开头）及其发布时间。commits 列出当前基准测试镜像中不带版本号的 nightly commit，以及 GitHub 比较该 commit 与此 release 的结果；behind 表示该 commit 是此 release 的祖先提交。GitHub 无法解析的 commit 不会列出。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag, ISO 8601 publish time and nightly commit statuses, or null.',
+        '框架键映射到版本标签、ISO 8601 发布时间和 nightly commit 比较结果；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+              commits: mapSchema({
+                type: 'string',
+                enum: ['ahead', 'behind', 'diverged', 'identical'],
+              }),
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: {
+            tag: 'v0.10.2',
+            publishedAt: '2026-08-01T12:00:00Z',
+            commits: { af7f9488c2210d67: 'behind', e68efc685ab1: 'diverged' },
+          },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z', commits: {} },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],
@@ -1933,7 +1952,7 @@ export const apiOperations: readonly ApiOperation[] = [
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
       'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. run.source_repository names the GitHub repository that ran the sweep when it is not SemiAnalysisAI/InferenceX. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若扫描并非由 SemiAnalysisAI/InferenceX 执行，run.source_repository 会标明实际执行的 GitHub 仓库。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
+      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若扫描并非由 SemiAnalysisAI/InferenceX 执行，run.source_repository 会标明实际执行的 GitHub 仓库。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',

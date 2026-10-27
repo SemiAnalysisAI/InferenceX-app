@@ -64,7 +64,7 @@ const STRINGS = {
   zh: {
     sessions: '会话列表',
     total: '总计',
-    searchPlaceholder: '搜索会话...',
+    searchPlaceholder: '搜索会话…',
     minReqs: { '20': '> 20 请求', '100': '> 100 请求', '0': '全部' } as Record<string, string>,
     allVersions: '所有版本',
     allHarnesses: '全部 harness',

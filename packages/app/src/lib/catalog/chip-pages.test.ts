@@ -129,9 +129,22 @@ describe('Chinese chip page parity', () => {
     }
   });
 
+  it('preserves pricing basis, exact domain capacity and throughput units in Chinese FAQs', () => {
+    const chip = getChipPage('b200')!;
+    const faq = buildZhChipFaq(chip);
+    expect(faq[0].answer).toContain('批量采购并自有设备');
+    expect(faq[0].answer).toContain('$1.73');
+    expect(faq[1].answer).toContain('8 颗芯片');
+    expect(faq[1].answer).toContain('合计 1,440 GB');
+    const comparison = buildZhChipVsFaq(getChipVsPage('b300-vs-b200')!);
+    expect(comparison[1].answer).toContain('B300 为 $2.26/hr');
+    expect(comparison[1].answer).not.toContain('租价');
+    expect(comparison[2].answer).toContain('每秒');
+  });
+
   it('localizes generated FAQ answers and highlight values', () => {
     expect(localizeVsHighlightValueZh('Not supported')).toBe('不支持');
-    expect(localizeVsHighlightValueZh('72 chips')).toBe('72 芯片');
+    expect(localizeVsHighlightValueZh('72 chips')).toBe('72 颗芯片');
     expect(localizeVsHighlightValueZh('8 TB/s')).toBe('8 TB/s');
     for (const entry of getAllChipPages()) {
       for (const item of buildZhChipFaq(entry)) {

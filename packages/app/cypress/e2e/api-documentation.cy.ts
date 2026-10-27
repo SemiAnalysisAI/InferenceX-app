@@ -16,12 +16,15 @@ describe('API documentation', () => {
         hiddenSize: 7168,
         numExperts: 898,
         activeExperts: 16,
+        routedExpertHiddenSize: 3584,
       });
       cy.request(`${endpoint}?model=Kimi-K3`).its('body').should('deep.equal', body);
     });
     cy.request(endpoint).then(({ body }) => {
       expect(body.params.model).to.equal(null);
-      expect(body.models.length).to.be.greaterThan(0);
+      expect(
+        body.models.find((entry: { slug: string }) => entry.slug === 'muse-spark-open'),
+      ).to.have.nested.property('architecture.totalParams', 816);
     });
     for (const suffix of [
       '?model=missing',

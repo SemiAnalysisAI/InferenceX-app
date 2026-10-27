@@ -147,8 +147,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const [inspected, setInspected] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
-  const workload = view?.workloads.find((w) => w.id === view.workload);
-  const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
+  // GPUs with results at the selected device split
+  const available = useMemo(() => sortHardware(view?.hardware.map((h) => h.id) ?? []), [view]);
   const colors = useMemo(
     () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],

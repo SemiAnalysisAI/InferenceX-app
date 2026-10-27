@@ -10,16 +10,8 @@ export function hardwareLabel(key: string): string {
   return OPERATORX_HARDWARE_REFERENCES[key]?.label ?? HW_REGISTRY[key]?.label ?? key.toUpperCase();
 }
 
-/** Cool crimson for Ascend, separate from AMD's warm red/orange hue range (12–42). */
 export function operatorXColors(keys: string[], theme: 'light' | 'dark'): Record<string, string> {
-  const colors = generateVendorColors(
-    keys.filter((key) => key !== 'ascend950pr'),
-    theme,
-  );
-  if (keys.includes('ascend950pr')) {
-    colors.ascend950pr = theme === 'dark' ? 'oklch(0.72 0.20 355)' : 'oklch(0.48 0.19 355)';
-  }
-  return colors;
+  return generateVendorColors(keys, theme);
 }
 
 export function sortHardware(keys: string[]): string[] {

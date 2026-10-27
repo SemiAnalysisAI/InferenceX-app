@@ -333,9 +333,20 @@ describe('parseTokenPriceInput', () => {
 });
 
 describe('profitModelDefaults', () => {
-  it('opens Kimi K3 on 45 tok/s/user, the Moonshot list price, and a 30% license fee', () => {
+  it.each([
+    [Model.Kimi_K3, 60],
+    [Model.GLM_5_2, 135],
+    [Model.MiniMax_M3, 115],
+    [Model.DeepSeek_V4_Pro, 170],
+    [Model.DeepSeek_V4_1_Flash, 150],
+  ] as const)('opens %s at a 5-step target with the most priced SKUs', (model, target) => {
+    expect(profitModelDefaults(model).interactivity).toBe(target);
+    expect(target % 5).toBe(0);
+  });
+
+  it('opens Kimi K3 on 60 tok/s/user, the Moonshot list price, and a 30% license fee', () => {
     const defaults = profitModelDefaults(Model.Kimi_K3);
-    expect(defaults.interactivity).toBe(DEFAULT_PROFIT_INTERACTIVITY);
+    expect(defaults.interactivity).toBe(60);
     expect(defaults.labCutPct).toBe(DEFAULT_LAB_CUT_PCT);
     expect(defaults.listPricing).toEqual({
       vendor: 'Moonshot',
@@ -352,9 +363,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens GLM 5.2/5.3 on 100 tok/s/user, the Z.ai list price, and a 20% license fee', () => {
+  it('opens GLM 5.2/5.3 on 135 tok/s/user, the Z.ai list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.GLM_5_2);
-    expect(defaults.interactivity).toBe(100);
+    expect(defaults.interactivity).toBe(135);
     expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'Z.ai',
@@ -365,9 +376,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens MiniMax M3 on 83 tok/s/user, the MiniMax list price, and a 20% license fee', () => {
+  it('opens MiniMax M3 on 115 tok/s/user, the MiniMax list price, and a 20% license fee', () => {
     const defaults = profitModelDefaults(Model.MiniMax_M3);
-    expect(defaults.interactivity).toBe(83);
+    expect(defaults.interactivity).toBe(115);
     expect(defaults.labCutPct).toBe(20);
     expect(defaults.listPricing).toEqual({
       vendor: 'MiniMax',
@@ -384,9 +395,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4 Pro on 35 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4 Pro on 170 tok/s/user, the DeepSeek peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_Pro);
-    expect(defaults.interactivity).toBe(35);
+    expect(defaults.interactivity).toBe(170);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',
@@ -403,9 +414,9 @@ describe('profitModelDefaults', () => {
     });
   });
 
-  it('opens DeepSeek V4.1 Flash on 125 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
+  it('opens DeepSeek V4.1 Flash on 150 tok/s/user, the DeepSeek Flash peak list price, and a 0% (MIT) license fee', () => {
     const defaults = profitModelDefaults(Model.DeepSeek_V4_1_Flash);
-    expect(defaults.interactivity).toBe(125);
+    expect(defaults.interactivity).toBe(150);
     expect(defaults.labCutPct).toBe(0);
     expect(defaults.listPricing).toEqual({
       vendor: 'DeepSeek',

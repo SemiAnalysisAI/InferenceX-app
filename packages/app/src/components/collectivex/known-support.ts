@@ -85,7 +85,7 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
   },
   'nccl-v02-ll': {
     en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 enabled on B200/GB200/GB300. The full decode ladder is restored; qualification is BF16 only.',
-    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试梯度已恢复；当前仅验证 BF16。',
+    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试阶梯已恢复；当前仅验证 BF16。',
   },
   'nccl-ll-ep16-not-enabled': {
     en: 'NCCL EP low-latency EP16 is not enabled on this pool; it is enabled on B200/GB200/GB300 with v0.2.',

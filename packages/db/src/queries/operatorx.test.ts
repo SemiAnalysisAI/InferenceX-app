@@ -105,6 +105,7 @@ function expectedComparison(raw: OperatorXRawBundle) {
   return buildComparison('gemm', [{ runner: dataset.run.plan!.runner, dataset }]);
 }
 
+// The first PGlite test also pays the database start-up.
 it('persists raw OperatorX documents and replaces a re-ingested run atomically', async () => {
   const db = new PGlite();
   try {
@@ -173,7 +174,7 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
   } finally {
     await db.close();
   }
-});
+}, 20_000);
 
 it('keeps raw documents and compact comparisons intact when a re-ingest fails', async () => {
   const db = new PGlite();

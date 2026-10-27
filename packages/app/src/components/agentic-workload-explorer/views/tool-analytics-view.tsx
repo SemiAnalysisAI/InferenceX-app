@@ -455,7 +455,7 @@ const STRINGS = {
     repeatShareDetail: '连续重复调用同一工具的比例',
     longestStreak: '最长连续调用',
     longestStreakDetail: '单会话中同一工具的最大连续调用次数',
-    sessionsMined: '已分析会话数',
+    sessionsMined: '已挖掘会话数',
     sessionsMinedDetail: (calls: string, steps: string) =>
       `${calls} 次工具调用 → ${steps} 步（合并后）`,
     recurringMotifs: '常见模式',
@@ -475,22 +475,22 @@ const STRINGS = {
       '交替 A→B→A→B 的 2+ 完整周期片段——编辑/验证和读取/调整反馈循环。Cycles = 每段 A→B 往返次数。',
     noRecurringLoops: '未发现循环模式',
     toolWallTime: '工具耗时',
-    turnaroundByTool: '按工具分组的响应时间',
+    turnaroundByTool: '按工具分组的周转时间',
     clientSideWallTime: '（客户端耗时）',
     turnaroundByToolDescription: (single: string, total: string, pct: string, batchLabel: string) =>
       `从 tool_use 响应结束到同一会话 lane 的下一条 tool_result 请求之间的时间——包含工具执行和 harness 开销。仅统计单工具 turn（${single} / ${total} 个 tool turns，${pct}%）；并行 tool call 的 turn 归入${batchLabel}；超过 30 分钟的间隔视为空闲已排除。`,
-    turnaroundDistribution: '响应时间分布',
+    turnaroundDistribution: '周转时间分布',
     colSamples: '样本数',
     colMean: '均值',
-    turnaroundShapeByOs: '按操作系统的响应时间分布',
+    turnaroundShapeByOs: '按操作系统的周转时间分布',
     splitByArch: '按架构拆分',
     turnaroundShapeDescription:
-      '按对数间隔 bin 统计的样本占比，各系列独立归一化。会话的 OS/arch 来自客户端元数据（SDK headers，或 Codex user-agent）。虚线为中位数；样本不足 200 的平台已隐藏。',
+      '按对数间隔 bin 统计的样本占比，各系列独立归一化。会话的 OS/arch 来自客户端元数据（SDK headers；无 headers 时使用 Codex user-agent）。虚线为中位数；样本不足 200 的平台已隐藏。',
     agent: 'Agent',
     tool: '工具',
-    turnaroundAxisLabel: '响应时间（对数坐标）',
+    turnaroundAxisLabel: '周转时间（对数坐标）',
     medianTurnaroundByOs: (splitArch: boolean) =>
-      `按${splitArch ? '平台' : '操作系统'}的中位响应时间`,
+      `按${splitArch ? '平台' : '操作系统'}的中位周转时间`,
     medianTurnaroundDescription: (splitArch: boolean) =>
       `p50 及下方 p90，按工具和${splitArch ? 'OS/arch' : 'OS'}分组。与图表使用相同的客户端耗时样本——差异来自 OS + 机器 + harness 开销，而非模型延迟。`,
     bashBreakdown: 'Bash 分类统计',
@@ -522,7 +522,7 @@ const STRINGS = {
     explicitToolErrorRate: '显式工具错误率',
     errorRateDetail: (errors: string, matched: string) =>
       `${errors} 个错误 / ${matched} 个 Anthropic 匹配结果`,
-    verifiedEdited: '已验证已编辑',
+    verifiedEdited: '编辑后已验证',
     verifiedEditedDetail: (verified: string, edited: string) =>
       `${verified} / ${edited} 个已编辑会话`,
     finalVerifiedPass: '最终验证通过',
@@ -530,7 +530,7 @@ const STRINGS = {
     uniqueToolTypes: '工具类型数',
     sessionsAnalyzed: '已分析会话数',
     avgToolsPerSession: '平均每会话工具数',
-    recoveredFailures: '已恢复失败',
+    recoveredFailures: '失败后恢复',
     recoveredFailuresDetail: (recovered: string, total: string) =>
       `${recovered} 个已恢复 / ${total} 个含最终失败信号的会话`,
     distribution: '分布',

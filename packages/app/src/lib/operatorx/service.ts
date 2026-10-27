@@ -9,6 +9,7 @@ import {
   type ComparisonOp,
   opFamily,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { topLevelModel } from '@semianalysisai/inferencex-db/operatorx/workloads';
 import {
   normalizeBundle,
   type OperatorXDataset,
@@ -20,6 +21,7 @@ import {
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
 import { cachedQuery, operatorXBlobPrefix } from '@/lib/cache/api-cache';
+import { isModelDeprecated, type Model } from '@/lib/catalog/data-mappings';
 
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
@@ -181,7 +183,55 @@ async function sharedComparison(
   }
 }
 
+const deprecated = (model: string) => isModelDeprecated(model as Model);
+
+/**
+ * The comparison without deprecated models: their roles leave every case, cases only
+ * they contribute and their workloads go, and the remaining workloads are recounted.
+ */
+function withoutDeprecated(comparison: Comparison): Comparison {
+  const dropWorkload = (id: string) =>
+    !id.startsWith(`${comparison.op}:testlist:`) &&
+    deprecated(topLevelModel(id.slice(comparison.op.length + 1)));
+  const rows = comparison.rows.flatMap((row) => {
+    const sources = row.sources.filter((s) => !deprecated(s.model));
+    if (row.sources.length > 0 && sources.length === 0) return [];
+    const workloads = row.workloads.filter((id) => !dropWorkload(id));
+    return workloads.length > 0 ? [{ ...row, sources, workloads }] : [];
+  });
+  const counts = new Map<string, { cases: Set<string>; hardware: Set<string> }>();
+  for (const row of rows)
+    for (const id of row.workloads) {
+      const w = counts.get(id) ?? { cases: new Set(), hardware: new Set() };
+      // Backend is the final suffix; coverage counts operation arguments only.
+      w.cases.add(row.caseKey.slice(0, row.caseKey.lastIndexOf('|')));
+      w.hardware.add(row.hardware);
+      counts.set(id, w);
+    }
+  const workloads = comparison.workloads
+    .flatMap((w) => {
+      const c = counts.get(w.id);
+      return c ? [{ ...w, cases: c.cases.size, hardware: [...c.hardware].sort() }] : [];
+    })
+    .sort((a, b) => b.hardware.length - a.hardware.length || a.label.localeCompare(b.label));
+  return { ...comparison, rows, workloads };
+}
+
+const current = new WeakMap<Comparison, Comparison>();
+
+/** Every op's comparison across runs, without deprecated models. */
 export async function getComparison(op: ComparisonOp): Promise<Comparison> {
+  const all = await readComparison(op);
+  let shown = current.get(all);
+  if (!shown) {
+    shown = withoutDeprecated(all);
+    if (partial.has(all)) partial.add(shown);
+    current.set(all, shown);
+  }
+  return shown;
+}
+
+async function readComparison(op: ComparisonOp): Promise<Comparison> {
   const runs = comparisonRuns(op, await listRuns());
   const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
   const hit = compared.get(op);

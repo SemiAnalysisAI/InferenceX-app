@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'ab8fd78bd66368f13c6f72c63419e7eb83f479b6d39a8efaee2b1a24f32a0fb9',
+    sourceSha256: '52939b7c8ad0f59e75461e90ef8fe0360b029c5274a774ad3dc8976f1a8e7a41',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -526,7 +526,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '237d7b2f095786cea52f8d65eaed73a4f091fa880803809271e2542b0d62b4d9',
+    sourceSha256: '20755a02e4f59eb3d3a833b8b6cb6c8179c046930b72376b06a5817fa5eab05a',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -769,7 +769,7 @@ export const apiRouteCatalog = [
     classification: 'ui-artifact-read',
     exclusionReason: {
       en: 'UI-only evaluation sample reader backed by live workflow artifacts with an unstable artifact contract.',
-      zh: '仅供界面读取由实时工作流制品支持的评测样本；该制品契约不稳定。',
+      zh: '仅供界面读取由实时工作流产物支持的评测样本；该产物契约不稳定。',
     },
     sourceSha256: '64d3881d026ca257336208dc3c515438d507aebcf681c4cc8860f5fb1d6b3f44',
   },
@@ -820,7 +820,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-framework-releases',
-    sourceSha256: 'ce0bd92ab1b567ee476f0a96b9a3b7ea3c5730b75b32d6941e8de661822be3f6',
+    sourceSha256: '128cca02401a847ecfd34a8a2315487a96c585a3b77fa3dd60b047066cf3ac6c',
   },
   {
     source: 'src/app/api/v1/invalidate/route.ts',
@@ -990,7 +990,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-workflow-info',
-    sourceSha256: 'f18a38f7484cbd3bf4f1fac96a3ebd9fdd4451bc2b0bcffc7eccb1afe8b1f440',
+    sourceSha256: '0f83003cc9fedd47fcfed5c19bd2579a762c8f8f2ed701db13a0f4317981f6aa',
   },
 ] as const satisfies readonly ApiRouteCatalogEntry[];
 
@@ -1167,8 +1167,42 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/ubenchx/ubenchx-transform.ts',
+    sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+  {
+    source: 'src/components/ubenchx/ubenchx-data.ts',
+    sourceSha256: '21beff5ed2452035aae42df208734cbda323272539ed265bf8dd39c3043981d1',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
+  {
+    source: 'src/components/ubenchx/core-memory-profiles.ts',
+    sourceSha256: '96c51ab39b475653dac1e9c5d5dd42eb23c595b4e5e7f485d59a72a44afd99a4',
+    reviewArea: {
+      en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
+      zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
+  {
+    source: 'src/lib/catalog/gpu-specs.ts',
+    sourceSha256: 'fb9dc719f347fb5b73ea73cf35a19d12c640b34a284f31cd70a8b9b2df76b4fd',
+    reviewArea: {
+      en: 'GPU specifications shared by chip pages, GPU charts and the public GPU specs view; review NIC rates, unknown topology, ranking values and units.',
+      zh: '芯片页、GPU 图表及公开 GPU 规格视图共用的数据；审核网卡速率、未指定的拓扑、排名数值及单位。',
+    },
+  },
+  {
     source: 'src/lib/catalog/model-architectures.ts',
-    sourceSha256: '409e60f3bf44ec5461563634178aabdf85084e3b8c707fd648fde0abca74efda',
+    sourceSha256: 'b70020f3ca528f3ef01f3e55421801fdf059fd08033c9cf79eac79831b8bfebb',
     reviewArea: {
       en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
       zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',
@@ -1200,7 +1234,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: '8be8dbf750d00e5cf9ffc92bc6c58c80fc8e94c43744162f450a9d7cfb780840',
+    sourceSha256: '7eec06104311e2673d9a898d6acdc5a49b56132d57c0d688d27fcd4479ef8d24',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',
@@ -1361,7 +1395,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-estimator.ts',
-    sourceSha256: 'f91b42f1d75182660c0879801c02f3c0f760bc9a1e53f95a9b84e417df8d4eb3',
+    sourceSha256: '0eeaaed822068e9aa782e6b40ad1bb9ae31f70ef755f67622767f3b89ade4d1a',
     reviewArea: {
       en: 'Shared profit-estimator defaults and calculation parity, including model-specific target assumptions.',
       zh: '利润估算器的共享默认值与计算一致性，包括各模型的目标假设。',
@@ -1601,7 +1635,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '39beddbcbea7decf60f0e2e8217083e0c88516fab3181e3f2b94cdd1dca2b8f1',
+    sourceSha256: 'bceb0916e3643f90f637530c7928bdf67860aab812362e48715432c88d93cdcc',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1645,7 +1679,7 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): one new DB
     // key, `minimaxm31flash`, with its own display name and release date. The
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
-    sourceSha256: '63a8ca335fccef8db1e93205db10456d75f2f8d4f100f89b160e6c1c574d62d4',
+    sourceSha256: '9afbd7db9690502ea53977496f228c89dc184c41e4a81a13a248bbf6fd38afb9',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
