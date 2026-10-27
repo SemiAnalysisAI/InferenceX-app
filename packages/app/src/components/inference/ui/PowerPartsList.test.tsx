@@ -15,15 +15,13 @@ vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
 vi.mock('@/lib/analytics/analytics', () => ({
   track: (...args: unknown[]) => track(...args),
 }));
-// jsdom has no media queries: the viewport is flipped per test for the phone branch.
-const media = vi.hoisted(() => ({ mobile: false }));
+// jsdom has no media queries: render the desktop list.
 vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
   ...(await importOriginal<typeof MediaQueryHooks>()),
-  useIsMobileViewport: () => media.mobile,
+  useIsMobileViewport: () => false,
 }));
 
 import PowerPartsList from './PowerPartsList';
-import { PowerXSurfaceProvider } from './powerx-surface';
 import {
   buildPowerBreakdownsWithOverlays,
   breakdownSeriesAtBoundary,
@@ -114,13 +112,9 @@ let container: HTMLDivElement;
 let root: Root;
 const onHover = vi.fn();
 const onTogglePin = vi.fn();
-// The phone branch is PowerX only: the list renders inside the surface provider.
-let powerX = false;
 
 beforeEach(() => {
   locale = 'en';
-  media.mobile = false;
-  powerX = false;
   track.mockClear();
   onHover.mockClear();
   onTogglePin.mockClear();
@@ -134,22 +128,20 @@ afterEach(() => {
   container.remove();
 });
 
-const render = (props: Partial<React.ComponentProps<typeof PowerPartsList>> = {}) => {
-  const list = (
-    <PowerPartsList
-      series={series}
-      entry={series.points[1]}
-      color="var(--b200_sglang)"
-      highlight={null}
-      onHover={onHover}
-      onTogglePin={onTogglePin}
-      {...props}
-    />
+const render = (props: Partial<React.ComponentProps<typeof PowerPartsList>> = {}) =>
+  act(() =>
+    root.render(
+      <PowerPartsList
+        series={series}
+        entry={series.points[1]}
+        color="var(--b200_sglang)"
+        highlight={null}
+        onHover={onHover}
+        onTogglePin={onTogglePin}
+        {...props}
+      />,
+    ),
   );
-  return act(() =>
-    root.render(powerX ? <PowerXSurfaceProvider>{list}</PowerXSurfaceProvider> : list),
-  );
-};
 const rows = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-part-row"]'),
 ];

@@ -10,16 +10,14 @@ import { type PowerXSelection } from './powerx-views';
 
 const mocks = vi.hoisted(() => ({
   locale: 'en' as 'en' | 'zh',
-  mobile: false,
-  coarse: false,
   track: vi.fn(),
 }));
 vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 vi.mock('@/lib/analytics/analytics', () => ({ track: mocks.track }));
-// The phone paths key on the md media query; jsdom has no matchMedia, so the hook is stubbed.
+// jsdom has no matchMedia: render the desktop layout.
 vi.mock('@/hooks/useMediaQuery', () => ({
-  useIsMobileViewport: () => mocks.mobile,
-  useIsCoarsePointer: () => mocks.coarse,
+  useIsMobileViewport: () => false,
+  useIsCoarsePointer: () => false,
   useMediaQuery: () => false,
 }));
 
