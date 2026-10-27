@@ -192,6 +192,13 @@ const SEGMENT_LABEL_MIN_PX = 15;
 const SEGMENT_LABEL_MIN_BAND = 30;
 const MAX_BAR_PX = 48;
 const MARGIN = { top: 40, right: 18, bottom: 56, left: 65 };
+/**
+ * Touch scrub: the readout above the plot carries the numbers, and the column labels
+ * that the top margin keeps room for protrude at most ~10 px above the plot's top
+ * (concurrency label at y(total) − 20 with an 8 % y headroom), so the band between
+ * the readout and the plot shrinks from 40 px to 16 px. Mouse charts keep MARGIN.
+ */
+const TOUCH_MARGIN = { ...MARGIN, top: 16 };
 
 /** Minimum free width around a column before its total label is drawn. */
 const TOTAL_LABEL_MIN_GAP_PX = 46;
@@ -1094,13 +1101,15 @@ function BreakdownChart({
         // While pinned, the column under the slider's guide is the way back to the slider.
         if (pinned && onGuideClick && Number(d.key) === guideNearestIndex) onGuideClick();
         else onColumnClick?.(d.entry);
-        // Touch: a tap on a layer hovers and pins it; a tap above the stack, or any
-        // mouse click on the plot, drops a pinned layer. Under a scrub the readout
-        // above the plot carries the layer, so no label is drawn.
+        // Under a scrub a tap only holds the column: isolating a layer on touch is the
+        // readout's chips, so the chart does not dim the moment the user taps to hold.
+        if (scrubbing) return;
+        // Touch (off the scrub): a tap on a layer hovers and pins it; a tap above the
+        // stack, or any mouse click on the plot, drops a pinned layer.
         const [mx, my] = d3.pointer(event, group.node());
         const found = coarsePointer ? bandAt(ctx, d, mx, my) : null;
         if (found) {
-          if (!scrubbing) showLabel(found);
+          showLabel(found);
           onTogglePin(bandTarget(found.band));
         } else {
           onUnpin();
@@ -1251,7 +1260,7 @@ function BreakdownChart({
       zoom={{ enabled: false }}
       grabCursor={false}
       instructions=""
-      margin={MARGIN}
+      margin={scrub ? TOUCH_MARGIN : MARGIN}
       xScale={{ type: 'linear', domain: xDomain }}
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{

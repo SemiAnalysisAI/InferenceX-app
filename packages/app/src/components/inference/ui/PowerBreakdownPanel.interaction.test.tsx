@@ -1006,6 +1006,9 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
 
   it('shows the compared point above the plot and the slider action as a button', () => {
     renderInline([...sglang, ...vllm]);
+    // The plot's top margin shrinks to 16 px under the readout (the stub keeps the
+    // 380 px height, so the hit band is 380 − 16 − 56 tall); mouse charts keep 40 px.
+    expect(hits()[0].getAttribute('height')).toBe('308');
     // The slider lands on vLLM c16 at 60 tok/s/user: that is what the readout reads.
     expect(readout()?.dataset.source).toBe('compared');
     expect(readout()?.dataset.concurrency).toBe('16');
@@ -1100,6 +1103,12 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
       concurrency: 64,
     });
     expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
+    // The tap landed on the GPU band, but on touch a column tap only holds: no layer is
+    // isolated, so the chart does not dim; isolating comes from the readout's chips.
+    for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
+    expect(readoutParts().every((part) => part.getAttribute('aria-pressed') === 'false')).toBe(
+      true,
+    );
     expect(readout()?.dataset.source).toBe('pinned');
     expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
     expect(readoutSource()).toBe('Pinned · tap the pin in its row to follow the slider');
@@ -1115,6 +1124,23 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     expect(readout()?.dataset.source).toBe('pinned');
     expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
     expect(rule()).toBeNull();
+    // A readout chip isolates its layer (pinned, like the legend); a second tap releases it.
+    const serverChip = readoutParts().find((part) => part.dataset.band === 'server')!;
+    mouse(serverChip, 'click');
+    expect(serverChip.getAttribute('aria-pressed')).toBe('true');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    expect(area('gpu').dataset.emphasis).toBe('faded');
+    // Another column tap holds that column and leaves the isolated layer alone.
+    pointer(hits()[2], 'pointerdown', { clientX: AT.c4, clientY: 200 });
+    pointer(hits()[2], 'pointerup', { clientX: AT.c4, clientY: 200 });
+    mouse(hits()[2], 'click', { clientX: AT.c4, clientY: 200 });
+    expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    mouse(
+      readoutParts().find((part) => part.dataset.band === 'server')!,
+      'click',
+    );
+    for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
     // The row's pin marker lets the chip follow the slider again; the readout follows.
     const unpin = chipRow('B200 (vLLM) FP8').querySelector<HTMLElement>(
       '[data-testid="power-chip-compare-unpin"]',
@@ -1148,6 +1174,7 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     renderInline([...sglang, ...vllm]);
     expect(readout()).toBeNull();
     expect(compareButton()).toBeNull();
+    expect(hits()[0].getAttribute('height')).toBe('284');
     mouse(hits()[0], 'mousemove', { clientX: AT.c64, clientY: 380 - 40 - 56 - 2 });
     expect(cursorLabel()?.textContent).toMatch(/^Measured GPU · /u);
   });

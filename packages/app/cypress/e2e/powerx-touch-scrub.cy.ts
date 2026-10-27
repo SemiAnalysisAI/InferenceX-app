@@ -228,6 +228,40 @@ describe('PowerX touch scrub on a phone', () => {
     cy.get(`${DRILLDOWN} [data-testid="power-breakdown-compared"]`).should('exist');
     cy.get(`${DRILLDOWN} [data-testid="power-breakdown-scrub-rule"]`).should('not.exist');
     cy.get('[data-testid="power-breakdown-cursor-label"]').should('not.exist');
+    // The tap held the column without isolating the layer under the finger; a readout chip
+    // isolates its layer, a second tap on it releases it.
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-area"]`).each(($area) => {
+      expect($area[0].dataset.emphasis).to.eq('plain');
+    });
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-readout-part"][data-band="server"]`)
+      .click()
+      .should('have.attr', 'aria-pressed', 'true');
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-area"][data-band="server"]`).should(
+      'have.attr',
+      'data-emphasis',
+      'highlighted',
+    );
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-area"][data-band="gpu"]`).should(
+      'have.attr',
+      'data-emphasis',
+      'faded',
+    );
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-readout-part"][data-band="server"]`)
+      .click()
+      .should('have.attr', 'aria-pressed', 'false');
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-area"][data-band="gpu"]`).should(
+      'have.attr',
+      'data-emphasis',
+      'plain',
+    );
+    // The readout sits right above the plot: 8 px to the svg, a 16 px top margin inside it.
+    cy.get(`${DRILLDOWN} [data-testid="power-breakdown-readout"]`).then(($readout) => {
+      const svg = $readout.closest(DRILLDOWN)[0].querySelector('[data-testid="d3-chart-svg"]')!;
+      const hit = svg.querySelector('[data-testid="power-breakdown-hit"]')!;
+      const gap = hit.getBoundingClientRect().top - $readout[0].getBoundingClientRect().bottom;
+      expect(gap).to.be.at.most(26);
+      expect(hit.getBoundingClientRect().top - svg.getBoundingClientRect().top).to.eq(16);
+    });
 
     // The explicit action: the slider moves to the held interactivity and every pin goes.
     cy.get(`${DRILLDOWN} [data-testid="power-breakdown-compare-at"]`)

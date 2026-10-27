@@ -127,9 +127,11 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   plot (`PowerBreakdownReadout`: total W/GPU with its basis pill, `c<N> · <interactivity>`,
   one chip per layer in stack order with the plot's swatches; tapping a chip isolates the
   layer) reads that column; the svg keeps `touch-action: pan-y`, so a vertical pan still
-  scrolls the page, and is `none` only while a scrub is in progress. A tap holds the column
-  through the same compared-point pin as a desktop click (dashed outline, `i_pbpoint`), the
-  readout then says Pinned until the next scrub or the row's pin marker. The 44 px "Compare
+  scrolls the page, and is `none` only while a scrub is in progress; the plot's top margin
+  is 16 px instead of 40 under the readout. A tap holds the column through the same
+  compared-point pin as a desktop click (dashed outline, `i_pbpoint`) and nothing else: on
+  touch a layer is isolated only from a readout chip, so the chart does not dim on the tap.
+  The readout then says Pinned until the next scrub or the row's pin marker. The 44 px "Compare
   chips at N tok/s/user" button under the plot moves the slider to the readout's
   interactivity (the slider's own action, so every pin drops; `powerx_compare_at_scrub`),
   disabled while the slider already reads it. A mouse keeps the hover label and the click.
