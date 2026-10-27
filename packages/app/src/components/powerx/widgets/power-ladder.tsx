@@ -5,8 +5,9 @@ import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 import { type Ladder, type StaggerLabel, staggerLabels } from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
-import { GROUP_LABELS, GROUP_TITLES } from './strings';
+import { CATEGORY_TITLES } from './strings';
 import { formatWatts, GrammarSwatch } from './widget-chrome';
 
 const STRINGS = {
@@ -63,8 +64,8 @@ export function PowerLadder({
   className,
 }: PowerLadderProps) {
   const t = STRINGS[locale];
-  const groups = GROUP_LABELS[locale];
-  const titles = GROUP_TITLES[locale];
+  const names = SYSTEM_POWER_CATEGORY_LABELS[locale];
+  const titles = CATEGORY_TITLES[locale];
   const { setContainerRef, dimensions } = useResponsiveChartDimensions({ height: 1 });
   const width = Math.max(dimensions.width, 240);
   const maxWatts = Math.max(ladder.facilityWatts, ladder.allInWatts) * 1.03;
@@ -192,8 +193,8 @@ export function PowerLadder({
         </rect>
 
         {segments.map((segment) => (
-          <g key={segment.group} data-segment={segment.group}>
-            <title>{`${groups[segment.group]} · ${formatWatts(segment.watts)} W · ${t.share(segment.share)} — ${titles[segment.group]}`}</title>
+          <g key={segment.category} data-segment={segment.category}>
+            <title>{`${names[segment.category]} · ${formatWatts(segment.watts)} W · ${t.share(segment.share)} — ${titles[segment.category]}`}</title>
             {segment.kind === 'measured' ? (
               <rect x={segment.x0} y={barY} width={segment.w} height={barH} fill={color} />
             ) : (
@@ -272,13 +273,13 @@ export function PowerLadder({
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           {segments.map((segment) => (
             <li
-              key={segment.group}
-              title={`${t.share(segment.share)} — ${titles[segment.group]}`}
+              key={segment.category}
+              title={`${t.share(segment.share)} — ${titles[segment.category]}`}
               className="flex items-center gap-1.5"
             >
               <GrammarSwatch kind={segment.kind} color={color} />
               <span className={segment.kind === 'measured' ? 'text-foreground' : undefined}>
-                {groups[segment.group]}
+                {names[segment.category]}
               </span>
               <span className="font-mono tabular-nums">{formatWatts(segment.watts)} W</span>
             </li>

@@ -1,12 +1,17 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { gpusPerMegawatt } from '@/lib/power/power-basis';
 import {
-  type BasisComponent,
-  type BasisHardware,
-  computeBasis,
-  hardwareAllInWatts,
-  hardwareTdp,
-} from './power-basis';
+  estimateChassisPower,
+  estimateRackPower,
+  isRackPowerHardware,
+  type RackPowerHardware,
+  type SystemPowerCategory,
+  type SystemPowerHardware,
+  type SystemPowerOperatingState,
+  systemUnitGpuCount,
+} from '@/lib/power/system-power-model';
+
 import { snapTo } from './widget-hash';
 
 /**
@@ -15,11 +20,10 @@ import { snapTo } from './widget-hash';
  * The hero, the load strip and the worked example all draw from this one shape.
  */
 
-export const LADDER_HARDWARE = [
-  'b200',
-  'gb200',
-  'mi355x',
-] as const satisfies readonly BasisHardware[];
+export const LADDER_HARDWARE = ['b200', 'gb200', 'mi355x'] as const satisfies readonly (
+  | SystemPowerHardware
+  | RackPowerHardware
+)[];
 export type LadderHardware = (typeof LADDER_HARDWARE)[number];
 export const DEFAULT_LADDER_HARDWARE: LadderHardware = 'b200';
 
@@ -28,36 +32,13 @@ export const LADDER_TARGET_INTERACTIVITY = 50;
 /** When no validated point exists for a chip, the ladder runs on this share of TDP, labelled. */
 export const LADDER_EXAMPLE_TDP_FRACTION = 0.6;
 
-export const PART_GROUPS = [
-  'cpu',
-  'memory',
-  'network',
-  'nvswitch',
-  'pcie',
-  'storage',
-  'fans',
-  'psu',
-  'other',
-] as const;
-export type PartGroup = (typeof PART_GROUPS)[number];
+const AGENTIC: SystemPowerOperatingState = { workload: 'agentic', scaleOut: false };
 
-/** Buckets a power_model leaf component by name; names are the port's own identifiers. */
-export function partGroup(name: string): PartGroup {
-  if (/fan/iu.test(name)) return 'fans';
-  if (/conversion|converter|loss|psu/iu.test(name)) return 'psu';
-  if (/nvswitch/iu.test(name)) return 'nvswitch';
-  if (/cpu/iu.test(name)) return 'cpu';
-  if (/dimm|lpddr|memory|dram/iu.test(name)) return 'memory';
-  if (/pex|retimer|pcie/iu.test(name)) return 'pcie';
-  if (/nvme|ssd/iu.test(name)) return 'storage';
-  if (/nic|transceiver|switch|ethernet/iu.test(name)) return 'network';
-  return 'other';
-}
-
-export type LadderSegmentGroup = 'gpu' | PartGroup;
+/** The IT parts a ladder stacks; the facility overhead is the PUE step past IT. */
+export type LadderCategory = Exclude<SystemPowerCategory, 'measuredCpu' | 'facility'>;
 
 export interface LadderSegment {
-  group: LadderSegmentGroup;
+  category: LadderCategory;
   /** Solid = measured telemetry, outlined = modeled by the power model. */
   kind: 'measured' | 'modeled';
   /** Watts per GPU. */
@@ -67,7 +48,7 @@ export interface LadderSegment {
 export interface Ladder {
   hardware: LadderHardware;
   gpuWatts: number;
-  /** GPU first, then modeled groups by size. */
+  /** GPU first, then modeled parts by size. */
   segments: LadderSegment[];
   itWatts: number;
   facilityWatts: number;
@@ -78,40 +59,50 @@ export interface Ladder {
   percentOfTdp: number;
 }
 
-function groupComponents(components: BasisComponent[]): LadderSegment[] {
-  const sums = new Map<LadderSegmentGroup, LadderSegment>();
-  for (const component of components) {
-    const group: LadderSegmentGroup = component.measured ? 'gpu' : partGroup(component.name);
-    const kind = component.measured ? 'measured' : 'modeled';
-    const current = sums.get(group) ?? { group, kind, watts: 0 };
-    current.watts += component.watts;
-    sums.set(group, current);
-  }
-  const gpu = sums.get('gpu');
-  const modeled = [...sums.values()]
-    .filter((segment) => segment.kind === 'modeled' && segment.watts > 0)
-    .toSorted((a, b) => b.watts - a.watts);
-  return [...(gpu ? [gpu] : []), ...modeled];
-}
+const MODELED_CATEGORIES = [
+  'cpu',
+  'memory',
+  'nic',
+  'nvswitch',
+  'storage',
+  'other',
+  'fans',
+  'psuLoss',
+  'network',
+] as const satisfies readonly LadderCategory[];
 
+const hardwareTdp = (hardware: LadderHardware): number => HW_REGISTRY[hardware].tdp;
+
+/** Runs the pinned power model in its agentic state with the Grace socket modeled. */
 export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder | null {
-  const result = computeBasis(hardware, gpuWatts);
-  if (!result.ok) return null;
-  const perGpu = (watts: number) => watts / result.gpuCount;
+  const gpuCount = systemUnitGpuCount(hardware);
+  const unit = isRackPowerHardware(hardware)
+    ? estimateRackPower(hardware, gpuWatts, null, AGENTIC)
+    : estimateChassisPower(hardware, gpuWatts * gpuCount, AGENTIC);
+  if (!unit) return null;
+  const perGpu = (watts: number) => watts / gpuCount;
+  const modeled = MODELED_CATEGORIES.map((category) => ({
+    category,
+    kind: 'modeled' as const,
+    watts: perGpu(unit.breakdown[category]),
+  }))
+    .filter((segment) => segment.watts > 0)
+    .toSorted((a, b) => b.watts - a.watts);
+  const itWatts = perGpu(unit.itWatts);
   return {
     hardware,
     gpuWatts,
-    segments: groupComponents(result.components).map((segment) => ({
-      ...segment,
-      watts: perGpu(segment.watts),
-    })),
-    itWatts: result.itPerGpu,
-    facilityWatts: result.facilityPerGpu,
-    pue: result.pue,
+    segments: [
+      { category: 'gpu', kind: 'measured', watts: perGpu(unit.breakdown.gpu) },
+      ...modeled,
+    ],
+    itWatts,
+    facilityWatts: perGpu(unit.facilityWatts),
+    pue: unit.pue,
     tdpWatts: hardwareTdp(hardware),
-    allInWatts: hardwareAllInWatts(hardware),
-    gpusPerMw: result.gpusPerMw,
-    percentOfTdp: result.percentOfTdp,
+    allInWatts: HW_REGISTRY[hardware].power * 1000,
+    gpusPerMw: gpusPerMegawatt(itWatts) ?? Number.POSITIVE_INFINITY,
+    percentOfTdp: (gpuWatts / hardwareTdp(hardware)) * 100,
   };
 }
 
@@ -128,7 +119,7 @@ export const decodeLadderHardware = (raw: string | null): LadderHardware =>
 export interface LoadSweep {
   tdpWatts: number;
   /** Per-GPU watts of every segment at each step, in ladder order of the TDP step. */
-  tracks: { group: LadderSegmentGroup; kind: 'measured' | 'modeled'; values: number[] }[];
+  tracks: { category: LadderCategory; kind: 'measured' | 'modeled'; values: number[] }[];
 }
 
 /** Runs the model from idle to TDP so the load strip can show which parts follow the GPU. */
@@ -138,12 +129,12 @@ export function loadSweep(hardware: LadderHardware, steps = 20): LoadSweep {
     Math.round((tdpWatts * index) / steps),
   );
   const ladders = gpuWatts.map((watts) => buildLadder(hardware, watts));
-  const order = ladders.at(-1)?.segments.map((segment) => segment.group) ?? [];
-  const tracks = order.map((group) => ({
-    group,
-    kind: group === 'gpu' ? ('measured' as const) : ('modeled' as const),
+  const order = ladders.at(-1)?.segments ?? [];
+  const tracks = order.map(({ category, kind }) => ({
+    category,
+    kind,
     values: ladders.map(
-      (ladder) => ladder?.segments.find((segment) => segment.group === group)?.watts ?? 0,
+      (ladder) => ladder?.segments.find((segment) => segment.category === category)?.watts ?? 0,
     ),
   }));
   return { tdpWatts, tracks };

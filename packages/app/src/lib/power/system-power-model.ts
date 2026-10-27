@@ -1,3 +1,5 @@
+import type { Locale } from '@/lib/i18n/i18n';
+
 import manifest from './power-model.manifest.json';
 import { create_power_model, type PowerEstimate, ValueError } from './power_model';
 import type { PowerComponentBreakdown as PowerComponent } from './power_model/base';
@@ -7,7 +9,7 @@ import type { RackScaleSystem } from './power_model/models/advanced/systems/rack
 export const SYSTEM_POWER_MODEL_REVISION = manifest.modelRevision;
 export const SYSTEM_POWER_MODEL_SOURCE_URL = manifest.sourceUrl;
 
-export const CHASSIS_SYSTEMS = {
+const CHASSIS_SYSTEMS = {
   h100: 'hopper',
   h200: 'hopper',
   b200: 'b200',
@@ -16,7 +18,7 @@ export const CHASSIS_SYSTEMS = {
   mi325x: 'mi325',
   mi355x: 'mi355',
 } as const satisfies Record<string, keyof typeof SYSTEMS>;
-export const RACK_SYSTEMS = {
+const RACK_SYSTEMS = {
   gb200: 'gb200-nvl72',
   gb300: 'gb300-nvl72',
 } as const satisfies Record<string, keyof typeof SYSTEMS>;
@@ -64,6 +66,37 @@ export const SYSTEM_POWER_CATEGORIES = [
 ] as const;
 export type SystemPowerCategory = (typeof SYSTEM_POWER_CATEGORIES)[number];
 export type SystemPowerBreakdown = Record<SystemPowerCategory, number>;
+
+export const SYSTEM_POWER_CATEGORY_LABELS: Record<Locale, Record<SystemPowerCategory, string>> = {
+  en: {
+    gpu: 'GPU',
+    measuredCpu: 'Grace CPU',
+    cpu: 'CPU',
+    memory: 'Memory',
+    nic: 'NICs',
+    nvswitch: 'NVSwitch',
+    storage: 'Storage',
+    other: 'PCIe & misc',
+    fans: 'Fans',
+    psuLoss: 'PSU loss',
+    network: 'Network share',
+    facility: 'Facility (PUE)',
+  },
+  zh: {
+    gpu: 'GPU',
+    measuredCpu: 'Grace CPU',
+    cpu: 'CPU',
+    memory: '内存',
+    nic: '网卡',
+    nvswitch: 'NVSwitch',
+    storage: '存储',
+    other: 'PCIe 及其他',
+    fans: '风扇',
+    psuLoss: '电源损耗',
+    network: '网络分摊',
+    facility: '机房开销（PUE）',
+  },
+};
 
 /** The parts read from telemetry; every other part is the model's estimate. */
 export const MEASURED_SYSTEM_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> = new Set([
@@ -193,3 +226,7 @@ const RACKS: Record<RackPowerHardware, RackScaleSystem> = {
 
 export const rackComputeTrayCount = (hardware: RackPowerHardware): number =>
   RACKS[hardware].compute_tray_count;
+
+/** GPUs in one modeled unit: an 8-GPU chassis or a whole NVL72 rack. */
+export const systemUnitGpuCount = (hardware: SystemPowerHardware | RackPowerHardware): number =>
+  isRackPowerHardware(hardware) ? RACKS[hardware].gpu_count : CHASSIS_GPU_COUNT;

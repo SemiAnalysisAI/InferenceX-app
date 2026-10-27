@@ -13,9 +13,10 @@ import {
   trackMoves,
 } from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
 import { hardwareStore } from './hardware-store';
-import { GROUP_LABELS, GROUP_TITLES } from './strings';
+import { CATEGORY_TITLES } from './strings';
 import {
   formatWatts,
   GrammarSwatch,
@@ -71,8 +72,8 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   });
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
-  const groups = GROUP_LABELS[locale];
-  const titles = GROUP_TITLES[locale];
+  const names = SYSTEM_POWER_CATEGORY_LABELS[locale];
+  const titles = CATEGORY_TITLES[locale];
   const fraction = gpuWatts / sweep.tdpWatts;
 
   return (
@@ -109,7 +110,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
       <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-5">
         {sweep.tracks.map((trackRow) => {
           const current =
-            ladder?.segments.find((segment) => segment.group === trackRow.group)?.watts ?? 0;
+            ladder?.segments.find((segment) => segment.category === trackRow.category)?.watts ?? 0;
           const max = Math.max(...trackRow.values, 1);
           const moves = trackMoves(trackRow.values);
           const path = trackRow.values
@@ -123,7 +124,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
           const cy = SPARK_H - (current / max) * (SPARK_H - 4) - 2;
           const measured = trackRow.kind === 'measured';
           return (
-            <li key={trackRow.group} title={titles[trackRow.group]} className="w-34 shrink-0">
+            <li key={trackRow.category} title={titles[trackRow.category]} className="w-34 shrink-0">
               <p
                 className={cn(
                   'flex items-center gap-1.5 truncate text-xs',
@@ -131,7 +132,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
                 )}
               >
                 <GrammarSwatch kind={trackRow.kind} color={color} />
-                {groups[trackRow.group]}
+                {names[trackRow.category]}
               </p>
               <svg
                 width={SPARK_W}
