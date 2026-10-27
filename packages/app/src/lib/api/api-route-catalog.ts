@@ -680,17 +680,6 @@ export const apiRouteCatalog = [
     sourceSha256: '2b33a33b56ec5afb9c44ddc7db581686dec7488a397cd50c8efa810acff3a86c',
   },
   {
-    source: 'src/app/api/v1/collectivex/ingest/route.ts',
-    path: '/api/v1/collectivex/ingest',
-    method: 'POST',
-    classification: 'admin',
-    exclusionReason: {
-      en: 'Secret-protected CollectiveX ingest mutation called by the benchmark repository workflow; it is not part of the public read API.',
-      zh: '由基准测试仓库工作流调用、受密钥保护的 CollectiveX 导入写操作；它不属于公开只读 API。',
-    },
-    sourceSha256: '017bebdc59684e37d4ac42862d0daa96ee7b4c1ffd28e92da967570ba3875247',
-  },
-  {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
     path: '/api/v1/collectivex/latest',
     method: 'GET',
@@ -1580,7 +1569,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'd168e625f68800e7bcf3c74f824491e4de7d201929e656809b8d4e225f6c53f5',
+    sourceSha256: '29c35918b58926ade3e28c81459e5938bdc761a28250b3d923fcac9141741a67',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',

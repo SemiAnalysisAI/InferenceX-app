@@ -41,17 +41,14 @@ limit. It then checks every file the way the benchmark repo's own test does: the
 result carries the `cases.json` version. Each document is then assembled alone, so every
 failure names its file. Files above 4 MiB, or a tree above 256 MiB, are rejected.
 
-- **HTTP**: `POST /api/v1/collectivex/ingest` with `Authorization: Bearer
-<COLLECTIVEX_ADMIN_SECRET>` and a JSON body of exactly `{"sha": "<7-40 hex>"}` or
-  `{"ref": "<branch or tag>"}`. It ingests through `DATABASE_COLLECTIVEX_WRITE_URL` and then
-  purges the CollectiveX cache scope. Responses: 200 `{ingested: "inserted" | "replaced",
-run_id, source_sha, generated_at, version, requested_cases, measured_cases, documents}`;
-  400 for any other body; 401 for a missing or wrong token; 404 when no results commit on
-  `main` matches; 409 for a run id held by another commit; 422 when the files break the
-  contract (the message names the file); 502 when GitHub cannot be read; 500 when the
-  secret is unset or the database write fails. An InferenceX workflow calls it on pushes to
-  `main` that touch `collectivex/results/`. One call reads a few GitHub API pages plus one
-  raw file per result and runs within the route's 300 s limit.
+- **Workflow**: `.github/workflows/ingest-collectivex.yml` runs on `repository_dispatch`
+  type `ingest-collectivex` with `client_payload: {"sha": "<40 hex>"}`, which the InferenceX
+  workflow sends on pushes to `main` that touch `collectivex/results/`, and on
+  `workflow_dispatch` with exactly one of `sha` (40 hex), `ref`, or `backfill`. It runs
+  `migrate-collectivex.ts --yes`, then the ingest CLI with `--sha`, `--ref` or `--backfill`
+  and `--yes` against the `DATABASE_COLLECTIVEX_WRITE_URL` secret (GitHub reads use
+  `INFX_MAIN_PAT`), then purges the cache with `POST /api/v1/invalidate?scope=collectivex`
+  (`VERCEL_INVALIDATE_SECRET`). It alerts Slack on failure, like `ingest-operatorx`.
 - **CLI**: `bun run admin:db:ingest:collectivex [--sha <sha> | --ref <ref>] [--backfill]
 [--yes] [--no-ssl]` ingests one commit (default: `main`), or with `--backfill` every
   results commit on `main`, oldest first, reusing unchanged files between commits. It asks
@@ -68,7 +65,8 @@ Run these against the CollectiveX database only, in order:
    Until the backfill finishes, `/api/v1/collectivex/latest` returns 404 and the run list is empty.
 3. **Migrate**: `bun run admin:db:migrate:collectivex` (applies `004_committed_results.sql`,
    which drops the unused `deleted_at` tombstone column).
-4. **Backfill**: `bun run admin:db:ingest:collectivex --backfill`, then purge the cache with
+4. **Backfill**: run the `Ingest CollectiveX Results` workflow with `backfill` checked, which
+   also purges the cache. Locally, `bun run admin:db:ingest:collectivex --backfill`, then
    `POST /api/v1/invalidate?scope=collectivex` (the CLI does not reach the CDN).
 
 ## Serving
@@ -77,13 +75,18 @@ Run these against the CollectiveX database only, in order:
   response cached right after an ingest's purge never comes from a lagging replica.
   `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.
 - **Caching**: responses carry the `collectivex` CDN tag with the default one-day `s-maxage`.
-  The ingest route and `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the
+  The ingest workflow purges only that tag through `POST /api/v1/invalidate?scope=collectivex`; the
   main dashboard's blob cache is untouched by CollectiveX operations.
+- **Partial results**: a commit may hold results for only some pools (the first committed
+  results cover only `mi300x` and `mi325x`). Every runnable case in `cases.json` without a
+  result file stays in `coverage` with outcome `pending` (requested, not run), counts toward
+  `requested_cases` but not `measured_cases`, and adds no series, so the SKU controls list
+  only measured pools. A later commit that adds pools is a new run with a later `run_id`,
+  so it becomes the latest run while the earlier one stays listed.
 - **Run list**: `/api/v1/collectivex/runs` always reports `discovery_complete: true`; the
   field stays for existing clients.
-- **No deletion**: runs are removed by changing the committed results, not through the app.
-  `COLLECTIVEX_ADMIN_SECRET` authorizes only the ingest route; when it is unset that route
-  returns 500 with `COLLECTIVEX_ADMIN_SECRET is not set`.
+- **No deletion or ingest in the app**: the app exposes no CollectiveX mutation. Runs are
+  added by the ingest workflow or CLI and removed by changing the committed results.
 - **Vendor scope is explicit**: the shared reader accepts only `amd` and `nvidia` results
   (case-insensitive). Other vendor values are omitted from chart series, coverage, and SKU
   summaries; runs with no supported-vendor cases stay hidden.

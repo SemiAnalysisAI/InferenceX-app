@@ -9,8 +9,8 @@ import { blobGet, blobPurge, blobSet } from './blob-cache';
  * `cachedJson(..., { tag })`), so a CollectiveX ingest can purge the CollectiveX
  * cache without dropping the main dashboard's. CollectiveX routes read their
  * DB directly — no blob layer, so the tag is the entire scope. Responses stay
- * cached until an ingest purges it (`POST /api/v1/collectivex/ingest`, or
- * `/api/v1/invalidate?scope=collectivex`).
+ * cached until the CollectiveX ingest workflow purges it
+ * (`/api/v1/invalidate?scope=collectivex`).
  */
 export const COLLECTIVEX_CACHE_SCOPE = 'collectivex';
 
