@@ -3,7 +3,7 @@
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
@@ -61,6 +61,7 @@ import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
+import { powerXChangedCount } from '../powerx/powerx-views';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -186,6 +187,8 @@ interface ChartControlsProps {
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
   showXAxisMode?: boolean;
+  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
+  powerXControls?: ReactNode;
 }
 
 export default function ChartControls({
@@ -193,6 +196,7 @@ export default function ChartControls({
   tcoSource = 'inference',
   showTcoBasis = false,
   showXAxisMode = false,
+  powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -427,7 +431,13 @@ export default function ChartControls({
   };
 
   const secondaryCount =
-    (selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
+    // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
+    // Power statistic and Rated boundaries controls count instead.
+    (powerXSurface
+      ? powerXChangedCount({ metric: selectedYAxisMetric, compare: powerCompare })
+      : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
+        ? 0
+        : 1) +
     (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
@@ -444,6 +454,21 @@ export default function ChartControls({
     showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
     showsTcoBasisSelector(selectedModel, selectedSequence);
+  // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
+  // where its options are longer, and the rest of the row shares what is left. PowerX
+  // keeps the same first column and splits the rest in two, so its Count toggle (two
+  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one
+  // cell each) flow left to right in rows of three. Below sm every cell is a row.
+  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  const chartConfigGridClass = powerXSurface
+    ? xAxisWide
+      ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
+      : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
+    : showXAxisMode
+      ? xAxisWide
+        ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'
+        : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
+      : 'sm:grid-cols-2';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -465,23 +490,27 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            <ScenarioSelector
-              value={selectedSequence}
-              onChange={handleSequenceChange}
-              open={openDropdown === 'sequence'}
-              onOpenChange={handleDropdownOpenChange('sequence')}
-              availableSequences={availableSequences}
-              model={selectedModel}
-              data-testid="scenario-selector"
-            />
-            <PrecisionSelector
-              value={selectedPrecisions}
-              onChange={handlePrecisionChange}
-              open={openDropdown === 'precision'}
-              onOpenChange={handleDropdownOpenChange('precision')}
-              availablePrecisions={availablePrecisions}
-              data-testid="precision-multiselect"
-            />
+            <div className="min-w-0">
+              <ScenarioSelector
+                value={selectedSequence}
+                onChange={handleSequenceChange}
+                open={openDropdown === 'sequence'}
+                onOpenChange={handleDropdownOpenChange('sequence')}
+                availableSequences={availableSequences}
+                model={selectedModel}
+                data-testid="scenario-selector"
+              />
+            </div>
+            <div className="min-w-0">
+              <PrecisionSelector
+                value={selectedPrecisions}
+                onChange={handlePrecisionChange}
+                open={openDropdown === 'precision'}
+                onOpenChange={handleDropdownOpenChange('precision')}
+                availablePrecisions={availablePrecisions}
+                data-testid="precision-multiselect"
+              />
+            </div>
           </div>
         </ControlPanel>
 
@@ -497,9 +526,10 @@ export default function ChartControls({
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
-              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+              className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
               {showXAxisMode && <XAxisModeSelector />}
+              {powerXSurface && powerXControls}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
                 hidden={powerXSurface}

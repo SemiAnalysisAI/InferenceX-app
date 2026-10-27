@@ -26,8 +26,8 @@ describe('Power boundary labels', () => {
       );
       const labels =
         locale === 'en'
-          ? ['GPU Level Measured', 'All in Measured']
-          : ['GPU 实测功耗', '整体实测功耗'];
+          ? ['GPU Level Measured', 'All in Measured IT (no PUE)', 'All in Measured']
+          : ['GPU 实测功耗', '整体实测 IT 功耗（不含 PUE）', '整体实测功耗'];
       cy.get('[data-testid="measured-power-basis"]').click();
       cy.get('[data-select-option]').should(($options) => {
         expect([...$options].map((option) => option.textContent?.trim())).to.deep.equal(labels);
@@ -170,7 +170,7 @@ describe('PowerX advanced metric controls', () => {
   it('offers both the two-boundary and the all-four-boundary compare', () => {
     mountControls('y_measuredJPerOutputToken');
     cy.get('[data-testid="measured-power-compare"]').click();
-    cy.get('[role="option"][data-value="all"]').should('contain.text', 'All four').click();
+    cy.get('[role="option"][data-value="all"]').should('contain.text', 'All five').click();
     cy.get('[data-testid="selected-compare"]').should('have.text', 'all');
     cy.get('[data-testid="measured-power-compare"]').click();
     cy.get('[role="option"][data-value="boundaries"]').click();

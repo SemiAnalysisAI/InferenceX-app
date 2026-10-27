@@ -241,6 +241,34 @@ const agenticRows = [
 }));
 
 describe('AgentX All in Measured chart and table', () => {
+  it('drops the chart hint and the ISL/OSL footer on PowerX without asking for sketches', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticRows });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticRows }).as('agenticBenchmarks');
+    cy.intercept('GET', '/api/v1/workflow-info*', {
+      body: { runs: [], changelogs: [], configs: [] },
+    });
+    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/resident-sequence-lengths*', { body: {} }).as(
+      'residentSequenceLengths',
+    );
+    cy.visit('/powerx?g_model=Kimi-K3&i_seq=agentic-traces&i_prec=fp4&i_optimal=0&i_best=0', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.wait('@agenticBenchmarks');
+    cy.get('[data-testid="chart-figure"]')
+      .first()
+      .find('.dot-group')
+      .should('have.length.at.least', 1);
+    // Same official agentic points on /inference show both lines; PowerX shows neither.
+    cy.contains('p', 'pin tooltip').should('not.exist');
+    cy.get('[data-testid="resident-sequence-lengths"]').should('not.exist');
+    cy.get('@residentSequenceLengths.all').should('have.length', 0);
+  });
+
   for (const [locale, width] of [
     ['en', 1280],
     ['zh', 390],
@@ -298,13 +326,6 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .find('.unofficial-overlay-pt')
         .should('have.length', 1);
-      // PowerX keeps the AgentX calibration caveat in the collapsed method note.
-      cy.get('[data-testid="powerx-method"]')
-        .first()
-        .should(
-          'contain.text',
-          locale === 'en' ? 'not been calibrated against measured AgentX' : '尚未用 AgentX',
-        );
       cy.get('header').invoke('css', 'visibility', 'hidden');
       cy.get('[data-testid="chart-figure"]')
         .first()

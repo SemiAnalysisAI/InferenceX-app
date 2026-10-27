@@ -71,6 +71,15 @@ export interface ChartLegendProps {
   readOnly?: boolean;
   /** An enclosing panel can own expansion instead of the legend itself. */
   collapsible?: boolean;
+  /** Sidebar only: extra controls rendered between the items and the switches. */
+  controls?: React.ReactNode;
+  /** Sidebar only: extra content rendered after the switches and their Advanced group. */
+  footer?: React.ReactNode;
+  /**
+   * Sidebar only: on phones the legend folds into one row with this label and
+   * opens on tap, so the chart stays the first thing on screen.
+   */
+  mobileLabel?: string;
 }
 
 export default function ChartLegend({
@@ -93,6 +102,9 @@ export default function ChartLegend({
   hideAtomFootnote = false,
   readOnly = false,
   collapsible = true,
+  controls,
+  footer,
+  mobileLabel,
 }: ChartLegendProps) {
   const isLegendExpanded = collapsible ? expandedProp : true;
   const locale = useLocale();
@@ -120,6 +132,8 @@ export default function ChartLegend({
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const advancedControlsId = useId();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const mobileBodyId = useId();
 
   const itemsExpanded = isSidebar ? false : isLegendExpanded;
   const activeCount = useMemo(
@@ -199,7 +213,8 @@ export default function ChartLegend({
   );
 
   const hasSidebarControls =
-    isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
+    isSidebar &&
+    (keyIndicators || controls || footer || (switches && switches.length > 0) || hasAtomFootnote);
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-initial min-h-0 space-y-0.5',
@@ -393,14 +408,20 @@ export default function ChartLegend({
   };
 
   const hasBottomControls =
-    switchElements || (!isSidebar && actionElements) || keyIndicators || hasAtomFootnote;
+    switchElements ||
+    (!isSidebar && actionElements) ||
+    keyIndicators ||
+    hasAtomFootnote ||
+    (isSidebar && (controls || footer));
   const bottomControls = hasBottomControls ? (
     <div
       data-testid="legend-display-controls"
       className={cn('shrink-0 grow-0', isSidebar && 'min-w-0 [contain:inline-size]')}
     >
       {!isSidebar && actionElements}
+      {isSidebar && controls}
       {switchElements}
+      {isSidebar && footer}
       {keyIndicators}
       {hasAtomFootnote && <AtomEngineFootnote className="mt-2 no-export" />}
     </div>
@@ -479,11 +500,30 @@ export default function ChartLegend({
       </ul>
     );
 
+  // On phones a sidebar legend with a mobile label folds into one row under the chart.
+  const foldsOnMobile = isSidebar && mobileLabel !== undefined && !readOnly;
   const content = (
     <div className={isSidebar ? 'min-w-0' : 'relative'}>
+      {foldsOnMobile && (
+        <button
+          type="button"
+          data-testid="legend-mobile-toggle"
+          aria-expanded={mobileOpen}
+          aria-controls={mobileBodyId}
+          onClick={() => setMobileOpen((open) => !open)}
+          className="no-export flex min-h-11 w-full items-center justify-between gap-2 rounded-md border border-border/60 px-3 text-sm font-medium text-foreground sm:hidden"
+        >
+          <span>{mobileLabel}</span>
+          <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+            {activeCount}
+            {mobileOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </span>
+        </button>
+      )}
       <div
+        id={foldsOnMobile ? mobileBodyId : undefined}
         data-testid={!isSidebar || isLegendExpanded ? 'chart-legend' : undefined}
-        className={outerClasses}
+        className={cn(outerClasses, foldsOnMobile && !mobileOpen && 'max-sm:hidden')}
         style={outerStyle}
       >
         {panelHeader}

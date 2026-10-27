@@ -152,7 +152,7 @@ which API selectors belong together.
 | View                            | Selection and calculation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare, powerFit and powerBreakdown panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                           |
+| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare, powerFit, powerBreakdown and headroom panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV.                                                                                                                                                                                 |
 | `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                                                                                                                                                                                                                                                               |
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                                                                                                                                                                                                                                       |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -361,36 +361,85 @@ intercept, not idle power, and do not read the line outside its x-range.
 `powerBreakdown=true` returns `powerBreakdowns`: per hardware line (`hwKey|precision`,
 the chart legend grouping), each point's All in Measured W/GPU split into `gpu`
 (measured board power), `measuredCpu` (Grace sockets, NVL72 only, when socket telemetry
-is valid), and the modeled `server` parts, `fansPsu` (fans + conversion loss), `network`
-(scale-out share) and `facility` (PUE overhead). Each part is the deployment share ÷
-allocated GPUs, so the parts sum to `totalWattsPerGpu`. Only `gpu` and `measuredCpu` are
-measured; call the rest modeled at the point's measured GPU power under `modelRevision`.
+is valid), and the modeled `cpu` (host sockets), `memory` (host DRAM), `nic` (NIC cards +
+system-side optics), `nvswitch` (NVLink switch ASICs and trays), `storage` (NVMe), `other`
+(PCIe switches, retimers, shelf controllers), `fans`, `psuLoss` (AC/DC + DC/DC conversion
+loss), `network` (scale-out share) and `facility` (PUE overhead), in that stack order.
+`categories` lists the parts with watts on at least one point: an NVL72 line with measured
+sockets has no `cpu` or `memory` (the socket figure covers both), an AMD line has no
+`nvswitch`, a B300 line has no `other`. Each part is the deployment share ÷ allocated GPUs, so the parts sum to
+`totalWattsPerGpu`. Only `gpu` and `measuredCpu` are measured; call the rest modeled at the
+point's measured GPU power under `modelRevision`.
 `tdpWattsPerGpu` and `allInProvisionedWattsPerGpu` are rated references, not Pareto power
 metrics. Points are sorted by `interactivity` on `interactivityField`: the chart's
 interactivity x-axis (AgentX P90/P75 included), otherwise `median_intvty`. Points without
 validated GPU telemetry, a supported system model or positive interactivity are omitted.
 
+`headroom=true` returns `headroom`: the PowerX measured-vs-TDP table. Per hardware line
+(`hwKey|precision`), the measured average and P90 GPU W per chip read at 25 / 50 / 100 /
+300 tok/s/user (`interactivities`, on `interactivityField`) with the chart's own
+interpolation (throughput Pareto front, monotone Steffen spline, no extrapolation), the
+P90 share of the registry TDP (`percentTdpP90`) and `headroomPercent = 100 − percentTdpP90`.
+A cell outside a line's measured range (`interactivityMin`..`interactivityMax`) is `null`,
+never a guess; lines without P90 power, throughput, a registry TDP or two points are omitted.
+These are GPU board figures; TDP does not bound IT or facility power.
+
+A fifth power basis, `it-modeled` (All in Measured IT, no PUE), sits between the GPU and
+the facility meter: the measured GPU plus the modeled CPU, server parts, fans and PSU loss
+and the network share of `powerBreakdowns`, without the `facility` part. Its `metric`
+values are `y_itModeledWatts` and `y_itModeledJPerOutputToken`; they share the All in
+Measured table rules (rows without a model stay with their reason) and the same
+coverage. `utility-modeled` = `it-modeled` × PUE at every point. Storage and out-of-rack
+network are not modeled.
+
 The PowerX dashboard tab (`/powerx`, `/zh/powerx`) is a presentation of the
 `inference` view and adds no selectors. Its Power draw, Energy per token, Over time and
 Where the power goes tabs select existing `metric` values; the chip comparison and
-per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). Chips with measured
+per-chip drill-down read `powerBreakdowns` (`powerBreakdown=true`). The drill-down's chart
+and the comparison bars fold the twelve parts into six hatched layers (`gpu`; `measuredCpu`;
+the server parts `cpu` + `memory` + `nic` + `nvswitch` + `storage` + `other`; `fans` +
+`psuLoss`; `network`; `facility`), and a parts list beside the chart shows every part of the
+compared point; the API keeps the twelve parts. Chips with measured
 GPU power but no supported system model are named as not shown, not dropped silently.
-On that tab, comparing GPU only with Whole system draws `gpu-measured` and
-`utility-modeled` only; Advanced settings → Compare → All four boundaries adds the two
-provisioned bounds. Inference Performance offers no power metrics: an `/inference` link with a
+On that tab the Count control names three measured boundaries, GPU only (`gpu-measured`),
+IT (no PUE) (`it-modeled`) and Facility (`utility-modeled`), plus All; All
+(`i_pcompare=boundaries`) draws those three per chip on the Power draw or Energy scatter
+(GPU only solid, IT dashed, Facility dash-dot), and the legend, line labels, tooltips, table
+and CSV call them GPU only, IT (no PUE) and Facility; the page has no further control layer.
+Every power number on the tab carries a GPU, IT or Facility tag, explained in the tag's own
+tooltip, and a readout row under the caption gives the hovered or pinned point's IT W per
+GPU, GPUs per MW (1e6 ÷ IT W per GPU) and facility W per GPU at the model's PUE. The four
+views are tabs above the plot; Count, Per and Show as, then Scope, Power statistic and
+Rated boundaries (Off | All-in provisioned, `i_pcompare=provisioned`: GPU Level Measured
+solid and All in Provisioned dashed per chip, nothing else) are plain Chart
+Config controls, each shown only on the views where it applies; Split by sits in the Where
+the power goes card.
+Power draw shown as % of TDP shades each chip's headroom between its P90 draw and 100 % and
+adds the headroom table (`headroom=true`) with a CSV download. On Where the power goes the
+chip comparison stacks IT only by default; an Include facility switch (presentation only, no
+API selector) appends the PUE part; the compared chip's across-load drill-down (stacked bars or
+stacked area, `i_pbview`, stacked area by default) is open inline under its bar and follows the slider, and the view
+itself is `i_pcompare=breakdown` (no boundary line chart; the boundaries are compared on Power
+draw under Count: All). Over time adds a load-swing table per
+trace (peak, min, idle floor, mean, P5/P95, max 1 s and 5 s change, ramp up/down, volatility),
+a × 72 per NVL72 rack switch, and per-point CSV / JSON downloads served by
+`/api/v1/gpu-metrics-point/stats` (`format=csv|json`, `scale=gpu|nvl72`), which computes the
+same statistics from the same stored buckets. None of this adds `inference` view selectors.
+A share link with `i_pcompare=all` (not offered by the UI) adds both provisioned bounds to the measured three. Inference Performance offers no power metrics: an `/inference` link with a
 measured `metric`, or with a power-tier filter and no `metric`, opens `/powerx` with the same
 filters. Historical Trends keeps its measured power and energy metrics.
 PowerX 仪表板标签页（`/powerx`、`/zh/powerx`）是 `inference` 视图的另一种呈现，不新增选择项；
-芯片对比与单芯片下钻读取 `powerBreakdowns`。没有受支持系统功耗模型的芯片会标注为未显示。
-“仅 GPU + 整机”对比只绘制 `gpu-measured` 与 `utility-modeled`；高级设置 → 对比 → 全部四个边界会加入两个额定边界。
+芯片对比与单芯片下钻读取 `powerBreakdowns`；下钻图与对比横条把十二个部件合并为六层带斜线填充的分层（`gpu`；`measuredCpu`；服务器部件 `cpu` + `memory` + `nic` + `nvswitch` + `storage` + `other`；`fans` + `psuLoss`；`network`；`facility`），图旁的部件列表逐项列出对比点的各部件，API 仍返回十二个部件。没有受支持系统功耗模型的芯片会标注为未显示。
+统计口径控件命名三个实测边界：仅 GPU（`gpu-measured`）、IT（不含 PUE）（`it-modeled`）与数据中心（`utility-modeled`），外加“全部”；“全部”（`i_pcompare=boundaries`）在功耗或能耗散点图上按芯片绘制这三条（仅 GPU 实线、IT 虚线、数据中心点划线），图例、曲线标签、提示框、表格与 CSV 也沿用这一叫法；页面不再有第二层控件。页面上每个功耗数值都带有 GPU / IT / 数据中心标签，含义见标签自身的提示框；标题行下方的读数行给出悬停或固定数据点的每 GPU IT 功耗、每 MW 可支持的 GPU 数（1e6 ÷ 每 GPU IT 功耗）以及按模型 PUE 计的每 GPU 数据中心功耗。四个视图为图表上方的标签页；统计口径、计量单位与显示方式，以及 GPU 范围、功耗统计量和额定边界（关闭 | 整体预配，`i_pcompare=provisioned`：每芯片仅绘制 GPU 实测功耗实线与整体预配功耗虚线两条线）都是图表配置中的普通控件，仅在适用的视图上显示；拆分方式位于“功耗去向”卡片中。“功耗”视图按 TDP 占比显示时，会在各芯片 P90 功耗与 100% 之间填充余量，并附带余量表（`headroom=true`）与 CSV 下载。“功耗去向”中芯片对比默认只堆叠 IT 部分；“计入数据中心开销”开关（仅为展示，不新增 API 选择项）追加 PUE 部分；所对比芯片的“随负载变化”下钻图（堆叠柱状图或堆叠面积图，`i_pbview`）默认即在其横条下方内联展开并随滑块切换芯片，该视图本身为 `i_pcompare=breakdown`（不再有功耗边界曲线图；边界对比位于“功耗”视图的“统计口径：全部”）。“随时间变化”新增每条曲线的负载波动表（峰值、最小值、空闲底线、均值、P5/P95、最大 1 秒与 5 秒变化、上升/下降速率、波动率）、“× 72（每 NVL72 机架）”开关，以及由 `/api/v1/gpu-metrics-point/stats`（`format=csv|json`、`scale=gpu|nvl72`）提供的逐点 CSV / JSON 下载，该接口用同一函数基于同一已存数据桶计算统计。这些都不新增 `inference` 视图的选择项。分享链接带 `i_pcompare=all`（界面不提供）时，会在三个实测边界之上加入两个额定边界。
 Inference Performance 不再提供功耗指标：带实测 `metric`，或带功耗等级筛选但未指定 `metric` 的 `/inference` 链接会以相同筛选条件打开 `/powerx`。Historical Trends 仍保留实测功耗与能耗指标。
 
-These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
+These analytical results (`serviceCompare`, `roleShare`, `powerFit`, `powerBreakdown`, `headroom`) require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured and its IT boundary, which export `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
 同并发表格或分享参数。功耗拟合（`powerFit`）同样仅通过 API 提供；PowerX 标签页保留角色分析与系统功耗构成面板，分别对应 `roleShare`
-和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分为
+和 `powerBreakdown`。功耗构成中只有 `gpu` 与 `measuredCpu` 为实测值，其余部分（`cpu`、`memory`、
+`nic`、`nvswitch`、`storage`、`other`、`fans`、`psuLoss`、`network`、`facility`）为
 按该点实测 GPU 功耗建模的结果，各部分之和等于 All in Measured W/GPU。各点按 `interactivityField` 上的
 `interactivity` 排序：图表 x 轴为交互性时（含 AgentX P90/P75）沿用该轴，否则使用 `median_intvty`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 

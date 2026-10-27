@@ -178,6 +178,8 @@ describe('PowerX measured power timeline', () => {
     );
     cy.get('path.power-trace[data-segment="full"]').should('not.exist');
     cy.get('path.power-trace[data-run-index="0"][data-segment="window"]').should('exist');
+    // PowerX shows no interaction hint under the timeline.
+    cy.contains('p', 'pin tooltip').should('not.exist');
     assertShareLinkParams({
       i_metric: 'y_measuredPowerTimeline',
       i_ptaxis: 'serving',
