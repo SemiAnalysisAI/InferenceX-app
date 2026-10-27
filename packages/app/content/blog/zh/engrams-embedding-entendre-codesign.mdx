@@ -84,7 +84,7 @@ Engram 的表现优于纯 MoE 基线。我们也复现了 DeepSeek 的另一项�
 
 这些例子说明，可学习记忆优化的是训练目标，而不是判断哪些事实值得保存。许可证、参考文献片段、API 框架代码和网页固定元素都能提供预测捷径，因此增加 Engram 容量的价值可能取决于数据准备后保留了什么。这不说明表容量被“浪费”：对评估语料的扫描既不能确定训练时见过什么，也不能确定每类内容占据多少容量。
 
-对于 offload，强 gate 并不能识别缓存热行。低 gate 也不会自动省掉读取：计算 gate 需要已经取回的 key，并会抵消融合内核的性能收益。若要跳过读取，需要另一个在检索之前运行的有用性预测器。
+对于 offload，强 gate 并不能识别缓存热行。低 gate 也不会自动省掉读取：计算 gate 需要已经取回的 key，并会抵消融合 kernel 的性能收益。若要跳过读取，需要另一个在检索之前运行的有用性预测器。
 
 ## 移除 Engram
 
@@ -154,7 +154,7 @@ DeepSeekv4.1 Flash 发布当天，NVIDIA vLLM 在 H100、H200、B200、B300、GB
   caption="来源：[InferenceX](https://inferencex.semianalysis.com/inference/deepseek-v41-flash)"
 />
 
-AMD 的 vLLM 文档要求使用 vllm/vllm-openai-rocm:deepseekv41-flash-0909，但从模型发布第 0 小时到第 23 小时，AMD 都没有公开该镜像。AMD 宣称“SPEED IS THE MOAT”，却直到第 23 小时仍未发布。我们希望 AMD 团队今后改善模型发布首小时的支持流程。
+AMD 的 vLLM 文档建议使用 vllm/vllm-openai-rocm:deepseekv41-flash-0909，但从模型发布第 0 小时到第 23 小时，AMD 都没有公开该镜像。AMD 宣称“SPEED IS THE MOAT”，却直到第 23 小时仍未发布。我们希望 AMD 团队今后改善模型发布首小时的支持流程。
 
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-14.png"
@@ -188,7 +188,7 @@ CUDA 护城河的力量来自 NVIDIA 与庞大的 600 万开发者社区生态�
 
 ## AgentX 中 Engram DRAM offload 带来的性能提升
 
-HBM 与 DRAM offload 使用同一个 GPU 内核选择和反量化行。HBM 版本读取 GPU 内存；统一虚拟寻址（UVA）版本则直接读取固定页主机内存。
+HBM 与 DRAM offload 使用同一个 GPU kernel 来完成行选择与反量化。HBM 版本读取 GPU 内存；统一虚拟寻址（UVA）版本则直接读取固定页主机内存。
 
 两者都支持完整 decode graph。把表移入 HBM 只加速稀疏查表，并不改变 decoder 的计算和通信，因此整体收益很小，却占用了原本可供 KV cache 使用的内存。
 
@@ -210,11 +210,11 @@ HBM 与 DRAM offload 使用同一个 GPU 内核选择和反量化行。HBM 版�
 
 我们在 B200 上创建了一个未经优化的 vLLM fork，把 Engram 表放入本地 SSD 上的内存映射文件。当其他应用需要 RAM 时，文件支持的映射允许操作系统回收表页面。已经缓存在内存中的页面可以直接提供数据，无需再次读取 SSD。还需要说明，我们未能启用 GDS。
 
-这个未经优化的 SSD 实现改变了行抵达 GPU 的路径：先把行 ID 复制到 CPU，去重后将所需行收集到固定页缓冲区，再把这些行复制回 GPU 并反量化。这些工作在 GPU 执行 graph 的片段之间运行。原生 UVA 则直接在 GPU 上选择并反量化行，避免 CPU 往返。
+这个未经优化的 SSD 实现改变了行抵达 GPU 的路径：先把行 ID 复制到 CPU，去重后将所需行收集到固定页缓冲区，再把这些行复制回 GPU 并反量化。这些工作穿插在 GPU 执行图（execution graph）的各个片段之间运行。原生 UVA 则直接在 GPU 上选择并反量化行，避免 CPU 往返。
 
-Warm 文件系统缓存可以消除物理 SSD 读取，但协调、行收集和传输仍然存在。因此，即使文件已经缓存在 RAM 中，也可能比固定页 DRAM 表更慢。这里比较的是完整服务路径，并未单独拆分各项操作耗时。
+处于 warm 状态的文件系统缓存可以消除物理 SSD 读取，但协调、行收集和传输仍然存在。因此，即使文件已经缓存在 RAM 中，也可能比固定页 DRAM 表更慢。这里比较的是完整服务路径，并未单独拆分各项操作耗时。
 
-在 total tokens per dollar 和 P90 interactivity 两项指标上，B200 DRAM 都优于两条实测 SSD 服务曲线。在约 125 tokens/s/user 时，DRAM 每美元提供 1.21 亿 total tokens，SSD 为 5200 万。
+在每美元总 token 数与 P90 交互性两项指标上，B200 DRAM 都优于两条实测 SSD 服务曲线。在约 125 tokens/s/user 时，DRAM 每美元提供 1.21 亿 total tokens，SSD 为 5200 万。
 
 <Figure
   src="/images/engrams-embedding-entendre-codesign/figure-19.png"

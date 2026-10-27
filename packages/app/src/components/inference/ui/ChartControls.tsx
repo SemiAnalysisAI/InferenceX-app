@@ -62,6 +62,7 @@ import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import { usePowerXSurface } from './powerx-surface';
 import { powerXChangedCount } from '../powerx/powerx-views';
+import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -188,7 +189,8 @@ interface ChartControlsProps {
   showTcoBasis?: boolean;
   showXAxisMode?: boolean;
   /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
-  powerXControls?: ReactNode;
+  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
+  powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
 }
 
 export default function ChartControls({
@@ -528,8 +530,15 @@ export default function ChartControls({
             <div
               className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
-              {showXAxisMode && <XAxisModeSelector />}
-              {powerXSurface && powerXControls}
+              {powerXSurface && powerXControls
+                ? powerXControls({
+                    // The More fold is one column: the cell fills it like Count and Per do.
+                    xAxisSelector: showXAxisMode ? (
+                      <XAxisModeSelector className="max-md:max-w-none" />
+                    ) : null,
+                    xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
+                  })
+                : showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
                 hidden={powerXSurface}

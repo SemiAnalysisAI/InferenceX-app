@@ -102,7 +102,7 @@ function expectBestPerSku(enabled: boolean) {
     'data-state',
     enabled ? 'checked' : 'unchecked',
   );
-  cy.contains('button', 'Done').click();
+  cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 }
 
 function visitModel(model: string, extra = '', path = '/inference') {

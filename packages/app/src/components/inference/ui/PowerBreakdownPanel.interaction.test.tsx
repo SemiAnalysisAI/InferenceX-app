@@ -12,8 +12,11 @@ import { modelSystemPower } from '@/lib/power/modeled-system-power';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777/attempts/1';
 
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+const track = vi.hoisted(() => vi.fn());
+// The locale and the pointer type are flipped per test: zh copy, touch scrub.
+const env = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', coarsePointer: false }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => env.locale }));
+vi.mock('@/lib/analytics/analytics', () => ({ track }));
 vi.mock('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: () => null, setUrlParams: () => {} }),
 }));
@@ -86,7 +89,12 @@ vi.mock('@/lib/d3-chart/D3Chart', async () => {
 });
 
 import PowerAnalysisPanels from './PowerAnalysisPanels';
-import PowerBreakdownPanel, { layerStyle, swatchStyle } from './PowerBreakdownPanel';
+import PowerBreakdownPanel, {
+  layerStyle,
+  nearestColumnIndex,
+  swatchStyle,
+} from './PowerBreakdownPanel';
+import { COARSE_POINTER_QUERY } from '@/hooks/useMediaQuery';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -189,9 +197,11 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  env.locale = 'en';
+  env.coarsePointer = false;
   // jsdom has no media queries (pointer type) or canvas text (the cursor label's width).
   window.matchMedia = ((query: string) => ({
-    matches: false,
+    matches: env.coarsePointer && query === COARSE_POINTER_QUERY,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -212,6 +222,20 @@ const mouse = (element: Element, type: string, init: MouseEventInit = {}) =>
   act(() => {
     element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...init }));
   });
+/** A finger (or a mouse, when said so) on the plot: jsdom reads client x as plot x. */
+const pointer = (element: Element, type: string, init: PointerEventInit = {}) =>
+  act(() => {
+    element.dispatchEvent(
+      new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 1,
+        pointerType: 'touch',
+        isPrimary: true,
+        ...init,
+      }),
+    );
+  });
 const legendItems = () => [
   ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-breakdown-legend-item"]'),
 ];
@@ -220,6 +244,7 @@ const legendItem = (band: string) =>
     `[data-testid="power-breakdown-legend-item"][data-band="${band}"]`,
   )!;
 const swatch = (item: HTMLElement) => item.querySelector('span[title]') as HTMLElement;
+const swatchOf = (part: HTMLElement) => part.querySelector('span') as HTMLElement;
 const areas = () => [
   ...container.querySelectorAll<SVGPathElement>('[data-testid="power-breakdown-area"]'),
 ];
@@ -239,6 +264,8 @@ const partRow = (category: string) =>
   container.querySelector<HTMLButtonElement>(
     `[data-testid="power-part-row"][data-category="${category}"]`,
   )!;
+const rowPoint = (row: HTMLElement) =>
+  row.querySelector('[data-testid="power-chip-compare-point"]')?.textContent;
 
 /** The B200 fixture's layers: no Grace socket on HGX; the facility counted off PowerX. */
 const LAYERS = ['gpu', 'server', 'fansPsu', 'network', 'facility'];
@@ -610,6 +637,206 @@ describe('PowerBreakdownPanel unofficial-run overlays', () => {
   });
 });
 
+describe('PowerAnalysisPanels per-chip compared point', () => {
+  const drilldownHits = () => [
+    ...container.querySelectorAll<SVGRectElement>(
+      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
+    ),
+  ];
+  const drilldownTitle = () =>
+    container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent;
+  const marker = () =>
+    container.querySelector<SVGRectElement>('[data-testid="power-breakdown-compared"]');
+  const partsHeading = () =>
+    container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
+  const chipRows = () => [
+    ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+  ];
+  const chipRow = (name: string) =>
+    chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
+  const sliderValue = () =>
+    container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
+  const moveSlider = (step: number) => {
+    const slider = container.querySelector<HTMLInputElement>(
+      '[data-testid="power-chip-compare-target"]',
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        slider,
+        String(step),
+      );
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  const renderInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
+    render(
+      <PowerXSurfaceProvider>
+        <PowerAnalysisPanels
+          data={data}
+          overlayData={overlayData}
+          xField="mean_tpot_intvty"
+          xLabel="Interactivity (output tok/s/user)"
+          chartId="chart-4"
+          placement="before"
+          layout="inline"
+        />
+      </PowerXSurfaceProvider>,
+    );
+
+  beforeEach(() => track.mockClear());
+
+  it('pins the clicked column for that chip only and keeps the drill-down on it', () => {
+    renderInline([...sglang, ...vllm]);
+    // The slider lands on vLLM c16 at 60 tok/s/user; the SGLang row reads its own nearest point.
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+    const sglangBefore = rowPoint(chipRow('B200 (SGLang) FP8'));
+    expect(marker()).not.toBeNull();
+    const markerBefore = marker()!.getAttribute('x');
+    // Columns sit in interactivity order: c64 (30), c16 (60), c4 (100), c1 (150).
+    const hits = drilldownHits();
+    expect(hits).toHaveLength(4);
+    mouse(hits[0], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(
+      chipRow('B200 (vLLM) FP8')
+        .querySelector('[data-testid="power-chip-compare-unpin"]')
+        ?.getAttribute('title'),
+    ).toBe('Pinned to c64 · click to follow the slider');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(sglangBefore);
+    expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
+    expect(sliderValue()).toBe('60 tok/s/user');
+    // The drill-down stays on the clicked chip; its outline and list move to the column.
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c64 · 30 tok/s/user');
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
+      hw: 'b200_vllm',
+      concurrency: 64,
+    });
+    // A second column replaces the pin; still one pinned chip.
+    mouse(drilldownHits()[2], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c4 · 100 tok/s/user');
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(1);
+  });
+
+  it('keeps the pin through opening another chip and collapsing, drops it when the slider moves', () => {
+    renderInline([...sglang, ...vllm]);
+    const order = chipRows().map(
+      (row) => row.querySelector('span span span.truncate')?.textContent,
+    );
+    mouse(drilldownHits()[2], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    // Another chip's drill-down: the vLLM pin stays on its row.
+    mouse(chipRow('B200 (SGLang) FP8'), 'click');
+    expect(drilldownTitle()).toBe('B200 (SGLang) FP8 across load');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c4 · 100 tok/s/user');
+    // Collapsed: still pinned; reopened: the outline and the list are back on c4.
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="power-breakdown-collapse"]')!
+        .click(),
+    );
+    expect(container.querySelector('[data-testid="power-chip-compare-drilldown"]')).toBeNull();
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    mouse(chipRow('B200 (vLLM) FP8'), 'click');
+    expect(drilldownTitle()).toBe('B200 (vLLM) FP8 across load');
+    expect(partsHeading()).toBe('B200 (vLLM) FP8 · c4 · 100 tok/s/user');
+    expect(marker()).not.toBeNull();
+    // The slider is the global control: every pin goes, the rows keep their order.
+    moveSlider(0);
+    expect(sliderValue()).toBe('20 tok/s/user');
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    expect(
+      chipRows().map((row) => row.querySelector('span span span.truncate')?.textContent),
+    ).toEqual(order);
+  });
+
+  it('draws the slider as a guide, labels it only off the compared column, and unpins from it', () => {
+    renderInline([...sglang, ...vllm]);
+    const guide = () =>
+      container.querySelector<SVGLineElement>('[data-testid="power-breakdown-guide"]');
+    const guideLabel = () =>
+      container.querySelector<SVGTextElement>('[data-testid="power-breakdown-guide-label"]');
+    const guideHit = () =>
+      container.querySelector<SVGRectElement>('[data-testid="power-breakdown-guide-hit"]');
+    // Not pinned: the guide sits on the compared column (vLLM c16 at 60), so no label.
+    expect(guide()).not.toBeNull();
+    expect(guideLabel()).toBeNull();
+    expect(guideHit()?.getAttribute('pointer-events')).toBe('none');
+    const guideX = Number(guide()!.getAttribute('x1'));
+    const markerX = Number(marker()!.getAttribute('x'));
+    const markerWidth = Number(marker()!.getAttribute('width'));
+    expect(guideX).toBeGreaterThan(markerX);
+    expect(guideX).toBeLessThan(markerX + markerWidth);
+    // Pinned to c1 (150): the outline moves, the guide stays at the slider and says so.
+    mouse(drilldownHits()[3], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c1 · 150 tok/s/user');
+    expect(Number(guide()!.getAttribute('x1'))).toBe(guideX);
+    expect(guideLabel()?.textContent).toBe('60');
+    expect(guideHit()?.getAttribute('pointer-events')).toBe('all');
+    // The guide is the way back: a click on it follows the slider again.
+    mouse(guideHit()!, 'click');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBeUndefined();
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+    expect(guideLabel()).toBeNull();
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_unpinned', {
+      hw: 'b200_vllm',
+      concurrency: 1,
+    });
+    // So is the column under it while pinned; a column click elsewhere pins again.
+    mouse(drilldownHits()[0], 'click');
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c64 · 30 tok/s/user');
+    mouse(drilldownHits()[1], 'click');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBeUndefined();
+    expect(rowPoint(chipRow('B200 (vLLM) FP8'))).toBe('c16 · 60 tok/s/user');
+  });
+
+  it('teaches the click in the cursor label: compare here, or this is the compared column', () => {
+    renderInline([...sglang, ...vllm]);
+    const hint = () =>
+      container.querySelector('[data-testid="power-breakdown-cursor-hint"]')?.textContent;
+    const hits = drilldownHits();
+    // Hovering the GPU band of the compared column (c16): the second line says so.
+    mouse(hits[1], 'mousemove', { clientX: 200, clientY: 380 - 40 - 56 - 2 });
+    expect(
+      container.querySelector('[data-testid="power-breakdown-cursor-label"]')?.textContent,
+    ).toMatch(/^Measured GPU · /u);
+    expect(hint()).toBe('Compared here');
+    // Another column invites the click at its concurrency.
+    mouse(hits[0], 'mousemove', { clientX: 40, clientY: 380 - 40 - 56 - 2 });
+    expect(hint()).toBe('Click to compare at c64');
+    mouse(hits[0], 'mouseleave');
+    expect(container.querySelector('[data-testid="power-breakdown-cursor-hint"]')).toBeNull();
+  });
+
+  it('pins a point of an unofficial-run series by its own key', () => {
+    renderInline([...sglang, ...overlay], overlay);
+    const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
+    const overlayName = overlayRow.querySelector('span span span.truncate')!.textContent!;
+    expect(chipRows().map((row) => row.dataset.pinned)).toEqual([undefined, undefined]);
+    mouse(overlayRow, 'click');
+    expect(drilldownTitle()).toContain('single-hue');
+    const officialBefore = rowPoint(chipRow('B200 (SGLang) FP8'));
+    // The overlay's columns: c64 (22), c16 (48), c4 (85).
+    mouse(drilldownHits()[0], 'click');
+    expect(rowPoint(chipRow(overlayName))).toBe('c64 · 22 tok/s/user');
+    expect(chipRow(overlayName).dataset.pinned).toBe('true');
+    expect(rowPoint(chipRow('B200 (SGLang) FP8'))).toBe(officialBefore);
+    expect(chipRow('B200 (SGLang) FP8').dataset.pinned).toBeUndefined();
+    expect(partsHeading()).toContain('single-hue');
+    expect(partsHeading()).toMatch(/c64 · 22 tok\/s\/user$/u);
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
+      hw: 'b200_sglang',
+      concurrency: 64,
+    });
+  });
+});
+
 describe('PowerChipCompare legend highlight', () => {
   it('lights the hovered layer on every chip bar and in the open drill-down, and pins on click', () => {
     render(
@@ -709,5 +936,283 @@ describe('PowerChipCompare legend highlight', () => {
     for (const segment of segments('server')) expect(segment.dataset.emphasis).toBe('faded');
     expect(partRow('fans').dataset.emphasis).toBe('highlighted');
     mouse(partRow('fans'), 'mouseout');
+  });
+});
+
+describe('nearestColumnIndex', () => {
+  it('picks the column whose centre is closest to the finger, whatever the hit bands', () => {
+    expect(nearestColumnIndex([], 10)).toBeNull();
+    expect(nearestColumnIndex([80, 200, 340, 460], -50)).toBe(0);
+    expect(nearestColumnIndex([80, 200, 340, 460], 139)).toBe(0);
+    expect(nearestColumnIndex([80, 200, 340, 460], 141)).toBe(1);
+    expect(nearestColumnIndex([80, 200, 340, 460], 900)).toBe(3);
+  });
+});
+
+describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
+  const renderInline = (data: InferenceData[], overlayData: InferenceData[] = []) =>
+    render(
+      <PowerXSurfaceProvider>
+        <PowerAnalysisPanels
+          data={data}
+          overlayData={overlayData}
+          xField="mean_tpot_intvty"
+          xLabel="Interactivity (output tok/s/user)"
+          chartId="chart-5"
+          placement="before"
+          layout="inline"
+        />
+      </PowerXSurfaceProvider>,
+    );
+  const hits = () => [
+    ...container.querySelectorAll<SVGRectElement>(
+      '[data-testid="power-chip-compare-drilldown"] [data-testid="power-breakdown-hit"]',
+    ),
+  ];
+  const readout = () =>
+    container.querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
+  const readoutPoint = () =>
+    container.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent;
+  const readoutTotal = () =>
+    container.querySelector('[data-testid="power-breakdown-readout-total"]')?.textContent;
+  const readoutParts = () => [
+    ...container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="power-breakdown-readout-part"]',
+    ),
+  ];
+  const readoutSource = () =>
+    container.querySelector('[data-testid="power-breakdown-readout-source"]')?.textContent;
+  const rule = () =>
+    container.querySelector<SVGLineElement>('[data-testid="power-breakdown-scrub-rule"]');
+  const cursorLabel = () => container.querySelector('[data-testid="power-breakdown-cursor-label"]');
+  const compareButton = () =>
+    container.querySelector<HTMLButtonElement>('[data-testid="power-breakdown-compare-at"]');
+  const chipRows = () => [
+    ...container.querySelectorAll<HTMLButtonElement>('[data-testid="power-chip-compare-row"]'),
+  ];
+  const chipRow = (name: string) =>
+    chipRows().find((row) => row.querySelector('span span span.truncate')?.textContent === name)!;
+  const sliderValue = () =>
+    container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent;
+  const marker = () =>
+    container.querySelector<SVGRectElement>('[data-testid="power-breakdown-compared"]');
+  // The stub plot is 517 px wide on even spacing: columns centre at 78, 207, 336, 465.
+  const AT = { c64: 60, c16: 210, c4: 330, c1: 470 };
+
+  beforeEach(() => {
+    track.mockClear();
+    env.coarsePointer = true;
+  });
+
+  it('shows the compared point above the plot and the slider action as a button', () => {
+    renderInline([...sglang, ...vllm]);
+    // The plot's top margin shrinks to 16 px under the readout (the stub keeps the
+    // 380 px height, so the hit band is 380 − 16 − 56 tall); mouse charts keep 40 px.
+    expect(hits()[0].getAttribute('height')).toBe('308');
+    // The slider lands on vLLM c16 at 60 tok/s/user: that is what the readout reads.
+    expect(readout()?.dataset.source).toBe('compared');
+    expect(readout()?.dataset.concurrency).toBe('16');
+    expect(readoutPoint()).toBe('c16 · 60 tok/s/user');
+    const rowTotal = chipRow('B200 (vLLM) FP8').querySelector('.font-semibold')?.textContent;
+    expect(readoutTotal()).toBe(rowTotal?.replace(' WIT', ' W/GPUIT'));
+    expect(
+      readout()?.querySelector<HTMLElement>('[data-testid="power-basis-pill"]')?.dataset.basis,
+    ).toBe('it');
+    // One chip per layer in stack order with the plot's swatches; PowerX counts IT only.
+    expect(readoutParts().map((part) => part.dataset.band)).toEqual([
+      'gpu',
+      'server',
+      'fansPsu',
+      'network',
+    ]);
+    expect(readoutParts().map((part) => part.textContent)).toEqual([
+      expect.stringMatching(/^GPU\d+$/u),
+      expect.stringMatching(/^Server\d+$/u),
+      expect.stringMatching(/^Fans \+ PSU\d+$/u),
+      expect.stringMatching(/^Network\d+$/u),
+    ]);
+    expect(swatchOf(readoutParts()[0]).style.backgroundColor).toBe(
+      'color-mix(in oklab, var(--b200_vllm) 90%, transparent)',
+    );
+    expect(swatchOf(readoutParts()[1]).style.backgroundImage).toContain(
+      'repeating-linear-gradient(135deg',
+    );
+    expect(readoutSource()).toBe('Compared point · drag across the chart to read others');
+    // Nothing scrubbed, nothing pinned: no rule, the slider already reads this point.
+    expect(rule()).toBeNull();
+    expect(compareButton()?.textContent).toBe('Compare chips at 60 tok/s/user');
+    expect(compareButton()?.disabled).toBe(true);
+    // The plot carries no tooltip on touch: the readout is the detail.
+    expect(container.querySelector('[data-testid="tooltip-probe"]')?.innerHTML).toBe('');
+  });
+
+  it('scrubs the nearest column into the readout, moves the slider from the button', () => {
+    renderInline([...sglang, ...vllm]);
+    const columns = hits();
+    expect(columns).toHaveLength(4);
+    // A finger on the plot reads the column nearest its x, wherever the hit band is.
+    pointer(columns[1], 'pointerdown', { clientX: AT.c64, clientY: 200 });
+    expect(readout()?.dataset.source).toBe('scrub');
+    expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
+    expect(rule()?.dataset.index).toBe('0');
+    expect(container.querySelector('circle.breakdown-scrub-dot')?.getAttribute('fill')).toBe(
+      'var(--b200_vllm)',
+    );
+    expect(readoutSource()).toBe('Drag to read · tap to hold');
+    expect(cursorLabel()).toBeNull();
+    // The compat mouse events a touch synthesises never draw the hover label.
+    mouse(columns[1], 'mousemove', { clientX: AT.c64, clientY: 380 - 40 - 56 - 2 });
+    expect(cursorLabel()).toBeNull();
+    pointer(columns[1], 'pointermove', { clientX: AT.c4, clientY: 180 });
+    expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
+    expect(rule()?.dataset.index).toBe('2');
+    // The scrub keeps the slider and every row where they were.
+    expect(sliderValue()).toBe('60 tok/s/user');
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
+    pointer(columns[1], 'pointerup', { clientX: AT.c4, clientY: 180 });
+    expect(readout()?.dataset.source).toBe('scrub');
+    expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
+    // The explicit action: the slider moves to the scrubbed interactivity.
+    expect(compareButton()?.textContent).toBe('Compare chips at 100 tok/s/user');
+    expect(compareButton()?.disabled).toBe(false);
+    act(() => compareButton()!.click());
+    expect(sliderValue()).toBe('100 tok/s/user');
+    expect(track).toHaveBeenCalledWith('powerx_compare_at_scrub', {
+      hw: 'b200_vllm',
+      concurrency: 4,
+      interactivity: 100,
+      source: 'scrub',
+    });
+    expect(chipRows().filter((row) => row.dataset.pinned === 'true')).toHaveLength(0);
+    expect(readout()?.dataset.source).toBe('compared');
+    expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
+    expect(rule()).toBeNull();
+    expect(compareButton()?.disabled).toBe(true);
+  });
+
+  it('holds the column on a tap through the compared-point pin, and a cancelled gesture restores', () => {
+    renderInline([...sglang, ...vllm]);
+    const markerBefore = marker()!.getAttribute('x');
+    // A tap: the finger lands and lifts without a drag, so the browser clicks the column.
+    pointer(hits()[0], 'pointerdown', { clientX: AT.c64, clientY: 200 });
+    pointer(hits()[0], 'pointerup', { clientX: AT.c64, clientY: 200 });
+    mouse(hits()[0], 'click', { clientX: AT.c64, clientY: 200 });
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
+      hw: 'b200_vllm',
+      concurrency: 64,
+    });
+    expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
+    // The tap landed on the GPU band, but on touch a column tap only holds: no layer is
+    // isolated, so the chart does not dim; isolating comes from the readout's chips.
+    for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
+    expect(readoutParts().every((part) => part.getAttribute('aria-pressed') === 'false')).toBe(
+      true,
+    );
+    expect(readout()?.dataset.source).toBe('pinned');
+    expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
+    expect(readoutSource()).toBe('Pinned · tap the pin in its row to follow the slider');
+    expect(rule()).toBeNull();
+    expect(sliderValue()).toBe('60 tok/s/user');
+    expect(compareButton()?.textContent).toBe('Compare chips at 30 tok/s/user');
+    expect(compareButton()?.disabled).toBe(false);
+    // Scrubbing again reads other columns; a page scroll (pointercancel) restores the hold.
+    pointer(hits()[0], 'pointerdown', { clientX: AT.c1, clientY: 200 });
+    expect(readout()?.dataset.source).toBe('scrub');
+    expect(readoutPoint()).toBe('c1 · 150 tok/s/user');
+    pointer(hits()[0], 'pointercancel', { clientX: AT.c1, clientY: 260 });
+    expect(readout()?.dataset.source).toBe('pinned');
+    expect(readoutPoint()).toBe('c64 · 30 tok/s/user');
+    expect(rule()).toBeNull();
+    // A readout chip isolates its layer (pinned, like the legend); a second tap releases it.
+    const serverChip = readoutParts().find((part) => part.dataset.band === 'server')!;
+    mouse(serverChip, 'click');
+    expect(serverChip.getAttribute('aria-pressed')).toBe('true');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    expect(area('gpu').dataset.emphasis).toBe('faded');
+    // Another column tap holds that column and leaves the isolated layer alone.
+    pointer(hits()[2], 'pointerdown', { clientX: AT.c4, clientY: 200 });
+    pointer(hits()[2], 'pointerup', { clientX: AT.c4, clientY: 200 });
+    mouse(hits()[2], 'click', { clientX: AT.c4, clientY: 200 });
+    expect(readoutPoint()).toBe('c4 · 100 tok/s/user');
+    expect(area('server').dataset.emphasis).toBe('highlighted');
+    mouse(
+      readoutParts().find((part) => part.dataset.band === 'server')!,
+      'click',
+    );
+    for (const path of areas()) expect(path.dataset.emphasis).toBe('plain');
+    // The row's pin marker lets the chip follow the slider again; the readout follows.
+    const unpin = chipRow('B200 (vLLM) FP8').querySelector<HTMLElement>(
+      '[data-testid="power-chip-compare-unpin"]',
+    )!;
+    mouse(unpin, 'click');
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBeUndefined();
+    expect(readout()?.dataset.source).toBe('compared');
+    expect(readoutPoint()).toBe('c16 · 60 tok/s/user');
+  });
+
+  it('holds the compared column itself on a tap, so the readout says pinned', () => {
+    renderInline([...sglang, ...vllm]);
+    // The slider's column (vLLM c16): the finger lands there and lifts.
+    pointer(hits()[1], 'pointerdown', { clientX: AT.c16, clientY: 200 });
+    expect(readout()?.dataset.source).toBe('scrub');
+    pointer(hits()[1], 'pointerup', { clientX: AT.c16, clientY: 200 });
+    mouse(hits()[1], 'click', { clientX: AT.c16, clientY: 200 });
+    expect(chipRow('B200 (vLLM) FP8').dataset.pinned).toBe('true');
+    expect(readout()?.dataset.source).toBe('pinned');
+    expect(readoutPoint()).toBe('c16 · 60 tok/s/user');
+    expect(rule()).toBeNull();
+  });
+
+  it('ignores a mouse pointer, which keeps the hover label and the click', () => {
+    renderInline([...sglang, ...vllm]);
+    pointer(hits()[0], 'pointerdown', { pointerType: 'mouse', clientX: AT.c64, clientY: 200 });
+    expect(readout()?.dataset.source).toBe('compared');
+    expect(rule()).toBeNull();
+    env.coarsePointer = false;
+    act(() => root.render(<div />));
+    renderInline([...sglang, ...vllm]);
+    expect(readout()).toBeNull();
+    expect(compareButton()).toBeNull();
+    expect(hits()[0].getAttribute('height')).toBe('284');
+    mouse(hits()[0], 'mousemove', { clientX: AT.c64, clientY: 380 - 40 - 56 - 2 });
+    expect(cursorLabel()?.textContent).toMatch(/^Measured GPU · /u);
+  });
+
+  it('reads an unofficial-run series in its run colour', () => {
+    renderInline([...sglang, ...overlay], overlay);
+    const overlayRow = chipRows().find((row) => row.textContent?.includes('single-hue'))!;
+    mouse(overlayRow, 'click');
+    expect(
+      container.querySelector('[data-testid="power-chip-compare-drilldown"] h3')?.textContent,
+    ).toContain('single-hue');
+    expect(swatchOf(readoutParts()[0]).style.backgroundColor).toContain('--overlay-run-2');
+    expect(swatchOf(readoutParts()[1]).style.backgroundImage).toContain('--overlay-run-2');
+    // The overlay's columns: c64 (22), c16 (48), c4 (85); its own compared point first.
+    pointer(hits()[0], 'pointerdown', { clientX: AT.c64, clientY: 200 });
+    expect(readoutPoint()).toBe('c64 · 22 tok/s/user');
+    expect(container.querySelector('circle.breakdown-scrub-dot')?.getAttribute('fill')).toBe(
+      overlayRunColor(2),
+    );
+    expect(compareButton()?.textContent).toBe('Compare chips at 22 tok/s/user');
+  });
+
+  it('speaks Chinese', () => {
+    env.locale = 'zh';
+    renderInline([...sglang, ...vllm]);
+    expect(readoutSource()).toBe('当前对比点 · 在图上拖动可读取其他数据点');
+    expect(readoutParts().map((part) => part.textContent?.replace(/\d+$/u, ''))).toEqual([
+      'GPU',
+      '服务器',
+      '风扇 + 电源',
+      '网络',
+    ]);
+    expect(readoutParts()[1].getAttribute('title')).toBe('服务器部件 · 建模');
+    pointer(hits()[0], 'pointerdown', { clientX: AT.c4, clientY: 200 });
+    expect(readoutSource()).toBe('拖动读取 · 点按固定');
+    expect(compareButton()?.textContent).toBe('在 100 tok/s/user 处对比各芯片');
+    expect(
+      container.querySelector('[data-testid="power-chip-compare-drilldown"] p')?.textContent,
+    ).toBe('在图上拖动可读取任一数据点；点按可将其固定为对比点（虚线框标出）。');
   });
 });

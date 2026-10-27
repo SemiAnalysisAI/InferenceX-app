@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 
@@ -31,6 +32,20 @@ function isOnInferenceTab(): boolean {
   if (segments[0] === 'zh') segments.shift();
   return (segments[0] ?? 'inference') === 'inference';
 }
+
+/**
+ * True on a phone-width PowerX page, where a bottom toast would cover the date and
+ * run controls under the chart. Dashboard toasts stay off there; from md up, and on
+ * every other tab, they show as usual.
+ */
+export function isPhoneWidthPowerX(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments[0] === 'zh') segments.shift();
+  return segments[0] === 'powerx' && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
+
+const notPhoneWidthPowerX = () => !isPhoneWidthPowerX();
 
 function localizedNudgeHref(enPath: string): string {
   if (typeof window === 'undefined') return enPath;
@@ -53,6 +68,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'timer', delayMs: 1500 },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-reproducibility-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 10,
     scope: 'dashboard',
     content: {
@@ -90,6 +106,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     storageKey: 'inferencex-star-nudge-shown',
     permanentSuppressKey: STARRED_KEY,
     permanentSuppressEvent: STARRED_EVENT,
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 20,
     scope: 'dashboard',
     content: {
@@ -126,6 +143,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-export-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 15,
     scope: 'dashboard',
     content: {
@@ -149,6 +167,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 25,
     scope: 'dashboard',
     content: {
@@ -158,7 +177,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
-      descriptionZh: '渐变标签按并发级别对数据点进行颜色编码，让您一目了然地发现性能模式。',
+      descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
         label: 'Enable Gradient Labels',
         labelZh: '启用渐变标签',

@@ -1,0 +1,26 @@
+---
+title: 'DeepSeek V4.1 Flash'
+developer: 'DeepSeek'
+releaseDate: 'September 10, 2026'
+description: "DeepSeek's 552B-backbone Causal Encoder-Decoder with 8B active during prefill, 16B during decode, CSA2, and separate 196B Engram memory."
+---
+
+## Overview
+
+DeepSeek-V4.1-Flash is a native image-and-text MoE model with a Causal Encoder-Decoder (CED) backbone. It is a separate architecture from DeepSeek V4 Pro. DeepSeek reports 552B backbone parameters, activating 8B during prefill and 16B during decode, plus a separate 196B Engram conditional-memory table ([model card](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)).
+
+## Architecture
+
+- **CED:** 40 Transformer layers split into a 20-layer causal encoder and a 20-layer decoder. Decoder global KV is projected from the final encoder states, rather than independently stored from every decoder layer.
+- **Attention:** Compressed Sparse Attention 2 (CSA2), with Full, Reindex and Reuse modes, a hierarchical decoder indexer, and 128-token sliding-window attention (SWA).
+- **Shape:** hidden size 5120; 64 query heads, 1 KV head, head dimension 512; vocabulary 129280.
+- **MoE:** 384 routed experts plus 1 shared expert, 6 routed experts selected per token, expert intermediate width 2304.
+- **Memory:** Engram uses token-based conditional lookup. Its 196B parameters are excluded from the 552B backbone figure; this is distinct from Qwen3.8-Flash-Next's counting convention.
+- **Residuals and speculation:** single-pass mHC with 4 streams; DSpark speculative decoding.
+- **Context and modalities:** 1,048,576 positions; image/text input and text output. A vision encoder and projector supply visual embeddings.
+
+These dimensions and the three next-token prediction layers are specified in the [published config](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash/raw/main/config.json). The [model card](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash) explains why prefill and decode have different active parameter counts; reporting just one number loses that distinction.
+
+## Serving scope
+
+The model is MIT-licensed. Its reported FP4 KV-cache footprint and bounded SWA replay describe the architecture; measured InferenceX results depend on the actual checkpoint, serving engine and run configuration. Do not infer a benchmark speedup directly from parameter counts ([model card](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash)).

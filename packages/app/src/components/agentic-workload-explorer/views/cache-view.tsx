@@ -74,7 +74,7 @@ const STRINGS = {
     cacheByClient: '各客户端缓存',
     cacheEfficiencyPerDev: '各开发者缓存效率',
     cacheEfficiencyPerDevDetail: '最后 90 天 · cache_read / (cache_read + input)',
-    loading: '加载中...',
+    loading: '加载中…',
     lastNDays: (n: number) => `最后 ${n} 天`,
     nModels: (n: number) => `${n} 个模型`,
     nClients: (n: number) => `${n} 个客户端`,

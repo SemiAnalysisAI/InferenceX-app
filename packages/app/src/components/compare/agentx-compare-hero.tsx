@@ -3,7 +3,6 @@ import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
-import { TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 import {
   agentxDashboardHref,
   FEATURED_AGENTX_MODELS,
@@ -19,6 +18,7 @@ const MODEL_LOGOS: Record<string, string> = {
   'deepseek-v4': '/logos/deepseek-color.svg',
   'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
+  'minimax-m31-flash': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
@@ -40,6 +40,19 @@ const VENDOR_MARKS: readonly {
   gradients?: readonly VendorMarkGradient[];
   paths: readonly { d: string; fill: string }[];
 }[] = [
+  {
+    name: 'Huawei',
+    viewBox: '0 0 24 24',
+    width: 24,
+    height: 24,
+    // Huawei brand mark from https://cdn.simpleicons.org/huawei (Simple Icons).
+    paths: [
+      {
+        d: 'M3.67 6.14S1.82 7.91 1.72 9.78v.35c.08 1.51 1.22 2.4 1.22 2.4 1.83 1.79 6.26 4.04 7.3 4.55 0 0 .06.03.1-.01l.02-.04v-.04C7.52 10.8 3.67 6.14 3.67 6.14zM9.65 18.6c-.02-.08-.1-.08-.1-.08l-7.38.26c.8 1.43 2.15 2.53 3.56 2.2.96-.25 3.16-1.78 3.88-2.3.06-.05.04-.09.04-.09zm.08-.78C6.49 15.63.21 12.28.21 12.28c-.15.46-.2.9-.21 1.3v.07c0 1.07.4 1.82.4 1.82.8 1.69 2.34 2.2 2.34 2.2.7.3 1.4.31 1.4.31.12.02 4.4 0 5.54 0 .05 0 .08-.05.08-.05v-.06c0-.03-.03-.05-.03-.05zM9.06 3.19a3.42 3.42 0 00-2.57 3.15v.41c.03.6.16 1.05.16 1.05.66 2.9 3.86 7.65 4.55 8.65.05.05.1.03.1.03a.1.1 0 00.06-.1c1.06-10.6-1.11-13.42-1.11-13.42-.32.02-1.19.23-1.19.23zm8.299 2.27s-.49-1.8-2.44-2.28c0 0-.57-.14-1.17-.22 0 0-2.18 2.81-1.12 13.43.01.07.06.08.06.08.07.03.1-.03.1-.03.72-1.03 3.9-5.76 4.55-8.64 0 0 .36-1.4.02-2.34zm-2.92 13.07s-.07 0-.09.05c0 0-.01.07.03.1.7.51 2.85 2 3.88 2.3 0 0 .16.05.43.06h.14c.69-.02 1.9-.37 3-2.26l-7.4-.25zm7.83-8.41c.14-2.06-1.94-3.97-1.94-3.98 0 0-3.85 4.66-6.67 10.8 0 0-.03.08.02.13l.04.01h.06c1.06-.53 5.46-2.77 7.28-4.54 0 0 1.15-.93 1.21-2.42zm1.52 2.14s-6.28 3.37-9.52 5.55c0 0-.05.04-.03.11 0 0 .03.06.07.06 1.16 0 5.56 0 5.67-.02 0 0 .57-.02 1.27-.29 0 0 1.56-.5 2.37-2.27 0 0 .73-1.45.17-3.14z',
+        fill: '#FF0000',
+      },
+    ],
+  },
   {
     name: 'Google',
     viewBox: '0 0 48 48',
@@ -365,19 +378,20 @@ const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'qwen-3-8-flash-next',
   'qwen-3-5',
   'minimax-m3',
+  'kimi-k3',
+  'glm-5-3',
 ]);
 
 const LANDING_HARDWARE_RESULTS = [
   {
-    id: 'tpu',
-    vendor: 'Google',
-    title: 'TPU Qwen3.5 Submission',
-    titleZh: 'TPU Qwen3.5 提交结果',
-    subtitle: 'AgentX',
-    href: TPUV7_QWEN_3_5_AGENTX_URL,
-    model: 'qwen-3-5',
-    analyticsEvent: 'landing_tpu_results_clicked',
-    isNew: true,
+    id: 'huawei',
+    vendor: 'Huawei',
+    title: 'Huawei Ascend 950PR',
+    titleZh: '华为 Ascend 950PR',
+    subtitle: 'UbenchX',
+    href: '/ubenchx/core-memory-profiles',
+    model: 'ascend950pr',
+    analyticsEvent: 'landing_huawei_results_clicked',
   },
   {
     id: 'tpu-kimi-k3',
@@ -403,17 +417,6 @@ const LANDING_HARDWARE_RESULTS = [
     analyticsEvent: 'landing_rubin_results_clicked',
   },
   {
-    id: 'rubin',
-    vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 MiniMax M3 Submission',
-    titleZh: 'Vera Rubin NVL72 MiniMax M3 提交结果',
-    subtitle: '428 Billion parameters AgentX',
-    subtitleZh: '4280 亿参数 AgentX',
-    href: '/inference/minimax-m3',
-    model: 'minimax-m3',
-    analyticsEvent: 'landing_rubin_results_clicked',
-  },
-  {
     id: 'jalapeno',
     vendor: 'OpenAI',
     title: 'OpenAI Jalapeño',
@@ -422,6 +425,17 @@ const LANDING_HARDWARE_RESULTS = [
     href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
+  },
+  {
+    id: 'minimax-m31-flash',
+    vendor: 'MiniMax',
+    title: 'MiniMax M3.1 Flash',
+    titleZh: 'MiniMax M3.1 Flash',
+    subtitle: 'AgentX',
+    href: '/inference/minimax-m31-flash',
+    model: 'minimax-m31-flash',
+    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
+    isNew: true,
   },
 ] as const;
 
@@ -489,38 +503,40 @@ export function AgentXCompareHero({
               data-testid="compare-agentx-vendor-marks"
               className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
             >
-              {VENDOR_MARKS.map((mark) => (
-                <svg
-                  key={mark.name}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox={mark.viewBox}
-                  width={mark.width}
-                  height={mark.height}
-                  className="shrink-0"
-                >
-                  {mark.gradients ? (
-                    <defs>
-                      {mark.gradients.map((gradient) => (
-                        <linearGradient
-                          key={gradient.id}
-                          id={gradient.id}
-                          x1={gradient.x1}
-                          y1={gradient.y1}
-                          x2={gradient.x2}
-                          y2={gradient.y2}
-                        >
-                          {gradient.stops.map((stop) => (
-                            <stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
-                          ))}
-                        </linearGradient>
-                      ))}
-                    </defs>
-                  ) : null}
-                  {mark.paths.map((path) => (
-                    <path key={path.d} d={path.d} fill={path.fill} />
-                  ))}
-                </svg>
-              ))}
+              {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
+                (mark) => (
+                  <svg
+                    key={mark.name}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox={mark.viewBox}
+                    width={mark.width}
+                    height={mark.height}
+                    className="shrink-0"
+                  >
+                    {mark.gradients ? (
+                      <defs>
+                        {mark.gradients.map((gradient) => (
+                          <linearGradient
+                            key={gradient.id}
+                            id={gradient.id}
+                            x1={gradient.x1}
+                            y1={gradient.y1}
+                            x2={gradient.x2}
+                            y2={gradient.y2}
+                          >
+                            {gradient.stops.map((stop) => (
+                              <stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
+                            ))}
+                          </linearGradient>
+                        ))}
+                      </defs>
+                    ) : null}
+                    {mark.paths.map((path) => (
+                      <path key={path.d} d={path.d} fill={path.fill} />
+                    ))}
+                  </svg>
+                ),
+              )}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
@@ -559,7 +575,7 @@ export function AgentXCompareHero({
             {surface === 'landing' && (
               <div className="divide-y divide-border/70 border-b border-border/70">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
-                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
+                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
                     <CompareIndexTrackedLink
                       key={result.id}
@@ -572,19 +588,32 @@ export function AgentXCompareHero({
                       className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
-                        <svg
-                          data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox={mark.viewBox}
-                          width={32}
-                          height={32}
-                          aria-hidden="true"
-                          className="size-8 shrink-0 text-foreground"
-                        >
-                          {mark.paths.map((path) => (
-                            <path key={path.d} d={path.d} fill={path.fill} />
-                          ))}
-                        </svg>
+                        {result.vendor === 'MiniMax' ? (
+                          <img
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            src={MODEL_LOGOS[result.model]}
+                            alt=""
+                            aria-hidden="true"
+                            width={32}
+                            height={32}
+                            loading="lazy"
+                            className="size-8 shrink-0 object-contain"
+                          />
+                        ) : (
+                          <svg
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox={mark!.viewBox}
+                            width={32}
+                            height={32}
+                            aria-hidden="true"
+                            className="size-8 shrink-0 text-foreground"
+                          >
+                            {mark!.paths.map((path) => (
+                              <path key={path.d} d={path.d} fill={path.fill} />
+                            ))}
+                          </svg>
+                        )}
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
                             <span className="min-w-0">

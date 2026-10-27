@@ -58,6 +58,7 @@ jobs:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           RUN_ID: ${{ inputs.run_id }}
         run: |
+          : "${DATABASE_WRITE_URL:?DATABASE_WRITE_URL secret is not set}"
           args=(--yes)
           if [[ -n "$RUN_ID" ]]; then
             args+=(--run-id "$RUN_ID")
@@ -67,7 +68,9 @@ jobs:
       - name: Verify database
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-        run: bun run admin:db:verify
+        run: |
+          : "${DATABASE_WRITE_URL:?DATABASE_WRITE_URL secret is not set}"
+          bun run admin:db:verify
 
       - name: Invalidate cache
         env:

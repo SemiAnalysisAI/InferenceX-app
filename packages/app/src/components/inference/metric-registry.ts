@@ -12,9 +12,9 @@ export const COST_TIER_LABELS: Record<
 > = {
   hyperscaler: {
     option: 'Owning at Large Hyperscaler Volume',
-    optionZh: '自有 - 超大规模云大批量',
+    optionZh: '自有 · 超大规模云厂商批量采购',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有（超大规模云大批量）',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
   rental: {
     option: 'Rent - 3 Year Commit',

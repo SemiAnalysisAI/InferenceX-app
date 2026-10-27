@@ -219,7 +219,7 @@ export const DASHBOARD_ROUTES = [
     key: 'operatorx',
     path: '/operatorx',
     canonicalPath: '/operatorx',
-    navGroup: 'feature-gated',
+    navGroup: 'primary',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,

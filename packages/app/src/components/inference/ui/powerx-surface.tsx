@@ -27,10 +27,13 @@ const SetCompareTargetContext = createContext<((value: number | null) => void) |
 const IncludeFacilityContext = createContext(true);
 const SetIncludeFacilityContext = createContext<((value: boolean) => void) | null>(null);
 
-/** The point the readout row under the caption describes: hovered, pinned, or none. */
+/**
+ * The point the readout row under the caption describes: hovered, scrubbed (a
+ * finger on the chart, PowerX on a coarse pointer), pinned, or none.
+ */
 export interface PowerXActivePoint {
   point: InferenceData;
-  source: 'hover' | 'pinned';
+  source: 'hover' | 'scrub' | 'pinned';
 }
 const ActivePointContext = createContext<PowerXActivePoint | null>(null);
 /** `null` ends a hover (a pinned point stays); `'clear'` drops a pinned point too. */
@@ -43,12 +46,14 @@ export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<number | null>(null);
   const [includeFacility, setIncludeFacility] = useState(false);
   const [activePoint, setActivePointState] = useState<PowerXActivePoint | null>(null);
-  // A hover never replaces a pinned point; hover end only clears a hover.
+  // A hover never replaces a pinned point; hover end only clears a hover. A scrub
+  // (the finger on the chart) replaces anything, and a hover end leaves it: the
+  // compat mouse events a tap synthesises must not blank the readout.
   const setActivePoint = useMemo(
     () => (next: PowerXActivePointUpdate) =>
       setActivePointState((current) => {
         if (next === 'clear') return null;
-        if (next === null) return current?.source === 'pinned' ? current : null;
+        if (next === null) return current?.source === 'hover' ? null : current;
         if (next.source === 'hover' && current?.source === 'pinned') return current;
         return next;
       }),

@@ -103,7 +103,7 @@ function tokenRevenuePerGpuHour(): MetricExplanation {
       zh:
         '表示该运行点下每块 GPU 每小时可获得的 token 毛收入。标准化模式下，未缓存输入和输出均按每百万 1 美元计价，' +
         '缓存输入按每百万 0.10 美元计价。OpenRouter 模式采用所选模型当前公开的价格；未提供缓存读取价格时，按输入价格的 10% 计算。' +
-        '未缓存输入、缓存输入与输出分别计价。输入 token 占比优先采用口径一致的实测输入/输出吞吐量。解耦运行的两类速率使用不同 GPU 分母时，' +
+        '未缓存输入、缓存输入与输出分别计价。输入 token 占比优先采用口径一致的实测输入/输出吞吐量。分离式部署中预填充与解码的速率使用不同 GPU 分母时，' +
         '固定序列采用 ISL:OSL，Agentic trace 采用实测 prompt/generation token 构成。已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加；' +
         '否则由 GPU 与 CPU cache 相加。Historical Trends 会在计价前分别插值总吞吐量、输入 token 占比和缓存命中率。' +
         '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。该指标把吞吐量与交互性的权衡转换为面向业务的 SLA 曲线。',
@@ -487,7 +487,7 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'Supports eight-GPU HGX/OAM chassis and GB200/GB300 NVL72, where measured Grace-socket power ' +
         'is a second input and every compute tray takes an equal share of a modeled rack.',
       zh:
-        '每已分配加速器的整体实测功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
+        '每个已分配加速器的设施级建模功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
         '支持八卡 HGX/OAM 机箱和 GB200/GB300 NVL72；NVL72 另以 Grace socket 实测功耗为输入，每个计算 tray 平均分摊建模机架的功耗。',
     },
     formula: {
@@ -502,12 +502,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'measured GPU energy equals the ratio of modeled facility power to measured GPU power. ' +
         'Missing where the system power model or validated measured power is unavailable.',
       zh:
-        '将实测每输出 token 能耗按整体实测功耗边界缩放，其与 GPU 实测能耗之比等于整体实测功耗与 GPU 实测功耗之比。' +
+        '将实测每输出 token 能耗按设施级建模功耗边界缩放，其与 GPU 实测能耗之比等于设施级建模功耗与 GPU 实测功耗之比。' +
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
       en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 整体实测功耗（W）÷ 每 GPU 实测功耗（W）',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 设施级建模功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
 };

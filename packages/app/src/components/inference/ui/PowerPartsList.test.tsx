@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import type * as MediaQueryHooks from '@/hooks/useMediaQuery';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
@@ -15,8 +16,20 @@ vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => locale }));
 vi.mock('@/lib/analytics/analytics', () => ({
   track: (...args: unknown[]) => track(...args),
 }));
+// jsdom has no media queries: the viewport is flipped per test for the phone branch.
+const media = vi.hoisted(() => ({ mobile: false }));
+vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
+  ...(await importOriginal<typeof MediaQueryHooks>()),
+  useIsMobileViewport: () => media.mobile,
+}));
 
-import PowerPartsList, { partBarStyle, SPARKLINE_HEIGHT } from './PowerPartsList';
+import PowerPartsList, {
+  foldPowerPartRows,
+  partBarStyle,
+  PHONE_VISIBLE_PARTS,
+  SPARKLINE_HEIGHT,
+} from './PowerPartsList';
+import { PowerXSurfaceProvider } from './powerx-surface';
 import {
   buildPowerBreakdownsWithOverlays,
   breakdownSeriesAtBoundary,
@@ -121,9 +134,13 @@ let container: HTMLDivElement;
 let root: Root;
 const onHover = vi.fn();
 const onTogglePin = vi.fn();
+// The phone branch is PowerX only: the list renders inside the surface provider.
+let powerX = false;
 
 beforeEach(() => {
   locale = 'en';
+  media.mobile = false;
+  powerX = false;
   track.mockClear();
   onHover.mockClear();
   onTogglePin.mockClear();
@@ -137,20 +154,22 @@ afterEach(() => {
   container.remove();
 });
 
-const render = (props: Partial<React.ComponentProps<typeof PowerPartsList>> = {}) =>
-  act(() =>
-    root.render(
-      <PowerPartsList
-        series={series}
-        entry={series.points[1]}
-        color="var(--b200_sglang)"
-        highlight={null}
-        onHover={onHover}
-        onTogglePin={onTogglePin}
-        {...props}
-      />,
-    ),
+const render = (props: Partial<React.ComponentProps<typeof PowerPartsList>> = {}) => {
+  const list = (
+    <PowerPartsList
+      series={series}
+      entry={series.points[1]}
+      color="var(--b200_sglang)"
+      highlight={null}
+      onHover={onHover}
+      onTogglePin={onTogglePin}
+      {...props}
+    />
   );
+  return act(() =>
+    root.render(powerX ? <PowerXSurfaceProvider>{list}</PowerXSurfaceProvider> : list),
+  );
+};
 const mouse = (element: Element, type: string) =>
   act(() => {
     element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
@@ -334,5 +353,175 @@ describe('PowerPartsList', () => {
     expect(
       row('gpu').querySelector('[data-testid="power-part-share"]')?.getAttribute('title'),
     ).toBe('占 IT W/GPU 的比例');
+  });
+});
+
+const STRINGS_EN_CATEGORIES = {
+  gpu: 'GPU',
+  measuredCpu: 'Grace CPU',
+  cpu: 'CPU',
+  memory: 'Memory',
+  nic: 'NICs',
+  nvswitch: 'NVSwitch',
+  storage: 'Storage',
+  other: 'PCIe & misc',
+  fans: 'Fans',
+  psuLoss: 'PSU loss',
+  network: 'Network share',
+  facility: 'Facility (PUE)',
+};
+
+const categories = () => rows().map((item) => item.dataset.category);
+const toggle = () =>
+  container.querySelector<HTMLButtonElement>('[data-testid="power-parts-toggle"]');
+const rest = () => container.querySelector<HTMLUListElement>('[data-testid="power-parts-rest"]');
+const parts = powerPartRows(series, series.points[1]);
+// The three largest IT parts; the facility overhead is listed last and always folds.
+const heaviest = parts
+  .filter((part) => part.category !== 'facility')
+  .toSorted((a, b) => b.watts - a.watts)
+  .slice(0, PHONE_VISIBLE_PARTS)
+  .map((part) => part.category);
+// The list's own order (heaviest first, facility last) filtered to the three largest.
+const topThree = parts.filter((part) => heaviest.includes(part.category)).map((p) => p.category);
+
+describe('PowerPartsList on a PowerX phone', () => {
+  beforeEach(() => {
+    media.mobile = true;
+    powerX = true;
+  });
+
+  it('folds to the three largest parts and an All N parts row that opens the rest in place', () => {
+    render();
+    expect(parts.length).toBeGreaterThan(PHONE_VISIBLE_PARTS);
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="power-parts-list"]')?.dataset.folded,
+    ).toBe('true');
+    expect(categories()).toEqual(topThree);
+    expect(categories()[0]).toBe('gpu');
+    expect(categories()).not.toContain('fans');
+    // The facility overhead outweighs several IT parts but stays in the remainder.
+    expect(parts.at(-1)!.category).toBe('facility');
+    expect(parts.at(-1)!.watts).toBeGreaterThan(parts.find((p) => p.category === 'fans')!.watts);
+    expect(categories()).not.toContain('facility');
+    // 56 px two-line rows that keep the bar and the sparkline.
+    for (const item of rows()) {
+      expect(item.className).toContain('min-h-14');
+      expect(
+        item.querySelector('[data-testid="power-part-bar"]')?.parentElement?.className,
+      ).toContain('h-2');
+      expect(item.querySelector('[data-testid="power-part-sparkline"]')).not.toBeNull();
+      expect(item.querySelector('span')?.textContent).toBe(
+        STRINGS_EN_CATEGORIES[item.dataset.category as keyof typeof STRINGS_EN_CATEGORIES],
+      );
+    }
+    const button = toggle()!;
+    expect(button.textContent).toBe(`All ${parts.length} parts · across load`);
+    expect(button.className).toContain('min-h-11');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.getAttribute('aria-controls')).toBe(rest()!.id);
+    expect(rest()!.children).toHaveLength(0);
+    act(() => button.click());
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('true');
+    expect(categories()).toEqual(parts.map((part) => part.category));
+    expect(rest()!.querySelectorAll('[data-testid="power-part-row"]')).toHaveLength(
+      parts.length - PHONE_VISIBLE_PARTS,
+    );
+    expect(track).toHaveBeenCalledWith('powerx_parts_expanded', {
+      expanded: true,
+      hw: 'b200_sglang',
+    });
+    // The facility row keeps its rule at the end of the remainder.
+    expect(rest()!.querySelector('li:last-child')?.className).toContain('border-t');
+    act(() => toggle()!.click());
+    expect(categories()).toEqual(topThree);
+    expect(track).toHaveBeenLastCalledWith('powerx_parts_expanded', {
+      expanded: false,
+      hw: 'b200_sglang',
+    });
+    // Rows in the folded list still hover and pin their part.
+    mouse(row('gpu'), 'mouseover');
+    expect(onHover).toHaveBeenLastCalledWith(partTarget('gpu'));
+    mouse(row('gpu'), 'click');
+    expect(onTogglePin).toHaveBeenCalledWith(partTarget('gpu'));
+  });
+
+  it('keeps a pinned part visible when it sits in the folded remainder', () => {
+    render({ highlight: { ...partTarget('fans'), pinned: true } });
+    expect(categories()).toEqual([...topThree, 'fans']);
+    expect(row('fans').getAttribute('aria-pressed')).toBe('true');
+    expect(toggle()!.textContent).toBe(`All ${parts.length} parts · across load`);
+    expect(toggle()!.getAttribute('aria-expanded')).toBe('false');
+    // Open, the list keeps its order: the pinned row stays in the remainder, where a tap
+    // pinned it, and rejoins the visible rows when the list folds.
+    act(() => toggle()!.click());
+    expect(categories()).toEqual(parts.map((part) => part.category));
+    expect(rest()!.querySelector('[data-category="fans"]')).not.toBeNull();
+    expect(row('fans').getAttribute('aria-pressed')).toBe('true');
+    act(() => toggle()!.click());
+    expect(categories()).toEqual([...topThree, 'fans']);
+    render({ highlight: { ...partTarget('facility'), pinned: true } });
+    expect(categories()).toEqual([...topThree, 'facility']);
+    expect(row('facility').closest('li')?.className).toContain('border-t');
+    // A hovered (unpinned) part and a pinned band add nothing to the visible rows.
+    render({ highlight: { ...partTarget('fans'), pinned: false } });
+    expect(categories()).toEqual(topThree);
+    render({ highlight: { band: 'fansPsu', category: null, pinned: true } });
+    expect(categories()).toEqual(topThree);
+    // A pinned part among the three largest changes nothing either.
+    render({ highlight: { ...partTarget('gpu'), pinned: true } });
+    expect(categories()).toEqual(topThree);
+    expect(foldPowerPartRows(parts, 'fans').shown.map((part) => part.category)).toEqual([
+      ...topThree,
+      'fans',
+    ]);
+    expect(foldPowerPartRows(parts, null).rest).toHaveLength(parts.length - PHONE_VISIBLE_PARTS);
+  });
+
+  it('keeps the full list from md up and outside PowerX', () => {
+    media.mobile = false;
+    render();
+    expect(categories()).toEqual(parts.map((part) => part.category));
+    expect(toggle()).toBeNull();
+    expect(rows()[0].className).not.toContain('min-h-14');
+    media.mobile = true;
+    powerX = false;
+    render();
+    expect(categories()).toEqual(parts.map((part) => part.category));
+    expect(toggle()).toBeNull();
+    expect(
+      container.querySelector<HTMLElement>('[data-testid="power-parts-list"]')?.dataset.folded,
+    ).toBeUndefined();
+  });
+
+  it('shows every part when a chip has three or fewer', () => {
+    const itSeries = breakdownSeriesAtBoundary(series, false);
+    render({ series: itSeries, entry: itSeries.points[0] });
+    expect(parts.length - 1).toBeGreaterThan(PHONE_VISIBLE_PARTS);
+    expect(rows()).toHaveLength(PHONE_VISIBLE_PARTS);
+    expect(toggle()!.textContent).toBe(`All ${parts.length - 1} parts · across load`);
+    expect(categories()).not.toContain('facility');
+  });
+
+  it('colours an overlay run’s folded list and its remainder with the run colour', () => {
+    render({ series: overlaySeries, entry: overlaySeries.points[1], color: overlayRunColor(3) });
+    expect(container.querySelector('[data-testid="power-parts-heading"]')?.textContent).toContain(
+      'parts-list',
+    );
+    expect(rows()).toHaveLength(PHONE_VISIBLE_PARTS);
+    act(() => toggle()!.click());
+    expect(rows().length).toBeGreaterThan(PHONE_VISIBLE_PARTS);
+    for (const item of rows()) {
+      const bar = item.querySelector<HTMLElement>('[data-testid="power-part-bar"]')!;
+      expect(bar.style.backgroundColor).toContain('--overlay-run-3');
+      expect(item.querySelector('circle')?.getAttribute('fill')).toBe(overlayRunColor(3));
+    }
+  });
+
+  it('renders the Chinese toggle label', () => {
+    locale = 'zh';
+    render();
+    expect(toggle()!.textContent).toBe(`全部 ${parts.length} 项 · 随负载变化`);
+    expect(row('gpu').querySelector('span')?.textContent).toBe('GPU');
   });
 });

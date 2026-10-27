@@ -39,7 +39,7 @@ TPU v7 目前在两个模型上有 AgentX 结果，即 Qwen3.5-397B 和 Kimi K3�
 
 每美元 token 数是仪表板的默认指标，统计每 1 美元 TCO 所服务的总 token 数（输入和输出）。成本采用 [SemiAnalysis AI Cloud TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中按超大规模云大批量采购计算的自持成本：GB300 NVL72 为每 GPU 每小时 $2.31，TPU v7 则有两个数值。外部数值为每芯片每小时 $1.21，是 Google 以外买家的自持成本。若以 3 年期承诺向 Google Cloud 租用，则为每芯片每小时 $2.00。仪表板默认采用每芯片每小时 $1.03，即 Google 自己持有并运营这颗芯片的成本。表格以“外部（$1.21）/ 内部（$1.03）”的形式同时列出两者。两种口径中只有 TPU v7 的成本不同，因此 GB300 NVL72 和其他 GPU 在两种口径下的每美元 token 数相同。图表采用仪表板默认值，因此按外部成本计算，TPU v7 的每个数据点都比图中低 15%。
 
-每 MW 指标采用 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中的单芯片全口径规划功率，TPU v7 为 1.207 kW，GB300 NVL72 为 2.12 kW，均为已部署系统的规划数值。一颗 TPU v7 芯片的规划功率是 GB300 GPU 的 57%，每小时成本按外部成本计算是其 52%，按内部成本计算是其 45%，因此每美元比值比每 MW 比值按外部成本计算高 9%，按内部成本计算高 28%。
+每 MW 指标采用 [SemiAnalysis Datacenter Industry Model](https://semianalysis.com/datacenter-industry-model/) 中的单芯片全口径规划功率，TPU v7 为 1.207 kW，GB300 NVL72 为 2.12 kW，均为已部署系统的规划数值。一颗 TPU v7 芯片的规划功率是 GB300 GPU 的 57%，每小时成本按外部成本计算是其 52%，按内部成本计算是其 45%，因此按外部成本计算，每美元比值比每 MW 比值高 9%；按内部成本计算则高 28%。
 
 我们的 [Vera Rubin NVL72 结果](/zh/hardware/vera-rubin-nvl72-vs-gb300-nvl72-agentx-results)介绍了 AgentX 工作负载。
 

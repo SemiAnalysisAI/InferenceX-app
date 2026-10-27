@@ -31,8 +31,10 @@ describe('powerXRedirectUrl', () => {
     expect(target.searchParams.get('g_model')).toBe(entry.model);
   });
 
-  it('opens PowerX for a power-tier link with no metric, as it used to chart power', () => {
-    expect(redirect('/inference?i_power=certified')).toBe('/powerx?i_power=certified');
+  it('opens PowerX for a power-tier link with no metric, on the power chart it used to open', () => {
+    expect(redirect('/inference?i_power=certified')).toBe(
+      '/powerx?i_power=certified&i_metric=y_measuredAvgPower',
+    );
     expect(redirect('/inference?i_metric=y_tokensPerDollarH&i_power=certified')).toBe(null);
     expect(redirect('/inference?i_power=bogus')).toBe(null);
   });

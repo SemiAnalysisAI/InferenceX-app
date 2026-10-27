@@ -171,7 +171,7 @@ const entries = [
     summary:
       'NVIDIA GB200 NVL72 specs, rack pricing and live LLM inference benchmarks: 72 Blackwell chips in one NVLink domain, 186 GB HBM3e per chip, 900 GB/s scale-up, measured daily on disaggregated vLLM, SGLang and Dynamo TRT-LLM.',
     overview: [
-      'The NVIDIA GB200 NVL72 is a rack-scale system: 72 Blackwell chips and 36 Grace CPUs joined by fifth-generation NVLink into a single 72-chip domain with 900 GB/s of unidirectional bandwidth per chip. There is no scale-out network inside the rack because the rack itself is the compute unit, with roughly 13.4 TB of pooled HBM3e.',
+      'The NVIDIA GB200 NVL72 is a rack-scale system: 72 Blackwell chips and 36 Grace CPUs joined by fifth-generation NVLink into a single 72-chip domain with 900 GB/s of unidirectional bandwidth per chip. GPUs communicate within the rack over NVLink, with roughly 13.4 TB of pooled HBM3e; each GPU also has a 400G ConnectX-7 NIC for scale-out communication.',
       'That one-hop, all-to-all fabric is why GB200 NVL72 dominates wide-expert-parallel serving of large MoE models: expert layers can be spread across dozens of chips without crossing InfiniBand or Ethernet. Disaggregated prefill/decode stacks such as Dynamo and SGLang PD map naturally onto the domain.',
     ],
     benchmarkContext:
@@ -304,7 +304,7 @@ const entries = [
     summary:
       'AMD Instinct MI355X specs, cloud pricing and live LLM inference benchmarks: 288 GB HBM3e, 8 TB/s bandwidth, 10,066 dense FP4 TFLOP/s, the first AMD chip with FP4, measured daily on ROCm vLLM, SGLang and ATOM.',
     overview: [
-      'The AMD Instinct MI355X is the CDNA 4 flagship and the first AMD accelerator with FP4 tensor throughput: 10,066 dense FP4 and 5,033 FP8 TFLOP/s with 288 GB of HBM3e at 8 TB/s, the largest single-chip memory in the field. Eight chips form a full-mesh node over fifth-generation Infinity Fabric at 538 GB/s per chip.',
+      'The AMD Instinct MI355X is the CDNA 4 flagship and the first AMD accelerator with FP4 tensor throughput: 10,066 dense FP4 and 5,033 FP8 TFLOP/s with 288 GB of HBM3e at 8 TB/s, the largest single-chip memory in the field. Eight chips form a full-mesh node over fourth-generation Infinity Fabric at 538 GB/s per chip.',
       'MI355X matches B200-class bandwidth and exceeds its memory while pricing meaningfully lower per hour, making it the sharpest performance-per-dollar challenge AMD has mounted. Its 1,400 W TDP and the maturity of ROCm serving stacks are the tradeoffs the live data quantifies.',
     ],
     benchmarkContext:

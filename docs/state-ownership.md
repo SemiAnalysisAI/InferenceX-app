@@ -232,6 +232,16 @@ detour through another setting. Which comparison rows a reader hid from the lege
 `ScatterGraph` component state (`hiddenPowerVariants`), never shared — see
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
 
+`i_pbpoint` (inference scope, default `''`) is the set of per-chip compared points on the
+Where the power goes view: `seriesKey:concurrency` pairs joined by commas, one per chip
+pinned by a column click in its drill-down, owned by `PowerAnalysisPanels` component state
+(`comparedPoints`) and written through `useUrlState` whenever it changes (`''` when no chip
+is pinned, so the parameter leaves the link). It is read once on mount; a pair naming a chip
+or a concurrency the current view lacks is carried but applies to nothing. The comparison
+interactivity itself (the slider) is `PowerXSurfaceProvider` context, not a URL parameter,
+and moving it clears every pin. See
+[PowerX Permanent View](./powerx-permanent-view.md#powerx-layout).
+
 ### Staged-result chart links
 
 The staging workflow reads the successfully ingested run's model, workload,

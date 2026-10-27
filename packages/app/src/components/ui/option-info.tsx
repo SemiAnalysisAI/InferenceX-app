@@ -115,6 +115,8 @@ export function InfoHelp({
         <button
           ref={triggerRef}
           type="button"
+          data-slot="info-help"
+          data-variant={variant}
           data-option-help={variant === 'option' ? '' : undefined}
           data-testid={triggerTestId ?? `option-help-${value}`}
           aria-label={ariaLabel ?? (locale === 'zh' ? `${label}说明` : `Help: ${label}`)}

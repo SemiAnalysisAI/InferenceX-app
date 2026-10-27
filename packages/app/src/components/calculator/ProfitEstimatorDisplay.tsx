@@ -323,11 +323,11 @@ const STRINGS = {
     powerDetails: `GPU 功耗在相同的吞吐量数据点间插值，计入 PUE（风冷机箱为 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 为 ${LIQUID_COOLED_RACK_PUE}）和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。NVL72 tray 平均分摊同一个建模机架的功耗；运行带有已验证的 Grace socket 遥测时使用实测功耗，否则使用 Grace 功耗估算值，两者不会相互插值。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。`,
     csvPowerHeaders: ['功耗口径', '功耗模型版本'],
     pricingGroup: '定价配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '算力支出分段采用的 TCO 层级：按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。带锁的租赁期限（按需至 2 年承诺）收录于 TCO 模型。',
+      '算力支出分段采用的 TCO 层级：按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁，单位为 $/GPU/hr，来自 SemiAnalysis AI Cloud TCO 模型。选择自定义可为每种芯片输入自己的 $/GPU/hr。带锁的租赁期限（按需至 2 年承诺）收录于 TCO 模型。',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
-    costProviderPlaceholder: '成本供应商',
+    costProviderPlaceholder: '计价方式',
     priceSourceLabel: 'Token 售价',
     priceSourceTooltip:
       '每百万 token 售价的来源。OpenRouter 读取该模型的公开目录价格；官方定价为模型厂商公布的 API 价格，在第三方托管方报价低于官方时提供；自定义则可自行输入输入/输出价格。',

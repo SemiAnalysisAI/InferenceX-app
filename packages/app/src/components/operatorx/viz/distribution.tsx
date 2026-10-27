@@ -1,57 +1,119 @@
 'use client';
 
-import { quantileSorted } from 'd3';
 import { useState } from 'react';
 
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { distributionView } from '@/lib/operatorx/distribution-view';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, tooltipHtml } from '../charts/kit';
 import { type BoxDatum, boxLayer } from '../charts/layers';
 import { valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
-import { type ComparisonModel, commonCases } from '../compare/model';
+import { metricById } from '../compare/metrics';
+import type { ComparisonModel } from '../compare/model';
 import type { VizDefinition } from './types';
 
+const STRINGS = {
+  en: {
+    matchedOnly: 'Matched only',
+    normalized: 'Normalized',
+    noMeasured: 'No measured cases.',
+    cases: 'cases',
+    median: 'median',
+    computeAxis: 'Share of peak compute (%)',
+    bandwidthAxis: 'Share of peak bandwidth (%)',
+    peakNote: 'Cases without a documented peak for their precision are omitted.',
+    ascendBandwidthNote: '950PR bandwidth uses an assumed 1.6 TB/s peak.',
+  },
+  zh: {
+    matchedOnly: '仅显示匹配用例',
+    normalized: '归一化',
+    noMeasured: '没有实测用例。',
+    cases: '个用例',
+    median: '中位数',
+    computeAxis: '计算峰值占比（%）',
+    bandwidthAxis: '带宽峰值占比（%）',
+    peakNote: '未公布对应精度峰值的用例不计入统计。',
+    ascendBandwidthNote: '950PR 带宽峰值按假定的 1.6 TB/s 计算。',
+  },
+};
+
 function Distribution({ model }: { model: ComparisonModel }) {
-  const { metric } = model;
+  const strings = STRINGS[useLocale()];
   const [pickedCommon, setCommon] = useState(true);
-  const shared = commonCases(model);
-  const common = pickedCommon && shared.length > 0;
-  const indices = common ? shared : model.view.cases.map((_, i) => i);
-  const boxes = model.hardware.flatMap((hw): (BoxDatum & { n: number })[] => {
-    const v = indices
-      .map((i) => model.value(hw, i))
-      .filter((x): x is number => x !== null)
-      .sort((a, b) => a - b);
-    if (v.length === 0) return [];
-    const q = (p: number) => quantileSorted(v, p) ?? 0;
-    return [
-      {
-        band: hw,
-        color: model.colors[hw],
-        n: v.length,
-        p5: q(0.05),
-        p25: q(0.25),
-        p50: q(0.5),
-        p75: q(0.75),
-        p95: q(0.95),
-      },
-    ];
+  const [pickedNormalized, setNormalized] = useState(false);
+  const normalizable = model.metric.id === 'tflops' || model.metric.id === 'bandwidth';
+  const distribution = distributionView(model.view, {
+    metric: model.metric.id,
+    hardware: model.hardware,
+    matchedOnly: pickedCommon,
+    normalized: pickedNormalized,
   });
+  const metric = metricById(distribution.metric);
+  const boxes: (BoxDatum & { n: number })[] = distribution.boxes.map((box) => ({
+    ...box,
+    band: box.hardware,
+    color: model.colors[box.hardware],
+  }));
+  const yLabel = distribution.normalized
+    ? distribution.metric === 'computeUtil'
+      ? strings.computeAxis
+      : strings.bandwidthAxis
+    : `${metric.label} (${metric.unit})`;
   return (
     <div className="space-y-3">
-      {shared.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Switch id="opx-dist-common" checked={common} onCheckedChange={setCommon} />
-          <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
-            Matched only
-          </Label>
-        </div>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {distribution.matchedCases > 0 && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-dist-common"
+              checked={distribution.matchedOnly}
+              onCheckedChange={(checked) => {
+                setCommon(checked);
+                track('operatorx_distribution_matched_changed', { checked });
+              }}
+            />
+            <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
+              {strings.matchedOnly}
+            </Label>
+          </div>
+        )}
+        {normalizable && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-dist-normalized"
+              checked={distribution.normalized}
+              onCheckedChange={(checked) => {
+                setNormalized(checked);
+                track('operatorx_distribution_normalized_changed', {
+                  checked,
+                  metric: model.metric.id,
+                });
+              }}
+            />
+            <Label
+              htmlFor="opx-dist-normalized"
+              className="text-sm font-normal text-muted-foreground"
+            >
+              {strings.normalized}
+            </Label>
+          </div>
+        )}
+      </div>
+      {distribution.normalized && (
+        <p className="text-xs text-muted-foreground">
+          {strings.peakNote}
+          {distribution.metric === 'bandwidthUtil' && model.hardware.includes('ascend950pr') && (
+            <> {strings.ascendBandwidthNote}</>
+          )}
+        </p>
       )}
       {boxes.length === 0 ? (
-        <EmptyChart>No measured cases.</EmptyChart>
+        <EmptyChart>{strings.noMeasured}</EmptyChart>
       ) : (
         <OpxChart<BoxDatum & { n: number }>
           chartId="operatorx-distribution"
@@ -65,7 +127,7 @@ function Distribution({ model }: { model: ComparisonModel }) {
           )}
           xAxis={{ tickFormat: (v) => hardwareLabel(String(v)), grid: false }}
           yAxis={{
-            label: `${metric.label} (${metric.unit})`,
+            label: yLabel,
             tickCount: 5,
             tickFormat: (v) => metric.tick(Number(v)),
           }}
@@ -77,8 +139,8 @@ function Distribution({ model }: { model: ComparisonModel }) {
                 title: hardwareLabel(b.band),
                 color: b.color,
                 rows: [
-                  `${b.n} cases`,
-                  `median <strong>${metric.format(b.p50)}</strong>`,
+                  `${b.n} ${strings.cases}`,
+                  `${strings.median} <strong>${metric.format(b.p50)}</strong>`,
                   `p25–p75 ${metric.format(b.p25)} – ${metric.format(b.p75)}`,
                   `p5–p95 ${metric.format(b.p5)} – ${metric.format(b.p95)}`,
                 ],

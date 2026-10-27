@@ -1,13 +1,16 @@
 'use client';
 
 import * as d3 from 'd3';
+import { Pin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Heading } from '@/components/ui/heading';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import type { AggDataEntry, InferenceData } from '../types';
 import { swatchStyle } from './PowerBreakdownPanel';
@@ -27,6 +30,7 @@ import {
   powerLayerEmphasis,
   type PowerBand,
   type PowerBreakdownDisplaySeries,
+  type PowerComparedPoints,
   type PowerLayerHighlight,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
@@ -36,6 +40,7 @@ import { IT_NOT_MODELED_NOTE } from '@/lib/power/power-basis';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
+  usePowerXSurface,
   useSetPowerXCompareTarget,
 } from './powerx-surface';
 
@@ -51,6 +56,9 @@ const STRINGS = {
     measured: 'Measured',
     modeled: 'Modeled (hatched)',
     pinned: 'Pinned',
+    pinnedPoint: (conc: number) => `Pinned to c${conc} · click to follow the slider`,
+    comparedAt: (x: string, slider: string) =>
+      `Compared at ${x} tok/s/user · slider at ${slider} tok/s/user`,
     legend: 'Power layers',
     bands: {
       gpu: 'GPU',
@@ -92,6 +100,9 @@ const STRINGS = {
     measured: '实测',
     modeled: '建模（斜线）',
     pinned: '已固定',
+    pinnedPoint: (conc: number) => `已固定在 c${conc} · 点击后跟随滑块`,
+    comparedAt: (x: string, slider: string) =>
+      `对比点 ${x} tok/s/user · 滑块位于 ${slider} tok/s/user`,
     legend: '功耗分层',
     bands: {
       gpu: 'GPU',
@@ -131,6 +142,8 @@ const MIN_LABEL_SHARE = 0.08;
 
 /** One hue for the shared legend: the stack's steps and hatches on the muted foreground. */
 const LEGEND_COLOR = 'var(--muted-foreground)';
+/** The slider's accent, on the pin glyph and the pinned row's point so both read as "off the slider". */
+export const PIN_ACCENT_CLASS = 'text-secondary dark:text-primary';
 
 export default function PowerChipCompare({
   data,
@@ -144,6 +157,9 @@ export default function PowerChipCompare({
   onNearestKeyChange,
   layerHighlight,
   onLayerHighlight,
+  comparedPoints = {},
+  onUnpinComparedPoint,
+  onTargetChange,
 }: {
   data: InferenceData[];
   /** Unofficial-run overlay points within `data`: their bars take the run's colour. */
@@ -161,10 +177,22 @@ export default function PowerChipCompare({
   /** Shared with the drill-down's plot on the Where view; own state when omitted. */
   layerHighlight?: PowerLayerHighlight | null;
   onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
+  /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
+  comparedPoints?: PowerComparedPoints;
+  /** The row's pin marker was clicked: that chip follows the slider again. */
+  onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
+  /** The slider moved (the global control): the owner drops every pinned point. */
+  onTargetChange?: () => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
+  // PowerX phones: 44 px legend and chip rows, a 28 px slider thumb (globals.css).
+  const powerX = usePowerXSurface();
+  // PowerX under `md`: 56 px chip cards with an 8 px bar and no in-bar watt labels (the
+  // readout and the parts rows carry the numbers); from `md` up the rows are unchanged.
+  const mobile = useIsMobileViewport();
+  const compactRows = powerX && mobile;
   // PowerX counts IT only until Include facility is on; elsewhere the facility meter.
   const includeFacility = usePowerXIncludeFacility();
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
@@ -207,16 +235,22 @@ export default function PowerChipCompare({
   useEffect(() => setTarget(null), [lo, hi, setTarget]);
   const value = target ?? fallback;
 
+  // Rows keep the series order (registry order, overlays last) whatever the slider reads.
   const { rows, outOfRange } = useMemo(
-    () => (value ? compareBreakdownsAt(series, value) : { rows: [], outOfRange: [] }),
-    [series, value],
+    () =>
+      value
+        ? compareBreakdownsAt(series, value, undefined, comparedPoints)
+        : { rows: [], outOfRange: [] },
+    [series, value, comparedPoints],
   );
-  // The compared chip: the one whose point is closest to the slider interactivity.
+  // The compared chip: the one whose point is closest to the slider interactivity. A
+  // pinned chip counts by its slider-nearest point, not its pin, so pinning never moves
+  // the drill-down to another chip.
   const nearestKey = useMemo(() => {
     if (value === null) return null;
     let best: string | null = null;
     let bestDistance = Infinity;
-    for (const row of rows) {
+    for (const row of compareBreakdownsAt(series, value).rows) {
       const distance = Math.abs(Math.log(row.entry.interactivity / value));
       if (distance < bestDistance) {
         best = row.series.key;
@@ -224,7 +258,7 @@ export default function PowerChipCompare({
       }
     }
     return best;
-  }, [rows, value]);
+  }, [series, value]);
   useEffect(() => onNearestKeyChange?.(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
   const bands = POWER_BANDS.filter((band) =>
@@ -277,9 +311,15 @@ export default function PowerChipCompare({
             min={0}
             max={SLIDER_STEPS}
             value={toStep(value)}
-            onChange={(event) => setTarget(fromStep(Number(event.target.value)))}
+            onChange={(event) => {
+              setTarget(fromStep(Number(event.target.value)));
+              onTargetChange?.();
+            }}
             onPointerUp={() => track('inference_power_compare_target_changed')}
-            className="min-w-0 flex-1 accent-secondary dark:accent-primary"
+            className={cn(
+              'min-w-0 flex-1 accent-secondary dark:accent-primary',
+              powerX && 'powerx-range text-secondary dark:text-primary',
+            )}
             data-testid="power-chip-compare-target"
             aria-valuetext={`${rate(value)} ${t.unit}`}
           />
@@ -317,9 +357,11 @@ export default function PowerChipCompare({
                 onFocus={() => layers.hover(bandTarget(band))}
                 onBlur={() => layers.hover(null)}
                 onClick={() => layers.togglePin(bandTarget(band))}
-                className={`flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
-                  pinned ? 'bg-muted ring-1 ring-border' : ''
-                }`}
+                className={cn(
+                  'flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60',
+                  powerX && 'max-md:min-h-11',
+                  pinned && 'bg-muted ring-1 ring-border',
+                )}
               >
                 <span
                   aria-hidden
@@ -345,7 +387,7 @@ export default function PowerChipCompare({
         <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
       ) : (
         <ol className="space-y-1.5" data-testid="power-chip-compare-rows">
-          {rows.map(({ series: entry, entry: point }) => {
+          {rows.map(({ series: entry, entry: point, pinned: pinnedPoint }) => {
             const color =
               entry.overlayRunIndex === undefined
                 ? resolveColor(entry.hwKey)
@@ -356,75 +398,153 @@ export default function PowerChipCompare({
             const active =
               entry.key === (renderExpanded && expandedKey !== null ? expandedKey : selectedKey);
             const gpuShare = point.wattsPerGpu.gpu / point.totalWattsPerGpu;
+            const chipName = (
+              <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                <span
+                  aria-hidden
+                  className="size-2.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="truncate">{entry.label}</span>
+              </span>
+            );
+            // A pinned row is off the slider: its point reads in the pin's accent and
+            // its title says where the slider is.
+            const pointLine = (
+              <span
+                className={`flex items-center gap-1 pl-4.5 text-xs ${
+                  pinnedPoint ? PIN_ACCENT_CLASS : 'text-muted-foreground'
+                }`}
+              >
+                {pinnedPoint && onUnpinComparedPoint && (
+                  <span
+                    data-testid="power-chip-compare-unpin"
+                    title={t.pinnedPoint(point.concurrency)}
+                    className={cn(
+                      'inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted hover:text-foreground',
+                      powerX && 'max-md:-m-2 max-md:size-8',
+                    )}
+                  >
+                    <Pin className="size-3" fill="currentColor" aria-hidden />
+                  </span>
+                )}
+                <span
+                  data-testid="power-chip-compare-point"
+                  title={
+                    pinnedPoint ? t.comparedAt(rate(point.interactivity), rate(value)) : undefined
+                  }
+                >
+                  {t.at(point.concurrency, rate(point.interactivity))}
+                </span>
+              </span>
+            );
+            // The stacked bar's segments: the layer steps and hatches; the watt labels only
+            // in the 28 px desktop bar, never in the 8 px phone bar.
+            const segments = (labels: boolean) =>
+              rowBands.map((band) => {
+                const w = bandWattsPerGpu(point, band);
+                const share = w / maxTotal;
+                return (
+                  <span
+                    key={band}
+                    title={segmentTitle(point, band)}
+                    data-testid="power-chip-compare-segment"
+                    data-band={band}
+                    data-emphasis={powerLayerEmphasis(band, layers.highlight)}
+                    onMouseEnter={() => layers.hover(bandTarget(band))}
+                    onMouseLeave={() => layers.hover(null)}
+                    className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
+                    style={{
+                      width: `${(w / point.totalWattsPerGpu) * 100}%`,
+                      ...swatchStyle(band, color, layers.highlight),
+                    }}
+                  >
+                    {labels && share >= MIN_LABEL_SHARE ? watts(w) : ''}
+                  </span>
+                );
+              });
             return (
               <li key={entry.key}>
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(event) => {
+                    // The pin marker sits inside the row: a click on it unpins, nothing else.
+                    if (
+                      pinnedPoint &&
+                      onUnpinComparedPoint &&
+                      event.target instanceof Element &&
+                      event.target.closest('[data-testid="power-chip-compare-unpin"]')
+                    ) {
+                      onUnpinComparedPoint(entry);
+                      return;
+                    }
                     onSelectKey(entry.key);
                     track('inference_power_compare_chip_selected');
                   }}
                   aria-pressed={active}
                   aria-expanded={renderExpanded ? expanded : undefined}
                   data-testid="power-chip-compare-row"
-                  className={`grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem] ${
-                    active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40'
-                  }`}
+                  data-pinned={pinnedPoint ? 'true' : undefined}
+                  data-layout={compactRows ? 'compact' : undefined}
+                  className={cn(
+                    compactRows
+                      ? 'grid min-h-14 w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-md px-2 py-1 text-left transition-colors'
+                      : 'grid w-full grid-cols-1 items-center gap-x-3 gap-y-1 rounded-md px-2 py-1.5 text-left transition-colors sm:grid-cols-[12rem_minmax(0,1fr)_5.5rem]',
+                    powerX && !compactRows && 'max-md:min-h-11',
+                    active ? 'bg-muted/60 ring-1 ring-border' : 'hover:bg-muted/40',
+                  )}
                 >
-                  <span className="flex min-w-0 flex-col">
-                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
-                      <span
-                        aria-hidden
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                      <span className="truncate">{entry.label}</span>
-                    </span>
-                    <span className="pl-4.5 text-xs text-muted-foreground">
-                      {t.at(point.concurrency, rate(point.interactivity))}
-                    </span>
-                  </span>
-                  <span className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-sm">
-                    <span
-                      className="flex h-full"
-                      style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
-                    >
-                      {rowBands.map((band) => {
-                        const w = bandWattsPerGpu(point, band);
-                        const share = w / maxTotal;
-                        return (
-                          <span
-                            key={band}
-                            title={segmentTitle(point, band)}
-                            data-testid="power-chip-compare-segment"
-                            data-band={band}
-                            data-emphasis={powerLayerEmphasis(band, layers.highlight)}
-                            onMouseEnter={() => layers.hover(bandTarget(band))}
-                            onMouseLeave={() => layers.hover(null)}
-                            className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
-                            style={{
-                              width: `${(w / point.totalWattsPerGpu) * 100}%`,
-                              ...swatchStyle(band, color, layers.highlight),
-                            }}
-                          >
-                            {share >= MIN_LABEL_SHARE ? watts(w) : ''}
-                          </span>
-                        );
-                      })}
-                    </span>
-                  </span>
-                  <span className="flex flex-col text-right sm:items-end">
-                    <span className="text-sm font-semibold tabular-nums">
-                      {watts(point.totalWattsPerGpu)} W
-                      <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {includeFacility
-                        ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
-                        : ''}
-                      {t.gpuShare(pct(gpuShare))}
-                    </span>
-                  </span>
+                  {compactRows ? (
+                    <>
+                      {chipName}
+                      <span className="text-right text-sm font-semibold tabular-nums">
+                        {watts(point.totalWattsPerGpu)} W
+                        <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
+                      </span>
+                      {pointLine}
+                      <span className="text-right text-xs tabular-nums text-muted-foreground">
+                        {includeFacility
+                          ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
+                          : ''}
+                        {t.gpuShare(pct(gpuShare))}
+                      </span>
+                      <span className="col-span-2 flex h-2 min-w-0 items-stretch overflow-hidden rounded-sm">
+                        <span
+                          className="flex h-full"
+                          style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
+                        >
+                          {segments(false)}
+                        </span>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex min-w-0 flex-col">
+                        {chipName}
+                        {pointLine}
+                      </span>
+                      <span className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-sm">
+                        <span
+                          className="flex h-full"
+                          style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
+                        >
+                          {segments(true)}
+                        </span>
+                      </span>
+                      <span className="flex flex-col text-right sm:items-end">
+                        <span className="text-sm font-semibold tabular-nums">
+                          {watts(point.totalWattsPerGpu)} W
+                          <PowerBasisPill tag={includeFacility ? 'facility' : 'it'} />
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {includeFacility
+                            ? `${t.itSubtotal(watts(breakdownItWattsPerGpu(point)))} · `
+                            : ''}
+                          {t.gpuShare(pct(gpuShare))}
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </button>
                 {expanded && (
                   <div

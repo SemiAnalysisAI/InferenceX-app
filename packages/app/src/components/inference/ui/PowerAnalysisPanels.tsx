@@ -1,9 +1,12 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useUrlState } from '@/hooks/useUrlState';
+import { track } from '@/lib/analytics/analytics';
 import { shadeOklch } from '@/lib/charts/dynamic-colors';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -17,19 +20,28 @@ import PowerBreakdownPanel from './PowerBreakdownPanel';
 import PowerChipCompare from './PowerChipCompare';
 import {
   buildPowerBreakdownsWithOverlays,
+  parseComparedPoints,
   powerBreakdownInteractivity,
+  serializeComparedPoints,
+  type PowerBreakdownPoint,
+  type PowerBreakdownSeries,
+  type PowerComparedPoints,
   type PowerLayerHighlight,
 } from '../utils/power-breakdown';
 import PowerRoleGroup from './PowerRoleGroup';
+import { usePowerXCompareTarget, usePowerXSurface } from './powerx-surface';
 
 const STRINGS = {
   en: {
     drillTitle: (chip: string) => `${chip} across load`,
-    drillSubtitle: 'Every point of this chip; the dashed outline marks the compared point.',
+    drillSubtitle: 'Click a point to compare it; the dashed outline marks the compared point.',
+    drillSubtitleTouch:
+      'Drag across the chart to read any point; tap to hold it as the compared point (dashed outline).',
   },
   zh: {
     drillTitle: (name: string) => `${name} 随负载的变化`,
-    drillSubtitle: '该芯片的每个基准测试点；虚线框标出上方对比所用的点。',
+    drillSubtitle: '点击任一数据点即可对比；虚线框标出上方对比所用的点。',
+    drillSubtitleTouch: '在图上拖动可读取任一数据点；点按可将其固定为对比点（虚线框标出）。',
   },
 };
 
@@ -75,6 +87,11 @@ export default function PowerAnalysisPanels({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // PowerX on a touch-primary device reads "Tap a point", everywhere else "Click".
+  const powerX = usePowerXSurface();
+  const coarsePointer = useIsCoarsePointer();
+  const touchCopy = powerX && coarsePointer;
+  const drillSubtitle = touchCopy ? t.drillSubtitleTouch : t.drillSubtitle;
   const { runIndexByUrl, unofficialRunInfos } = useUnofficialRun();
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   // Panels reuse the main chart's hardware colors; several configs on one GPU get shades of it.
@@ -133,6 +150,50 @@ export default function PowerAnalysisPanels({
     },
     [nearestKey],
   );
+  // Per-chip compared points: a click on a column of a chip's drill-down compares that
+  // chip at that point while the others keep following the slider. The slider is the
+  // global control, so moving it drops every pin; the Hardware select and Collapse keep
+  // them. Shared as `i_pbpoint`, read once on load.
+  const { getUrlParam, setUrlParams } = useUrlState();
+  const [comparedPoints, setComparedPoints] = useState<PowerComparedPoints>(() =>
+    parseComparedPoints(getUrlParam('i_pbpoint')),
+  );
+  useEffect(() => {
+    setUrlParams({ i_pbpoint: serializeComparedPoints(comparedPoints) });
+  }, [comparedPoints, setUrlParams]);
+  const clearComparedPoints = useCallback(() => {
+    setComparedPoints((current) => (Object.keys(current).length === 0 ? current : {}));
+  }, []);
+  const sharedTarget = usePowerXCompareTarget();
+  const lastTarget = useRef(sharedTarget);
+  useEffect(() => {
+    if (lastTarget.current === sharedTarget) return;
+    lastTarget.current = sharedTarget;
+    clearComparedPoints();
+  }, [sharedTarget, clearComparedPoints]);
+  const pinComparedPoint = useCallback(
+    (series: PowerBreakdownSeries, entry: PowerBreakdownPoint) => {
+      setComparedPoints((current) => ({ ...current, [series.key]: entry.concurrency }));
+      // The clicked chip stays the open one: its point moved, not the slider.
+      openDrilldown(series.key);
+      track('powerx_breakdown_point_pinned', {
+        hw: series.hwKey,
+        concurrency: entry.concurrency,
+      });
+    },
+    [openDrilldown],
+  );
+  const unpinComparedPoint = useCallback(
+    (series: PowerBreakdownSeries) => {
+      const concurrency = comparedPoints[series.key];
+      if (concurrency === undefined) return;
+      setComparedPoints(
+        Object.fromEntries(Object.entries(comparedPoints).filter(([key]) => key !== series.key)),
+      );
+      track('powerx_breakdown_point_unpinned', { hw: series.hwKey, concurrency });
+    },
+    [comparedPoints],
+  );
   const breakdownSeries = useMemo(
     () =>
       buildPowerBreakdownsWithOverlays(
@@ -181,6 +242,9 @@ export default function PowerAnalysisPanels({
           selectedKey={drillSeries?.key ?? null}
           expandedKey={expandedKey}
           onNearestKeyChange={setNearestKey}
+          comparedPoints={comparedPoints}
+          onUnpinComparedPoint={unpinComparedPoint}
+          onTargetChange={clearComparedPoints}
           onSelectKey={(key) => {
             // Clicking the open bar closes it, like Collapse; any other bar opens there.
             if (key === expandedKey) {
@@ -202,13 +266,16 @@ export default function PowerAnalysisPanels({
                 xLabel={xLabel}
                 selectedKey={key}
                 onSelectKey={openDrilldown}
+                comparedPoints={comparedPoints}
+                onPinComparedPoint={pinComparedPoint}
+                onUnpinComparedPoint={unpinComparedPoint}
                 compact
                 layerHighlight={layerHighlight}
                 onLayerHighlight={setLayerHighlight}
                 onCollapse={() => setCollapsed(true)}
                 heading={
                   series
-                    ? { title: t.drillTitle(series.label), subtitle: t.drillSubtitle }
+                    ? { title: t.drillTitle(series.label), subtitle: drillSubtitle }
                     : undefined
                 }
               />
@@ -225,6 +292,9 @@ export default function PowerAnalysisPanels({
             onSelectKey={setCompareKey}
             layerHighlight={layerHighlight}
             onLayerHighlight={setLayerHighlight}
+            comparedPoints={comparedPoints}
+            onUnpinComparedPoint={unpinComparedPoint}
+            onTargetChange={clearComparedPoints}
           />
           <PowerBreakdownPanel
             chartId={chartId}
@@ -237,9 +307,12 @@ export default function PowerAnalysisPanels({
             xLabel={xLabel}
             selectedKey={drillSeries?.key ?? null}
             onSelectKey={setCompareKey}
+            comparedPoints={comparedPoints}
+            onPinComparedPoint={pinComparedPoint}
+            onUnpinComparedPoint={unpinComparedPoint}
             heading={
               breakdownSeriesLabel
-                ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: t.drillSubtitle }
+                ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: drillSubtitle }
                 : undefined
             }
           />

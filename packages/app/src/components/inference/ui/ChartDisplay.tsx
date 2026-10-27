@@ -60,6 +60,7 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
+import { formatMetricValue } from '@/components/inference/utils/tooltipUtils';
 import {
   PowerXChartConfig,
   PowerXFacilitySwitch,
@@ -107,6 +108,7 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
+  isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
@@ -1234,6 +1236,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
+                            deprecated={isModelDeprecated(selectedModel)}
                             precision={
                               embedded
                                 ? selectedPrecisions
@@ -1302,7 +1305,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             powerXMounted &&
                             powerXReadoutPoints &&
                             getViewMode(graphIndex) === 'chart' && (
-                              <PowerXReadout points={powerXReadoutPoints} />
+                              <PowerXReadout
+                                points={powerXReadoutPoints}
+                                yMetric={{
+                                  label: metricLabel(
+                                    graph.chartDefinition,
+                                    selectedYAxisMetric,
+                                    locale,
+                                  ),
+                                  value: (point) => formatMetricValue(point.y, selectedYAxisMetric),
+                                }}
+                              />
                             )}
                           {!powerXSurface && (
                             <>
@@ -1540,7 +1553,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           });
 
   return (
-    <div data-testid="inference-chart-display" className="flex flex-col gap-4">
+    <div
+      data-testid="inference-chart-display"
+      // PowerX phones: globals.css enlarges shared chart chrome under this marker.
+      data-powerx-surface={powerXLayout ? '' : undefined}
+      className="flex flex-col gap-4"
+    >
       {!minimalChrome && (
         <section className="relative z-20">
           <Card>
@@ -1579,12 +1597,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
-                      powerXLayout && powerXMounted ? (
-                        <PowerXChartConfig
-                          selection={powerXSelection}
-                          onSelectionChange={setPowerXSelection}
-                        />
-                      ) : undefined
+                      powerXLayout && powerXMounted
+                        ? (slots) => (
+                            <PowerXChartConfig
+                              selection={powerXSelection}
+                              onSelectionChange={setPowerXSelection}
+                              slots={slots}
+                            />
+                          )
+                        : undefined
                     }
                   />
                 </>

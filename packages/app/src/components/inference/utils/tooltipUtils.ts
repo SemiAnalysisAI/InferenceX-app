@@ -54,6 +54,8 @@ export interface TooltipConfig {
   locale?: Locale;
   /** PowerX names boundaries the way its Count control does (GPU only, Whole system). */
   powerLabelStyle?: PowerBasisLabelStyle;
+  /** The viewer is on a touch-primary device: the pinned hint says Tap, not Click. */
+  touch?: boolean;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -127,6 +129,7 @@ export const fmt = (v: number): string => {
 const TOOLTIP_STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
+    dismissTouch: 'Tap elsewhere to dismiss',
     unofficialRun: '✕ UNOFFICIAL RUN',
     date: 'Date',
     dataFrom: (d: string) => `(data from ${d})`,
@@ -147,6 +150,7 @@ const TOOLTIP_STRINGS = {
   },
   zh: {
     dismiss: '点击其他区域关闭',
+    dismissTouch: '点按其他区域关闭',
     unofficialRun: '✕ 非官方运行',
     date: '日期',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
@@ -353,6 +357,9 @@ const WATT_METRICS = new Set([
 const fmtY = (value: number, metric: string): string =>
   WATT_METRICS.has(metric) && Number.isFinite(value) ? fmtWatts(value) : fmt(value);
 
+/** A point's y value as the tooltip prints it for the metric (watts get their own format). */
+export const formatMetricValue = fmtY;
+
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
@@ -388,8 +395,8 @@ const modeledSystemPowerHTML = (
       ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
       </details>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
     }
@@ -808,7 +815,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
       </div>
@@ -868,7 +875,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
 
   return `
     <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
         ${t.unofficialRun}
       </div>
@@ -919,7 +926,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
       ${

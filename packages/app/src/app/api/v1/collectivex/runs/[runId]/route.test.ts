@@ -138,10 +138,11 @@ describe('DELETE /api/v1/collectivex/runs/[runId]', () => {
     expect(mockDelete).not.toHaveBeenCalled();
   });
 
-  it('rejects all requests when the secret is not configured', async () => {
+  it('returns 500 when the secret is not configured', async () => {
     vi.stubEnv('COLLECTIVEX_ADMIN_SECRET', '');
-    const res = await del(runId, '');
-    expect(res.status).toBe(401);
+    const res = await del(runId, 'anything');
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('COLLECTIVEX_ADMIN_SECRET is not set');
     expect(mockDelete).not.toHaveBeenCalled();
   });
 

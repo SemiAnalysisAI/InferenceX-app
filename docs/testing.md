@@ -18,7 +18,7 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 
 ## Easter egg themes and games
 
-Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
+Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, Excalidraw, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
 
 - Do not add unit, Cypress component, Cypress E2E, or CI checks for easter egg features. The only exceptions are the two main-site isolation checks listed below.
 - The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.

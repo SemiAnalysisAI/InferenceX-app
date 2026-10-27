@@ -9,6 +9,7 @@ import {
   bandTarget,
   bandWattsPerGpu,
   breakdownItWattsPerGpu,
+  breakdownPointAtConcurrency,
   breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
   buildPowerBreakdownsWithOverlays,
@@ -19,6 +20,8 @@ import {
   isHatchedBand,
   MEASURED_POWER_BANDS,
   nearestBreakdownPoint,
+  orderBreakdownSeriesForDisplay,
+  parseComparedPoints,
   partTarget,
   POWER_BAND_CATEGORIES,
   POWER_BAND_OPACITY,
@@ -35,9 +38,11 @@ import {
   powerPartEmphasis,
   powerPartRows,
   sameLayerTarget,
+  serializeComparedPoints,
   sparklineGeometry,
   stackedBandsAt,
   stackPowerBands,
+  type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
 } from './power-breakdown';
@@ -271,13 +276,16 @@ describe('cross-chip comparison', () => {
     expect(defaultComparisonInteractivity([low, high])).toBeCloseTo(Math.sqrt(5 * 200), 9);
   });
 
-  it("picks each chip's nearest point on a log scale and sorts by total", () => {
+  it("picks each chip's nearest point on a log scale and keeps the chips in the given order", () => {
     const { rows, outOfRange } = compareBreakdownsAt([a, b], 56);
     expect(outOfRange).toEqual([]);
-    expect(rows.map((r) => [r.series.label, r.entry.interactivity])).toEqual([
-      ['B', 80],
-      ['A', 40],
+    // B's point is lighter (1000 W vs 1200 W); the rows still read A, B: a row never
+    // changes place when the slider moves.
+    expect(rows.map((r) => [r.series.label, r.entry.interactivity, r.pinned])).toEqual([
+      ['A', 40, false],
+      ['B', 80, false],
     ]);
+    expect(compareBreakdownsAt([b, a], 56).rows.map((r) => r.series.label)).toEqual(['B', 'A']);
   });
 
   it('leaves out chips with no point near the target', () => {
@@ -285,6 +293,129 @@ describe('cross-chip comparison', () => {
     expect(rows.map((r) => r.series.label)).toEqual(['A']);
     expect(outOfRange.map((s) => s.label)).toEqual(['B']);
     expect(compareBreakdownsAt([a], 0).outOfRange).toHaveLength(1);
+  });
+
+  const withConcurrency = (
+    label: string,
+    points: [concurrency: number, interactivity: number, total: number][],
+  ) => {
+    const series = fakeSeries(
+      label,
+      points.map(([, interactivity, total]) => [interactivity, total]),
+    );
+    for (const [index, [concurrency]] of points.entries()) {
+      (series.points[index] as { concurrency: number }).concurrency = concurrency;
+    }
+    return series;
+  };
+  const c = withConcurrency('C', [
+    [64, 10, 1500],
+    [16, 40, 1200],
+    [4, 160, 900],
+  ]);
+  const d = withConcurrency('D', [
+    [32, 20, 1300],
+    [8, 80, 1000],
+  ]);
+
+  it('compares a pinned chip at its pinned point, in place, whatever the slider reads', () => {
+    const { rows, outOfRange } = compareBreakdownsAt([c, d], 56, undefined, { C: 64 });
+    expect(outOfRange).toEqual([]);
+    expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
+      ['C', 64, true],
+      ['D', 8, false],
+    ]);
+  });
+
+  it('keeps a pinned chip in the rows when its nearest point is out of the slider range', () => {
+    const { rows, outOfRange } = compareBreakdownsAt([c, d], 160, undefined, { D: 8 });
+    expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
+      ['C', 4, false],
+      ['D', 8, true],
+    ]);
+    expect(outOfRange).toEqual([]);
+    // Even with no usable slider value, a pinned chip is compared at its point.
+    expect(compareBreakdownsAt([c, d], 0, undefined, { D: 32 }).rows).toHaveLength(1);
+    expect(compareBreakdownsAt([c, d], 0, undefined, { D: 32 }).outOfRange).toEqual([c]);
+  });
+
+  it('ignores a pin at a concurrency the chip was not benchmarked at', () => {
+    const { rows } = compareBreakdownsAt([c, d], 56, undefined, { C: 999, Z: 16 });
+    expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
+      ['C', 16, false],
+      ['D', 8, false],
+    ]);
+  });
+});
+
+describe('breakdownPointAtConcurrency', () => {
+  const series = {
+    points: [
+      { concurrency: 16, interactivity: 30 },
+      { concurrency: 16, interactivity: 70 },
+      { concurrency: 4, interactivity: 120 },
+    ] as PowerBreakdownPoint[],
+  };
+
+  it('finds the point at a concurrency and null when there is none', () => {
+    expect(breakdownPointAtConcurrency(series, 4)?.interactivity).toBe(120);
+    expect(breakdownPointAtConcurrency(series, 8)).toBeNull();
+  });
+
+  it('picks the duplicate nearest the slider, the first one without a slider', () => {
+    expect(breakdownPointAtConcurrency(series, 16)?.interactivity).toBe(30);
+    expect(breakdownPointAtConcurrency(series, 16, 60)?.interactivity).toBe(70);
+    expect(breakdownPointAtConcurrency(series, 16, 35)?.interactivity).toBe(30);
+  });
+});
+
+describe('compared points share parameter', () => {
+  it('round-trips series keys and concurrencies, keys sorted', () => {
+    const points = { 'b200_vllm|fp8': 64, 'b200_sglang|fp8|run2': 16 };
+    const value = serializeComparedPoints(points);
+    expect(value).toBe('b200_sglang|fp8|run2:16,b200_vllm|fp8:64');
+    expect(parseComparedPoints(value)).toEqual(points);
+    expect(serializeComparedPoints({})).toBe('');
+    expect(parseComparedPoints('')).toEqual({});
+    expect(parseComparedPoints(undefined)).toEqual({});
+  });
+
+  it('drops malformed pairs and keeps the rest', () => {
+    expect(parseComparedPoints('b200_vllm|fp8:64,nope,:4,x:0,y:1.5,h200|fp8: 8 ')).toEqual({
+      'b200_vllm|fp8': 64,
+      'h200|fp8': 8,
+    });
+  });
+});
+
+describe('orderBreakdownSeriesForDisplay', () => {
+  const display = (hwKey: string, label: string, overlayRunIndex?: number) =>
+    ({
+      ...fakeSeries(label, [[10, 1]]),
+      key: `${hwKey}|${label}`,
+      hwKey,
+      overlayRunIndex,
+    }) as PowerBreakdownDisplaySeries;
+
+  it('orders official lines by the registry, then label, and overlays after them by run', () => {
+    const ordered = orderBreakdownSeriesForDisplay([
+      display('h100_sglang', 'H100'),
+      display('b200_sglang', 'B200 run 1', 1),
+      display('mi355x_sglang', 'MI355X'),
+      display('b200_vllm', 'B200 vLLM'),
+      display('gb300_dynamo', 'GB300 run 0', 0),
+      display('b200_sglang', 'B200 SGLang'),
+      display('gb300_dynamo', 'GB300'),
+    ]);
+    expect(ordered.map((entry) => entry.label)).toEqual([
+      'GB300',
+      'B200 SGLang',
+      'B200 vLLM',
+      'MI355X',
+      'H100',
+      'GB300 run 0',
+      'B200 run 1',
+    ]);
   });
 });
 
@@ -603,5 +734,18 @@ describe('buildPowerBreakdownsWithOverlays', () => {
     expect(buildPowerBreakdownsWithOverlays(official, undefined)).toEqual(
       buildPowerBreakdowns(official),
     );
+  });
+
+  it('lists the dashboard series in registry order, not label order', () => {
+    const h200 = point(400, { hwKey: 'h200_sglang' });
+    const mi355x = point(420, { hwKey: 'mi355x_sglang' });
+    // By label H200 sorts before MI355X; the registry (the chart legend) puts MI355X first.
+    expect(buildPowerBreakdowns([h200, mi355x]).map((entry) => entry.hwKey)).toEqual([
+      'h200_sglang',
+      'mi355x_sglang',
+    ]);
+    expect(
+      buildPowerBreakdownsWithOverlays([h200, mi355x], undefined).map((entry) => entry.hwKey),
+    ).toEqual(['mi355x_sglang', 'h200_sglang']);
   });
 });

@@ -12,8 +12,10 @@ import {
   interceptDerivedAgenticMetrics,
   selectXAxisMode,
 } from '../support/e2e';
+import { assertShareLinkParams } from '../support/share-link';
 import {
   interceptOverlayRun,
+  AGENTIC_DATE,
   OVERLAY_RUN_ID,
   OVERLAY_RUN_URL,
   SINGLE_TURN_DATE,
@@ -364,7 +366,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', '自有 - 超大规模云大批量')
+      .should('contain.text', '自有 · 超大规模云厂商批量采购')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
@@ -385,6 +387,123 @@ describe('Inference Chart', () => {
     cy.visit('/inference');
     cy.wait('@availabilityFailure');
     cy.contains('h2', 'Something went wrong!').should('be.visible');
+  });
+});
+
+describe('Deprecated model source attribution', () => {
+  it('marks every deprecated model in the source, without a background watermark', () => {
+    cy.viewport(1280, 900);
+    for (const [display, dbKey, deprecated] of [
+      ['MiniMax-M3', 'minimaxm3', true],
+      ['MiniMax-M2.5', 'minimaxm2.5', true],
+      ['Kimi-K2.5', 'kimik2.5', true],
+      ['GLM-5', 'glm5', true],
+      ['gpt-oss-120b', 'gptoss120b', true],
+      ['Llama-3.3-70B-Instruct-FP8', 'llama70b', true],
+      ['MiniMax-M3.1-Flash', 'minimaxm31flash', false],
+    ] as const) {
+      const rows = b300Rows(null).map((row) => ({ ...row, model: dbKey }));
+      cy.intercept('GET', '/api/v1/availability', {
+        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
+      cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
+      cy.get('#chart-0 [data-testid="result-context"]')
+        .should('contain.text', 'Source: SemiAnalysis InferenceX™')
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
+      cy.get('.deprecated-watermark').should('not.exist');
+    }
+  });
+
+  it('keeps the suffix in PNG exports, overlays, and the Chinese mobile chart', () => {
+    const model = 'minimaxm3';
+    const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
+    const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
+    cy.intercept('GET', '/api/v1/availability', {
+      body: officialRows.map(({ metrics: _metrics, ...row }) => row),
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: officialRows });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            name: 'historical-m3-overlay',
+            branch: 'historical-m3-overlay',
+            sha: 'abc000',
+            createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: overlayRows,
+        evaluations: [],
+      },
+    }).as('historicalM3Overlay');
+
+    cy.visit('/inference/minimax-m3?i_seq=agentic-traces', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+    );
+    let exportedPng = '';
+    let exportedCaption = '';
+    cy.window().then((win) => {
+      win.HTMLAnchorElement.prototype.click = function () {
+        if (this.download.endsWith('.png')) {
+          exportedPng = this.href;
+          exportedCaption =
+            win.document.querySelector('#chart-0-export [data-testid="result-context"]')
+              ?.textContent ?? '';
+          expect(win.document.querySelector('#chart-0-export .deprecated-watermark')).to.equal(
+            null,
+          );
+        }
+      };
+    });
+    cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window().should(() => {
+      expect(exportedPng).to.match(/^data:image\/png;base64,/u);
+      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (Deprecated)');
+    });
+
+    cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
+    );
+    cy.get('#chart-0 .unofficial-watermark-image').should('exist');
+    cy.get('.deprecated-watermark').should('not.exist');
+    cy.get('[aria-label="Dismiss historical-m3-overlay"]').click();
+    cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+    );
+
+    cy.viewport(375, 900);
+    cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    );
+    cy.get('.deprecated-watermark').should('not.exist');
+    expectNoPageOverflow();
   });
 });
 
@@ -1100,5 +1219,84 @@ describe('Qwen3.5 chart defaults', () => {
       'interactivity',
     );
     cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
+  });
+});
+
+describe('PowerX controls on a phone', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+    cy.visit('/powerx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
+  });
+
+  it('shows all four views as a 2×2 grid of 48 px buttons without a sideways scroll', () => {
+    cy.get('[data-testid="powerx-tabs"]').then(($strip) => {
+      expect($strip[0].scrollWidth).to.be.at.most($strip[0].clientWidth);
+    });
+    for (const view of ['energy', 'draw', 'where', 'time']) {
+      cy.get(`[data-testid="powerx-tab-${view}"]`)
+        .should('be.visible')
+        .then(($tab) => {
+          const bounds = $tab[0].getBoundingClientRect();
+          expect(bounds.height).to.be.at.least(44);
+          expect(bounds.right).to.be.at.most(390);
+        });
+    }
+    cy.get('[data-testid="powerx-tab-time"]').click();
+    cy.get('[data-testid="powerx-tab-time"]').should('have.attr', 'aria-selected', 'true');
+    assertShareLinkParams({ i_metric: 'y_measuredPowerTimeline' });
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(390);
+    });
+  });
+
+  it('turns Count and Per into native selects and folds the rest behind More', () => {
+    cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="powerx-boundary"]').should('match', 'select').and('have.value', 'gpu');
+    cy.get('[data-testid="powerx-energy-per"]')
+      .should('match', 'select')
+      .and('have.value', 'output');
+    cy.get('[data-testid="powerx-boundary"] option[value="it"]').should(
+      'contain.text',
+      'IT (no PUE) — GPU measured',
+    );
+    // Secondary controls are collapsed by default.
+    cy.get('[data-testid="powerx-more"]')
+      .should('have.text', 'More')
+      .and('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="measured-energy-scope"]').should('not.exist');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('not.exist');
+    cy.get('[data-testid="powerx-compare-boundaries"]').should('not.exist');
+
+    cy.get('[data-testid="powerx-boundary"]').select('it');
+    cy.get('[data-testid="powerx-boundary"]').should('have.value', 'it');
+    assertShareLinkParams({ i_metric: 'y_itModeledJPerOutputToken' });
+    cy.get('[data-testid="powerx-boundary"]').select('gpu');
+    cy.get('[data-testid="powerx-boundary"]').should('have.value', 'gpu');
+
+    cy.get('[data-testid="powerx-more"]').click();
+    cy.get('[data-testid="powerx-more"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="x-axis-mode-selector"]').should('exist');
+    cy.get('[data-testid="measured-energy-scope"]').should('be.visible');
+    cy.get('[data-testid="powerx-compare-boundaries"]').should('be.visible');
+    cy.contains('[data-testid="powerx-compare-boundaries"] button', 'All-in provisioned').click();
+    cy.contains('[data-testid="powerx-compare-boundaries"] button', 'All-in provisioned').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+    cy.get('[data-testid="powerx-more"]').should('have.text', 'More · 1 changed');
+    assertShareLinkParams({ i_pcompare: 'provisioned' });
+    cy.get('[data-testid="powerx-more"]').click();
+    cy.get('[data-testid="powerx-compare-boundaries"]').should('not.exist');
+    cy.get('[data-testid="powerx-more"]').should('have.text', 'More · 1 changed');
+    cy.document().then((document) => {
+      expect(document.documentElement.scrollWidth).to.be.at.most(390);
+    });
   });
 });

@@ -29,7 +29,7 @@ import {
   WhitepaperSourceLink,
 } from './whitepaper-links';
 
-const ESTIMATOR_PATH = '/profit-estimator-per-gigawatt';
+const ESTIMATOR_PATH = '/profit-estimator-per-gigawatt/kimi-k3/target/45';
 
 const KPI_NUMBER_CLASS = 'text-[#ba534b] dark:text-[#d97a70]';
 

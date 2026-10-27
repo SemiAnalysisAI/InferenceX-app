@@ -29,6 +29,20 @@ describe('Muse Spark Open ingestion', () => {
   });
 });
 
+describe('MiniMax M3.1 Flash ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'minimaxm31flash' },
+    { model_prefix: 'minimaxm31flash' },
+    { model: 'MiniMaxAI/MiniMax-M3.1-Flash' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('minimaxm31flash');
+  });
+
+  it('keeps MiniMax M3 rows in their own bucket', () => {
+    expect(resolveModelKey({ infmax_model_prefix: 'minimaxm3' })).toBe('minimaxm3');
+  });
+});
+
 describe('hwToGpuKey', () => {
   it('strips -nv suffix', () => {
     expect(hwToGpuKey('h200-nv')).toBe('h200');

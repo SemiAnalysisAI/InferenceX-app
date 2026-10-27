@@ -1,5 +1,5 @@
 import type { AggDataEntry, InferenceData } from '../types';
-import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { getPrecisionLabel, type Precision } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
 import { getOverlayLineLabel, type OverlayRunIdentity } from '@/lib/benchmarks/inference-labels';
@@ -384,7 +384,7 @@ export function buildPowerBreakdownsWithOverlays(
     locale,
     interactivity,
   );
-  if (!overlay || overlay.points.length === 0) return official;
+  if (!overlay || overlay.points.length === 0) return orderBreakdownSeriesForDisplay(official);
   const byRun = new Map<number, InferenceData[]>();
   for (const point of overlay.points) {
     const runIndex = overlayRunIndex(point.run_url ?? null, overlay.runIndexByUrl);
@@ -405,7 +405,26 @@ export function buildPowerBreakdownsWithOverlays(
         },
       ),
     );
-  return [...official, ...overlays];
+  return orderBreakdownSeriesForDisplay([...official, ...overlays]);
+}
+
+/**
+ * The dashboard's fixed series order: official lines in the registry's hardware
+ * order (the one the chart legend uses), then by label; unofficial-run lines after
+ * them in run order. The chip comparison lists its rows in this order whatever the
+ * slider reads, so a chip never changes place when the compared point moves.
+ */
+export function orderBreakdownSeriesForDisplay<S extends PowerBreakdownDisplaySeries>(
+  series: readonly S[],
+): S[] {
+  return series.toSorted(
+    (a, b) =>
+      (a.overlayRunIndex ?? -1) - (b.overlayRunIndex ?? -1) ||
+      getModelSortIndex(a.hwKey) - getModelSortIndex(b.hwKey) ||
+      a.hwKey.localeCompare(b.hwKey) ||
+      a.label.localeCompare(b.label) ||
+      a.key.localeCompare(b.key),
+  );
 }
 
 /**
@@ -592,9 +611,63 @@ export interface PowerBreakdownComparisonRow<
   S extends PowerBreakdownSeries = PowerBreakdownSeries,
 > {
   series: S;
-  /** The series' benchmark point closest to the target interactivity (log distance). */
+  /**
+   * The compared point: the one pinned for this chip, else the series' benchmark
+   * point closest to the target interactivity (log distance).
+   */
   entry: PowerBreakdownPoint;
+  /** True when `entry` is the chip's pinned point rather than the slider's nearest. */
+  pinned: boolean;
 }
+
+/**
+ * Compared points pinned per chip by a click on a column of its drill-down:
+ * series key (`hwKey|precision`, `|run<N>` for an unofficial run) to concurrency.
+ * A pinned chip is compared at that point whatever the slider reads; moving the
+ * slider drops every pin. Shared as `i_pbpoint`, `key:concurrency` pairs joined
+ * by commas; a pair naming a chip or a concurrency the view does not have is
+ * carried but applies to nothing.
+ */
+export type PowerComparedPoints = Readonly<Record<string, number>>;
+
+const COMPARED_POINT_PAIR = /^\s*(?<key>[^:,\s]+)\s*:\s*(?<concurrency>\d+)\s*$/u;
+
+export function parseComparedPoints(value: string | null | undefined): PowerComparedPoints {
+  const points: Record<string, number> = {};
+  if (!value) return points;
+  for (const pair of value.split(',')) {
+    const match = COMPARED_POINT_PAIR.exec(pair);
+    if (!match?.groups) continue;
+    const concurrency = Number(match.groups.concurrency);
+    if (Number.isInteger(concurrency) && concurrency > 0) points[match.groups.key] = concurrency;
+  }
+  return points;
+}
+
+/** The `i_pbpoint` value of a set of pins; empty (the parameter's default) when none. */
+export function serializeComparedPoints(points: PowerComparedPoints): string {
+  return Object.entries(points)
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([key, concurrency]) => `${key}:${concurrency}`)
+    .join(',');
+}
+
+/**
+ * The series' point at `concurrency`, or null when it has none. A source with two
+ * points at one concurrency (`c16 · 1`, `c16 · 2`) gives the one nearest `near`.
+ */
+export function breakdownPointAtConcurrency(
+  series: Pick<PowerBreakdownSeries, 'points'>,
+  concurrency: number,
+  near: number | null = null,
+): PowerBreakdownPoint | null {
+  const candidates = series.points.filter((point) => point.concurrency === concurrency);
+  if (candidates.length <= 1 || near === null) return candidates[0] ?? null;
+  return nearestBreakdownPoint({ points: candidates }, near);
+}
+
+/** A chip is compared only when its nearest point is within this ratio of the target. */
+export const COMPARISON_MAX_RATIO = 1.5;
 
 /**
  * Interactivity every series can be compared at: the geometric middle of the
@@ -636,36 +709,37 @@ export function nearestBreakdownPoint(
 }
 
 /**
- * One row per series at its point nearest `target`. A series is left out when
+ * One row per series, in the order given, at its pinned point when it has one,
+ * else at its point nearest `target`. A series without a pin is left out when
  * its closest point is more than `maxRatio`× away, so a chip is never compared
  * at a load it was not benchmarked near.
  */
 export function compareBreakdownsAt<S extends PowerBreakdownSeries>(
   series: readonly S[],
   target: number,
-  maxRatio = 1.5,
+  maxRatio = COMPARISON_MAX_RATIO,
+  pinnedPoints: PowerComparedPoints = {},
 ): { rows: PowerBreakdownComparisonRow<S>[]; outOfRange: S[] } {
   const rows: PowerBreakdownComparisonRow<S>[] = [];
   const outOfRange: S[] = [];
-  if (!(target > 0)) return { rows, outOfRange: [...series] };
+  const near = target > 0 ? target : null;
   for (const entry of series) {
-    let best: PowerBreakdownPoint | null = null;
-    let bestDistance = Infinity;
-    for (const point of entry.points) {
-      const distance = Math.abs(Math.log(point.interactivity / target));
-      if (distance < bestDistance) {
-        best = point;
-        bestDistance = distance;
-      }
+    const pinnedConcurrency = pinnedPoints[entry.key];
+    const pinned =
+      pinnedConcurrency === undefined
+        ? null
+        : breakdownPointAtConcurrency(entry, pinnedConcurrency, near);
+    if (pinned) {
+      rows.push({ series: entry, entry: pinned, pinned: true });
+      continue;
     }
-    if (best && bestDistance <= Math.log(maxRatio)) rows.push({ series: entry, entry: best });
-    else outOfRange.push(entry);
+    const best = near === null ? null : nearestBreakdownPoint(entry, near);
+    if (best && Math.abs(Math.log(best.interactivity / target)) <= Math.log(maxRatio)) {
+      rows.push({ series: entry, entry: best, pinned: false });
+    } else {
+      outOfRange.push(entry);
+    }
   }
-  rows.sort(
-    (a, b) =>
-      a.entry.totalWattsPerGpu - b.entry.totalWattsPerGpu ||
-      a.series.label.localeCompare(b.series.label),
-  );
   return { rows, outOfRange };
 }
 

@@ -9,6 +9,7 @@ import {
   powerXMetricFields,
   powerXRatedAvailable,
   powerXRatedOn,
+  powerXSecondaryChangedCount,
   powerXShowAsFor,
   powerXShowsHeadroom,
   powerXViewFor,
@@ -288,5 +289,47 @@ describe('powerXChangedCount', () => {
     expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'breakdown' })).toBe(0);
     expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'roles' })).toBe(0);
     expect(powerXChangedCount({ metric: 'y_measuredPowerTimeline', compare: 'none' })).toBe(0);
+  });
+});
+
+describe('powerXSecondaryChangedCount', () => {
+  it('counts nothing on the default Energy and Power draw selections', () => {
+    expect(powerXSecondaryChangedCount({ metric: POWERX_DEFAULT_METRIC, compare: 'none' })).toBe(0);
+    expect(powerXSecondaryChangedCount({ metric: 'y_measuredAvgPower', compare: 'none' })).toBe(0);
+  });
+
+  it('counts Scope, Power statistic and Rated boundaries, not Count, Per or Show as', () => {
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredDecodeJPerOutputToken', compare: 'none' }),
+    ).toBe(1);
+    expect(powerXSecondaryChangedCount({ metric: 'y_measuredP90Power', compare: 'none' })).toBe(1);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredDecodeAvgPower', compare: 'none' }),
+    ).toBe(1);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' }),
+    ).toBe(1);
+    // Count, Per and Show as sit in front of the More row.
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_itModeledJPerOutputToken', compare: 'none' }),
+    ).toBe(0);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredJPerInputToken', compare: 'none' }),
+    ).toBe(0);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredPowerPercentTdp', compare: 'none' }),
+    ).toBe(0);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'boundaries' }),
+    ).toBe(0);
+  });
+
+  it('counts nothing on the Where and Over time views', () => {
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredAvgPower', compare: 'breakdown' }),
+    ).toBe(0);
+    expect(
+      powerXSecondaryChangedCount({ metric: 'y_measuredPowerTimeline', compare: 'none' }),
+    ).toBe(0);
   });
 });

@@ -86,7 +86,12 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   on the views they apply to, and the Rated boundaries toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
-  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`.
+  Compare history fieldsets fold into "More chart controls" exactly as on `/inference`. Under `md`
+  the view tabs become a 2×2 grid of 48 px buttons, Count and Per (or Show as) render as native
+  selects (`SegmentedToggle` `variant="select"`, each option carrying the segment's hover hint),
+  and the X-Axis Metric, Scope, Power statistic and Rated boundaries sit behind one "More" row
+  (`powerx-more`, "More · N changed" via `powerXSecondaryChangedCount`); dashboard toasts stay
+  off there and the pinned point sheet says Tap. From `md` up nothing changes.
 - The Chart/Table toggle and the export menu sit above the chart card, right-aligned, like
   `/inference`; the chart card keeps the h2 caption (model logo + title), the Updated / Source
   line, the readout badge row, the Quick Filters legend (no PowerX controls in the rail) and
@@ -100,6 +105,47 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   Collapse hides it for the session (`PowerAnalysisPanels` `layout="inline"`). The stack
   legend above the bars is the only one. There is no boundary line chart on this view: the
   three measured boundaries are compared on Power draw under Count: All.
+- Chip rows keep a fixed order: official lines in `HW_REGISTRY` order (the chart legend's,
+  `orderBreakdownSeriesForDisplay`), unofficial-run lines after them in run order. A row
+  never changes place when the slider moves or a chip is pinned; a chip with no point
+  within 1.5× of the slider is named in the "Not benchmarked near" note as before.
+- Per-chip compared point (`i_pbpoint`): clicking a column of the open drill-down (stacked
+  bars or stacked area) pins that chip's compared point to that column. Only that chip
+  changes: its row (bar, watts, `c<N> · <interactivity>` label, a `×` marker whose `title`
+  reads "Pinned to c<N> · click to follow the slider"), the dashed outline in its drill-down
+  and the parts list; the slider does not move and the other chips keep their
+  slider-derived point. The slider is the global control: moving it drops every pin.
+  The Hardware select and Collapse keep the pins. The `×` marker unpins that chip alone.
+  `i_pbpoint` carries `seriesKey:concurrency` pairs joined by commas (`b200_vllm|fp8:64`;
+  `|run<N>` keys for `?unofficialrun=` lines), only for pinned chips, and is read once on
+  load; a pair naming a chip or a concurrency the view does not have applies to nothing.
+  This is a presentation-only selector over data the views API already returns
+  (`powerBreakdown=true` rows carry every point), so it adds no API selector.
+- Touch (PowerX on a coarse pointer, `useIsCoarsePointer()`): the drill-down's hover label
+  and tooltip give way to a scrub. A finger anywhere across the plot moves a solid rule to
+  the nearest column (`nearestColumnIndex`, by column centre) and the readout above the
+  plot (`PowerBreakdownReadout`: total W/GPU with its basis pill, `c<N> · <interactivity>`,
+  one chip per layer in stack order with the plot's swatches; tapping a chip isolates the
+  layer) reads that column; the svg keeps `touch-action: pan-y`, so a vertical pan still
+  scrolls the page, and is `none` only while a scrub is in progress; the plot's top margin
+  is 16 px instead of 40 under the readout. A tap holds the column through the same
+  compared-point pin as a desktop click (dashed outline, `i_pbpoint`) and nothing else: on
+  touch a layer is isolated only from a readout chip, so the chart does not dim on the tap.
+  The readout then says Pinned until the next scrub or the row's pin marker. The 44 px "Compare
+  chips at N tok/s/user" button under the plot moves the slider to the readout's
+  interactivity (the slider's own action, so every pin drops; `powerx_compare_at_scrub`),
+  disabled while the slider already reads it. A mouse keeps the hover label and the click.
+- Phones (PowerX under `md`, `useIsMobileViewport()`): the chip rows are 56 px cards (name
+  and total W with its basis pill on the first line, `c<N> · <interactivity>` with the pin
+  marker and "GPU NN%" on the second, one 8 px stacked bar with the same layer steps and
+  hatches and no in-bar watt labels; `data-layout="compact"`), the parts list folds to its
+  three largest IT parts by watts (the facility row always folds) plus an "All N parts ·
+  across load" row (`power-parts-toggle`, `aria-expanded`/`aria-controls`,
+  `powerx_parts_expanded`) that opens the rest in place, in 56 px rows (name, watts and
+  share above the 8 px bar and the sparkline). Open, the list keeps its order and a tap pins
+  a row where it is; when the list folds, a pinned part that sits in the remainder stays
+  among the visible rows (`foldPowerPartRows`). The CSV export keeps every part. With the touch readout above the plot the drill-down plot is
+  260 px high instead of 380 (`PHONE_PLOT_HEIGHT`). From `md` up nothing changes.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
   is gone, and only the shared /inference footer notes remain. The meaning of the GPU /
@@ -128,7 +174,13 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   badge row's outline-badge style): IT W/GPU,
   GPUs per MW (`1e6 ÷ IT W`), Facility W/GPU at PUE and measured GPU W for the hovered or
   pinned point (`PowerXSurfaceProvider` active-point context, fed by `ScatterGraph`), or the
-  point nearest 80 tok/s/user.
+  point nearest 80 tok/s/user. On a coarse pointer the chart has no hover tooltip: a finger
+  dragged across the plot snaps to the nearest visible point, official or `?unofficialrun=`
+  overlay under the current zoom (`nearestScrubCandidate`, the `powerx-scrub` layer: a rule
+  plus a ring in the chip or run colour), and the row leads with the chart's own y value
+  (`yMetric`, formatted as the tooltip would) for it (`source: 'scrub'`, which replaces a
+  pinned point and survives the compat hover end a tap synthesises); a tap on a point still
+  opens the point sheet as before.
 - **Where the power goes** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
@@ -161,8 +213,10 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
 ## Article figure → share link
 
 Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
-selection. Old `/inference` links that carry a measured `i_metric` are redirected to `/powerx`
-with the same query by `src/proxy.ts` (`lib/routing/powerx-redirect.ts`); Inference Performance
+selection. Old `/inference` links that carry a measured `i_metric`, or a power-tier filter (`i_power`)
+with no metric, are redirected to `/powerx` with the same query by `src/proxy.ts`
+(`lib/routing/powerx-redirect.ts`; the no-metric case lands on the Power draw scatter,
+`i_metric=y_measuredAvgPower`, as such links used to chart power); Inference Performance
 no longer offers power metrics. Append:
 
 | Figure | Content                                       | Parameters                                                                                                                                                                                                   |
@@ -283,7 +337,9 @@ Measured, Modeled · fixed or Modeled · moves with load (`POWER_PART_BEHAVIOUR`
 pins, Escape or a click on the plot unpins. Measured sits at the bottom; the chip comparison's
 segments are the same six layers on each chip's colour (a folded layer's `title` lists its
 parts) and share the highlight. The list follows the slider and the Hardware select exactly as
-the plot's dashed outline does. Unofficial-run series take the run colour (`overlayRunColor`)
+the plot's dashed outline does; a column click pins that chip's compared point for the row,
+the outline and the list (`i_pbpoint`, see [PowerX layout](#powerx-layout)) without moving the
+slider. Unofficial-run series take the run colour (`overlayRunColor`)
 for the layers, the hatches, the list and the sparklines. TDP and All in Provisioned are
 dashed reference lines, not stacked values. Bar width comes from the room to the neighboring
 points and carries no data; the concurrency label sits above each total and both are hidden

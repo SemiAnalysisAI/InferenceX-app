@@ -49,6 +49,31 @@ describe('GET /api/v1/views/gpu-specs', () => {
     expect(h100.domainMemoryBandwidthTBs).toBeCloseTo(26.8, 10);
   });
 
+  it('exposes NVL72 NICs in the same bandwidth ranking as the UI, without inventing topology', async () => {
+    const res = await GET(request('/api/v1/views/gpu-specs?metric=scaleOutBandwidth'));
+    const body = await res.json();
+    for (const [name, bandwidth, nic] of [
+      ['GB200 NVL72', 400, 'ConnectX-7 400G'],
+      ['GB300 NVL72', 800, 'ConnectX-8 800G'],
+    ] as const) {
+      const spec = GPU_SPECS.find((row) => row.name === name)!;
+      const chip = body.chips.find((row: { name: string }) => row.name === name);
+      expect(chip).toMatchObject({
+        nic,
+        scaleOutBandwidthGbits: bandwidth,
+        scaleOutSwitch: null,
+        scaleOutTopology: null,
+      });
+      const metric = GPU_CHART_METRICS.find((row) => row.key === 'scaleOutBandwidth')!;
+      expect(body.ranking.find((row: { chip: string }) => row.chip === chip.key).value).toBe(
+        metric.getValue(spec),
+      );
+    }
+    expect(body.chips.find((row: { name: string }) => row.name === 'MI355X').scaleUpTech).toBe(
+      '4th Gen Infinity Fabric',
+    );
+  });
+
   it('exposes the chart-metric metadata', async () => {
     const res = await GET(request('/api/v1/views/gpu-specs'));
     const body = await res.json();
@@ -101,6 +126,8 @@ describe('GET /api/v1/views/gpu-specs', () => {
     const lines = resText.trim().split('\r\n');
     expect(lines).toHaveLength(GPU_SPECS.length + 1);
     expect(lines[0].startsWith('key,label,name,vendor,')).toBe(true);
+    expect(lines.find((line) => line.startsWith('gb200-nvl72,'))).toContain('ConnectX-7 400G');
+    expect(lines.find((line) => line.startsWith('gb300-nvl72,'))).toContain('ConnectX-8 800G');
   });
 
   it('adds metric value and rank columns to CSV when metric is set', async () => {
