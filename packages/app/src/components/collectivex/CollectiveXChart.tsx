@@ -121,7 +121,9 @@ function formatPercentiles(
   unavailable: string,
 ): string {
   if (value === null) return unavailable;
-  return `${value.latency_us.p50.toFixed(1)} / ${value.latency_us.p90.toFixed(1)} / ${value.latency_us.p95.toFixed(1)} / ${value.latency_us.p99.toFixed(1)} µs`;
+  const { p50, p90, p95, p99 } = value.latency_us;
+  const us = (v: number | null) => (v === null ? unavailable : v.toFixed(1));
+  return `${us(p50)} / ${us(p90)} / ${us(p95)} / ${us(p99)} µs`;
 }
 
 function escapeHtml(value: string): string {

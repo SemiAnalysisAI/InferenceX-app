@@ -1,4 +1,4 @@
-import { readSwapResults, isSwapMatrix } from './swap-reader';
+import { readSwapResults } from './swap-reader';
 
 import type {
   CollectiveXComponent,
@@ -10,11 +10,11 @@ import type {
   CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOutcome,
-  CollectiveXPercentiles,
   CollectiveXPoint,
   CollectiveXPrecision,
   CollectiveXRunSummary,
   CollectiveXSeries,
+  CollectiveXTailPercentiles,
   CollectiveXTerminalStatus,
 } from './types';
 
@@ -38,13 +38,13 @@ interface RawCase {
 
 interface RawComponent {
   availability: string;
-  percentiles_us: CollectiveXPercentiles | null;
+  percentiles_us: CollectiveXTailPercentiles | null;
 }
 
 interface RawRow {
   tokens_per_rank: number;
   global_tokens: number;
-  token_rate_at_latency_percentile: CollectiveXPercentiles;
+  token_rate_at_latency_percentile: CollectiveXTailPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
   wire_byte_provenance?: Record<
@@ -115,7 +115,6 @@ function toSupportedVendor(raw: string): CollectiveXVendor | null {
 }
 
 function matrixOf(value: unknown): RawMatrix {
-  if (isSwapMatrix(value)) return { version: 1, requested_cases: [] };
   const matrix = value as RawMatrix;
   if (!Number.isSafeInteger(matrix?.version) || !Array.isArray(matrix?.requested_cases)) {
     throw new TypeError('invalid CollectiveX matrix');
@@ -152,10 +151,11 @@ function toMode(raw: string | undefined): CollectiveXMode {
 
 function ratesFrom(
   bytes: number,
-  latency: CollectiveXPercentiles,
+  latency: CollectiveXTailPercentiles,
   divisor = 1,
-): CollectiveXPercentiles {
-  const rate = (us: number) => (bytes / divisor / us) * 1e-3;
+): CollectiveXTailPercentiles {
+  const rate = (us: number | null) =>
+    us !== null && us > 0 ? (bytes / divisor / us) * 1e-3 : null;
   return {
     p50: rate(latency.p50),
     p90: rate(latency.p90),
@@ -285,6 +285,11 @@ function isKvCase(kase: RawCase): boolean {
   return kase.suite === 'kv-transfer';
 }
 
+// swap_blocks cases have no EP ladder; their measurements come from swap-reader.
+function isSwapCase(kase: RawCase): boolean {
+  return kase.suite === 'swap-blocks';
+}
+
 function mapKvRow(row: RawKvRow): CollectiveXKvRow {
   return {
     kind: row.kind === 'bulk' ? 'bulk' : 'paged',
@@ -365,12 +370,17 @@ export function buildDatasetFromNeutral(
   run: CollectiveXNeutralRunMeta,
 ): CollectiveXDataset {
   const matrix = matrixOf(matrixRaw);
-  const swap = readSwapResults(matrixRaw, docs, run.source_sha);
+  const swapRequested = matrix.requested_cases.filter((requested) => isSwapCase(requested.case));
+  const swap = readSwapResults(matrix.requested_cases, docs);
   const swapPoints = swap.reduce((count, result) => count + result.points.length, 0);
   const shards = docs.flatMap((doc) => {
     const shard = shardOf(doc);
     if (!shard) return [];
-    if (Number(shard.version) !== matrix.version) throw new Error('CollectiveX version mismatch');
+    if (Number(shard.version) !== matrix.version) {
+      throw new Error(
+        `CollectiveX version mismatch: ${shard.identity.case_id} has version ${String(shard.version)}, cases.json has ${matrix.version}`,
+      );
+    }
     return [shard];
   });
   const supportedShards = shards.flatMap((shard): SupportedShard[] => {
@@ -397,7 +407,7 @@ export function buildDatasetFromNeutral(
   const coverage: CollectiveXCoverage[] = matrix.requested_cases.flatMap((requested) => {
     const kase = requested.case;
     const caseId = kase.case_id;
-    if (isKvCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
+    if (isKvCase(kase) || isSwapCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
     const measured = successful.get(caseId)?.shard;
     const failed = terminal.get(caseId)?.shard;
     let outcome: CollectiveXOutcome;
@@ -446,7 +456,7 @@ export function buildDatasetFromNeutral(
     version: matrix.version,
     run: {
       ...run,
-      requested_cases: coverage.length + kv.length + swap.length,
+      requested_cases: coverage.length + kv.length + swapRequested.length,
       terminal_cases:
         coverage.filter((item) => item.points.every((point) => point.terminal_status !== 'pending'))
           .length +
@@ -472,10 +482,10 @@ export function buildDatasetFromNeutral(
         ...new Set([
           ...coverage.map((item) => item.sku),
           ...kv.map((item) => item.sku),
-          ...swap.map((item) => item.sku),
+          ...swapRequested.map((item) => item.sku),
         ]),
       ].toSorted(),
-      swap_requested_cases: swap.length,
+      swap_requested_cases: swapRequested.length,
       swap_measured_cases: swap.length,
       kv_requested_cases: kv.length,
       kv_measured_cases: kv.filter((item) => item.outcome === 'success').length,
@@ -516,20 +526,4 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
       measured: run.kv_measured_cases ?? 0,
     },
   };
-}
-
-export function isMatrixDoc(doc: unknown): boolean {
-  if (isSwapMatrix(doc)) return true;
-  const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
-  return (
-    Array.isArray(candidate?.requested_cases) &&
-    Array.isArray(candidate?.include) &&
-    matrixVersion(doc) !== null
-  );
-}
-
-export function matrixVersion(doc: unknown): number | null {
-  if (isSwapMatrix(doc)) return 1;
-  const value = (doc as { version?: unknown } | null)?.version;
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
 }

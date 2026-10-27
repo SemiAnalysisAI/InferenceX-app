@@ -4,17 +4,11 @@ import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectiv
 import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import { listCollectiveXRuns } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
-import {
-  collectiveXSweepErrorStatus,
-  ensureCollectiveXRunsList,
-} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const DISCOVERY_CACHE_CONTROL = 'private, no-store';
 
 export async function GET(request: NextRequest) {
   const version = parseCollectiveXVersion(request.nextUrl.searchParams.get('version') ?? '');
@@ -23,35 +17,10 @@ export async function GET(request: NextRequest) {
   }
   if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-runs'));
 
-  // Backfill failures must not take the run table down — serve the stored list
-  // and only surface the error when there is nothing at all to show.
-  let ensureError: unknown = null;
-  let discoveryComplete: boolean;
   try {
-    discoveryComplete = await ensureCollectiveXRunsList(version);
-  } catch (error) {
-    ensureError = error;
-    discoveryComplete = false;
-  }
-
-  try {
-    // Backfill may have persisted runs, so read from the same primary.
     const runs = await listCollectiveXRuns(getCollectiveXWriteDb(), version);
-    if (runs.length === 0 && ensureError) {
-      console.error('CollectiveX run backfill failed with no stored fallback:', ensureError);
-      const status = collectiveXSweepErrorStatus(ensureError) ?? 502;
-      return NextResponse.json({ error: 'Unavailable' }, { status });
-    }
-    if (ensureError) {
-      console.error('CollectiveX run backfill failed; serving stored list:', ensureError);
-    }
-    return cachedJson(
-      { version, runs, discovery_complete: discoveryComplete },
-      {
-        tag: collectiveXCacheTag(),
-        cacheControl: discoveryComplete ? COLLECTIVEX_CACHE_CONTROL : DISCOVERY_CACHE_CONTROL,
-      },
-    );
+    // Every run is ingested ahead of time, so the stored list is always complete.
+    return cachedJson({ version, runs, discovery_complete: true }, { tag: collectiveXCacheTag() });
   } catch (error) {
     console.error('Error listing CollectiveX runs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

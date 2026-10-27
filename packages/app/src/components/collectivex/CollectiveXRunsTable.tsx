@@ -1,16 +1,15 @@
 'use client';
 
-import { ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { useRef } from 'react';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
-import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
-import { collectiveXConclusionLabel, collectiveXRunDasharray, collectiveXSkuLabel } from './data';
+import { collectiveXRunDasharray, collectiveXSkuLabel } from './data';
 import type { CollectiveXRunSummary } from './types';
 
 interface CollectiveXRunsTableProps {
@@ -18,9 +17,10 @@ interface CollectiveXRunsTableProps {
   selectedRunIndexById: ReadonlyMap<string, number>;
   visibleRunIds: ReadonlySet<string>;
   loadingRunIds: ReadonlySet<string>;
-  deletingRunIds: ReadonlySet<string>;
+  /** InferenceX commit of each loaded run; a run links to its committed results once known. */
+  sourceShaByRunId: ReadonlyMap<string, string>;
+  /** Applies one visibility state to every listed run (one id, or a shift-click range). */
   onVisibleChange: (runIds: string[], visible: boolean) => void;
-  onDelete: (runId: string) => void;
   emptyMessage?: string;
 }
 
@@ -29,18 +29,15 @@ const STRINGS = {
     shown: 'Shown',
     shownHint: 'Shift-click a checkbox to set every run between it and the last one clicked',
     run: 'Run',
-    result: 'Result',
     swapSuite: (m: number, n: number) => `swap_blocks: ${m}/${n} measured`,
     suites: 'Suites',
     cases: 'Measured cases',
     points: 'Terminal points',
     skus: 'SKUs',
     published: 'Published (UTC)',
-    actions: 'Actions',
     showRun: (id: string) => `Show run #${id}`,
     lineStyle: (id: string) => `Line style for run #${id}`,
-    openRun: (id: string) => `Open GitHub Actions run #${id}`,
-    deleteRun: (id: string) => `Delete run #${id}`,
+    openRun: (id: string) => `Open the results committed for run #${id}`,
     empty: 'No runs match this benchmark version.',
     epSuite: (measured: number, requested: number) => `EP: ${measured}/${requested} measured`,
     kvSuite: (measured: number, requested: number) =>
@@ -50,18 +47,15 @@ const STRINGS = {
     shown: '显示',
     shownHint: '按住 Shift 点击复选框，可一次性勾选或取消勾选它与上次点击行之间的全部运行',
     run: '运行',
-    result: '结果',
     swapSuite: (m: number, n: number) => `swap_blocks：已测量 ${m}/${n}`,
     suites: '测试套件',
     cases: '实测用例',
     points: '终态数据点',
     skus: 'SKUs',
     published: '发布时间（UTC）',
-    actions: '操作',
     showRun: (id: string) => `显示运行 #${id}`,
     lineStyle: (id: string) => `运行 #${id} 的线型`,
-    openRun: (id: string) => `打开 GitHub Actions 运行 #${id}`,
-    deleteRun: (id: string) => `删除运行 #${id}`,
+    openRun: (id: string) => `打开运行 #${id} 对应的已提交结果`,
     empty: '该基准测试版本下暂无运行记录。',
     epSuite: (measured: number, requested: number) => `EP：已测量 ${measured}/${requested}`,
     kvSuite: (measured: number, requested: number) => `KV 传输：已测量 ${measured}/${requested}`,
@@ -72,13 +66,6 @@ const SUITE_BADGE_CLASSES = {
   ep: 'border-sky-600/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',
   kv: 'border-violet-600/40 bg-violet-500/10 text-violet-700 dark:text-violet-300',
 } as const;
-
-const CONCLUSION_CLASSES: Record<string, string> = {
-  success: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  failure: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
-};
-const CONCLUSION_FALLBACK_CLASS =
-  'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
 
 function formatDate(value: string, locale: 'en' | 'zh'): string {
   return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
@@ -93,9 +80,8 @@ export function CollectiveXRunsTable({
   selectedRunIndexById,
   visibleRunIds,
   loadingRunIds,
-  deletingRunIds,
+  sourceShaByRunId,
   onVisibleChange,
-  onDelete,
   emptyMessage,
 }: CollectiveXRunsTableProps) {
   const locale = useLocale();
@@ -120,21 +106,18 @@ export function CollectiveXRunsTable({
               {t.shown}
             </th>
             <th className="px-3 py-1.5 font-medium">{t.run}</th>
-            <th className="px-3 py-1.5 font-medium">{t.result}</th>
             <th className="px-3 py-1.5 font-medium">{t.suites}</th>
             <th className="px-3 py-1.5 text-right font-medium">{t.cases}</th>
             <th className="px-3 py-1.5 text-right font-medium">{t.points}</th>
             <th className="px-3 py-1.5 font-medium">{t.skus}</th>
             <th className="px-3 py-1.5 font-medium">{t.published}</th>
-            <th className="px-3 py-1.5 text-right font-medium">{t.actions}</th>
           </tr>
         </thead>
         <tbody>
           {runs.map((run, rowIndex) => {
             const visible = visibleRunIds.has(run.run_id);
             const loading = loadingRunIds.has(run.run_id);
-            const deleting = deletingRunIds.has(run.run_id);
-            const conclusion = run.conclusion;
+            const sourceSha = sourceShaByRunId.get(run.run_id);
             const selectedRunIndex = selectedRunIndexById.get(run.run_id);
             const kvRequested = run.kv_cases?.requested ?? 0;
             const kvMeasured = run.kv_cases?.measured ?? 0;
@@ -158,7 +141,6 @@ export function CollectiveXRunsTable({
                     <input
                       type="checkbox"
                       checked={visible}
-                      disabled={deletingRunIds.size > 0}
                       aria-label={t.showRun(run.run_id)}
                       data-testid={`collectivex-run-visible-${run.run_id}`}
                       title={t.shownHint}
@@ -219,28 +201,23 @@ export function CollectiveXRunsTable({
                         />
                       </svg>
                     )}
-                    <a
-                      href={`https://github.com/${run.source_repository ?? GITHUB_REPO_FULL}/actions/runs/${run.run_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={t.openRun(run.run_id)}
-                      onClick={() => track('collectivex_run_source_opened', { run: run.run_id })}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      #{run.run_id}
-                      <ExternalLink className="size-3" />
-                    </a>
-                  </div>
-                </td>
-                <td className="px-3 py-1.5">
-                  <span
-                    className={cn(
-                      'inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium',
-                      CONCLUSION_CLASSES[conclusion ?? ''] ?? CONCLUSION_FALLBACK_CLASS,
+                    {sourceSha === undefined ? (
+                      <span>#{run.run_id}</span>
+                    ) : (
+                      <a
+                        href={`https://github.com/${run.source_repository ?? GITHUB_REPO_FULL}/tree/${sourceSha}/collectivex/results`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={t.openRun(run.run_id)}
+                        data-testid={`collectivex-run-source-${run.run_id}`}
+                        onClick={() => track('collectivex_run_source_opened', { run: run.run_id })}
+                        className="inline-flex items-center gap-1 hover:underline"
+                      >
+                        #{run.run_id}
+                        <ExternalLink className="size-3" />
+                      </a>
                     )}
-                  >
-                    {collectiveXConclusionLabel(conclusion, locale)}
-                  </span>
+                  </div>
                 </td>
                 <td className="px-3 py-1.5">
                   <div className="flex gap-1">
@@ -292,24 +269,6 @@ export function CollectiveXRunsTable({
                 </td>
                 <td className="whitespace-nowrap px-3 py-1.5 text-xs text-muted-foreground">
                   {formatDate(run.generated_at, locale)}
-                </td>
-                <td className="px-3 py-1.5 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={t.deleteRun(run.run_id)}
-                    data-testid={`collectivex-delete-run-${run.run_id}`}
-                    disabled={deletingRunIds.size > 0}
-                    onClick={() => onDelete(run.run_id)}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    {deleting ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="size-4" />
-                    )}
-                  </Button>
                 </td>
               </tr>
             );

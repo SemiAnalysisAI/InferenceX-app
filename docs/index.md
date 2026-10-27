@@ -28,7 +28,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [Data Transforms](./data-transforms.md) covers power boundaries, prefix-cache tier shares, and hardware-key gotchas in the chart data pipeline.
 - [State Ownership](./state-ownership.md) explains where shared chart state lives and how URL state is restored across navigation.
 - [Blog](./blog.md) covers MDX content, frontmatter and scheduled publishing, captions, heading IDs, and math.
-- [CollectiveX](./collectivex.md) covers the lazy ingest-on-read pipeline, its separate Neon database, tombstoned deletes, and the shared reader.
+- [CollectiveX](./collectivex.md) covers the separate Neon database filled from committed results, run identity, the ingest route and CLI, the re-seed runbook, and the shared reader.
 - [Chinese Pages (/zh)](./i18n.md) explains why /zh pages are hand-authored and how hreflang and blog translation pairing work.
 - [Chinese Copy Editorial Guide](./chinese-copy.md) covers audience, register, terminology, the review workflow, and the PR checklist for Chinese copy.
 
