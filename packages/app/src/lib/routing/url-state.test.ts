@@ -40,13 +40,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
-  it('opens on tokens per dollar, or on measured power under any power tier filter', async () => {
-    const { defaultYAxisMetric } = await import('@/lib/routing/url-state');
+  it('opens on tokens per dollar', async () => {
+    const { DEFAULT_Y_AXIS_METRIC } = await import('@/lib/routing/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
-    expect(defaultYAxisMetric([])).toBe('y_tokensPerDollarH');
-    expect(defaultYAxisMetric([])).toBe(DEFAULT_METRIC_CONFIG_KEY);
-    expect(defaultYAxisMetric(['certified'])).toBe('y_measuredAvgPower');
-    expect(defaultYAxisMetric(['legacy'])).toBe('y_measuredAvgPower');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
   });
 
   it('has expected default for r_range', async () => {
@@ -92,24 +90,24 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
-  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
+  it('drops retired comparison and panel toggles from old share links but keeps the breakdown view', async () => {
     setupWindow(
       '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1&i_powerbreakdown=1&i_pbview=area',
     );
     const { readUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
     const params = readUrlParams();
     const shared = new URL(buildShareUrl()).searchParams;
-    expect(params).toMatchObject({
-      i_roleshare: '1',
-      i_powerfit: '1',
-      i_powerbreakdown: '1',
-      i_pbview: 'area',
-    });
-    expect(shared.get('i_powerbreakdown')).toBe('1');
+    expect(params).toMatchObject({ i_pbview: 'area' });
     expect(shared.get('i_pbview')).toBe('area');
-    expect(shared.get('i_roleshare')).toBe('1');
-    expect(shared.get('i_powerfit')).toBe('1');
-    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
+    for (const key of [
+      'i_servicecompare',
+      'i_servicebase',
+      'i_servicepeer',
+      'i_servicetarget',
+      'i_roleshare',
+      'i_powerfit',
+      'i_powerbreakdown',
+    ]) {
       expect(params).not.toHaveProperty(key);
       expect(shared.has(key)).toBe(false);
     }

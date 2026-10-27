@@ -34,7 +34,7 @@ export function allInMeasuredUnavailableReason(
   if (point.modeledSystemPower?.status === 'unsupported') return point.modeledSystemPower.reason;
   if (
     point.modeledSystemPower?.status === 'supported' &&
-    metricKey === 'utilityModeledJPerOutputToken'
+    (metricKey === 'utilityModeledJPerOutputToken' || metricKey === 'itModeledJPerOutputToken')
   )
     return 'energy';
   return 'model-unavailable';

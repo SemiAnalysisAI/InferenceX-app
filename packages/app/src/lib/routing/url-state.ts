@@ -1,5 +1,4 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
@@ -22,9 +21,6 @@ const URL_STATE_KEYS = [
   'i_pctl',
   'i_mstat',
   'i_tokens',
-  'i_roleshare',
-  'i_powerfit',
-  'i_powerbreakdown',
   'i_pbview',
   'i_xmetric',
   'i_e2e_xmetric',
@@ -99,10 +95,6 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
-export function defaultYAxisMetric(powerTiers: readonly string[]): string {
-  return powerTiers.length > 0 ? MEASURED_METRIC_DEFAULTS.power : DEFAULT_Y_AXIS_METRIC;
-}
-
 export const DEFAULT_FLEET_MW = '10';
 export const DEFAULT_LIFECYCLE_RAMP_MONTHS = String(LIFECYCLE_DEFAULTS.rampMonths);
 
@@ -118,10 +110,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_pctl: 'p90',
   i_mstat: 'median',
   i_tokens: 'total',
-  i_roleshare: '0',
-  i_powerfit: '0',
-  i_powerbreakdown: '0',
-  i_pbview: 'bars',
+  i_pbview: 'area',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',

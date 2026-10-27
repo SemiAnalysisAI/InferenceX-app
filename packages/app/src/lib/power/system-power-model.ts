@@ -40,31 +40,39 @@ export interface SystemPowerOperatingState {
 }
 
 /**
- * Where a modeled unit's watts go, in the boxes PowerX Figure 1 draws: measured
- * GPU boards, measured Grace sockets (NVL72 rows with same-window CPU telemetry),
- * the rest of the server, fans plus power-conversion losses, the scale-out
- * network share, and the facility overhead PUE adds. The six parts sum to
- * `facilityWatts`; every part but `facility` sums to `itWatts`.
+ * Where a modeled unit's watts go, one part per component class in the stack
+ * order PowerX draws them (bottom up): measured GPU boards, measured Grace
+ * sockets (NVL72 rows with same-window CPU telemetry), then the modeled host
+ * CPUs, memory, NICs, NVSwitch, storage, the small PCIe parts, fans, power
+ * conversion loss, the scale-out network share, and the facility overhead PUE
+ * adds. The parts sum to `facilityWatts`; every part but `facility` sums to
+ * `itWatts`.
  */
 export const SYSTEM_POWER_CATEGORIES = [
   'gpu',
   'measuredCpu',
-  'server',
-  'fansPsu',
+  'cpu',
+  'memory',
+  'nic',
+  'nvswitch',
+  'storage',
+  'other',
+  'fans',
+  'psuLoss',
   'network',
   'facility',
 ] as const;
 export type SystemPowerCategory = (typeof SYSTEM_POWER_CATEGORIES)[number];
 export type SystemPowerBreakdown = Record<SystemPowerCategory, number>;
 
-export const emptySystemPowerBreakdown = (): SystemPowerBreakdown => ({
-  gpu: 0,
-  measuredCpu: 0,
-  server: 0,
-  fansPsu: 0,
-  network: 0,
-  facility: 0,
-});
+/** The parts read from telemetry; every other part is the model's estimate. */
+export const MEASURED_SYSTEM_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> = new Set([
+  'gpu',
+  'measuredCpu',
+]);
+
+export const emptySystemPowerBreakdown = (): SystemPowerBreakdown =>
+  Object.fromEntries(SYSTEM_POWER_CATEGORIES.map((key) => [key, 0])) as SystemPowerBreakdown;
 
 export const scaleSystemPowerBreakdown = (
   breakdown: SystemPowerBreakdown,
@@ -78,14 +86,30 @@ export const scaleSystemPowerBreakdown = (
 const SCALE_OUT_GROUP = 'Scale-out networking';
 const MEASURED_GPU_LEAF = 'GPUs';
 const MEASURED_GRACE_LEAF = 'Grace socket (measured)';
-const FAN_OR_LOSS = /\bfan|loss/iu;
 
-function leafCategory(top: PowerComponent, leaf: PowerComponent): SystemPowerCategory {
-  if (top.name === SCALE_OUT_GROUP) return 'network';
-  if (leaf.name === MEASURED_GPU_LEAF) return 'gpu';
-  if (leaf.name === MEASURED_GRACE_LEAF) return 'measuredCpu';
-  if (FAN_OR_LOSS.test(leaf.name)) return 'fansPsu';
-  return 'server';
+/**
+ * Leaf component name → part, first match wins. The names are the pinned
+ * port's class and label names (`system-power-model.test.ts` pins the full
+ * table across every supported system). The NVSwitch tray's embedded EPYC is
+ * tray overhead, so it counts as `nvswitch`, not as a host CPU; system-side
+ * transceivers sit on the NIC side of the chassis, so they count as `nic`.
+ */
+const LEAF_CATEGORY_RULES: readonly (readonly [RegExp, SystemPowerCategory])[] = [
+  [/NVSwitch|^EPYCEmbedded/u, 'nvswitch'],
+  [/CPU/u, 'cpu'],
+  [/DIMM|Memory/u, 'memory'],
+  [/NICCard|Transceiver/u, 'nic'],
+  [/Drive/u, 'storage'],
+  [/\bfan/iu, 'fans'],
+  [/loss/iu, 'psuLoss'],
+];
+
+/** The part a leaf of the pinned model's component tree counts toward. */
+export function systemPowerLeafCategory(topName: string, leafName: string): SystemPowerCategory {
+  if (topName === SCALE_OUT_GROUP) return 'network';
+  if (leafName === MEASURED_GPU_LEAF) return 'gpu';
+  if (leafName === MEASURED_GRACE_LEAF) return 'measuredCpu';
+  return LEAF_CATEGORY_RULES.find(([pattern]) => pattern.test(leafName))?.[1] ?? 'other';
 }
 
 /** Sums the pinned model's leaf components into {@link SystemPowerBreakdown} categories. */
@@ -93,7 +117,7 @@ export function breakdownPowerEstimate(estimate: PowerEstimate): SystemPowerBrea
   const breakdown = emptySystemPowerBreakdown();
   const visit = (top: PowerComponent, component: PowerComponent) => {
     if (component.children.length === 0) {
-      breakdown[leafCategory(top, component)] += component.power_w;
+      breakdown[systemPowerLeafCategory(top.name, component.name)] += component.power_w;
       return;
     }
     for (const child of component.children) visit(top, child);

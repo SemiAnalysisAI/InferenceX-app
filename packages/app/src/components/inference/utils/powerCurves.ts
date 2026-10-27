@@ -16,6 +16,7 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
+  'y_itModeledWatts',
   'y_utilityModeledWatts',
 ]);
 
