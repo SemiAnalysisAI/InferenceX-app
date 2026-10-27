@@ -121,7 +121,7 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
       </div>
       <div className="mt-5 min-h-28">
         {view.status !== 'loading' && ladder && (
-          <PowerLadder ladder={ladder} color={color} locale={locale} />
+          <PowerLadder ladder={ladder} color={color} locale={locale} build />
         )}
       </div>
       <div className="mt-5 flex flex-wrap items-start justify-between gap-x-8 gap-y-3">

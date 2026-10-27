@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/shared/utils';
 import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
-import { useEasedValues } from './eased-values';
+import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { CATEGORY_TITLES } from './strings';
 import {

@@ -13,7 +13,7 @@ import {
 } from '@/lib/powerx/ladder';
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
 
-import { useEasedValues } from './eased-values';
+import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
 import {

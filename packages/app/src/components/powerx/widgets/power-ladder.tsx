@@ -7,7 +7,7 @@ import { type Ladder, type StaggerLabel, staggerLabels } from '@/lib/powerx/ladd
 import { cn } from '@/lib/shared/utils';
 import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
-import { useEasedValues } from './eased-values';
+import { stepProgress, useBuildClock, useEasedValues } from './motion';
 import { CATEGORY_TITLES } from './strings';
 import { formatWatts, GrammarSwatch } from './widget-chrome';
 
@@ -125,14 +125,23 @@ export interface PowerLadderProps {
   locale: Locale;
   /** Without the parts list and with a shorter bar, for the worked example. */
   compact?: boolean;
+  /** Build the ladder up in reading order the first time it scrolls into view. */
+  build?: boolean;
   className?: string;
 }
+
+/**
+ * The build reads the ladder in order: the measured GPU bar grows, the modeled parts fill in left
+ * to right, then the PUE extension draws and the rated ticks fade in.
+ */
+const BUILD = { gpuMs: 700, stepMs: 60, partMs: 320, extensionMs: 400, ticksMs: 300 } as const;
 
 export function PowerLadder({
   ladder,
   color,
   locale,
   compact = false,
+  build = false,
   className,
 }: PowerLadderProps) {
   const t = STRINGS[locale];
@@ -148,8 +157,29 @@ export function PowerLadder({
   };
   for (const segment of ladder.segments) targets[`seg:${segment.category}`] = segment.watts;
   const shown = useEasedValues(targets);
-  const segmentWatts = (category: string) => shown[`seg:${category}`] ?? 0;
-  const itShown = ladder.segments.reduce((sum, segment) => sum + segmentWatts(segment.category), 0);
+  const extensionStart =
+    BUILD.gpuMs + Math.max(0, ladder.segments.length - 2) * BUILD.stepMs + BUILD.partMs;
+  const ticksStart = extensionStart + BUILD.extensionMs - 100;
+  const [buildRef, elapsed] = useBuildClock<SVGSVGElement>(build, ticksStart + BUILD.ticksMs);
+  const grown = ladder.segments.map(
+    (segment, index) =>
+      (shown[`seg:${segment.category}`] ?? 0) *
+      (index === 0
+        ? stepProgress(elapsed, 0, BUILD.gpuMs)
+        : stepProgress(elapsed, BUILD.gpuMs + (index - 1) * BUILD.stepMs, BUILD.partMs)),
+  );
+  const itShown = grown.reduce((sum, watts) => sum + watts, 0);
+  const extension = stepProgress(elapsed, extensionStart, BUILD.extensionMs);
+  const ticks = stepProgress(elapsed, ticksStart, BUILD.ticksMs);
+  const gpuLabel = stepProgress(elapsed, BUILD.gpuMs * 0.45, 300);
+  const facilityShown = itShown + extension * (shown.facility - itShown);
+  const labelOpacity: Record<string, number> = {
+    it: 1,
+    gpu: gpuLabel,
+    tdp: ticks,
+    allIn: ticks,
+    facility: extension,
+  };
 
   const barH = compact ? 26 : 34;
   // Rows and the GPU label's placement come from the final numbers so labels never hop mid-ease.
@@ -184,9 +214,9 @@ export function PowerLadder({
     titles.gpu,
     width,
     {
-      gpu: segmentWatts('gpu'),
+      gpu: grown[0] ?? 0,
       it: itShown,
-      facility: shown.facility,
+      facility: facilityShown,
       tdp: shown.tdp,
       allIn: shown.allIn,
       scaleMax: shown.scaleMax,
@@ -196,11 +226,11 @@ export function PowerLadder({
   );
   const { px, xOf } = live;
   const itX = xOf(itShown);
-  const facilityX = xOf(shown.facility);
+  const facilityX = xOf(facilityShown);
 
   let cursor = 0;
-  const segments = ladder.segments.map((segment) => {
-    const watts = segmentWatts(segment.category);
+  const segments = ladder.segments.map((segment, index) => {
+    const watts = grown[index];
     const x0 = xOf(cursor);
     cursor += watts;
     const w = Math.max(0, watts * px - GAP);
@@ -210,6 +240,7 @@ export function PowerLadder({
   return (
     <div ref={setContainerRef} className={cn('min-w-0', className)}>
       <svg
+        ref={buildRef}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
@@ -231,6 +262,7 @@ export function PowerLadder({
             textAnchor={label.anchor}
             fill="var(--foreground)"
             fontWeight={label.key === 'it' ? 600 : 500}
+            opacity={labelOpacity[label.key]}
             className="tabular-nums"
           >
             <title>{label.title}</title>
@@ -278,6 +310,7 @@ export function PowerLadder({
             fill="var(--primary-foreground)"
             fontWeight={600}
             pointerEvents="none"
+            opacity={gpuLabel}
             className="tabular-nums"
           >
             {live.gpuText}
@@ -305,6 +338,7 @@ export function PowerLadder({
               stroke={RATED}
               strokeWidth={1.25}
               strokeDasharray="3 2"
+              opacity={ticks}
             />
           );
         })}
@@ -315,6 +349,7 @@ export function PowerLadder({
           y2={tickY + 8}
           stroke={RATED}
           strokeWidth={1}
+          opacity={extension}
         />
 
         {live.bottom.map((label) => (
@@ -323,6 +358,7 @@ export function PowerLadder({
             x={label.x}
             y={tickY + 10 + (bottomRows.get(label.key) ?? 0) * ROW + 9}
             textAnchor={label.anchor}
+            opacity={labelOpacity[label.key]}
             className="tabular-nums"
           >
             <title>{label.title}</title>
