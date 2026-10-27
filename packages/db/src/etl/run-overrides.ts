@@ -97,6 +97,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   40316025285, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4515) ingested without append-only, replacing the full curve with three disagg points
   40054839636, // 2026-10-27 | GLM-5.2 FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4449) ingested without append-only, replacing the full curve with two agg points
   40279236382, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4529) ingested without append-only, replacing the full curve
+  40185235651, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4497) ingested without append-only, replacing the full curve
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
