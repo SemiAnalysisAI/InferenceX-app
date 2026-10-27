@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { huaweiSkuConfigurations, HUAWEI_SKU_SOURCE } from './huawei-sku-configurations';
+import { huaweiSkuConfigurations } from './huawei-sku-configurations';
 
 const STRINGS = {
   en: {
@@ -27,9 +27,6 @@ const STRINGS = {
     measured:
       'Our core-profile experiments cover PR_9579: 28 Cube and 56 Vector cores, with 14 Cube and 28 Vector IDs observed in each of two die groups. This grouping must not be extrapolated to other SKUs; the table alone does not identify enabled core IDs or physical placement.',
     profiles: 'View measured PR_9579 core profiles',
-    source: 'Source table (received 27 October 2026)',
-    provenance:
-      'Contributor-provided screenshot; original publisher and revision are unverified. This is not a complete SKU catalog.',
     scroll: 'Scroll horizontally to view all configuration columns.',
   },
   zh: {
@@ -53,8 +50,6 @@ const STRINGS = {
     measured:
       '我们的核心访存实验覆盖 PR_9579：共 28 个 Cube 核心、56 个 Vector 核心，在两个 die 分组中各观察到 14 个 Cube 和 28 个 Vector 核心 ID。不能将这一分组推广到其他 SKU；仅凭配置表无法确定启用的核心 ID 或物理位置。',
     profiles: '查看 PR_9579 实测核心访存特征',
-    source: '原始配置表（2026 年 10 月 27 日收到）',
-    provenance: '截图由贡献者提供，原始发布方及版本尚未核实。此表并非完整的 SKU 目录。',
     scroll: '横向滚动可查看全部配置列。',
   },
 } as const;
@@ -134,19 +129,6 @@ export function HuaweiSkuConfigurations() {
           {t.profiles}
         </Link>
       </div>
-      <p className="text-xs text-muted-foreground">
-        <a
-          className="underline underline-offset-4"
-          href={HUAWEI_SKU_SOURCE.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => track('ubenchx_sku_source_opened')}
-        >
-          {t.source}
-        </a>
-        {' · '}
-        {t.provenance}
-      </p>
     </section>
   );
 }

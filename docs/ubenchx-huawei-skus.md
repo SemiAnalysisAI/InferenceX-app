@@ -16,5 +16,5 @@ AI Core count equals Cube count in every row. Cube/Vector clocks and DDR Base/Re
 - Huawei table: `skuConfigurations`, produced by the same helper in UI and API.
 - `gpu=all` or `gpu=Huawei 950PR`: all nine configurations; exact `Ascend 950PR_<suffix>`: one. NVIDIA filters return an empty configuration array.
 - `test=all` returns the same filtered array within `tpcSkyline`; devices without other measurements keep empty arrays in those sections.
-- Source/profile links and table scrolling are presentation-only, with no new data filters.
+- The source image remains available through API metadata; its page footer is omitted. The profile link and table scrolling are presentation-only, with no new data filters.
 - No inference or unofficial-run overlay is involved: this is static, explicitly sourced hardware configuration evidence.
