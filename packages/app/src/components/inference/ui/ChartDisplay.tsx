@@ -124,6 +124,8 @@ import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-le
 import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { powerxTutorialPath } from '@/lib/powerx/tutorial-path';
+import { PowerXTutorialLink } from '@/components/powerx/powerx-tutorial-link';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
@@ -1547,7 +1549,24 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 <>
                   <DashboardSectionHeader
                     title={powerXSurface ? powerXT.title : t.inferencePerformance}
-                    description={powerXSurface ? powerXT.description : t.inferencePerformanceDesc}
+                    description={
+                      powerXSurface ? (
+                        <>
+                          {powerXT.description}{' '}
+                          <PowerXTutorialLink
+                            href={powerxTutorialPath(locale)}
+                            analyticsEvent="powerx_tutorial_section_opened"
+                            analyticsTarget="powerx-header"
+                            data-testid="powerx-tutorial-link"
+                            className="whitespace-nowrap text-foreground underline underline-offset-2"
+                          >
+                            {powerXT.tutorial}
+                          </PowerXTutorialLink>
+                        </>
+                      ) : (
+                        t.inferencePerformanceDesc
+                      )
+                    }
                     actions={<ShareButton />}
                   />
                   {powerXLayout && powerXMounted && (

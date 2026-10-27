@@ -5,10 +5,10 @@ import matter from 'gray-matter';
 import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { POWERX_TUTORIAL_PATH, powerxTutorialPath } from './tutorial-path';
 import {
   enAlternates,
   type Locale,
-  localePath,
   ZH_LANG_TAG,
   ZH_OG_LOCALE,
   zhAlternates,
@@ -24,9 +24,6 @@ export interface PowerXTutorial {
   meta: PowerXTutorialMeta;
   raw: string;
 }
-
-export const POWERX_PATH = '/powerx';
-export const POWERX_TUTORIAL_PATH = '/powerx/tutorial';
 
 const CONTENT_DIR = path.join(process.cwd(), 'content', 'powerx');
 const FRONTMATTER_FIELDS = ['title', 'description', 'updated'] as const;
@@ -68,10 +65,6 @@ export function getPowerXTutorial(locale: Locale = 'en'): PowerXTutorial {
     throw new Error(`Invalid PowerX tutorial frontmatter in ${where}:\n- ${errors.join('\n- ')}`);
   }
   return { meta: data as PowerXTutorialMeta, raw: content };
-}
-
-export function powerxTutorialPath(locale: Locale = 'en'): string {
-  return localePath(POWERX_TUTORIAL_PATH, locale);
 }
 
 /**

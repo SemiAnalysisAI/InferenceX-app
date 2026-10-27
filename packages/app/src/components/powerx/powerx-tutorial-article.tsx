@@ -4,7 +4,8 @@ import { BLOG_PROSE_CLASS } from '@/components/blog/blog-prose';
 import { HashScroll } from '@/components/blog/hash-scroll';
 import { formatBlogDate } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
-import { POWERX_PATH, type PowerXTutorialMeta } from '@/lib/powerx/tutorial';
+import type { PowerXTutorialMeta } from '@/lib/powerx/tutorial';
+import { getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { cn } from '@/lib/shared/utils';
 
 import { PowerXTutorialLink } from './powerx-tutorial-link';
@@ -44,7 +45,7 @@ export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialA
       <HashScroll />
       <header className="pt-4 sm:pt-8">
         <PowerXTutorialLink
-          href={localePath(POWERX_PATH, locale)}
+          href={localePath(getDashboardRoute('powerx').path, locale)}
           analyticsEvent="powerx_tutorial_returned"
           analyticsTarget="powerx"
           className="text-sm text-muted-foreground transition-colors hover:text-foreground"
