@@ -13,6 +13,7 @@ import {
 } from '@/lib/powerx/ladder';
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
 
+import { useEasedValues } from './eased-values';
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
 import {
@@ -67,6 +68,12 @@ const ROW_KIND: Record<RowKey, Provenance> = {
   facility: 'modeled',
   allIn: 'rated',
 };
+const watts = (value: number) => `${formatWatts(value)} W`;
+
+function Readout({ value, format }: { value: number; format: (value: number) => string }) {
+  const shown = useEasedValues({ value });
+  return <>{format(shown.value)}</>;
+}
 
 export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -87,16 +94,19 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const label = ladderLabel(hardware);
 
-  const values: Record<RowKey, string> | null =
+  const values: Record<RowKey, { value: number; format: (value: number) => string }> | null =
     view.status === 'loading' || !ladder
       ? null
       : {
-          gpu: `${formatWatts(ladder.gpuWatts)} W`,
-          it: `${formatWatts(ladder.itWatts)} W`,
-          gpusPerMw: Math.round(ladder.gpusPerMw).toLocaleString('en-US'),
-          tdp: `${ladder.percentOfTdp.toFixed(0)} %`,
-          facility: `${formatWatts(ladder.facilityWatts)} W`,
-          allIn: `${formatWatts(ladder.allInWatts)} W`,
+          gpu: { value: ladder.gpuWatts, format: watts },
+          it: { value: ladder.itWatts, format: watts },
+          gpusPerMw: {
+            value: ladder.gpusPerMw,
+            format: (value) => Math.round(value).toLocaleString('en-US'),
+          },
+          tdp: { value: ladder.percentOfTdp, format: (value) => `${value.toFixed(0)} %` },
+          facility: { value: ladder.facilityWatts, format: watts },
+          allIn: { value: ladder.allInWatts, format: watts },
         };
 
   return (
@@ -125,7 +135,7 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
                 {t.rows[key][0]}
               </dt>
               <dd className="mt-1 font-mono text-xl font-semibold text-foreground tabular-nums">
-                {values[key]}
+                <Readout value={values[key].value} format={values[key].format} />
               </dd>
               <dd className="text-xs text-muted-foreground">{t.rows[key][1]}</dd>
             </div>
