@@ -121,6 +121,18 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   load; a pair naming a chip or a concurrency the view does not have applies to nothing.
   This is a presentation-only selector over data the views API already returns
   (`powerBreakdown=true` rows carry every point), so it adds no API selector.
+- Touch (PowerX on a coarse pointer, `useIsCoarsePointer()`): the drill-down's hover label
+  and tooltip give way to a scrub. A finger anywhere across the plot moves a solid rule to
+  the nearest column (`nearestColumnIndex`, by column centre) and the readout above the
+  plot (`PowerBreakdownReadout`: total W/GPU with its basis pill, `c<N> · <interactivity>`,
+  one chip per layer in stack order with the plot's swatches; tapping a chip isolates the
+  layer) reads that column; the svg keeps `touch-action: pan-y`, so a vertical pan still
+  scrolls the page, and is `none` only while a scrub is in progress. A tap holds the column
+  through the same compared-point pin as a desktop click (dashed outline, `i_pbpoint`), the
+  readout then says Pinned until the next scrub or the row's pin marker. The 44 px "Compare
+  chips at N tok/s/user" button under the plot moves the slider to the readout's
+  interactivity (the slider's own action, so every pin drops; `powerx_compare_at_scrub`),
+  disabled while the slider already reads it. A mouse keeps the hover label and the click.
 - A pinned point's "View power trace" action opens the Over time view focused on that trace.
 - The footer carries no PowerX-specific note: the former collapsed "How we measure" details
   is gone, and only the shared /inference footer notes remain. The meaning of the GPU /

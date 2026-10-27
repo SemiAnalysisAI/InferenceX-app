@@ -7,8 +7,11 @@ import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
   usePowerXSurface,
+  useSetPowerXCompareTarget,
 } from './powerx-surface';
 import { usePowerLayerHighlight } from './power-layer-highlight';
+import { LAYER_STROKE_OPACITY, layerStyle, swatchStyle } from './power-layer-style';
+import PowerBreakdownReadout, { type PowerBreakdownReadoutSource } from './PowerBreakdownReadout';
 import PowerPartsList from './PowerPartsList';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -44,20 +47,17 @@ import {
   breakdownSeriesAtBoundary,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
-  cssHatchAngle,
   defaultComparisonInteractivity,
   HATCH_ANGLE,
   isHatchedBand,
   MEASURED_POWER_BANDS,
   nearestBreakdownPoint,
   POWER_BAND_OPACITY,
-  POWER_LAYER_FADED_OPACITY,
   powerBandFillOpacity,
   powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
   powerLayerEmphasis,
-  powerLayerFill,
   stackedBandsAt,
   stackPowerBands,
   SYSTEM_POWER_CATEGORIES,
@@ -66,13 +66,14 @@ import {
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
   type PowerComparedPoints,
-  type PowerLayerEmphasis,
   type PowerLayerHighlight,
   type PowerLayerTarget,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 
 export type PowerBreakdownView = 'bars' | 'area';
+
+export { layerStyle, swatchStyle, type LayerStyle } from './power-layer-style';
 
 const STRINGS = {
   en: {
@@ -98,6 +99,7 @@ const STRINGS = {
     graceModeled: 'Grace sockets are modeled (no validated socket telemetry).',
     clickToCompare: (label: string) => `Click to compare at ${label}`,
     comparedHere: 'Compared here',
+    compareAt: (x: string) => `Compare chips at ${x} tok/s/user`,
     note: (revision: string) =>
       `Power model revision ${revision}. Every part is the deployment's share divided by its allocated GPUs, so the stack equals the chart's All in Measured W/GPU. TDP and All in Provisioned are rated references, not measurements.`,
     empty:
@@ -148,6 +150,7 @@ const STRINGS = {
     graceModeled: 'Grace 插槽功耗为建模值（无有效插槽遥测）。',
     clickToCompare: (label: string) => `点击以在 ${label} 处对比`,
     comparedHere: '当前对比点',
+    compareAt: (x: string) => `在 ${x} tok/s/user 处对比各芯片`,
     note: (revision: string) =>
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
@@ -185,8 +188,6 @@ const STRINGS = {
  * detail; hovering a layer, a legend row or a list row raises that layer and
  * fades the rest, and a click pins it.
  */
-const LAYER_STROKE_OPACITY = 0.9;
-const HIGHLIGHT_STROKE_WIDTH = 1.5;
 const SEGMENT_LABEL_MIN_PX = 15;
 const SEGMENT_LABEL_MIN_BAND = 30;
 const MAX_BAR_PX = 48;
@@ -222,6 +223,8 @@ const CSV_COLUMNS: Record<SystemPowerCategory, string> = {
 const watts = d3.format(',.0f');
 const percent = d3.format('.0%');
 const interactivityFormat = d3.format(',.1f');
+/** The slider's own rounding, so the button names the value the slider will show. */
+const interactivityRate = d3.format(',.0f');
 
 interface Column {
   key: string;
@@ -254,64 +257,6 @@ export function interactivityColumnLayout(positions: readonly number[], plotWidt
 
 function hatchId(sectionId: string, band: PowerBand) {
   return `${sectionId}-${band}-hatch`.replaceAll(/[^a-zA-Z0-9_-]/g, '_');
-}
-
-export interface LayerStyle {
-  emphasis: PowerLayerEmphasis;
-  /** The layer's own step (a hatched layer's pattern already carries its tint). */
-  fillOpacity: number;
-  /** Whole-element opacity: faded siblings of a highlighted layer. */
-  opacity: number;
-  strokeWidth: number;
-  strokeOpacity: number;
-}
-
-/** How a layer is drawn under a highlight: its step and hatch stay, the rest fades. */
-export function layerStyle(band: PowerBand, highlight: PowerLayerHighlight | null | undefined) {
-  const emphasis = powerLayerEmphasis(band, highlight);
-  const fillOpacity = isHatchedBand(band) ? 1 : POWER_BAND_OPACITY[band];
-  if (emphasis === 'highlighted') {
-    return {
-      emphasis,
-      fillOpacity,
-      opacity: 1,
-      strokeWidth: HIGHLIGHT_STROKE_WIDTH,
-      strokeOpacity: 1,
-    } satisfies LayerStyle;
-  }
-  return {
-    emphasis,
-    fillOpacity,
-    opacity: emphasis === 'faded' ? POWER_LAYER_FADED_OPACITY : 1,
-    strokeWidth: 1,
-    strokeOpacity: LAYER_STROKE_OPACITY,
-  } satisfies LayerStyle;
-}
-
-/**
- * A layer as a CSS box (legend swatch, comparison segment): the chip colour at
- * the layer's step, striped at its hatch angle when modeled, outlined in the
- * chip colour; faded like the plot's layer under a highlight.
- */
-export function swatchStyle(
-  band: PowerBand,
-  color: string,
-  highlight: PowerLayerHighlight | null = null,
-): React.CSSProperties {
-  const { opacity } = layerStyle(band, highlight);
-  if (isHatchedBand(band)) {
-    return {
-      backgroundColor: powerLayerFill(color, powerBandFillOpacity(band)),
-      backgroundImage: `repeating-linear-gradient(${cssHatchAngle(band)}deg, ${color} 0 2px, transparent 2px 6px)`,
-      border: `1px solid ${color}`,
-      opacity,
-    };
-  }
-  return {
-    backgroundColor: powerLayerFill(color, POWER_BAND_OPACITY[band]),
-    border: `1px solid ${color}`,
-    opacity,
-  };
 }
 
 let textMeasurer: CanvasRenderingContext2D | null | undefined;
@@ -404,6 +349,35 @@ interface CursorLabel {
 const GUIDE_LABEL_Y = 8;
 const GUIDE_HIT_HALF_WIDTH = 5;
 const guideFormat = d3.format(',.0f');
+const SCRUB_DOT_RADIUS = 5;
+
+/** A finger landed, moved to another column, or the gesture became a page scroll. */
+export type ScrubPhase = 'start' | 'move' | 'cancel';
+
+/**
+ * Touch scrub (PowerX on coarse pointers): the column nearest a plot x, by the
+ * distance to each column's centre, so a finger anywhere across the plot reads
+ * a column and the hit bands' edges carry no meaning.
+ */
+export function nearestColumnIndex(centers: readonly number[], x: number): number | null {
+  if (centers.length === 0) return null;
+  let best = 0;
+  for (let index = 1; index < centers.length; index += 1) {
+    if (Math.abs(centers[index] - x) < Math.abs(centers[best] - x)) best = index;
+  }
+  return best;
+}
+
+/**
+ * A finger-driven gesture on the drill-down: the scrubbed column index while a
+ * touch moves across the plot. Mouse pointers never scrub; they keep the hover
+ * label and the click.
+ */
+export interface ScrubControls {
+  /** The column the readout shows (held by React), drawn as the rule on render. */
+  index: number | null;
+  onScrub: (index: number | null, phase: ScrubPhase) => void;
+}
 
 function BreakdownChart({
   sectionId,
@@ -424,6 +398,7 @@ function BreakdownChart({
   onTogglePin,
   onUnpin,
   coarsePointer,
+  scrub,
 }: {
   sectionId: string;
   series: PowerBreakdownSeries;
@@ -455,6 +430,11 @@ function BreakdownChart({
   onUnpin: () => void;
   /** Touch: a tap on a layer hovers and pins it in one go. */
   coarsePointer: boolean;
+  /**
+   * PowerX on touch: a drag across the plot scrubs columns into the readout above
+   * the chart instead of the hover label and the tooltip; a tap still clicks.
+   */
+  scrub?: ScrubControls;
 }) {
   const labels = powerBreakdownPointLabels(series.points);
   const columns: Column[] = series.points.map((entry, index) => ({
@@ -537,6 +517,13 @@ function BreakdownChart({
   liveHighlight.current = highlight;
   const cursor = useRef<CursorLabel | null>(null);
   const tooltipElement = useRef<HTMLDivElement | null>(null);
+  // The touch gesture in flight: which pointer, and the column it last reported.
+  const scrubState = useRef<{ pointerId: number | null; index: number | null }>({
+    pointerId: null,
+    index: null,
+  });
+  const scrubRef = useRef(scrub);
+  scrubRef.current = scrub;
 
   const applyEmphasis = (
     group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -972,6 +959,52 @@ function BreakdownChart({
       : null;
   };
 
+  /**
+   * The touch scrub's mark: a solid rule on the scrubbed column with a dot on its
+   * total, distinct from the slider's dashed guide and the compared column's
+   * dashed outline. Drawn from the React-held index on render and straight from
+   * the pointer handlers while the finger moves.
+   */
+  const drawScrubRule = (
+    group: d3.Selection<SVGGElement, unknown, null, undefined>,
+    ctx: Parameters<NonNullable<CustomLayerConfig['render']>>[1],
+    index: number | null,
+  ) => {
+    const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
+    const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const column = index === null ? null : (columns[index] ?? null);
+    const centerOf = (d: Column) => layout[Number(d.key)].center;
+    group
+      .selectAll<SVGLineElement, Column>('line.breakdown-scrub-rule')
+      .data(column ? [column] : [], (d) => d.key)
+      .join('line')
+      .attr('class', 'breakdown-scrub-rule')
+      .attr('data-testid', 'power-breakdown-scrub-rule')
+      .attr('data-index', (d) => d.key)
+      .attr('x1', centerOf)
+      .attr('x2', centerOf)
+      .attr('y1', 0)
+      .attr('y2', ctx.height)
+      .attr('stroke', 'var(--foreground)')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-opacity', 0.75)
+      .attr('pointer-events', 'none')
+      .raise();
+    group
+      .selectAll<SVGCircleElement, Column>('circle.breakdown-scrub-dot')
+      .data(column ? [column] : [], (d) => d.key)
+      .join('circle')
+      .attr('class', 'breakdown-scrub-dot')
+      .attr('cx', centerOf)
+      .attr('cy', (d) => y(d.entry.totalWattsPerGpu))
+      .attr('r', SCRUB_DOT_RADIUS)
+      .attr('fill', color)
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 2)
+      .attr('pointer-events', 'none')
+      .raise();
+  };
+
   const drawHitAreas: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
     const layout = layoutFor(ctx.xScale as ContinuousScale, ctx.width);
     const showLabel = (label: CursorLabel | null) => {
@@ -979,6 +1012,7 @@ function BreakdownChart({
       drawCursorLabel(group, ctx.width, ctx.height);
     };
     const y = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+    const scrubbing = scrub !== undefined;
     const hoverBand = (event: MouseEvent, column: Column) => {
       const [mx, my] = d3.pointer(event, group.node());
       const pinnedLayer = liveHighlight.current?.pinned ? liveHighlight.current : null;
@@ -1032,8 +1066,14 @@ function BreakdownChart({
       .attr('fill', 'var(--foreground)')
       .attr('fill-opacity', 0)
       .style('cursor', onColumnClick ? 'pointer' : 'default')
-      .on('mousemove.layer', (event: MouseEvent, d) => hoverBand(event, d))
+      // Touch scrub: the readout above the plot replaces the hover label, so the
+      // compat mouse events a tap synthesises must not draw it.
+      .on('mousemove.layer', (event: MouseEvent, d) => {
+        if (scrubbing) return;
+        hoverBand(event, d);
+      })
       .on('mouseleave.layer', (event: MouseEvent) => {
+        if (scrubbing) return;
         // Crossing into the next column is not leaving the plot.
         const next = event.relatedTarget;
         if (next instanceof Element && next.classList.contains('breakdown-hit')) return;
@@ -1045,23 +1085,75 @@ function BreakdownChart({
           onHover(null);
         }
       })
+      // One listener for the compared point and the layer: a state update in the
+      // first of two listeners can flush synchronously inside a trusted click, and
+      // the re-render re-registers the second one mid-dispatch, which the browser
+      // then skips (a touch tap, whose layer pin always changes state, lost its
+      // compared-point pin that way).
       .on('click.layer', (event: MouseEvent, d) => {
+        // While pinned, the column under the slider's guide is the way back to the slider.
+        if (pinned && onGuideClick && Number(d.key) === guideNearestIndex) onGuideClick();
+        else onColumnClick?.(d.entry);
         // Touch: a tap on a layer hovers and pins it; a tap above the stack, or any
-        // mouse click on the plot, drops a pinned layer.
+        // mouse click on the plot, drops a pinned layer. Under a scrub the readout
+        // above the plot carries the layer, so no label is drawn.
         const [mx, my] = d3.pointer(event, group.node());
         const found = coarsePointer ? bandAt(ctx, d, mx, my) : null;
         if (found) {
-          showLabel(found);
+          if (!scrubbing) showLabel(found);
           onTogglePin(bandTarget(found.band));
         } else {
           onUnpin();
         }
-      })
-      .on('click.compare', (_event, d) => {
-        // While pinned, the column under the slider's guide is the way back to the slider.
-        if (pinned && onGuideClick && Number(d.key) === guideNearestIndex) onGuideClick();
-        else onColumnClick?.(d.entry);
       });
+    // Touch scrub: a finger anywhere on the plot reads the nearest column; its moves
+    // arrive here through the pointer capture a touch gets on its target. A tap keeps
+    // its click (above), a drag past the tap slop produces none. The svg's touch-action
+    // stays pan-y, so a vertical pan still scrolls the page (the browser cancels the
+    // pointer); it is set to none only while a scrub is in progress.
+    const centers = layout.map((slot) => slot.center);
+    const svgNode = ctx.layout.svg.node();
+    const endScrub = (event: PointerEvent, cancelled: boolean) => {
+      const state = scrubState.current;
+      if (state.pointerId !== event.pointerId) return;
+      state.pointerId = null;
+      if (svgNode) svgNode.style.touchAction = 'pan-y';
+      if (cancelled) {
+        state.index = null;
+        scrubRef.current?.onScrub(null, 'cancel');
+      }
+    };
+    hits
+      .on('pointerdown.scrub', (event: PointerEvent) => {
+        if (!scrubbing || event.pointerType === 'mouse' || event.isPrimary === false) return;
+        const target = event.currentTarget as Element & {
+          setPointerCapture?: (pointerId: number) => void;
+        };
+        try {
+          target.setPointerCapture?.(event.pointerId);
+        } catch {
+          // Pointer capture is a convenience: a touch is captured implicitly anyway.
+        }
+        const [mx] = d3.pointer(event, group.node());
+        const index = nearestColumnIndex(centers, mx);
+        scrubState.current = { pointerId: event.pointerId, index };
+        drawScrubRule(group, ctx, index);
+        scrubRef.current?.onScrub(index, 'start');
+      })
+      .on('pointermove.scrub', (event: PointerEvent) => {
+        const state = scrubState.current;
+        if (!scrubbing || state.pointerId !== event.pointerId) return;
+        if (svgNode) svgNode.style.touchAction = 'none';
+        const [mx] = d3.pointer(event, group.node());
+        const index = nearestColumnIndex(centers, mx);
+        if (index === state.index) return;
+        state.index = index;
+        drawScrubRule(group, ctx, index);
+        scrubRef.current?.onScrub(index, 'move');
+      })
+      .on('pointerup.scrub', (event: PointerEvent) => endScrub(event, false))
+      .on('pointercancel.scrub', (event: PointerEvent) => endScrub(event, true));
+    drawScrubRule(group, ctx, scrub?.index ?? null);
     const guides: number[] = guidePosition() === null ? [] : [guidePosition()!];
     group
       .selectAll<SVGRectElement, number>('rect.breakdown-guide-hit')
@@ -1183,14 +1275,20 @@ function BreakdownChart({
       }}
       yAxis={{ label: t.yAxis, tickCount: 5 }}
       layers={layers}
-      tooltip={{
-        rulerType: 'none',
-        content: (column) =>
-          tooltipHtml(series, column, color, xLabel, t, totalLabel, liveHighlight.current),
-        attachToLayer: 4,
-        onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
-        onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
-      }}
+      // Touch scrub: the readout carries the column's layers, so no tooltip (and no
+      // point sheet on a tap) is attached to the plot.
+      tooltip={
+        scrub
+          ? undefined
+          : {
+              rulerType: 'none',
+              content: (column) =>
+                tooltipHtml(series, column, color, xLabel, t, totalLabel, liveHighlight.current),
+              attachToLayer: 4,
+              onHoverStart: (selection) => selection.attr('fill-opacity', 0.05),
+              onHoverEnd: (selection) => selection.attr('fill-opacity', 0),
+            }
+      }
     />
   );
 }
@@ -1324,6 +1422,46 @@ export default function PowerBreakdownPanel({
   const color = series ? colorOf(series) : 'currentColor';
   const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
   const coarsePointer = useIsCoarsePointer();
+  // PowerX on a touch-primary device: a drag across the plot scrubs the readout above
+  // it, a tap holds the column (pins this chip's compared point) and an explicit
+  // button moves the slider; with a mouse the plot keeps its hover label and click.
+  const setCompareTarget = useSetPowerXCompareTarget();
+  const touchScrub = powerXSurface && coarsePointer;
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+  const scrubBeforeGesture = useRef<number | null>(null);
+  // A new compared point (slider, pin, unpin) or another chip ends the scrub: state
+  // adjusted during render, so a double-invoked dev render cannot skip the reset.
+  const scrubKey = `${series?.key ?? ''}:${comparedAt ?? ''}:${markedIndex}:${pinnedConcurrency ?? ''}`;
+  const [scrubFor, setScrubFor] = useState(scrubKey);
+  if (scrubFor !== scrubKey) {
+    setScrubFor(scrubKey);
+    setScrubIndex(null);
+  }
+  const onScrub = (index: number | null, phase: ScrubPhase) => {
+    if (phase === 'start') scrubBeforeGesture.current = scrubIndex;
+    // The gesture became a page scroll: back to what the readout showed before it.
+    setScrubIndex(phase === 'cancel' ? scrubBeforeGesture.current : index);
+  };
+  const scrubEntry =
+    touchScrub && series && scrubIndex !== null ? (series.points[scrubIndex] ?? null) : null;
+  const readoutEntry = scrubEntry ?? comparedEntry ?? listEntry;
+  const readoutSource: PowerBreakdownReadoutSource = scrubEntry
+    ? 'scrub'
+    : pinnedEntry
+      ? 'pinned'
+      : 'compared';
+  const compareAtScrub = () => {
+    if (!series || !readoutEntry || !setCompareTarget) return;
+    // The slider's own action: a new shared target, which drops every pin.
+    setCompareTarget(readoutEntry.interactivity);
+    setScrubIndex(null);
+    track('powerx_compare_at_scrub', {
+      hw: series.hwKey,
+      concurrency: readoutEntry.concurrency,
+      interactivity: readoutEntry.interactivity,
+      source: readoutSource,
+    });
+  };
 
   const exportCsv = () => {
     exportToCsv(
@@ -1496,6 +1634,17 @@ export default function PowerBreakdownPanel({
           {/* Overview left, detail right from `lg`; the list stacks under the plot below. */}
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
             <div className="min-w-0">
+              {touchScrub && readoutEntry && (
+                <PowerBreakdownReadout
+                  series={series}
+                  entry={readoutEntry}
+                  color={color}
+                  includeFacility={includeFacility}
+                  source={readoutSource}
+                  highlight={layers.highlight}
+                  onTogglePin={layers.togglePin}
+                />
+              )}
               <BreakdownChart
                 key={`${series.key}-${view}`}
                 sectionId={sectionId}
@@ -1518,7 +1667,19 @@ export default function PowerBreakdownPanel({
                 onTogglePin={layers.togglePin}
                 onUnpin={layers.unpin}
                 coarsePointer={coarsePointer}
+                scrub={touchScrub ? { index: scrubIndex, onScrub } : undefined}
               />
+              {touchScrub && readoutEntry && setCompareTarget && (
+                <button
+                  type="button"
+                  data-testid="power-breakdown-compare-at"
+                  disabled={comparedAt !== null && readoutEntry.interactivity === comparedAt}
+                  onClick={compareAtScrub}
+                  className="no-export mt-2 flex min-h-11 w-full items-center justify-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium text-foreground disabled:opacity-50"
+                >
+                  {t.compareAt(interactivityRate(readoutEntry.interactivity))}
+                </button>
+              )}
             </div>
             {listEntry && (
               <PowerPartsList

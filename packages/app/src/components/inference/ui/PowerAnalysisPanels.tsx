@@ -35,12 +35,13 @@ const STRINGS = {
   en: {
     drillTitle: (chip: string) => `${chip} across load`,
     drillSubtitle: 'Click a point to compare it; the dashed outline marks the compared point.',
-    drillSubtitleTouch: 'Tap a point to compare it; the dashed outline marks the compared point.',
+    drillSubtitleTouch:
+      'Drag across the chart to read any point; tap to hold it as the compared point (dashed outline).',
   },
   zh: {
     drillTitle: (name: string) => `${name} 随负载的变化`,
     drillSubtitle: '点击任一数据点即可对比；虚线框标出上方对比所用的点。',
-    drillSubtitleTouch: '点按任一数据点即可对比；虚线框标出上方对比所用的点。',
+    drillSubtitleTouch: '在图上拖动可读取任一数据点；点按可将其固定为对比点（虚线框标出）。',
   },
 };
 

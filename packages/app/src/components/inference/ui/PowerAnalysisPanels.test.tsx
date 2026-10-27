@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
+import type * as MediaQueryHooks from '@/hooks/useMediaQuery';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
@@ -29,6 +30,12 @@ vi.mock('@/hooks/useThemeColors', () => ({
 }));
 vi.mock('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ runIndexByUrl: {} }),
+}));
+// jsdom has no media queries: the pointer type is flipped per test for the touch branch.
+const media = vi.hoisted(() => ({ coarsePointer: false }));
+vi.mock('@/hooks/useMediaQuery', async (importOriginal) => ({
+  ...(await importOriginal<typeof MediaQueryHooks>()),
+  useIsCoarsePointer: () => media.coarsePointer,
 }));
 // The breakdown plot is D3 against a measured layout; jsdom has none, so the chart is a stub.
 vi.mock('@/lib/d3-chart/D3Chart', () => ({
@@ -175,10 +182,58 @@ beforeEach(() => {
   urlState.params = {};
   urlState.setUrlParams.mockClear();
   track.mockClear();
+  media.coarsePointer = false;
   mount([...sglang, ...vllm]);
 });
 
 afterEach(unmount);
+
+describe('PowerAnalysisPanels touch branch (PowerX on a coarse pointer)', () => {
+  it('keeps the mouse copy and chrome off touch', () => {
+    expect(
+      container.querySelector('[data-testid="power-chip-compare-drilldown"] p')?.textContent,
+    ).toBe('Click a point to compare it; the dashed outline marks the compared point.');
+    expect(container.querySelector('[data-testid="power-breakdown-readout"]')).toBeNull();
+    expect(container.querySelector('[data-testid="power-breakdown-compare-at"]')).toBeNull();
+  });
+
+  it('teaches the drag and the tap, and reads the compared point above the plot', () => {
+    unmount();
+    media.coarsePointer = true;
+    mount([...sglang, ...vllm]);
+    expect(
+      container.querySelector('[data-testid="power-chip-compare-drilldown"] p')?.textContent,
+    ).toBe(
+      'Drag across the chart to read any point; tap to hold it as the compared point (dashed outline).',
+    );
+    // The readout and the compare button sit around the plot, inside the drill-down.
+    const drilldown = container.querySelector('[data-testid="power-chip-compare-drilldown"]')!;
+    const readout = drilldown.querySelector<HTMLElement>('[data-testid="power-breakdown-readout"]');
+    expect(readout?.dataset.source).toBe('compared');
+    expect(readout?.dataset.concurrency).toBe('16');
+    expect(
+      readout?.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent,
+    ).toBe('c16 · 60 tok/s/user');
+    const plot = drilldown.querySelector('[data-testid="d3-chart-stub"]')!;
+    expect(readout!.compareDocumentPosition(plot) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const button = drilldown.querySelector<HTMLButtonElement>(
+      '[data-testid="power-breakdown-compare-at"]',
+    )!;
+    expect(plot.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The slider already reads this point: nothing to compare at until a scrub or a pin.
+    expect(button.textContent).toBe('Compare chips at 60 tok/s/user');
+    expect(button.disabled).toBe(true);
+    // The slider is the global control: the readout follows it like the rows do.
+    moveSlider(0);
+    expect(container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent).toBe(
+      '20 tok/s/user',
+    );
+    expect(drilldownTitle()).toBe(SGLANG_TITLE);
+    expect(
+      container.querySelector('[data-testid="power-breakdown-readout-point"]')?.textContent,
+    ).toBe('c64 · 20 tok/s/user');
+  });
+});
 
 const drilldowns = () => container.querySelectorAll('[data-testid="power-chip-compare-drilldown"]');
 const drilldownTitle = () =>
