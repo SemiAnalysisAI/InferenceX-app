@@ -500,6 +500,7 @@ export function PrecisionSelector({
           showClearAll={false}
           searchable={false}
           wrapSelectedChips={false}
+          summarizeSelectionOnMobile
         />
       </div>
     </div>

@@ -305,25 +305,32 @@ describe('Chart Selectors', () => {
         'title',
         'FP4, FP8, BF16',
       );
-      cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]')
-        .should('have.length', 3)
-        .should(($chips) => {
-          const tops = [...$chips].map((chip) => chip.getBoundingClientRect().top);
-          expect(new Set(tops).size, 'precision chips stay on a single row').to.equal(1);
-        });
       if (width === 390) {
+        // Phones summarize several precisions as one line instead of clipping chips.
+        cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]').should(
+          'not.be.visible',
+        );
+        cy.get('[data-testid="precision-multiselect"] [data-slot="select-compact-value"]')
+          .should('be.visible')
+          .and('have.text', 'FP4 + FP8 + BF16');
         cy.get('[data-testid="precision-multiselect"] [data-slot="select-values"]').should(
           ($values) => {
             const values = $values[0];
-            expect(
-              values.scrollWidth,
-              'all chips remain reachable by horizontal scrolling',
-            ).to.be.greaterThan(values.clientWidth);
-            expect(values.ownerDocument.defaultView!.getComputedStyle(values).overflowX).to.equal(
-              'auto',
+            expect(values.scrollWidth, 'the summary never overflows').to.be.at.most(
+              values.clientWidth,
             );
           },
         );
+      } else {
+        cy.get('[data-testid="precision-multiselect"] [data-slot="select-compact-value"]').should(
+          'not.be.visible',
+        );
+        cy.get('[data-testid="precision-multiselect"] [data-slot="select-chip"]')
+          .should('have.length', 3)
+          .should(($chips) => {
+            const tops = [...$chips].map((chip) => chip.getBoundingClientRect().top);
+            expect(new Set(tops).size, 'precision chips stay on a single row').to.equal(1);
+          });
       }
       cy.get('[data-testid="precision-multiselect"]').click('right');
       cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);

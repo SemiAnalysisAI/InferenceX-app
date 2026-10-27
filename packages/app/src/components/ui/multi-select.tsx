@@ -77,6 +77,11 @@ interface MultiSelectProps {
   searchable?: boolean;
   plainSelectedText?: boolean;
   wrapSelectedChips?: boolean;
+  /**
+   * Below the `sm` breakpoint, show several selected values as one truncated
+   * "A + B" summary instead of chips, so a narrow trigger never clips a chip.
+   */
+  summarizeSelectionOnMobile?: boolean;
   showSelectionSummary?: boolean;
   searchPlaceholder?: string;
   searchAriaLabel?: string;
@@ -106,6 +111,7 @@ function MultiSelect({
   searchable = true,
   plainSelectedText = false,
   wrapSelectedChips = true,
+  summarizeSelectionOnMobile = false,
   showSelectionSummary = true,
   searchPlaceholder,
   searchAriaLabel,
@@ -429,37 +435,51 @@ function MultiSelect({
                 </span>
               </span>
             ) : (
-              selectedLabels.map((label, index) => (
-                <span
-                  key={value[index]}
-                  data-slot="select-chip"
-                  className="bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0"
-                >
-                  {selectedOptions[index]?.icon}
-                  <span className="min-w-0 truncate" title={label}>
-                    {label}
-                  </span>
+              <>
+                {summarizeSelectionOnMobile && value.length > 1 && (
                   <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => handleRemove(value[index], e)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleRemove(value[index], e);
-                      }
-                    }}
-                    className={cn(
-                      'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
-                      (disabled || isMinReached) && 'hidden',
-                    )}
-                    aria-label={`${t.removePrefix}${label}`}
-                    aria-disabled={disabled || isMinReached}
+                    data-slot="select-compact-value"
+                    className="text-foreground block min-w-0 truncate sm:hidden"
+                    title={selectedLabels.join(', ')}
                   >
-                    <XIcon className="size-4 text-foreground" />
+                    {selectedLabels.join(' + ')}
                   </span>
-                </span>
-              ))
+                )}
+                {selectedLabels.map((label, index) => (
+                  <span
+                    key={value[index]}
+                    data-slot="select-chip"
+                    className={cn(
+                      'bg-transparent text-foreground border border-border dark:bg-[#0a6ca8] dark:border-border inline-flex min-w-0 max-w-full items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium transition-colors shrink-0',
+                      summarizeSelectionOnMobile && value.length > 1 && 'max-sm:hidden',
+                    )}
+                  >
+                    {selectedOptions[index]?.icon}
+                    <span className="min-w-0 truncate" title={label}>
+                      {label}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => handleRemove(value[index], e)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRemove(value[index], e);
+                        }
+                      }}
+                      className={cn(
+                        'hover:bg-primary/20 rounded-sm cursor-pointer transition-colors',
+                        (disabled || isMinReached) && 'hidden',
+                      )}
+                      aria-label={`${t.removePrefix}${label}`}
+                      aria-disabled={disabled || isMinReached}
+                    >
+                      <XIcon className="size-4 text-foreground" />
+                    </span>
+                  </span>
+                ))}
+              </>
             )
           ) : (
             <span className="text-muted-foreground">{resolvedPlaceholder}</span>
