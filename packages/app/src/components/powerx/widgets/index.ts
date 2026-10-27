@@ -9,11 +9,7 @@ import { ValidityWidget } from './validity-widget';
 import type { WidgetLayout, WidgetProps } from './widget-chrome';
 import { WorkedExampleWidget } from './worked-example-widget';
 
-/**
- * Widgets the tutorial mounts in place of `../../public/images/powerx-tutorial/widgets/<key>.<ext>`.
- * The image is the GitHub fallback (a screenshot, or the exported SVG for the flow diagram); the
- * page renders the component at the declared layout.
- */
+/** Widgets the tutorial mounts with `<Widget name="<key>" alt="…" />`, at the declared layout. */
 export const POWERX_TUTORIAL_WIDGETS = {
   ladder: { component: LadderWidget, layout: 'bleed' },
   flow: { component: FlowWidget, layout: 'bleed' },
@@ -28,6 +24,3 @@ export const POWERX_TUTORIAL_WIDGETS = {
 >;
 
 export type PowerXTutorialWidgetName = keyof typeof POWERX_TUTORIAL_WIDGETS;
-
-export const isPowerXTutorialWidget = (name: string): name is PowerXTutorialWidgetName =>
-  Object.hasOwn(POWERX_TUTORIAL_WIDGETS, name);

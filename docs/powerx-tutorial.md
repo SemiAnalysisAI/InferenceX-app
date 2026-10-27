@@ -1,18 +1,17 @@
 # PowerX Tutorial
 
-`/powerx/tutorial` and `/zh/powerx/tutorial` render `packages/app/content/powerx/tutorial.md` and
-`zh/tutorial.md`. Those two files are the only prose: GitHub renders them as they are, and the app
-compiles the same file with `compileBlogMdx(raw, locale, { format: 'md', … })`. No second copy.
+`/powerx/tutorial` and `/zh/powerx/tutorial` render `packages/app/content/powerx/tutorial.mdx` and
+`zh/tutorial.mdx` through `compileBlogMdx(raw, locale, createPowerXTutorialComponents(locale))`.
+The pages are the only rendering target; the files are not written for GitHub.
 
-## Allowed syntax
+## Syntax
 
-- GitHub-flavoured markdown: headings, lists, tables, fenced code, links, images, emphasis.
-- GitHub alerts (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`), rendered by
-  `remark-github-alerts.ts` as `aside[data-callout]` → `TutorialCallout` (a ruled aside, not a card).
-- `<details><summary>`, `<kbd>`, `<br>`, rebuilt as elements by `remark-github-html.ts` because
-  plain-markdown MDX drops raw HTML. The FAQ is the last H2 and consists only of `<details>` items.
-- Not allowed: `import`/`export`, `{}` expressions, other HTML or JSX, `$math$`. Front matter is
-  exactly `title`, `description`, `updated` (`'YYYY-MM-DD'`).
+- Markdown with GFM, as in the blog.
+- `<Callout kind="note">` (or `tip`, `important`, `warning`, `caution`) renders `TutorialCallout`,
+  a ruled aside, not a card. Leave blank lines around the body so it parses as paragraphs.
+- `<Widget name="<key>" alt="…" />` mounts an interactive widget (below).
+- The FAQ is the last H2 and consists only of `<details><summary>` items.
+- Front matter is exactly `title`, `description`, `updated` (`'YYYY-MM-DD'`).
 
 ## Page shape
 
@@ -20,10 +19,6 @@ The page is one reading column (`max-w-5xl` container, 72ch prose) with wider se
 the blog. The body opens with the ladder widget before the first H2, so the hero (eyebrow, title,
 dek from front matter) is followed by the first visual. Every H2 gets a running number from the
 `h2` override in `tutorial-mdx-components.tsx`; there is no "On this page" list.
-
-Figures go in `packages/app/public/images/powerx-tutorial/` and are referenced in both files as
-`../../public/images/powerx-tutorial/<name>.png`, which GitHub resolves; the page's `img` override
-rewrites that prefix to `/images/powerx-tutorial/<name>.png`.
 
 ## One visual grammar
 
@@ -35,14 +30,10 @@ has no chip and uses `--brand`. Do not add a palette.
 
 ## Interactive widgets
 
-An image under `packages/app/public/images/powerx-tutorial/widgets/<name>.png` (or `.svg`) is a
-widget mount: `<name>` is a key of `POWERX_TUTORIAL_WIDGETS` (`src/components/powerx/widgets/index.ts`),
-and the page's `img` override renders that `'use client'` component with `locale` and the image's
-alt text instead of the file, wrapped in `div[data-layout]` at the registry's layout: `bleed`
-(container width: ladder, flow, measured-vs-modeled) or `column` (72ch). `remark-widget-images.ts`
-lifts the image out of its paragraph so the widget is a block. The file is the GitHub fallback: a
-screenshot of the finished widget at 1100 px light theme, or for `flow` the SVG exported from the
-same `FlowSvg` component (`bun run powerx:flow-svg`).
+`<Widget name>` takes a key of `POWERX_TUTORIAL_WIDGETS` (`src/components/powerx/widgets/index.ts`)
+and renders that `'use client'` component with `locale` and `alt`, wrapped in `div[data-layout]` at
+the registry's layout: `bleed` (container width: ladder, flow, measured-vs-modeled) or `column`
+(72ch).
 
 Widgets:
 
@@ -67,8 +58,8 @@ views API. Nothing measured is embedded in source. Every control tracks
 
 To add one: write the pure model in `src/lib/powerx/<name>.ts`, build the component
 on `widget-chrome.tsx` (`WidgetFrame`, `Chips`, `CopyButton`, `GrammarLegend`, `useView`,
-`useWidgetHash`), register it with a layout in `widgets/index.ts`, add the image line to both markdown
-files, and screenshot it into `widgets/<name>.png`.
+`useWidgetHash`), register it with a layout in `widgets/index.ts`, and add the `<Widget>` line to
+both `.mdx` files.
 
 Both pages stay `noindex` until the PowerX tab is indexable; flip
 `robots` in `tutorial.ts` and add the pair to the sitemap together.

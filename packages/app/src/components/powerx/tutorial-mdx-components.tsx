@@ -3,21 +3,17 @@ import { cloneElement, type ComponentType, isValidElement, type ReactElement } f
 import { createMdxComponents } from '@/components/blog/mdx-components';
 import { Reveal } from '@/components/motion/reveal';
 import type { Locale } from '@/lib/i18n/i18n';
-import { tutorialImageSrc, tutorialWidgetName } from '@/lib/powerx/tutorial';
 
 import { TutorialCallout, type TutorialCalloutProps } from './tutorial-callout';
-import { isPowerXTutorialWidget, POWERX_TUTORIAL_WIDGETS } from './widgets';
+import { POWERX_TUTORIAL_WIDGETS, type PowerXTutorialWidgetName } from './widgets';
 
 /**
  * The blog component map plus the tutorial-only overrides: H2s carry a running section number
- * and fade-rise once when scrolled into view, GitHub alerts render as callouts, `../../public/...` image paths (which GitHub resolves) map to
- * the app's `/...` paths, and an image under `images/powerx-tutorial/widgets/` mounts the
- * registered client widget at its declared layout instead of the file, which stays as the
- * GitHub fallback.
+ * and fade-rise once when scrolled into view, `<Callout>` renders a ruled aside, and
+ * `<Widget name>` mounts a registered client widget at its declared layout.
  */
 export function createPowerXTutorialComponents(locale: Locale): Record<string, ComponentType<any>> {
   const base = createMdxComponents(locale);
-  const BaseImage = base.img;
   const BaseH2 = base.h2;
   let section = 0;
   return {
@@ -44,22 +40,19 @@ export function createPowerXTutorialComponents(locale: Locale): Record<string, C
         </Reveal>
       );
     },
-    aside: (props: TutorialCalloutProps) => <TutorialCallout {...props} locale={locale} />,
-    img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-      const src = typeof props.src === 'string' ? props.src : null;
-      const widget = src === null ? null : tutorialWidgetName(src);
-      if (widget !== null && isPowerXTutorialWidget(widget)) {
-        const { component: Widget, layout } = POWERX_TUTORIAL_WIDGETS[widget];
-        return (
-          <div
-            data-layout={layout}
-            className={layout === 'bleed' ? 'my-10 max-w-none' : 'my-8 max-w-[72ch]'}
-          >
-            <Widget locale={locale} alt={props.alt ?? widget} />
-          </div>
-        );
-      }
-      return <BaseImage {...props} src={src === null ? props.src : tutorialImageSrc(src)} />;
+    Callout: (props: Omit<TutorialCalloutProps, 'locale'>) => (
+      <TutorialCallout {...props} locale={locale} />
+    ),
+    Widget: ({ name, alt }: { name: PowerXTutorialWidgetName; alt: string }) => {
+      const { component: Widget, layout } = POWERX_TUTORIAL_WIDGETS[name];
+      return (
+        <div
+          data-layout={layout}
+          className={layout === 'bleed' ? 'my-10 max-w-none' : 'my-8 max-w-[72ch]'}
+        >
+          <Widget locale={locale} alt={alt} />
+        </div>
+      );
     },
   };
 }

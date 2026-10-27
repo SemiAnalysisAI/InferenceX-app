@@ -38,37 +38,19 @@ function getHighlighter() {
   return highlighterPromise;
 }
 
-type MdxOptions = NonNullable<
-  NonNullable<Parameters<typeof compileMDX>[0]['options']>['mdxOptions']
->;
-
-export interface CompileBlogMdxOptions {
-  /** `'md'` compiles plain markdown: no JSX, imports or `{}` expressions (default `'mdx'`). */
-  format?: NonNullable<MdxOptions['format']>;
-  /** Replaces the default `createMdxComponents(locale)` map. */
-  components?: Record<string, ComponentType<any>>;
-  /** Extra remark plugins, run after GFM and math. */
-  remarkPlugins?: NonNullable<MdxOptions['remarkPlugins']>;
-}
-
 export async function compileBlogMdx(
   source: string,
   locale: BlogLocale = 'en',
-  options: CompileBlogMdxOptions = {},
+  components: Record<string, ComponentType<any>> = createMdxComponents(locale),
 ) {
   const highlighter = await getHighlighter();
 
   return compileMDX({
     source,
-    components: options.components ?? createMdxComponents(locale),
+    components,
     options: {
       mdxOptions: {
-        ...(options.format && { format: options.format }),
-        remarkPlugins: [
-          remarkGfm,
-          [remarkMath, { singleDollarTextMath: false }],
-          ...(options.remarkPlugins ?? []),
-        ],
+        remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
         rehypePlugins: [
           [rehypeKatex, { strict: false }],
           [

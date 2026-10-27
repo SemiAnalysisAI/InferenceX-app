@@ -4,9 +4,6 @@ import { PowerXTutorialArticle } from '@/components/powerx/powerx-tutorial-artic
 import { createPowerXTutorialComponents } from '@/components/powerx/tutorial-mdx-components';
 import { JsonLd } from '@/components/seo/json-ld';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
-import { remarkGithubAlerts } from '@/lib/powerx/remark-github-alerts';
-import { remarkGithubHtml } from '@/lib/powerx/remark-github-html';
-import { remarkWidgetImages } from '@/lib/powerx/remark-widget-images';
 import {
   buildPowerXTutorialJsonLd,
   getPowerXTutorial,
@@ -21,11 +18,7 @@ export function generateMetadata(): Metadata {
 
 export default async function PowerXTutorialPage() {
   const { meta, raw } = getPowerXTutorial(LOCALE);
-  const { content } = await compileBlogMdx(raw, LOCALE, {
-    format: 'md',
-    components: createPowerXTutorialComponents(LOCALE),
-    remarkPlugins: [remarkGithubAlerts, remarkGithubHtml, remarkWidgetImages],
-  });
+  const { content } = await compileBlogMdx(raw, LOCALE, createPowerXTutorialComponents(LOCALE));
 
   return (
     <main className="relative">
