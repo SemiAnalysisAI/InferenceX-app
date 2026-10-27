@@ -3,7 +3,6 @@ import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
-import { TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 import {
   agentxDashboardHref,
   FEATURED_AGENTX_MODELS,
@@ -19,6 +18,7 @@ const MODEL_LOGOS: Record<string, string> = {
   'deepseek-v4': '/logos/deepseek-color.svg',
   'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
+  'minimax-m31-flash': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
@@ -388,21 +388,10 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Huawei',
     title: 'Huawei Ascend 950PR',
     titleZh: '华为 Ascend 950PR',
-    subtitle: 'OperatorX',
-    href: '/operatorx',
+    subtitle: 'UbenchX',
+    href: '/ubenchx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
-  },
-  {
-    id: 'tpu',
-    vendor: 'Google',
-    title: 'TPU Qwen3.5 Submission',
-    titleZh: 'TPU Qwen3.5 提交结果',
-    subtitle: 'AgentX',
-    href: TPUV7_QWEN_3_5_AGENTX_URL,
-    model: 'qwen-3-5',
-    analyticsEvent: 'landing_tpu_results_clicked',
-    isNew: true,
   },
   {
     id: 'tpu-kimi-k3',
@@ -428,17 +417,6 @@ const LANDING_HARDWARE_RESULTS = [
     analyticsEvent: 'landing_rubin_results_clicked',
   },
   {
-    id: 'rubin',
-    vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 MiniMax M3 Submission',
-    titleZh: 'Vera Rubin NVL72 MiniMax M3 提交结果',
-    subtitle: '428 Billion parameters AgentX',
-    subtitleZh: '4280 亿参数 AgentX',
-    href: '/inference/minimax-m3',
-    model: 'minimax-m3',
-    analyticsEvent: 'landing_rubin_results_clicked',
-  },
-  {
     id: 'jalapeno',
     vendor: 'OpenAI',
     title: 'OpenAI Jalapeño',
@@ -447,6 +425,17 @@ const LANDING_HARDWARE_RESULTS = [
     href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
+  },
+  {
+    id: 'minimax-m31-flash',
+    vendor: 'MiniMax',
+    title: 'MiniMax M3.1 Flash',
+    titleZh: 'MiniMax M3.1 Flash',
+    subtitle: 'AgentX',
+    href: '/inference/minimax-m31-flash',
+    model: 'minimax-m31-flash',
+    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
+    isNew: true,
   },
 ] as const;
 
@@ -586,13 +575,12 @@ export function AgentXCompareHero({
             {surface === 'landing' && (
               <div className="divide-y divide-border/70 border-b border-border/70">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
-                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
+                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
                     <CompareIndexTrackedLink
                       key={result.id}
                       data-testid={`landing-${result.id}-results-link`}
                       href={`${prefix}${result.href}`}
-                      prefetchOperatorX={result.id === 'huawei'}
                       analyticsEvent={result.analyticsEvent}
                       analyticsTarget={result.model}
                       analyticsSurface={surface}
@@ -600,19 +588,32 @@ export function AgentXCompareHero({
                       className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
-                        <svg
-                          data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox={mark.viewBox}
-                          width={32}
-                          height={32}
-                          aria-hidden="true"
-                          className="size-8 shrink-0 text-foreground"
-                        >
-                          {mark.paths.map((path) => (
-                            <path key={path.d} d={path.d} fill={path.fill} />
-                          ))}
-                        </svg>
+                        {result.vendor === 'MiniMax' ? (
+                          <img
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            src={MODEL_LOGOS[result.model]}
+                            alt=""
+                            aria-hidden="true"
+                            width={32}
+                            height={32}
+                            loading="lazy"
+                            className="size-8 shrink-0 object-contain"
+                          />
+                        ) : (
+                          <svg
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox={mark!.viewBox}
+                            width={32}
+                            height={32}
+                            aria-hidden="true"
+                            className="size-8 shrink-0 text-foreground"
+                          >
+                            {mark!.paths.map((path) => (
+                              <path key={path.d} d={path.d} fill={path.fill} />
+                            ))}
+                          </svg>
+                        )}
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
                             <span className="min-w-0">

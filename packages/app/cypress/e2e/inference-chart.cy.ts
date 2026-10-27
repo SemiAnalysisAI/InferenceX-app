@@ -14,6 +14,7 @@ import {
 } from '../support/e2e';
 import {
   interceptOverlayRun,
+  AGENTIC_DATE,
   OVERLAY_RUN_ID,
   OVERLAY_RUN_URL,
   SINGLE_TURN_DATE,
@@ -364,7 +365,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', '自有 - 超大规模云大批量')
+      .should('contain.text', '自有 · 超大规模云厂商批量采购')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
@@ -385,6 +386,123 @@ describe('Inference Chart', () => {
     cy.visit('/inference');
     cy.wait('@availabilityFailure');
     cy.contains('h2', 'Something went wrong!').should('be.visible');
+  });
+});
+
+describe('Deprecated model source attribution', () => {
+  it('marks every deprecated model in the source, without a background watermark', () => {
+    cy.viewport(1280, 900);
+    for (const [display, dbKey, deprecated] of [
+      ['MiniMax-M3', 'minimaxm3', true],
+      ['MiniMax-M2.5', 'minimaxm2.5', true],
+      ['Kimi-K2.5', 'kimik2.5', true],
+      ['GLM-5', 'glm5', true],
+      ['gpt-oss-120b', 'gptoss120b', true],
+      ['Llama-3.3-70B-Instruct-FP8', 'llama70b', true],
+      ['MiniMax-M3.1-Flash', 'minimaxm31flash', false],
+    ] as const) {
+      const rows = b300Rows(null).map((row) => ({ ...row, model: dbKey }));
+      cy.intercept('GET', '/api/v1/availability', {
+        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
+      cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
+        onBeforeLoad: unlockAgenticGate,
+      });
+      cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
+      cy.get('#chart-0 [data-testid="result-context"]')
+        .should('contain.text', 'Source: SemiAnalysis InferenceX™')
+        .and(deprecated ? 'contain.text' : 'not.contain.text', '(Deprecated)');
+      cy.get('.deprecated-watermark').should('not.exist');
+    }
+  });
+
+  it('keeps the suffix in PNG exports, overlays, and the Chinese mobile chart', () => {
+    const model = 'minimaxm3';
+    const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
+    const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
+    cy.intercept('GET', '/api/v1/availability', {
+      body: officialRows.map(({ metrics: _metrics, ...row }) => row),
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: officialRows });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            name: 'historical-m3-overlay',
+            branch: 'historical-m3-overlay',
+            sha: 'abc000',
+            createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: overlayRows,
+        evaluations: [],
+      },
+    }).as('historicalM3Overlay');
+
+    cy.visit('/inference/minimax-m3?i_seq=agentic-traces', {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+    );
+    let exportedPng = '';
+    let exportedCaption = '';
+    cy.window().then((win) => {
+      win.HTMLAnchorElement.prototype.click = function () {
+        if (this.download.endsWith('.png')) {
+          exportedPng = this.href;
+          exportedCaption =
+            win.document.querySelector('#chart-0-export [data-testid="result-context"]')
+              ?.textContent ?? '';
+          expect(win.document.querySelector('#chart-0-export .deprecated-watermark')).to.equal(
+            null,
+          );
+        }
+      };
+    });
+    cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window().should(() => {
+      expect(exportedPng).to.match(/^data:image\/png;base64,/u);
+      expect(exportedCaption).to.contain('Source: SemiAnalysis InferenceX™ (Deprecated)');
+    });
+
+    cy.visit(`/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
+    );
+    cy.get('#chart-0 .unofficial-watermark-image').should('exist');
+    cy.get('.deprecated-watermark').should('not.exist');
+    cy.get('[aria-label="Dismiss historical-m3-overlay"]').click();
+    cy.get('#chart-0 .unofficial-overlay-pt').should('not.exist');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      'Source: SemiAnalysis InferenceX™ (Deprecated)',
+    );
+
+    cy.viewport(375, 900);
+    cy.visit(`/zh/inference/minimax-m3?i_seq=agentic-traces&unofficialrun=${OVERLAY_RUN_ID}`, {
+      onBeforeLoad: unlockAgenticGate,
+    });
+    cy.wait('@historicalM3Overlay');
+    cy.get('#chart-0 [data-testid="result-context"]').should(
+      'contain.text',
+      '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
+    );
+    cy.get('.deprecated-watermark').should('not.exist');
+    expectNoPageOverflow();
   });
 });
 

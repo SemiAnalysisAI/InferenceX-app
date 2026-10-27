@@ -32,8 +32,9 @@ export async function POST(request: Request) {
     }
   }
 
-  // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the
-  // default remains a full purge (which covers both).
+  // ?scope=collectivex or ?scope=operatorx purges only that cache scope. The
+  // default full purge covers CollectiveX but not OperatorX, which only its own
+  // ingest invalidates.
   const scope = new URL(request.url).searchParams.get('scope');
   if (scope && scope !== COLLECTIVEX_CACHE_SCOPE && scope !== OPERATORX_CACHE_SCOPE) {
     return NextResponse.json({ error: 'unknown scope' }, { status: 400 });

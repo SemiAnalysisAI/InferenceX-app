@@ -21,6 +21,48 @@ TFLOPS is derived by the shared comparison transform as useful FLOPs (`usefulFlo
 `latency_us*1e6`, per GPU. An eight-GPU Slurm allocation does not multiply this number.
 Charts plot only successful measurements. The coverage strip counts the other cases per GPU.
 
+### Distribution normalization
+
+The Distribution per GPU chart can show raw TFLOPS or TB/s, or normalize those
+values by the documented peak for each hardware and case precision. Normalized
+throughput is achieved TFLOPS divided by peak TFLOPS; normalized bandwidth is
+achieved TB/s divided by peak TB/s. The axis and box tooltips show percentages.
+Cases without a peak for their precision are excluded from normalized boxes;
+values above 100% are retained. Matched only is recalculated after normalization
+so every displayed box uses the same eligible case set. Latency has no peak
+percentage, and already normalized metric choices keep their existing units.
+The Normalized switch is offered for raw throughput and bandwidth metrics.
+Ascend 950PR bandwidth normalization uses the documented, assumed 1.6 TB/s basis.
+
+The page-owned `GET /api/v1/operatorx/compare` route accepts optional
+`distributionMetric`, `distributionNormalized`, `distributionMatchedOnly`, and
+`distributionHardware` query parameters. If any is present, it returns a
+`distribution` projection with resolved controls, per-GPU quantiles, counts, and
+case indices. The same pure helper produces the chart boxes and API projection;
+the existing comparison response is unchanged when those parameters are absent.
+The response's measurement columns retain statuses and source run/result identities.
+OperatorX remains a page-owned API outside the published OpenAPI document.
+
+| Distribution control | API parameter             | Returned data effect                                   |
+| -------------------- | ------------------------- | ------------------------------------------------------ |
+| GEMM/MoE tab         | `op`                      | Selects the operation                                  |
+| Workload             | `workload`                | Selects cases before distribution                      |
+| Metric               | `distributionMetric`      | Selects the value and peak basis                       |
+| GPUs                 | `distributionHardware`    | Selects distribution columns and matched cohort        |
+| Matched only         | `distributionMatchedOnly` | Uses cases eligible on every selected GPU              |
+| Normalized           | `distributionNormalized`  | Divides throughput or bandwidth by the applicable peak |
+
+Box hover and expansion change presentation only; they retain these results.
+
+中文：Distribution per GPU 可将实测 TFLOPS 除以对应硬件和精度的计算峰值，或将实测
+TB/s 除以带宽峰值；纵轴与箱线图提示均显示峰值占比。缺少对应精度峰值的用例不计入归一化
+统计，超过 100% 的实测值不会截断。“仅显示匹配用例”会按归一化后的有效数据重新
+选取共同用例。归一化开关仅用于原始吞吐量和带宽指标；延迟没有对应的峰值百分比，
+已是峰值占比的指标保持原有单位。
+950PR 的带宽归一化使用文档中假定的 1.6 TB/s 参考值。
+页面专属 `/api/v1/operatorx/compare` 接口通过上述四个 `distribution*` 参数返回
+筛选后的分布统计，并保留原始测量状态和 run/result 来源；未传这些参数时，响应保持不变。
+
 ## Compact comparison reads
 
 Ingestion normalizes each run once and stores versioned per-run GEMM and MoE
@@ -222,14 +264,13 @@ Do not replace measured latencies with synthetic values for manual verification.
 ### Landing-page Huawei link
 
 The English and Chinese landing pages link Huawei Ascend 950PR results to
-`/operatorx` and `/zh/operatorx`, respectively. The logo and result button are
-presentation-only navigation to the existing OperatorX view: they add no data
-selectors, defaults, calculations, or API contracts. Existing OperatorX API
-coverage applies; no additional endpoint or OpenAPI change is needed.
+`/ubenchx/core-memory-profiles` and `/zh/ubenchx/core-memory-profiles`, respectively,
+with a UbenchX subtitle. This entry no longer opens or prefetches OperatorX.
+OperatorX remains available through its own navigation and API.
 
-中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
-`/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
-API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
+中文：英文和中文首页的华为 Ascend 950PR 入口显示 UbenchX 副标题，分别链接至
+`/ubenchx/core-memory-profiles` 和 `/zh/ubenchx/core-memory-profiles`，
+不再打开或预取 OperatorX。OperatorX 仍可通过自身导航入口和 API 访问。
 
 ### Cross-backend case alignment
 
@@ -266,15 +307,26 @@ Request order, revision checks, missing/null results, and error handling are pre
 above Next's 2 MB limit. Keys include op, ordered revisions, format version, and
 namespace; distinct deployments need distinct namespaces or prefixes. Partial or
 replaced revisions remain uncached/no-store. Blob failures retain the source path.
-Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag; full
-purge covers the configured prefix. Warm process caches remain until revision or
-code/version changes. The run-list query remains; measure benefits in the deployment
+Scope invalidation awaits OperatorX Blob deletion and clears its CDN tag. A full
+purge, which every results ingest triggers, keeps OperatorX's CDN tag and Blob
+subtree, so only an OperatorX ingest makes its cached responses cold.
+Vercel's CDN cache key includes the deployment, so each production promotion
+starts cold. The `Warm After Deploy` workflow runs on Vercel's
+`vercel.deployment.promoted` dispatch (automatic deploys, manual promotions, and
+rollbacks) and fetches both OperatorX pages, `/runs`, and the GEMM and MoE
+comparisons in full. The CDN cache is per region, so this fills the runner's
+region and leaves a warm function for the others. Warm process caches remain until
+revision or code/version changes. The run-list query remains; measure benefits in the deployment
 region, and bump `OPERATORX_COMPARISON_VERSION` when changing derivation.
 
 中文：配置上述 Blob 环境变量后，可共享超过 2 MB 的对比数据，按算子、revision、版本和
 namespace 分隔。不同部署需使用独立 namespace 或前缀。部分失败或被替换的 revision
-不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签，完整清除
-覆盖整个前缀；内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
+不会缓存；Blob 失败时仍可读取来源数据。定向清除等待 Blob 删除并清除 CDN 标签。每次结果数据
+写入都会触发完整清除，但完整清除不影响 OperatorX 的 CDN 标签和 Blob 子目录，因此只有
+OperatorX 自身的写入才会使其缓存失效。Vercel 的 CDN 缓存键包含部署本身，因此生产环境每次切换到新部署后
+缓存都为空。`Warm After Deploy` 工作流由 Vercel 的 `vercel.deployment.promoted` 事件触发（涵盖自动部署、
+手动 promote 和回滚），完整拉取两个 OperatorX 页面、`/runs` 以及 GEMM 和 MoE 对比数据。CDN 缓存按区域
+划分，因此该流程只填充 runner 所在区域的缓存，其他区域则可复用已预热的函数实例。内存缓存由 revision 或代码版本变化更新。仍需查询运行列表，并在部署区域测量收益。
 
 ### Progressive rendering and intent prefetch
 

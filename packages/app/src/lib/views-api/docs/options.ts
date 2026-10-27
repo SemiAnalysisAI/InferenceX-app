@@ -122,6 +122,13 @@ const responseExample = {
       releaseDate: '2026-06-30',
       compareSlug: 'deepseek-v4-pro',
     },
+    {
+      name: 'MiniMax-M3',
+      dbKeys: ['minimaxm3'],
+      category: 'deprecated',
+      releaseDate: '2026-06-07',
+      compareSlug: 'minimax-m3',
+    },
   ],
   sequences: [
     {
@@ -232,8 +239,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/options',
     summary: text('Discover every views-API option domain', '获取 views API 的全部选项域'),
     description: text(
-      'Static discovery endpoint for the views API: models (with DB keys, category and release date), sequences, precisions, hardware (with vendor, architecture, TDP and per-provider hourly cost), frameworks, speculative-decoding methods, percentiles, x-axis and scale modes, chart metrics (bilingual labels, unit, polarity), quick-filter domains, reliability ranges, and overview/calculator/fleet option sets — plus the defaults the dashboard itself uses. Values come from the same registries the dashboard renders its controls from, so this response is the authoritative input catalog for the other /api/v1/views endpoints. No database access.',
-      'views API 的静态发现端点：模型（含数据库键、分类与发布日期）、序列、精度、硬件（含厂商、架构、TDP 及各供应商每小时成本）、推理框架、投机解码方法、百分位、x 轴与坐标缩放模式、图表指标（中英文标签、单位、极性）、快捷筛选域、可靠性时间范围，以及 overview/calculator/fleet 的选项集，并附仪表盘实际使用的默认值。所有取值直接来自仪表盘控件渲染所用的注册表，因此该响应是其余 /api/v1/views 端点的权威输入目录。不访问数据库。',
+      'Static discovery endpoint for the views API: models (with DB keys, category and release date), sequences, precisions, hardware (with vendor, architecture, TDP and per-provider hourly cost), frameworks, speculative-decoding methods, percentiles, x-axis and scale modes, chart metrics (bilingual labels, unit, polarity), quick-filter domains, reliability ranges, and overview/calculator/fleet option sets — plus the defaults the dashboard itself uses. Values come from the same registries the dashboard renders its controls from, so this response is the authoritative input catalog for the other /api/v1/views endpoints. Inference charts for models with category deprecated append (Deprecated) to the source attribution, including PNG exports and unofficial-run overlays, without deprecated background watermarks. This is presentation only and does not change view data. No database access.',
+      'views API 的静态发现端点：模型（含数据库键、分类与发布日期）、序列、精度、硬件（含厂商、架构、TDP 及各供应商每小时成本）、推理框架、投机解码方法、百分位、x 轴与坐标缩放模式、图表指标（中英文标签、单位、极性）、快捷筛选域、可靠性时间范围，以及 overview/calculator/fleet 的选项集，并附仪表盘实际使用的默认值。所有取值直接来自仪表盘控件渲染所用的注册表，因此该响应是其余 /api/v1/views 端点的权威输入目录。分类为 deprecated 的模型会在推理图表的来源署名后添加 (已弃用)，英文页面显示 (Deprecated)；PNG 导出和非官方 run overlay 中也保留该后缀，不再显示“已弃用”背景水印。此变更仅影响展示，不改变视图数据。不访问数据库。',
     ),
     audience: 'public',
     stability: 'beta',

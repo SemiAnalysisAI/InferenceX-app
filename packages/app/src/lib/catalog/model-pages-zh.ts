@@ -8,6 +8,31 @@ export interface ModelPageZhTranslation {
 }
 
 export const MODEL_PAGE_ZH = {
+  'muse-spark-open': {
+    description:
+      'Meta 的多模态 MoE 模型，总参数量 816B、每个 token 激活 42B，采用 pooled experts 与门控残差，支持 1M token 上下文。',
+    releaseDate: '2026 年 10 月 15 日',
+  },
+  'deepseek-v41-flash': {
+    description:
+      'DeepSeek 的因果编码器—解码器模型，主干参数 552B，prefill 激活 8B、decode 激活 16B，采用 CSA2，另含 196B Engram 条件记忆。',
+    releaseDate: '2026 年 9 月 10 日',
+  },
+  'minimax-m31-flash': {
+    description:
+      'MiniMax 的多模态 MoE 模型，总参数量 428B、每个 token 激活 23B，60 层均采用稀疏注意力，前 3 层使用稠密 FFN，并内置 DSpark 投机解码。',
+    releaseDate: '2026 年 10 月 23 日',
+  },
+  'qwen-3-8-27b': {
+    description:
+      'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。',
+    releaseDate: '2026 年 8 月 5 日',
+  },
+  'qwen-3-8-27b-eager': {
+    description:
+      'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。',
+    releaseDate: '2026 年 8 月 5 日',
+  },
   'deepseek-r1': {
     description:
       'DeepSeek 的 MoE 推理模型，总参数量 671B、每个 token 激活 37B，采用多头潜在注意力（MLA），并以 MIT 许可证发布。',
@@ -51,7 +76,7 @@ export const MODEL_PAGE_ZH = {
   },
   'minimax-m27': {
     description:
-      'MiniMax 的 MoE 模型系列，总参数量 229B、每个 token 激活约 10B，采用 GQA 和 FP8 分块量化，并支持 192K token 上下文。',
+      'MiniMax 的 MoE 模型系列，总参数量 229B、每个 token 激活约 10B，采用 GQA 和 FP8 分块量化；M2.5 支持 192K token 上下文，M2.7 支持 200K。',
     releaseDate: '2026 年 2 月 12 日（M2.5）；2026 年 3 月 18 日（M2.7）',
   },
   'minimax-m3': {

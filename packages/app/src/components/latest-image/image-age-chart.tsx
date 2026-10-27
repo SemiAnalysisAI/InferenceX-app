@@ -211,8 +211,8 @@ export function ImageAgeChart({
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         {zh
-          ? '历史曲线按每日已知的最近成功提交重建，沿用当前的模型和场景停用规则。无新提交时年龄继续增加；新配置从首次提交当天起计入。'
-          : 'History uses the latest successful submission known on each day and today’s model/scenario retirement rules. Ages increase on days without submissions; new configurations enter on their first submission date.'}
+          ? '历史曲线只统计下表中的配置，按每日已知的最近成功提交重建。无新提交时年龄继续增加；新配置从首次提交当天起计入。'
+          : 'History tracks the configurations in the table below, using the latest successful submission known on each day. Ages increase on days without submissions; new configurations enter on their first submission date.'}
       </p>
     </section>
   );

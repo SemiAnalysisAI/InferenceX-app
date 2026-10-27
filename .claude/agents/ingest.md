@@ -6,6 +6,8 @@ tools: Bash, Read, Edit, Write
 
 You ingest benchmark runs from the benchmark repository's GitHub Actions (`$INGEST_REPO`, for example `SemiAnalysisAI/InferenceX`) into the Neon DB backing this dashboard. All benchmark types, including agentic, live in the main production DB. File paths below are relative to the root of this repository checkout.
 
+For runs from another repository, runs with large multinode server logs, publication approval, and verification queries, follow [Manual Run Ingest](../../docs/ingesting-runs.md).
+
 ## Environment
 
 - **DB write URL — MUST be provided by the invoker.** There is no default: the target Neon branch changes over time, and ingesting into the wrong one silently corrupts a live deployment. If the prompt does not include a `postgresql://` write URL, STOP and ask for it before touching anything. Requirements:
@@ -42,6 +44,8 @@ curl -s -X POST -H "Authorization: Bearer $SECRET" http://localhost:3002/api/v1/
 # Deployed site
 curl -sS -X POST -H "Authorization: Bearer $SECRET" "${APP_URL%/}/api/v1/invalidate"
 ```
+
+If `.env` has no `INVALIDATE_SECRET`, refresh the public site with `gh workflow run cache-refresh.yml --repo SemiAnalysisAI/InferenceX-app --ref master`.
 
 ## Delete + reingest (use only when user explicitly says "delete and reingest" OR when the run supersedes prior data with the same (model, hw, framework, precision))
 
@@ -134,6 +138,8 @@ Changelog descriptions used to include "AIPerf harness" wording. Don't add this 
 
 **You ALWAYS MUST add a changelog entry for every run you ingest. This is not optional.** Every standard ingest, delete+reingest, and partial ingest gets exactly one changelog entry. Never finish an ingest without one.
 
+If the run has a `changelog-metadata` artifact, the ingest writes the entry itself and its summary prints `Changelog: 1 written`. Do not add a second entry; check the written one instead.
+
 - If the user gave changelog text, use it verbatim (substitute `<SKU>` with the run's hardware SKU when the text contains that placeholder).
 - If the user did NOT specify text, DO NOT skip the changelog — derive a sensible description from the run name (see convention below) and add it anyway, then tell the user what you used so they can adjust.
 
@@ -169,7 +175,7 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 1. **Always start by checking the run** with `gh api "repos/$INGEST_REPO/actions/runs/<RID>" --jq '{name, status, conclusion}'`. Note the model/hw/precision from the name. If `status != "completed"`, ask the user if they want to ingest in-progress data (will likely have failed_run skips).
 2. **Check the DB** for any pre-existing rows for this run or the same (model, hw, framework, precision) combo if the user mentioned superseding.
 3. **Ingest** via the standard path. Do NOT use AIPerf tagging unless the user explicitly asks for a separate legend line.
-4. **Add changelog entry (ALWAYS, MANDATORY).** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"). Use the user's text if given (substituting `<SKU>`). Otherwise derive one from the run name and add it anyway. Never skip this step.
+4. **Add changelog entry (ALWAYS, MANDATORY).** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"); skip the manual insert when the ingest summary shows `Changelog: 1 written`. Use the user's text if given (substituting `<SKU>`). Otherwise derive one from the run name and add it anyway. Never skip this step.
 5. **Refresh both caches for manual ingests** (localhost 3002 and `$APP_URL`, never port 3000). Override-only commits are handled by CI after merge.
 6. **Report** the row count, date, hardware, run id, and the changelog id (always present).
 

@@ -22,9 +22,9 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced date for every model except Muse, whose release date is unverified', () => {
+  it('has a sourced release date for every supported model', () => {
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
-    expect(missing).toEqual([Model.Muse_Spark_Open]);
+    expect(missing).toEqual([]);
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {
@@ -172,7 +172,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.numKVHeads).toBe(8);
     expect(arch?.ffnDim).toBe(28672);
     expect(arch?.vocabSize).toBe(128256);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(131072);
     expect(arch?.developer).toBe('Meta');
   });
 
@@ -208,7 +208,8 @@ describe('getModelArchitecture', () => {
     expect(arch?.hasSharedExpert).toBe(true);
     expect(arch?.denseFFNLayers).toBe(3);
     expect(arch?.denseFFNDim).toBe(18432);
-    expect(arch?.contextWindow).toBe(128000);
+    expect(arch?.contextWindow).toBe(163840);
+    expect(arch?.advertisedContextWindow).toBe(128000);
     expect(arch?.developer).toBe('DeepSeek');
     expect(arch?.vocabSize).toBe(129280);
   });
@@ -333,7 +334,7 @@ describe('getModelArchitecture', () => {
     for (const spec of arch!.alternatingLayers!) {
       expect(spec.slidingWindow).toBeUndefined();
     }
-    expect(arch?.alternatingNote).toBe('gated MLA every 4th layer');
+    expect(arch?.alternatingNote).toBe('gated MLA at layers 4, 8, …, 92, 93');
     expect(getModelArchitecture(Model.DeepSeek_V4_Pro)?.alternatingNote).toBeUndefined();
   });
 
@@ -415,7 +416,7 @@ describe('getModelArchitecture', () => {
     expect(arch?.contextWindow).toBe(196608);
     expect(arch?.vocabSize).toBe(200064);
     expect(arch?.developer).toBe('MiniMax');
-    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2');
+    expect(arch?.sourceUrl).toBe('https://huggingface.co/MiniMaxAI/MiniMax-M2.5');
   });
 
   it('MiniMax M2.5 has no dense initial layers', () => {
@@ -450,8 +451,8 @@ describe('getModelArchitecture', () => {
   it('returns architecture for gpt-oss 120B with MoE, alternating attention, and sink tokens', () => {
     const arch = getModelArchitecture(Model.GptOss);
     expect(arch).toBeDefined();
-    expect(arch?.totalParams).toBe(120);
-    expect(arch?.activeParams).toBe(5);
+    expect(arch?.totalParams).toBe(116.83);
+    expect(arch?.activeParams).toBe(5.13);
     expect(arch?.architectureType).toBe('moe');
     expect(arch?.attentionType).toBe('AlternatingSinkGQA');
     expect(arch?.numLayers).toBe(36);
@@ -482,9 +483,10 @@ describe('getModelArchitecture', () => {
     expect(sliding.description).toContain('attention sink');
     expect(sliding.slidingWindow).toBe(128);
 
-    expect(full.label).toBe('Causal Grouped Query Attention');
+    expect(full.label).toBe('Causal GQA + Sink');
     expect(full.count).toBe(18);
-    expect(full.description).toContain('full causal masking');
+    expect(full.description).toContain('Full causal GQA');
+    expect(full.description).toContain('softmax sink');
     expect(full.slidingWindow).toBeUndefined();
   });
 
@@ -544,7 +546,7 @@ describe('getArchitectureSummary', () => {
 
   it('returns MoE summary for gpt-oss 120B', () => {
     const arch = getModelArchitecture(Model.GptOss);
-    expect(getArchitectureSummary(arch!)).toBe('MoE 120B (5B active)');
+    expect(getArchitectureSummary(arch!)).toBe('MoE 116.83B (5.13B active)');
   });
 
   it('returns MoE summary for Kimi K2.5 with trillion-scale params', () => {
@@ -930,3 +932,12 @@ function getAllBlocks(flow: SubBlockFlow) {
     ];
   return [...flow.leftPath, ...flow.rightPath, ...flow.mergeBlocks];
 }
+
+describe('Llama 3.1 checkpoint context regression', () => {
+  it('uses the checkpoint position limit and explicit head dimension', () => {
+    expect(getModelArchitecture(Model.Llama3_1_70B)).toMatchObject({
+      contextWindow: 131072,
+      headDim: 128,
+    });
+  });
+});

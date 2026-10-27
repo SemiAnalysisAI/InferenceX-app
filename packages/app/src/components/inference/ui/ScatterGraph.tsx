@@ -3713,7 +3713,12 @@ const ScatterGraph = React.memo(
     }
 
     return (
-      <>
+      <div
+        className="contents"
+        data-orange-chicken-eligible={
+          selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
+        }
+      >
         <D3Chart<InferenceData>
           ref={chartRef}
           instructions={minimalChrome ? '' : undefined}
@@ -4100,7 +4105,7 @@ const ScatterGraph = React.memo(
             }}
           />
         )}
-      </>
+      </div>
     );
   },
 );

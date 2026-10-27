@@ -40,7 +40,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'string',
     description: text(
       'Display model name (case-insensitive) or compare-page model slug. Use together with gpus as an alternative to slug.',
-      '展示模型名称（不区分大小写）或对比页模型 slug。与 gpus 搭配使用，可替代 slug。',
+      '模型显示名称（不区分大小写）或对比页模型 slug。与 gpus 搭配使用，可替代 slug。',
     ),
     schema: stringSchema,
     example: 'DeepSeek-V4-Pro',

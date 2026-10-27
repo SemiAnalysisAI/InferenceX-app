@@ -158,7 +158,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
-      descriptionZh: '渐变标签按并发级别对数据点进行颜色编码，让您一目了然地发现性能模式。',
+      descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
         label: 'Enable Gradient Labels',
         labelZh: '启用渐变标签',

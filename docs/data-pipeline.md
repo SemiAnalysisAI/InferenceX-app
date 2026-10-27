@@ -670,6 +670,19 @@ backfills; it rewrites only missing or stale rows (`--run-id ID --force` for one
 run). The format-version test fails when a transform file changes without updating
 the recorded version and fingerprint.
 
+### Per-run ingest report
+
+`admin:db:ingest:ci` writes `INGEST_REPORT_OUTPUT` (JSON, `packages/db/src/etl/ingest-run-report.ts`)
+and appends the same counts to the job summary, for success and failure alike. It counts what this
+run wrote, unlike `admin:db:verify`, which prints whole-database totals. Rows are `benchmark`
+(benchmark_results rows), `eval` (eval_results rows), `trace` (agentic benchmark rows linked to a
+trace_replay blob) and `power` (gpu_metrics series; `unmapped` counts power result rows the mapper
+could not place). Columns are `new`, `duplicate`, `skipped` (failed-run rows, rows held by per-job
+files, purged points, missing siblings, telemetry not collected), `unmapped` and `failed` (database
+write or telemetry errors). For
+dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_REPO`, whose
+`ingest-results-callback` workflow comments the counts on the merged PR.
+
 ### PowerX publication receipts
 
 The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each

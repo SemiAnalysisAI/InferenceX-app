@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get('benchmarkType') === 'agentic_traces'
       ? 'agentic_traces'
       : undefined;
-  if (date && !/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
+  // Every query casts date to SQL date, so a missing date is a client error, not a 500.
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
     return publicApiError(PUBLIC_API_ERRORS.invalidDate, 400);
   }
   if (FIXTURES_MODE) return cachedJson(loadFixture('workflow-info'));

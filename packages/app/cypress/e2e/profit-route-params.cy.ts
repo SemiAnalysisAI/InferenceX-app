@@ -69,12 +69,12 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.reload();
         cy.get('[data-testid="profit-target-input"]').should('have.value', '28');
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
-        cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
+        cy.get('[data-testid="profit-target-input"]').clear().type('170').blur();
         cy.location('pathname').should('eq', `${base}/cache-hit-mode/theoretical`);
         cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
         cy.get('[data-testid="profit-model-selector"]').click();
         cy.contains('[role="option"]', 'Kimi K3').click();
-        cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+        cy.get('[data-testid="profit-target-input"]').should('have.value', '60');
         cy.location('pathname').should('eq', `${prefix}/${tab}/kimi-k3/cache-hit-mode/theoretical`);
       });
     }
@@ -90,7 +90,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     cy.get('label[for="profit-target"]').should('contain.text', 'P90');
     cy.location('search').should('eq', '');
     cy.get('a[href="/profit-estimator-per-gigawatt"]').filter(':visible').first().click();
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '60');
     cy.location('pathname').should('not.include', '/target/24');
   });
 

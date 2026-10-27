@@ -146,12 +146,14 @@ describe('metric registry', () => {
     expect(metricOptionTitle('costr', 'en')).toBe(
       'Cost per Million Total Tokens (Rent - 3 Year Commit)',
     );
-    expect(metricOptionTitle('costh', 'zh')).toBe('每百万总 token 成本（自有 - 超大规模云大批量）');
+    expect(metricOptionTitle('costh', 'zh')).toBe(
+      '每百万总 token 成本（自有 · 超大规模云厂商批量采购）',
+    );
     expect(metricOptionTitle('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
 
     expect(costTierLabel('hyperscaler', 'en')).toBe('Owning at Large Hyperscaler Volume');
     expect(costTierLabel('rental', 'en')).toBe('Rent - 3 Year Commit');
-    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模云大批量）');
+    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有 · 超大规模云厂商批量采购');
 
     const [interactivity] = chartDefinitions;
     expect(interactivity.y_tokensPerDollarH_title).toBe(

@@ -5,7 +5,6 @@ const MODEL_LABELS = [
   'DeepSeek V4 Pro 0813 1.6T',
   'DeepSeek V4.1 Flash 552B',
   'Kimi K3 2.8T',
-  'MiniMax M3 428B',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
@@ -21,7 +20,7 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-const MATRIX_ROWS = 10;
+const MATRIX_ROWS = 9;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -393,6 +392,7 @@ describe('Overview page', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+    desktopModel('MiniMax-M3').should('not.exist');
 
     cy.get('[data-testid="overview-model-scope-toggle"]')
       .find('[data-overview-model-scope="all"]')
@@ -404,6 +404,9 @@ describe('Overview page', () => {
       .should('have.attr', 'data-category', 'deprecated')
       .and('contain.text', 'Deprecated')
       .and('contain.text', 'Model is no longer actively benchmarked.');
+    desktopModel('MiniMax-M3', AGENTX)
+      .find('[data-testid="overview-model-category-badge"]')
+      .should('have.attr', 'data-category', 'deprecated');
     desktopModel('DeepSeek-R1-0528')
       .find('[data-testid="overview-model-category-badge"]')
       .should('have.attr', 'data-category', 'maintenance');
@@ -426,6 +429,7 @@ describe('Overview page', () => {
       .click();
     cy.location('search').should('eq', '?tier=75');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
+    desktopModel('MiniMax-M3').should('not.exist');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -931,7 +935,7 @@ describe('Overview page', () => {
 
   it('prefers speculative decode and falls back to labelled standard-decode reads', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('gb300').should('contain.text', 'SGLang · FP8 · STP');
@@ -984,7 +988,7 @@ describe('Overview page', () => {
 
   it('color-grades the whole cell against B200 and badges a missing baseline with a neutral ∞', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('b200').find('[data-testid="overview-cost-delta"]').should('not.exist');
@@ -1103,13 +1107,7 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of [
-      'DeepSeek-V4-Pro',
-      'DeepSeek-V4.1-Flash',
-      'Kimi-K3',
-      'GLM-5.2',
-      'MiniMax-M3',
-    ]) {
+    for (const model of ['DeepSeek-V4-Pro', 'DeepSeek-V4.1-Flash', 'Kimi-K3', 'GLM-5.2']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });
@@ -1251,7 +1249,7 @@ describe('Overview page', () => {
 
   it('distinguishes per-platform and whole-row missing results with a plain dash', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?models=all');
 
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('mi355x').within(() => {
@@ -1656,6 +1654,9 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
+    cy.get('[data-testid="overview-model-scope-toggle"]')
+      .find('[data-overview-model-scope="all"]')
+      .click();
     desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')

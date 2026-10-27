@@ -6,9 +6,26 @@
 - **TFLOPS are dense tensor core peak without sparsity**. Sparsity doubles theoretical FLOPS but real workloads rarely achieve structured sparsity. Dense values reflect realistic performance.
 - **NIC naming is `{Model} {PortSpec}`** not `{PortSpec} {Model}` because the model name (ConnectX-7, Pollara) identifies the generation, which is more important for comparison. `GbE` suffix = Ethernet; plain `G` = InfiniBand (industry convention).
 
-## Why NVL72 Systems Have No Scale-Out Topology
+## NVL72 NICs and Inter-Rack Topology
 
-GB200 and GB300 NVL72 are rack-scale systems where all 72 GPUs are connected via NVLink domain. There's no "scale out" — the entire rack IS the compute unit. Scale-out would be connecting multiple NVL72 racks, which isn't a standardized topology yet. Fields are `null`, rendered as `N/A²` with footnote.
+GB200 and GB300 NVL72 connect 72 GPUs in one NVLink domain, but also have scale-out
+NICs: one ConnectX-7 400G InfiniBand NDR per GPU on GB200, and one ConnectX-8 800G
+InfiniBand XDR per GPU on GB300. These are the installed benchmark-system interfaces,
+verified with PCI device inventory and active RDMA link rates. Other deployments may
+use Ethernet. Inter-rack switch and topology remain unspecified (`null`); this does
+not mean the NICs are absent.
+
+### View/control coverage
+
+- `/chips/*`, `/zh/chips/*`, `/gpu-specs`, and `/zh/gpu-specs` share `GPU_SPECS` with
+  `/api/v1/views/gpu-specs` (JSON and CSV). NIC, network technology, bandwidth and
+  MI355X's fourth-generation Infinity Fabric therefore agree across these views.
+- The scale-out bandwidth ranking includes GB200 (400 Gbit/s) and GB300 (800 Gbit/s).
+  Unspecified topology does not remove a known NIC measurement from the ranking.
+- Chinese ownership-tier labels, FAQ wording, and blog-title corrections are
+  presentation-only; they change no price, filter, default, or calculation.
+- Static specifications apply independently of official/unofficial run selection;
+  no benchmark overlay rendering or filtering is changed.
 
 ## Scale-Out Topology Invariants
 

@@ -51,7 +51,7 @@ const STRINGS = {
     locked: '已锁定',
     title: (tier: string) => `${tier}价格包含在 ${TCO_MODEL_TITLE} 中`,
     lead: (tier: string) =>
-      `InferenceX 公开两档 TCO：自有（超大规模云大批量）与租赁 - 3 年承诺。${tier}及其他租赁期限的价格来自同一来源：SemiAnalysis ${TCO_MODEL_TITLE}。`,
+      `InferenceX 公开两档 TCO：“自有 · 超大规模云厂商批量采购”和“租赁 - 3 年承诺”。${tier}及其他租赁期限的价格来自同一来源：SemiAnalysis ${TCO_MODEL_TITLE}。`,
     includesHeading: '模型包含的内容',
     includes: [
       '当前市场 GPU 租赁价格及其在按需、1 个月、6 个月、1 年、2 年和 3 年期限之间的差异。',

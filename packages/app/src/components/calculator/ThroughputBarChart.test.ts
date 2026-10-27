@@ -288,7 +288,7 @@ describe('getValueLabel', () => {
 
 describe('getCostProviderLabel', () => {
   it('returns natural Chinese ownership labels', () => {
-    expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · 超大规模云大批量');
+    expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · 超大规模云厂商批量采购');
     expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年承诺');
   });
 

@@ -9,7 +9,7 @@ Every path below goes through the same ETL entry point, `packages/db/src/ingest-
 | Download | `ingest-ci-run.ts --download <run-url> [repo]` | GitHub, into a temp directory it creates |
 | CI       | `ingest-ci-run.ts` with `INGEST_*` env vars    | A directory you already populated        |
 
-`bun run admin:db:ingest:run <run-url>` is download mode with the repo-root `.env` loaded. You need Bun, the GitHub CLI, `unzip`, and database credentials supplied through your approved credential channel. Never commit `.env` or paste tokens and database URLs into issues, PRs, or logs.
+`bun run admin:db:ingest:run <run-url>` is download mode with the repo-root `.env` loaded. You need Bun at the root `package.json` `packageManager` version (older Bun fails `--frozen-lockfile`), the GitHub CLI, `unzip`, and database credentials supplied through your approved credential channel. Never commit `.env` or paste tokens and database URLs into issues, PRs, or logs.
 
 ## Set up a clean checkout
 
@@ -35,6 +35,8 @@ if (!value) throw new Error("DATABASE_WRITE_URL is required");
 console.log(new URL(value).host);
 '
 ```
+
+The host alone does not identify the database. The public database already holds the newest CI-ingested `SemiAnalysisAI/InferenceX` runs, so compare `select max(github_run_id), max(date) from workflow_runs` with the latest run shown on the public dashboard.
 
 Writing to the public database requires explicit publication approval for the run and its artifacts, including server logs and trace payloads. Do not ingest confidential or NDA-covered data into it. A successful ingest is not publication clearance.
 
@@ -76,6 +78,8 @@ unset T
 ```
 
 Re-run the metadata command after changing credentials. Stop if authentication fails.
+
+Repositories in another organization can reject a token that works here. A 404 means the token cannot see the repository. A 403 whose message names an enterprise policy, such as a limit on classic token lifetime, means that token type is blocked; the stored `gh` login usually passes.
 
 ### Option A: download mode
 
@@ -132,6 +136,7 @@ Skipped: 1 rows
 - **`failed run (0 successful)`:** A selected artifact had no successful requests and was skipped. Confirm that the expected successful points were stored; this message alone does not prove a good retry was selected.
 - **`auto-captured unexpected metric '<key>'`:** The value is stored in `metrics` JSONB. Review the key and add it to `METRIC_KEYS` when it should become a first-class metric.
 - **`missing sibling artifact`:** A nonzero count means some agentic points have no matching trace-replay sibling. Check that the required `agentic_*` artifacts downloaded. A zero count alone does not establish that every server-metrics export is present.
+- **`Changelog: 1 written`:** The run's `changelog-metadata` artifact already produced the changelog entry. Do not add another one by hand.
 
 ## Apply overrides and refresh the cache
 
@@ -155,6 +160,8 @@ The ingest refreshes `latest_benchmarks` itself. The dashboard can keep serving 
   gh workflow run cache-refresh.yml --repo SemiAnalysisAI/InferenceX-app --ref master
   ```
 
+  The job has a 5-minute timeout. If `Invalidate cache` succeeded, a cancelled `Warm up cache` step needs no action; uncached pages fill on first request.
+
 - **Another deployment with `INVALIDATE_SECRET` available:** Use its deployment URL.
 
   ```bash
@@ -165,13 +172,13 @@ Do not dispatch the public cache workflow for an unrelated database or deploymen
 
 ## Verify
 
-Ensure `DATABASE_READONLY_URL` points to the same database as the write connection. Compare stored rows with the source artifacts; this query lists each point with headline metrics and whether server-metrics JSON was attached.
+The query reads `DATABASE_READONLY_URL` and falls back to `DATABASE_WRITE_URL`; make sure whichever is set points to the database you wrote. Compare stored rows with the source artifacts; this query lists each point with headline metrics and whether server-metrics JSON was attached.
 
 ```bash
 cd /tmp/ifx-app-ingest/packages/db
 bun --env-file=../../.env -e '
 import { neon } from "@neondatabase/serverless";
-const sql = neon(process.env.DATABASE_READONLY_URL);
+const sql = neon(process.env.DATABASE_READONLY_URL ?? process.env.DATABASE_WRITE_URL);
 console.table(await sql`
   select br.conc, c.model, c.hardware, c.framework, c.precision, c.disagg, wr.date,
          round((br.metrics->>$$tput_per_gpu$$)::numeric) tput_per_gpu,
@@ -197,6 +204,21 @@ done | sort -n
 Compare matching configurations and units, accounting for rounding in the displayed query. Also check output throughput, E2EL, and TPOT where present. Agentic ITL and interactivity can differ from legacy artifact fields because ingest uses full-response metrics and can reconstruct them from the AIPerf profile; do not assume a fixed tolerance for that difference.
 
 Finally, open the target dashboard's model page in the AgentX view and verify the run's points. Model slugs live in `packages/app/src/lib/compare/compare-slug.ts`; use a model present in the approved run.
+
+## Preview a run from another repository
+
+`?unofficialrun=<run-id>` looks the run up in `SemiAnalysisAI/InferenceX` and then in each repository listed in `INFERENCEX_SOURCE_REPOS`, using the deployment's `GITHUB_TOKEN`. A link posted by another repository's bot returns 404 on a deployment that does not list that repository or cannot read it. The route is unauthenticated, so never add a confidential repository to the public deployment.
+
+To preview locally, pass the settings on the command line instead of editing `.env`. Next.js runs one dev server per directory, so stop any existing one first.
+
+```bash
+cd packages/app
+INFERENCEX_SOURCE_REPOS="$REPO" GITHUB_TOKEN="$(gh auth token)" \
+  bun --env-file=../../.env next dev --turbopack
+# Open http://localhost:3000/inference?unofficialrun=<run-id>
+```
+
+The official curves still need `DATABASE_READONLY_URL`.
 
 ## Behavior to expect
 
