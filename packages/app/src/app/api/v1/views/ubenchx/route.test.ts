@@ -253,3 +253,54 @@ it('does not expose the removed 910B3 bandwidth series', async () => {
   const removed = await GET(request({ test: 'mem-bw', gpu: 'Ascend 910B3' }));
   expect(removed.status).toBe(400);
 });
+
+describe('Huawei SKU configuration evidence', () => {
+  it('keeps configuration rows separate from measured NVIDIA groupings', async () => {
+    const bodyResponse = await GET(request({ test: 'tpc-skyline' }));
+    const body = await bodyResponse.json();
+    expect(body.gpus).toHaveLength(5);
+    expect(body.skuConfigurations).toHaveLength(9);
+    expect(
+      body.skuConfigurations.find((row: { sku: string }) => row.sku === 'PR_957c'),
+    ).toMatchObject({
+      cubeCores: 28,
+      vectorCores: 56,
+      memoryGiB: 84,
+      l2MiB: 112,
+      ddrRate: { base: 14, read: 14, write: 14, unit: null },
+      source: { vendorSourceVerified: false, kind: 'provided-sku-table' },
+    });
+    expect(
+      body.skuConfigurations
+        .filter((row: { hasCoreProfileMeasurements: boolean }) => row.hasCoreProfileMeasurements)
+        .map((row: { sku: string }) => row.sku),
+    ).toEqual(['PR_9579']);
+  });
+
+  it('filters the family or exact SKU case-insensitively without inventing measurements', async () => {
+    const familyResponse = await GET(request({ test: 'tpc-skyline', gpu: 'huawei 950pr' }));
+    const family = await familyResponse.json();
+    expect(family.gpus).toEqual([]);
+    expect(family.skuConfigurations).toHaveLength(9);
+    const oneResponse = await GET(request({ test: 'all', gpu: 'ascend 950pr_9599' }));
+    const one = await oneResponse.json();
+    expect(one.params.gpu).toBe('Ascend 950PR_9599');
+    expect(one.tpcSkyline.skuConfigurations).toHaveLength(1);
+    expect(one.tpcSkyline.skuConfigurations[0]).toMatchObject({
+      cubeCores: 36,
+      vectorCores: 72,
+      cubeClockMHz: 1800,
+    });
+    expect(one.tpcSkyline.gpus).toEqual([]);
+    expect(one.memBw.gpus).toEqual([]);
+    expect(one.coreMemoryProfiles.gpus).toEqual([]);
+    const nvidiaResponse = await GET(request({ test: 'tpc-skyline', gpu: 'B200 SXM' }));
+    const nvidia = await nvidiaResponse.json();
+    expect(nvidia.skuConfigurations).toEqual([]);
+    const allResponse = await GET(request());
+    const all = await allResponse.json();
+    expect(all.tpcSkyline.skuConfigurations).toHaveLength(9);
+    const unknown = await GET(request({ test: 'tpc-skyline', gpu: 'Ascend 950PR_unknown' }));
+    expect(unknown.status).toBe(400);
+  });
+});

@@ -21,7 +21,7 @@ const STRINGS = {
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'HBM Bandwidth',
-    tpcSkylineTitle: 'TPC Skyline',
+    tpcSkylineTitle: 'TPC Skyline & SKU configurations',
     coreProfilesTitle: 'Core memory-access profiles',
   },
   zh: {
@@ -30,7 +30,7 @@ const STRINGS = {
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
-    tpcSkylineTitle: 'TPC Skyline',
+    tpcSkylineTitle: 'TPC Skyline 与 SKU 配置',
     coreProfilesTitle: '核心访存特征',
   },
 } as const;
@@ -66,7 +66,9 @@ export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
           }}
         >
           <SelectTrigger id="ubenchx-test-select" data-testid="ubenchx-test-select">
-            <SelectValue />
+            <SelectValue>
+              {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {UBENCHX_TESTS.map((test) => (

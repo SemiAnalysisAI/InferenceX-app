@@ -518,7 +518,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '20755a02e4f59eb3d3a833b8b6cb6c8179c046930b72376b06a5817fa5eab05a',
+    sourceSha256: 'e668aec3ee167b4930eb3681f806ab21585fae88481ca0457dedbc7971a1ced9',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -1172,6 +1172,15 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
+    },
+  },
+
+  {
+    source: 'src/components/ubenchx/huawei-sku-configurations.ts',
+    sourceSha256: 'b1ef962920ae1127aba42421eb47411df26935bc600de2723a09754d482f0c85',
+    reviewArea: {
+      en: 'Huawei SKU configuration transcription, source provenance and UI/API filtering.',
+      zh: 'Huawei SKU 配置转录、来源信息及界面与 API 筛选。',
     },
   },
 
