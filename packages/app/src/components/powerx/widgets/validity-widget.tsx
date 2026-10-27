@@ -1,233 +1,141 @@
 'use client';
 
-import { useMemo } from 'react';
-
 import { track } from '@/lib/analytics/analytics';
 import {
-  decodeValidity,
-  encodeValidity,
-  evaluateValidity,
-  EXPECTED_GPUS,
-  MAX_GAP_INPUT_SECONDS,
-  MAX_MISMATCH_INPUT_SECONDS,
   MAX_SAMPLE_GAP_SECONDS,
-  type ProducerState,
-  type TokenState,
-  type ValidityInput,
-  type ValidityReason,
-  WINDOW_LENGTHS,
-  type WindowLength,
+  VALIDITY_CHECKS,
+  type ValidityCheckId,
 } from '@/lib/powerx/validity-rules';
 
-import {
-  ChipRow,
-  OutputBadge,
-  OutputHeader,
-  RangeRow,
-  useWidgetHash,
-  WidgetCard,
-  type WidgetProps,
-} from './widget-chrome';
+import { WidgetFrame, type WidgetProps } from './widget-chrome';
 
 const STRINGS = {
   en: {
-    gap: 'Largest sample gap',
-    gapReadout: (seconds: number) => `${seconds.toFixed(1)} s`,
-    gapHint: `limit ${MAX_SAMPLE_GAP_SECONDS.toFixed(1)} s`,
-    gpus: 'GPUs reported',
-    gpusReadout: (reported: number) => `${reported} of ${EXPECTED_GPUS}`,
-    gpusHint: 'every expected GPU must report',
-    mismatch: 'Window mismatch',
-    mismatchReadout: (seconds: number) => `${seconds.toFixed(2)} s`,
-    mismatchHint: (tolerance: number) => `tolerance max(0.5 s, 1 %) = ${tolerance.toFixed(1)} s`,
-    window: 'Window length',
-    windowOption: (seconds: number) => `${seconds} s`,
-    windowSubtitle: (tolerance: number) => `±${tolerance.toFixed(1)} s`,
-    producer: 'Producer pin',
-    producers: {
-      matches: { label: 'Matches', subtitle: 'collector commit = pin' },
-      differs: { label: 'Differs', subtitle: 'collector rebuilt' },
+    checks: {
+      devices: {
+        title: 'Every expected GPU reported for the whole window',
+        detail:
+          'The validator lists the devices the topology expects and the devices that appear in samples.csv; one missing GPU fails the point.',
+        audit: 'observed_gpu_ids · expected GPU count',
+      },
+      gap: {
+        title: `No gap between samples longer than ${MAX_SAMPLE_GAP_SECONDS} s`,
+        detail:
+          'A stalled exporter leaves holes the trapezoid integral would paper over, so the largest per-GPU gap is checked against the limit.',
+        audit: 'max_sample_gap_s · sample_count',
+      },
+      clock: {
+        title: 'Telemetry window matches the client window within 0.5 s or 1 %',
+        detail:
+          'The head node writes the window from its own clock; the benchmark client reports its own start and end. The two must agree within max(0.5 s, 1 % of the window).',
+        audit: 'window_start_unix · window_end_unix',
+      },
+      producer: {
+        title: 'Producer commit matches the pinned version, exporter image recorded',
+        detail:
+          'The code that wrote the samples is identified by its git commit and must equal the pin the validator was built with; the exporter image digest is stored beside it.',
+        audit: 'producer_sha · exporter_image_sha256',
+      },
+      tokens: {
+        title: 'Token counts the energy is divided by are positive',
+        detail:
+          'Joules per token needs a denominator. A window with zero output tokens keeps its watts but cannot carry an energy metric.',
+        audit: 'joules_per_output_token denominator',
+      },
     },
-    tokens: 'Token count',
-    tokenStates: {
-      positive: { label: 'Positive', subtitle: 'client counted output tokens' },
-      zero: { label: 'Zero', subtitle: 'nothing to divide by' },
-    },
-    validated: 'Validated',
-    historical: 'Historical',
-    verdictTitle: 'The verdict the offline validator writes to power_validation_<result>.json',
-    reasons: 'reason_codes',
-    none: 'none',
-    meanings: {
-      sample_gap_exceeded: 'a GPU went more than 3 s between samples',
-      expected_device_missing: 'an expected GPU has no samples in the window',
-      measurement_window_clock_mismatch: 'the window and the client disagree on its length',
-      producer_commit_mismatch: 'the collector was not the pinned commit',
-      invalid_output_token_count: 'the energy denominator is not positive',
-    } satisfies Record<ValidityReason, string>,
-    keeps: 'Keeps: throughput and interactivity.',
-    loses: 'Loses: energy per token, measured watts, modeled IT and Facility.',
-    keepsAll: 'Keeps everything: measured watts, energy per token, modeled IT and Facility.',
+    reason: 'Reason code',
+    audit: 'Audit fields',
+    source: 'Validator',
+    verdict:
+      'All five pass: Validated. Any failure: Historical, throughput kept, energy and modeled power dropped.',
   },
   zh: {
-    gap: '最大采样间隔',
-    gapReadout: (seconds: number) => `${seconds.toFixed(1)} s`,
-    gapHint: `上限 ${MAX_SAMPLE_GAP_SECONDS.toFixed(1)} s`,
-    gpus: '上报的 GPU 数',
-    gpusReadout: (reported: number) => `${reported} / ${EXPECTED_GPUS}`,
-    gpusHint: '所有预期 GPU 都必须上报',
-    mismatch: '窗口偏差',
-    mismatchReadout: (seconds: number) => `${seconds.toFixed(2)} s`,
-    mismatchHint: (tolerance: number) => `容差 max(0.5 s, 1 %) = ${tolerance.toFixed(1)} s`,
-    window: '窗口长度',
-    windowOption: (seconds: number) => `${seconds} s`,
-    windowSubtitle: (tolerance: number) => `±${tolerance.toFixed(1)} s`,
-    producer: '采集端版本',
-    producers: {
-      matches: { label: '一致', subtitle: '采集端 commit = 固定版本' },
-      differs: { label: '不一致', subtitle: '采集端被重新构建' },
+    checks: {
+      devices: {
+        title: '所有预期 GPU 在整个窗口内都有上报',
+        detail:
+          '验证器比对拓扑预期的设备与 samples.csv 中出现的设备，缺少任意一颗 GPU，该点即失效。',
+        audit: 'observed_gpu_ids · 预期 GPU 数',
+      },
+      gap: {
+        title: `样本间隔不超过 ${MAX_SAMPLE_GAP_SECONDS} s`,
+        detail:
+          'exporter 卡住会留下空洞，梯形积分会把它抹平，所以要用每颗 GPU 的最大间隔与上限比较。',
+        audit: 'max_sample_gap_s · sample_count',
+      },
+      clock: {
+        title: '遥测窗口与客户端窗口相差不超过 0.5 s 或 1 %',
+        detail:
+          '头节点按自己的时钟写窗口，基准测试客户端上报自己的起止时间，两者必须在 max(0.5 s, 窗口的 1 %) 内一致。',
+        audit: 'window_start_unix · window_end_unix',
+      },
+      producer: {
+        title: '采集端 commit 与固定版本一致，并记录 exporter 镜像',
+        detail:
+          '写入样本的代码由其 git commit 标识，必须等于验证器构建时固定的版本；exporter 镜像摘要一并记录。',
+        audit: 'producer_sha · exporter_image_sha256',
+      },
+      tokens: {
+        title: '用作能量分母的 token 数为正',
+        detail: '每 token 焦耳数需要分母。输出 token 为零的窗口保留瓦特数，但不能给出能量指标。',
+        audit: 'joules_per_output_token 的分母',
+      },
     },
-    tokens: 'token 数',
-    tokenStates: {
-      positive: { label: '大于零', subtitle: '客户端统计到输出 token' },
-      zero: { label: '为零', subtitle: '没有可用的分母' },
-    },
-    validated: 'Validated',
-    historical: 'Historical',
-    verdictTitle: '离线验证器写入 power_validation_<result>.json 的判定',
-    reasons: 'reason_codes',
-    none: '无',
-    meanings: {
-      sample_gap_exceeded: '某颗 GPU 相邻样本间隔超过 3 s',
-      expected_device_missing: '某颗预期 GPU 在窗口内没有样本',
-      measurement_window_clock_mismatch: '窗口长度与客户端记录不一致',
-      producer_commit_mismatch: '采集端不是固定的 commit',
-      invalid_output_token_count: '能量分母不是正数',
-    } satisfies Record<ValidityReason, string>,
-    keeps: '保留：吞吐量和交互性。',
-    loses: '失去：每 token 能量、实测瓦特数、建模的 IT 和 Facility。',
-    keepsAll: '全部保留：实测瓦特数、每 token 能量、建模的 IT 和 Facility。',
+    reason: '原因代码',
+    audit: '审计字段',
+    source: '验证器',
+    verdict: '五项全部通过：Validated。任一失败：Historical，保留吞吐量，去掉能量和建模功耗。',
   },
 } as const;
 
-const HASH_KEY = 'vd';
-
 export function ValidityWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
-  const [input, setInput] = useWidgetHash<ValidityInput>(HASH_KEY, encodeValidity, decodeValidity);
-  const verdict = useMemo(() => evaluateValidity(input), [input]);
-
-  function update(patch: Partial<ValidityInput>, action: string, value: string | number) {
-    setInput({ ...input, ...patch });
-    track(`powerx_tutorial_validity_${action}`, { value });
-  }
-
   return (
-    <WidgetCard name="validity" alt={alt}>
-      <RangeRow
-        label={t.gap}
-        value={input.gapSeconds}
-        min={0}
-        max={MAX_GAP_INPUT_SECONDS}
-        step={0.1}
-        onChange={(gapSeconds) => update({ gapSeconds }, 'gap', gapSeconds)}
-        readout={t.gapReadout(input.gapSeconds)}
-        hint={t.gapHint}
-      />
-      <RangeRow
-        label={t.gpus}
-        value={input.reportedGpus}
-        min={0}
-        max={EXPECTED_GPUS}
-        step={1}
-        onChange={(reportedGpus) => update({ reportedGpus }, 'gpus', reportedGpus)}
-        readout={t.gpusReadout(input.reportedGpus)}
-        hint={t.gpusHint}
-      />
-      <RangeRow
-        label={t.mismatch}
-        value={input.mismatchSeconds}
-        min={0}
-        max={MAX_MISMATCH_INPUT_SECONDS}
-        step={0.05}
-        onChange={(mismatchSeconds) => update({ mismatchSeconds }, 'mismatch', mismatchSeconds)}
-        readout={t.mismatchReadout(input.mismatchSeconds)}
-        hint={t.mismatchHint(verdict.toleranceSeconds)}
-      />
-      <ChipRow<`${WindowLength}`>
-        label={t.window}
-        value={`${input.windowSeconds}`}
-        onChange={(value) =>
-          update({ windowSeconds: Number(value) as WindowLength }, 'window', value)
-        }
-        groups={[
-          {
-            options: WINDOW_LENGTHS.map((seconds) => ({
-              value: `${seconds}` as `${WindowLength}`,
-              label: t.windowOption(seconds),
-              subtitle: t.windowSubtitle(Math.max(0.5, seconds * 0.01)),
-            })),
-          },
-        ]}
-      />
-      <ChipRow<ProducerState>
-        label={t.producer}
-        value={input.producer}
-        onChange={(producer) => update({ producer }, 'producer', producer)}
-        groups={[
-          {
-            options: (['matches', 'differs'] as const).map((producer) => ({
-              value: producer,
-              ...t.producers[producer],
-            })),
-          },
-        ]}
-      />
-      <ChipRow<TokenState>
-        label={t.tokens}
-        value={input.tokens}
-        onChange={(tokens) => update({ tokens }, 'tokens', tokens)}
-        groups={[
-          {
-            options: (['positive', 'zero'] as const).map((tokens) => ({
-              value: tokens,
-              ...t.tokenStates[tokens],
-            })),
-          },
-        ]}
-      />
-
-      <OutputHeader>
-        <OutputBadge tone={verdict.valid ? 'valid' : 'invalid'} title={t.verdictTitle}>
-          <span data-testid="powerx-validity-verdict" className="text-sm">
-            {verdict.valid ? t.validated : t.historical}
-          </span>
-        </OutputBadge>
-        <span className="font-mono text-xs text-muted-foreground">
-          {t.reasons}: {verdict.reasons.length === 0 ? `[${t.none}]` : verdict.reasons.length}
-        </span>
-      </OutputHeader>
-      <div className="space-y-2 px-4 py-3 text-xs leading-5">
-        {verdict.reasons.length > 0 && (
-          <ul className="space-y-1">
-            {verdict.reasons.map((reason) => (
-              <li key={reason} className="flex flex-wrap gap-x-2">
-                <code className="rounded bg-muted/60 px-1 font-mono text-foreground">{reason}</code>
-                <span className="text-muted-foreground">{t.meanings[reason]}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-muted-foreground">
-          {verdict.valid ? (
-            t.keepsAll
-          ) : (
-            <>
-              <span className="text-foreground">{t.keeps}</span> {t.loses}
-            </>
-          )}
-        </p>
-      </div>
-    </WidgetCard>
+    <WidgetFrame name="validity" alt={alt}>
+      <ol className="divide-y divide-border/60 border-y border-border/60">
+        {VALIDITY_CHECKS.map((check, index) => {
+          const copy = t.checks[check.id as ValidityCheckId];
+          return (
+            <li key={check.id}>
+              <details
+                className="group"
+                onToggle={(event) => {
+                  if (event.currentTarget.open) {
+                    track('powerx_tutorial_validity_check_opened', { value: check.id });
+                  }
+                }}
+              >
+                <summary className="flex min-h-11 cursor-pointer list-none items-baseline gap-4 py-3 text-base text-foreground marker:hidden [&::-webkit-details-marker]:hidden">
+                  <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="min-w-0 flex-1 leading-6">{copy.title}</span>
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground transition-transform group-open:rotate-45 motion-reduce:transition-none"
+                  >
+                    +
+                  </span>
+                </summary>
+                <div className="pb-4 pl-10 text-sm leading-6 text-muted-foreground">
+                  <p>{copy.detail}</p>
+                  <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs sm:grid-cols-[auto_1fr]">
+                    <dt>{t.reason}</dt>
+                    <dd>
+                      <code className="font-mono text-foreground">{check.reason}</code>
+                    </dd>
+                    <dt>{t.audit}</dt>
+                    <dd className="font-mono">{copy.audit}</dd>
+                    <dt>{t.source}</dt>
+                    <dd className="font-mono">{check.source}</dd>
+                  </dl>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.verdict}</p>
+    </WidgetFrame>
   );
 }

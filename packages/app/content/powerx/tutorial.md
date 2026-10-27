@@ -1,120 +1,111 @@
 ---
-title: 'PowerX tutorial: how we measure and model inference power'
-description: 'What PowerX measures, what it models, how to read each chart, and how to collect power in your own InferenceX run.'
+title: 'PowerX: measured GPU power, modeled system power'
+description: 'How one-second GPU telemetry becomes energy per token, IT power and facility power, what is measured and what is modeled, and how to use the numbers.'
 updated: '2026-10-27'
 ---
 
-PowerX shows how much power each accelerator draws while it serves a benchmark, and how much energy each token costs. Every number starts from GPU telemetry sampled once a second during the benchmark's serving window. Everything that cannot be measured on the benchmark cluster is modeled and labeled as modeled.
+![Power ladder: one measured point extended through the modeled parts to IT and facility power](../../public/images/powerx-tutorial/widgets/ladder.png)
 
-## What PowerX measures
+PowerX measures what each accelerator draws while it serves a benchmark and models the rest of the system around it. Solid marks are measured telemetry, outlined marks are modeled by the open-source power model, dashed marks are rated or assumed values. The grammar holds on every chart.
 
-- **Per-GPU power, once a second.** NVIDIA clusters run `dcgm-exporter` on every node at a 1 s interval; AMD clusters run AMD's `device-metrics-exporter` at 1 s. The head node scrapes every node on one clock.
-- **One window per benchmark point.** Each concurrency point has a serving window that starts after warmup and ends with the last request. Only samples inside that window count.
-- **Energy by integration.** Energy per GPU is the trapezoid integral of its power samples over the window. Energy per token divides the whole deployment's GPU energy by the tokens the benchmark client counted (output, input, total, or per request).
-- **Statistics across the fleet.** Average, P75, and P90 power are time-weighted over the window across all GPUs in the deployment. For prefill/decode deployments, role averages cover that role's GPUs over the same full window.
+## From measurement to modeled power
 
-> [!NOTE]
-> Measured watts and joules cover accelerator telemetry only: the GPU board on NVIDIA HGX systems, the GPU module on NVL72, and the GPU package on AMD. Host, network, cooling, and facility power are modeled, never measured, and PowerX always says which is which.
+![Flow from exporter samples to measured GPU watts, the power model, IT power and facility power](../../public/images/powerx-tutorial/widgets/flow.svg)
 
-## Four ways to count power
-
-The **Count** control picks the boundary. Pick the one that matches the question.
-
-| Count       | What it includes                                                                                                | Source                                                          | Use it for                                    |
-| ----------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------- |
-| GPU only    | The accelerator the exporter reports                                                                            | Measured                                                        | Chip efficiency, J/token, % of TDP            |
-| IT (no PUE) | GPU + CPU, memory, NICs, NVSwitch, storage, PCIe, fans, PSU loss, plus the chassis' share of scale-out switches | Measured GPU (and Grace sockets where available) + modeled rest | Data-center capacity: kW per GPU, GPUs per MW |
-| Facility    | IT × PUE (1.3 for air-cooled chassis, 1.1 for liquid-cooled NVL72 racks)                                        | Modeled                                                         | Utility power and energy cost                 |
-| All         | The three lines on one chart                                                                                    | Both                                                            | Seeing how much sits outside the GPU          |
-
-**Rated boundaries** adds the vendor numbers for comparison: GPU TDP, and the all-in provisioned W per GPU that operators size racks with. Measured power at a typical decode point sits well below both.
-
-> [!TIP]
-> If you plan capacity, read **IT (no PUE)** at **P90**. If you compare chips, read **GPU only** on the energy-per-token view.
-
-Pick a chip, a workload, a deployment, and a GPU wattage to see the four counts, GPUs per MW, and every modeled part.
-
-![Power basis explorer](../../public/images/powerx-tutorial/widgets/power-basis.png)
-
-Measured points sit on the [Power draw view](/inference?i_metric=y_measuredAvgPower).
-
-## Measured and modeled, by platform
-
-| Platform                            | Measured                                                                                                                                         | Modeled                                                                  |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| NVIDIA HGX (H100, H200, B200, B300) | GPU board power via DCGM (NVML sensor, including the module's own regulation)                                                                    | 2 CPUs, DRAM, NICs, PCIe switches, NVMe, fans, PSU loss                  |
-| NVIDIA NVL72 (GB200, GB300)         | GPU module power via DCGM per compute tray; Grace socket power (CPU, LPDDR5X, and socket regulation) when the same window passes the Grace check | NVSwitch trays, tray fans, power shelves, and Grace when its check fails |
-| AMD OAM (MI300X, MI325X, MI355X)    | GPU package power as reported by the AMD exporter                                                                                                | 2 CPUs, DRAM, NICs, PCIe switches, NVMe, fans, PSU loss                  |
-
-The model is the open-source `power_model` package in the InferenceX repository, ported file for file into the app. It takes the measured per-GPU watts and a workload state (fixed sequence length, agentic, or agentic with KV offload) and returns chassis or rack IT and facility watts. Modeled numbers are computed when a chart is drawn, from the stored GPU measurements, with a pinned model revision; a model change updates every point at once and nothing is backfilled.
-
-> [!IMPORTANT]
-> AMD's exporter reports package power and NVIDIA's reports board or module power. The boundaries differ by the board-level regulation and components outside the package, so cross-vendor comparisons should say so. AgentX (agentic) points use the model's agentic state, which has not yet been calibrated against measured system power.
-
-## Reading the charts
-
-**Energy per token.** Joules per output token against interactivity (tok/s/user). Lower is better and the lines are Pareto frontiers, like the rest of the dashboard. This is the chip-comparison view.
-
-**Power draw.** Watts per GPU against interactivity. Dots are measured points. The line is the upper envelope of a chip's points, not a frontier: raw watts have no "better" direction, and the envelope answers "what will this chip draw at this interactivity?" Switch **Power statistic** between Average, P75, and P90; planners use P90 because dynamic power steering reacts to peaks. The **headroom band** shows the gap to TDP, and the headroom table lists IT W per GPU and GPUs per MW at 25, 50, 100, and 300 tok/s/user.
-
-**Where the power goes.** For the point under the slider, a stack of measured GPU power, the modeled parts, and facility overhead, with a list of every component, its watts, its share of IT, and how it moves across load. CPU, memory, and NICs are flat; fans and PSU loss follow the GPU.
-
-**Over time.** The 1 s trace of the whole run with load swings: peak, minimum, idle floor, largest 1 s and 5 s steps, and ramp rate, per GPU or per NVL72 rack. Download it as CSV or JSON for grid and ramp questions.
+- **Sampled.** `dcgm-exporter` on NVIDIA nodes and `device-metrics-exporter` on AMD nodes report every GPU once a second; the head node scrapes every node on one clock.
+- **Windowed.** Each concurrency point has one serving window, from the end of warmup to the last request. Only samples inside it count.
+- **Integrated.** Energy per GPU is the trapezoid integral of its samples over the window; energy per token divides the deployment's GPU energy by the tokens the client counted.
+- **Modeled.** The `power_model` package takes the measured watts and an operating state (fixed sequence, agentic, agentic with KV offload), adds CPUs, memory, NICs, switches, storage, fans and PSU loss to reach IT power, then applies PUE (1.3 for an air-cooled chassis, 1.1 for a liquid-cooled NVL72 rack) for facility power.
 
 > [!NOTE]
-> Watts and joules answer different questions. A configuration can draw more watts and still use fewer joules per token when it serves more tokens per second, for example with speculative decoding or larger batches.
+> Measured watts cover the accelerator only: the GPU board on HGX systems, the GPU module on NVL72, the GPU package on AMD. On NVL72 the Grace socket is measured too when its window passes the Grace check. Nothing modeled is stored; it is recomputed from the stored GPU samples at a pinned model revision, so a model change moves every point at once.
 
-Switch the metric to see the same two chips on live validated points.
+## Explore PowerX
 
-![Live chart](../../public/images/powerx-tutorial/widgets/chart.png)
+The modeled curve sits above the measured one with the same shape, because the parts the model adds barely move with load.
 
-Every control is on [/inference](/inference?i_metric=y_measuredJPerOutputToken).
+![Measured GPU energy per token against modeled facility energy per token for the same points](../../public/images/powerx-tutorial/widgets/measured-vs-modeled.png)
 
-## Validated vs Historical
+Lower is better, and both lines are Pareto frontiers against interactivity like the rest of the dashboard.
 
-A point is **Validated** when its telemetry passed every check the offline validator re-runs from the raw samples:
+Move the GPU from idle to TDP to see which modeled parts follow it.
 
-- every expected GPU reported for the whole window;
-- no gap between samples longer than 3 s;
-- the serving window matches the benchmark client's window within 0.5 s or 1 %;
-- the producer commit matches the pinned version and the exporter image hash is recorded;
-- the token counts the energy is divided by are positive.
+![Load strip: each modeled part across GPU load](../../public/images/powerx-tutorial/widgets/load.png)
 
-Anything else is **Historical**: the throughput still counts, but the point carries no energy metrics and is excluded from modeled IT and facility power. The audit record on each point lists the failing reason, the sample count, the largest gap, and the window bounds.
+Fans and PSU loss track the GPU; CPUs, memory, NICs and switches hold their level, so a lightly loaded GPU carries the largest overhead in relative terms.
 
-Move the sample gap, the GPU count, the window mismatch, the producer pin, and the token count to see the verdict and its reason codes.
+## Methodology
 
-![Validity explorer](../../public/images/powerx-tutorial/widgets/validity.png)
+Average, P75 and P90 power are time-weighted over the window across every GPU in the deployment; prefill and decode roles are averaged over the same window. Planners read **P90**, because dynamic power steering reacts to peaks; chip comparisons read **energy per token**.
 
-Historical points keep their throughput on every other view.
+A point is **Validated** only when the offline validator, re-run from the raw samples, passes all five checks. Anything else is **Historical**: throughput stays, energy and modeled power are dropped, and the audit record names the failing check.
 
-## Collect power in your own run
+![The five validity checks](../../public/images/powerx-tutorial/widgets/validity.png)
 
-Power collection is part of every official InferenceX sweep, so a submitted recipe gets measured automatically. To run it yourself:
-
-1. In the InferenceX matrix config, set `power: true` on a multi-node entry; single-node and AgentX jobs inherit the cluster's native exporter.
-2. Set `require-power` (or `REQUIRE_POWER=1`) if an invalid measurement should fail the job instead of recording an invalid verdict.
-3. Read the result: the aggregate JSON carries `power_valid`, `avg_power_w`, `p90_power_w`, and the `joules_per_*` metrics; the `power_audit_<result>` artifact holds `samples.csv`, the window files, and `power_validation_<result>.json`.
-4. Pull published numbers with the API or the `inferencex powerx export` command from the `@semianalysisai/inferencex-skills` package.
-
-Pick the platform, topology, workload, and strictness to get the matrix rows, the workflow input, and the result keys.
+Power collection is part of every official sweep, so a submitted recipe is measured automatically. To run it yourself, add `power: true` to a multi-node matrix entry; single-node and AgentX jobs use the cluster's native exporter. `require-power` (or `REQUIRE_POWER=1`) fails the job on an invalid window instead of recording `power_valid: 0`.
 
 ![Run-config generator](../../public/images/powerx-tutorial/widgets/run-config.png)
 
-Field reference: [configs/CONFIGS.md](https://github.com/SemiAnalysisAI/InferenceX/blob/main/inferencex-e2e/configs/CONFIGS.md).
+The aggregate JSON carries `power_valid`, `avg_power_w`, `p90_power_w` and the `joules_per_*` metrics; the `power_audit_<result>` artifact holds `samples.csv`, the window files and `power_validation_<result>.json`.
+
+> [!IMPORTANT]
+> AMD's exporter reports package power and NVIDIA's reports board or module power, so cross-vendor comparisons should say so. AgentX points use the model's agentic state, which has not been calibrated against measured system power.
+
+## Apply the results
+
+One validated point, read the way a capacity plan reads it: measured watts, the IT watts the model adds, GPUs per megawatt, and the rated marks it sits under.
+
+![Worked example: one point read as GPU power, IT power, GPUs per MW, share of TDP and all-in provisioned power](../../public/images/powerx-tutorial/widgets/worked-example.png)
+
+Open [PowerX](/inference?i_metric=y_measuredAvgPower), pull the same numbers from the [API](/api), or run `inferencex powerx export` from the [skills package](https://github.com/SemiAnalysisAI/InferenceX-app/tree/main/packages/skills).
 
 ## FAQ
 
-**Why is measured power so far below TDP?** Decode-heavy inference is bound by memory and latency targets, not by compute, so the GPU rarely reaches its power limit. Prefill, video generation, and training sit close to TDP.
+<details>
+<summary>Why is measured power so far below TDP?</summary>
 
-**Do DCGM and nvidia-smi disagree?** No. Both read the same NVML sensor, and the firmware already averages over roughly a second, which is why sampling faster than 1 Hz adds little. DCGM adds a daemon and an energy counter.
+Decode-heavy inference is bound by memory and latency targets, not by compute, so the GPU rarely reaches its power limit. Prefill, video generation and training sit close to TDP.
 
-**Why P90 rather than average?** Capacity is provisioned for peaks. P90 is the power exceeded for 10 % of the window and is what a buffer should be added to.
+</details>
 
-**Why offer IT without PUE?** Data-center capacity teams size on critical IT kW per GPU. PUE depends on the site, so Facility applies it separately.
+<details>
+<summary>Do DCGM and nvidia-smi disagree?</summary>
 
-**What happens when the power model changes?** Nothing is stored. Every modeled number is recomputed from the stored GPU measurements with the pinned model revision, so an update changes every point at once and the revision is shown in the tooltip.
+No. Both read the same NVML sensor, and the firmware already averages over roughly a second, which is why sampling faster than 1 Hz adds little. DCGM adds a daemon and an energy counter.
 
-**Why does one point show Historical when the rest of the run is Validated?** Validity is per window. One lost sample or a clock mismatch invalidates that window only; the point keeps its throughput and loses its energy.
+</details>
 
-**Does a higher Facility number mean the site is less efficient?** No. PUE is a fixed model input per cooling type, not a measurement of the benchmark site.
+<details>
+<summary>Why P90 rather than average?</summary>
+
+Capacity is provisioned for peaks. P90 is the power exceeded for 10 % of the window and is what a buffer should be added to.
+
+</details>
+
+<details>
+<summary>Why offer IT without PUE?</summary>
+
+Data-center capacity teams size on critical IT kW per GPU. PUE depends on the site, so Facility applies it separately.
+
+</details>
+
+<details>
+<summary>What happens when the power model changes?</summary>
+
+Nothing is stored. Every modeled number is recomputed from the stored GPU measurements with the pinned model revision, so an update changes every point at once and the revision is shown in the tooltip.
+
+</details>
+
+<details>
+<summary>Why is one point Historical when the rest of the run is Validated?</summary>
+
+Validity is per window. One lost sample or a clock mismatch invalidates that window only; the point keeps its throughput and loses its energy.
+
+</details>
+
+<details>
+<summary>Does a higher Facility number mean the site is less efficient?</summary>
+
+No. PUE is a fixed model input per cooling type, not a measurement of the benchmark site.
+
+</details>

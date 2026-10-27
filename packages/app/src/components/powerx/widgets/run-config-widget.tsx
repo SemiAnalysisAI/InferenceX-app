@@ -1,16 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
-import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
 import { track } from '@/lib/analytics/analytics';
 import {
   buildRunConfig,
   decodeRunConfig,
   disabledTopologyReason,
   encodeRunConfig,
+  INFERENCEX_CONFIG_REVISION,
   INFERENCEX_CONFIGS_URL,
-  normalizeRunConfig,
+  RUN_PLATFORMS,
+  RUN_STRICTNESS,
+  RUN_TOPOLOGIES,
+  RUN_WORKLOADS,
   type RunConfigNote,
   type RunConfigSelection,
   type RunPlatform,
@@ -18,88 +21,81 @@ import {
   type RunTopology,
   type RunWorkload,
 } from '@/lib/powerx/run-config';
-import { cn } from '@/lib/shared/utils';
 
-import {
-  ChipRow,
-  OutputBadge,
-  OutputHeader,
-  useWidgetHash,
-  WidgetCard,
-  WidgetNote,
-  type WidgetProps,
-} from './widget-chrome';
-
-const TABS = ['yaml', 'workflow', 'result'] as const;
-type Tab = (typeof TABS)[number];
+import { Chips, CopyButton, useWidgetHash, WidgetFrame, type WidgetProps } from './widget-chrome';
 
 const STRINGS = {
   en: {
     platform: 'Platform',
-    platforms: {
-      hgx: { label: 'NVIDIA HGX', subtitle: 'H100, H200, B200, B300' },
-      nvl72: { label: 'NVIDIA NVL72', subtitle: 'GB200, GB300' },
-      amd: { label: 'AMD OAM', subtitle: 'MI300X, MI325X, MI355X' },
+    platforms: { hgx: 'NVIDIA HGX', nvl72: 'NVIDIA NVL72', amd: 'AMD' },
+    platformTitles: {
+      hgx: 'H100, H200, B200, B300: dcgm-exporter',
+      nvl72: 'GB200, GB300: dcgm-exporter per compute tray',
+      amd: 'MI300X, MI325X, MI355X: device-metrics-exporter',
     },
     topology: 'Topology',
-    topologies: {
-      single: { label: 'Single node', subtitle: 'native exporter, best effort' },
-      multi: { label: 'Multi-node', subtitle: 'power: true on the row' },
+    topologies: { single: 'Single node', multi: 'Multi-node' },
+    topologyTitles: {
+      single: "The cluster's native exporter; nothing to add to the matrix",
+      multi: 'power: true merges the DCGM telemetry recipe',
     },
     amdMulti:
-      'AMD multi-node power is not collected yet: no AMD cluster has a POWER_LANES rule and no amd-master.yaml entry sets power: true.',
+      'Multi-node AMD power is not collected yet: no AMD cluster is in POWER_LANES and amd-master.yaml sets no power: true.',
+    more: 'More options',
     workload: 'Workload',
-    workloads: {
-      fixed: { label: 'Fixed sequence', subtitle: 'fixed-seq-len scenario' },
-      agentx: { label: 'AgentX', subtitle: 'agentic-coding scenario' },
-    },
+    workloads: { fixed: 'Fixed sequence', agentx: 'AgentX' },
     strictness: 'Strictness',
-    strictnesses: {
-      'best-effort': { label: 'Best effort', subtitle: 'invalid verdict, run passes' },
-      require: { label: 'Require power', subtitle: 'job fails on invalid' },
+    strictnessOptions: { 'best-effort': 'Best effort', require: 'Require power' },
+    strictnessTitles: {
+      'best-effort': 'An invalid window records power_valid: 0 and the run still passes',
+      require: 'require-power fails the point on an invalid window',
     },
-    tabs: { yaml: 'YAML', workflow: 'Workflow input', result: 'Result' },
-    badge: (sha: string) => `Matches configs/CONFIGS.md @ ${sha}`,
-    badgeTitle: 'Every line cites its InferenceX source file at this revision',
+    copy: 'Copy YAML',
+    sources: (revision: string) => `Sources at InferenceX ${revision}`,
     notes: {
-      'nvl72-grace': 'Grace socket power is measured when the window passes the Grace check.',
-      'amd-exporter':
-        "The cluster record's device-metrics-exporter block is used; no recipe change.",
-      'agentx-lane': 'The lane rule must have agentx=True.',
-    } satisfies Record<RunConfigNote, string>,
+      'single-node':
+        'Single-node rows inherit telemetry-native.yaml; power: true is rejected on them.',
+      'nvl72-grace':
+        'On NVL72 the Grace socket is measured when its window passes the Grace check.',
+      'amd-exporter': 'AMD rows read device-metrics-exporter at 1 s; the metric is package power.',
+      'agentx-lane': 'The multi-node AgentX lane must be listed with agentx=True in POWER_LANES.',
+    },
+    reference: 'Field reference',
   },
   zh: {
     platform: '平台',
-    platforms: {
-      hgx: { label: 'NVIDIA HGX', subtitle: 'H100、H200、B200、B300' },
-      nvl72: { label: 'NVIDIA NVL72', subtitle: 'GB200、GB300' },
-      amd: { label: 'AMD OAM', subtitle: 'MI300X、MI325X、MI355X' },
+    platforms: { hgx: 'NVIDIA HGX', nvl72: 'NVIDIA NVL72', amd: 'AMD' },
+    platformTitles: {
+      hgx: 'H100、H200、B200、B300：dcgm-exporter',
+      nvl72: 'GB200、GB300：每个计算托盘一个 dcgm-exporter',
+      amd: 'MI300X、MI325X、MI355X：device-metrics-exporter',
     },
     topology: '拓扑',
-    topologies: {
-      single: { label: '单节点', subtitle: '集群自带 exporter，尽力采集' },
-      multi: { label: '多节点', subtitle: '在该行设置 power: true' },
+    topologies: { single: '单节点', multi: '多节点' },
+    topologyTitles: {
+      single: '使用集群自带的 exporter，matrix 无需改动',
+      multi: 'power: true 会合并 DCGM 遥测配置',
     },
     amdMulti:
-      'AMD 多节点功耗尚未采集：没有任何 AMD 集群配置 POWER_LANES 规则，amd-master.yaml 中也没有条目设置 power: true。',
+      '多节点 AMD 功耗暂未采集：POWER_LANES 中没有 AMD 集群，amd-master.yaml 也没有设置 power: true。',
+    more: '更多选项',
     workload: '工作负载',
-    workloads: {
-      fixed: { label: '固定序列长度', subtitle: 'fixed-seq-len 场景' },
-      agentx: { label: 'AgentX', subtitle: 'agentic-coding 场景' },
-    },
+    workloads: { fixed: '固定序列', agentx: 'AgentX' },
     strictness: '严格程度',
-    strictnesses: {
-      'best-effort': { label: '尽力采集', subtitle: '记录无效判定，任务照常通过' },
-      require: { label: '强制采集', subtitle: '测量无效时任务失败' },
+    strictnessOptions: { 'best-effort': '尽力而为', require: '要求功耗有效' },
+    strictnessTitles: {
+      'best-effort': '窗口无效时记录 power_valid: 0，运行照常通过',
+      require: 'require-power 会让窗口无效的数据点直接失败',
     },
-    tabs: { yaml: 'YAML', workflow: 'Workflow 输入', result: '结果' },
-    badge: (sha: string) => `与 configs/CONFIGS.md @ ${sha} 一致`,
-    badgeTitle: '每一行都注明了该版本下的 InferenceX 源文件',
+    copy: '复制 YAML',
+    sources: (revision: string) => `来源：InferenceX ${revision}`,
     notes: {
-      'nvl72-grace': '窗口通过 Grace 校验时，Grace socket 功耗采用实测值。',
-      'amd-exporter': '直接使用集群记录中的 device-metrics-exporter 配置块，无需修改测试配置。',
-      'agentx-lane': 'lane 规则必须带有 agentx=True。',
-    } satisfies Record<RunConfigNote, string>,
+      'single-node': '单节点条目继承 telemetry-native.yaml，不接受 power: true。',
+      'nvl72-grace': 'NVL72 上窗口通过 Grace 校验时，Grace socket 为实测值。',
+      'amd-exporter': 'AMD 条目以 1 s 读取 device-metrics-exporter，指标为封装功耗。',
+      'agentx-lane': '多节点 AgentX lane 必须在 POWER_LANES 中以 agentx=True 登记。',
+    },
+    reference: '字段参考',
   },
 } as const;
 
@@ -112,118 +108,111 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
     encodeRunConfig,
     decodeRunConfig,
   );
-  const [tab, setTab] = useState<Tab>('yaml');
   const config = useMemo(() => buildRunConfig(selection), [selection]);
-
-  function update(patch: Partial<RunConfigSelection>, action: string, value: string) {
-    setSelection(normalizeRunConfig({ ...selection, ...patch }));
-    track(`powerx_tutorial_run_config_${action}`, { value });
-  }
-
-  const body: Record<Tab, string> = {
-    yaml: config.yaml,
-    workflow: config.workflowInput,
-    result: config.result,
+  const update = (patch: Partial<RunConfigSelection>, event: string, value: string) => {
+    setSelection({ ...selection, ...patch });
+    track(`powerx_tutorial_run_config_${event}`, { value });
   };
 
   return (
-    <WidgetCard name="run-config" alt={alt}>
-      <ChipRow<RunPlatform>
-        label={t.platform}
-        value={selection.platform}
-        onChange={(platform) => update({ platform }, 'platform', platform)}
-        groups={[
-          {
-            options: (['hgx', 'nvl72', 'amd'] as const).map((platform) => ({
-              value: platform,
-              ...t.platforms[platform],
-            })),
-          },
-        ]}
-      />
-      <ChipRow<RunTopology>
-        label={t.topology}
-        value={selection.topology}
-        onChange={(topology) => update({ topology }, 'topology', topology)}
-        groups={[
-          {
-            options: (['single', 'multi'] as const).map((topology) => ({
-              value: topology,
-              ...t.topologies[topology],
-              disabled: disabledTopologyReason(selection.platform, topology) ? t.amdMulti : null,
-            })),
-          },
-        ]}
-      />
-      <ChipRow<RunWorkload>
-        label={t.workload}
-        value={selection.workload}
-        onChange={(workload) => update({ workload }, 'workload', workload)}
-        groups={[
-          {
-            options: (['fixed', 'agentx'] as const).map((workload) => ({
-              value: workload,
-              ...t.workloads[workload],
-            })),
-          },
-        ]}
-      />
-      <ChipRow<RunStrictness>
-        label={t.strictness}
-        value={selection.strictness}
-        onChange={(strictness) => update({ strictness }, 'strictness', strictness)}
-        groups={[
-          {
-            options: (['best-effort', 'require'] as const).map((strictness) => ({
-              value: strictness,
-              ...t.strictnesses[strictness],
-            })),
-          },
-        ]}
-      />
-
-      <OutputHeader>
-        <div role="tablist" aria-label={t.tabs.yaml} className="flex flex-wrap gap-1">
-          {TABS.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              aria-selected={tab === name}
-              onClick={() => {
-                setTab(name);
-                track('powerx_tutorial_run_config_tab', { value: name });
-              }}
-              className={cn(
-                'inline-flex min-h-11 items-center rounded-md px-2.5 text-xs font-medium transition-colors md:min-h-8',
-                tab === name
-                  ? 'bg-brand text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              {t.tabs[name]}
-            </button>
-          ))}
+    <WidgetFrame name="run-config" alt={alt}>
+      <div className="grid gap-x-8 gap-y-3 sm:grid-cols-[auto_1fr]">
+        <span className="pt-2 text-sm font-medium text-foreground sm:w-20">{t.platform}</span>
+        <Chips<RunPlatform>
+          label={t.platform}
+          value={selection.platform}
+          onChange={(platform) => update({ platform }, 'platform', platform)}
+          options={RUN_PLATFORMS.map((key) => ({
+            value: key,
+            label: t.platforms[key],
+            title: t.platformTitles[key],
+          }))}
+        />
+        <span className="pt-2 text-sm font-medium text-foreground sm:w-20">{t.topology}</span>
+        <Chips<RunTopology>
+          label={t.topology}
+          value={selection.topology}
+          onChange={(topology) => update({ topology }, 'topology', topology)}
+          options={RUN_TOPOLOGIES.map((key) => ({
+            value: key,
+            label: t.topologies[key],
+            title: t.topologyTitles[key],
+            disabled: disabledTopologyReason(selection.platform, key) ? t.amdMulti : null,
+          }))}
+        />
+      </div>
+      <details
+        className="group mt-3"
+        onToggle={(event) => {
+          if (event.currentTarget.open) track('powerx_tutorial_run_config_more_opened');
+        }}
+      >
+        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:min-h-9 [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden="true"
+            className="transition-transform group-open:rotate-45 motion-reduce:transition-none"
+          >
+            +
+          </span>
+          {t.more}
+        </summary>
+        <div className="mt-2 grid gap-x-8 gap-y-3 sm:grid-cols-[auto_1fr]">
+          <span className="pt-2 text-sm font-medium text-foreground sm:w-20">{t.workload}</span>
+          <Chips<RunWorkload>
+            label={t.workload}
+            value={selection.workload}
+            onChange={(workload) => update({ workload }, 'workload', workload)}
+            options={RUN_WORKLOADS.map((key) => ({ value: key, label: t.workloads[key] }))}
+          />
+          <span className="pt-2 text-sm font-medium text-foreground sm:w-20">{t.strictness}</span>
+          <Chips<RunStrictness>
+            label={t.strictness}
+            value={selection.strictness}
+            onChange={(strictness) => update({ strictness }, 'strictness', strictness)}
+            options={RUN_STRICTNESS.map((key) => ({
+              value: key,
+              label: t.strictnessOptions[key],
+              title: t.strictnessTitles[key],
+            }))}
+          />
         </div>
+      </details>
+
+      <div className="mt-4 overflow-hidden rounded-lg border border-border/60">
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1">
+          <span className="font-mono text-xs text-muted-foreground">{config.file}</span>
+          <CopyButton
+            text={config.yaml}
+            label={t.copy}
+            locale={locale}
+            event="powerx_tutorial_run_config_copied"
+          />
+        </div>
+        <pre
+          data-testid="powerx-run-config-yaml"
+          className="overflow-x-auto px-4 py-3 font-mono text-xs leading-5 text-foreground"
+        >
+          {config.yaml}
+        </pre>
+      </div>
+      <p className="mt-2 font-mono text-xs leading-5 text-muted-foreground">
+        {t.sources(INFERENCEX_CONFIG_REVISION)} · {config.sources.join(' · ')} ·{' '}
         <a
           href={INFERENCEX_CONFIGS_URL}
           target="_blank"
           rel="noopener noreferrer"
-          title={t.badgeTitle}
-          onClick={() => track('powerx_tutorial_run_config_source_opened')}
-          className="hover:text-foreground"
+          className="text-brand hover:underline"
         >
-          <OutputBadge tone="verified">{t.badge(config.revision)}</OutputBadge>
+          {t.reference}
         </a>
-      </OutputHeader>
-      <div className="p-3">
-        <CopyableCodeBlock locale={locale} label={t.tabs[tab]}>
-          {body[tab]}
-        </CopyableCodeBlock>
-      </div>
-      {config.notes.map((note) => (
-        <WidgetNote key={note}>{t.notes[note]}</WidgetNote>
-      ))}
-    </WidgetCard>
+      </p>
+      {config.notes.length > 0 && (
+        <ul className="mt-2 space-y-1 text-sm leading-6 text-muted-foreground">
+          {config.notes.map((note: RunConfigNote) => (
+            <li key={note}>{t.notes[note]}</li>
+          ))}
+        </ul>
+      )}
+    </WidgetFrame>
   );
 }

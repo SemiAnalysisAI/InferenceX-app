@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { describe, expect, it } from 'vitest';
 
 import { createPowerXTutorialComponents } from '@/components/powerx/tutorial-mdx-components';
+import { renderStaticFlowSvg } from '@/components/powerx/widgets/flow-static';
 import { POWERX_TUTORIAL_WIDGETS } from '@/components/powerx/widgets';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
 import { extractHeadings } from '@/lib/blog/blog';
@@ -26,9 +27,9 @@ import {
 const APP_DIR = path.resolve(import.meta.dirname, '..', '..', '..');
 const PUBLIC_DIR = path.join(APP_DIR, 'public');
 
-const MAX_EN_WORDS = 1600;
-const MAX_EN_SECTION_WORDS = 450;
-const MAX_ZH_CJK_CHARS = 3000;
+const MAX_EN_WORDS = 1100;
+const MAX_EN_SECTION_WORDS = 300;
+const MAX_ZH_CJK_CHARS = 2000;
 const MAX_FAQ_QUESTIONS = 10;
 
 const ALLOWED_TAGS = new Set(['details', 'summary', 'br', 'kbd']);
@@ -149,10 +150,13 @@ describe('PowerX tutorial EN/ZH parity', () => {
     expect(widgets(en)).toEqual(registered);
     expect(widgets(zh)).toEqual(registered);
     for (const name of registered) {
-      expect(
-        fs.existsSync(path.join(PUBLIC_DIR, 'images/powerx-tutorial/widgets', `${name}.png`)),
-        name,
-      ).toBe(true);
+      const files = ['png', 'svg'].filter((ext) =>
+        fs.existsSync(path.join(PUBLIC_DIR, 'images/powerx-tutorial/widgets', `${name}.${ext}`)),
+      );
+      expect(files, `${name}: exactly one fallback file`).toHaveLength(1);
+    }
+    for (const src of images(en).filter((image) => tutorialWidgetName(image) !== null)) {
+      expect(src, 'widget mounts are lines of their own').toMatch(/\.(?:png|svg)$/u);
     }
   });
 
@@ -194,13 +198,22 @@ describe('PowerX tutorial conciseness', () => {
     expect(cjk).toBeLessThanOrEqual(MAX_ZH_CJK_CHARS);
   });
 
-  it(`keeps the FAQ at ${MAX_FAQ_QUESTIONS} questions or fewer`, () => {
+  it(`keeps the FAQ last, as <details> items, ${MAX_FAQ_QUESTIONS} or fewer`, () => {
     for (const side of sides) {
       const faq = sections(side.body).at(-1)!;
       expect(faq.heading, side.locale).toMatch(/^(?:FAQ|常见问题)$/u);
-      const questions = faq.text.split('\n').filter((line) => line.startsWith('**'));
-      expect(questions.length, side.locale).toBeGreaterThan(0);
-      expect(questions.length, side.locale).toBeLessThanOrEqual(MAX_FAQ_QUESTIONS);
+      const questions = faq.text.match(/<summary>/gu)?.length ?? 0;
+      expect(questions, side.locale).toBeGreaterThan(0);
+      expect(questions, side.locale).toBeLessThanOrEqual(MAX_FAQ_QUESTIONS);
+      expect(details(side), `${side.locale}: every <details> is an FAQ item`).toBe(questions);
+    }
+  });
+
+  it('opens with the ladder before any heading, so the hero carries the first visual', () => {
+    for (const side of sides) {
+      const lead = side.body.split(/^## /mu)[0];
+      expect(lead, side.locale).toContain('widgets/ladder.png');
+      expect(wordCount(lead.replace(IMAGE, '')), side.locale).toBeLessThanOrEqual(80);
     }
   });
 });
@@ -233,6 +246,8 @@ describe('plain-markdown compile', () => {
 
   it('names widgets only from the widgets folder', () => {
     expect(tutorialWidgetName(`${WIDGET_IMAGE}power-basis.png`)).toBe('power-basis');
+    expect(tutorialWidgetName(`${WIDGET_IMAGE}flow.svg`)).toBe('flow');
+    expect(tutorialWidgetName(`${WIDGET_IMAGE}flow.webp`)).toBeNull();
     expect(tutorialWidgetName(`${WIDGET_IMAGE}Power.png`)).toBeNull();
     expect(tutorialWidgetName(`${WIDGET_IMAGE}nested/chart.png`)).toBeNull();
     expect(tutorialWidgetName('../../public/images/powerx-tutorial/chart.png')).toBeNull();
@@ -241,11 +256,9 @@ describe('plain-markdown compile', () => {
 
   it('lifts a lone widget image out of its paragraph and leaves figures wrapped', async () => {
     const html = await render(
-      `Knobs.\n\n![Explorer](${WIDGET_IMAGE}power-basis.png)\n\n![Figure](../../public/images/powerx-tutorial/figure.png)\n`,
+      `Knobs.\n\n![Explorer](${WIDGET_IMAGE}ladder.png)\n\n![Figure](../../public/images/powerx-tutorial/figure.png)\n`,
     );
-    expect(html).toContain(
-      `<p>Knobs.</p>\n<img src="${WIDGET_IMAGE}power-basis.png" alt="Explorer"/>`,
-    );
+    expect(html).toContain(`<p>Knobs.</p>\n<img src="${WIDGET_IMAGE}ladder.png" alt="Explorer"/>`);
     expect(html).toContain(
       '<p><img src="../../public/images/powerx-tutorial/figure.png" alt="Figure"/></p>',
     );
@@ -270,16 +283,37 @@ describe('plain-markdown compile', () => {
       for (const heading of extractHeadings(side.body)) {
         expect(html, `${side.locale}: #${heading.id}`).toContain(`id="${heading.id}"`);
       }
-      expect(html).toContain('data-callout="tip"');
+      expect(html).toContain('data-callout="note"');
       expect(html).not.toContain('[!');
       for (const name of Object.keys(POWERX_TUTORIAL_WIDGETS)) {
         expect(html, `${side.locale}: ${name}`).toContain(`data-widget="${name}"`);
         expect(html, `${side.locale}: ${name} in <p>`).not.toMatch(
-          new RegExp(`<p><section[^>]*data-widget="${name}"`, 'u'),
+          new RegExp(`<p><div[^>]*data-layout="[a-z]+"><section[^>]*data-widget="${name}"`, 'u'),
+        );
+        expect(html, `${side.locale}: ${name} layout`).toMatch(
+          new RegExp(
+            `<div data-layout="(?:bleed|column)" class="[^"]*"><section[^>]*data-widget="${name}"`,
+            'u',
+          ),
         );
       }
-      expect(html).not.toContain('widgets/power-basis.png');
+      expect(html).not.toContain('widgets/ladder.png');
+      expect(html).not.toContain('widgets/flow.svg');
+      expect(html.match(/data-section="0[1-5]"/gu)?.length, `${side.locale}: numbered H2s`).toBe(5);
+      expect(html).toContain('<details><summary>');
     }
+  });
+});
+
+describe('PowerX tutorial static flow diagram', () => {
+  it('matches the FlowSvg component (run `bun run powerx:flow-svg` after changing it)', () => {
+    const file = fs.readFileSync(
+      path.join(PUBLIC_DIR, 'images/powerx-tutorial/widgets/flow.svg'),
+      'utf8',
+    );
+    expect(file).toBe(`${renderToStaticMarkup(renderStaticFlowSvg('en'))}\n`);
+    expect(file).toContain('<rect x="-8"');
+    expect(file).not.toContain('var(--');
   });
 });
 

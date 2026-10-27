@@ -24,6 +24,7 @@
     "test:e2e:full": "cypress run --component && cypress run",
     "test:e2e:component": "cypress run --component",
     "test:e2e:integration": "cypress run",
+    "powerx:flow-svg": "bun scripts/powerx-flow-svg.tsx",
     "test:unit": "bun --env-file=../../.env vitest run",
     "test:unit:coverage": "bun --env-file=../../.env vitest run --coverage",
     "clean": "rimraf .next out",

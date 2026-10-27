@@ -1,10 +1,9 @@
 import { snapTo } from './widget-hash';
 
 /**
- * Pure generator behind the "Run-config generator" widget on /powerx/tutorial.
- *
- * Every emitted line cites its InferenceX source at `INFERENCEX_CONFIG_REVISION`
- * (paths relative to `inferencex-e2e/` unless they start with `.github/`).
+ * Pure generator behind the run-config widget on /powerx/tutorial. The YAML stays clean; the
+ * InferenceX lines each row comes from are returned separately (paths relative to
+ * `inferencex-e2e/` at `INFERENCEX_CONFIG_REVISION`).
  */
 
 export const INFERENCEX_CONFIG_REVISION = 'e1356ab';
@@ -33,13 +32,12 @@ export const DEFAULT_RUN_CONFIG: RunConfigSelection = {
   strictness: 'best-effort',
 };
 
-export type RunConfigNote = 'nvl72-grace' | 'amd-exporter' | 'agentx-lane';
+export type RunConfigNote = 'nvl72-grace' | 'amd-exporter' | 'agentx-lane' | 'single-node';
 
 /**
  * Multi-node AMD power is not collected: no AMD cluster has a `POWER_LANES` entry
- * (`infx/launch/drivers/srt/power.py:42-130` lists gb200-nv, gb300-nv, b300-dsxe, b200-nscale and
- * h200-dgxc only) and no `configs/amd-master.yaml` entry sets `power: true`, so the launcher
- * would reject the lane (`power.py:153-155`).
+ * (`infx/launch/drivers/srt/power.py:42-130`) and no `configs/amd-master.yaml` entry sets
+ * `power: true`, so the launcher would reject the lane (`power.py:153-155`).
  */
 export function disabledTopologyReason(
   platform: RunPlatform,
@@ -48,7 +46,6 @@ export function disabledTopologyReason(
   return platform === 'amd' && topology === 'multi' ? 'amd-multi' : null;
 }
 
-/** Snaps an AMD multi-node choice back to single node. */
 export function normalizeRunConfig(selection: RunConfigSelection): RunConfigSelection {
   return disabledTopologyReason(selection.platform, selection.topology)
     ? { ...selection, topology: 'single' }
@@ -56,9 +53,10 @@ export function normalizeRunConfig(selection: RunConfigSelection): RunConfigSele
 }
 
 export interface RunConfig {
+  file: string;
   yaml: string;
-  workflowInput: string;
-  result: string;
+  /** InferenceX locations the rows come from, in the order they first apply. */
+  sources: string[];
   notes: RunConfigNote[];
   revision: string;
 }
@@ -87,153 +85,111 @@ const ENTRY: Record<RunPlatform, { single: string; multi: string; recipeDir: str
   },
 };
 
-function singleNodeYaml(selection: RunConfigSelection): string {
-  const entry = ENTRY[selection.platform];
-  const header = [
-    `# ${MASTER_FILE[selection.platform]} — single-node entry (${entry.single} pattern)`,
-    "# nothing to add: single-node entries inherit telemetry-native.yaml and the cluster's",
-    '# default_gpu_exporter; power: true is rejected here (infx/matrix/validation.py:714-716)',
-  ];
-  const rows =
-    selection.workload === 'agentx'
-      ? [
-          '  scenarios:',
-          '    agentic-coding:',
-          '    - dram-utilization: 0.80',
-          '      search-space:',
-          '      - tp: 8',
-          '        kv-offloading: none                # required on single-node agentic rows (validation.py:710-713)',
-          '        conc-list: [1, 2, 4, 8]',
-          '        srt-recipe: agentic.yaml           # ENABLE_AGENTX_POWER=1 is set when telemetry is enabled (infx/srt_slurm/workload.py:345-347)',
-        ]
-      : [
-          '  scenarios:',
-          '    fixed-seq-len:',
-          '    - isl: 8192',
-          '      osl: 1024',
-          '      search-space:',
-          '      - tp: 8',
-          '        conc-start: 4',
-          '        conc-end: 64',
-          '        srt-recipe: 8k1k.yaml              # recipe merges configs/srt-recipes/telemetry-native.yaml (RECIPES.md:56)',
-        ];
-  return [
-    ...header,
-    `${entry.single}:`,
-    '  multinode: false',
-    `  srt-recipe-dir: ${entry.recipeDir}     # configs/srt-recipes/<dir>/<srt-recipe>`,
-    ...rows,
-  ].join('\n');
+interface Line {
+  text: string;
+  source?: string;
 }
 
-function multiNodeYaml(selection: RunConfigSelection): string {
+function singleNodeLines(selection: RunConfigSelection): Line[] {
   const entry = ENTRY[selection.platform];
-  const requireLine =
-    selection.strictness === 'require'
-      ? [
-          '      require-power: true                # fails the point on an invalid window (validation.py:640)',
-        ]
-      : [];
-  const scenario =
+  const scenario: Line[] =
     selection.workload === 'agentx'
       ? [
-          '  scenarios:',
-          '    agentic-coding:',
-          '    - dram-utilization: 0.80',
-          ...requireLine,
-          '      search-space:',
-          '      - spec-decoding: mtp',
-          '        kv-offloading: none',
-          '        conc-list: [1, 2, 4, 8]',
-          '        num-nodes: 4                       # validation.py:664',
-          '        srt-recipe: agg-tp16dp2ep32-latency.yaml',
-          '        power: true                        # merges configs/srt-recipes/telemetry-dcgm.yaml (CONFIGS.md:156); lane rule must have agentx=True (infx/launch/drivers/srt/power.py:45-53)',
+          { text: '  scenarios:' },
+          { text: '    agentic-coding:' },
+          { text: '    - dram-utilization: 0.80' },
+          { text: '      search-space:' },
+          { text: '      - tp: 8' },
+          { text: '        kv-offloading: none', source: 'infx/matrix/validation.py:710-713' },
+          { text: '        conc-list: [1, 2, 4, 8]' },
+          {
+            text: '        srt-recipe: agentic.yaml',
+            source: 'infx/srt_slurm/workload.py:345-347',
+          },
         ]
       : [
-          '  scenarios:',
-          '    fixed-seq-len:',
-          '    - isl: 8192',
-          '      osl: 1024',
-          ...requireLine,
-          '      search-space:',
-          '      - num-nodes: 4                       # validation.py:664',
-          '        srt-recipe: agg-tp16dp2ep32-latency.yaml',
-          '        power: true                        # merges configs/srt-recipes/telemetry-dcgm.yaml (CONFIGS.md:156); lane must be in POWER_LANES (infx/launch/drivers/srt/power.py:42)',
-          '        conc-list: [1, 2, 4, 8]',
+          { text: '  scenarios:' },
+          { text: '    fixed-seq-len:' },
+          { text: '    - isl: 8192' },
+          { text: '      osl: 1024' },
+          { text: '      search-space:' },
+          { text: '      - tp: 8' },
+          { text: '        conc-start: 4' },
+          { text: '        conc-end: 64' },
+          { text: '        srt-recipe: 8k1k.yaml', source: 'srt-slurm-recipes/RECIPES.md:56' },
         ];
   return [
-    `# ${MASTER_FILE[selection.platform]} — multinode entry (${entry.multi} pattern, nvidia-master.yaml:1380-1386)`,
-    `${entry.multi}:`,
-    '  multinode: true                      # only multinode rows accept power: true (validation.py:714-716)',
+    { text: `${entry.single}:`, source: 'infx/matrix/validation.py:714-716' },
+    { text: '  multinode: false' },
+    { text: `  srt-recipe-dir: ${entry.recipeDir}` },
     ...scenario,
-  ].join('\n');
+  ];
 }
 
-function workflowInput(selection: RunConfigSelection): string {
-  if (selection.strictness === 'best-effort') {
-    return [
-      '# not needed: an invalid window records power_valid: 0 and the run still passes',
-      '# (configs/CONFIGS.md:283-287)',
-    ].join('\n');
-  }
-  const template =
-    selection.topology === 'multi'
-      ? '.github/workflows/benchmark-multinode-tmpl.yml:66 → :146'
-      : '.github/workflows/benchmark-tmpl.yml:77 → :100';
-  return [
-    `# workflow_dispatch input (${template})`,
-    'require-power: true',
-    '',
-    '# same thing from a shell on the runner',
-    'export REQUIRE_POWER=1                 # → telemetry.required (infx/srt_slurm/workload.py:341-343)',
-  ].join('\n');
-}
-
-function resultText(selection: RunConfigSelection): string {
-  const roleKeys =
-    selection.topology === 'multi'
-      ? [
-          '  "prefill_avg_power_w": 1013.6,      # ROLE_METRIC_KEYS, prefill/decode deployments only',
-          '  "decode_avg_power_w": 621.4,',
-          '  "prefill_joules_per_input_token": 0.09,',
-          '  "decode_joules_per_output_token": 1.71,',
-        ]
+function multiNodeLines(selection: RunConfigSelection): Line[] {
+  const entry = ENTRY[selection.platform];
+  const requireLine: Line[] =
+    selection.strictness === 'require'
+      ? [{ text: '      require-power: true', source: 'infx/matrix/validation.py:640' }]
       : [];
+  const powerLine: Line = {
+    text: '        power: true',
+    source:
+      selection.workload === 'agentx'
+        ? 'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:45-53'
+        : 'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:42',
+  };
+  const scenario: Line[] =
+    selection.workload === 'agentx'
+      ? [
+          { text: '  scenarios:' },
+          { text: '    agentic-coding:' },
+          { text: '    - dram-utilization: 0.80' },
+          ...requireLine,
+          { text: '      search-space:' },
+          { text: '      - spec-decoding: mtp' },
+          { text: '        kv-offloading: none' },
+          { text: '        conc-list: [1, 2, 4, 8]' },
+          { text: '        num-nodes: 4', source: 'infx/matrix/validation.py:664' },
+          { text: '        srt-recipe: agg-tp16dp2ep32-latency.yaml' },
+          powerLine,
+        ]
+      : [
+          { text: '  scenarios:' },
+          { text: '    fixed-seq-len:' },
+          { text: '    - isl: 8192' },
+          { text: '      osl: 1024' },
+          ...requireLine,
+          { text: '      search-space:' },
+          { text: '      - num-nodes: 4', source: 'infx/matrix/validation.py:664' },
+          { text: '        srt-recipe: agg-tp16dp2ep32-latency.yaml' },
+          powerLine,
+          { text: '        conc-list: [1, 2, 4, 8]' },
+        ];
   return [
-    '# aggregate result JSON, one per concurrency point (infx/results/power/__init__.py:8-32)',
-    '{',
-    '  "power_metric_schema_version": 2,',
-    '  "power_valid": 1,                     # 0 keeps the throughput and drops every key below',
-    '  "avg_power_w": 684.2,                 # per GPU, time-weighted over the window',
-    '  "p75_power_w": 731.0,',
-    '  "p90_power_w": 768.5,',
-    '  "avg_total_gpu_power_w": 5473.6,      # whole deployment',
-    '  "total_gpu_energy_j": 1642080.0,',
-    '  "joules_per_output_token": 1.79,',
-    '  "joules_per_input_token": 0.21,',
-    '  "joules_per_total_token": 0.19,',
-    '  "joules_per_successful_query": 1817.4,',
-    ...roleKeys,
-    '}',
-    '',
-    `# power_audit_<RESULT> artifact (infx/results/power/multinode.py:4, fixed_sequence.py:264)`,
-    'samples.csv                           # one row per GPU per second',
-    'manifest.json                         # exporter image sha256, producer git commit',
-    'windows/*.json                        # serving window per point',
-    'power_validation_<RESULT>.json        # verdict, reason_codes, per_gpu_max_sample_gap_s',
-  ].join('\n');
+    { text: `${entry.multi}:`, source: 'configs/nvidia-master.yaml:1380-1386' },
+    { text: '  multinode: true', source: 'infx/matrix/validation.py:714-716' },
+    ...scenario,
+  ];
 }
 
 export function buildRunConfig(input: RunConfigSelection): RunConfig {
   const selection = normalizeRunConfig(input);
+  const lines =
+    selection.topology === 'multi' ? multiNodeLines(selection) : singleNodeLines(selection);
   const notes: RunConfigNote[] = [];
+  if (selection.topology === 'single') notes.push('single-node');
   if (selection.platform === 'nvl72') notes.push('nvl72-grace');
   if (selection.platform === 'amd') notes.push('amd-exporter');
   if (selection.workload === 'agentx' && selection.topology === 'multi') notes.push('agentx-lane');
+  const sources: string[] = [];
+  for (const line of lines) {
+    if (line.source && !sources.includes(line.source)) sources.push(line.source);
+  }
   return {
-    yaml: selection.topology === 'multi' ? multiNodeYaml(selection) : singleNodeYaml(selection),
-    workflowInput: workflowInput(selection),
-    result: resultText(selection),
+    file: MASTER_FILE[selection.platform],
+    yaml: lines.map((line) => line.text).join('\n'),
+    sources,
     notes,
     revision: INFERENCEX_CONFIG_REVISION,
   };
