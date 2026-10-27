@@ -524,9 +524,6 @@ const ScatterGraph = React.memo(
     xExtentOverride,
     yExtentOverride,
     plotHeight,
-    legendControls,
-    legendFooter,
-    legendMobileLabel,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -3519,7 +3516,6 @@ const ScatterGraph = React.memo(
         zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
         xScale: ContinuousScale,
         yScale: ContinuousScale,
-        width: number,
       ) => {
         const domainTop = Math.max(...(yScale.domain() as number[]));
         const topY = yScale(Math.min(100, domainTop));
@@ -3557,7 +3553,6 @@ const ScatterGraph = React.memo(
           .attr('stroke-width', 1)
           .attr('stroke-dasharray', '2,3')
           .attr('d', (d) => line(d.band));
-        void width;
       };
       const headroomLayer: CustomLayerConfig = {
         type: 'custom',
@@ -3567,14 +3562,12 @@ const ScatterGraph = React.memo(
             zoomGroup,
             (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
             (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
-            ctx.width,
           ),
         onZoom: (zoomGroup, ctx) =>
           drawHeadroom(
             zoomGroup,
             ctx.newXScale as ContinuousScale,
             ctx.newYScale as ContinuousScale,
-            ctx.width,
           ),
       };
 
@@ -4133,9 +4126,6 @@ const ScatterGraph = React.memo(
           legendElement={
             <ChartLegend
               variant="sidebar"
-              controls={legendControls}
-              footer={legendFooter}
-              mobileLabel={legendMobileLabel}
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
               onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}

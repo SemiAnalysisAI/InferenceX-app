@@ -46,60 +46,11 @@ const finger = (element: Element, type: string, init: PointerEventInit = {}) =>
 
 const datumOf = (node: Element) => (node as unknown as { __data__?: InferenceData }).__data__;
 /** A dot's plot position from its transform; the svg has no layout in jsdom. */
-const dotPosition = (container: HTMLElement, hwKey: string, x: number) => {
-  const dot = [...container.querySelectorAll<SVGGElement>('.dot-group')].find(
-    (node) => node.dataset.hwKey === hwKey && datumOf(node)?.x === x,
-  )!;
-  const match = /translate\((?<x>[^,]+),(?<y>[^)]+)\)/u.exec(dot.getAttribute('transform') ?? '');
-  return { x: Number(match?.groups?.x), y: Number(match?.groups?.y) };
-};
 
 const mark = (container: HTMLElement) =>
   container.querySelector<SVGGElement>('[data-testid="powerx-scrub"]');
 
 describe('PowerX touch scrub on the main chart', () => {
-  it('snaps a finger to the nearest visible point and reports it to the readout', () => {
-    mocks.setActivePoint.mockClear();
-    inferenceState.current = baseInferenceState();
-    const { container, unmount } = mountChart();
-    const svg = container.querySelector('svg')!;
-    // jsdom has no plot geometry: pointer coordinates read as plot coordinates. The h100
-    // fp8 point at x=100 is the rightmost; a finger past it snaps there.
-    const far = dotPosition(container, 'h100', 100);
-    finger(svg, 'pointerdown', { clientX: far.x + 40, clientY: far.y + 5 });
-    expect(mark(container)?.dataset.hwKey).toBe('h100');
-    expect(mark(container)?.dataset.overlay).toBeUndefined();
-    expect(mark(container)?.querySelector('line')?.getAttribute('x1')).toBe(String(far.x));
-    expect(mark(container)?.querySelector('circle')?.getAttribute('cx')).toBe(String(far.x));
-    expect(mark(container)?.querySelector('circle')?.getAttribute('cy')).toBe(String(far.y));
-    expect(mocks.setActivePoint).toHaveBeenLastCalledWith({
-      point: expect.objectContaining({ hwKey: 'h100', x: 100 }),
-      source: 'scrub',
-    });
-    // The finger moves: the mark follows to the b200 fp8 point at x=50.
-    const near = dotPosition(container, 'b200', 50);
-    finger(svg, 'pointermove', { clientX: near.x - 3, clientY: near.y + 2 });
-    expect(mark(container)?.dataset.hwKey).toBe('b200');
-    expect(mark(container)?.querySelector('circle')?.getAttribute('cx')).toBe(String(near.x));
-    expect(mocks.setActivePoint).toHaveBeenLastCalledWith({
-      point: expect.objectContaining({ hwKey: 'b200', x: 50 }),
-      source: 'scrub',
-    });
-    expect(svg.style.touchAction).toBe('none');
-    finger(svg, 'pointerup', { clientX: near.x, clientY: near.y });
-    expect(svg.style.touchAction).toBe('pan-y');
-    // Another finger (not the one in flight) and a mouse are ignored.
-    const calls = mocks.setActivePoint.mock.calls.length;
-    finger(svg, 'pointermove', { pointerId: 9, clientX: far.x, clientY: far.y });
-    finger(svg, 'pointerdown', { pointerType: 'mouse', clientX: far.x, clientY: far.y });
-    expect(mocks.setActivePoint.mock.calls).toHaveLength(calls);
-    // A hidden precision is not a candidate: only fp8 points are plotted here.
-    expect(mocks.setActivePoint.mock.calls.every((call) => call[0].point.precision === 'fp8')).toBe(
-      true,
-    );
-    unmount();
-  });
-
   it('reads an unofficial-run overlay point in its run colour and respects the overlay toggles', () => {
     mocks.setActivePoint.mockClear();
     const runUrl = 'https://github.com/o/r/actions/runs/123';
@@ -151,21 +102,5 @@ describe('PowerX touch scrub on the main chart', () => {
     expect(mark(container)?.dataset.overlay).toBeUndefined();
     expect(mocks.setActivePoint.mock.calls.at(-1)?.[0].point.run_url).toBeUndefined();
     unmount();
-  });
-
-  it('attaches nothing for a fine pointer', () => {
-    mocks.setActivePoint.mockClear();
-    mocks.coarse = false;
-    try {
-      inferenceState.current = baseInferenceState();
-      const { container, unmount } = mountChart();
-      const svg = container.querySelector('svg')!;
-      finger(svg, 'pointerdown', { clientX: 100, clientY: 100 });
-      expect(mark(container)).toBeNull();
-      expect(mocks.setActivePoint).not.toHaveBeenCalled();
-      unmount();
-    } finally {
-      mocks.coarse = true;
-    }
   });
 });

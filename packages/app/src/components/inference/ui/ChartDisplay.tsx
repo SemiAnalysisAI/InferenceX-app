@@ -1529,7 +1529,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               xLabel={resolvedXLabel}
                               showRoles={powerCompare === 'roles'}
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
-                              layout={powerXLayout ? 'inline' : 'stacked'}
                             />
                           </>
                         );

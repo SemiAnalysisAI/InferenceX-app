@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SegmentedToggle, segmentedSelectOptionLabel } from './segmented-toggle';
+import { SegmentedToggle } from './segmented-toggle';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -51,13 +51,6 @@ describe('SegmentedToggle select variant', () => {
     expect(container.querySelector('button')).toBeNull();
   });
 
-  it('falls back to the aria label for icon-only options', () => {
-    expect(segmentedSelectOptionLabel({ value: 'x', ariaLabel: 'Export', title: 'As PNG' })).toBe(
-      'Export — As PNG',
-    );
-    expect(segmentedSelectOptionLabel({ value: 'x', label: 'Plain' })).toBe('Plain');
-  });
-
   it('reports the chosen value on change, like a segment click', () => {
     const onValueChange = vi.fn();
     const container = document.createElement('div');
@@ -83,23 +76,5 @@ describe('SegmentedToggle select variant', () => {
     expect(onValueChange).toHaveBeenCalledWith('it');
     act(() => root.unmount());
     container.remove();
-  });
-
-  it('keeps the segment buttons as the default', () => {
-    const container = document.createElement('div');
-    container.innerHTML = renderToStaticMarkup(
-      <SegmentedToggle<Value>
-        value="gpu"
-        ariaLabel="Count"
-        testId="count"
-        role="group"
-        onValueChange={() => {}}
-        options={[...options]}
-      />,
-    );
-    expect(container.querySelector('select')).toBeNull();
-    const buttons = [...container.querySelectorAll('[data-testid="count"] button')];
-    expect(buttons.map((button) => button.textContent)).toEqual(['GPU only', 'IT (no PUE)', 'All']);
-    expect(buttons[1].getAttribute('title')).toBe('GPU measured; the rest modeled');
   });
 });

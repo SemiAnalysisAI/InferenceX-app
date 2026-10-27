@@ -560,7 +560,7 @@ const rate = (value: number) =>
   value >= 100 ? Math.round(value).toLocaleString('en-US') : value.toFixed(1);
 const watts = (value: number) => Math.round(value).toLocaleString('en-US');
 /** Where the readout lands before anyone hovers: a mid-range interactivity. */
-export const READOUT_INTERACTIVITY = 80;
+const READOUT_INTERACTIVITY = 80;
 
 /** The chart point the readout describes when nothing is hovered or pinned. */
 export function defaultReadoutPoint(points: readonly InferenceData[]): InferenceData | null {

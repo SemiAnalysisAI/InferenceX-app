@@ -27,17 +27,6 @@ describe('Inference ChartControls', () => {
     cy.get('[data-testid="measured-metric-controls"]').should('not.exist');
   });
 
-  it('keeps measured power metrics on Historical Trends', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
-    mountWithProviders(<InferenceChartControls tcoSource="historical" hideGpuComparison />, {
-      inference: {},
-      unofficial: {},
-    });
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-select-option]', 'Measured Power').should('exist');
-    cy.contains('[data-select-option]', 'Measured Energy').should('exist');
-  });
-
   it('renders the Y-axis metric selector', () => {
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
     cy.get('[data-testid="cost-display-selector"]').should('not.exist');

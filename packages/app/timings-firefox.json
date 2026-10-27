@@ -3326,20 +3326,6 @@
       ]
     },
     {
-      "spec": "cypress/e2e/measured-power-overlay.cy.ts",
-      "duration": 1706,
-      "tests": [
-        {
-          "title": [
-            "Measured power on unofficial-run overlay",
-            "exposes both measured families and selects average power on the overlay view"
-          ],
-          "duration": 1697,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/e2e/model-architecture.cy.ts",
       "duration": 9559,
       "tests": [
@@ -4513,16 +4499,8 @@
       "duration": 4000
     },
     {
-      "spec": "cypress/e2e/powerx-parts-accordion.cy.ts",
-      "duration": 6000
-    },
-    {
       "spec": "cypress/e2e/powerx-timeline.cy.ts",
       "duration": 4000
-    },
-    {
-      "spec": "cypress/e2e/powerx-touch-scrub.cy.ts",
-      "duration": 7000
     },
     {
       "spec": "cypress/e2e/profit-estimator.cy.ts",

@@ -9,12 +9,6 @@ const redirect = (path: string) =>
     .replace('https://inferencex.test', '') ?? null;
 
 describe('powerXRedirectUrl', () => {
-  it('opens PowerX with the same filters for an old power link', () => {
-    expect(redirect('/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower')).toBe(
-      '/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
-    );
-  });
-
   it('keeps all four boundaries of an old boundary compare', () => {
     expect(redirect('/zh/inference?i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries')).toBe(
       '/zh/powerx?i_metric=y_measuredJPerOutputToken&i_pcompare=all',

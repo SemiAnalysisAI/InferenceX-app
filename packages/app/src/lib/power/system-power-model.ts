@@ -146,7 +146,7 @@ export function systemPowerLeafCategory(topName: string, leafName: string): Syst
 }
 
 /** Sums the pinned model's leaf components into {@link SystemPowerBreakdown} categories. */
-export function breakdownPowerEstimate(estimate: PowerEstimate): SystemPowerBreakdown {
+function breakdownPowerEstimate(estimate: PowerEstimate): SystemPowerBreakdown {
   const breakdown = emptySystemPowerBreakdown();
   const visit = (top: PowerComponent, component: PowerComponent) => {
     if (component.children.length === 0) {

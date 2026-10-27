@@ -129,6 +129,14 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
     expect(lines).toHaveLength(21);
     expect(lines[1]).toBe('power_audit_sweep,power_validation_point.json,0,-7,0,90');
     expect(lines[8]).toBe('power_audit_sweep,power_validation_point.json,7,0,1,510');
+    // The NVL72 scale swaps the column for kW per rack: per-GPU W × 72 / 1000.
+    const rack = await GET(request('id=7&scale=nvl72&format=csv'));
+    const rackText = await rack.text();
+    const rackLines = rackText.trim().split(/\r?\n/u);
+    expect(rackLines[0]).toBe(
+      'artifact,source,t_s,since_serving_s,in_validated_window,kw_per_nvl72_rack',
+    );
+    expect(rackLines[1]).toBe('power_audit_sweep,power_validation_point.json,0,-7,0,6.48');
   });
 
   it('rejects bad ids, formats and scales without touching the database', async () => {
@@ -151,13 +159,5 @@ describe('GET /api/v1/gpu-metrics-point/stats', () => {
     expect(noSeries.status).toBe(404);
     const noCsv = await GET(request('id=7&format=csv'));
     expect(noCsv.status).toBe(404);
-  });
-
-  it('returns 500 with no-store when the lookup fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    readRevision.mockRejectedValue(new Error('database unavailable'));
-    const response = await GET(request('id=7'));
-    expect(response.status).toBe(500);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
   });
 });

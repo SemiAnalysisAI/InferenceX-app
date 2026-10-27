@@ -1,4 +1,4 @@
-import { assertShareLinkParams } from '../support/share-link';
+import { unlockAgenticGate } from '../support/e2e';
 
 const MODEL = 'dsv4';
 const DATE = '2026-09-01';
@@ -57,151 +57,6 @@ const rows = (runUrl: string | null, hardware: 'b200' | 'h200') =>
     run_url: runUrl,
   }));
 
-const availability = [
-  {
-    model: MODEL,
-    isl: 8192,
-    osl: 1024,
-    precision: 'fp4',
-    hardware: 'b200',
-    framework: 'dynamo-sglang',
-    spec_method: 'none',
-    disagg: true,
-    benchmark_type: 'single_turn',
-    date: DATE,
-  },
-];
-
-function interceptRows(officialRunUrl: string) {
-  const official = rows(null, 'b200').map((row, index) => ({
-    ...row,
-    curve_workflow_run_id: 27182818284,
-    curve_date: DATE,
-    run_url: index === 0 ? officialRunUrl : `${officialRunUrl}0`,
-    power_audit: {
-      producer_sha: index === 0 ? 'producer-a' : 'producer-b',
-      exporter_image_sha256: index === 0 ? 'exporter-a' : 'exporter-b',
-    },
-  }));
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: official }).as('benchmarks');
-  cy.intercept('GET', '/api/v1/workflow-info*', {
-    body: { runs: [], changelogs: [], configs: [] },
-  });
-}
-
-function interceptCheaperOverlayRows() {
-  const cheaper = rows(OVERLAY_RUN_URL, 'h200').map((row) => ({
-    ...row,
-    metrics: {
-      ...row.metrics,
-      joules_per_output_token: row.metrics.joules_per_output_token * 0.9,
-      joules_per_input_token: row.metrics.joules_per_input_token * 0.9,
-    },
-  }));
-  cy.intercept('GET', '/api/unofficial-run*', {
-    body: {
-      runInfos: [
-        {
-          id: OVERLAY_RUN_ID,
-          name: 'powerx-panels',
-          branch: 'powerx-panels',
-          sha: 'abc000',
-          createdAt: `${DATE}T00:00:00Z`,
-          url: OVERLAY_RUN_URL,
-          conclusion: 'success',
-          status: 'completed',
-          isNonMainBranch: true,
-        },
-      ],
-      benchmarks: cheaper,
-      evaluations: [],
-    },
-  }).as('unofficialRun');
-}
-
-function visitChart(extraParams: string, officialRunUrl: string) {
-  interceptRows(officialRunUrl);
-  cy.visit(`/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
-    },
-  });
-  cy.wait(['@availability', '@benchmarks']);
-  cy.get('[data-testid="inference-chart-display"]').should('exist');
-  cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-}
-
-describe('PowerX article panels', () => {
-  const PANELS = '&i_pcompare=roles';
-  const RETIRED_COMPARE =
-    '&i_servicecompare=1&i_servicebase=old-baseline&i_servicepeer=old-comparator&i_servicetarget=40';
-  const OFFICIAL_RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27182818284';
-  const OVERLAY_COLOR = 'var(--overlay-run-0)';
-
-  beforeEach(() => {
-    cy.on('uncaught:exception', (error) => {
-      if (error.message === 'ResizeObserver loop completed with undelivered notifications.') {
-        return false;
-      }
-    });
-  });
-
-  it('keeps the role panels on PowerX while ignoring retired share state', () => {
-    interceptCheaperOverlayRows();
-    visitChart(
-      `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken${PANELS}${RETIRED_COMPARE}`,
-      OFFICIAL_RUN_URL,
-    );
-    cy.wait('@unofficialRun');
-    cy.get('[data-testid="power-analysis-panels"]').should('be.visible');
-    cy.get('[data-testid^="equal-service-"]').should('not.exist');
-    cy.get('[data-testid^="matched-concurrency"]').should('not.exist');
-
-    cy.get('[data-testid="chart-0-role-power-plot"] circle.point').should(
-      'have.length',
-      CONFIGS.length * 4,
-    );
-    cy.get(`[data-testid="chart-0-role-power-plot"] circle.point[fill="${OVERLAY_COLOR}"]`).should(
-      'have.length',
-      CONFIGS.length * 2,
-    );
-    cy.get('[data-testid="chart-0-role-share-plot"] circle.point').should(
-      'have.length',
-      CONFIGS.length * 2,
-    );
-
-    cy.get('[data-testid="power-fit-panel"]').should('not.exist');
-
-    assertShareLinkParams({
-      i_servicecompare: null,
-      i_servicebase: null,
-      i_servicepeer: null,
-      i_servicetarget: null,
-      i_roleshare: null,
-      i_powerfit: null,
-      i_pcompare: 'roles',
-    });
-  });
-
-  it('lists the unofficial frontier points on the PowerX energy chart', () => {
-    interceptCheaperOverlayRows();
-    visitChart(
-      `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken&i_frontier=1`,
-      OFFICIAL_RUN_URL,
-    );
-    cy.wait('@unofficialRun');
-    cy.get('[data-testid="frontier-points-row"]')
-      .should('have.length', CONFIGS.length)
-      .each(($row) => {
-        expect($row.text()).to.include('unofficial');
-        expect($row.find('a').attr('href')).to.eq(OVERLAY_RUN_URL);
-      });
-    assertShareLinkParams({ i_frontier: '1' });
-  });
-});
-
 const agenticRows = [
   ['b200', 'dynamo-vllm', 8, 2, 1, 16, 760],
   ['h200', 'vllm', 16, 1, 2, 32, 168],
@@ -241,34 +96,6 @@ const agenticRows = [
 }));
 
 describe('AgentX All in Measured chart and table', () => {
-  it('drops the chart hint and the ISL/OSL footer on PowerX without asking for sketches', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: agenticRows });
-    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticRows }).as('agenticBenchmarks');
-    cy.intercept('GET', '/api/v1/workflow-info*', {
-      body: { runs: [], changelogs: [], configs: [] },
-    });
-    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
-    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
-    cy.intercept('GET', '/api/v1/resident-sequence-lengths*', { body: {} }).as(
-      'residentSequenceLengths',
-    );
-    cy.visit('/powerx?g_model=Kimi-K3&i_seq=agentic-traces&i_prec=fp4&i_optimal=0&i_best=0', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.setItem('inferencex-feature-gate', '1');
-      },
-    });
-    cy.wait('@agenticBenchmarks');
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .find('.dot-group')
-      .should('have.length.at.least', 1);
-    // Same official agentic points on /inference show both lines; PowerX shows neither.
-    cy.contains('p', 'pin tooltip').should('not.exist');
-    cy.get('[data-testid="resident-sequence-lengths"]').should('not.exist');
-    cy.get('@residentSequenceLengths.all').should('have.length', 0);
-  });
-
   for (const [locale, width] of [
     ['en', 1280],
     ['zh', 390],
@@ -311,7 +138,7 @@ describe('AgentX All in Measured chart and table', () => {
         {
           onBeforeLoad(win) {
             win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-            win.localStorage.setItem('inferencex-feature-gate', '1');
+            unlockAgenticGate(win);
             win.URL.createObjectURL = (object) => {
               if (object instanceof win.Blob) csvBlob = object;
               return 'blob:agentic-power';

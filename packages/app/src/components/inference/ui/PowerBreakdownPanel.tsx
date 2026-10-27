@@ -6,11 +6,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
-  usePowerXSurface,
   useSetPowerXCompareTarget,
 } from './powerx-surface';
 import { usePowerLayerHighlight } from './power-layer-highlight';
-import { LAYER_STROKE_OPACITY, layerStyle, swatchStyle } from './power-layer-style';
+import { LAYER_STROKE_OPACITY, layerStyle } from './power-layer-style';
 import PowerBreakdownReadout, { type PowerBreakdownReadoutSource } from './PowerBreakdownReadout';
 import PowerPartsList from './PowerPartsList';
 
@@ -35,7 +34,10 @@ import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
+import {
+  SYSTEM_POWER_CATEGORIES,
+  SYSTEM_POWER_MODEL_REVISION,
+} from '@/lib/power/system-power-model';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { escapeHtml } from '@/lib/shared/utils';
 import type { AggDataEntry, InferenceData } from '../types';
@@ -57,10 +59,8 @@ import {
   powerBandsOf,
   powerBreakdownInteractivity,
   powerBreakdownPointLabels,
-  powerLayerEmphasis,
   stackedBandsAt,
   stackPowerBands,
-  SYSTEM_POWER_CATEGORIES,
   type PowerBand,
   type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
@@ -71,9 +71,7 @@ import {
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 
-export type PowerBreakdownView = 'bars' | 'area';
-
-export { layerStyle, swatchStyle, type LayerStyle } from './power-layer-style';
+type PowerBreakdownView = 'bars' | 'area';
 
 const STRINGS = {
   en: {
@@ -88,10 +86,8 @@ const STRINGS = {
     yAxis: 'Power (W/GPU)',
     total: 'All in Measured',
     totalIt: 'IT (no PUE)',
-    share: 'Share',
     measured: 'Measured',
     modeled: 'Modeled',
-    pinned: 'Pinned',
     tdp: 'TDP',
     provisioned: 'All in Provisioned',
     pue: 'PUE',
@@ -105,13 +101,13 @@ const STRINGS = {
     empty:
       'No point in this view has both validated GPU telemetry and a supported system power model.',
     bands: {
-      gpu: ['Measured GPU', 'GPU board power from telemetry'],
-      measuredCpu: ['Measured Grace CPU', 'Grace socket telemetry'],
-      server: ['Server parts', 'CPUs, memory, NICs, NVSwitch, drives'],
-      fansPsu: ['Fans + PSU loss', 'Moves with load'],
-      network: ['Network share', 'Scale-out switch + its optics'],
-      facility: ['Facility overhead', 'PUE'],
-    } satisfies Record<PowerBand, [string, string]>,
+      gpu: 'Measured GPU',
+      measuredCpu: 'Measured Grace CPU',
+      server: 'Server parts',
+      fansPsu: 'Fans + PSU loss',
+      network: 'Network share',
+      facility: 'Facility overhead',
+    } satisfies Record<PowerBand, string>,
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -139,10 +135,8 @@ const STRINGS = {
     yAxis: '功耗（W/GPU）',
     total: 'All in Measured',
     totalIt: 'IT（不含 PUE）',
-    share: '占比',
     measured: '实测',
     modeled: '建模',
-    pinned: '已固定',
     tdp: 'TDP',
     provisioned: 'All in Provisioned',
     pue: 'PUE',
@@ -155,13 +149,13 @@ const STRINGS = {
       `功耗模型版本 ${revision}。各部分均为部署分摊值除以已分配 GPU 数，因此堆叠总和等于图表中的 All in Measured W/GPU。TDP 和 All in Provisioned 为额定参考值，并非实测。`,
     empty: '当前视图中没有同时具备有效 GPU 遥测和受支持系统功耗模型的数据点。',
     bands: {
-      gpu: ['实测 GPU', '遥测得到的 GPU 板卡功耗'],
-      measuredCpu: ['实测 Grace CPU', 'Grace 插槽遥测'],
-      server: ['服务器部件', 'CPU、内存、网卡、NVSwitch、硬盘'],
-      fansPsu: ['风扇 + 电源损耗', '随负载变化'],
-      network: ['网络分摊', 'Scale-out 交换机及其光模块'],
-      facility: ['机房开销', 'PUE'],
-    } satisfies Record<PowerBand, [string, string]>,
+      gpu: '实测 GPU',
+      measuredCpu: '实测 Grace CPU',
+      server: '服务器部件',
+      fansPsu: '风扇 + 电源损耗',
+      network: '网络分摊',
+      facility: '机房开销',
+    } satisfies Record<PowerBand, string>,
     categories: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -210,7 +204,6 @@ const PHONE_PLOT_HEIGHT = 260;
 /** Minimum free width around a column before its total label is drawn. */
 const TOTAL_LABEL_MIN_GAP_PX = 46;
 const MIN_BAR_PX = 6;
-const X_TICK_SPACING_PX = 70;
 const REFERENCE_LABEL_CHAR_PX = 6.5;
 const REFERENCE_LABEL_CLEARANCE_PX = 34;
 const BAR_GAP_FRACTION = 0.72;
@@ -252,7 +245,7 @@ interface Column {
  * cluster stays separable while isolated low-concurrency bars stay readable;
  * width carries no data. Each column's hover band runs to the midpoints.
  */
-export function interactivityColumnLayout(positions: readonly number[], plotWidth: number) {
+function interactivityColumnLayout(positions: readonly number[], plotWidth: number) {
   return positions.map((center, index) => {
     const left = index === 0 ? 0 : (positions[index - 1] + center) / 2;
     const right = index === positions.length - 1 ? plotWidth : (center + positions[index + 1]) / 2;
@@ -314,7 +307,7 @@ function tooltipHtml(
   const rows = stackPowerBands(entry, bands)
     .toReversed()
     .map((band) => {
-      const [label] = t.bands[band.key];
+      const label = t.bands[band.key];
       const basis = MEASURED_POWER_BANDS.has(band.key) ? t.measured : t.modeled;
       const bold = highlight?.band === band.key && highlight.category === null;
       const parts = bandPartsAt(entry, band.key);
@@ -400,7 +393,6 @@ function BreakdownChart({
   view,
   xLabel,
   t,
-  evenSpacing = false,
   markedIndex = null,
   onColumnClick,
   guideAt = null,
@@ -425,11 +417,6 @@ function BreakdownChart({
   t: (typeof STRINGS)['en'];
   /** What the stack total is called in the tooltip (All in Measured, or IT without PUE). */
   totalLabel?: string;
-  /**
-   * One evenly spaced slot per benchmark point, in interactivity order. A sweep's
-   * points bunch up at low interactivity, so true positions leave slivers there.
-   */
-  evenSpacing?: boolean;
   /** Column the chip comparison above is reading; outlined so the two views line up. */
   markedIndex?: number | null;
   /** Clicking a column pins the chip comparison's row for this chip to that point. */
@@ -459,18 +446,12 @@ function BreakdownChart({
     label: labels[index],
     entry,
   }));
-  const positionOf = (column: Column) =>
-    evenSpacing ? Number(column.key) : column.entry.interactivity;
-  const xValues = columns.map(positionOf);
-  const xMin = Math.min(...xValues);
-  const xMax = Math.max(...xValues);
-  const xPad = Math.max((xMax - xMin) * 0.06, xMax * 0.02);
-  const xDomain: [number, number] = evenSpacing
-    ? [-0.6, columns.length - 0.4]
-    : [Math.max(0, xMin - xPad), xMax + xPad];
+  // One evenly spaced slot per benchmark point, in interactivity order. A sweep's
+  // points bunch up at low interactivity, so true positions leave slivers there.
+  const xDomain: [number, number] = [-0.6, columns.length - 0.4];
   const layoutFor = (x: ContinuousScale, width: number) =>
     interactivityColumnLayout(
-      columns.map((column) => x(positionOf(column))),
+      columns.map((column) => x(Number(column.key))),
       width,
     );
   // The slider's guide: on even spacing it sits between the two columns that bracket the
@@ -490,7 +471,6 @@ function BreakdownChart({
         );
   const guidePosition = (): number | null => {
     if (guideAt === null || !(guideAt > 0) || columns.length === 0) return null;
-    if (!evenSpacing) return Math.min(xDomain[1], Math.max(xDomain[0], guideAt));
     if (guideAt <= interactivities[0]) return 0;
     if (guideAt >= interactivities.at(-1)!) return columns.length - 1;
     const right = interactivities.findIndex((value) => value >= guideAt);
@@ -523,7 +503,7 @@ function BreakdownChart({
       ...references.map((reference) => reference.value),
     ) * 1.08;
   const bands = powerBandsOf(series.categories);
-  const nameOf = (band: PowerBand) => t.bands[band][0];
+  const nameOf = (band: PowerBand) => t.bands[band];
   const fill = (band: PowerBand) =>
     isHatchedBand(band) ? `url(#${hatchId(sectionId, band)})` : color;
   const hatchedBands = bands.filter(isHatchedBand);
@@ -1275,21 +1255,13 @@ function BreakdownChart({
       yScale={{ type: 'linear', domain: [0, yMax], nice: true }}
       xAxis={{
         label: xLabel,
-        ...(evenSpacing && {
-          // Each slot is labelled with its point's interactivity; thin out on narrow plots.
-          tickFormat: (d: d3.AxisDomain) => watts(columns[Number(d)]?.entry.interactivity ?? 0),
-        }),
-        // One tick per ~70px so phone widths never run interactivity labels together.
+        // Each slot is labelled with its point's interactivity; thin out on narrow plots.
+        tickFormat: (d: d3.AxisDomain) => watts(columns[Number(d)]?.entry.interactivity ?? 0),
         tickValues: (scale) => {
-          if (evenSpacing) {
-            const [start, end] = (scale as d3.ScaleLinear<number, number>).range();
-            const room = Math.abs(end - start) / Math.max(1, columns.length);
-            const step = Math.max(1, Math.ceil(44 / Math.max(1, room)));
-            return columns.map((_, index) => index).filter((index) => index % step === 0);
-          }
-          const linear = scale as d3.ScaleLinear<number, number>;
-          const [start, end] = linear.range();
-          return linear.ticks(Math.max(2, Math.floor(Math.abs(end - start) / X_TICK_SPACING_PX)));
+          const [start, end] = (scale as d3.ScaleLinear<number, number>).range();
+          const room = Math.abs(end - start) / Math.max(1, columns.length);
+          const step = Math.max(1, Math.ceil(44 / Math.max(1, room)));
+          return columns.map((_, index) => index).filter((index) => index % step === 0);
         },
       }}
       yAxis={{ label: t.yAxis, tickCount: 5 }}
@@ -1319,10 +1291,9 @@ export default function PowerBreakdownPanel({
   contextLabel,
   xField,
   xLabel,
-  selectedKey: controlledKey,
+  selectedKey,
   onSelectKey,
   heading,
-  compact = false,
   onCollapse,
   layerHighlight,
   onLayerHighlight,
@@ -1336,24 +1307,22 @@ export default function PowerBreakdownPanel({
   overlayData?: readonly InferenceData[];
   contextLabel?: string;
   /**
-   * Inline drill-down under a chip-compare bar (PowerX v2): the compare legend above the
-   * bars already explains the stack, so the legend list is dropped and the title row is
-   * one line; the Hardware select and the Stacked bars | Stacked area toggle stay, and a
-   * Collapse button closes it.
+   * Inline drill-down under a chip-compare bar: the compare legend above the bars already
+   * explains the stack, so the title row is one line; the Hardware select and the Stacked
+   * bars | Stacked area toggle stay, and a Collapse button closes it.
    */
-  compact?: boolean;
-  onCollapse?: () => void;
-  /** Controlled hardware line (series key); the panel keeps its own choice when omitted. */
-  selectedKey?: string | null;
-  onSelectKey?: (key: string) => void;
+  onCollapse: () => void;
+  /** The hardware line (series key) shown. */
+  selectedKey: string;
+  onSelectKey: (key: string) => void;
   /** Overrides the panel title and subtitle, e.g. as a drill-down under a comparison. */
   heading?: { title: string; subtitle: string };
   /** The main chart's x field; the breakdown uses it when it is an interactivity axis. */
   xField?: keyof AggDataEntry;
   xLabel?: string;
-  /** Shared with the chip comparison's legend on the Where view; own state when omitted. */
-  layerHighlight?: PowerLayerHighlight | null;
-  onLayerHighlight?: (next: PowerLayerHighlight | null) => void;
+  /** Shared with the chip comparison's legend on the Where view. */
+  layerHighlight: PowerLayerHighlight | null;
+  onLayerHighlight: (next: PowerLayerHighlight | null) => void;
   /** Chips compared at a pinned point (series key → concurrency) instead of the slider's. */
   comparedPoints?: PowerComparedPoints;
   /** A column was clicked: the owner pins this chip's compared point to it. */
@@ -1363,7 +1332,6 @@ export default function PowerBreakdownPanel({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const powerXSurface = usePowerXSurface();
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
   const { getUrlParam, setUrlParams } = useUrlState();
@@ -1392,19 +1360,11 @@ export default function PowerBreakdownPanel({
       })),
     [data, overlayData, runIndexByUrl, unofficialRunInfos, locale, interactivity, includeFacility],
   );
-  const [ownKey, setOwnKey] = useState<string | null>(null);
-  const selectedKey = controlledKey === undefined ? ownKey : controlledKey;
-  const setSelectedKey = (key: string) => {
-    setOwnKey(key);
-    onSelectKey?.(key);
-  };
   const series = breakdowns.find((entry) => entry.key === selectedKey) ?? breakdowns[0] ?? null;
-  // The point the chip comparison reads for this chip: its pinned point, else (PowerX)
-  // the one nearest the shared slider. Outlined in the plot; a click pins another.
+  // The point the chip comparison reads for this chip: its pinned point, else the one
+  // nearest the shared slider. Outlined in the plot; a click pins another.
   const compareTarget = usePowerXCompareTarget();
-  const comparedAt = powerXSurface
-    ? (compareTarget ?? defaultComparisonInteractivity(breakdowns))
-    : null;
+  const comparedAt = compareTarget ?? defaultComparisonInteractivity(breakdowns);
   const pinnedConcurrency = series ? comparedPoints?.[series.key] : undefined;
   const pinnedEntry =
     series && pinnedConcurrency !== undefined
@@ -1418,10 +1378,9 @@ export default function PowerBreakdownPanel({
   const markedIndex = series && comparedEntry ? series.points.indexOf(comparedEntry) : -1;
   // The parts list reads the compared point; off the comparison's range (a chip picked
   // in the Hardware select that has no bar near the slider) it reads the nearest point.
-  const listAt = compareTarget ?? defaultComparisonInteractivity(breakdowns);
   const listEntry =
     comparedEntry ??
-    (series && listAt !== null ? nearestBreakdownPoint(series, listAt) : null) ??
+    (series && comparedAt !== null ? nearestBreakdownPoint(series, comparedAt) : null) ??
     series?.points.at(-1) ??
     null;
   const sectionId = `${chartId}-power-breakdown`;
@@ -1442,11 +1401,11 @@ export default function PowerBreakdownPanel({
   const layers = usePowerLayerHighlight(layerHighlight, onLayerHighlight);
   const coarsePointer = useIsCoarsePointer();
   const phone = useIsMobileViewport();
-  // PowerX on a touch-primary device: a drag across the plot scrubs the readout above
+  // On a touch-primary device: a drag across the plot scrubs the readout above
   // it, a tap holds the column (pins this chip's compared point) and an explicit
   // button moves the slider; with a mouse the plot keeps its hover label and click.
   const setCompareTarget = useSetPowerXCompareTarget();
-  const touchScrub = powerXSurface && coarsePointer;
+  const touchScrub = coarsePointer;
   const [scrubIndex, setScrubIndex] = useState<number | null>(null);
   const scrubBeforeGesture = useRef<number | null>(null);
   // A new compared point (slider, pin, unpin) or another chip ends the scrub: state
@@ -1518,23 +1477,19 @@ export default function PowerBreakdownPanel({
 
   return (
     <section id={sectionId} className="min-w-0 space-y-3" data-testid="power-breakdown-panel">
-      <div className={compact ? 'flex flex-wrap items-baseline gap-x-3 gap-y-1' : 'space-y-1'}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Heading as="h3" level="card">
           {heading?.title ?? t.title}
         </Heading>
-        <p className={compact ? 'text-xs text-muted-foreground' : 'text-sm text-muted-foreground'}>
-          {heading?.subtitle ?? t.subtitle}
-        </p>
-        {compact && onCollapse && (
-          <button
-            type="button"
-            onClick={onCollapse}
-            data-testid="power-breakdown-collapse"
-            className="ml-auto min-h-11 rounded-md border border-border/60 px-3 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-8"
-          >
-            {t.collapse}
-          </button>
-        )}
+        <p className="text-xs text-muted-foreground">{heading?.subtitle ?? t.subtitle}</p>
+        <button
+          type="button"
+          onClick={onCollapse}
+          data-testid="power-breakdown-collapse"
+          className="ml-auto min-h-11 rounded-md border border-border/60 px-3 text-xs font-medium text-muted-foreground hover:text-foreground md:min-h-8"
+        >
+          {t.collapse}
+        </button>
       </div>
       <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {series === null ? (
@@ -1552,7 +1507,7 @@ export default function PowerBreakdownPanel({
               <Select
                 value={series.key}
                 onValueChange={(value) => {
-                  setSelectedKey(value);
+                  onSelectKey(value);
                   track('inference_power_breakdown_source_selected');
                 }}
               >
@@ -1594,63 +1549,6 @@ export default function PowerBreakdownPanel({
               ]}
             />
           </div>
-          {!compact && (
-            <ul
-              className="flex flex-wrap gap-x-1 gap-y-0.5 text-xs"
-              data-testid="power-breakdown-legend"
-            >
-              {/* Top layer first, as the stack reads. */}
-              {powerBandsOf(series.categories)
-                .toReversed()
-                .map((band) => {
-                  const [label, description] = t.bands[band];
-                  const detail =
-                    band === 'facility' ? `${description} ${series.points[0].pue}` : description;
-                  const basis = MEASURED_POWER_BANDS.has(band) ? t.measured : t.modeled;
-                  const pinned =
-                    layers.highlight?.pinned === true &&
-                    layers.highlight.band === band &&
-                    layers.highlight.category === null;
-                  const emphasis = powerLayerEmphasis(band, layers.highlight);
-                  return (
-                    <li key={band} className="flex min-w-0">
-                      <button
-                        type="button"
-                        data-testid="power-breakdown-legend-item"
-                        data-band={band}
-                        data-emphasis={emphasis}
-                        aria-pressed={pinned}
-                        onMouseEnter={() => layers.hover(bandTarget(band))}
-                        onMouseLeave={() => layers.hover(null)}
-                        onFocus={() => layers.hover(bandTarget(band))}
-                        onBlur={() => layers.hover(null)}
-                        onClick={() => layers.togglePin(bandTarget(band))}
-                        className={`flex min-h-7 min-w-0 items-baseline gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
-                          pinned ? 'bg-muted ring-1 ring-border' : ''
-                        }`}
-                      >
-                        <span
-                          aria-hidden
-                          className="inline-block size-3 shrink-0 translate-y-0.5 rounded-[2px]"
-                          title={`${basis}${pinned ? ` · ${t.pinned}` : ''}`}
-                          style={swatchStyle(band, color, layers.highlight)}
-                        />
-                        <span
-                          className={`shrink-0 whitespace-nowrap ${
-                            emphasis === 'faded' ? 'text-muted-foreground' : 'font-medium'
-                          }`}
-                        >
-                          {label}
-                        </span>
-                        <span className="min-w-0 text-muted-foreground">
-                          {detail} · {basis}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-            </ul>
-          )}
           {/* Overview left, detail right from `lg`; the list stacks under the plot below. */}
           <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start">
             <div className="min-w-0">
@@ -1673,7 +1571,6 @@ export default function PowerBreakdownPanel({
                 view={view}
                 xLabel={interactivityLabel}
                 t={t}
-                evenSpacing={powerXSurface}
                 totalLabel={includeFacility ? t.total : t.totalIt}
                 markedIndex={markedIndex >= 0 ? markedIndex : null}
                 onColumnClick={

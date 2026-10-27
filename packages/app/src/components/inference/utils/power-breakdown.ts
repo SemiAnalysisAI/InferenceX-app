@@ -28,13 +28,7 @@ import {
  * Measured W/GPU exactly.
  */
 
-export { SYSTEM_POWER_CATEGORIES };
 export type { SystemPowerCategory };
-
-/** Drawn bottom-up; measured parts sit under the modeled ones. */
-export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = SYSTEM_POWER_CATEGORIES;
-
-export const MEASURED_POWER_CATEGORIES = MEASURED_SYSTEM_POWER_CATEGORIES;
 
 /**
  * The plot draws six layers, not twelve parts (PowerX Figure 1's boxes):
@@ -73,7 +67,7 @@ export function powerBandOf(category: SystemPowerCategory): PowerBand {
 /** The layers read from telemetry; every other layer is the model's estimate. */
 export const MEASURED_POWER_BANDS: ReadonlySet<PowerBand> = new Set(
   POWER_BANDS.filter((band) =>
-    POWER_BAND_CATEGORIES[band].every((category) => MEASURED_POWER_CATEGORIES.has(category)),
+    POWER_BAND_CATEGORIES[band].every((category) => MEASURED_SYSTEM_POWER_CATEGORIES.has(category)),
   ),
 );
 
@@ -121,7 +115,7 @@ export const POWER_BAND_OPACITY: Record<PowerBand, number> = {
 };
 
 /** Background behind the facility hatch, so the stripes sit on a tint of the chip colour. */
-export const HATCH_OPACITY = 0.18;
+const HATCH_OPACITY = 0.18;
 
 /** Modeled layers are hatched (estimates), measured layers solid. */
 export const isHatchedBand = (band: PowerBand) => !MEASURED_POWER_BANDS.has(band);
@@ -190,7 +184,7 @@ export function powerLayerEmphasis(
 }
 
 /** A parts-list row: its own component, a sibling in the highlighted band, or neither. */
-export type PowerPartEmphasis = 'highlighted' | 'band' | 'plain';
+type PowerPartEmphasis = 'highlighted' | 'band' | 'plain';
 
 export function powerPartEmphasis(
   category: SystemPowerCategory,
@@ -237,7 +231,7 @@ export interface PowerBreakdownSeries {
 
 const DERIVED_INTERACTIVITY = /^p\d+_e2e_norm_intvty$/u;
 
-export interface PowerBreakdownInteractivity {
+interface PowerBreakdownInteractivity {
   /** The interactivity field the x positions come from. */
   field: string;
   /** True when that is the main chart's own x-axis (so its axis label applies). */
@@ -268,7 +262,7 @@ export function powerBreakdownInteractivity(
   return { field: 'median_intvty', fromChart: false, value: (point) => point.median_intvty };
 }
 
-export function powerBreakdownForPoint(
+function powerBreakdownForPoint(
   point: InferenceData,
   config?: EqualServiceSource,
   interactivity: PowerBreakdownInteractivity = powerBreakdownInteractivity(),
@@ -345,7 +339,7 @@ export function buildPowerBreakdowns(
           .filter(Boolean)
           .join(' '),
         points: sorted,
-        categories: POWER_BREAKDOWN_STACK_ORDER.filter((category) =>
+        categories: SYSTEM_POWER_CATEGORIES.filter((category) =>
           sorted.some((entry) => entry.wattsPerGpu[category] > 0),
         ),
         tdpWattsPerGpu: isPositive(specs.tdp) ? specs.tdp : null,
@@ -360,7 +354,7 @@ export interface PowerBreakdownDisplaySeries extends PowerBreakdownSeries {
   overlayRunIndex?: number;
 }
 
-export interface PowerBreakdownOverlayInput {
+interface PowerBreakdownOverlayInput {
   points: readonly InferenceData[];
   runIndexByUrl: Record<string, number>;
   runInfos: readonly OverlayRunIdentity[];
@@ -476,7 +470,7 @@ export function breakdownItWattsPerGpu(entry: Pick<PowerBreakdownPoint, 'wattsPe
   );
 }
 
-export interface StackedSegment<K extends string = PowerBand> {
+interface StackedSegment<K extends string = PowerBand> {
   key: K;
   y0: number;
   y1: number;
@@ -568,7 +562,7 @@ export function powerPartRows(
   });
 }
 
-export interface SparklineGeometry {
+interface SparklineGeometry {
   /** Closed area path from the baseline. */
   area: string;
   /** The top edge alone, for a 1 px stroke. */
@@ -607,9 +601,7 @@ export function sparklineGeometry(
   return { area, line, dot: { x: f(selected[0]), y: f(selected[1]) } };
 }
 
-export interface PowerBreakdownComparisonRow<
-  S extends PowerBreakdownSeries = PowerBreakdownSeries,
-> {
+interface PowerBreakdownComparisonRow<S extends PowerBreakdownSeries = PowerBreakdownSeries> {
   series: S;
   /**
    * The compared point: the one pinned for this chip, else the series' benchmark

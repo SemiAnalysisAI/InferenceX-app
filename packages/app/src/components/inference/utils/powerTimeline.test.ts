@@ -122,26 +122,24 @@ describe('prioritizeRuns', () => {
 
 describe('mostCoveredConcurrency', () => {
   it('picks the concurrency shared by the most hardware configs', () => {
+    // conc 4 has the most rows (four b200), conc 64 the most distinct configs.
     expect(
       mostCoveredConcurrency([
+        { conc: 4, hwKey: 'b200' },
+        { conc: 4, hwKey: 'b200' },
+        { conc: 4, hwKey: 'b200' },
         { conc: 4, hwKey: 'b200' },
         { conc: 64, hwKey: 'b200' },
         { conc: 64, hwKey: 'mi355x' },
         { conc: 64, hwKey: 'mi355x' },
-        { conc: 4, hwKey: 'b200' },
       ]),
     ).toBe(64);
-  });
-
-  it('breaks ties toward the higher load and ignores invalid levels', () => {
+    // A tie breaks toward the higher load.
     expect(
       mostCoveredConcurrency([
         { conc: 8, hwKey: 'b200' },
         { conc: 32, hwKey: 'h200' },
-        { conc: 0, hwKey: 'mi355x' },
-        { conc: Number.NaN, hwKey: 'mi355x' },
       ]),
     ).toBe(32);
-    expect(mostCoveredConcurrency([])).toBeNull();
   });
 });

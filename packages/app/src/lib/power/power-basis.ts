@@ -36,16 +36,8 @@ export const POWER_COUNT_LABELS: Record<PowerBasis, { en: string; zh: string }> 
  * power (GPU plus the modeled rest of the server and the network share, no
  * PUE) or facility power (IT × PUE). Rated bounds tag the boundary they rate.
  */
-export const POWER_BASIS_TAGS = ['gpu', 'it', 'facility'] as const;
+const POWER_BASIS_TAGS = ['gpu', 'it', 'facility'] as const;
 export type PowerBasisTag = (typeof POWER_BASIS_TAGS)[number];
-
-export const POWER_BASIS_TAG_OF: Record<PowerBasis, PowerBasisTag> = {
-  'gpu-measured': 'gpu',
-  'gpu-provisioned': 'gpu',
-  'utility-provisioned': 'facility',
-  'it-modeled': 'it',
-  'utility-modeled': 'facility',
-};
 
 export const POWER_BASIS_TAG_LABELS: Record<PowerBasisTag, { en: string; zh: string }> = {
   gpu: { en: 'GPU', zh: 'GPU' },

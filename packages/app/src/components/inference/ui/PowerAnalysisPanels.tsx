@@ -64,7 +64,6 @@ export default function PowerAnalysisPanels({
   contextLabel,
   showRoles = false,
   placement = 'after',
-  layout = 'stacked',
 }: {
   data: InferenceData[];
   overlayData?: readonly InferenceData[];
@@ -79,11 +78,6 @@ export default function PowerAnalysisPanels({
    * and the boundary line chart follows as supporting detail.
    */
   placement?: 'before' | 'after';
-  /**
-   * `inline` (PowerX v2): the chip comparison is the only visual; clicking a bar opens
-   * that chip's drill-down under it instead of a second panel below the list.
-   */
-  layout?: 'stacked' | 'inline';
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -130,10 +124,10 @@ export default function PowerAnalysisPanels({
     [overlaySourceKeys, runIndexByUrl, resolveColor, sourceShade],
   );
   const [compareKey, setCompareKey] = useState<string | null>(null);
-  // Inline layout: the drill-down is open under the compared chip (the one nearest the
-  // slider) from the first render and follows the slider to another chip. A clicked bar
-  // or the Hardware select pins it to a chip until the slider moves on; Collapse hides it
-  // for the rest of the session (clicking a bar opens it again).
+  // The drill-down is open under the compared chip (the one nearest the slider) from the
+  // first render and follows the slider to another chip. A clicked bar or the Hardware
+  // select pins it to a chip until the slider moves on; Collapse hides it for the rest of
+  // the session (clicking a bar opens it again).
   const [nearestKey, setNearestKey] = useState<string | null>(null);
   const [pinned, setPinned] = useState<{ key: string; nearest: string | null } | null>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -211,7 +205,6 @@ export default function PowerAnalysisPanels({
   // The drill-down follows the chip picked in the comparison, else its first chip.
   const drillSeries =
     breakdownSeries.find((entry) => entry.key === compareKey) ?? breakdownSeries[0] ?? null;
-  const breakdownSeriesLabel = drillSeries?.label ?? null;
 
   return (
     <div
@@ -231,12 +224,11 @@ export default function PowerAnalysisPanels({
           sources={sources}
           colorOf={colorOf}
         />
-      ) : layout === 'inline' ? (
+      ) : (
         <PowerChipCompare
           data={data}
           overlayData={overlayData}
           xField={xField}
-          compact
           layerHighlight={layerHighlight}
           onLayerHighlight={setLayerHighlight}
           selectedKey={drillSeries?.key ?? null}
@@ -269,7 +261,6 @@ export default function PowerAnalysisPanels({
                 comparedPoints={comparedPoints}
                 onPinComparedPoint={pinComparedPoint}
                 onUnpinComparedPoint={unpinComparedPoint}
-                compact
                 layerHighlight={layerHighlight}
                 onLayerHighlight={setLayerHighlight}
                 onCollapse={() => setCollapsed(true)}
@@ -282,41 +273,6 @@ export default function PowerAnalysisPanels({
             );
           }}
         />
-      ) : (
-        <>
-          <PowerChipCompare
-            data={data}
-            overlayData={overlayData}
-            xField={xField}
-            selectedKey={drillSeries?.key ?? null}
-            onSelectKey={setCompareKey}
-            layerHighlight={layerHighlight}
-            onLayerHighlight={setLayerHighlight}
-            comparedPoints={comparedPoints}
-            onUnpinComparedPoint={unpinComparedPoint}
-            onTargetChange={clearComparedPoints}
-          />
-          <PowerBreakdownPanel
-            chartId={chartId}
-            data={data}
-            overlayData={overlayData}
-            contextLabel={contextLabel}
-            layerHighlight={layerHighlight}
-            onLayerHighlight={setLayerHighlight}
-            xField={xField}
-            xLabel={xLabel}
-            selectedKey={drillSeries?.key ?? null}
-            onSelectKey={setCompareKey}
-            comparedPoints={comparedPoints}
-            onPinComparedPoint={pinComparedPoint}
-            onUnpinComparedPoint={unpinComparedPoint}
-            heading={
-              breakdownSeriesLabel
-                ? { title: t.drillTitle(breakdownSeriesLabel), subtitle: drillSubtitle }
-                : undefined
-            }
-          />
-        </>
       )}
     </div>
   );

@@ -102,7 +102,7 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   (`i_pbview`), TDP and All in Provisioned reference lines and PNG/CSV buttons) is open
   inline under that chip's bar from the first render and follows the slider to whichever
   chip is nearest; clicking a bar or picking another chip in the Hardware select moves it,
-  Collapse hides it for the session (`PowerAnalysisPanels` `layout="inline"`). The stack
+  Collapse hides it for the session (`PowerAnalysisPanels`). The stack
   legend above the bars is the only one. There is no boundary line chart on this view: the
   three measured boundaries are compared on Power draw under Count: All.
 - Chip rows keep a fixed order: official lines in `HW_REGISTRY` order (the chart legend's,
@@ -310,7 +310,8 @@ area by default) draws one hardware line at a time, grouped exactly like the sca
 (`hwKey` + precision); the vendor color marks the Hardware select dot, the area's top edge and its
 total dots. The x-axis is the chart's own interactivity
 axis (including the AgentX P90/P75 trace-derived axes), or median interactivity when the chart
-plots something else, so a bar sits where its point sits in the scatter. Each point gets a
+plots something else; points sit in evenly spaced slots labelled with their interactivity, so
+a sweep's points bunched at low interactivity stay readable. Each point gets a
 stacked bar, or a point on a stacked area, of its All in Measured W/GPU split by
 `deploymentBreakdownWatts` (see [system power](./powerx-system-power.md#per-point-breakdown)).
 The plot draws six layers, not twelve parts (`POWER_BANDS` and `powerBandsOf` in
@@ -321,8 +322,8 @@ and Facility overhead (`facility`, only when the facility is counted); an empty 
 out. Layers step down in opacity of the hardware color like the Profit Estimator's stacked
 bars (`POWER_BAND_OPACITY`: 0.9, 0.72, 0.5, 0.34, 0.2, hatch tint 0.18), and every modeled
 layer is hatched at its own stripe angle (`HATCH_ANGLE`: 45°, 135°, vertical, horizontal for
-the facility) like its loss segment, while measured layers are solid; the legend repeats each
-layer's swatch with its description and Measured or Modeled. The per-column tooltip lists the
+the facility) like its loss segment, while measured layers are solid; the chip comparison's
+legend repeats each layer's swatch with Measured or Modeled. The per-column tooltip lists the
 layers top first with their subtotal in bold, and the parts of a layer that folds several
 (Server parts, Fans + PSU loss) under it. The per-component detail lives in the parts list
 (`ui/PowerPartsList.tsx`) beside the plot (under it below `lg`): one row per non-empty part of

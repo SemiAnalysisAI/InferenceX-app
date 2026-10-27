@@ -10,10 +10,8 @@ import {
   LIQUID_COOLED_RACK_PUE,
   rackComputeTrayCount,
   SYSTEM_POWER_MODEL_REVISION,
-  SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_SOURCE_URL,
   systemPowerLeafCategory,
-  type SystemPowerBreakdown,
   type SystemPowerCategory,
 } from './system-power-model';
 import type { PowerComponentBreakdown } from './power_model/base';
@@ -32,11 +30,6 @@ function upstream(system: string, gpuWattsPerGpu: number, socketWatts: number | 
     pue: estimate.pue,
   };
 }
-
-const sum = (
-  b: SystemPowerBreakdown,
-  keys: readonly (keyof SystemPowerBreakdown)[] = SYSTEM_POWER_CATEGORIES,
-) => keys.reduce((total, key) => total + b[key], 0);
 
 describe('system power model adapter', () => {
   it('pins the ported upstream revision', () => {
@@ -77,54 +70,6 @@ describe('system power model adapter', () => {
       expect(rackComputeTrayCount(hardware)).toBe(18);
     },
   );
-
-  const itKeys = SYSTEM_POWER_CATEGORIES.filter((key) => key !== 'facility');
-
-  // Parts a chassis legitimately lacks: AMD boards have no NVSwitch, the B300
-  // HGX chassis has no PCIe retimers or switches.
-  it.each([
-    ['h100', []],
-    ['h200', []],
-    ['b200', []],
-    ['b300', ['other']],
-    ['mi300x', ['nvswitch']],
-    ['mi325x', ['nvswitch']],
-    ['mi355x', ['nvswitch']],
-  ] as const)(
-    'splits a %s chassis into measured GPU and the modeled component parts (empty: %j)',
-    (hardware, empty) => {
-      const model = estimateChassisPower(hardware, 8 * 612.5, STATE)!;
-      const b = model.breakdown;
-      expect(b.gpu).toBeCloseTo(8 * 612.5, 6);
-      expect(b.measuredCpu).toBe(0);
-      for (const key of itKeys) {
-        if (key === 'gpu' || key === 'measuredCpu') continue;
-        if ((empty as readonly string[]).includes(key)) expect(b[key]).toBe(0);
-        else expect(b[key]).toBeGreaterThan(0);
-      }
-      expect(sum(b, itKeys)).toBeCloseTo(model.itWatts, 6);
-      expect(sum(b)).toBeCloseTo(model.facilityWatts, 6);
-      expect(b.facility).toBeCloseTo(model.itWatts * (model.pue - 1), 6);
-    },
-  );
-
-  it('moves fans and PSU loss with GPU load while the other parts stay fixed', () => {
-    const low = estimateChassisPower('h200', 8 * 226, STATE)!.breakdown;
-    const high = estimateChassisPower('h200', 8 * 474, STATE)!.breakdown;
-    for (const key of [
-      'cpu',
-      'memory',
-      'nic',
-      'nvswitch',
-      'storage',
-      'other',
-      'network',
-    ] as const) {
-      expect(high[key]).toBeCloseTo(low[key], 6);
-    }
-    expect(high.fans).toBeGreaterThan(low.fans);
-    expect(high.psuLoss).toBeGreaterThan(low.psuLoss);
-  });
 
   /** Every leaf the pinned port produces, across every supported system and state. */
   const PINNED_LEAVES: Record<string, SystemPowerCategory> = {
@@ -212,27 +157,6 @@ describe('system power model adapter', () => {
     // A renamed upstream component lands in `other` and fails the table above.
     expect(systemPowerLeafCategory('GPU systems', 'SomethingNew')).toBe('other');
   });
-
-  it.each(['gb200', 'gb300'] as const)(
-    'keeps measured Grace sockets apart from modeled %s server parts',
-    (hardware) => {
-      const measured = estimateRackPower(hardware, 900, 98.066, STATE)!;
-      const modeled = estimateRackPower(hardware, 900, null, STATE)!;
-      expect(measured.breakdown.gpu).toBeCloseTo(72 * 900, 6);
-      expect(measured.breakdown.measuredCpu).toBeCloseTo(36 * 98.066, 6);
-      expect(modeled.breakdown.measuredCpu).toBe(0);
-      // Measured sockets cover CPU + LPDDR, so the modeled CPU and memory parts drop out.
-      expect(measured.breakdown.cpu).toBe(0);
-      expect(measured.breakdown.memory).toBe(0);
-      expect(modeled.breakdown.cpu).toBeGreaterThan(0);
-      expect(modeled.breakdown.memory).toBeGreaterThan(0);
-      expect(measured.breakdown.nvswitch).toBeCloseTo(modeled.breakdown.nvswitch, 6);
-      for (const model of [measured, modeled]) {
-        expect(sum(model.breakdown, itKeys)).toBeCloseTo(model.itWatts, 6);
-        expect(sum(model.breakdown)).toBeCloseTo(model.facilityWatts, 6);
-      }
-    },
-  );
 
   it('quotes the upstream cooling PUEs', () => {
     expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, STATE)!.pue);

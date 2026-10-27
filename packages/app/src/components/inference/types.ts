@@ -320,12 +320,6 @@ export interface ScatterGraphProps {
   runNumbering?: Map<string, number>;
   /** Plot height in px; the default is the shared 600 px chart height. */
   plotHeight?: number;
-  /** Extra sidebar-legend controls rendered between the series and the switches (PowerX). */
-  legendControls?: React.ReactNode;
-  /** Extra sidebar-legend content rendered after the switches (PowerX). */
-  legendFooter?: React.ReactNode;
-  /** Folds the sidebar legend into one tappable row with this label on phones. */
-  legendMobileLabel?: string;
 }
 
 export interface LegendItemProps {

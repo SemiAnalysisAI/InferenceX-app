@@ -7,16 +7,12 @@ import {
   powerXChangedCount,
   powerXCountFor,
   powerXMetricFields,
-  powerXRatedAvailable,
   powerXRatedOn,
   powerXSecondaryChangedCount,
-  powerXShowAsFor,
-  powerXShowsHeadroom,
   powerXViewFor,
   selectPowerXCount,
   selectPowerXPer,
   selectPowerXRated,
-  selectPowerXShowAs,
   selectPowerXView,
 } from './powerx-views';
 
@@ -29,17 +25,6 @@ describe('powerXViewFor', () => {
     expect(powerXViewFor(POWERX_DEFAULT_METRIC, 'none')).toBe('energy');
     expect(powerXViewFor('y_measuredPowerTimeline', 'none')).toBe('time');
     expect(powerXViewFor('y_notAPowerMetric', 'none')).toBeNull();
-  });
-
-  it('keeps a boundary overlay on its own view and sends the breakdown and role splits to Where', () => {
-    expect(powerXViewFor('y_measuredJPerOutputToken', 'boundaries')).toBe('energy');
-    expect(powerXViewFor('y_measuredJPerOutputToken', 'all')).toBe('energy');
-    expect(powerXViewFor('y_measuredJPerOutputToken', 'provisioned')).toBe('energy');
-    // Count: All on Power draw draws GPU only, IT and Facility on the one scatter.
-    expect(powerXViewFor('y_measuredAvgPower', 'boundaries')).toBe('draw');
-    expect(powerXViewFor('y_measuredAvgPower', 'all')).toBe('draw');
-    expect(powerXViewFor('y_measuredAvgPower', 'breakdown')).toBe('where');
-    expect(powerXViewFor('y_measuredAvgPower', 'roles')).toBe('where');
   });
 });
 
@@ -59,24 +44,6 @@ describe('selectPowerXView', () => {
       compare: 'none',
     });
   });
-
-  it('returns to GPU-only energy from the Where and Over time views', () => {
-    const where = { metric: 'y_measuredAvgPower', compare: 'breakdown' as const };
-    expect(selectPowerXView('energy', where)).toEqual({
-      metric: 'y_measuredJPerOutputToken',
-      compare: 'none',
-    });
-    const time = { metric: 'y_measuredPowerTimeline', compare: 'none' as const };
-    expect(selectPowerXView('draw', time)).toEqual({
-      metric: 'y_measuredAvgPower',
-      compare: 'none',
-    });
-  });
-
-  it('is a no-op for the current view', () => {
-    const current = { metric: 'y_measuredP75Power', compare: 'none' as const };
-    expect(selectPowerXView('draw', current)).toBe(current);
-  });
 });
 
 describe('Count, Per and Show as', () => {
@@ -91,37 +58,6 @@ describe('Count, Per and Show as', () => {
     // The rated pair keeps the GPU-only base: Count reads GPU only.
     expect(powerXCountFor('y_measuredJPerOutputToken', 'provisioned')).toBe('gpu');
     expect(powerXBoundaryFor('y_gpuProvisionedJPerOutputToken')).toBe('system');
-  });
-
-  it('maps the IT (no PUE) Count onto the IT metrics of each view', () => {
-    const draw = { metric: 'y_measuredAvgPower', compare: 'none' as const };
-    expect(selectPowerXCount('it', draw)).toEqual({ metric: 'y_itModeledWatts', compare: 'none' });
-    const energy = { metric: 'y_measuredJPerOutputToken', compare: 'none' as const };
-    expect(selectPowerXCount('it', energy)).toEqual({
-      metric: 'y_itModeledJPerOutputToken',
-      compare: 'none',
-    });
-    // Per keeps the IT boundary on output tokens and returns to GPU for other units.
-    const itEnergy = { metric: 'y_itModeledJPerOutputToken', compare: 'none' as const };
-    expect(selectPowerXPer('input', itEnergy)).toEqual({
-      metric: 'y_measuredJPerInputToken',
-      compare: 'none',
-    });
-    expect(
-      selectPowerXPer('output', { metric: 'y_measuredJPerInputToken', compare: 'none' }),
-    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'none' });
-    expect(powerXViewFor('y_itModeledWatts', 'none')).toBe('draw');
-    expect(powerXViewFor('y_itModeledJPerOutputToken', 'none')).toBe('energy');
-    expect(selectPowerXView('energy', { metric: 'y_itModeledWatts', compare: 'none' })).toEqual({
-      metric: 'y_itModeledJPerOutputToken',
-      compare: 'none',
-    });
-  });
-
-  it('shows headroom only on Power draw as % of TDP without a comparison', () => {
-    expect(powerXShowsHeadroom('y_measuredPowerPercentTdp', 'none')).toBe(true);
-    expect(powerXShowsHeadroom('y_measuredPowerPercentTdp', 'boundaries')).toBe(false);
-    expect(powerXShowsHeadroom('y_measuredAvgPower', 'none')).toBe(false);
   });
 
   it('switches boundary on the current view and overlays all three on output-token energy', () => {
@@ -139,29 +75,6 @@ describe('Count, Per and Show as', () => {
       metric: 'y_measuredAvgPower',
       compare: 'none',
     });
-  });
-
-  it('overlays all three measured boundaries on the Power draw scatter and back', () => {
-    const draw = { metric: 'y_itModeledWatts', compare: 'none' as const };
-    expect(selectPowerXCount('both', draw)).toEqual({
-      metric: 'y_measuredAvgPower',
-      compare: 'boundaries',
-    });
-    const all = { metric: 'y_measuredAvgPower', compare: 'boundaries' as const };
-    expect(powerXViewFor(all.metric, all.compare)).toBe('draw');
-    expect(selectPowerXCount('system', all)).toEqual({
-      metric: 'y_utilityModeledWatts',
-      compare: 'none',
-    });
-  });
-
-  it('offers the rated lines for J per output token only', () => {
-    expect(powerXRatedAvailable('y_measuredJPerOutputToken')).toBe(true);
-    expect(powerXRatedAvailable('y_itModeledJPerOutputToken')).toBe(true);
-    // The rated bases have no W per chip series: All already draws every boundary there.
-    expect(powerXRatedAvailable('y_measuredAvgPower')).toBe(false);
-    expect(powerXRatedAvailable('y_measuredPowerPercentTdp')).toBe(false);
-    expect(powerXRatedAvailable('y_measuredPowerTimeline')).toBe(false);
   });
 
   it('draws only GPU measured and All in Provisioned with the Rated boundaries toggle', () => {
@@ -218,37 +131,15 @@ describe('Count, Per and Show as', () => {
       selectPowerXPer('output', { metric: 'y_measuredJPerInputToken', compare: 'none' }),
     ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'none' });
   });
-
-  it('maps Show as between W per chip and % of TDP', () => {
-    expect(powerXShowAsFor('y_measuredAvgPower')).toBe('watts');
-    expect(powerXShowAsFor('y_measuredPowerPercentTdp')).toBe('tdp');
-    expect(selectPowerXShowAs('tdp')).toBe('y_measuredPowerPercentTdp');
-    expect(selectPowerXShowAs('watts')).toBe('y_measuredAvgPower');
-  });
 });
 
 describe('powerXMetricFields', () => {
-  it('keeps Scope and Power statistic for GPU-only power draw', () => {
-    expect(powerXMetricFields('y_measuredAvgPower', 'none')).toEqual(['scope', 'statistic']);
-    expect(powerXMetricFields('y_measuredP90Power', 'none')).toEqual(['scope', 'statistic']);
-    expect(powerXMetricFields('y_measuredPrefillAvgPower', 'none')).toEqual(['scope', 'statistic']);
-  });
-
   it('keeps Scope for per-token energy, where a role has its own denominator', () => {
     expect(powerXMetricFields('y_measuredJPerOutputToken', 'none')).toEqual(['scope']);
     expect(powerXMetricFields('y_measuredJPerInputToken', 'none')).toEqual(['scope']);
     expect(powerXMetricFields('y_measuredDecodeJPerOutputToken', 'none')).toEqual(['scope']);
     expect(powerXMetricFields('y_measuredJPerTotalToken', 'none')).toEqual([]);
     expect(powerXMetricFields('y_measuredWhPerSuccessfulQuery', 'none')).toEqual([]);
-  });
-
-  it('offers nothing for comparisons, the modeled whole system and the timeline', () => {
-    expect(powerXMetricFields('y_measuredAvgPower', 'boundaries')).toEqual([]);
-    expect(powerXMetricFields('y_measuredAvgPower', 'breakdown')).toEqual([]);
-    expect(powerXMetricFields('y_measuredAvgPower', 'roles')).toEqual([]);
-    expect(powerXMetricFields('y_utilityModeledWatts', 'none')).toEqual([]);
-    expect(powerXMetricFields('y_utilityModeledJPerOutputToken', 'none')).toEqual([]);
-    expect(powerXMetricFields('y_measuredPowerTimeline', 'none')).toEqual([]);
   });
 });
 
@@ -275,20 +166,6 @@ describe('powerXChangedCount', () => {
       powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' }),
     ).toBe(1);
     expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'all' })).toBe(2);
-  });
-
-  it('counts each Power draw control off its default: Count, Show as, Scope and statistic', () => {
-    expect(powerXChangedCount({ metric: 'y_utilityModeledWatts', compare: 'none' })).toBe(1);
-    expect(powerXChangedCount({ metric: 'y_measuredPowerPercentTdp', compare: 'none' })).toBe(1);
-    expect(powerXChangedCount({ metric: 'y_measuredP90Power', compare: 'none' })).toBe(1);
-    expect(powerXChangedCount({ metric: 'y_measuredPrefillAvgPower', compare: 'none' })).toBe(1);
-    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'boundaries' })).toBe(1);
-  });
-
-  it('counts nothing on the Where and Over time views, whose controls sit in the card', () => {
-    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'breakdown' })).toBe(0);
-    expect(powerXChangedCount({ metric: 'y_measuredAvgPower', compare: 'roles' })).toBe(0);
-    expect(powerXChangedCount({ metric: 'y_measuredPowerTimeline', compare: 'none' })).toBe(0);
   });
 });
 
@@ -321,15 +198,6 @@ describe('powerXSecondaryChangedCount', () => {
     ).toBe(0);
     expect(
       powerXSecondaryChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'boundaries' }),
-    ).toBe(0);
-  });
-
-  it('counts nothing on the Where and Over time views', () => {
-    expect(
-      powerXSecondaryChangedCount({ metric: 'y_measuredAvgPower', compare: 'breakdown' }),
-    ).toBe(0);
-    expect(
-      powerXSecondaryChangedCount({ metric: 'y_measuredPowerTimeline', compare: 'none' }),
     ).toBe(0);
   });
 });

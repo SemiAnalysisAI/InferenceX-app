@@ -105,7 +105,6 @@ const STRINGS = {
     perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
     raw: 'Raw 1-s samples',
     rawHelp: `Draw the one-second buckets as recorded. Off by default: lines show a centered ${POWER_TIMELINE_SMOOTH_SECONDS}-second rolling mean so overlapping configs stay readable. Tooltips and the summary table always use recorded values.`,
-    smoothed: (seconds: number) => `${seconds}-s rolling mean`,
     pools: 'Prefill / decode pools',
     poolsHelp:
       'One line per worker-role pool: the summed board power of the prefill GPUs and of the decode GPUs of a config. Dashed references are pool size × rated TDP.',
@@ -173,7 +172,6 @@ const STRINGS = {
     perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
     raw: '原始 1 秒采样',
     rawHelp: `按记录值绘制 1 秒采样桶。默认关闭：曲线显示以每点为中心的 ${POWER_TIMELINE_SMOOTH_SECONDS} 秒滚动平均，以便多条配置重叠时仍可辨认。提示框和汇总表始终使用记录值。`,
-    smoothed: (seconds: number) => `${seconds} 秒滚动平均`,
     pools: '预填充 / 解码 GPU 池',
     poolsHelp:
       '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
@@ -586,7 +584,7 @@ function labelWidth(text: string): number {
 }
 
 /** Right-gutter width that fits the longest trace label, capped so the plot keeps its room. */
-export function powerTimelineGutter(labels: readonly { text: string }[]): number {
+function powerTimelineGutter(labels: readonly { text: string }[]): number {
   if (labels.length === 0) return MARGIN.right;
   const widest = Math.max(...labels.map((label) => labelWidth(label.text)));
   return Math.min(MAX_GUTTER, Math.ceil(widest + GUTTER_GAP + 6));
