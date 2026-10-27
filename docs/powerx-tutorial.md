@@ -42,7 +42,7 @@ alt text instead of the file, wrapped in `div[data-layout]` at the registry's la
 (container width: ladder, flow, measured-vs-modeled) or `column` (72ch). `remark-widget-images.ts`
 lifts the image out of its paragraph so the widget is a block. The file is the GitHub fallback: a
 screenshot of the finished widget at 1100 px light theme, or for `flow` the SVG exported from the
-same `FlowSvg` component (`bun run powerx:flow-svg`, guarded by `tutorial.test.ts`).
+same `FlowSvg` component (`bun run powerx:flow-svg`).
 
 Widgets:
 
@@ -65,14 +65,10 @@ Numbers come only from the power model port (`computeBasis` → `buildLadder`), 
 views API. Nothing measured is embedded in source. Every control tracks
 `powerx_tutorial_<widget>_<action>`.
 
-To add one: write the pure model in `src/lib/powerx/<name>.ts` with a unit test, build the component
+To add one: write the pure model in `src/lib/powerx/<name>.ts`, build the component
 on `widget-chrome.tsx` (`WidgetFrame`, `Chips`, `CopyButton`, `GrammarLegend`, `useView`,
 `useWidgetHash`), register it with a layout in `widgets/index.ts`, add the image line to both markdown
-files, and screenshot it into `widgets/<name>.png`. The tutorial test fails when a referenced widget
-image has no registry key, a registry key has no fallback file, or a widget renders inside `<p>`.
+files, and screenshot it into `widgets/<name>.png`.
 
-`packages/app/src/lib/powerx/tutorial.test.ts` keeps the pair in step and concise: same front-matter
-keys, heading sequence, links (after `/zh/` mapping), images, alerts and `<details>` counts; no
-syntax GitHub would not render; EN ≤ 1,100 words with no H2 over 300, ZH ≤ 2,000 CJK characters,
-FAQ ≤ 10 items, lead ≤ 80 words. Both pages stay `noindex` until the PowerX tab is indexable; flip
+Both pages stay `noindex` until the PowerX tab is indexable; flip
 `robots` in `tutorial.ts` and add the pair to the sitemap together.
