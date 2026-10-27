@@ -85,8 +85,6 @@ const response: GpuPowerSeriesResponse = {
   series: [series('b200', 16, 700), series('b200', 64, 900)],
 };
 
-const Y_LABEL = 'Measured Average Power per Chip over Time (W)';
-
 function providerOverrides(
   unofficial: Parameters<typeof createMockUnofficialRunContext>[0] = {},
   activeHwTypes?: readonly string[],
@@ -110,17 +108,14 @@ function mountTimeline(
     overlay?: Parameters<typeof PowerTimeline>[0]['overlayData'];
     unofficial?: Parameters<typeof createMockUnofficialRunContext>[0];
     activeHwTypes?: readonly string[];
+    /** Container width; phone tests pass `'100%'` after setting the viewport. */
+    width?: number | string;
   } = {},
 ) {
   mountWithProviders(
     <PathnameContext.Provider value="/inference">
-      <div style={{ width: 1100, height: 700 }}>
-        <PowerTimeline
-          chartId="power-timeline-test"
-          data={data}
-          overlayData={options.overlay}
-          yLabel={Y_LABEL}
-        />
+      <div style={{ width: options.width ?? 1100, height: 700 }}>
+        <PowerTimeline chartId="power-timeline-test" data={data} overlayData={options.overlay} />
       </div>
     </PathnameContext.Provider>,
     providerOverrides(options.unofficial, options.activeHwTypes),
@@ -141,7 +136,7 @@ function GrowingTimeline() {
         add run
       </button>
       <div style={{ width: 1100, height: 700 }}>
-        <PowerTimeline chartId="power-timeline-test" data={data} yLabel={Y_LABEL} />
+        <PowerTimeline chartId="power-timeline-test" data={data} />
       </div>
     </PathnameContext.Provider>
   );
@@ -185,6 +180,11 @@ function overlayRun(hw: string): Parameters<typeof createMockUnofficialRunContex
 }
 
 const svg = () => cy.get('[data-testid="power-timeline-chart-svg"]');
+
+const status = (options?: Partial<Cypress.Timeoutable>) =>
+  cy.get('[data-testid="power-timeline-empty"]', options);
+const plotSvg = () =>
+  cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]');
 
 describe('PowerTimeline', () => {
   beforeEach(() => {
@@ -332,7 +332,6 @@ describe('PowerTimeline', () => {
                 }),
                 measuredPoint('b200', 16, 700, { date: DATES[1] }),
               ]}
-              yLabel="Measured Average Power per Chip over Time (W)"
             />
           </div>
         </InferenceContextsProvider>
@@ -412,7 +411,6 @@ describe('PowerTimeline', () => {
                 measuredPoint('b200', 16, 600, { date: DATES[0], run_url: EARLIER_RUN_URL }),
                 measuredPoint('b200', 16, 700, { date: DATES[1] }),
               ]}
-              yLabel="Measured Average Power per Chip over Time (W)"
             />
           </div>
         </InferenceContextsProvider>
@@ -444,6 +442,119 @@ describe('PowerTimeline', () => {
     svg().within(() => {
       cy.get('path.power-trace[data-segment="window"]').should('have.length', 1);
       cy.get('text.power-trace-label').should('have.text', 'c16');
+    });
+  });
+  describe('layout and status states', () => {
+    const PHONE = 361;
+    it('stacks the toolbar on a phone with the time axis as one select inside the card', () => {
+      cy.viewport(PHONE, 800);
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)], {
+        width: '100%',
+      });
+      cy.wait('@series');
+      cy.get('select[data-testid="power-timeline-axis"]').should('be.visible').select('elapsed');
+      cy.get('.x-axis-label').should('have.text', 'Time since telemetry start (m:ss)');
+      cy.get('[data-testid="power-timeline-toolbar"]').then(($toolbar) => {
+        const toolbar = $toolbar[0].getBoundingClientRect();
+        const controls = $toolbar.find('select').toArray();
+        // Concurrency, highlight and time axis: one full-width row each, none past the edge.
+        expect(controls).to.have.length(3);
+        const rects = controls.map((control) => control.getBoundingClientRect());
+        for (const rect of rects) {
+          expect(rect.right).to.be.at.most(toolbar.right + 0.5);
+          expect(rect.height).to.be.at.least(44);
+        }
+        expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
+        expect(rects[2].top).to.be.greaterThan(rects[1].bottom);
+      });
+      cy.get<SVGTextElement>('.y-axis-label').then(($label) => {
+        const label = $label[0].getBoundingClientRect();
+        const svgRect = $label[0].closest('svg')!.getBoundingClientRect();
+        expect(label.left).to.be.at.least(svgRect.left);
+        expect(label.top).to.be.at.least(svgRect.top);
+        expect(label.bottom).to.be.at.most(svgRect.bottom);
+      });
+    });
+
+    it('keeps the time axis segments on one row on desktop', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)]);
+      cy.wait('@series');
+      cy.get('[data-testid="power-timeline-axis"] button').then(($buttons) => {
+        const tops = $buttons.toArray().map((button) => button.getBoundingClientRect().top);
+        expect(tops).to.have.length(3);
+        expect(new Set(tops).size).to.equal(1);
+      });
+    });
+
+    it('names the y axis for the drawn line mode', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)]);
+      cy.wait('@series');
+      cy.get('.y-axis-label').should('have.text', 'Mean power per GPU (W)');
+      cy.get('[data-testid="power-timeline-per-gpu"]').click();
+      cy.get('.y-axis-label').should('have.text', 'Power per GPU (W)');
+    });
+
+    it('replaces the placeholder axes with a loading panel until telemetry arrives', () => {
+      cy.viewport(PHONE, 800);
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+        body: response,
+        delay: 1500,
+      }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)], { width: '100%' });
+      status()
+        .should('have.attr', 'data-status', 'loading')
+        .and('have.attr', 'role', 'status')
+        .and('be.visible')
+        .and('contain.text', 'Loading GPU telemetry');
+      // No fake 0–100 W scale, gridlines or watermark behind the panel.
+      plotSvg().should('have.css', 'visibility', 'hidden');
+      cy.wait('@series');
+      status().should('not.exist');
+      plotSvg().should('have.css', 'visibility', 'visible');
+      cy.get('path.power-trace').should('exist');
+    });
+
+    it('keeps drawn runs visible while another run is still loading', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('first');
+      cy.intercept('POST', `/api/gpu-metrics?runId=${SECOND_RUN_ID}*`, {
+        body: { ...response, series: [series('h100', 16, 500)] },
+        delay: 1500,
+      }).as('second');
+      mountTimeline([
+        measuredPoint('b200', 16, 700),
+        measuredPoint('h100', 16, 500, { run_url: SECOND_RUN_URL }),
+      ]);
+      cy.wait('@first');
+      status().should('have.attr', 'data-status', 'loading').and('contain.text', '1 more run');
+      plotSvg().should('have.css', 'visibility', 'visible');
+      cy.get('path.power-trace[data-hw="b200"]').should('exist');
+      cy.wait('@second');
+      status().should('not.exist');
+    });
+
+    it('shows a failure panel, not the empty-legend hint, when every run fails', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+        statusCode: 502,
+        body: { error: 'artifact download failed' },
+      }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)]);
+      status({ timeout: 10000 })
+        .should('have.attr', 'data-status', 'error')
+        .and('have.attr', 'role', 'alert');
+      plotSvg().should('have.css', 'visibility', 'hidden');
+      cy.get('[data-testid="power-timeline-status"] [role="alert"]').should(
+        'contain.text',
+        'artifact download failed',
+      );
+    });
+
+    it('explains points without telemetry artifacts in the same panel', () => {
+      mountTimeline([measuredPoint('b200', 16, 700, { power_audit: undefined })]);
+      status().should('have.attr', 'data-status', 'empty').and('contain.text', 'predate');
+      plotSvg().should('have.css', 'visibility', 'hidden');
     });
   });
 });

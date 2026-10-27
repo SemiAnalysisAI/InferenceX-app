@@ -2,6 +2,7 @@
 
 import * as d3 from 'd3';
 import { useQueries, type UseQueryResult } from '@tanstack/react-query';
+import { ChartNoAxesCombined, ChevronDown, Loader2, TriangleAlert } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -15,9 +16,11 @@ import {
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
+import { CONTROL_HEIGHT, SELECT_TRIGGER_STYLE } from '@/components/ui/control-styles';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
@@ -30,7 +33,7 @@ import { lttbDownsample } from '@/lib/d3-chart/downsample';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { getDisplayLabel } from '@/lib/shared/utils';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   useInferenceActions,
@@ -54,6 +57,7 @@ import {
   prioritizeRun,
   prioritizeRuns,
   POWER_TIMELINE_SMOOTH_SECONDS,
+  powerTimelineStatus,
   rollingMean,
   spreadLabelYs,
   runIdFromUrl,
@@ -67,6 +71,7 @@ import {
   type PowerTimelineAxis,
   type PowerTimelineLines,
   type PowerTimelineRequest,
+  type PowerTimelineStatus,
   type PowerTimelineTrace,
   type WindowPhase,
   mostCoveredConcurrency,
@@ -111,8 +116,13 @@ const STRINGS = {
     utilityLines: 'All-in provisioned lines',
     utilityHelp:
       'Dashed reference at the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
-    loading: (runs: number) =>
-      `Loading GPU telemetry for ${runs} run${runs === 1 ? '' : 's'}… (may take a minute)`,
+    loadingTitle: 'Loading GPU telemetry',
+    loadingDetail: (runs: number) =>
+      `${runs} run${runs === 1 ? '' : 's'} · this can take up to a minute`,
+    loadingMore: (runs: number) => `Loading ${runs} more run${runs === 1 ? '' : 's'}…`,
+    errorTitle: 'GPU telemetry failed to load',
+    errorDetail: 'The run errors are listed below the chart.',
+    emptyTitle: 'No telemetry to show',
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
     noTraces:
       'No telemetry traces for the visible hardware. Enable a series in the legend or choose another date.',
@@ -142,6 +152,8 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
+    yMean: 'Mean power per GPU (W)',
+    yGpu: 'Power per GPU (W)',
     yPool: 'GPU pool power (W)',
     pool: 'Pool',
     poolPower: 'Pool power',
@@ -178,7 +190,12 @@ const STRINGS = {
     utilityLines: '整体预配功耗参考线',
     utilityHelp:
       '以虚线标出硬件注册表中每 GPU 的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
-    loading: (runs: number) => `正在加载 ${runs} 个运行的 GPU 遥测数据……（可能需要约一分钟）`,
+    loadingTitle: '正在加载 GPU 遥测数据',
+    loadingDetail: (runs: number) => `${runs} 个运行 · 可能需要约一分钟`,
+    loadingMore: (runs: number) => `正在加载另外 ${runs} 个运行……`,
+    errorTitle: 'GPU 遥测数据加载失败',
+    errorDetail: '各运行的错误信息列在图表下方。',
+    emptyTitle: '暂无可显示的遥测数据',
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
     noArtifacts: '这些数据点早于按配置上传的遥测产物，因此没有可用的时间线。',
@@ -205,6 +222,8 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
+    yMean: '每 GPU 平均功耗（W）',
+    yGpu: '单 GPU 功耗（W）',
     yPool: 'GPU 池功耗（W）',
     pool: 'GPU 池',
     poolPower: '池功耗',
@@ -288,10 +307,145 @@ export interface PowerTimelineProps {
   chartId: string;
   data: InferenceData[];
   overlayData?: OverlayData;
-  yLabel: string;
   caption?: React.ReactNode;
   comparison?: boolean;
   runNumbering?: Map<string, number>;
+}
+
+type TimelineStrings = (typeof STRINGS)[keyof typeof STRINGS];
+
+/** A labelled toolbar control: label beside the control on desktop, a label column on phones. */
+function ToolbarField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  const labelClass = 'text-xs text-muted-foreground';
+  return (
+    <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] items-center gap-3 md:flex md:gap-2">
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelClass}>
+          {label}
+        </label>
+      ) : (
+        <span className={labelClass}>{label}</span>
+      )}
+      {children}
+    </div>
+  );
+}
+
+/** Native select styled like the segmented toggle's phone variant, so all toolbar controls match. */
+function ToolbarSelect({
+  id,
+  testId,
+  value,
+  onChange,
+  className,
+  children,
+}: {
+  id: string;
+  testId: string;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn('relative min-w-0', className)}>
+      <select
+        id={id}
+        data-testid={testId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={cn(
+          SELECT_TRIGGER_STYLE,
+          CONTROL_HEIGHT.sm,
+          'w-full appearance-none truncate pr-9 text-foreground',
+        )}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground"
+      />
+    </div>
+  );
+}
+
+/**
+ * Loading, error and empty states. A blocking status is a centred panel over the hidden plot; a
+ * non-blocking one (more runs still loading) is a small notice that leaves drawn lines visible.
+ */
+function PowerTimelineStatusPanel({
+  status,
+  t,
+}: {
+  status: PowerTimelineStatus;
+  t: TimelineStrings;
+}) {
+  if (!status.blocking) {
+    return (
+      <div
+        className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2"
+        data-testid="power-timeline-empty"
+        data-status={status.kind}
+        role="status"
+        aria-live="polite"
+      >
+        <p className="inline-flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          {t.loadingMore(status.runs)}
+        </p>
+      </div>
+    );
+  }
+  const { icon, title, detail } =
+    status.kind === 'loading'
+      ? {
+          icon: (
+            <Loader2 className="size-6 animate-spin text-muted-foreground" aria-hidden="true" />
+          ),
+          title: t.loadingTitle,
+          detail: t.loadingDetail(status.runs),
+        }
+      : status.kind === 'error'
+        ? {
+            icon: <TriangleAlert className="size-6 text-destructive" aria-hidden="true" />,
+            title: t.errorTitle,
+            detail: t.errorDetail,
+          }
+        : {
+            icon: (
+              <ChartNoAxesCombined className="size-6 text-muted-foreground" aria-hidden="true" />
+            ),
+            title: t.emptyTitle,
+            detail:
+              status.reason === 'missingWindow'
+                ? t.missingWindow(status.missing)
+                : t[status.reason],
+          };
+  return (
+    <div
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-lg border border-dashed border-border/70 p-4 lg:right-3"
+      data-testid="power-timeline-empty"
+      data-status={status.kind}
+      role={status.kind === 'error' ? 'alert' : 'status'}
+      aria-live="polite"
+      aria-busy={status.kind === 'loading'}
+    >
+      <div className="flex max-w-xs flex-col items-center gap-2 text-center">
+        {icon}
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground">{detail}</p>
+      </div>
+    </div>
+  );
 }
 
 async function fetchPowerSeries(
@@ -713,7 +867,6 @@ export default function PowerTimeline({
   chartId,
   data,
   overlayData,
-  yLabel,
   caption,
   comparison = false,
   runNumbering: providedRunNumbering,
@@ -747,6 +900,7 @@ export default function PowerTimeline({
     }),
   );
   const powerXSurface = usePowerXSurface();
+  const isPhone = useIsMobileViewport();
   // On the PowerX tab, align runs at serving start unless the URL picks an axis.
   const [xModeChoice, setXModeChoice] = useState<XMode | null>(
     initialView.axis ?? (powerXSurface ? 'serving' : null),
@@ -1506,17 +1660,16 @@ export default function PowerTimeline({
 
   const toolbar = (
     <div
-      className="flex flex-wrap items-center justify-end gap-2 pb-1"
+      className="flex flex-col gap-2 pb-1 md:flex-row md:flex-wrap md:items-center md:justify-end md:gap-x-4"
       data-testid="power-timeline-toolbar"
     >
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
-        {t.concurrency}
-        <select
-          className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"
-          data-testid="power-timeline-concurrency"
-          value={concurrency ?? ''}
-          onChange={(event) => {
-            const value = event.target.value === '' ? null : Number(event.target.value);
+      <ToolbarField label={t.concurrency} htmlFor={`${chartId}-power-timeline-concurrency`}>
+        <ToolbarSelect
+          id={`${chartId}-power-timeline-concurrency`}
+          testId="power-timeline-concurrency"
+          value={concurrency === null ? '' : String(concurrency)}
+          onChange={(selected) => {
+            const value = selected === '' ? null : Number(selected);
             setConcurrency(value);
             track('inference_power_timeline_concurrency_changed', { concurrency: value });
           }}
@@ -1528,17 +1681,17 @@ export default function PowerTimeline({
           {concurrencyOptions.map((conc) => (
             <option key={conc} value={conc}>{`c${conc}`}</option>
           ))}
-        </select>
-      </label>
+        </ToolbarSelect>
+      </ToolbarField>
       {visibleTraces.length > 1 && (
-        <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          {t.highlight}
-          <select
-            className="max-w-56 truncate rounded-md border bg-background px-2 py-1 text-xs text-foreground"
-            data-testid="power-timeline-highlight"
+        <ToolbarField label={t.highlight} htmlFor={`${chartId}-power-timeline-highlight`}>
+          <ToolbarSelect
+            id={`${chartId}-power-timeline-highlight`}
+            testId="power-timeline-highlight"
+            className="md:max-w-56"
             value={focusedTrace?.key ?? ''}
-            onChange={(event) => {
-              const key = event.target.value === '' ? null : event.target.value;
+            onChange={(selected) => {
+              const key = selected === '' ? null : selected;
               setFocusKey(key);
               track('inference_power_timeline_highlight_changed', { highlighted: key !== null });
             }}
@@ -1549,37 +1702,54 @@ export default function PowerTimeline({
                 {`${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`}
               </option>
             ))}
-          </select>
-        </label>
+          </ToolbarSelect>
+        </ToolbarField>
       )}
-      <span className="text-xs text-muted-foreground">{t.timeAxis}</span>
-      <SegmentedToggle<XMode>
-        value={xMode}
-        ariaLabel={t.timeAxis}
-        role="group"
-        options={[
-          { value: 'wall', label: t.wall, testId: 'power-timeline-axis-wall' },
-          { value: 'elapsed', label: t.elapsed, testId: 'power-timeline-axis-elapsed' },
-          { value: 'serving', label: t.serving, testId: 'power-timeline-axis-serving' },
-        ]}
-        onValueChange={(mode) => {
-          setXModeChoice(mode);
-          track('inference_power_timeline_axis_changed', { mode });
-        }}
-      />
+      <ToolbarField label={t.timeAxis}>
+        <SegmentedToggle<XMode>
+          value={xMode}
+          ariaLabel={t.timeAxis}
+          role="group"
+          // Three long segments cannot share a phone row; a native select keeps one tidy control.
+          variant={isPhone ? 'select' : 'segments'}
+          testId="power-timeline-axis"
+          className={isPhone ? 'w-full' : 'flex-nowrap'}
+          buttonClassName="whitespace-nowrap"
+          options={[
+            { value: 'wall', label: t.wall, testId: 'power-timeline-axis-wall' },
+            { value: 'elapsed', label: t.elapsed, testId: 'power-timeline-axis-elapsed' },
+            { value: 'serving', label: t.serving, testId: 'power-timeline-axis-serving' },
+          ]}
+          onValueChange={(mode) => {
+            setXModeChoice(mode);
+            track('inference_power_timeline_axis_changed', { mode });
+          }}
+        />
+      </ToolbarField>
     </div>
   );
 
-  let emptyMessage: string | null = null;
-  if (loadingRuns > 0) emptyMessage = t.loading(loadingRuns);
-  else if (!hasAnyArtifact) emptyMessage = t.noArtifacts;
-  else if (visibleTraces.length === 0) emptyMessage = t.noTraces;
-  else if (missingWindows === visibleTraces.length) emptyMessage = t.missingWindow(missingWindows);
+  const status = powerTimelineStatus({
+    loadingRuns,
+    fetchedRuns: fetchedRequests.length,
+    failedRuns: errors.length,
+    hasAnyArtifact,
+    visibleTraces: visibleTraces.length,
+    missingWindows,
+    drawable: model.paths.length > 0,
+  });
+  const blocked = status?.blocking === true;
 
   return (
     <div
-      className="relative flex flex-col gap-2 [&_circle.point]:[fill-opacity:0]"
+      className={cn(
+        'relative flex flex-col gap-2 [&_circle.point]:[fill-opacity:0]',
+        // Nothing to draw yet: hide the placeholder axes, grid and watermark so the status panel
+        // is the only thing in the plot area instead of text over a fake 0–100 W scale.
+        blocked && "[&_svg[data-testid='d3-chart-svg']]:invisible",
+      )}
       data-testid="power-timeline"
+      data-status={status?.kind ?? 'ready'}
     >
       <D3Chart<TimelineSample>
         key={`${chartId}-${xMode}-${lineMode}-${windowOnly}`}
@@ -1590,7 +1760,7 @@ export default function PowerTimeline({
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
         testId="power-timeline-chart-svg"
         grabCursor
-        instructions={powerXSurface ? '' : t.instructions}
+        instructions={powerXSurface || blocked ? '' : t.instructions}
         xScale={
           xMode === 'wall'
             ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
@@ -1608,7 +1778,10 @@ export default function PowerTimeline({
           },
           tickFormat: xTickFormat,
         }}
-        yAxis={{ label: lineMode === 'pool' ? t.yPool : yLabel, tickCount: 8 }}
+        yAxis={{
+          label: lineMode === 'pool' ? t.yPool : lineMode === 'gpu' ? t.yGpu : t.yMean,
+          tickCount: 8,
+        }}
         layers={layers}
         displayIdentity={activeHighlight ?? ''}
         onDisplayUpdate={onDisplayUpdate}
@@ -1649,17 +1822,7 @@ export default function PowerTimeline({
             )}
           </>
         }
-        noDataOverlay={
-          emptyMessage ? (
-            <div
-              className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-muted-foreground"
-              data-testid="power-timeline-empty"
-              aria-live="polite"
-            >
-              {emptyMessage}
-            </div>
-          ) : undefined
-        }
+        noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
       />
       {powerXSurface && <PowerLoadSwingsCaveat />}
       <div
