@@ -1,5 +1,8 @@
 import {
-  CORE_PROFILE_GPU,
+  HUAWEI_SKU_GPU_KEYS,
+  huaweiSkuConfigurations,
+} from '@/components/ubenchx/huawei-sku-configurations';
+import {
   CORE_PROFILE_GPU_KEYS,
   coreMemoryProfileResults,
 } from '@/components/ubenchx/core-memory-profiles';
@@ -28,7 +31,9 @@ const AVAILABLE_TESTS = [
 function tpcSkylineResults(gpu: string) {
   return gpu === 'all'
     ? Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) => transformTpcSkylineRun(key, run))
-    : [transformTpcSkylineRun(gpu, TPC_SKYLINE_RUNS[gpu])];
+    : TPC_SKYLINE_RUNS[gpu]
+      ? [transformTpcSkylineRun(gpu, TPC_SKYLINE_RUNS[gpu])]
+      : [];
 }
 
 export function GET(request: NextRequest) {
@@ -52,7 +57,7 @@ export function GET(request: NextRequest) {
     }
 
     if (test === 'tpc-skyline') {
-      const gpuKeys = Object.keys(TPC_SKYLINE_RUNS);
+      const gpuKeys = [...Object.keys(TPC_SKYLINE_RUNS), 'Huawei 950PR', ...HUAWEI_SKU_GPU_KEYS];
       const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...gpuKeys], 'all');
       return Promise.resolve(
         cachedJson({
@@ -61,6 +66,7 @@ export function GET(request: NextRequest) {
           test: 'tpc-skyline',
           params: { test: 'tpc-skyline', gpu },
           gpus: tpcSkylineResults(gpu),
+          skuConfigurations: huaweiSkuConfigurations(gpu),
         }),
       );
     }
@@ -68,7 +74,7 @@ export function GET(request: NextRequest) {
     if (test === 'mem-bw' || test === 'all') {
       const gpuKeys =
         test === 'all'
-          ? [...Object.keys(UBENCHX_RUNS), CORE_PROFILE_GPU]
+          ? [...Object.keys(UBENCHX_RUNS), ...HUAWEI_SKU_GPU_KEYS]
           : Object.keys(UBENCHX_RUNS);
       const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...gpuKeys], gpuKeys[0]);
 
@@ -114,6 +120,7 @@ export function GET(request: NextRequest) {
           // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
           // match the GPU key case-insensitively as parseEnumParam does for the others.
           tpcSkyline: {
+            skuConfigurations: huaweiSkuConfigurations(rawGpu === null ? 'all' : gpu),
             gpus:
               rawGpu === null || gpu === 'all'
                 ? tpcSkylineResults('all')
