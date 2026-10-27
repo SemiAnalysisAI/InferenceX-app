@@ -1,6 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
+import { Pin } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Heading } from '@/components/ui/heading';
@@ -412,19 +413,19 @@ export default function PowerChipCompare({
                       />
                       <span className="truncate">{entry.label}</span>
                     </span>
-                    <span className="flex items-center gap-1.5 pl-4.5 text-xs text-muted-foreground">
-                      <span data-testid="power-chip-compare-point">
-                        {t.at(point.concurrency, rate(point.interactivity))}
-                      </span>
+                    <span className="flex items-center gap-1 pl-4.5 text-xs text-muted-foreground">
                       {pinnedPoint && onUnpinComparedPoint && (
                         <span
                           data-testid="power-chip-compare-unpin"
                           title={t.pinnedPoint(point.concurrency)}
-                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-border text-2xs leading-none text-foreground hover:bg-muted"
+                          className="inline-flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted hover:text-foreground"
                         >
-                          ×
+                          <Pin className="size-3" fill="currentColor" aria-hidden />
                         </span>
                       )}
+                      <span data-testid="power-chip-compare-point">
+                        {t.at(point.concurrency, rate(point.interactivity))}
+                      </span>
                     </span>
                   </span>
                   <span className="flex h-7 min-w-0 items-stretch overflow-hidden rounded-sm">

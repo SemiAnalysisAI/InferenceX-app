@@ -33,11 +33,11 @@ import { usePowerXCompareTarget } from './powerx-surface';
 const STRINGS = {
   en: {
     drillTitle: (chip: string) => `${chip} across load`,
-    drillSubtitle: 'Every point of this chip; the dashed outline marks the compared point.',
+    drillSubtitle: 'Click a point to compare it; the dashed outline marks the compared point.',
   },
   zh: {
     drillTitle: (name: string) => `${name} 随负载的变化`,
-    drillSubtitle: '该芯片的每个基准测试点；虚线框标出上方对比所用的点。',
+    drillSubtitle: '点击任一数据点即可对比；虚线框标出上方对比所用的点。',
   },
 };
 
