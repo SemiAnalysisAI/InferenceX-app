@@ -7,6 +7,7 @@ import { useId, useMemo, useState } from 'react';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 import { cn } from '@/lib/shared/utils';
 import {
   isHatchedBand,
@@ -38,20 +39,7 @@ const STRINGS = {
     shareOfFacility: 'Share of facility W/GPU',
     acrossLoad: 'W/GPU across this chip’s points, lowest interactivity first',
     allParts: (count: number) => `All ${count} parts · across load`,
-    categories: {
-      gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
-      cpu: 'CPU',
-      memory: 'Memory',
-      nic: 'NICs',
-      nvswitch: 'NVSwitch',
-      storage: 'Storage',
-      other: 'PCIe & misc',
-      fans: 'Fans',
-      psuLoss: 'PSU loss',
-      network: 'Network share',
-      facility: 'Facility (PUE)',
-    } satisfies Record<SystemPowerCategory, string>,
+    categories: SYSTEM_POWER_CATEGORY_LABELS.en,
   },
   zh: {
     list: '对比点处的功耗部件',
@@ -64,20 +52,7 @@ const STRINGS = {
     shareOfFacility: '占机房 W/GPU 的比例',
     acrossLoad: '该芯片各数据点的 W/GPU，按交互性从低到高',
     allParts: (count: number) => `全部 ${count} 项 · 随负载变化`,
-    categories: {
-      gpu: 'GPU',
-      measuredCpu: 'Grace CPU',
-      cpu: 'CPU',
-      memory: '内存',
-      nic: '网卡',
-      nvswitch: 'NVSwitch',
-      storage: '存储',
-      other: 'PCIe 及其他',
-      fans: '风扇',
-      psuLoss: '电源损耗',
-      network: '网络分摊',
-      facility: '机房开销（PUE）',
-    } satisfies Record<SystemPowerCategory, string>,
+    categories: SYSTEM_POWER_CATEGORY_LABELS.zh,
   },
 };
 

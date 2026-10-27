@@ -59,6 +59,7 @@ const STRINGS = {
     title: 'PowerX',
     description:
       'Measured GPU power and energy per token for every benchmark point, with a modeled IT and facility breakdown.',
+    tutorial: 'How PowerX measures power →',
     viewsLabel: 'PowerX view',
     views: {
       energy: 'Energy per token',
@@ -132,6 +133,7 @@ const STRINGS = {
     title: 'PowerX 功耗',
     description:
       '每个基准测试点的实测 GPU 功耗与每 Token 能耗，并附模型估算的 IT 与数据中心功耗构成。',
+    tutorial: '了解 PowerX 如何测量功耗 →',
     viewsLabel: 'PowerX 视图',
     views: {
       energy: '每 Token 能耗',
