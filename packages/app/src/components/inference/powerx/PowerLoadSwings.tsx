@@ -7,6 +7,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import type { InferenceData } from '@/components/inference/types';
 import type { PowerTimelineTrace } from '@/components/inference/utils/powerTimeline';
 import { Switch } from '@/components/ui/switch';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { track } from '@/lib/analytics/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -125,6 +126,7 @@ export function PowerLoadSwings({
   const locale = useLocale();
   const t = STRINGS[locale];
   const [rack, setRack] = useState(false);
+  const isPhone = useIsMobileViewport();
   const rows = useMemo(() => loadSwingRows(traces, colorOf, labelOf), [traces, colorOf, labelOf]);
   if (rows.length === 0) return null;
   const unit = rack ? 'kW' : 'W';
@@ -135,6 +137,73 @@ export function PowerLoadSwings({
   };
   const pctTdp = (watts: number, tdp: number) =>
     tdp > 0 ? ` · ${Math.round((watts / tdp) * 100)}% ${t.tdp}` : '';
+  // One column list feeds both the desktop table and the phone cards, so they cannot drift.
+  const statCells = ({ stats, tdpWatts }: LoadSwingTraceRow) => [
+    { key: 'peak', label: t.peak, value: value(stats.peak) },
+    { key: 'min', label: t.min, value: value(stats.min) },
+    { key: 'idle', label: t.idle, value: value(stats.idleFloor) },
+    { key: 'mean', label: t.mean, value: value(stats.mean) },
+    { key: 'p5p95', label: t.p5p95, value: `${value(stats.p5)} / ${value(stats.p95)}` },
+    {
+      key: 'd1',
+      label: t.d1,
+      value: `${value(stats.maxDelta1s)}${pctTdp(stats.maxDelta1s, tdpWatts)}`,
+    },
+    {
+      key: 'd5',
+      label: t.d5,
+      value: `${value(stats.maxDelta5s)}${pctTdp(stats.maxDelta5s, tdpWatts)}`,
+    },
+    { key: 'up', label: t.up, value: `${value(stats.rampUpPerSecond)}/s` },
+    { key: 'down', label: t.down, value: `${value(stats.rampDownPerSecond)}/s` },
+    {
+      key: 'volatility',
+      label: t.volatility,
+      value: stats.volatility === null ? '—' : `${(stats.volatility * 100).toFixed(1)}%`,
+    },
+  ];
+  const traceName = ({ trace, color, label, stats }: LoadSwingTraceRow) => (
+    <>
+      <span
+        aria-hidden
+        className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
+        style={{ backgroundColor: color }}
+      />
+      <span className="font-medium">{label}</span>{' '}
+      <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
+      {stats.gapCount > 0 && (
+        <span className="ml-1 text-muted-foreground">· {t.gaps(stats.gapCount)}</span>
+      )}
+      {stats.mean === null && <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>}
+    </>
+  );
+  const downloads = (id: number | undefined) =>
+    isPersistedBenchmarkId(id) ? (
+      <>
+        <a
+          href={statsDownloadUrl(id, 'csv', rack)}
+          download
+          data-testid="powerx-swings-csv"
+          className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
+          onClick={() => track('inference_powerx_swings_exported', { format: 'csv' })}
+        >
+          <Download className="size-3" aria-hidden />
+          {t.csv}
+        </a>
+        {' · '}
+        <a
+          href={statsDownloadUrl(id, 'json', rack)}
+          download
+          data-testid="powerx-swings-json"
+          className="underline decoration-dotted hover:text-foreground"
+          onClick={() => track('inference_powerx_swings_exported', { format: 'json' })}
+        >
+          {t.json}
+        </a>
+      </>
+    ) : (
+      '—'
+    );
   return (
     <section className="min-w-0 space-y-2 px-1 pb-2" data-testid="powerx-load-swings">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -158,113 +227,73 @@ export function PowerLoadSwings({
           </span>
         </label>
       </div>
-      <div className="max-h-96 min-w-0 overflow-auto">
-        <table
-          className="w-full min-w-[64rem] text-left text-xs tabular-nums"
-          data-testid="powerx-load-swings-table"
-        >
-          <thead className="sticky top-0 bg-background">
-            <tr>
-              <th className="p-2">{t.trace}</th>
-              <th className="p-2">
-                {t.peak}
-                <PowerBasisPill tag="gpu" />
-              </th>
-              <th className="p-2">{t.min}</th>
-              <th className="p-2">{t.idle}</th>
-              <th className="p-2">{t.mean}</th>
-              <th className="p-2">{t.p5p95}</th>
-              <th className="p-2">{t.d1}</th>
-              <th className="p-2">{t.d5}</th>
-              <th className="p-2">{t.up}</th>
-              <th className="p-2">{t.down}</th>
-              <th className="p-2">{t.volatility}</th>
-              <th className="p-2 no-export">{t.downloads}</th>
-            </tr>
-          </thead>
-          <tbody className="border-t">
-            {rows.map(({ trace, color, label, stats, tdpWatts }) => {
-              const id = trace.point.id;
-              const persisted = isPersistedBenchmarkId(id);
-              return (
-                <tr key={trace.key} data-testid="powerx-load-swings-row">
-                  <th className="p-2 align-top font-normal whitespace-nowrap">
-                    <span
-                      aria-hidden
-                      className="mr-1.5 inline-block size-2.5 rounded-full align-middle"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="font-medium">{label}</span>{' '}
-                    <span className="text-muted-foreground">{t.at(trace.point.conc)}</span>
-                    {stats.gapCount > 0 && (
-                      <span className="ml-1 text-muted-foreground">· {t.gaps(stats.gapCount)}</span>
-                    )}
-                    {stats.mean === null && (
-                      <span className="ml-1 text-muted-foreground">· {t.noWindow}</span>
-                    )}
-                  </th>
-                  <td className="p-2 align-top">{value(stats.peak)}</td>
-                  <td className="p-2 align-top">{value(stats.min)}</td>
-                  <td className="p-2 align-top">{value(stats.idleFloor)}</td>
-                  <td className="p-2 align-top">{value(stats.mean)}</td>
-                  <td className="p-2 align-top whitespace-nowrap">
-                    {value(stats.p5)} / {value(stats.p95)}
-                  </td>
-                  <td className="p-2 align-top whitespace-nowrap">
-                    {value(stats.maxDelta1s)}
-                    {pctTdp(stats.maxDelta1s, tdpWatts)}
-                  </td>
-                  <td className="p-2 align-top whitespace-nowrap">
-                    {value(stats.maxDelta5s)}
-                    {pctTdp(stats.maxDelta5s, tdpWatts)}
-                  </td>
-                  <td className="p-2 align-top whitespace-nowrap">
-                    {value(stats.rampUpPerSecond)}/s
-                  </td>
-                  <td className="p-2 align-top whitespace-nowrap">
-                    {value(stats.rampDownPerSecond)}/s
-                  </td>
-                  <td className="p-2 align-top">
-                    {stats.volatility === null ? '—' : `${(stats.volatility * 100).toFixed(1)}%`}
-                  </td>
+      {isPhone ? (
+        // Eleven columns cannot fit a phone: one card per trace with a two-column stat grid.
+        <ul className="space-y-2" data-testid="powerx-load-swings-cards">
+          {rows.map((row) => (
+            <li
+              key={row.trace.key}
+              className="rounded-lg border border-border/60 p-3 text-xs tabular-nums"
+              data-testid="powerx-load-swings-row"
+            >
+              <p className="text-sm">{traceName(row)}</p>
+              <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                {statCells(row).map((cell) => (
+                  <div key={cell.key} className="min-w-0" data-stat={cell.key}>
+                    <dt className="text-muted-foreground">{cell.label}</dt>
+                    <dd className="font-medium whitespace-nowrap">{cell.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="no-export mt-2 border-t border-border/60 pt-2 text-muted-foreground">
+                {downloads(row.trace.point.id)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <div className="max-h-96 min-w-0 overflow-auto">
+          <table
+            className="w-full min-w-[64rem] text-left text-xs tabular-nums"
+            data-testid="powerx-load-swings-table"
+          >
+            <thead className="sticky top-0 bg-background">
+              <tr>
+                <th className="p-2">{t.trace}</th>
+                <th className="p-2">
+                  {t.peak}
+                  <PowerBasisPill tag="gpu" />
+                </th>
+                <th className="p-2">{t.min}</th>
+                <th className="p-2">{t.idle}</th>
+                <th className="p-2">{t.mean}</th>
+                <th className="p-2">{t.p5p95}</th>
+                <th className="p-2">{t.d1}</th>
+                <th className="p-2">{t.d5}</th>
+                <th className="p-2">{t.up}</th>
+                <th className="p-2">{t.down}</th>
+                <th className="p-2">{t.volatility}</th>
+                <th className="p-2 no-export">{t.downloads}</th>
+              </tr>
+            </thead>
+            <tbody className="border-t">
+              {rows.map((row) => (
+                <tr key={row.trace.key} data-testid="powerx-load-swings-row">
+                  <th className="p-2 align-top font-normal whitespace-nowrap">{traceName(row)}</th>
+                  {statCells(row).map((cell) => (
+                    <td key={cell.key} className="p-2 align-top whitespace-nowrap">
+                      {cell.value}
+                    </td>
+                  ))}
                   <td className="no-export p-2 align-top whitespace-nowrap">
-                    {persisted ? (
-                      <>
-                        <a
-                          href={statsDownloadUrl(id, 'csv', rack)}
-                          download
-                          data-testid="powerx-swings-csv"
-                          className="inline-flex items-center gap-1 underline decoration-dotted hover:text-foreground"
-                          onClick={() =>
-                            track('inference_powerx_swings_exported', { format: 'csv' })
-                          }
-                        >
-                          <Download className="size-3" aria-hidden />
-                          {t.csv}
-                        </a>
-                        {' · '}
-                        <a
-                          href={statsDownloadUrl(id, 'json', rack)}
-                          download
-                          data-testid="powerx-swings-json"
-                          className="underline decoration-dotted hover:text-foreground"
-                          onClick={() =>
-                            track('inference_powerx_swings_exported', { format: 'json' })
-                          }
-                        >
-                          {t.json}
-                        </a>
-                      </>
-                    ) : (
-                      '—'
-                    )}
+                    {downloads(row.trace.point.id)}
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground">
         {rack ? t.perRack : t.perGpu} {t.definitions}
         <PowerBasisPill tag="gpu" />

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { GpuPowerSeries, GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import type { InferenceData } from '@/components/inference/types';
 import { traceKeyForPoint } from '@/components/inference/utils/powerTimeline';
 import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
@@ -110,13 +111,18 @@ function mountTimeline(
     activeHwTypes?: readonly string[];
     /** Container width; phone tests pass `'100%'` after setting the viewport. */
     width?: number | string;
+    /** Render on the PowerX surface (load-swing stats, validated-window summary). */
+    powerx?: boolean;
   } = {},
 ) {
+  const timeline = (
+    <div style={{ width: options.width ?? 1100, height: 700 }}>
+      <PowerTimeline chartId="power-timeline-test" data={data} overlayData={options.overlay} />
+    </div>
+  );
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
-      <div style={{ width: options.width ?? 1100, height: 700 }}>
-        <PowerTimeline chartId="power-timeline-test" data={data} overlayData={options.overlay} />
-      </div>
+    <PathnameContext.Provider value={options.powerx ? '/powerx' : '/inference'}>
+      {options.powerx ? <PowerXSurfaceProvider>{timeline}</PowerXSurfaceProvider> : timeline}
     </PathnameContext.Provider>,
     providerOverrides(options.unofficial, options.activeHwTypes),
   );
@@ -555,6 +561,75 @@ describe('PowerTimeline', () => {
       mountTimeline([measuredPoint('b200', 16, 700, { power_audit: undefined })]);
       status().should('have.attr', 'data-status', 'empty').and('contain.text', 'predate');
       plotSvg().should('have.css', 'visibility', 'hidden');
+    });
+    it('gives the plot the card width on a phone and names traces in a key above it', () => {
+      cy.viewport(PHONE, 800);
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+        body: { ...response, series: [series('b200', 16, 700), series('h100', 16, 500)] },
+      }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('h100', 16, 500)], {
+        width: '100%',
+      });
+      cy.wait('@series');
+      cy.get('[data-testid="power-timeline-key"] li').should('have.length', 2);
+      cy.get('[data-testid="power-timeline-key"] li[data-hw="b200"]').should('be.visible');
+      cy.get('text.power-trace-label').should('not.exist');
+      cy.get('[data-testid="power-timeline-chart-svg"] svg[data-testid="d3-chart-svg"]').then(
+        ($svg) => {
+          const svgBox = $svg[0].getBoundingClientRect();
+          const grid = $svg[0].querySelector('.y-axis')!.getBoundingClientRect();
+          const xTicks = [...$svg[0].querySelectorAll('.x-axis .tick text')];
+          // Without the label gutter the plot spans all but the y axis and a small end margin.
+          expect(svgBox.right - grid.right).to.be.greaterThan(svgBox.width * 0.7);
+          expect(xTicks.length).to.be.at.least(3);
+          const last = xTicks.at(-1)!.getBoundingClientRect();
+          expect(last.right).to.be.at.most(svgBox.right + 0.5);
+        },
+      );
+    });
+
+    it('keeps the end-of-line labels in the gutter on desktop', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)]);
+      cy.wait('@series');
+      cy.get('text.power-trace-label').should('have.length', 1);
+      cy.get('[data-testid="power-timeline-key"]').should('not.exist');
+    });
+
+    it('lays the PowerX stats out as cards on a phone, below the chart, without clipping', () => {
+      cy.viewport(PHONE, 800);
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 1237)], { width: '100%', powerx: true });
+      cy.wait('@series');
+      cy.get('[data-testid="powerx-load-swings-table"]').should('not.exist');
+      cy.get('[data-testid="powerx-load-swings-row"]').should('have.length', 1);
+      cy.get('[data-testid="power-timeline-chart-svg"]').then(($chart) => {
+        cy.get('[data-testid="powerx-load-swings"]').should(($swings) => {
+          expect($swings[0].getBoundingClientRect().top).to.be.greaterThan(
+            $chart[0].getBoundingClientRect().bottom,
+          );
+        });
+      });
+      for (const card of ['powerx-load-swings-row', 'power-timeline-summary-trace']) {
+        cy.get(`[data-testid="${card}"]`).each(($card) => {
+          const box = $card[0].getBoundingClientRect();
+          for (const value of $card[0].querySelectorAll('dd')) {
+            const rect = value.getBoundingClientRect();
+            expect(rect.right, value.textContent ?? '').to.be.at.most(box.right + 0.5);
+            // One line: values like "1,237 W" must not wrap the unit onto its own line.
+            expect(rect.height, value.textContent ?? '').to.be.lessThan(24);
+          }
+        });
+      }
+    });
+
+    it('keeps the PowerX stats table on desktop with single-line values', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 1237)], { powerx: true });
+      cy.wait('@series');
+      cy.get('[data-testid="powerx-load-swings-table"] td').each(($cell) => {
+        expect($cell.css('white-space')).to.equal('nowrap');
+      });
     });
   });
 });

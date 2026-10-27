@@ -85,6 +85,10 @@ const MARGIN = { top: 24, right: 24, bottom: 60, left: 64 };
 const GUTTER_GAP = 10;
 const DENSE_TRACES = 8;
 const MAX_GUTTER = 168;
+// Room for half of the last x tick label, which the label gutter used to provide.
+const PHONE_MARGIN_RIGHT = 20;
+/** Minimum pixels per x tick, tighter on phones so a narrow plot still gets three or four. */
+const X_TICK_SPACING = { phone: 48, desktop: 80 };
 
 const STRINGS = {
   en: {
@@ -152,6 +156,7 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
+    traceKey: 'Trace colours',
     yMean: 'Mean power per GPU (W)',
     yGpu: 'Power per GPU (W)',
     yPool: 'GPU pool power (W)',
@@ -222,6 +227,7 @@ const STRINGS = {
       PowerPoolRole,
       string
     >,
+    traceKey: '曲线颜色',
     yMean: '每 GPU 平均功耗（W）',
     yGpu: '单 GPU 功耗（W）',
     yPool: 'GPU 池功耗（W）',
@@ -757,8 +763,14 @@ function drawLabels(
   plotWidth: number,
   plotHeight: number,
   highlight: string | null,
+  inGutter: boolean,
 ): void {
   plotGroup.selectAll('text.power-trace-label').remove();
+  if (!inGutter) {
+    // Phones name the traces in the HTML colour key above the plot instead.
+    chartGroup.select('g.power-trace-gutter').remove();
+    return;
+  }
   let gutter = chartGroup.select<SVGGElement>('g.power-trace-gutter');
   if (gutter.empty()) gutter = chartGroup.append('g').attr('class', 'power-trace-gutter');
   const rowHeight = CHART_TYPE.dataLabel + 3;
@@ -1233,8 +1245,13 @@ export default function PowerTimeline({
   ]);
 
   const margin = useMemo(
-    () => ({ ...MARGIN, right: powerTimelineGutter(model.labels) }),
-    [model.labels],
+    () =>
+      // A phone cannot spare a label gutter: the plot takes the card width and the colour key
+      // above it names the traces.
+      isPhone
+        ? { ...MARGIN, right: PHONE_MARGIN_RIGHT }
+        : { ...MARGIN, right: powerTimelineGutter(model.labels) },
+    [model.labels, isPhone],
   );
 
   const samples = useMemo(
@@ -1395,6 +1412,7 @@ export default function PowerTimeline({
             ctx.width,
             ctx.height,
             highlightRef.current,
+            !isPhone,
           );
         },
         onZoom: (group, ctx: ZoomContext) => {
@@ -1407,11 +1425,12 @@ export default function PowerTimeline({
             ctx.width,
             ctx.height,
             highlightRef.current,
+            !isPhone,
           );
         },
       },
     ],
-    [referenceLines, model, samples],
+    [referenceLines, model, samples, isPhone],
   );
 
   const onDisplayUpdate = useCallback(
@@ -1729,6 +1748,14 @@ export default function PowerTimeline({
     </div>
   );
 
+  const loadSwings = powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
+    <PowerLoadSwings
+      traces={focusedTrace ? [focusedTrace] : visibleTraces}
+      colorOf={(trace) => colorForTrace(trace).color}
+      labelOf={seriesLabel}
+    />
+  );
+
   const status = powerTimelineStatus({
     loadingRuns,
     fetchedRuns: fetchedRequests.length,
@@ -1774,7 +1801,8 @@ export default function PowerTimeline({
               | d3.ScaleTime<number, number>
               | d3.ScaleLinear<number, number>;
             const [left, right] = timeScale.range();
-            return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / 80))));
+            const spacing = isPhone ? X_TICK_SPACING.phone : X_TICK_SPACING.desktop;
+            return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / spacing))));
           },
           tickFormat: xTickFormat,
         }}
@@ -1813,18 +1841,43 @@ export default function PowerTimeline({
           <>
             {caption}
             {toolbar}
-            {powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
-              <PowerLoadSwings
-                traces={focusedTrace ? [focusedTrace] : visibleTraces}
-                colorOf={(trace) => colorForTrace(trace).color}
-                labelOf={seriesLabel}
-              />
+            {!isPhone && loadSwings}
+            {isPhone && model.labels.length > 0 && (
+              <ul
+                className="flex flex-wrap gap-x-3 gap-y-1 px-1 text-xs"
+                aria-label={t.traceKey}
+                data-testid="power-timeline-key"
+              >
+                {model.labels.map((label) => (
+                  <li
+                    key={label.id}
+                    className="flex items-center gap-1.5 font-medium whitespace-nowrap"
+                    style={{ opacity: labelOpacity(label, activeHighlight) }}
+                    data-hw={label.hwKey}
+                  >
+                    <svg aria-hidden="true" width="14" height="6" className="shrink-0">
+                      <line
+                        x1="0"
+                        x2="14"
+                        y1="3"
+                        y2="3"
+                        stroke={label.color}
+                        strokeWidth="3"
+                        strokeDasharray={(label.pool && poolDash(label.pool)) || undefined}
+                      />
+                    </svg>
+                    {label.text}
+                  </li>
+                ))}
+              </ul>
             )}
           </>
         }
         noDataOverlay={status ? <PowerTimelineStatusPanel status={status} t={t} /> : undefined}
       />
       {powerXSurface && <PowerLoadSwingsCaveat />}
+      {/* On phones the per-trace stat cards follow the chart so the plot stays near the top. */}
+      {isPhone && loadSwings}
       <div
         className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
         data-testid="power-timeline-status"
