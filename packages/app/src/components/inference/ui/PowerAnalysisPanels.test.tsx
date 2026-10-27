@@ -232,13 +232,28 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     ).not.toBeNull();
   });
 
-  it('follows the slider to the chip nearest the new interactivity', () => {
+  it('follows the slider to the chip nearest the new interactivity, parts list included', () => {
+    const heading = () =>
+      container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
+    expect(heading()).toBe(`${label('b200_vllm')} FP8 · c16 · 60 tok/s/user`);
     moveSlider(0);
     expect(container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent).toBe(
       '20 tok/s/user',
     );
     expect(drilldowns()).toHaveLength(1);
     expect(drilldownTitle()).toBe(SGLANG_TITLE);
+    // The list re-reads the new chip at its c64 point: GPU 640 W, the heaviest row first.
+    expect(heading()).toBe(`${label('b200_sglang')} FP8 · c64 · 20 tok/s/user`);
+    const rows = [...container.querySelectorAll<HTMLElement>('[data-testid="power-part-row"]')];
+    expect(rows[0].dataset.category).toBe('gpu');
+    expect(rows[0].querySelector('[data-testid="power-part-watts"]')?.textContent).toBe('640 W');
+    // IT only on PowerX by default: no facility row, no facility band.
+    expect(rows.map((row) => row.dataset.category)).not.toContain('facility');
+    expect(
+      container.querySelectorAll(
+        '[data-testid="power-chip-compare-segment"][data-band="facility"]',
+      ),
+    ).toHaveLength(0);
   });
 
   it('stays collapsed after Collapse until a bar is clicked, even when the slider moves', () => {

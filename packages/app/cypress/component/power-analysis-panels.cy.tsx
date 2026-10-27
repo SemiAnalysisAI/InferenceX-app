@@ -202,20 +202,27 @@ describe('PowerAnalysisPanels', () => {
       cy.get('[data-testid="power-breakdown-panel"]').should('be.visible');
       cy.get('[data-testid="power-breakdown-legend"]')
         .should('contain.text', 'Measured GPU')
+        .and('contain.text', 'Modeled server')
         .and('contain.text', 'Facility overhead')
         .and('not.contain.text', 'Grace');
-      // One stacked column per concurrency, each with a measured GPU base and a facility top.
-      cy.get('[data-testid="power-breakdown-bar"][data-category="gpu"]').should('have.length', 4);
-      cy.get('[data-testid="power-breakdown-bar"][data-category="facility"]').should(
-        'have.length',
-        4,
-      );
+      cy.get('[data-testid="power-breakdown-legend-item"]').should('have.length', 3);
+      // One stacked column per concurrency, each with a measured base and a facility top.
+      cy.get('[data-testid="power-breakdown-bar"][data-band="measured"]').should('have.length', 4);
+      cy.get('[data-testid="power-breakdown-bar"][data-band="facility"]').should('have.length', 4);
+      // The parts list beside the plot reads the compared point, heaviest part first.
+      cy.get('[data-testid="power-parts-heading"]').should('contain.text', 'tok/s/user');
+      cy.get('[data-testid="power-part-row"]').should('have.length.at.least', 9);
+      cy.get('[data-testid="power-part-row"]').first().should('have.attr', 'data-category', 'gpu');
+      cy.get('[data-testid="power-part-row"]')
+        .last()
+        .should('have.attr', 'data-category', 'facility');
+      cy.get('[data-testid="power-part-sparkline"]').should('have.length.at.least', 9);
       // Bars sit on the chart's interactivity axis: lowest interactivity (c64) first.
       cy.get('[data-testid$="power-breakdown-plot"]').should(
         'contain.text',
         'Interactivity (output tok/s/user)',
       );
-      cy.get('[data-testid="power-breakdown-bar"][data-category="gpu"]').then(($bars) => {
+      cy.get('[data-testid="power-breakdown-bar"][data-band="measured"]').then(($bars) => {
         const xs = [...$bars].map((bar) => Number(bar.getAttribute('x')));
         expect(xs).to.deep.equal(xs.toSorted((a, b) => a - b));
       });
@@ -226,6 +233,8 @@ describe('PowerAnalysisPanels', () => {
         .should('contain.text', 'c64')
         .and('contain.text', '640')
         .and('contain.text', 'Interactivity (output tok/s/user): 20.0')
+        .and('contain.text', 'Modeled server')
+        .and('contain.text', 'NICs')
         .and('contain.text', 'All in Measured');
       cy.get('[data-testid="power-breakdown-hit"]').eq(0).trigger('mouseleave', { force: true });
 
@@ -236,7 +245,20 @@ describe('PowerAnalysisPanels', () => {
         'true',
       );
       cy.get('[data-testid="power-breakdown-bar"]').should('not.exist');
-      cy.get('[data-testid="power-breakdown-area"]').should('have.length.at.least', 5);
+      cy.get('[data-testid="power-breakdown-area"]').should('have.length', 3);
+      // Hovering a list row raises its band in the plot.
+      cy.get('[data-testid="power-part-row"][data-category="fans"]').trigger('mouseover');
+      cy.get('[data-testid="power-breakdown-area"][data-band="modeled"]').should(
+        'have.attr',
+        'data-emphasis',
+        'highlighted',
+      );
+      cy.get('[data-testid="power-breakdown-area"][data-band="measured"]').should(
+        'have.attr',
+        'data-emphasis',
+        'faded',
+      );
+      cy.get('[data-testid="power-part-row"][data-category="fans"]').trigger('mouseout');
       cy.get('[data-testid="power-breakdown-panel"]').then(($panel) => {
         expect($panel[0].scrollWidth).to.be.at.most($panel[0].clientWidth + 1);
       });

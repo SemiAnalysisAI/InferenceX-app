@@ -13,15 +13,18 @@ import type { AggDataEntry, InferenceData } from '../types';
 import { segmentStyle, swatchStyle } from './PowerBreakdownPanel';
 import { usePowerLayerHighlight } from './power-layer-highlight';
 import {
+  bandPartsAt,
+  bandTarget,
+  bandWattsPerGpu,
   breakdownItWattsPerGpu,
   breakdownSeriesAtBoundary,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
   defaultComparisonInteractivity,
-  MEASURED_POWER_CATEGORIES,
-  POWER_BREAKDOWN_STACK_ORDER,
+  POWER_BANDS,
   powerBreakdownInteractivity,
   powerLayerEmphasis,
+  type PowerBand,
   type PowerBreakdownDisplaySeries,
   type PowerLayerHighlight,
   type SystemPowerCategory,
@@ -47,7 +50,12 @@ const STRINGS = {
     measured: 'Measured',
     modeled: 'Modeled',
     pinned: 'Pinned',
-    legend: 'Power parts',
+    legend: 'Power bands',
+    bands: {
+      measured: 'Measured GPU',
+      modeled: 'Modeled server',
+      facility: 'Facility (PUE)',
+    } satisfies Record<PowerBand, string>,
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -80,7 +88,12 @@ const STRINGS = {
     measured: '实测',
     modeled: '建模',
     pinned: '已固定',
-    legend: '功耗部件',
+    legend: '功耗分段',
+    bands: {
+      measured: '实测 GPU',
+      modeled: '建模服务器',
+      facility: '机房开销（PUE）',
+    } satisfies Record<PowerBand, string>,
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
@@ -207,9 +220,16 @@ export default function PowerChipCompare({
   }, [rows, value]);
   useEffect(() => onNearestKeyChange?.(nearestKey), [nearestKey, onNearestKeyChange]);
   const maxTotal = Math.max(1, ...rows.map((row) => row.entry.totalWattsPerGpu));
-  const categories = POWER_BREAKDOWN_STACK_ORDER.filter((key) =>
-    rows.some((row) => row.entry.wattsPerGpu[key] > 0),
+  const bands = POWER_BANDS.filter((band) =>
+    rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
   );
+  /** A segment's hover text: the band, its watts and (for a modeled band) its parts. */
+  const segmentTitle = (entry: (typeof rows)[number]['entry'], band: PowerBand) => {
+    const parts = bandPartsAt(entry, band);
+    const head = `${t.bands[band]}: ${watts(bandWattsPerGpu(entry, band))} W`;
+    if (band === 'measured' && parts.length === 1) return head;
+    return `${head} · ${parts.map((part) => `${t.categories[part.category]} ${watts(part.watts)} W`).join(' · ')}`;
+  };
   // No chip in this selection has a whole-system model: say so instead of leaving a gap.
   if (series.length === 0 || value === null) {
     return (
@@ -270,22 +290,25 @@ export default function PowerChipCompare({
         aria-label={t.legend}
         data-testid="power-chip-compare-legend"
       >
-        {categories.map((key, index) => {
-          const pinned = layers.highlight?.pinned === true && layers.highlight.category === key;
-          const emphasis = powerLayerEmphasis(key, layers.highlight);
+        {bands.map((band) => {
+          const pinned =
+            layers.highlight?.pinned === true &&
+            layers.highlight.band === band &&
+            layers.highlight.category === null;
+          const emphasis = powerLayerEmphasis(band, layers.highlight);
           return (
-            <li key={key} className="flex min-w-0">
+            <li key={band} className="flex min-w-0">
               <button
                 type="button"
                 data-testid="power-chip-compare-legend-item"
-                data-category={key}
+                data-band={band}
                 data-emphasis={emphasis}
                 aria-pressed={pinned}
-                onMouseEnter={() => layers.hover(key)}
+                onMouseEnter={() => layers.hover(bandTarget(band))}
                 onMouseLeave={() => layers.hover(null)}
-                onFocus={() => layers.hover(key)}
+                onFocus={() => layers.hover(bandTarget(band))}
                 onBlur={() => layers.hover(null)}
-                onClick={() => layers.togglePin(key)}
+                onClick={() => layers.togglePin(bandTarget(band))}
                 className={`flex min-h-7 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left hover:bg-muted/60 ${
                   pinned ? 'bg-muted ring-1 ring-border' : ''
                 }`}
@@ -293,15 +316,15 @@ export default function PowerChipCompare({
                 <span
                   aria-hidden
                   className="inline-block size-3 shrink-0 rounded-[2px]"
-                  title={`${MEASURED_POWER_CATEGORIES.has(key) ? t.measured : t.modeled}${pinned ? ` · ${t.pinned}` : ''}`}
-                  style={swatchStyle(key, LEGEND_COLOR, index, categories.length, layers.highlight)}
+                  title={`${band === 'measured' ? t.measured : t.modeled}${pinned ? ` · ${t.pinned}` : ''}`}
+                  style={swatchStyle(band, LEGEND_COLOR, layers.highlight)}
                 />
                 <span
                   className={`whitespace-nowrap ${
                     emphasis === 'faded' ? 'text-muted-foreground' : 'font-medium'
                   }`}
                 >
-                  {t.categories[key]}
+                  {t.bands[band]}
                 </span>
               </button>
             </li>
@@ -318,8 +341,7 @@ export default function PowerChipCompare({
               entry.overlayRunIndex === undefined
                 ? resolveColor(entry.hwKey)
                 : overlayRunColor(entry.overlayRunIndex);
-            // The ramp spreads over the parts this chip has (an AMD chassis has no NVSwitch).
-            const rowCategories = categories.filter((key) => point.wattsPerGpu[key] > 0);
+            const rowBands = bands.filter((band) => bandWattsPerGpu(point, band) > 0);
             const expanded = renderExpanded !== undefined && entry.key === expandedKey;
             // Inline layout: the bar whose drill-down is open is the active one.
             const active =
@@ -358,28 +380,22 @@ export default function PowerChipCompare({
                       className="flex h-full"
                       style={{ width: `${(point.totalWattsPerGpu / maxTotal) * 100}%` }}
                     >
-                      {rowCategories.map((key, index) => {
-                        const w = point.wattsPerGpu[key];
+                      {rowBands.map((band) => {
+                        const w = bandWattsPerGpu(point, band);
                         const share = w / maxTotal;
                         return (
                           <span
-                            key={key}
-                            title={`${t.categories[key]}: ${watts(w)} W`}
+                            key={band}
+                            title={segmentTitle(point, band)}
                             data-testid="power-chip-compare-segment"
-                            data-category={key}
-                            data-emphasis={powerLayerEmphasis(key, layers.highlight)}
-                            onMouseEnter={() => layers.hover(key)}
+                            data-band={band}
+                            data-emphasis={powerLayerEmphasis(band, layers.highlight)}
+                            onMouseEnter={() => layers.hover(bandTarget(band))}
                             onMouseLeave={() => layers.hover(null)}
                             className="flex h-full items-center justify-center text-2xs font-medium tabular-nums text-foreground"
                             style={{
                               width: `${(w / point.totalWattsPerGpu) * 100}%`,
-                              ...segmentStyle(
-                                key,
-                                color,
-                                index,
-                                rowCategories.length,
-                                layers.highlight,
-                              ),
+                              ...segmentStyle(band, color, layers.highlight),
                             }}
                           >
                             {share >= MIN_LABEL_SHARE ? watts(w) : ''}

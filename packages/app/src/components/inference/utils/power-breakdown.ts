@@ -37,10 +37,56 @@ export const POWER_BREAKDOWN_STACK_ORDER: readonly SystemPowerCategory[] = SYSTE
 export const MEASURED_POWER_CATEGORIES = MEASURED_SYSTEM_POWER_CATEGORIES;
 
 /**
- * One hue per chip: every part is a lightness step of the chip's own colour,
- * most opaque at the measured GPU base and lightest at the facility top. The
- * ramp spreads over the parts a series actually has, so an AMD chassis without
- * NVSwitch or an IT-only stack still gets evenly spaced, tellable steps. A 1 px
+ * The overview draws three bands, not twelve parts: what the meter measured
+ * (GPU boards, plus Grace sockets on NVL72), what the model adds for the rest
+ * of the server (host CPUs, memory, NICs, NVSwitch, storage, PCIe, fans, PSU
+ * loss and the scale-out network share) and the facility overhead PUE adds.
+ * The parts list beside the chart carries the per-component detail.
+ */
+export const POWER_BANDS = ['measured', 'modeled', 'facility'] as const;
+export type PowerBand = (typeof POWER_BANDS)[number];
+
+export const POWER_BAND_CATEGORIES: Record<PowerBand, readonly SystemPowerCategory[]> = {
+  measured: ['gpu', 'measuredCpu'],
+  modeled: ['cpu', 'memory', 'nic', 'nvswitch', 'storage', 'other', 'fans', 'psuLoss', 'network'],
+  facility: ['facility'],
+};
+
+export function powerBandOf(category: SystemPowerCategory): PowerBand {
+  if (category === 'facility') return 'facility';
+  return MEASURED_POWER_CATEGORIES.has(category) ? 'measured' : 'modeled';
+}
+
+/** The bands a series draws, in stack order: those with at least one non-empty part. */
+export function powerBandsOf(categories: readonly SystemPowerCategory[]): PowerBand[] {
+  return POWER_BANDS.filter((band) => categories.some((key) => powerBandOf(key) === band));
+}
+
+/**
+ * How a part behaves across load: read from telemetry, modeled from the GPU
+ * load (fans, PSU loss, and the PUE overhead that scales with IT) or a fixed
+ * figure of the chassis (`system-power-model.test.ts` pins which is which).
+ */
+export type PowerPartBehaviour = 'measured' | 'load' | 'fixed';
+
+export const POWER_PART_BEHAVIOUR: Record<SystemPowerCategory, PowerPartBehaviour> = {
+  gpu: 'measured',
+  measuredCpu: 'measured',
+  cpu: 'fixed',
+  memory: 'fixed',
+  nic: 'fixed',
+  nvswitch: 'fixed',
+  storage: 'fixed',
+  other: 'fixed',
+  fans: 'load',
+  psuLoss: 'load',
+  network: 'fixed',
+  facility: 'load',
+};
+
+/**
+ * One hue per chip: every band is a lightness step of the chip's own colour,
+ * most opaque at the measured base and lightest at the facility top. A 1 px
  * stroke in the chip colour separates neighbours; hover and pin do the rest.
  */
 export const POWER_LAYER_OPACITY_RANGE: readonly [number, number] = [0.92, 0.14];
@@ -52,27 +98,62 @@ export function powerLayerOpacity(index: number, count: number): number {
   return Math.round((base - (base - top) * step) * 1000) / 1000;
 }
 
+/** A band's step is fixed, so the modeled band reads the same with or without the facility. */
+export const powerBandOpacity = (band: PowerBand): number =>
+  powerLayerOpacity(POWER_BANDS.indexOf(band), POWER_BANDS.length);
+
 /** The chip colour at a ramp step, for CSS backgrounds (legend swatches, comparison segments). */
 export const powerLayerFill = (color: string, opacity: number): string =>
   `color-mix(in oklab, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 
-/** The part a viewer is telling apart: hovered (transient) or pinned by a click. */
+/**
+ * The band a viewer is telling apart: hovered (transient) or pinned by a click.
+ * A parts-list row drives it through its component, so the row and its band
+ * light together; the plot and the legends drive it by band alone.
+ */
 export interface PowerLayerHighlight {
-  category: SystemPowerCategory;
+  band: PowerBand;
+  category: SystemPowerCategory | null;
   pinned: boolean;
 }
 
-/** Faded siblings of a highlighted layer keep this much of their opacity. */
+export type PowerLayerTarget = Pick<PowerLayerHighlight, 'band' | 'category'>;
+
+export const bandTarget = (band: PowerBand): PowerLayerTarget => ({ band, category: null });
+
+export const partTarget = (category: SystemPowerCategory): PowerLayerTarget => ({
+  band: powerBandOf(category),
+  category,
+});
+
+export const sameLayerTarget = (
+  a: PowerLayerTarget | null | undefined,
+  b: PowerLayerTarget | null | undefined,
+): boolean => a?.band === b?.band && (a?.category ?? null) === (b?.category ?? null);
+
+/** Faded siblings of a highlighted band keep this much of their opacity. */
 export const POWER_LAYER_FADED_OPACITY = 0.25;
 
 export type PowerLayerEmphasis = 'highlighted' | 'faded' | 'plain';
 
 export function powerLayerEmphasis(
-  category: SystemPowerCategory,
+  band: PowerBand,
   highlight: PowerLayerHighlight | null | undefined,
 ): PowerLayerEmphasis {
   if (!highlight) return 'plain';
-  return highlight.category === category ? 'highlighted' : 'faded';
+  return highlight.band === band ? 'highlighted' : 'faded';
+}
+
+/** A parts-list row: its own component, a sibling in the highlighted band, or neither. */
+export type PowerPartEmphasis = 'highlighted' | 'band' | 'plain';
+
+export function powerPartEmphasis(
+  category: SystemPowerCategory,
+  highlight: PowerLayerHighlight | null | undefined,
+): PowerPartEmphasis {
+  if (!highlight) return 'plain';
+  if (highlight.category === category) return 'highlighted';
+  return highlight.category === null && highlight.band === powerBandOf(category) ? 'band' : 'plain';
 }
 
 export interface PowerBreakdownPoint {
@@ -331,24 +412,135 @@ export function breakdownItWattsPerGpu(entry: Pick<PowerBreakdownPoint, 'wattsPe
   );
 }
 
-export interface StackedSegment {
-  key: SystemPowerCategory;
+export interface StackedSegment<K extends string = PowerBand> {
+  key: K;
   y0: number;
   y1: number;
   watts: number;
 }
 
-export function stackPowerBreakdown(
+/** W/GPU of one band at a point: the sum of its parts. */
+export function bandWattsPerGpu(entry: Pick<PowerBreakdownPoint, 'wattsPerGpu'>, band: PowerBand) {
+  return POWER_BAND_CATEGORIES[band].reduce((sum, key) => sum + entry.wattsPerGpu[key], 0);
+}
+
+/** The three-band stack of a point, bottom up, in the given band order. */
+export function stackPowerBands(
   entry: PowerBreakdownPoint,
-  categories: readonly SystemPowerCategory[],
-): StackedSegment[] {
+  bands: readonly PowerBand[],
+): StackedSegment<PowerBand>[] {
   let y = 0;
-  return categories.map((key) => {
-    const watts = entry.wattsPerGpu[key];
+  return bands.map((key) => {
+    const watts = bandWattsPerGpu(entry, key);
     const segment = { key, y0: y, y1: y + watts, watts };
     y += watts;
     return segment;
   });
+}
+
+/** The parts of one band with watts at a point, in stack order. */
+export function bandPartsAt(
+  entry: Pick<PowerBreakdownPoint, 'wattsPerGpu'>,
+  band: PowerBand,
+): { category: SystemPowerCategory; watts: number }[] {
+  return POWER_BAND_CATEGORIES[band]
+    .map((category) => ({ category, watts: entry.wattsPerGpu[category] }))
+    .filter((part) => part.watts > 0);
+}
+
+export interface PowerPartRow {
+  category: SystemPowerCategory;
+  band: PowerBand;
+  behaviour: PowerPartBehaviour;
+  /** W/GPU at the selected point. */
+  watts: number;
+  /** Share of the point's IT W/GPU; the facility row's share of its facility total. */
+  share: number;
+  /** The part's W/GPU at every point of the series, in interactivity order. */
+  history: number[];
+  /** Top of this row's own sparkline scale: the part's largest W/GPU across the series. */
+  max: number;
+  /** Index of the selected point within `history`. */
+  selectedIndex: number;
+}
+
+/**
+ * The parts list beside the chart: one row per non-empty part of the chip at
+ * the selected point, heaviest first, the facility overhead last. Shares of
+ * the IT rows sum to 1; the facility row is its share of the facility total.
+ */
+export function powerPartRows(
+  series: Pick<PowerBreakdownSeries, 'points'>,
+  entry: PowerBreakdownPoint,
+): PowerPartRow[] {
+  const itWatts = breakdownItWattsPerGpu(entry);
+  const selectedIndex = Math.max(0, series.points.indexOf(entry));
+  const rows = SYSTEM_POWER_CATEGORIES.filter((category) => entry.wattsPerGpu[category] > 0).map(
+    (category): PowerPartRow => {
+      const history = series.points.map((point) => point.wattsPerGpu[category]);
+      const watts = entry.wattsPerGpu[category];
+      return {
+        category,
+        band: powerBandOf(category),
+        behaviour: POWER_PART_BEHAVIOUR[category],
+        watts,
+        share:
+          category === 'facility'
+            ? watts / entry.totalWattsPerGpu
+            : itWatts > 0
+              ? watts / itWatts
+              : 0,
+        history,
+        max: Math.max(0, ...history),
+        selectedIndex,
+      };
+    },
+  );
+  return rows.toSorted((a, b) => {
+    if (a.category === 'facility' || b.category === 'facility') {
+      return a.category === 'facility' ? 1 : -1;
+    }
+    return b.watts - a.watts || a.category.localeCompare(b.category);
+  });
+}
+
+export interface SparklineGeometry {
+  /** Closed area path from the baseline. */
+  area: string;
+  /** The top edge alone, for a 1 px stroke. */
+  line: string;
+  /** The selected point. */
+  dot: { x: number; y: number };
+}
+
+/**
+ * A tiny area of `values` on its own 0..max scale, one evenly spaced x per
+ * value (the PowerX chart spaces points evenly too), 1 px inset so the stroke
+ * and the dot stay inside the box. A single value draws a flat line.
+ */
+const roundPx = (value: number) => Math.round(value * 100) / 100;
+
+export function sparklineGeometry(
+  values: readonly number[],
+  selectedIndex: number,
+  width: number,
+  height: number,
+): SparklineGeometry {
+  const inset = 1;
+  const max = Math.max(0, ...values);
+  const n = Math.max(1, values.length);
+  const x = (index: number) =>
+    n === 1 ? width / 2 : inset + (index / (n - 1)) * (width - 2 * inset);
+  const y = (value: number) =>
+    height - inset - (max > 0 ? (value / max) * (height - 2 * inset) : 0);
+  const points = (values.length === 0 ? [0] : values).map((value, index) => [x(index), y(value)]);
+  const f = roundPx;
+  const line = points
+    .map(([px, py], index) => `${index === 0 ? 'M' : 'L'}${f(px)},${f(py)}`)
+    .join('');
+  const area = `${line}L${f(points.at(-1)![0])},${height - inset}L${f(points[0][0])},${height - inset}Z`;
+  const selected = points[Math.min(Math.max(0, selectedIndex), points.length - 1)];
+  return { area, line, dot: { x: f(selected[0]), y: f(selected[1]) } };
 }
 
 export interface PowerBreakdownComparisonRow<
@@ -378,6 +570,24 @@ export function defaultComparisonInteractivity(
       ? [lo, hi]
       : [Math.min(...ranges.map(([min]) => min)), Math.max(...ranges.map(([, max]) => max))];
   return Math.sqrt(a * b);
+}
+
+/** The series' point nearest `target` on a log scale, whatever the distance; null when empty. */
+export function nearestBreakdownPoint(
+  series: Pick<PowerBreakdownSeries, 'points'>,
+  target: number,
+): PowerBreakdownPoint | null {
+  if (!(target > 0)) return series.points[0] ?? null;
+  let best: PowerBreakdownPoint | null = null;
+  let bestDistance = Infinity;
+  for (const point of series.points) {
+    const distance = Math.abs(Math.log(point.interactivity / target));
+    if (distance < bestDistance) {
+      best = point;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 /**
@@ -415,15 +625,15 @@ export function compareBreakdownsAt<S extends PowerBreakdownSeries>(
 }
 
 /**
- * Every part's stacked band at an arbitrary x, linearly interpolated between
- * the two neighbouring points (clamped to the ends), so a hover between
- * columns can name the layer under the cursor and its W/GPU there.
+ * Every band at an arbitrary x, linearly interpolated between the two
+ * neighbouring points (clamped to the ends), so a hover between columns can
+ * name the band under the cursor and its W/GPU there.
  */
 export function stackedBandsAt(
   points: readonly { x: number; entry: PowerBreakdownPoint }[],
   x: number,
-  categories: readonly SystemPowerCategory[],
-): StackedSegment[] {
+  bands: readonly PowerBand[],
+): StackedSegment<PowerBand>[] {
   if (points.length === 0) return [];
   const sorted = points.toSorted((a, b) => a.x - b.x);
   let right = sorted.findIndex((point) => point.x >= x);
@@ -433,8 +643,8 @@ export function stackedBandsAt(
   const b = sorted[right];
   const span = b.x - a.x;
   const mix = span > 0 ? Math.min(1, Math.max(0, (x - a.x) / span)) : 0;
-  const stackA = stackPowerBreakdown(a.entry, categories);
-  const stackB = stackPowerBreakdown(b.entry, categories);
+  const stackA = stackPowerBands(a.entry, bands);
+  const stackB = stackPowerBands(b.entry, bands);
   return stackA.map((segment, index) => {
     const other = stackB[index];
     const lerp = (from: number, to: number) => from + (to - from) * mix;
@@ -448,17 +658,17 @@ export function stackedBandsAt(
 }
 
 /** The band (in stack order) that contains `watts`; null above the stack or below zero. */
-export function bandAtWatts(
-  bands: readonly StackedSegment[],
+export function bandAtWatts<K extends string>(
+  bands: readonly StackedSegment<K>[],
   watts: number,
-): StackedSegment | null {
+): StackedSegment<K> | null {
   if (!(watts >= 0)) return null;
   return bands.find((band) => band.watts > 0 && watts >= band.y0 && watts <= band.y1) ?? null;
 }
 
 /**
- * Direct labels at the right edge of the area: one per layer at its band
- * centre, pushed apart to `lineHeight` so none overlap. Labels keep their
+ * Direct labels at the right edge of the area: one per band at its centre,
+ * pushed apart to `lineHeight` so none overlap. Labels keep their
  * stack order (`centers` runs bottom to top, in pixel y, so descending);
  * the greedy pass walks the stack upward, then slides the whole run down if it
  * ran past the plot top. Returns a pixel y per label, in the input order.
