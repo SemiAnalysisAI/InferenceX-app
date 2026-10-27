@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '8cf74590a89a4aa56a4e9dff001bc5e58d456492cc7b09d71e7b90690f1d7f34',
+    sourceSha256: 'e37117e8c85b60c1786d87cc5277b243643a049787dda8b301ee3089dde339f9',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '97055c4a644c1c4da47de893afeeeb7a57121de15dd88244aeb5ba0bb67623f0',
+    sourceSha256: 'e19bddc4e9d3e4ab81eb52372048659201aeb73ed6037fa28577e31b885f341f',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -872,6 +872,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'de607d7ae70093d9575fe63158946574d2cd2bfbbd058b504602377995cd0a57',
   },
   {
+    source: 'src/app/api/v1/gpu-metrics-point/stats/route.ts',
+    path: '/api/v1/gpu-metrics-point/stats',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-gpu-metrics-point-stats',
+    sourceSha256: '0c33e545c7742473b299471997bda42bcaba4cc365eada2fc1aa7b231f6e4988',
+  },
+  {
     source: 'src/app/api/v1/request-chart-data/route.ts',
     path: '/api/v1/request-chart-data',
     method: 'GET',
@@ -1308,10 +1316,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/inference-table-data.ts',
-    sourceSha256: '69b7c57385575177fc942b6be1f30856ad1298bb3d0c72edcdcf873f09529975',
+    sourceSha256: '3e21f77c762ec28b824a1afe9ff4027377b25d7ca0cecd125bd41987c78d076b',
     reviewArea: {
-      en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
-      zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',
+      en: 'All in Measured and IT (no PUE) table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
+      zh: '界面、CSV 和公开视图共用的整体实测与 IT（不含 PUE）表格行筛选、可空数值与不可用原因。',
     },
   },
   {
@@ -1344,6 +1352,14 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
       zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/power-breakdown.ts',
+    sourceSha256: 'dc11d8c04a614a9313e390b5eb0911beb1dc94473984eaa6f9a62b9542af1d09',
+    reviewArea: {
+      en: 'Per-point system power breakdown: measured GPU and Grace parts, then the modeled CPU, memory, NIC, NVSwitch, storage, PCIe/misc, fan, PSU-loss, scale-out network and PUE overhead parts, summing to All in Measured W/GPU; the IT (no PUE) boundary is the same stack without the facility part.',
+      zh: '逐点系统功耗构成：实测 GPU 与 Grace 部分，以及建模的 CPU、内存、网卡、NVSwitch、存储、PCIe 及其他、风扇、电源损耗、横向扩展网络与 PUE 开销部分，合计等于 All in Measured W/GPU；IT（不含 PUE）边界即去掉数据中心开销后的同一堆叠。',
     },
   },
   {
@@ -1530,7 +1546,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '00b11a56c38009ada23f4efbc7d378cdc6133377c7ede054230790acf2bf2742',
+    sourceSha256: '7b5e23a835687af4bc7d35edeaadcb267f6ecf7bc42baa8d17ea4482cf81f6bd',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

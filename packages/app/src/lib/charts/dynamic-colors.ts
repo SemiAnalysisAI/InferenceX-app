@@ -204,3 +204,17 @@ export function generateHighContrastGpuDateColors(
 
   return result;
 }
+
+/**
+ * Lighter/darker variant of an `oklch(L C H)` color for the nth series that shares one
+ * hardware color: 0 keeps the base, then alternates darker/lighter in widening steps.
+ * Non-oklch colors are returned unchanged.
+ */
+export function shadeOklch(color: string, index: number): string {
+  if (index <= 0) return color;
+  const groups = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u.exec(color)?.groups;
+  if (!groups) return color;
+  const step = Math.ceil(index / 2) * 0.09 * (index % 2 === 1 ? -1 : 1);
+  const lightness = Math.min(0.92, Math.max(0.3, Number(groups.l) + step));
+  return `oklch(${lightness.toFixed(3)} ${groups.c} ${groups.h})`;
+}

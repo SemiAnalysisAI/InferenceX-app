@@ -38,6 +38,8 @@ export interface CommonLegendItemProps {
   isRemovable?: boolean;
   onShowPoints?: (name: string) => void;
   showPointsAriaLabel?: string;
+  /** Items sharing a section render after the main list under that heading, in given order. */
+  section?: string;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({

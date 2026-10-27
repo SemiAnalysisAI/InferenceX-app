@@ -5,8 +5,12 @@ import {
   estimateRackPower,
   isRackPowerHardware,
   isSystemPowerHardware,
+  emptySystemPowerBreakdown,
   rackComputeTrayCount,
+  scaleSystemPowerBreakdown,
+  SYSTEM_POWER_CATEGORIES,
   SYSTEM_POWER_MODEL_REVISION,
+  type SystemPowerBreakdown,
   type SystemPowerOperatingState,
   type SystemUnitPower,
 } from '@/lib/power/system-power-model';
@@ -43,6 +47,8 @@ interface SupportedSystemPower {
   facilityWatts: number;
   deploymentItWatts: number;
   deploymentFacilityWatts: number;
+  /** `deploymentFacilityWatts` split by category; the parts sum to it. */
+  deploymentBreakdownWatts: SystemPowerBreakdown;
   pue: number;
   telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
   topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
@@ -281,6 +287,7 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
       itWatts: rackModel.itWatts / traysPerRack,
       facilityWatts: rackModel.facilityWatts / traysPerRack,
       pue: rackModel.pue,
+      breakdown: scaleSystemPowerBreakdown(rackModel.breakdown, 1 / traysPerRack),
     };
     models = chassis.map(() => tray);
   } else {
@@ -299,6 +306,12 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
   const facilityWatts = results.reduce((sum, r) => sum + r.model.facilityWatts, 0);
   const share = (watts: (r: (typeof results)[number]) => number) =>
     results.reduce((sum, r) => sum + (watts(r) * r.measuredGpus) / unitGpuCount, 0);
+  const deploymentBreakdownWatts = emptySystemPowerBreakdown();
+  for (const key of SYSTEM_POWER_CATEGORIES) {
+    deploymentBreakdownWatts[key] = extrapolated
+      ? share((r) => r.model.breakdown[key])
+      : results.reduce((sum, r) => sum + r.model.breakdown[key], 0);
+  }
   const estimate: SupportedSystemPower = {
     status: 'supported',
     hardware,
@@ -313,6 +326,7 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     facilityWatts,
     deploymentItWatts: extrapolated ? share((r) => r.model.itWatts) : itWatts,
     deploymentFacilityWatts: extrapolated ? share((r) => r.model.facilityWatts) : facilityWatts,
+    deploymentBreakdownWatts,
     pue: results[0].model.pue,
     telemetryBasis: unversionedSingleNode ? 'validated-unversioned-single-node' : 'validated-v2',
     topologyBasis,

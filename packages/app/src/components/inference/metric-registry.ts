@@ -397,6 +397,22 @@ export const METRIC_REGISTRY = {
     titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
     polarity: 'lower',
   },
+  itModeledWatts: {
+    field: 'itModeledWatts.y',
+    label: 'All in Measured IT Power per Chip, no PUE (W)',
+    labelZh: '每芯片整体实测 IT 功耗，不含 PUE（W）',
+    title: 'All in Measured IT Power per Chip (no PUE)',
+    titleZh: '每芯片整体实测 IT 功耗（不含 PUE）',
+    polarity: 'lower',
+  },
+  itModeledJPerOutputToken: {
+    field: 'itModeledJPerOutputToken.y',
+    label: 'All in Measured IT J per Output Token, no PUE (J/tok)',
+    labelZh: '每输出 token 整体实测 IT 能耗，不含 PUE（J/tok）',
+    title: 'All in Measured IT Joules per Output Token (no PUE)',
+    titleZh: '每输出 token 整体实测 IT 焦耳能耗（不含 PUE）',
+    polarity: 'lower',
+  },
   utilityModeledWatts: {
     field: 'utilityModeledWatts.y',
     label: 'All in Measured Power per Chip (W)',
@@ -660,6 +676,8 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
   'y_gpuProvisionedJPerOutputToken',
   'y_utilityProvisionedJPerOutputToken',
+  'y_itModeledWatts',
+  'y_itModeledJPerOutputToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',
 ] as const satisfies readonly MetricConfigKey[];
@@ -672,8 +690,16 @@ export function isPowerBasisConfigKey(configKey: string): boolean {
   return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
+const ALL_IN_MEASURED_CONFIG_KEYS: ReadonlySet<string> = new Set([
+  'y_itModeledWatts',
+  'y_itModeledJPerOutputToken',
+  'y_utilityModeledWatts',
+  'y_utilityModeledJPerOutputToken',
+]);
+
+/** The modeled measured boundaries (IT without PUE and the facility meter); both share the All in Measured table rules. */
 export function isAllInMeasuredConfigKey(configKey: string): boolean {
-  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
+  return ALL_IN_MEASURED_CONFIG_KEYS.has(configKey);
 }
 
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [

@@ -188,6 +188,8 @@ const responseExample = {
     serviceCompare: false,
     roleShare: false,
     powerFit: false,
+    powerBreakdown: false,
+    headroom: false,
   },
 };
 
