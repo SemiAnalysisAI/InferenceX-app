@@ -6,7 +6,7 @@ import {
   DEFAULT_RUN_CONFIG,
   disabledTopologyReason,
   encodeRunConfig,
-  INFERENCEX_CONFIG_REVISION,
+  INFERENCEX_CONFIGS_URL,
   normalizeRunConfig,
   type RunConfigSelection,
 } from './run-config';
@@ -39,7 +39,7 @@ const VARIANTS: Record<string, RunConfigSelection> = {
 };
 
 describe('buildRunConfig', () => {
-  it('emits clean YAML with the citations beside it, not inside it', () => {
+  it('emits clean YAML with no code citations anywhere', () => {
     const config = buildRunConfig(VARIANTS['hgx multi fixed require']);
     expect(config.yaml).toMatchInlineSnapshot(`
       "kimik3-fp4-h200-dynamo-sglang:
@@ -57,13 +57,11 @@ describe('buildRunConfig', () => {
     `);
     expect(config.yaml).not.toContain('#');
     expect(config.file).toBe('configs/nvidia-master.yaml');
-    expect(config.sources).toEqual([
-      'configs/nvidia-master.yaml:1380-1386',
-      'infx/matrix/validation.py:714-716',
-      'infx/matrix/validation.py:640',
-      'infx/matrix/validation.py:664',
-      'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:42',
-    ]);
+    expect(Object.keys(config).toSorted()).toEqual(['file', 'notes', 'yaml']);
+    expect(config.yaml).not.toMatch(/\.(?:py|md|yaml):\d+/u);
+    expect(INFERENCEX_CONFIGS_URL).toMatch(
+      /\/blob\/[0-9a-f]{7,}\/inferencex-e2e\/configs\/CONFIGS\.md$/u,
+    );
   });
 
   it('only emits power: true and require-power on multi-node rows', () => {
@@ -81,9 +79,6 @@ describe('buildRunConfig', () => {
     expect(agentx.yaml).toContain('agentic-coding:');
     expect(agentx.yaml).toContain('power: true');
     expect(agentx.yaml).not.toContain('require-power');
-    expect(agentx.sources).toContain(
-      'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:45-53',
-    );
   });
 
   it('flips the notes with the selection', () => {
@@ -96,9 +91,6 @@ describe('buildRunConfig', () => {
       'single-node',
       'amd-exporter',
     ]);
-    expect(buildRunConfig(VARIANTS['hgx multi fixed require']).revision).toBe(
-      INFERENCEX_CONFIG_REVISION,
-    );
   });
 
   it('disables AMD multi-node and snaps it to single node', () => {

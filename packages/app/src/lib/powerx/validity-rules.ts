@@ -9,11 +9,11 @@ export const CLOCK_TOLERANCE_SECONDS = 0.5;
 export const CLOCK_TOLERANCE_FRACTION = 0.01;
 
 export const VALIDITY_CHECKS = [
-  { id: 'devices', reason: 'expected_device_missing', source: 'multinode.py:503' },
-  { id: 'gap', reason: 'sample_gap_exceeded', source: 'multinode.py:86, :773' },
-  { id: 'clock', reason: 'measurement_window_clock_mismatch', source: 'multinode.py:96, :729' },
-  { id: 'producer', reason: 'producer_commit_mismatch', source: 'multinode.py:993' },
-  { id: 'tokens', reason: 'invalid_output_token_count', source: 'common.py:178' },
+  { id: 'devices', reason: 'expected_device_missing' },
+  { id: 'gap', reason: 'sample_gap_exceeded' },
+  { id: 'clock', reason: 'measurement_window_clock_mismatch' },
+  { id: 'producer', reason: 'producer_commit_mismatch' },
+  { id: 'tokens', reason: 'invalid_output_token_count' },
 ] as const;
 export type ValidityCheckId = (typeof VALIDITY_CHECKS)[number]['id'];
 export type ValidityReason = (typeof VALIDITY_CHECKS)[number]['reason'];

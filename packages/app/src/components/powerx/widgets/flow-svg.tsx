@@ -227,10 +227,16 @@ export function FlowSvg({
   }
   const windowBox = boxes.window;
   const energyBox = boxes.energy;
+  // The branch ends where its arrowhead sits: under the window box when the row is horizontal
+  // (the energy box is wider than the window box, so its own centre is not on the line).
+  const branchEnd: [number, number] =
+    orientation === 'horizontal'
+      ? [windowBox.x + windowBox.w / 2, energyBox.y]
+      : [energyBox.x + energyBox.w / 2, energyBox.y];
   const branch =
     orientation === 'horizontal'
-      ? `M${windowBox.x + windowBox.w / 2},${windowBox.y + windowBox.h} L${windowBox.x + windowBox.w / 2},${energyBox.y}`
-      : `M${windowBox.x + windowBox.w},${windowBox.y + windowBox.h / 2} L${energyBox.x + energyBox.w / 2},${windowBox.y + windowBox.h / 2} L${energyBox.x + energyBox.w / 2},${energyBox.y}`;
+      ? `M${branchEnd[0]},${windowBox.y + windowBox.h} L${branchEnd[0]},${branchEnd[1]}`
+      : `M${windowBox.x + windowBox.w},${windowBox.y + windowBox.h / 2} L${branchEnd[0]},${windowBox.y + windowBox.h / 2} L${branchEnd[0]},${branchEnd[1]}`;
 
   return (
     <svg
@@ -308,7 +314,7 @@ export function FlowSvg({
             style={motionVars({ delayMs: delays.branch, drawMs: FLOW_MOTION.branchMs })}
           />
           <path
-            d={arrowHead(energyBox.x + energyBox.w / 2, energyBox.y, 'down')}
+            d={arrowHead(...branchEnd, 'down')}
             fill="none"
             stroke={palette.muted}
             strokeWidth={1.25}

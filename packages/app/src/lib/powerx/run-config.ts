@@ -1,9 +1,9 @@
 import { snapTo } from './widget-hash';
 
 /**
- * Pure generator behind the run-config widget on /powerx/tutorial. The YAML stays clean; the
- * InferenceX lines each row comes from are returned separately (paths relative to
- * `inferencex-e2e/` at `INFERENCEX_CONFIG_REVISION`).
+ * Pure generator behind the run-config widget on /powerx/tutorial. The YAML mirrors the matrix
+ * entries in InferenceX at `INFERENCEX_CONFIG_REVISION`; readers see the config, not the
+ * launcher code behind it.
  */
 
 export const INFERENCEX_CONFIG_REVISION = 'e1356ab';
@@ -55,10 +55,7 @@ export function normalizeRunConfig(selection: RunConfigSelection): RunConfigSele
 export interface RunConfig {
   file: string;
   yaml: string;
-  /** InferenceX locations the rows come from, in the order they first apply. */
-  sources: string[];
   notes: RunConfigNote[];
-  revision: string;
 }
 
 const MASTER_FILE: Record<RunPlatform, string> = {
@@ -87,7 +84,6 @@ const ENTRY: Record<RunPlatform, { single: string; multi: string; recipeDir: str
 
 interface Line {
   text: string;
-  source?: string;
 }
 
 function singleNodeLines(selection: RunConfigSelection): Line[] {
@@ -100,11 +96,10 @@ function singleNodeLines(selection: RunConfigSelection): Line[] {
           { text: '    - dram-utilization: 0.80' },
           { text: '      search-space:' },
           { text: '      - tp: 8' },
-          { text: '        kv-offloading: none', source: 'infx/matrix/validation.py:710-713' },
+          { text: '        kv-offloading: none' },
           { text: '        conc-list: [1, 2, 4, 8]' },
           {
             text: '        srt-recipe: agentic.yaml',
-            source: 'infx/srt_slurm/workload.py:345-347',
           },
         ]
       : [
@@ -116,10 +111,10 @@ function singleNodeLines(selection: RunConfigSelection): Line[] {
           { text: '      - tp: 8' },
           { text: '        conc-start: 4' },
           { text: '        conc-end: 64' },
-          { text: '        srt-recipe: 8k1k.yaml', source: 'srt-slurm-recipes/RECIPES.md:56' },
+          { text: '        srt-recipe: 8k1k.yaml' },
         ];
   return [
-    { text: `${entry.single}:`, source: 'infx/matrix/validation.py:714-716' },
+    { text: `${entry.single}:` },
     { text: '  multinode: false' },
     { text: `  srt-recipe-dir: ${entry.recipeDir}` },
     ...scenario,
@@ -129,16 +124,8 @@ function singleNodeLines(selection: RunConfigSelection): Line[] {
 function multiNodeLines(selection: RunConfigSelection): Line[] {
   const entry = ENTRY[selection.platform];
   const requireLine: Line[] =
-    selection.strictness === 'require'
-      ? [{ text: '      require-power: true', source: 'infx/matrix/validation.py:640' }]
-      : [];
-  const powerLine: Line = {
-    text: '        power: true',
-    source:
-      selection.workload === 'agentx'
-        ? 'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:45-53'
-        : 'configs/CONFIGS.md:156; infx/launch/drivers/srt/power.py:42',
-  };
+    selection.strictness === 'require' ? [{ text: '      require-power: true' }] : [];
+  const powerLine: Line = { text: '        power: true' };
   const scenario: Line[] =
     selection.workload === 'agentx'
       ? [
@@ -150,7 +137,7 @@ function multiNodeLines(selection: RunConfigSelection): Line[] {
           { text: '      - spec-decoding: mtp' },
           { text: '        kv-offloading: none' },
           { text: '        conc-list: [1, 2, 4, 8]' },
-          { text: '        num-nodes: 4', source: 'infx/matrix/validation.py:664' },
+          { text: '        num-nodes: 4' },
           { text: '        srt-recipe: agg-tp16dp2ep32-latency.yaml' },
           powerLine,
         ]
@@ -161,16 +148,12 @@ function multiNodeLines(selection: RunConfigSelection): Line[] {
           { text: '      osl: 1024' },
           ...requireLine,
           { text: '      search-space:' },
-          { text: '      - num-nodes: 4', source: 'infx/matrix/validation.py:664' },
+          { text: '      - num-nodes: 4' },
           { text: '        srt-recipe: agg-tp16dp2ep32-latency.yaml' },
           powerLine,
           { text: '        conc-list: [1, 2, 4, 8]' },
         ];
-  return [
-    { text: `${entry.multi}:`, source: 'configs/nvidia-master.yaml:1380-1386' },
-    { text: '  multinode: true', source: 'infx/matrix/validation.py:714-716' },
-    ...scenario,
-  ];
+  return [{ text: `${entry.multi}:` }, { text: '  multinode: true' }, ...scenario];
 }
 
 export function buildRunConfig(input: RunConfigSelection): RunConfig {
@@ -182,16 +165,10 @@ export function buildRunConfig(input: RunConfigSelection): RunConfig {
   if (selection.platform === 'nvl72') notes.push('nvl72-grace');
   if (selection.platform === 'amd') notes.push('amd-exporter');
   if (selection.workload === 'agentx' && selection.topology === 'multi') notes.push('agentx-lane');
-  const sources: string[] = [];
-  for (const line of lines) {
-    if (line.source && !sources.includes(line.source)) sources.push(line.source);
-  }
   return {
     file: MASTER_FILE[selection.platform],
     yaml: lines.map((line) => line.text).join('\n'),
-    sources,
     notes,
-    revision: INFERENCEX_CONFIG_REVISION,
   };
 }
 

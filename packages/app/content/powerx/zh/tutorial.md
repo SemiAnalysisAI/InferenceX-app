@@ -1,6 +1,6 @@
 ---
-title: 'PowerX：实测 GPU 功耗，建模系统功耗'
-description: '每秒一次的 GPU 遥测如何变成每 token 能量、IT 功率和数据中心功率，哪些是实测、哪些是建模，以及这些数字怎么用。'
+title: '每一块 GPU，每一秒，每一瓦'
+description: 'PowerX 公开实测 AI 推理背后的功耗。'
 updated: '2026-10-27'
 ---
 

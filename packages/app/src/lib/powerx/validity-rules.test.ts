@@ -12,7 +12,9 @@ describe('validity checks', () => {
       'invalid_output_token_count',
     ]);
     expect(new Set(VALIDITY_CHECKS.map((check) => check.id)).size).toBe(VALIDITY_CHECKS.length);
-    for (const check of VALIDITY_CHECKS) expect(check.source).toMatch(/\.py:\d+/u);
+    for (const check of VALIDITY_CHECKS) {
+      expect(Object.keys(check), 'reason codes only, no code citations').toEqual(['id', 'reason']);
+    }
   });
 
   it('keeps the 3 s sample-gap limit and the max(0.5 s, 1 %) clock tolerance', () => {

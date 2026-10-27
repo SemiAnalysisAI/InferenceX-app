@@ -1,6 +1,6 @@
 ---
-title: 'PowerX: measured GPU power, modeled system power'
-description: 'How one-second GPU telemetry becomes energy per token, IT power and facility power, what is measured and what is modeled, and how to use the numbers.'
+title: 'Every GPU. Every second. Every watt.'
+description: 'PowerX measures the power behind AI inference, in the open.'
 updated: '2026-10-27'
 ---
 

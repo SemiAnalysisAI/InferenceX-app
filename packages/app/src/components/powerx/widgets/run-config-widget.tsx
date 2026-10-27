@@ -8,7 +8,6 @@ import {
   decodeRunConfig,
   disabledTopologyReason,
   encodeRunConfig,
-  INFERENCEX_CONFIG_REVISION,
   INFERENCEX_CONFIGS_URL,
   RUN_PLATFORMS,
   RUN_STRICTNESS,
@@ -40,7 +39,7 @@ const STRINGS = {
       multi: 'power: true merges the DCGM telemetry recipe',
     },
     amdMulti:
-      'Multi-node AMD power is not collected yet: no AMD cluster is in POWER_LANES and amd-master.yaml sets no power: true.',
+      'Multi-node AMD power is not collected yet: no AMD cluster is registered as a power lane and amd-master.yaml sets no power: true.',
     more: 'More options',
     workload: 'Workload',
     workloads: { fixed: 'Fixed sequence', agentx: 'AgentX' },
@@ -51,14 +50,13 @@ const STRINGS = {
       require: 'require-power fails the point on an invalid window',
     },
     copy: 'Copy YAML',
-    sources: (revision: string) => `Sources at InferenceX ${revision}`,
     notes: {
       'single-node':
         'Single-node rows inherit telemetry-native.yaml; power: true is rejected on them.',
       'nvl72-grace':
         'On NVL72 the Grace socket is measured when its window passes the Grace check.',
       'amd-exporter': 'AMD rows read device-metrics-exporter at 1 s; the metric is package power.',
-      'agentx-lane': 'The multi-node AgentX lane must be listed with agentx=True in POWER_LANES.',
+      'agentx-lane': 'The multi-node AgentX lane must be registered as an AgentX power lane.',
     },
     reference: 'Field reference',
   },
@@ -77,7 +75,7 @@ const STRINGS = {
       multi: 'power: true 会合并 DCGM 遥测配置',
     },
     amdMulti:
-      '多节点 AMD 功耗暂未采集：POWER_LANES 中没有 AMD 集群，amd-master.yaml 也没有设置 power: true。',
+      '多节点 AMD 功耗暂未采集：没有 AMD 集群登记为功耗 lane，amd-master.yaml 也没有设置 power: true。',
     more: '更多选项',
     workload: '工作负载',
     workloads: { fixed: '固定序列', agentx: 'AgentX' },
@@ -88,12 +86,11 @@ const STRINGS = {
       require: 'require-power 会让窗口无效的数据点直接失败',
     },
     copy: '复制 YAML',
-    sources: (revision: string) => `来源：InferenceX ${revision}`,
     notes: {
       'single-node': '单节点条目继承 telemetry-native.yaml，不接受 power: true。',
       'nvl72-grace': 'NVL72 上窗口通过 Grace 校验时，Grace socket 为实测值。',
       'amd-exporter': 'AMD 条目以 1 s 读取 device-metrics-exporter，指标为封装功耗。',
-      'agentx-lane': '多节点 AgentX lane 必须在 POWER_LANES 中以 agentx=True 登记。',
+      'agentx-lane': '多节点 AgentX lane 必须登记为 AgentX 功耗 lane。',
     },
     reference: '字段参考',
   },
@@ -195,8 +192,7 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
           {config.yaml}
         </pre>
       </div>
-      <p className="mt-2 font-mono text-xs leading-5 text-muted-foreground">
-        {t.sources(INFERENCEX_CONFIG_REVISION)} · {config.sources.join(' · ')} ·{' '}
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">
         <a
           href={INFERENCEX_CONFIGS_URL}
           target="_blank"

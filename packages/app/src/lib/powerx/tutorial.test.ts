@@ -18,6 +18,10 @@ import { remarkGithubAlerts } from './remark-github-alerts';
 import { remarkGithubHtml } from './remark-github-html';
 import { remarkWidgetImages } from './remark-widget-images';
 import {
+  buildPowerXTutorialJsonLd,
+  type PowerXTutorialMeta,
+  powerxTutorialMetadata,
+  powerxTutorialSeoTitle,
   tutorialFilePath,
   tutorialFrontmatterErrors,
   tutorialImageSrc,
@@ -124,6 +128,29 @@ describe('PowerX tutorial front matter', () => {
     expect(tutorialFrontmatterErrors({ ...en.data, updated: '2026-13-01' })).toEqual([
       "updated must be a quoted 'YYYY-MM-DD' date",
     ]);
+  });
+});
+
+describe('PowerX tutorial metadata', () => {
+  it('keeps the launch line as the H1 and prefixes the <title> and headline with the page kind', () => {
+    const enMeta = en.data as unknown as PowerXTutorialMeta;
+    const zhMeta = zh.data as unknown as PowerXTutorialMeta;
+    expect(enMeta.title).toBe('Every GPU. Every second. Every watt.');
+    expect(powerxTutorialSeoTitle(enMeta, 'en')).toBe(
+      'PowerX tutorial: Every GPU. Every second. Every watt.',
+    );
+    expect(powerxTutorialSeoTitle(zhMeta, 'zh')).toBe('PowerX 教程：每一块 GPU，每一秒，每一瓦');
+    for (const [meta, locale] of [
+      [enMeta, 'en'],
+      [zhMeta, 'zh'],
+    ] as const) {
+      const seoTitle = powerxTutorialSeoTitle(meta, locale);
+      const metadata = powerxTutorialMetadata(meta, locale);
+      expect(metadata.title, locale).toBe(seoTitle);
+      expect(metadata.description, locale).toBe(meta.description);
+      expect(metadata.openGraph?.title, locale).toBe(`${seoTitle} | InferenceX`);
+      expect(buildPowerXTutorialJsonLd(meta, locale).headline, locale).toBe(seoTitle);
+    }
   });
 });
 

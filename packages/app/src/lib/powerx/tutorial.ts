@@ -92,24 +92,33 @@ export function powerxTutorialPath(locale: Locale = 'en'): string {
   return localePath(POWERX_TUTORIAL_PATH, locale);
 }
 
+/**
+ * The H1 is the launch line on its own; search results, link previews and the JSON-LD headline
+ * carry a "PowerX tutorial" prefix so they still say what the page is.
+ */
+export function powerxTutorialSeoTitle(meta: PowerXTutorialMeta, locale: Locale): string {
+  return locale === 'zh' ? `PowerX 教程：${meta.title}` : `PowerX tutorial: ${meta.title}`;
+}
+
 export function powerxTutorialMetadata(meta: PowerXTutorialMeta, locale: Locale): Metadata {
   const url = `${SITE_URL}${powerxTutorialPath(locale)}`;
+  const title = powerxTutorialSeoTitle(meta, locale);
   return {
-    title: meta.title,
+    title,
     description: meta.description,
     alternates:
       locale === 'zh' ? zhAlternates(POWERX_TUTORIAL_PATH) : enAlternates(POWERX_TUTORIAL_PATH),
     // The /powerx tab is not indexable until the article ships; flip both sides together.
     robots: { index: false, follow: true },
     openGraph: {
-      title: `${meta.title} | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description: meta.description,
       url,
       type: 'article',
       modifiedTime: `${meta.updated}T00:00:00Z`,
       ...(locale === 'zh' && { locale: ZH_OG_LOCALE }),
     },
-    twitter: { title: `${meta.title} | ${SITE_NAME}`, description: meta.description },
+    twitter: { title: `${title} | ${SITE_NAME}`, description: meta.description },
   };
 }
 
@@ -117,7 +126,7 @@ export function buildPowerXTutorialJsonLd(meta: PowerXTutorialMeta, locale: Loca
   return {
     '@context': 'https://schema.org',
     '@type': 'TechArticle',
-    headline: meta.title,
+    headline: powerxTutorialSeoTitle(meta, locale),
     description: meta.description,
     url: `${SITE_URL}${powerxTutorialPath(locale)}`,
     inLanguage: locale === 'zh' ? ZH_LANG_TAG : 'en',
