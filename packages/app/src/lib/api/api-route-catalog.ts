@@ -1211,7 +1211,9 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/catalog/model-architectures.ts',
-    sourceSha256: 'b70020f3ca528f3ef01f3e55421801fdf059fd08033c9cf79eac79831b8bfebb',
+    // Reviewed for the MiMo-V2.6-Flash addition (InferenceX#4330): one new
+    // entry with existing fields only, so the architecture catalog shape stands.
+    sourceSha256: '95a2e2cc6bd1450fc6b44cab88c4845d47746cb31c7981020cb891022536032c',
     reviewArea: {
       en: 'Model architecture facts shared by model pages, diagrams and the public architecture catalog; preserve exact dimensions, parameter accounting, source URLs and optional fields.',
       zh: '模型页、架构图和公开架构目录共用的规格；保留精确维度、参数量口径、来源链接及可选字段。',
@@ -1667,7 +1669,10 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): the model
     // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
     // shape change, so the docs stand.
-    sourceSha256: 'b722464d1738566c5b71eb44975539028eca4d0a68342362dceff041c5b43a97',
+    // Reviewed for the MiMo-V2.6-Flash addition (InferenceX#4330): the model
+    // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
+    // shape change, so the docs stand.
+    sourceSha256: 'fff0a4022436733c86917ff224d5e63ea97b96f759b377e11107993c785209b2',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1696,7 +1701,10 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): one new DB
     // key, `minimaxm31flash`, with its own display name and release date. The
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
-    sourceSha256: '9afbd7db9690502ea53977496f228c89dc184c41e4a81a13a248bbf6fd38afb9',
+    // Reviewed for the MiMo-V2.6-Flash addition (InferenceX#4330): one new DB
+    // key, `mimov2.6flash`, with its own display name and release date. The
+    // AgentX cookbook documents the model; no endpoint or parameter shape changes.
+    sourceSha256: '28249b7c18136e523b825c96a3f72a05d19223bf5a68991a5056fa9ac6d42210',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
