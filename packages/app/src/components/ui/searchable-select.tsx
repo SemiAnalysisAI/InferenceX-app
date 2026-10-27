@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { matchesSearch } from '@/lib/shared/search-match';
 import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_HEIGHT,
@@ -136,14 +137,12 @@ export function SearchableSelect({
 
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
-    const lower = search.toLowerCase();
     const seen = new Set<string>();
     return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
         options: g.options.filter((opt) => {
-          const matches =
-            opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower);
+          const matches = matchesSearch(opt.label, search) || matchesSearch(g.label, search);
           if (!matches || seen.has(opt.value)) return false;
           seen.add(opt.value);
           return true;
