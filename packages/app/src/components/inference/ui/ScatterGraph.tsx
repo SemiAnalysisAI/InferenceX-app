@@ -144,7 +144,7 @@ import {
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
-import { ALL_IN_MEASURED_EMPTY } from '@/lib/power/power-basis';
+import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -191,6 +191,14 @@ import {
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
+import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
+import {
+  usePowerXSurface,
+  useSetPowerXActivePoint,
+  useSetPowerXCompareTarget,
+  type PowerXActivePointUpdate,
+} from '@/components/inference/ui/powerx-surface';
+import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -267,6 +275,7 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
       ['basis', 'gpu-measured'],
       ['basis', 'gpu-provisioned'],
       ['basis', 'utility-provisioned'],
+      ['basis', 'it-modeled'],
       ['basis', 'utility-modeled'],
       ['role', 'all'],
       ['role', 'prefill'],
@@ -512,6 +521,10 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    plotHeight,
+    legendControls,
+    legendFooter,
+    legendMobileLabel,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -591,6 +604,11 @@ const ScatterGraph = React.memo(
       [showPowerEnvelope, paretoDirection, selectedYAxisMetric],
     );
     const locale = useLocale();
+    // PowerX names the measured boundaries the way its Count control does.
+    const powerXSurface = usePowerXSurface();
+    const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
+    // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
+    const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
@@ -1363,10 +1381,17 @@ const ScatterGraph = React.memo(
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
 
+      // Bounded metrics (% TDP) read against their full 0-to-limit range, with headroom
+      // so the dashed limit line stays visible.
       const ceiling = metricAxisCeiling(selectedYAxisMetric);
+      if (ceiling !== undefined && !useLog) yMin = 0;
+      // % TDP stops at 100%; values above the rating keep the plain 5% headroom.
+      // The PowerX headroom band runs up to the rating, so the axis reaches it then.
       const yMax =
         ceiling !== undefined && ext[1] <= ceiling
-          ? Math.min(ext[1] * 1.05, ceiling)
+          ? headroomShading
+            ? ceiling
+            : Math.min(ext[1] * 1.05, ceiling)
           : ext[1] * 1.05;
 
       return {
@@ -1381,6 +1406,7 @@ const ScatterGraph = React.memo(
       niceAxes,
       yExtentOverride,
       selectedYAxisMetric,
+      headroomShading,
     ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
@@ -1660,7 +1686,15 @@ const ScatterGraph = React.memo(
         return {
           name: legendId,
           hw: legendId,
-          label: powerVariantLabel(variant, locale),
+          label: powerVariantLabel(variant, locale, powerLabelStyle),
+          section:
+            variant.kind === 'basis'
+              ? locale === 'zh'
+                ? '功耗边界'
+                : 'Boundary'
+              : locale === 'zh'
+                ? 'GPU 角色'
+                : 'GPU role',
           color: 'var(--foreground)',
           lineDasharray: isBase ? '1 0' : powerVariantDash(variant) || '1 0',
           isActive: !hiddenPowerVariants.has(isBase ? '' : id),
@@ -1686,6 +1720,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       powerCompareBaseId,
       locale,
+      powerLabelStyle,
       hiddenPowerVariants,
     ]);
 
@@ -1858,6 +1893,16 @@ const ScatterGraph = React.memo(
       [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
+    const setCompareTarget = useSetPowerXCompareTarget();
+    // PowerX: the readout row under the caption follows the hovered or pinned point.
+    const setActivePoint = useSetPowerXActivePoint();
+    const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
+    activePointRef.current = setActivePoint;
+    const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
+    compareFollowsHoverRef.current =
+      setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
+        ? setCompareTarget
+        : null;
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
@@ -2188,20 +2233,28 @@ const ScatterGraph = React.memo(
               ? (interactionRef.current.logAvailability?.[d.id] ?? false)
               : false,
             locale,
+            powerLabelStyle,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
-        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          // PowerX: the chip comparison follows the hovered point's interactivity.
+          if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
+          activePointRef.current?.({ point: d, source: 'hover' });
           applyHoverState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
-        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+          );
+        },
+        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          activePointRef.current?.(null);
           applyNormalState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
+          );
+        },
         onPointClick: (d: InferenceData) => {
+          activePointRef.current?.({ point: d, source: 'pinned' });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
@@ -2259,7 +2312,15 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       }),
-      [attachPowerTraceAction, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, locale],
+      [
+        attachPowerTraceAction,
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        locale,
+        powerLabelStyle,
+      ],
     );
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
@@ -2277,11 +2338,24 @@ const ScatterGraph = React.memo(
         powerLineLabelSuffix(identity.variant, {
           isBase: identity.isBase,
           locale,
+          labelStyle: powerLabelStyle,
           flatWatts:
             !identity.isBase && wattsAxis && identity.variant?.kind === 'basis'
               ? flatSeriesValue(points.map((point) => point.y))
               : null,
         });
+
+      // Comparison lines carry no label pill (the legend's line styles name them) unless they
+      // are flat references whose value is the point of the pill, e.g. "TDP 1 kW".
+      const showsLinePill = (hw: string, points: readonly InferenceData[]) => {
+        const identity = lineLabelIdentity(hw, points);
+        if (identity.isBase) return true;
+        return (
+          wattsAxis &&
+          identity.variant?.kind === 'basis' &&
+          flatSeriesValue(points.map((point) => point.y)) !== null
+        );
+      };
 
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
@@ -2530,26 +2604,26 @@ const ScatterGraph = React.memo(
               }
             }
 
-            const officialSeries: LineLabelSeries<InferenceData>[] = [
-              ...officialByGroup.values(),
-            ].map((entry) => {
-              const identity = lineLabelIdentity(entry.hw, entry.points);
-              const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
-              return {
-                key: entry.key,
-                seriesId: identity.seriesId,
-                label: `${lineLabelText(
-                  entry.hw,
-                  entry.precision,
-                  multiPrecision,
-                  modelLabel,
-                  entry.points,
-                )}${suffix}`,
-                color: ir.getCssColor(ir.resolveColor(entry.hw)),
-                points: entry.points,
-              };
-            });
+            const officialSeries: LineLabelSeries<InferenceData>[] = [...officialByGroup.values()]
+              .filter((entry) => showsLinePill(entry.hw, entry.points))
+              .map((entry) => {
+                const identity = lineLabelIdentity(entry.hw, entry.points);
+                const suffix = lineLabelSuffix(identity, entry.points);
+                lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
+                return {
+                  key: entry.key,
+                  seriesId: identity.seriesId,
+                  label: `${lineLabelText(
+                    entry.hw,
+                    entry.precision,
+                    multiPrecision,
+                    modelLabel,
+                    entry.points,
+                  )}${suffix}`,
+                  color: ir.getCssColor(ir.resolveColor(entry.hw)),
+                  points: entry.points,
+                };
+              });
             const overlayRunsByHw = new Map<string, Set<number>>();
             for (const group of Object.values(displayedOverlayRooflines)) {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
@@ -2560,6 +2634,7 @@ const ScatterGraph = React.memo(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
+              if (!showsLinePill(group.hwKey, group.points)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
               const hardwareLabel = lineLabelText(
@@ -3084,6 +3159,7 @@ const ScatterGraph = React.memo(
                     hardwareConfig: overlayData.hardwareConfig,
                     overlayData,
                     locale,
+                    powerLabelStyle,
                   }),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
@@ -3333,9 +3409,175 @@ const ScatterGraph = React.memo(
           ),
       };
 
-      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
+      const axisCeiling = metricAxisCeiling(selectedYAxisMetric);
+      const drawCeiling = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        // Only mark the rating when the axis reaches it.
+        const y = axisCeiling === undefined || axisCeiling > domainTop ? null : yScale(axisCeiling);
+        const g = zoomGroup
+          .selectAll<SVGGElement, number>('g.metric-ceiling')
+          .data(y === null || !Number.isFinite(y) ? [] : [y])
+          .join('g')
+          .attr('class', 'metric-ceiling')
+          .attr('pointer-events', 'none');
+        g.selectAll('line')
+          .data((d) => [d])
+          .join('line')
+          .attr('x1', 0)
+          .attr('x2', width)
+          .attr('y1', (d) => d)
+          .attr('y2', (d) => d)
+          .attr('stroke', 'var(--muted-foreground)')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '5,4');
+        g.selectAll('text')
+          .data((d) => [d])
+          .join('text')
+          .attr('x', width - 4)
+          .attr('y', (d) => d - 4)
+          .attr('text-anchor', 'end')
+          .attr('font-size', 11)
+          .attr('fill', 'var(--muted-foreground)')
+          .text('100% TDP');
+      };
+      const ceilingLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'metric-ceiling',
+        render: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale, ctx.width),
+        onZoom: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
+      };
+
+      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP,
+      // for the official chip lines and for every unofficial-run overlay line in its run color.
+      const headroomBand = (points: InferenceData[], optimal: (p: InferenceData) => boolean) =>
+        points
+          .filter(
+            (p) =>
+              selectedPrecisions.includes(p.precision) &&
+              (!hideNonOptimal || optimal(p)) &&
+              Number.isFinite(p.measuredP90Power?.y) &&
+              Number.isFinite(p.measuredAvgPower?.y) &&
+              (p.measuredAvgPower?.y ?? 0) > 0 &&
+              Number.isFinite(p.measuredPowerPercentTdp?.y),
+          )
+          .map((p) => ({
+            x: p.x,
+            // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
+            y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
+          }))
+          .toSorted((a, b) => a.x - b.x);
+      const headroomSeries: {
+        key: string;
+        color: string;
+        band: { x: number; y: number }[];
+        runIndex: number | null;
+      }[] = headroomShading
+        ? [
+            ...Object.entries(groupedData).flatMap(([key, points]) => {
+              if (points[0]?.powerVariant) return [];
+              const hwKey = points[0]?.hwKey;
+              if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
+              const band = headroomBand(points, (p) => optimalPointKeys.has(optimalPointKey(p)));
+              return band.length >= 2
+                ? [{ key, color: getCssColor(resolveColor(hwKey)), band, runIndex: null }]
+                : [];
+            }),
+            ...Object.entries(overlayGroups).flatMap(([key, group]) => {
+              if (group.variant !== null || !activeOverlayHwTypes.has(group.hwKey)) return [];
+              const band = headroomBand(group.points, (p) => overlayOptimalPoints.has(p));
+              return band.length >= 2
+                ? [
+                    {
+                      key: `overlay-${key}`,
+                      color: overlayRunColor(group.runIndex),
+                      band,
+                      runIndex: group.runIndex,
+                    },
+                  ]
+                : [];
+            }),
+          ]
+        : [];
+      const drawHeadroom = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        const topY = yScale(Math.min(100, domainTop));
+        const area = d3
+          .area<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y0(() => topY)
+          .y1((d) => yScale(d.y));
+        const line = d3
+          .line<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y((d) => yScale(d.y));
+        const g = zoomGroup
+          .selectAll<SVGGElement, (typeof headroomSeries)[number]>('g.headroom-band')
+          .data(headroomSeries, (d) => d.key)
+          .join('g')
+          .attr('class', 'headroom-band')
+          .attr('data-testid', 'headroom-band')
+          .attr('data-run-index', (d) => (d.runIndex === null ? null : d.runIndex))
+          .attr('pointer-events', 'none');
+        g.selectAll('path.headroom-area')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-area')
+          .attr('fill', (d) => d.color)
+          .attr('fill-opacity', 0.09)
+          .attr('stroke', 'none')
+          .attr('d', (d) => area(d.band));
+        g.selectAll('path.headroom-p90')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-p90')
+          .attr('fill', 'none')
+          .attr('stroke', (d) => d.color)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '2,3')
+          .attr('d', (d) => line(d.band));
+        void width;
+      };
+      const headroomLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-headroom',
+        render: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+            ctx.width,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+            ctx.width,
+          ),
+      };
+
+      const result: LayerConfig<InferenceData>[] = headroomShading
+        ? [headroomLayer, rooflineLayer, scatterLayer]
+        : [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, paretoHighlightLayer, perfRulerLayer, knownIssueLayer);
+      result.push(
+        overflowContinuationLayer,
+        paretoHighlightLayer,
+        perfRulerLayer,
+        knownIssueLayer,
+        ceilingLayer,
+      );
       return result;
     }, [
       displayedRooflines,
@@ -3366,8 +3608,20 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
+      headroomShading,
+      groupedData,
+      overlayGroups,
+      activeOverlayHwTypes,
+      overlayOptimalPoints,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      optimalPointKeys,
+      getCssColor,
+      resolveColor,
       chartDefinition,
       locale,
+      powerLabelStyle,
       drawPerfRuler,
       attachPowerTraceAction,
     ]);
@@ -3716,8 +3970,10 @@ const ScatterGraph = React.memo(
       <>
         <D3Chart<InferenceData>
           ref={chartRef}
-          instructions={minimalChrome ? '' : undefined}
+          // PowerX drops the interaction hint under its charts; /inference keeps it.
+          instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
+          height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
@@ -3748,6 +4004,9 @@ const ScatterGraph = React.memo(
           legendElement={
             <ChartLegend
               variant="sidebar"
+              controls={legendControls}
+              footer={legendFooter}
+              mobileLabel={legendMobileLabel}
               onItemHover={handleLegendHover}
               onItemHoverEnd={handleLegendHoverEnd}
               onItemRemove={showAllHardwareTypes ? undefined : handleRemoveHwType}

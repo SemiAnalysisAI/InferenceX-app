@@ -94,8 +94,14 @@ const systemPower = {
   deploymentBreakdownWatts: {
     gpu: 8000,
     measuredCpu: 0,
-    server: 2400,
-    fansPsu: 1000,
+    cpu: 900,
+    memory: 360,
+    nic: 600,
+    nvswitch: 300,
+    storage: 150,
+    other: 90,
+    fans: 500,
+    psuLoss: 500,
     network: 600,
     facility: 2400,
   },
@@ -187,8 +193,8 @@ describe('modeled system-power tooltip', () => {
       '1 eight-GPU chassis · 4 of 8 GPUs measured, extrapolated to full chassis',
     );
     expect(html).toContain('Unmeasured chassis GPUs are assumed to run the same workload');
-    expect(html).toContain('3000 W');
-    expect(html).toContain('3600 W');
+    expect(html).toContain('3,000 W');
+    expect(html).toContain('3,600 W');
     expect(html).not.toContain('6000 W');
     expect(html).not.toContain('7200 W');
     expect(html).toContain('<strong>Total Chips:</strong> 4');
@@ -196,7 +202,7 @@ describe('modeled system-power tooltip', () => {
     const zh = generateTooltipContent(config({ data, locale: 'zh' }));
     expect(zh).toContain('1 个八卡机箱 · 实测 4/8 张 GPU，按满机箱外推');
     expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
-    expect(zh).toContain('3000 W');
+    expect(zh).toContain('3,000 W');
     expect(zh).not.toContain('6000 W');
   });
 
@@ -204,7 +210,7 @@ describe('modeled system-power tooltip', () => {
     const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
     const html = generateTooltipContent(config({ data }));
     expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
-    expect(html).toContain('Measured Grace socket power:</strong> 98.066 W/socket');
+    expect(html).toContain('Measured Grace socket power:</strong> 98 W/socket');
     expect(html).toContain('Measured: GPU boards and whole Grace sockets');
     expect(html).toContain('each tray takes 1/18 of the rack');
     expect(html).toContain('PUE 1.1');
@@ -222,7 +228,7 @@ describe('modeled system-power tooltip', () => {
       [pt({ modeledSystemPower: systemPower }), ['500 W/GPU', '750 W/GPU', 'PUE 1.2']],
       [
         pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) }),
-        ['2 full NVL72 compute trays · 8 GPUs', '98.066 W/socket', 'PUE 1.1'],
+        ['2 full NVL72 compute trays · 8 GPUs', '98 W/socket', 'PUE 1.1'],
       ],
     ];
     for (const [data, expected] of cases) {

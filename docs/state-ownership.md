@@ -223,8 +223,8 @@ the chart prunes them against the rendered curves, so a link written from one da
 degrades to fewer rulers, never to an error. Overlay ids depend on the run order in `unofficialruns`, which the share
 link already carries.
 
-`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries` or
-`roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
+`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries`,
+`provisioned`, `all` (share links only) or `roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
 `setPowerCompare` (actions). It is written as `''` for `none`. It is deliberately NOT cleared
 when the metric changes to one without a common axis for the siblings: the chart then draws
 the metric alone and the Measured controls show a hint, so the link's intent survives a

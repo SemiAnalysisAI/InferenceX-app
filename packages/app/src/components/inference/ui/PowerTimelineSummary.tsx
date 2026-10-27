@@ -147,9 +147,14 @@ export default function PowerTimelineSummary({
                               {`run ${trace.runId}`}
                             </a>
                             {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
-                            <span className="block break-all text-muted-foreground">
+                            {/* The file name is provenance, not something to read in a table:
+                                one truncated line, full name on hover. */}
+                            <span
+                              className="block truncate text-muted-foreground"
+                              title={name ? `power_validation_${name}.json` : undefined}
+                            >
+                              {source ? `${t.source[source]} · ` : ''}
                               {name ? `power_validation_${name}.json` : '—'}
-                              {source ? ` · ${t.source[source]}` : ''}
                             </span>
                           </td>
                           <td className="p-2 align-top" rowSpan={summary.pools.length}>

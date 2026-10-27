@@ -20,6 +20,7 @@ import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
+import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
 import { track } from '@/lib/analytics/analytics';
 import { computeToggle } from '@/lib/shared/toggle-set';
 import { getModelSortIndex } from '@/lib/catalog/constants';
@@ -39,6 +40,7 @@ import {
 } from '../InferenceContext';
 import type { InferenceData, OverlayData } from '../types';
 import { powerVariantDash } from '../utils/power-compare';
+import { PowerLoadSwings, PowerLoadSwingsCaveat } from '../powerx/PowerLoadSwings';
 import PowerTimelineSummary from './PowerTimelineSummary';
 import {
   allGpuPool,
@@ -51,8 +53,9 @@ import {
   planPowerTimelineRequests,
   prioritizeRun,
   prioritizeRuns,
-  referenceLabelSlots,
-  stackTraceLabels,
+  POWER_TIMELINE_SMOOTH_SECONDS,
+  rollingMean,
+  spreadLabelYs,
   runIdFromUrl,
   traceConfigLabel,
   traceKeyRunId,
@@ -66,19 +69,25 @@ import {
   type PowerTimelineRequest,
   type PowerTimelineTrace,
   type WindowPhase,
+  mostCoveredConcurrency,
 } from '../utils/powerTimeline';
 
 export const POWER_TIMELINE_MAX_RUNS = 4;
 const HIT_POINTS_PER_TRACE = 200;
 const MAX_LABELED_TRACES = 40;
 const CHART_HEIGHT = 600;
-const MARGIN = { top: 24, right: 84, bottom: 60, left: 64 };
+const MARGIN = { top: 24, right: 24, bottom: 60, left: 64 };
+const GUTTER_GAP = 10;
+const DENSE_TRACES = 8;
+const MAX_GUTTER = 168;
 
 const STRINGS = {
   en: {
     timeAxis: 'Time axis',
     concurrency: 'Concurrency',
     allConcurrencies: 'All',
+    highlight: 'Highlight',
+    highlightNone: 'All lines',
     wall: 'Wall clock (UTC)',
     elapsed: 'Since telemetry start',
     serving: 'Since serving start',
@@ -94,6 +103,9 @@ const STRINGS = {
     xElapsed: 'Time since telemetry start (m:ss)',
     perGpu: 'One line per GPU',
     perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
+    raw: 'Raw 1-s samples',
+    rawHelp: `Draw the one-second buckets as recorded. Off by default: lines show a centered ${POWER_TIMELINE_SMOOTH_SECONDS}-second rolling mean so overlapping configs stay readable. Tooltips and the summary table always use recorded values.`,
+    smoothed: (seconds: number) => `${seconds}-s rolling mean`,
     pools: 'Prefill / decode pools',
     poolsHelp:
       'One line per worker-role pool: the summed board power of the prefill GPUs and of the decode GPUs of a config. Dashed references are pool size × rated TDP.',
@@ -145,6 +157,8 @@ const STRINGS = {
     timeAxis: '时间轴',
     concurrency: '并发数',
     allConcurrencies: '全部',
+    highlight: '突出显示',
+    highlightNone: '全部曲线',
     wall: '实际时刻（UTC）',
     elapsed: '距遥测起点',
     serving: '距服务窗口起点',
@@ -157,6 +171,9 @@ const STRINGS = {
     xElapsed: '距遥测开始的时间（分:秒）',
     perGpu: '每个 GPU 一条线',
     perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
+    raw: '原始 1 秒采样',
+    rawHelp: `按记录值绘制 1 秒采样桶。默认关闭：曲线显示以每点为中心的 ${POWER_TIMELINE_SMOOTH_SECONDS} 秒滚动平均，以便多条配置重叠时仍可辨认。提示框和汇总表始终使用记录值。`,
+    smoothed: (seconds: number) => `${seconds} 秒滚动平均`,
     pools: '预填充 / 解码 GPU 池',
     poolsHelp:
       '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
@@ -218,6 +235,8 @@ interface TimelineSample {
   gpuCount: number;
   phase: WindowPhase;
   pool?: { role: PowerPoolRole; gpuCount: number };
+  /** Y of the drawn (smoothed) line at this sample, so the hover dot sits on the line. */
+  drawnY?: number;
 }
 
 interface TracePoint {
@@ -361,12 +380,19 @@ function tracePaths(
   xMode: XMode,
   lineMode: LineMode,
   windowOnly: boolean,
+  raw = false,
+  dense = false,
 ): TracePath[] {
   const { series } = trace;
-  const rows = traceRows(series, lineMode);
-  const faint = lineMode === 'gpu' ? 0.22 : 0.32;
-  const strong = lineMode === 'gpu' ? 0.85 : 1;
-  const widths = lineMode === 'gpu' ? [1, 1.5] : [1.25, 2.25];
+  const span = raw ? 1 : smoothSpan(series);
+  const rows = traceRows(series, lineMode).map((row) => ({
+    ...row,
+    values: rollingMean(row.values, span),
+  }));
+  // Many overlaid configs: thinner, slightly translucent lines so crossings stay readable.
+  const faint = lineMode === 'gpu' ? 0.22 : dense ? 0.22 : 0.32;
+  const strong = lineMode === 'gpu' ? 0.85 : dense ? 0.8 : 1;
+  const widths = lineMode === 'gpu' ? [1, 1.5] : dense ? [1, 1.4] : [1.25, 2.25];
   const paths: TracePath[] = [];
   for (const row of rows) {
     const full: TracePoint[] = [];
@@ -409,6 +435,11 @@ function tracePaths(
   return paths;
 }
 
+function smoothSpan(series: Pick<GpuPowerSeries, 'bucketSeconds'>): number {
+  const bucket = series.bucketSeconds > 0 ? series.bucketSeconds : 1;
+  return Math.max(1, Math.round(POWER_TIMELINE_SMOOTH_SECONDS / bucket));
+}
+
 function traceSamples(
   trace: PowerTimelineTrace,
   color: string,
@@ -416,17 +447,24 @@ function traceSamples(
   xMode: XMode,
   lineMode: LineMode,
   windowOnly: boolean,
+  raw = false,
 ): TimelineSample[] {
   const { series } = trace;
   if (lineMode !== 'pool') {
     const rows = series.power.map((_, row) => row);
-    return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined);
+    return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined, !raw);
   }
   return drawnPools(series).flatMap((pool) =>
-    sampleRows(trace, color, overlayIndex, xMode, windowOnly, pool.rows, {
-      role: pool.role,
-      gpuCount: pool.rows.length,
-    }),
+    sampleRows(
+      trace,
+      color,
+      overlayIndex,
+      xMode,
+      windowOnly,
+      pool.rows,
+      { role: pool.role, gpuCount: pool.rows.length },
+      !raw,
+    ),
   );
 }
 
@@ -438,6 +476,7 @@ function sampleRows(
   windowOnly: boolean,
   rows: readonly number[],
   pool: TimelineSample['pool'],
+  smoothY = false,
 ): TimelineSample[] {
   const { series } = trace;
   const samples: TimelineSample[] = [];
@@ -471,6 +510,15 @@ function sampleRows(
       gpuCount: count,
       phase: windowPhase(trace, timeMs),
       pool,
+    });
+  }
+  if (smoothY) {
+    const smoothed = rollingMean(
+      samples.map((sample) => sample.y),
+      smoothSpan(series),
+    );
+    samples.forEach((sample, index) => {
+      sample.drawnY = smoothed[index] ?? sample.y;
     });
   }
   return lttbDownsample(
@@ -533,49 +581,85 @@ function labelOpacity(label: TraceLabel, highlight: string | null): number {
   return highlight === null || isHighlighted(label, highlight) ? 1 : 0.2;
 }
 
+function labelWidth(text: string): number {
+  return text.length * LABEL_CHAR_WIDTH;
+}
+
+/** Right-gutter width that fits the longest trace label, capped so the plot keeps its room. */
+export function powerTimelineGutter(labels: readonly { text: string }[]): number {
+  if (labels.length === 0) return MARGIN.right;
+  const widest = Math.max(...labels.map((label) => labelWidth(label.text)));
+  return Math.min(MAX_GUTTER, Math.ceil(widest + GUTTER_GAP + 6));
+}
+
+/**
+ * Trace names sit in the right gutter, outside the clipped plot, spread so none overlap. A faint
+ * leader joins each name to the end of its line, so traces that stop early stay attributable.
+ */
 function drawLabels(
-  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+  plotGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+  chartGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: AnyContinuousScale,
   yScale: AnyContinuousScale,
   model: DrawModel,
   plotWidth: number,
+  plotHeight: number,
   highlight: string | null,
 ): void {
-  const selection = group
-    .selectAll<SVGTextElement, TraceLabel>('text.power-trace-label')
+  plotGroup.selectAll('text.power-trace-label').remove();
+  let gutter = chartGroup.select<SVGGElement>('g.power-trace-gutter');
+  if (gutter.empty()) gutter = chartGroup.append('g').attr('class', 'power-trace-gutter');
+  const rowHeight = CHART_TYPE.dataLabel + 3;
+  const ys = spreadLabelYs(
+    model.labels.map((label) => yScale(label.y)),
+    rowHeight,
+    rowHeight / 2,
+    plotHeight - rowHeight / 2,
+  );
+  const labelX = plotWidth + GUTTER_GAP;
+  const items = gutter
+    .selectAll<SVGGElement, TraceLabel>('g.power-trace-label-item')
     .data(model.labels, (label) => label.id);
-  selection.exit().remove();
-  selection
-    .enter()
+  items.exit().remove();
+  const entered = items.enter().append('g').attr('class', 'power-trace-label-item');
+  entered.append('path').attr('class', 'power-trace-leader').attr('fill', 'none');
+  entered
     .append('text')
     .attr('class', 'power-trace-label')
     .attr('font-family', CHART_FONT_SANS)
     .attr('font-size', px(CHART_TYPE.dataLabel))
     .attr('font-weight', '600')
     .attr('dominant-baseline', 'middle')
-    .attr('pointer-events', 'none')
-    .merge(selection)
-    .attr('data-hw', (label) => label.hwKey)
-    .attr('data-pool', (label) => label.pool ?? null)
-    .attr('fill', (label) => label.color)
-    .attr('opacity', (label) => labelOpacity(label, highlight))
-    .text((label) => label.text);
-  const boxes = model.labels.map((label) => {
-    const x = xScale(label.x);
-    const width = label.text.length * LABEL_CHAR_WIDTH;
-    const flip = x + 6 + width > plotWidth;
-    const left = flip ? x - 6 - width : x + 6;
-    return { flip, left, right: left + width, y: yScale(label.y) };
-  });
-  const rows = stackTraceLabels(boxes, CHART_TYPE.dataLabel + 2);
+    .attr('pointer-events', 'none');
+  const merged = entered.merge(items);
   const byId = new Map(model.labels.map((label, index) => [label.id, index]));
-  group.selectAll<SVGTextElement, TraceLabel>('text.power-trace-label').each(function (label) {
-    const index = byId.get(label.id)!;
-    const box = boxes[index];
-    d3.select(this)
-      .attr('text-anchor', box.flip ? 'end' : 'start')
-      .attr('x', box.flip ? box.right : box.left)
-      .attr('y', rows[index]);
+  merged.each(function (label) {
+    const y = ys[byId.get(label.id)!];
+    const endX = xScale(label.x);
+    const endY = yScale(label.y);
+    const item = d3.select(this);
+    const opacity = labelOpacity(label, highlight);
+    item
+      .select('path.power-trace-leader')
+      .attr('stroke', label.color)
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.45 * opacity)
+      .attr(
+        'd',
+        endX >= 0 && endX <= plotWidth
+          ? `M${endX},${endY}L${plotWidth + 2},${endY}L${labelX - 3},${y}`
+          : `M${plotWidth + 2},${y}L${labelX - 3},${y}`,
+      );
+    item
+      .select('text.power-trace-label')
+      .attr('data-hw', label.hwKey)
+      .attr('data-pool', label.pool ?? null)
+      .attr('fill', label.color)
+      .attr('opacity', opacity)
+      .attr('text-anchor', 'start')
+      .attr('x', labelX)
+      .attr('y', y)
+      .text(label.text);
   });
 }
 
@@ -586,7 +670,14 @@ function drawReferenceLines(
   lines: ReferenceLine[],
 ): void {
   group.selectAll('.power-reference').remove();
-  const slots = referenceLabelSlots(lines);
+  // Labels sit at the left end, above their line, and are spread so stacked TDPs stay legible;
+  // the right end belongs to the trace leaders.
+  const labelYs = spreadLabelYs(
+    lines.map((line) => yScale(line.watts) - 6),
+    REFERENCE_LABEL_ROW,
+    REFERENCE_LABEL_ROW / 2,
+    Number.POSITIVE_INFINITY,
+  );
   lines.forEach((line, index) => {
     const y = yScale(line.watts);
     const g = group
@@ -603,15 +694,19 @@ function drawReferenceLines(
       .attr('stroke', line.color)
       .attr('stroke-width', 1.25)
       .attr('stroke-dasharray', line.kind === 'tdp' ? '6,4' : '2,4')
-      .attr('opacity', 0.9);
+      .attr('opacity', 0.8);
     g.append('text')
-      .attr('x', width - 4)
-      .attr('y', y - 5 - slots[index] * REFERENCE_LABEL_ROW)
-      .attr('text-anchor', 'end')
+      .attr('x', 6)
+      .attr('y', labelYs[index])
+      .attr('text-anchor', 'start')
+      .attr('dominant-baseline', 'middle')
       .attr('fill', line.color)
       .attr('font-family', CHART_FONT_SANS)
       .attr('font-size', px(CHART_TYPE.annotation))
       .attr('font-weight', '600')
+      .attr('paint-order', 'stroke')
+      .attr('stroke', 'var(--background)')
+      .attr('stroke-width', 3)
       .text(line.label);
   });
 }
@@ -650,12 +745,18 @@ export default function PowerTimeline({
       i_ptfocus: getUrlParam('i_ptfocus'),
       i_ptutility: getUrlParam('i_ptutility'),
       i_ptconc: getUrlParam('i_ptconc'),
+      i_ptraw: getUrlParam('i_ptraw'),
     }),
   );
-  const [xModeChoice, setXModeChoice] = useState<XMode | null>(initialView.axis);
+  const powerXSurface = usePowerXSurface();
+  // On the PowerX tab, align runs at serving start unless the URL picks an axis.
+  const [xModeChoice, setXModeChoice] = useState<XMode | null>(
+    initialView.axis ?? (powerXSurface ? 'serving' : null),
+  );
   const [lineMode, setLineMode] = useState<LineMode>(initialView.lines);
   const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
   const [showUtility, setShowUtility] = useState(initialView.utility);
+  const [raw, setRaw] = useState(initialView.raw);
   const [highlight, setHighlight] = useState<string | null>(null);
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
   const requestedFocusRef = useRef<string | null | undefined>(undefined);
@@ -686,6 +787,19 @@ export default function PowerTimeline({
         .toSorted((a, b) => a - b),
     [measuredData, overlayPoints],
   );
+  // PowerX tab: first view compares chips at one shared load rather than every concurrency.
+  // A shared or requested focus keeps every load so the focused trace stays drawn.
+  const autoConcurrencyRef = useRef(
+    !powerXSurface ||
+      initialView.concurrency !== null ||
+      Boolean(initialView.focus) ||
+      Boolean(requestedFocusRef.current),
+  );
+  useEffect(() => {
+    if (autoConcurrencyRef.current || measuredData.length === 0) return;
+    autoConcurrencyRef.current = true;
+    setConcurrency(mostCoveredConcurrency(measuredData));
+  }, [measuredData]);
   const allPoints = useMemo(
     () =>
       [...measuredData, ...overlayPoints].filter(
@@ -862,8 +976,9 @@ export default function PowerTimeline({
       i_ptfocus: focusKey ?? '',
       i_ptutility: showUtility ? '1' : '',
       i_ptconc: concurrency === null ? '' : String(concurrency),
+      i_ptraw: raw ? '1' : '',
     });
-  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, concurrency, setUrlParams]);
+  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, concurrency, raw, setUrlParams]);
 
   const missingWindows =
     windowOnly || xMode === 'serving'
@@ -910,9 +1025,16 @@ export default function PowerTimeline({
     for (const trace of visibleTraces) {
       const { color, overlayIndex } = colorForTrace(trace);
       const series = comparisonSeriesOf(trace.point);
-      const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode, windowOnly).map(
-        (path) => ({ ...path, series }),
-      );
+      const tracePathSet = tracePaths(
+        trace,
+        color,
+        overlayIndex,
+        xMode,
+        lineMode,
+        windowOnly,
+        raw,
+        visibleTraces.length > DENSE_TRACES,
+      ).map((path) => ({ ...path, series }));
       paths.push(...tracePathSet);
       if (visibleTraces.length > MAX_LABELED_TRACES) continue;
       const groups: { pool?: PowerPoolRole; paths: TracePath[] }[] =
@@ -954,16 +1076,22 @@ export default function PowerTimeline({
     xMode,
     lineMode,
     windowOnly,
+    raw,
     t,
   ]);
+
+  const margin = useMemo(
+    () => ({ ...MARGIN, right: powerTimelineGutter(model.labels) }),
+    [model.labels],
+  );
 
   const samples = useMemo(
     () =>
       visibleTraces.flatMap((trace) => {
         const { color, overlayIndex } = colorForTrace(trace);
-        return traceSamples(trace, color, overlayIndex, xMode, lineMode, windowOnly);
+        return traceSamples(trace, color, overlayIndex, xMode, lineMode, windowOnly, raw);
       }),
-    [visibleTraces, colorForTrace, xMode, lineMode, windowOnly],
+    [visibleTraces, colorForTrace, xMode, lineMode, windowOnly, raw],
   );
 
   const referenceLines = useMemo<ReferenceLine[]>(() => {
@@ -1092,7 +1220,7 @@ export default function PowerTimeline({
           getCx: () => 0,
           getCy: () => 0,
           getX: (sample) => sample.x,
-          getY: (sample) => sample.y,
+          getY: (sample) => sample.drawnY ?? sample.y,
           getColor: (sample) => sample.color,
           getRadius: () => 2,
           keyFn: (sample) =>
@@ -1108,20 +1236,24 @@ export default function PowerTimeline({
         render: (group, ctx: RenderContext) => {
           drawLabels(
             group,
+            ctx.layout.g,
             ctx.xScale as AnyContinuousScale,
             ctx.yScale as AnyContinuousScale,
             model,
             ctx.width,
+            ctx.height,
             highlightRef.current,
           );
         },
         onZoom: (group, ctx: ZoomContext) => {
           drawLabels(
             group,
+            ctx.layout.g,
             ctx.newXScale as AnyContinuousScale,
             ctx.newYScale as AnyContinuousScale,
             model,
             ctx.width,
+            ctx.height,
             highlightRef.current,
           );
         },
@@ -1317,6 +1449,16 @@ export default function PowerTimeline({
   }
   switches.push(
     {
+      id: 'power-timeline-raw',
+      label: t.raw,
+      checked: raw,
+      onCheckedChange: (checked) => {
+        setRaw(checked);
+        track('inference_power_timeline_raw_toggled', { enabled: checked });
+      },
+      infoTooltip: t.rawHelp,
+    },
+    {
       id: 'power-timeline-window-only',
       label: t.windowOnly,
       checked: windowOnly,
@@ -1390,6 +1532,28 @@ export default function PowerTimeline({
           ))}
         </select>
       </label>
+      {visibleTraces.length > 1 && (
+        <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          {t.highlight}
+          <select
+            className="max-w-56 truncate rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+            data-testid="power-timeline-highlight"
+            value={focusedTrace?.key ?? ''}
+            onChange={(event) => {
+              const key = event.target.value === '' ? null : event.target.value;
+              setFocusKey(key);
+              track('inference_power_timeline_highlight_changed', { highlighted: key !== null });
+            }}
+          >
+            <option value="">{t.highlightNone}</option>
+            {visibleTraces.map((trace) => (
+              <option key={trace.key} value={trace.key}>
+                {`${seriesLabel(trace.point)} · ${traceConfigLabel(trace.point)}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <span className="text-xs text-muted-foreground">{t.timeAxis}</span>
       <SegmentedToggle<XMode>
         value={xMode}
@@ -1415,17 +1579,20 @@ export default function PowerTimeline({
   else if (missingWindows === visibleTraces.length) emptyMessage = t.missingWindow(missingWindows);
 
   return (
-    <div className="relative flex flex-col gap-2" data-testid="power-timeline">
+    <div
+      className="relative flex flex-col gap-2 [&_circle.point]:[fill-opacity:0]"
+      data-testid="power-timeline"
+    >
       <D3Chart<TimelineSample>
         key={`${chartId}-${xMode}-${lineMode}-${windowOnly}`}
         chartId={chartId}
         data={samples}
         height={CHART_HEIGHT}
-        margin={MARGIN}
+        margin={margin}
         watermark={overlayData && overlayPoints.length > 0 ? 'unofficial' : 'logo'}
         testId="power-timeline-chart-svg"
         grabCursor
-        instructions={t.instructions}
+        instructions={powerXSurface ? '' : t.instructions}
         xScale={
           xMode === 'wall'
             ? { type: 'time', domain: [new Date(xDomain[0]), new Date(xDomain[1])] }
@@ -1457,12 +1624,16 @@ export default function PowerTimeline({
           rulerType: 'crosshair',
           content: tooltipContent,
           getRulerX: (sample, xScale) => (xScale as AnyContinuousScale)(sample.x),
-          getRulerY: (sample, yScale) => yScale(sample.y),
+          getRulerY: (sample, yScale) => yScale(sample.drawnY ?? sample.y),
           onHoverStart: (selection) => {
-            selection.attr('r', 5).attr('stroke', 'white').attr('stroke-width', 1);
+            selection
+              .attr('r', 5)
+              .attr('stroke', 'white')
+              .attr('stroke-width', 1)
+              .style('fill-opacity', 1);
           },
           onHoverEnd: (selection) => {
-            selection.attr('r', 2).attr('stroke', 'none');
+            selection.attr('r', 2).attr('stroke', 'none').style('fill-opacity', null);
           },
           attachToLayer: 2,
         }}
@@ -1471,6 +1642,13 @@ export default function PowerTimeline({
           <>
             {caption}
             {toolbar}
+            {powerXSurface && loadingRuns === 0 && visibleTraces.length > 0 && (
+              <PowerLoadSwings
+                traces={focusedTrace ? [focusedTrace] : visibleTraces}
+                colorOf={(trace) => colorForTrace(trace).color}
+                labelOf={seriesLabel}
+              />
+            )}
           </>
         }
         noDataOverlay={
@@ -1485,6 +1663,7 @@ export default function PowerTimeline({
           ) : undefined
         }
       />
+      {powerXSurface && <PowerLoadSwingsCaveat />}
       <div
         className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
         data-testid="power-timeline-status"
