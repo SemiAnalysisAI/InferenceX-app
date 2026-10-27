@@ -303,6 +303,8 @@ describe('PowerAnalysisPanels', () => {
 
   it('pins the compared point of one chip from a drill-down column until the slider moves', () => {
     cy.viewport(1280, 900);
+    // URL state is module-level and outlives a mount: start with no pinned chip.
+    writeUrlParams({ i_pbpoint: '' });
     mountWithProviders(<PanelsHarness initial={breakdownLadder} overlay={[]} />, providers);
     // The slider starts at the geometric middle (49 tok/s/user): the c16 point at 45.
     cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c16 · 45');
@@ -327,11 +329,25 @@ describe('PowerAnalysisPanels', () => {
     cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c16 · 45');
     cy.get('[data-testid="power-breakdown-hit"]').eq(0).click({ force: true });
     cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c64 · 20');
-    cy.get('[data-testid="power-chip-compare-target"]')
-      .invoke('val', 200)
-      .trigger('input', { force: true });
+    // A React range input ignores a value set through its own property (the value
+    // tracker swallows it): set it through the prototype, then fire `input`.
+    cy.get<HTMLInputElement>('[data-testid="power-chip-compare-target"]').then(($slider) => {
+      const slider = $slider[0];
+      const view = slider.ownerDocument.defaultView;
+      if (view === null) throw new Error('Slider has no window');
+      const nativeValueSetter = Object.getOwnPropertyDescriptor(
+        view.HTMLInputElement.prototype,
+        'value',
+      )?.set;
+      if (nativeValueSetter === undefined)
+        throw new Error('Range input has no native value setter');
+      nativeValueSetter.call(slider, '200');
+      slider.dispatchEvent(new view.Event('input', { bubbles: true }));
+    });
+    cy.get('[data-testid="power-chip-compare-value"]').should('contain.text', '120 tok/s/user');
     cy.get('[data-testid="power-chip-compare-row"]').should('not.have.attr', 'data-pinned');
     cy.get('[data-testid="power-chip-compare-point"]').should('contain.text', 'c1 · 120');
     cy.get('[data-testid="power-chip-compare-unpin"]').should('not.exist');
+    writeUrlParams({ i_pbpoint: '' });
   });
 });

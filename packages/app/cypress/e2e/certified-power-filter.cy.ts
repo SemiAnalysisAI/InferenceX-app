@@ -118,7 +118,9 @@ describe('Validated vs historical measured power', () => {
   });
 
   it('filters validated and historical measured points via Quick Filters', () => {
-    visitCertifiedPowerChart();
+    // PowerX opens on Energy per token; the Validated / Historical filter is tested on the
+    // power scatter the article links to.
+    visitCertifiedPowerChart('&i_metric=y_measuredAvgPower');
     assertChartTitle(MEASURED_POWER_TITLE);
 
     cy.get('.dot-group[data-hw-key^="b200"]').should('exist');

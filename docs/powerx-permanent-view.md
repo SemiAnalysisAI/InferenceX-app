@@ -177,8 +177,10 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
 ## Article figure → share link
 
 Base: `/powerx?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
-selection. Old `/inference` links that carry a measured `i_metric` are redirected to `/powerx`
-with the same query by `src/proxy.ts` (`lib/routing/powerx-redirect.ts`); Inference Performance
+selection. Old `/inference` links that carry a measured `i_metric`, or a power-tier filter (`i_power`)
+with no metric, are redirected to `/powerx` with the same query by `src/proxy.ts`
+(`lib/routing/powerx-redirect.ts`; the no-metric case lands on the Power draw scatter,
+`i_metric=y_measuredAvgPower`, as such links used to chart power); Inference Performance
 no longer offers power metrics. Append:
 
 | Figure | Content                                       | Parameters                                                                                                                                                                                                   |
