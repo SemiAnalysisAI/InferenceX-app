@@ -138,3 +138,72 @@
     transform: none;
   }
 }
+
+/* In-view reveals for SVG drawings (PowerX tutorial widgets): a path with pathLength="1" draws
+   along its stroke, anything else fades. Both wait for data-inview="true" and stagger through
+   --motion-delay. Without scripting or with reduced motion nothing is hidden. */
+@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+  [data-fade] {
+    opacity: 0;
+    transition: opacity var(--motion-fade-duration, 400ms) var(--motion-ease-enter)
+      var(--motion-delay, 0ms);
+  }
+
+  [data-fade][data-inview='true'] {
+    opacity: 1;
+  }
+
+  [data-draw] {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset var(--motion-draw-duration, 900ms) var(--motion-ease-enter)
+      var(--motion-delay, 0ms);
+  }
+
+  [data-draw][data-inview='true'] {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* A page-load entrance that needs no script: fade and rise from the first paint, staggered
+     through --motion-delay. */
+  .motion-enter {
+    animation: motion-enter var(--motion-enter-duration, 500ms) var(--motion-ease-enter) both;
+    animation-delay: var(--motion-delay, 0ms);
+  }
+
+  /* A marker that follows a control: transform eases instead of jumping. */
+  .motion-move {
+    transition: transform var(--motion-dur-base) var(--motion-ease-standard);
+  }
+
+  /* <details> inside this container open and close with a height transition where the
+     browser can animate height: auto (Chromium); elsewhere they toggle as before. */
+  .motion-details details {
+    interpolate-size: allow-keywords;
+  }
+
+  .motion-details details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height var(--motion-dur-base) var(--motion-ease-standard),
+      content-visibility var(--motion-dur-base) allow-discrete;
+  }
+
+  .motion-details details[open]::details-content {
+    height: auto;
+  }
+}
+
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

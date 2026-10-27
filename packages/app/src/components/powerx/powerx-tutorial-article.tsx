@@ -23,10 +23,18 @@ const TUTORIAL_PROSE_CLASS = cn(
   'prose-p:text-base prose-p:leading-7 prose-li:my-1',
   'prose-h2:mt-24 prose-h2:mb-6 prose-h2:text-3xl prose-h2:font-semibold prose-h2:tracking-tight sm:prose-h2:text-4xl',
   'prose-table:my-6 prose-td:align-top [&_td:first-child]:whitespace-nowrap',
-  '[&>details]:max-w-[72ch] [&>details]:border-t [&>details]:border-border/60 [&>details:last-of-type]:border-b',
-  '[&>details>summary]:min-h-11 [&>details>summary]:cursor-pointer [&>details>summary]:list-none [&>details>summary]:py-3 [&>details>summary]:text-base [&>details>summary]:font-medium [&>details>summary]:text-foreground [&>details>summary::-webkit-details-marker]:hidden',
+  'motion-details [&>details]:max-w-[72ch] [&>details]:border-t [&>details]:border-border/60 [&>details:last-of-type]:border-b',
+  '[&>details>summary]:flex [&>details>summary]:min-h-11 [&>details>summary]:cursor-pointer [&>details>summary]:list-none [&>details>summary]:items-baseline [&>details>summary]:justify-between [&>details>summary]:gap-4 [&>details>summary]:py-3 [&>details>summary]:text-base [&>details>summary]:font-medium [&>details>summary]:text-foreground [&>details>summary::-webkit-details-marker]:hidden',
+  // The FAQ `<details>` come from the markdown untouched, so the "+" chevron is drawn here.
+  "[&>details>summary]:after:inline-block [&>details>summary]:after:shrink-0 [&>details>summary]:after:text-muted-foreground [&>details>summary]:after:transition-transform [&>details>summary]:after:duration-(--motion-dur-base) [&>details>summary]:after:ease-[var(--motion-ease-standard)] [&>details>summary]:after:content-['+'] [&>details[open]>summary]:after:rotate-45 motion-reduce:[&>details>summary]:after:transition-none",
   '[&>details>p]:mt-0 [&>details>p]:mb-4 [&>details>p]:text-muted-foreground',
 );
+
+/** The hero's three-step entrance (eyebrow, title, dek; 60 ms apart) is a CSS keyframe so it
+ * plays from the first paint of the server HTML instead of waiting for hydration. */
+const HERO_STEP_MS = 60;
+const heroStep = (step: number) =>
+  ({ '--motion-delay': `${step * HERO_STEP_MS}ms` }) as React.CSSProperties;
 
 export interface PowerXTutorialArticleProps {
   locale: Locale;
@@ -49,23 +57,29 @@ export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialA
         >
           {t.back}
         </PowerXTutorialLink>
-        <p className="mt-10 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
+        <p
+          className="motion-enter mt-10 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase"
+          style={heroStep(0)}
+        >
           {t.eyebrow}
         </p>
         <h1
           className={cn(
-            'mt-4 text-4xl font-semibold tracking-heading text-balance text-foreground sm:text-5xl',
+            'motion-enter mt-4 text-4xl font-semibold tracking-heading text-balance text-foreground sm:text-5xl',
             locale === 'en' && 'max-w-[22ch] lg:text-6xl',
           )}
+          style={heroStep(1)}
         >
           {meta.title}
         </h1>
-        <p className="mt-6 max-w-[58ch] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
-          {meta.description}
-        </p>
-        <p className="mt-5 font-mono text-xs text-muted-foreground">
-          {t.updated} <time dateTime={meta.updated}>{formatBlogDate(meta.updated, locale)}</time>
-        </p>
+        <div className="motion-enter" style={heroStep(2)}>
+          <p className="mt-6 max-w-[58ch] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+            {meta.description}
+          </p>
+          <p className="mt-5 font-mono text-xs text-muted-foreground">
+            {t.updated} <time dateTime={meta.updated}>{formatBlogDate(meta.updated, locale)}</time>
+          </p>
+        </div>
       </header>
 
       <div className={cn(TUTORIAL_PROSE_CLASS, 'mt-12')} data-testid="powerx-tutorial-body">

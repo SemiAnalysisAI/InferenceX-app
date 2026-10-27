@@ -92,7 +92,7 @@ export function ValidityWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
   return (
     <WidgetFrame name="validity" alt={alt}>
-      <ol className="divide-y divide-border/60 border-y border-border/60">
+      <ol className="motion-details divide-y divide-border/60 border-y border-border/60">
         {VALIDITY_CHECKS.map((check, index) => {
           const copy = t.checks[check.id as ValidityCheckId];
           return (
@@ -112,7 +112,7 @@ export function ValidityWidget({ locale, alt }: WidgetProps) {
                   <span className="min-w-0 flex-1 leading-6">{copy.title}</span>
                   <span
                     aria-hidden="true"
-                    className="shrink-0 text-muted-foreground transition-transform group-open:rotate-45 motion-reduce:transition-none"
+                    className="shrink-0 text-muted-foreground transition-transform duration-(--motion-dur-base) ease-[var(--motion-ease-standard)] group-open:rotate-45 motion-reduce:transition-none"
                   >
                     +
                   </span>

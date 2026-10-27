@@ -1,6 +1,8 @@
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 
+import { inViewAttr, motionVars } from './motion';
+
 /**
  * The measurement-to-model flow as one pure SVG, so the page can mount it live and a script can
  * export the same drawing to `public/images/powerx-tutorial/widgets/flow.svg` for GitHub.
@@ -114,6 +116,44 @@ export const STATIC_PALETTE: FlowPalette = {
 
 const MAIN: FlowNode[] = ['exporter', 'window', 'gpu', 'model', 'it', 'pue', 'facility'];
 
+/**
+ * The in-view sequence: each main node lights up 90 ms after the one before it, the arrow to
+ * the next node draws just behind it, and the energy branch comes last. Only the live page
+ * passes `motion`; the static export keeps markers and no data attributes.
+ */
+export const FLOW_MOTION = {
+  stepMs: 90,
+  nodeMs: 400,
+  edgeMs: 450,
+  edgeLagMs: 40,
+  headMs: 200,
+  branchMs: 500,
+} as const;
+
+export function flowDelays(): Record<FlowNode, number> & { edge: number[]; branch: number } {
+  const { stepMs, branchMs } = FLOW_MOTION;
+  const delays = {} as Record<FlowNode, number>;
+  MAIN.forEach((node, index) => {
+    delays[node] = index * stepMs;
+  });
+  const branch = MAIN.length * stepMs;
+  delays.energy = branch + branchMs * 0.6;
+  return {
+    ...delays,
+    edge: MAIN.slice(1).map((_, index) => index * stepMs + FLOW_MOTION.edgeLagMs),
+    branch,
+  };
+}
+
+/** The arrowhead the marker draws, as a path so the live page can fade it in after the line. */
+function arrowHead(x: number, y: number, direction: 'right' | 'down'): string {
+  const back = 6.1;
+  const half = 3.1;
+  return direction === 'right'
+    ? `M${x - back},${y - half} L${x},${y} L${x - back},${y + half}`
+    : `M${x - half},${y - back} L${x},${y} L${x + half},${y - back}`;
+}
+
 interface Box {
   x: number;
   y: number;
@@ -153,6 +193,8 @@ export interface FlowSvgProps {
   onSelect?: (node: FlowNode) => void;
   /** The id prefix for the description the nodes point at. */
   describedBy?: string;
+  /** Live page only: nodes and arrows reveal in sequence once `inView` turns true. */
+  motion?: { inView: boolean };
 }
 
 export function FlowSvg({
@@ -164,17 +206,24 @@ export function FlowSvg({
   onActivate,
   onSelect,
   describedBy,
+  motion,
 }: FlowSvgProps) {
   const t = FLOW_STRINGS[locale];
   const { boxes, height } = flowLayout(width, orientation);
   const edges: [FlowNode, FlowNode][] = [];
   for (let index = 1; index < MAIN.length; index++) edges.push([MAIN[index - 1], MAIN[index]]);
+  const inView = motion ? inViewAttr(motion.inView) : undefined;
+  const delays = motion ? flowDelays() : null;
+  const edgeDirection = orientation === 'horizontal' ? 'right' : 'down';
 
   function edgePath(a: Box, b: Box): string {
     if (orientation === 'horizontal') {
       return `M${a.x + a.w},${a.y + a.h / 2} L${b.x},${b.y + b.h / 2}`;
     }
     return `M${a.x + a.w / 2},${a.y + a.h} L${b.x + b.w / 2},${b.y}`;
+  }
+  function edgeEnd(b: Box): [number, number] {
+    return orientation === 'horizontal' ? [b.x, b.y + b.h / 2] : [b.x + b.w / 2, b.y];
   }
   const windowBox = boxes.window;
   const energyBox = boxes.energy;
@@ -209,23 +258,77 @@ export function FlowSvg({
           <path d="M0,0.5 L7,4 L0,7.5" fill="none" stroke={palette.muted} strokeWidth="1.25" />
         </marker>
       </defs>
-      {edges.map(([a, b]) => (
+      {edges.map(([a, b], index) =>
+        delays ? (
+          <g key={`${a}-${b}`}>
+            <path
+              d={edgePath(boxes[a], boxes[b])}
+              pathLength={1}
+              fill="none"
+              stroke={palette.muted}
+              strokeWidth={1.25}
+              data-draw=""
+              data-inview={inView}
+              style={motionVars({ delayMs: delays.edge[index], drawMs: FLOW_MOTION.edgeMs })}
+            />
+            <path
+              d={arrowHead(...edgeEnd(boxes[b]), edgeDirection)}
+              fill="none"
+              stroke={palette.muted}
+              strokeWidth={1.25}
+              data-fade=""
+              data-inview={inView}
+              style={motionVars({
+                delayMs: delays.edge[index] + FLOW_MOTION.edgeMs - 120,
+                fadeMs: FLOW_MOTION.headMs,
+              })}
+            />
+          </g>
+        ) : (
+          <path
+            key={`${a}-${b}`}
+            d={edgePath(boxes[a], boxes[b])}
+            fill="none"
+            stroke={palette.muted}
+            strokeWidth={1.25}
+            markerEnd="url(#powerx-flow-arrow)"
+          />
+        ),
+      )}
+      {delays ? (
+        <g>
+          <path
+            d={branch}
+            pathLength={1}
+            fill="none"
+            stroke={palette.muted}
+            strokeWidth={1.25}
+            data-draw=""
+            data-inview={inView}
+            style={motionVars({ delayMs: delays.branch, drawMs: FLOW_MOTION.branchMs })}
+          />
+          <path
+            d={arrowHead(energyBox.x + energyBox.w / 2, energyBox.y, 'down')}
+            fill="none"
+            stroke={palette.muted}
+            strokeWidth={1.25}
+            data-fade=""
+            data-inview={inView}
+            style={motionVars({
+              delayMs: delays.branch + FLOW_MOTION.branchMs - 120,
+              fadeMs: FLOW_MOTION.headMs,
+            })}
+          />
+        </g>
+      ) : (
         <path
-          key={`${a}-${b}`}
-          d={edgePath(boxes[a], boxes[b])}
+          d={branch}
           fill="none"
           stroke={palette.muted}
           strokeWidth={1.25}
           markerEnd="url(#powerx-flow-arrow)"
         />
-      ))}
-      <path
-        d={branch}
-        fill="none"
-        stroke={palette.muted}
-        strokeWidth={1.25}
-        markerEnd="url(#powerx-flow-arrow)"
-      />
+      )}
       {FLOW_NODES.map((node) => {
         const box = boxes[node];
         const kind = FLOW_PROVENANCE[node];
@@ -242,6 +345,8 @@ export function FlowSvg({
             role={interactive ? 'button' : undefined}
             aria-pressed={interactive ? isActive : undefined}
             aria-describedby={describedBy}
+            data-fade={delays ? '' : undefined}
+            data-inview={inView}
             onMouseEnter={() => onActivate?.(node)}
             onFocus={() => onActivate?.(node)}
             onClick={() => onSelect?.(node)}
@@ -251,7 +356,11 @@ export function FlowSvg({
                 onSelect?.(node);
               }
             }}
-            style={{ cursor: interactive ? 'pointer' : undefined, outline: 'none' }}
+            style={{
+              cursor: interactive ? 'pointer' : undefined,
+              outline: 'none',
+              ...(delays ? motionVars({ delayMs: delays[node], fadeMs: FLOW_MOTION.nodeMs }) : {}),
+            }}
           >
             <rect
               x={box.x + 0.75}
