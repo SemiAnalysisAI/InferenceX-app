@@ -363,5 +363,20 @@ export function useView(url: string | null): Fetched {
   return state;
 }
 
+const subscribeNoop = () => () => {};
+
+/**
+ * False during server render and hydration, true after. Chip colours depend on the resolved
+ * theme, which the server cannot know, so colour-bearing SSR markup waits for this to avoid a
+ * hydration mismatch in dark mode.
+ */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
+}
+
 /** 1 234 → "1,234"; keeps watts readable in both locales. */
 export const formatWatts = (watts: number): string => Math.round(watts).toLocaleString('en-US');

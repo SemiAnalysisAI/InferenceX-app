@@ -19,6 +19,7 @@ import { GROUP_LABELS, GROUP_TITLES } from './strings';
 import {
   formatWatts,
   GrammarSwatch,
+  useHydrated,
   useWidgetHash,
   WidgetFrame,
   type WidgetProps,
@@ -68,7 +69,8 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
     highContrast: false,
     activeKeys: [...LADDER_HARDWARE],
   });
-  const color = resolveColor(hardware);
+  const hydrated = useHydrated();
+  const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const groups = GROUP_LABELS[locale];
   const titles = GROUP_TITLES[locale];
   const fraction = gpuWatts / sweep.tdpWatts;
@@ -95,13 +97,14 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
         <span className="font-mono text-sm tabular-nums text-foreground">
           {t.readout(formatWatts(gpuWatts), fraction * 100)}
         </span>
-        <span
-          className="font-mono text-xs text-muted-foreground"
-          title={t.chip(ladderLabel(hardware))}
-        >
-          {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(ladder.itWatts)) : ''}
-        </span>
       </div>
+      <p
+        className="mt-2 font-mono text-xs text-muted-foreground"
+        title={t.chip(ladderLabel(hardware))}
+        data-testid="powerx-load-context"
+      >
+        {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(ladder.itWatts)) : ''}
+      </p>
 
       <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-5">
         {sweep.tracks.map((trackRow) => {

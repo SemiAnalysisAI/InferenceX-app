@@ -1,3 +1,5 @@
+import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
+
 import { snapTo } from './widget-hash';
 import { type TutorialViewResponse, viewsInferenceUrl } from './views-api';
 
@@ -66,6 +68,18 @@ export function pairSeries(
         .toSorted((a, b) => a.x - b.x),
     }))
     .filter((series) => series.points.length > 0);
+}
+
+/**
+ * The frontier the dashboard draws for energy per token (direction `lower_right`: higher
+ * interactivity and lower joules are both better), on one series' measured or modeled values.
+ * Dominated points stay as dots; only the line follows the frontier.
+ */
+export function frontierLine(series: PairedSeries, key: 'measured' | 'modeled'): PairedPoint[] {
+  const candidates = series.points
+    .filter((point) => point[key] !== null)
+    .map((point) => ({ point, x: point.x, y: point[key]! }));
+  return globalParetoFrontier(candidates, true, false).map((entry) => entry.point);
 }
 
 export const encodeMmView = (view: MmView): string => view;

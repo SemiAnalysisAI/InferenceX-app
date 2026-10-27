@@ -17,7 +17,14 @@ import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
 
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
-import { Chips, GrammarLegend, useView, WidgetFrame, type WidgetProps } from './widget-chrome';
+import {
+  Chips,
+  GrammarLegend,
+  useHydrated,
+  useView,
+  WidgetFrame,
+  type WidgetProps,
+} from './widget-chrome';
 
 const STRINGS = {
   en: {
@@ -80,7 +87,8 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
       : null;
   const gpuWatts = point?.y ?? exampleGpuWatts(hardware);
   const ladder = useMemo(() => buildLadder(hardware, gpuWatts), [hardware, gpuWatts]);
-  const color = resolveColor(hardware);
+  const hydrated = useHydrated();
+  const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
 
   return (
     <WidgetFrame name="ladder" alt={alt}>

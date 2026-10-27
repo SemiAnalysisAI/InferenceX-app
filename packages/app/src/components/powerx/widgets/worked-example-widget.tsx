@@ -19,6 +19,7 @@ import {
   formatWatts,
   GrammarSwatch,
   type Provenance,
+  useHydrated,
   useView,
   WidgetFrame,
   type WidgetProps,
@@ -82,17 +83,21 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
       : null;
   const gpuWatts = point?.y ?? exampleGpuWatts(hardware);
   const ladder = useMemo(() => buildLadder(hardware, gpuWatts), [hardware, gpuWatts]);
-  const color = resolveColor(hardware);
+  const hydrated = useHydrated();
+  const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const label = ladderLabel(hardware);
 
-  const values: Record<RowKey, string> | null = ladder && {
-    gpu: `${formatWatts(ladder.gpuWatts)} W`,
-    it: `${formatWatts(ladder.itWatts)} W`,
-    gpusPerMw: Math.round(ladder.gpusPerMw).toLocaleString('en-US'),
-    tdp: `${ladder.percentOfTdp.toFixed(0)} %`,
-    facility: `${formatWatts(ladder.facilityWatts)} W`,
-    allIn: `${formatWatts(ladder.allInWatts)} W`,
-  };
+  const values: Record<RowKey, string> | null =
+    view.status === 'loading' || !ladder
+      ? null
+      : {
+          gpu: `${formatWatts(ladder.gpuWatts)} W`,
+          it: `${formatWatts(ladder.itWatts)} W`,
+          gpusPerMw: Math.round(ladder.gpusPerMw).toLocaleString('en-US'),
+          tdp: `${ladder.percentOfTdp.toFixed(0)} %`,
+          facility: `${formatWatts(ladder.facilityWatts)} W`,
+          allIn: `${formatWatts(ladder.allInWatts)} W`,
+        };
 
   return (
     <WidgetFrame name="worked-example" alt={alt}>

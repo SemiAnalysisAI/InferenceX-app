@@ -9,6 +9,7 @@ import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import {
   decodeMmView,
   encodeMmView,
+  frontierLine,
   MM_GPUS,
   MM_VIEWS,
   mmDashboardUrl,
@@ -43,7 +44,7 @@ const STRINGS = {
       modeled:
         'The same points scaled by the power model: facility watts per GPU over measured watts',
     },
-    x: 'P90 interactivity (tok/s/user)',
+    x: 'Interactivity (tok/s/user)',
     y: 'J per output token, log',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: 'Open in PowerX',
@@ -71,7 +72,7 @@ const STRINGS = {
       measured: '仅由 GPU 遥测得到的每输出 token 焦耳数',
       modeled: '同一批数据点按功耗模型换算：乘以每 GPU 数据中心瓦特数 ÷ 实测瓦特数',
     },
-    x: 'P90 交互性（tok/s/user）',
+    x: '交互性（tok/s/user）',
     y: '每输出 token 焦耳数，对数坐标',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: '在 PowerX 中打开',
@@ -195,8 +196,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
   }
 
   const linePath = (series: PairedSeries, key: 'measured' | 'modeled') =>
-    series.points
-      .filter((point) => point[key] !== null)
+    frontierLine(series, key)
       .map(
         (point, index) =>
           `${index === 0 ? 'M' : 'L'}${plot!.xOf(point.x).toFixed(1)},${plot!.yOf(point[key]!).toFixed(1)}`,
@@ -219,7 +219,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
             title: t.viewTitles[key],
           }))}
         />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 pr-1 text-xs text-muted-foreground">
           {paired?.map((series) => (
             <span key={series.hwKey} className="flex items-center gap-1.5">
               <GrammarSwatch kind="measured" color={resolveColor(series.gpu)} />

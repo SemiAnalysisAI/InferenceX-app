@@ -5,6 +5,7 @@ import type { InferenceSeriesEntry } from '@/lib/views-api/series';
 import {
   decodeMmView,
   encodeMmView,
+  frontierLine,
   mmDashboardUrl,
   mmViewUrl,
   pairSeries,
@@ -81,6 +82,31 @@ describe('pairSeries', () => {
       ]),
     ]);
     expect(pairSeries(measured, response([]))[0].points.map((point) => point.id)).toEqual([3]);
+  });
+});
+
+describe('frontierLine', () => {
+  it('keeps only the lower-right frontier (higher interactivity, lower joules), per value kind', () => {
+    const measured = response([
+      series('b200_vllm', 'B200', [
+        [1, 30, 1.4],
+        [2, 50, 1.7],
+        [3, 40, 1.9], // dominated by point 2: slower and more joules
+        [4, 80, 1.6], // dominates point 2 on both axes
+      ]),
+    ]);
+    const modeled = response([
+      series('b200_vllm', 'B200', [
+        [1, 30, 2.8],
+        [2, 50, 3.2],
+        [3, 40, 3.5], // dominated by point 2 on the modeled axis too
+        [4, 80, 3.9],
+      ]),
+    ]);
+    const [paired] = pairSeries(measured, modeled);
+    expect(frontierLine(paired, 'measured').map((point) => point.id)).toEqual([1, 4]);
+    expect(frontierLine(paired, 'modeled').map((point) => point.id)).toEqual([1, 2, 4]);
+    expect(paired.points).toHaveLength(4);
   });
 });
 
