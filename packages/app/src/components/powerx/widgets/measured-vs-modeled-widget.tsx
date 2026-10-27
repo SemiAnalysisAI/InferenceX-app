@@ -21,7 +21,6 @@ import {
 } from '@/lib/powerx/measured-vs-modeled';
 import { cn } from '@/lib/shared/utils';
 
-import { inViewAttr, motionVars, useInView } from './motion';
 import {
   Chips,
   CopyButton,
@@ -94,11 +93,6 @@ const STRINGS = {
 
 const HASH_KEY = 'mm';
 const MARGIN = { top: 16, right: 20, bottom: 42, left: 50 };
-/** Lines draw over 900 ms once the chart is on screen; the points fade in as they finish. */
-const DRAW_MS = 900;
-const POINTS_DELAY_MS = 650;
-const TOGGLE_FADE =
-  'transition-opacity duration-500 ease-[var(--motion-ease-enter)] motion-reduce:transition-none';
 
 function logTicks(min: number, max: number): number[] {
   const ticks: number[] = [];
@@ -142,8 +136,6 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
   const height = width < 560 ? 300 : 380;
   const [hover, setHover] = useState<Hover | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const [inViewRef, inView] = useInView({ threshold: 0.25 });
-  const revealed = inViewAttr(inView);
 
   const paired = useMemo(
     () =>
@@ -244,7 +236,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
         onMouseLeave={() => setHover(null)}
       >
         {status === 'ok' && plot && paired ? (
-          <div ref={inViewRef}>
+          <>
             <svg
               ref={svgRef}
               width={width}
@@ -312,68 +304,54 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
                 const color = resolveColor(series.gpu);
                 return (
                   <g key={series.hwKey}>
-                    <g opacity={view === 'modeled' ? 1 : 0.35} className={TOGGLE_FADE}>
+                    <g
+                      opacity={view === 'modeled' ? 1 : 0.35}
+                      className="transition-opacity motion-reduce:transition-none"
+                    >
                       <path
                         d={linePath(series, 'modeled')}
-                        pathLength={1}
                         fill="none"
                         stroke={color}
                         strokeWidth={1.5}
                         strokeLinejoin="round"
-                        data-draw=""
-                        data-inview={revealed}
-                        style={motionVars({ drawMs: DRAW_MS })}
                       />
-                      <g
-                        data-fade=""
-                        data-inview={revealed}
-                        style={motionVars({ delayMs: POINTS_DELAY_MS })}
-                      >
-                        {series.points
-                          .filter((point) => point.modeled !== null)
-                          .map((point) => (
-                            <circle
-                              key={`m-${point.id}`}
-                              cx={plot.xOf(point.x)}
-                              cy={plot.yOf(point.modeled!)}
-                              r={4}
-                              fill="var(--background)"
-                              stroke={color}
-                              strokeWidth={1.5}
-                            />
-                          ))}
-                      </g>
+                      {series.points
+                        .filter((point) => point.modeled !== null)
+                        .map((point) => (
+                          <circle
+                            key={`m-${point.id}`}
+                            cx={plot.xOf(point.x)}
+                            cy={plot.yOf(point.modeled!)}
+                            r={4}
+                            fill="var(--background)"
+                            stroke={color}
+                            strokeWidth={1.5}
+                          />
+                        ))}
                     </g>
-                    <g opacity={view === 'measured' ? 1 : 0.35} className={TOGGLE_FADE}>
+                    <g
+                      opacity={view === 'measured' ? 1 : 0.35}
+                      className="transition-opacity motion-reduce:transition-none"
+                    >
                       <path
                         d={linePath(series, 'measured')}
-                        pathLength={1}
                         fill="none"
                         stroke={color}
                         strokeWidth={2}
                         strokeLinejoin="round"
                         strokeLinecap="round"
-                        data-draw=""
-                        data-inview={revealed}
-                        style={motionVars({ drawMs: DRAW_MS })}
                       />
-                      <g
-                        data-fade=""
-                        data-inview={revealed}
-                        style={motionVars({ delayMs: POINTS_DELAY_MS })}
-                      >
-                        {series.points.map((point) => (
-                          <circle
-                            key={`s-${point.id}`}
-                            cx={plot.xOf(point.x)}
-                            cy={plot.yOf(point.measured)}
-                            r={4.5}
-                            fill={color}
-                            stroke="var(--background)"
-                            strokeWidth={2}
-                          />
-                        ))}
-                      </g>
+                      {series.points.map((point) => (
+                        <circle
+                          key={`s-${point.id}`}
+                          cx={plot.xOf(point.x)}
+                          cy={plot.yOf(point.measured)}
+                          r={4.5}
+                          fill={color}
+                          stroke="var(--background)"
+                          strokeWidth={2}
+                        />
+                      ))}
                     </g>
                   </g>
                 );
@@ -431,7 +409,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
                 )}
               </div>
             )}
-          </div>
+          </>
         ) : (
           <p role="status" className="flex min-h-40 items-center text-sm text-muted-foreground">
             {status === 'loading' ? t.loading : status === 'failed' ? t.failed : t.empty}

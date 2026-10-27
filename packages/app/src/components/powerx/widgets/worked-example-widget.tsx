@@ -14,7 +14,6 @@ import {
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
 
 import { hardwareStore } from './hardware-store';
-import { useCountUp, useInView, useReducedMotion } from './motion';
 import { PowerLadder } from './power-ladder';
 import {
   formatWatts,
@@ -68,31 +67,6 @@ const ROW_KIND: Record<RowKey, Provenance> = {
   facility: 'modeled',
   allIn: 'rated',
 };
-const ROW_ORDER = Object.keys(ROW_KIND) as RowKey[];
-const READOUT_STAGGER_MS = 70;
-const watts = (value: number) => `${formatWatts(value)} W`;
-
-/** One readout that counts up when the grid scrolls into view and eases on a chip switch. */
-function Readout({
-  value,
-  format,
-  index,
-  active,
-}: {
-  value: number;
-  format: (value: number) => string;
-  index: number;
-  active: boolean;
-}) {
-  const reduced = useReducedMotion();
-  const shown = useCountUp(value, {
-    active,
-    reduced,
-    delayMs: index * READOUT_STAGGER_MS,
-    durationMs: 900,
-  });
-  return <>{format(shown)}</>;
-}
 
 export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -112,22 +86,17 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const label = ladderLabel(hardware);
-  const [ladderRef, ladderInView] = useInView({ threshold: 0.35 });
-  const [readoutsRef, readoutsInView] = useInView<HTMLDListElement>({ threshold: 0.35 });
 
-  const values: Record<RowKey, { value: number; format: (value: number) => string }> | null =
+  const values: Record<RowKey, string> | null =
     view.status === 'loading' || !ladder
       ? null
       : {
-          gpu: { value: ladder.gpuWatts, format: watts },
-          it: { value: ladder.itWatts, format: watts },
-          gpusPerMw: {
-            value: ladder.gpusPerMw,
-            format: (value) => Math.round(value).toLocaleString('en-US'),
-          },
-          tdp: { value: ladder.percentOfTdp, format: (value) => `${value.toFixed(0)} %` },
-          facility: { value: ladder.facilityWatts, format: watts },
-          allIn: { value: ladder.allInWatts, format: watts },
+          gpu: `${formatWatts(ladder.gpuWatts)} W`,
+          it: `${formatWatts(ladder.itWatts)} W`,
+          gpusPerMw: Math.round(ladder.gpusPerMw).toLocaleString('en-US'),
+          tdp: `${ladder.percentOfTdp.toFixed(0)} %`,
+          facility: `${formatWatts(ladder.facilityWatts)} W`,
+          allIn: `${formatWatts(ladder.allInWatts)} W`,
         };
 
   return (
@@ -139,23 +108,14 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
             ? t.point(point.label, point.x, point.concurrency, point.date)
             : t.example(label)}
       </p>
-      <div ref={ladderRef} className="mt-4 min-h-20">
+      <div className="mt-4 min-h-20">
         {view.status !== 'loading' && ladder && (
-          <PowerLadder
-            ladder={ladder}
-            color={color}
-            locale={locale}
-            compact
-            active={ladderInView}
-          />
+          <PowerLadder ladder={ladder} color={color} locale={locale} compact />
         )}
       </div>
       {values && (
-        <dl
-          ref={readoutsRef}
-          className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-border/60 pt-4 sm:grid-cols-3"
-        >
-          {ROW_ORDER.map((key, index) => (
+        <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-border/60 pt-4 sm:grid-cols-3">
+          {(Object.keys(t.rows) as RowKey[]).map((key) => (
             <div key={key} className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <GrammarSwatch
@@ -165,12 +125,7 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
                 {t.rows[key][0]}
               </dt>
               <dd className="mt-1 font-mono text-xl font-semibold text-foreground tabular-nums">
-                <Readout
-                  value={values[key].value}
-                  format={values[key].format}
-                  index={index}
-                  active={readoutsInView}
-                />
+                {values[key]}
               </dd>
               <dd className="text-xs text-muted-foreground">{t.rows[key][1]}</dd>
             </div>

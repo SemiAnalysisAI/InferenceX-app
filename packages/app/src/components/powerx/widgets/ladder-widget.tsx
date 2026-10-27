@@ -16,7 +16,6 @@ import {
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
 
 import { hardwareStore } from './hardware-store';
-import { useInView } from './motion';
 import { PowerLadder } from './power-ladder';
 import {
   Chips,
@@ -90,8 +89,6 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
   const ladder = useMemo(() => buildLadder(hardware, gpuWatts), [hardware, gpuWatts]);
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
-  // The build plays once the bar is on screen after hydration; chip switches interpolate.
-  const [ladderRef, ladderInView] = useInView({ threshold: 0.2 });
 
   return (
     <WidgetFrame name="ladder" alt={alt}>
@@ -122,9 +119,9 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
               : t.example}
         </p>
       </div>
-      <div ref={ladderRef} className="mt-5 min-h-28">
+      <div className="mt-5 min-h-28">
         {view.status !== 'loading' && ladder && (
-          <PowerLadder ladder={ladder} color={color} locale={locale} active={ladderInView} />
+          <PowerLadder ladder={ladder} color={color} locale={locale} />
         )}
       </div>
       <div className="mt-5 flex flex-wrap items-start justify-between gap-x-8 gap-y-3">

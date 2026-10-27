@@ -1,8 +1,6 @@
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 
-import { inViewAttr, motionVars } from './motion';
-
 export const FLOW_NODES = [
   'exporter',
   'window',
@@ -94,35 +92,6 @@ const COLOR = {
 
 const MAIN: FlowNode[] = ['exporter', 'window', 'gpu', 'model', 'it', 'pue', 'facility'];
 
-/**
- * The in-view sequence: each main node lights up 90 ms after the one before it, the arrow to
- * the next node draws just behind it, and the energy branch comes last.
- */
-export const FLOW_MOTION = {
-  stepMs: 90,
-  nodeMs: 400,
-  edgeMs: 450,
-  edgeLagMs: 40,
-  headMs: 200,
-  branchMs: 500,
-} as const;
-
-export function flowDelays(): Record<FlowNode, number> & { edge: number[]; branch: number } {
-  const { stepMs, branchMs } = FLOW_MOTION;
-  const delays = {} as Record<FlowNode, number>;
-  MAIN.forEach((node, index) => {
-    delays[node] = index * stepMs;
-  });
-  const branch = MAIN.length * stepMs;
-  delays.energy = branch + branchMs * 0.6;
-  return {
-    ...delays,
-    edge: MAIN.slice(1).map((_, index) => index * stepMs + FLOW_MOTION.edgeLagMs),
-    branch,
-  };
-}
-
-/** The arrowhead the marker draws, as a path so the live page can fade it in after the line. */
 function arrowHead(x: number, y: number, direction: 'right' | 'down'): string {
   const back = 6.1;
   const half = 3.1;
@@ -169,8 +138,6 @@ export interface FlowSvgProps {
   onSelect: (node: FlowNode) => void;
   /** The id prefix for the description the nodes point at. */
   describedBy: string;
-  /** Nodes and arrows reveal in sequence once this turns true. */
-  inView: boolean;
 }
 
 export function FlowSvg({
@@ -181,14 +148,11 @@ export function FlowSvg({
   onActivate,
   onSelect,
   describedBy,
-  inView,
 }: FlowSvgProps) {
   const t = FLOW_STRINGS[locale];
   const { boxes, height } = flowLayout(width, orientation);
   const edges: [FlowNode, FlowNode][] = [];
   for (let index = 1; index < MAIN.length; index++) edges.push([MAIN[index - 1], MAIN[index]]);
-  const inViewData = inViewAttr(inView);
-  const delays = flowDelays();
   const edgeDirection = orientation === 'horizontal' ? 'right' : 'down';
 
   function edgePath(a: Box, b: Box): string {
@@ -223,54 +187,29 @@ export function FlowSvg({
       fontFamily="inherit"
       style={{ display: 'block', overflow: 'visible' }}
     >
-      {edges.map(([a, b], index) => (
+      {edges.map(([a, b]) => (
         <g key={`${a}-${b}`}>
           <path
             d={edgePath(boxes[a], boxes[b])}
-            pathLength={1}
             fill="none"
             stroke={COLOR.muted}
             strokeWidth={1.25}
-            data-draw=""
-            data-inview={inViewData}
-            style={motionVars({ delayMs: delays.edge[index], drawMs: FLOW_MOTION.edgeMs })}
           />
           <path
             d={arrowHead(...edgeEnd(boxes[b]), edgeDirection)}
             fill="none"
             stroke={COLOR.muted}
             strokeWidth={1.25}
-            data-fade=""
-            data-inview={inViewData}
-            style={motionVars({
-              delayMs: delays.edge[index] + FLOW_MOTION.edgeMs - 120,
-              fadeMs: FLOW_MOTION.headMs,
-            })}
           />
         </g>
       ))}
       <g>
-        <path
-          d={branch}
-          pathLength={1}
-          fill="none"
-          stroke={COLOR.muted}
-          strokeWidth={1.25}
-          data-draw=""
-          data-inview={inViewData}
-          style={motionVars({ delayMs: delays.branch, drawMs: FLOW_MOTION.branchMs })}
-        />
+        <path d={branch} fill="none" stroke={COLOR.muted} strokeWidth={1.25} />
         <path
           d={arrowHead(...branchEnd, 'down')}
           fill="none"
           stroke={COLOR.muted}
           strokeWidth={1.25}
-          data-fade=""
-          data-inview={inViewData}
-          style={motionVars({
-            delayMs: delays.branch + FLOW_MOTION.branchMs - 120,
-            fadeMs: FLOW_MOTION.headMs,
-          })}
         />
       </g>
       {FLOW_NODES.map((node) => {
@@ -288,8 +227,6 @@ export function FlowSvg({
             role="button"
             aria-pressed={isActive}
             aria-describedby={describedBy}
-            data-fade=""
-            data-inview={inViewData}
             onMouseEnter={() => onActivate(node)}
             onFocus={() => onActivate(node)}
             onClick={() => onSelect(node)}
@@ -302,7 +239,6 @@ export function FlowSvg({
             style={{
               cursor: 'pointer',
               outline: 'none',
-              ...motionVars({ delayMs: delays[node], fadeMs: FLOW_MOTION.nodeMs }),
             }}
           >
             <rect

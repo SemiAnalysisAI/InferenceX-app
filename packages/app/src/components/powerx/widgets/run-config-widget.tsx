@@ -139,16 +139,13 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
         />
       </div>
       <details
-        className="group mt-3 motion-details"
+        className="group mt-3"
         onToggle={(event) => {
           if (event.currentTarget.open) track('powerx_tutorial_run_config_more_opened');
         }}
       >
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground md:min-h-9 [&::-webkit-details-marker]:hidden">
-          <span
-            aria-hidden="true"
-            className="transition-transform duration-(--motion-dur-base) ease-[var(--motion-ease-standard)] group-open:rotate-45 motion-reduce:transition-none"
-          >
+          <span aria-hidden="true" className="group-open:rotate-45">
             +
           </span>
           {t.more}

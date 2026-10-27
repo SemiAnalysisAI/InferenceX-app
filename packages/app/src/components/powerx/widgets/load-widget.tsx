@@ -15,7 +15,6 @@ import {
 import { cn } from '@/lib/shared/utils';
 
 import { hardwareStore } from './hardware-store';
-import { inViewAttr, motionVars, useCountUp, useInView, useReducedMotion } from './motion';
 import { GROUP_LABELS, GROUP_TITLES } from './strings';
 import {
   formatWatts,
@@ -54,31 +53,6 @@ const STRINGS = {
 const HASH_KEY = 'ld';
 const SPARK_W = 136;
 const SPARK_H = 40;
-/** Sparklines draw in 50 ms apart once the strip is on screen; slider changes ease in 200 ms. */
-const SPARK_STAGGER_MS = 50;
-const SPARK_DRAW_MS = 700;
-const SLIDE_MS = 200;
-
-/** One watt readout that counts up on first view and eases to each new value. */
-function Watts({
-  value,
-  active,
-  delayMs = 0,
-}: {
-  value: number;
-  active: boolean;
-  delayMs?: number;
-}) {
-  const reduced = useReducedMotion();
-  const shown = useCountUp(value, {
-    active,
-    reduced,
-    delayMs,
-    durationMs: 700,
-    updateMs: SLIDE_MS,
-  });
-  return <>{formatWatts(shown)}</>;
-}
 
 export function LoadWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -100,16 +74,6 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   const groups = GROUP_LABELS[locale];
   const titles = GROUP_TITLES[locale];
   const fraction = gpuWatts / sweep.tdpWatts;
-  const reduced = useReducedMotion();
-  const [stripRef, stripInView] = useInView<HTMLUListElement>({ threshold: 0.3 });
-  const revealed = inViewAttr(stripInView);
-  const shownGpuWatts = useCountUp(gpuWatts, { reduced, durationMs: 0, updateMs: SLIDE_MS });
-  const shownFraction = shownGpuWatts / sweep.tdpWatts;
-  const shownItWatts = useCountUp(ladder?.itWatts ?? 0, {
-    reduced,
-    durationMs: 0,
-    updateMs: SLIDE_MS,
-  });
 
   return (
     <WidgetFrame name="load" alt={alt}>
@@ -131,7 +95,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
           />
         </label>
         <span className="font-mono text-sm tabular-nums text-foreground">
-          {t.readout(formatWatts(shownGpuWatts), shownFraction * 100)}
+          {t.readout(formatWatts(gpuWatts), fraction * 100)}
         </span>
       </div>
       <p
@@ -139,11 +103,11 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
         title={t.chip(ladderLabel(hardware))}
         data-testid="powerx-load-context"
       >
-        {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(shownItWatts)) : ''}
+        {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(ladder.itWatts)) : ''}
       </p>
 
-      <ul ref={stripRef} className="mt-5 flex flex-wrap gap-x-7 gap-y-5">
-        {sweep.tracks.map((trackRow, trackIndex) => {
+      <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-5">
+        {sweep.tracks.map((trackRow) => {
           const current =
             ladder?.segments.find((segment) => segment.group === trackRow.group)?.watts ?? 0;
           const max = Math.max(...trackRow.values, 1);
@@ -158,7 +122,6 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
           const cx = fraction * SPARK_W;
           const cy = SPARK_H - (current / max) * (SPARK_H - 4) - 2;
           const measured = trackRow.kind === 'measured';
-          const delayMs = trackIndex * SPARK_STAGGER_MS;
           return (
             <li key={trackRow.group} title={titles[trackRow.group]} className="w-34 shrink-0">
               <p
@@ -181,51 +144,35 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
                   d={`${path} L${SPARK_W},${SPARK_H} L0,${SPARK_H} Z`}
                   fill={color}
                   fillOpacity={measured ? 0.22 : 0.1}
-                  data-fade=""
-                  data-inview={revealed}
-                  style={motionVars({ delayMs: delayMs + SPARK_DRAW_MS * 0.4 })}
                 />
                 <path
                   d={path}
-                  pathLength={1}
                   fill="none"
                   stroke={color}
                   strokeWidth={measured ? 2 : 1.5}
-                  data-draw=""
-                  data-inview={revealed}
-                  style={motionVars({ delayMs, drawMs: SPARK_DRAW_MS })}
+                  strokeDasharray={undefined}
                 />
-                <g
-                  data-fade=""
-                  data-inview={revealed}
-                  style={motionVars({ delayMs: delayMs + SPARK_DRAW_MS * 0.6 })}
-                >
-                  <line
-                    x1={0}
-                    x2={0}
-                    y1={0}
-                    y2={SPARK_H}
-                    stroke="var(--foreground)"
-                    strokeOpacity={0.35}
-                    strokeWidth={1}
-                    className="motion-move"
-                    style={{ transform: `translateX(${cx}px)` }}
-                  />
-                  <circle
-                    cx={0}
-                    cy={0}
-                    r={4}
-                    fill={measured ? color : 'var(--background)'}
-                    stroke={measured ? 'var(--background)' : color}
-                    strokeWidth={measured ? 2 : 1.5}
-                    className="motion-move"
-                    style={{ transform: `translate(${cx}px, ${cy}px)` }}
-                  />
-                </g>
+                <line
+                  x1={cx}
+                  x2={cx}
+                  y1={0}
+                  y2={SPARK_H}
+                  stroke="var(--foreground)"
+                  strokeOpacity={0.35}
+                  strokeWidth={1}
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={4}
+                  fill={measured ? color : 'var(--background)'}
+                  stroke={measured ? 'var(--background)' : color}
+                  strokeWidth={measured ? 2 : 1.5}
+                />
               </svg>
               <p className="mt-1 flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
                 <span className="font-mono tabular-nums text-foreground">
-                  <Watts value={current} active={stripInView} delayMs={delayMs} /> W
+                  {formatWatts(current)} W
                 </span>
                 <span>{measured ? t.input : moves ? t.follows : t.flat}</span>
               </p>
