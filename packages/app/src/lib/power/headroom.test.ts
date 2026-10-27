@@ -118,7 +118,7 @@ describe('buildHeadroomRows', () => {
       measuredAvgPower: metric(p.measuredAvgPower!.y * 1.1),
       measuredP90Power: metric(p.measuredP90Power!.y * 1.1),
     }));
-    const rows = buildHeadroomRows([...b200, ...h200], HEADROOM_INTERACTIVITIES, {
+    const rows = buildHeadroomRows([...b200, ...h200], {
       points: overlay,
       runIndexByUrl: { [runUrl]: 1 },
       runInfos: [

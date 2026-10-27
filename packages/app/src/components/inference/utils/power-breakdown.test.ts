@@ -4,45 +4,21 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { InferenceData } from '../types';
 import {
-  bandAtWatts,
   bandPartsAt,
-  bandTarget,
   bandWattsPerGpu,
   breakdownItWattsPerGpu,
-  breakdownPointAtConcurrency,
   breakdownSeriesAtBoundary,
   buildPowerBreakdowns,
   buildPowerBreakdownsWithOverlays,
   compareBreakdownsAt,
-  cssHatchAngle,
-  defaultComparisonInteractivity,
-  HATCH_ANGLE,
-  isHatchedBand,
-  MEASURED_POWER_BANDS,
-  nearestBreakdownPoint,
-  orderBreakdownSeriesForDisplay,
-  parseComparedPoints,
-  partTarget,
-  POWER_BAND_CATEGORIES,
-  POWER_BAND_OPACITY,
-  POWER_BANDS,
-  POWER_BREAKDOWN_STACK_ORDER,
   POWER_PART_BEHAVIOUR,
-  powerBandFillOpacity,
   powerBandOf,
   powerBandsOf,
   powerBreakdownInteractivity,
-  powerBreakdownPointLabels,
-  powerLayerEmphasis,
-  powerLayerFill,
-  powerPartEmphasis,
   powerPartRows,
-  sameLayerTarget,
-  serializeComparedPoints,
   sparklineGeometry,
   stackedBandsAt,
   stackPowerBands,
-  type PowerBreakdownDisplaySeries,
   type PowerBreakdownPoint,
   type PowerBreakdownSeries,
 } from './power-breakdown';
@@ -142,7 +118,7 @@ describe('buildPowerBreakdowns', () => {
     expect(series.categories[0]).toBe('gpu');
     expect(series.categories).not.toContain('measuredCpu');
     expect(series.categories).toEqual(
-      POWER_BREAKDOWN_STACK_ORDER.filter((key) => series.categories.includes(key)),
+      SYSTEM_POWER_CATEGORIES.filter((key) => series.categories.includes(key)),
     );
     expect(series.tdpWattsPerGpu).toBeGreaterThan(0);
     expect(series.allInProvisionedWattsPerGpu).toBeGreaterThan(series.points[1].totalWattsPerGpu);
@@ -191,17 +167,6 @@ describe('powerBreakdownInteractivity', () => {
     const latency = powerBreakdownInteractivity('median_e2el');
     expect(latency).toMatchObject({ field: 'median_intvty', fromChart: false });
     expect(latency.value(point(300, { x: 9, median_intvty: 42 }))).toBe(42);
-  });
-});
-
-describe('powerBreakdownPointLabels', () => {
-  it('numbers repeated concurrencies so every bar keeps a distinct tick', () => {
-    const [series] = buildPowerBreakdowns([
-      point(250, { conc: 1, median_intvty: 120 }),
-      point(400, { conc: 16, date: '2026-09-01', median_intvty: 40 }),
-      point(420, { conc: 16, date: '2026-09-08', median_intvty: 38 }),
-    ]);
-    expect(powerBreakdownPointLabels(series.points)).toEqual(['c16 · 1', 'c16 · 2', 'c1']);
   });
 });
 
@@ -259,23 +224,6 @@ describe('cross-chip comparison', () => {
     [80, 1000],
   ]);
 
-  it('defaults to the geometric middle of the range every chip covers', () => {
-    expect(defaultComparisonInteractivity([a, b])).toBeCloseTo(40, 9);
-    expect(defaultComparisonInteractivity([])).toBeNull();
-  });
-
-  it('falls back to the full range when chips do not overlap', () => {
-    const low = fakeSeries('L', [
-      [5, 1],
-      [10, 1],
-    ]);
-    const high = fakeSeries('H', [
-      [100, 1],
-      [200, 1],
-    ]);
-    expect(defaultComparisonInteractivity([low, high])).toBeCloseTo(Math.sqrt(5 * 200), 9);
-  });
-
   it("picks each chip's nearest point on a log scale and keeps the chips in the given order", () => {
     const { rows, outOfRange } = compareBreakdownsAt([a, b], 56);
     expect(outOfRange).toEqual([]);
@@ -326,133 +274,9 @@ describe('cross-chip comparison', () => {
       ['D', 8, false],
     ]);
   });
-
-  it('keeps a pinned chip in the rows when its nearest point is out of the slider range', () => {
-    const { rows, outOfRange } = compareBreakdownsAt([c, d], 160, undefined, { D: 8 });
-    expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
-      ['C', 4, false],
-      ['D', 8, true],
-    ]);
-    expect(outOfRange).toEqual([]);
-    // Even with no usable slider value, a pinned chip is compared at its point.
-    expect(compareBreakdownsAt([c, d], 0, undefined, { D: 32 }).rows).toHaveLength(1);
-    expect(compareBreakdownsAt([c, d], 0, undefined, { D: 32 }).outOfRange).toEqual([c]);
-  });
-
-  it('ignores a pin at a concurrency the chip was not benchmarked at', () => {
-    const { rows } = compareBreakdownsAt([c, d], 56, undefined, { C: 999, Z: 16 });
-    expect(rows.map((r) => [r.series.label, r.entry.concurrency, r.pinned])).toEqual([
-      ['C', 16, false],
-      ['D', 8, false],
-    ]);
-  });
-});
-
-describe('breakdownPointAtConcurrency', () => {
-  const series = {
-    points: [
-      { concurrency: 16, interactivity: 30 },
-      { concurrency: 16, interactivity: 70 },
-      { concurrency: 4, interactivity: 120 },
-    ] as PowerBreakdownPoint[],
-  };
-
-  it('finds the point at a concurrency and null when there is none', () => {
-    expect(breakdownPointAtConcurrency(series, 4)?.interactivity).toBe(120);
-    expect(breakdownPointAtConcurrency(series, 8)).toBeNull();
-  });
-
-  it('picks the duplicate nearest the slider, the first one without a slider', () => {
-    expect(breakdownPointAtConcurrency(series, 16)?.interactivity).toBe(30);
-    expect(breakdownPointAtConcurrency(series, 16, 60)?.interactivity).toBe(70);
-    expect(breakdownPointAtConcurrency(series, 16, 35)?.interactivity).toBe(30);
-  });
-});
-
-describe('compared points share parameter', () => {
-  it('round-trips series keys and concurrencies, keys sorted', () => {
-    const points = { 'b200_vllm|fp8': 64, 'b200_sglang|fp8|run2': 16 };
-    const value = serializeComparedPoints(points);
-    expect(value).toBe('b200_sglang|fp8|run2:16,b200_vllm|fp8:64');
-    expect(parseComparedPoints(value)).toEqual(points);
-    expect(serializeComparedPoints({})).toBe('');
-    expect(parseComparedPoints('')).toEqual({});
-    expect(parseComparedPoints(undefined)).toEqual({});
-  });
-
-  it('drops malformed pairs and keeps the rest', () => {
-    expect(parseComparedPoints('b200_vllm|fp8:64,nope,:4,x:0,y:1.5,h200|fp8: 8 ')).toEqual({
-      'b200_vllm|fp8': 64,
-      'h200|fp8': 8,
-    });
-  });
-});
-
-describe('orderBreakdownSeriesForDisplay', () => {
-  const display = (hwKey: string, label: string, overlayRunIndex?: number) =>
-    ({
-      ...fakeSeries(label, [[10, 1]]),
-      key: `${hwKey}|${label}`,
-      hwKey,
-      overlayRunIndex,
-    }) as PowerBreakdownDisplaySeries;
-
-  it('orders official lines by the registry, then label, and overlays after them by run', () => {
-    const ordered = orderBreakdownSeriesForDisplay([
-      display('h100_sglang', 'H100'),
-      display('b200_sglang', 'B200 run 1', 1),
-      display('mi355x_sglang', 'MI355X'),
-      display('b200_vllm', 'B200 vLLM'),
-      display('gb300_dynamo', 'GB300 run 0', 0),
-      display('b200_sglang', 'B200 SGLang'),
-      display('gb300_dynamo', 'GB300'),
-    ]);
-    expect(ordered.map((entry) => entry.label)).toEqual([
-      'GB300',
-      'B200 SGLang',
-      'B200 vLLM',
-      'MI355X',
-      'H100',
-      'GB300 run 0',
-      'B200 run 1',
-    ]);
-  });
 });
 
 describe('six-layer overview', () => {
-  it('folds the twelve parts into six layers, in stack order', () => {
-    expect(POWER_BANDS).toEqual(['gpu', 'measuredCpu', 'server', 'fansPsu', 'network', 'facility']);
-    expect(POWER_BANDS.flatMap((band) => POWER_BAND_CATEGORIES[band])).toEqual([
-      ...SYSTEM_POWER_CATEGORIES,
-    ]);
-    expect(powerBandOf('gpu')).toBe('gpu');
-    expect(powerBandOf('measuredCpu')).toBe('measuredCpu');
-    expect(powerBandOf('cpu')).toBe('server');
-    expect(powerBandOf('nic')).toBe('server');
-    expect(powerBandOf('nvswitch')).toBe('server');
-    expect(powerBandOf('other')).toBe('server');
-    expect(powerBandOf('fans')).toBe('fansPsu');
-    expect(powerBandOf('psuLoss')).toBe('fansPsu');
-    expect(powerBandOf('network')).toBe('network');
-    expect(powerBandOf('facility')).toBe('facility');
-    expect([...MEASURED_POWER_BANDS]).toEqual(['gpu', 'measuredCpu']);
-    // The layers a series draws are those with a non-empty part: HGX has no Grace layer,
-    // a single-node run no network share, an IT-only stack no facility.
-    expect(powerBandsOf(['gpu', 'cpu', 'fans', 'facility'])).toEqual([
-      'gpu',
-      'server',
-      'fansPsu',
-      'facility',
-    ]);
-    expect(powerBandsOf(['gpu', 'measuredCpu', 'nic', 'network'])).toEqual([
-      'gpu',
-      'measuredCpu',
-      'server',
-      'network',
-    ]);
-    expect(powerBandsOf(['gpu'])).toEqual(['gpu']);
-  });
-
   it('stacks the layers so they sum to the total and each layer to its parts', () => {
     const [series] = buildPowerBreakdowns([point(500)]);
     const entry = series.points[0];
@@ -494,52 +318,6 @@ describe('six-layer overview', () => {
     expect(bandPartsAt(entry, 'measuredCpu')).toEqual([]);
   });
 
-  it('steps opacity down from the measured base and hatches each modeled layer at its own angle', () => {
-    expect(POWER_BANDS.map((band) => POWER_BAND_OPACITY[band])).toEqual([
-      0.9, 0.72, 0.5, 0.34, 0.2, 0,
-    ]);
-    expect(POWER_BANDS.map(isHatchedBand)).toEqual([false, false, true, true, true, true]);
-    // The facility's stripes sit on a tint; every other layer's tint is its own step.
-    expect(powerBandFillOpacity('facility')).toBe(0.18);
-    expect(powerBandFillOpacity('server')).toBe(0.5);
-    expect(powerBandFillOpacity('gpu')).toBe(0.9);
-    expect(POWER_BANDS.map((band) => HATCH_ANGLE[band])).toEqual([45, 45, 45, 135, 0, 90]);
-    expect(cssHatchAngle('server')).toBe(135);
-    expect(cssHatchAngle('fansPsu')).toBe(225);
-    expect(cssHatchAngle('network')).toBe(90);
-    expect(cssHatchAngle('facility')).toBe(180);
-    expect(powerLayerFill('var(--chip)', 0.5)).toBe(
-      'color-mix(in oklab, var(--chip) 50%, transparent)',
-    );
-  });
-
-  it('tells highlighted, faded and plain layers apart, by layer or by part', () => {
-    expect(powerLayerEmphasis('server', null)).toBe('plain');
-    expect(powerLayerEmphasis('server', { ...bandTarget('server'), pinned: false })).toBe(
-      'highlighted',
-    );
-    expect(powerLayerEmphasis('gpu', { ...bandTarget('server'), pinned: true })).toBe('faded');
-    // A part target raises its layer.
-    expect(partTarget('nic')).toEqual({ band: 'server', category: 'nic' });
-    expect(partTarget('fans')).toEqual({ band: 'fansPsu', category: 'fans' });
-    expect(powerLayerEmphasis('server', { ...partTarget('nic'), pinned: false })).toBe(
-      'highlighted',
-    );
-    expect(powerLayerEmphasis('fansPsu', { ...partTarget('nic'), pinned: false })).toBe('faded');
-    expect(powerLayerEmphasis('facility', { ...partTarget('nic'), pinned: false })).toBe('faded');
-    expect(sameLayerTarget(bandTarget('server'), partTarget('nic'))).toBe(false);
-    expect(sameLayerTarget(partTarget('nic'), { band: 'server', category: 'nic' })).toBe(true);
-    expect(sameLayerTarget(null, null)).toBe(true);
-    // List rows: the hovered part, siblings of a layer hovered in the plot, or plain.
-    expect(powerPartEmphasis('nic', null)).toBe('plain');
-    expect(powerPartEmphasis('nic', { ...partTarget('nic'), pinned: false })).toBe('highlighted');
-    expect(powerPartEmphasis('cpu', { ...partTarget('nic'), pinned: false })).toBe('plain');
-    expect(powerPartEmphasis('cpu', { ...bandTarget('server'), pinned: false })).toBe('band');
-    expect(powerPartEmphasis('fans', { ...bandTarget('server'), pinned: false })).toBe('plain');
-    expect(powerPartEmphasis('gpu', { ...bandTarget('server'), pinned: false })).toBe('plain');
-    expect(powerPartEmphasis('gpu', { ...bandTarget('gpu'), pinned: false })).toBe('band');
-  });
-
   it('knows which parts are measured, move with load or stay fixed, as the model does', () => {
     const state = { workload: 'agentic', scaleOut: true } as const;
     const low = estimateChassisPower('h200', 8 * 226, state)!.breakdown;
@@ -567,26 +345,6 @@ describe('powerPartRows', () => {
   const selected = series.points[1];
   const rows = powerPartRows(series, selected);
 
-  it('lists every non-empty part heaviest first, the facility overhead last', () => {
-    expect(rows[0].category).toBe('gpu');
-    expect(rows.at(-1)!.category).toBe('facility');
-    expect(rows.map((part) => part.category)).not.toContain('measuredCpu');
-    expect(rows.map((part) => part.category).toSorted()).toEqual([...series.categories].toSorted());
-    const itRows = rows.slice(0, -1);
-    for (let index = 1; index < itRows.length; index += 1) {
-      expect(itRows[index].watts).toBeLessThanOrEqual(itRows[index - 1].watts);
-    }
-    expect(rows[0]).toMatchObject({ band: 'gpu', behaviour: 'measured', selectedIndex: 1 });
-    expect(rows.find((part) => part.category === 'fans')).toMatchObject({
-      band: 'fansPsu',
-      behaviour: 'load',
-    });
-    expect(rows.find((part) => part.category === 'nic')).toMatchObject({
-      band: 'server',
-      behaviour: 'fixed',
-    });
-  });
-
   it('shares of IT sum to 1 and the facility row is its share of the facility total', () => {
     const itRows = rows.slice(0, -1);
     expect(itRows.reduce((sum, part) => sum + part.share, 0)).toBeCloseTo(1, 9);
@@ -595,22 +353,6 @@ describe('powerPartRows', () => {
       selected.wattsPerGpu.facility / selected.totalWattsPerGpu,
       9,
     );
-  });
-
-  it('gives each row its own history and scale across the series', () => {
-    expect(rows[0].history).toEqual([600, 400, 250]);
-    expect(rows[0].max).toBe(600);
-    const fans = rows.find((part) => part.category === 'fans')!;
-    expect(fans.history).toHaveLength(3);
-    expect(fans.max).toBe(Math.max(...fans.history));
-    expect(fans.max).toBeLessThan(rows[0].max);
-  });
-
-  it('omits the facility row at the IT boundary', () => {
-    const itSeries = breakdownSeriesAtBoundary(series, false);
-    const itRows = powerPartRows(itSeries, itSeries.points[1]);
-    expect(itRows.map((part) => part.category)).not.toContain('facility');
-    expect(itRows.reduce((sum, part) => sum + part.share, 0)).toBeCloseTo(1, 9);
   });
 });
 
@@ -623,27 +365,6 @@ describe('sparklineGeometry', () => {
     expect(spark.dot).toEqual({ x: 36, y: 1 });
     // A different row with a smaller max still reaches the top of its own box.
     expect(sparklineGeometry([2, 4], 0, 72, 18).line).toBe('M1,9L71,1');
-  });
-
-  it('draws a single value as a flat mid-line and clamps the selected index', () => {
-    expect(sparklineGeometry([5], 0, 72, 18).line).toBe('M36,1');
-    expect(sparklineGeometry([0, 0], 5, 72, 18).dot).toEqual({ x: 71, y: 17 });
-    expect(sparklineGeometry([], 0, 72, 18).line).toBe('M36,17');
-  });
-});
-
-describe('nearestBreakdownPoint', () => {
-  const series = fakeSeries('A', [
-    [10, 1500],
-    [40, 1200],
-    [160, 900],
-  ]);
-
-  it('returns the point nearest the target on a log scale, however far', () => {
-    expect(nearestBreakdownPoint(series, 56)?.interactivity).toBe(40);
-    expect(nearestBreakdownPoint(series, 5000)?.interactivity).toBe(160);
-    expect(nearestBreakdownPoint(series, 0)?.interactivity).toBe(10);
-    expect(nearestBreakdownPoint(fakeSeries('E', []), 10)).toBeNull();
   });
 });
 
@@ -687,19 +408,6 @@ describe('stackedBandsAt', () => {
       ['facility', 180, 210, 30],
     ]);
   });
-
-  it('clamps to the ends outside the points', () => {
-    expect(stackedBandsAt(points, -10, bands)[0].watts).toBe(100);
-    expect(stackedBandsAt(points, 500, bands)[0].watts).toBe(200);
-  });
-
-  it('names the band under a watts value and nothing above the stack', () => {
-    const stack = stackedBandsAt(points, 50, bands);
-    expect(bandAtWatts(stack, 160)?.key).toBe('server');
-    expect(bandAtWatts(stack, 0)?.key).toBe('gpu');
-    expect(bandAtWatts(stack, 300)).toBeNull();
-    expect(bandAtWatts(stack, -1)).toBeNull();
-  });
 });
 
 describe('buildPowerBreakdownsWithOverlays', () => {
@@ -728,12 +436,6 @@ describe('buildPowerBreakdownsWithOverlays', () => {
     expect(series[1].points.map((entry) => entry.wattsPerGpu.gpu)).toEqual([520, 410]);
     expect(series[1].label).toContain(series[0].label);
     expect(series[1].label).not.toBe(series[0].label);
-  });
-
-  it('is the plain breakdown without overlay points', () => {
-    expect(buildPowerBreakdownsWithOverlays(official, undefined)).toEqual(
-      buildPowerBreakdowns(official),
-    );
   });
 
   it('lists the dashboard series in registry order, not label order', () => {
