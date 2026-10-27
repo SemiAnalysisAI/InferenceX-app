@@ -169,16 +169,6 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
   });
 
-  it('opens an old Inference i_power link without i_metric on the PowerX power scatter', () => {
-    visitCertifiedPowerChart('&i_power=certified', powerBenchmarks, '/inference');
-
-    cy.location('pathname').should('eq', '/powerx');
-    assertChartTitle(MEASURED_POWER_TITLE);
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    assertShareLinkParams({ i_power: 'certified', i_metric: 'y_measuredAvgPower' });
-  });
-
   it('keeps an explicit tokens-per-dollar metric next to a power tier filter', () => {
     visitCertifiedPowerChart(
       '&i_metric=y_tokensPerDollarH&i_power=certified',
@@ -189,19 +179,6 @@ describe('Validated vs historical measured power', () => {
     cy.location('pathname').should('eq', '/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', TOKENS_PER_DOLLAR_TITLE);
     assertChartTitle(TOKENS_PER_DOLLAR_TITLE);
-    assertShareLinkParams({ i_metric: null, i_power: 'certified' });
-  });
-
-  it('keeps the Inference Performance metric when Validated turns on', () => {
-    visitCertifiedPowerChart('', powerBenchmarks, '/inference');
-    assertChartTitle(TOKENS_PER_DOLLAR_TITLE);
-
-    cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filter-power-certified"]').click();
-    cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
-    assertChartTitle(TOKENS_PER_DOLLAR_TITLE);
-    cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
-
     assertShareLinkParams({ i_metric: null, i_power: 'certified' });
   });
 

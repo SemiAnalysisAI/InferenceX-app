@@ -273,56 +273,6 @@ const moveSlider = (step: number) => {
 };
 
 describe('PowerAnalysisPanels inline drill-down', () => {
-  it('opens under the compared chip on first render, with the across-load controls', () => {
-    expect(container.querySelector('[data-testid="power-chip-compare-value"]')?.textContent).toBe(
-      '60 tok/s/user',
-    );
-    expect(drilldowns()).toHaveLength(1);
-    expect(drilldownTitle()).toBe(VLLM_TITLE);
-    // The drill-down sits inside the compared chip's row, which is the active one.
-    const row = expandedRow();
-    expect(
-      row?.closest('li')?.querySelector('[data-testid="power-chip-compare-drilldown"]'),
-    ).not.toBeNull();
-    expect(row?.getAttribute('aria-pressed')).toBe('true');
-    const drilldown = drilldowns()[0];
-    expect(drilldown.querySelector('[data-testid="power-breakdown-source"]')).not.toBeNull();
-    const views = [
-      ...drilldown.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="power-breakdown-view"] button',
-      ),
-    ];
-    expect(views.map((button) => button.textContent)).toEqual(['Stacked bars', 'Stacked area']);
-    expect(drilldown.querySelector('[data-testid="power-breakdown-collapse"]')).not.toBeNull();
-    expect(drilldown.querySelector('[data-testid="chart-buttons"]')).not.toBeNull();
-    // One stack legend for the whole view: the compact panel adds none of its own.
-    expect(container.querySelector('[data-testid="power-breakdown-legend"]')).toBeNull();
-  });
-
-  it('opens on the stacked area view and switches the compact panel to stacked bars', () => {
-    const drilldown = '[data-testid="power-chip-compare-drilldown"]';
-    expect(
-      container
-        .querySelector(`${drilldown} [data-testid="power-breakdown-view-area"]`)
-        ?.getAttribute('aria-pressed'),
-    ).toBe('true');
-    const bars = container.querySelector<HTMLButtonElement>(
-      `${drilldown} [data-testid="power-breakdown-view-bars"]`,
-    )!;
-    expect(bars.getAttribute('aria-pressed')).toBe('false');
-    act(() => bars.click());
-    expect(
-      container
-        .querySelector(`${drilldown} [data-testid="power-breakdown-view-bars"]`)
-        ?.getAttribute('aria-pressed'),
-    ).toBe('true');
-    expect(
-      container.querySelector(
-        '[data-testid="power-chip-compare-drilldown"] [data-testid="d3-chart-stub"]',
-      ),
-    ).not.toBeNull();
-  });
-
   it('follows the slider to the chip nearest the new interactivity, parts list included', () => {
     const heading = () =>
       container.querySelector('[data-testid="power-parts-heading"]')?.textContent;
@@ -347,7 +297,7 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     ).toHaveLength(0);
   });
 
-  it('stays collapsed after Collapse until a bar is clicked, even when the slider moves', () => {
+  it('stays collapsed after Collapse until a bar is clicked, even when the slider moves, and a second click closes it', () => {
     act(() =>
       container
         .querySelector<HTMLButtonElement>('[data-testid="power-breakdown-collapse"]')!
@@ -360,13 +310,8 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     act(() => rowFor(VLLM_TITLE)!.click());
     expect(drilldowns()).toHaveLength(1);
     expect(drilldownTitle()).toBe(VLLM_TITLE);
-  });
-
-  it('pins to a clicked bar, and clicking the open bar closes it', () => {
-    act(() => rowFor(SGLANG_TITLE)!.click());
-    expect(drilldownTitle()).toBe(SGLANG_TITLE);
-    expect(rowFor(SGLANG_TITLE)?.getAttribute('aria-expanded')).toBe('true');
-    act(() => rowFor(SGLANG_TITLE)!.click());
+    // Clicking the open bar closes it again.
+    act(() => rowFor(VLLM_TITLE)!.click());
     expect(drilldowns()).toHaveLength(0);
   });
 });

@@ -3326,20 +3326,6 @@
       ]
     },
     {
-      "spec": "cypress/e2e/measured-power-overlay.cy.ts",
-      "duration": 1486,
-      "tests": [
-        {
-          "title": [
-            "Measured power on unofficial-run overlay",
-            "exposes both measured families and selects average power on the overlay view"
-          ],
-          "duration": 1482,
-          "attempts": 1
-        }
-      ]
-    },
-    {
       "spec": "cypress/e2e/model-architecture.cy.ts",
       "duration": 8390,
       "tests": [

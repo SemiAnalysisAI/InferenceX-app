@@ -619,13 +619,11 @@ describe('deployment power breakdown', () => {
     );
     const modeled = supported(nvl72Row({ cpu_power_valid: 0 }));
     expect(modeled.deploymentBreakdownWatts.measuredCpu).toBe(0);
-  });
-
-  it('sums distinct prefill and decode chassis into one deployment breakdown', () => {
+    // Distinct prefill and decode trays sum into one deployment breakdown.
     const source = gb300DisaggRow();
-    const result = supported(source);
-    expect(total(result.deploymentBreakdownWatts)).toBeCloseTo(result.deploymentFacilityWatts, 6);
-    expect(result.deploymentBreakdownWatts.gpu).toBeCloseTo(
+    const disagg = supported(source);
+    expect(total(disagg.deploymentBreakdownWatts)).toBeCloseTo(disagg.deploymentFacilityWatts, 6);
+    expect(disagg.deploymentBreakdownWatts.gpu).toBeCloseTo(
       source.metrics.avg_total_gpu_power_w!,
       2,
     );

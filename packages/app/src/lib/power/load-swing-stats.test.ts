@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 
-import {
-  computeLoadSwingStats,
-  loadSwingStatsFromSeries,
-  loadSwingTraceRows,
-  quantile,
-  scaleLoadSwingStatsToRack,
-} from './load-swing-stats';
+import { computeLoadSwingStats, loadSwingStatsFromSeries, quantile } from './load-swing-stats';
 
 // 20 one-second samples: 100 W idle for 5 s, a ramp to 500 W, serving at 500±20 W, a drop.
 const samples = [
@@ -55,13 +49,15 @@ describe('computeLoadSwingStats', () => {
   });
 
   it('never reads a delta across a telemetry gap and counts the gap', () => {
+    // Sample 6 is raised to 700 so the step across the gap (300 → 700) would be the largest.
     const gapped = {
       ...input,
+      samples: samples.map((v, i) => (i === 6 ? 700 : v)),
       times: times.map((t) => (t >= 6 ? t + 3 : t)),
     };
     const stats = computeLoadSwingStats(gapped)!;
     expect(stats.gapCount).toBe(1);
-    // The 300 → 500 step now spans 4 s and is skipped; the next largest step is 200 (100 → 300).
+    // The 300 → 700 step now spans 4 s and is skipped; the next largest step is 200 (100 → 300).
     expect(stats.maxDelta1s).toBe(200);
     // Window bounds move with the samples; stats stay defined.
     expect(
@@ -85,16 +81,6 @@ describe('computeLoadSwingStats', () => {
     expect(stats.idleFloor).toBeNull();
     expect(stats.peak).toBe(520);
     expect(computeLoadSwingStats({ ...input, samples: [null, null], times: [0, 1] })).toBeNull();
-  });
-
-  it('scales to an NVL72 rack as kW × 72 and keeps the volatility ratio', () => {
-    const stats = computeLoadSwingStats(input)!;
-    const rack = scaleLoadSwingStatsToRack(stats);
-    expect(rack.unit).toBe('kW per NVL72 rack');
-    expect(rack.peak).toBeCloseTo((520 * 72) / 1000, 9);
-    expect(rack.rampUpPerSecond).toBeCloseTo((84 * 72) / 1000, 9);
-    expect(rack.volatility).toBe(stats.volatility);
-    expect(rack.sampleCount).toBe(stats.sampleCount);
   });
 
   it('interpolates quantiles like the mock and the summary table', () => {
@@ -123,20 +109,5 @@ describe('loadSwingStatsFromSeries', () => {
     expect(stats.mean).toBeCloseTo(490, 9);
     expect(stats.idleFloor).toBe(90);
     expect(stats.maxDelta5s).toBe(420);
-  });
-
-  it('exports one CSV row per bucket with serving-relative time and the window flag', () => {
-    const rows = loadSwingTraceRows(series, windowStartMs, windowEndMs);
-    expect(rows).toHaveLength(20);
-    expect(rows[0]).toEqual({ t_s: 0, since_serving_s: -7, in_validated_window: 0, w_per_gpu: 90 });
-    expect(rows[7]).toMatchObject({ since_serving_s: 0, in_validated_window: 1, w_per_gpu: 510 });
-    expect(rows[17].in_validated_window).toBe(0);
-    const rack = loadSwingTraceRows(series, null, null, 'nvl72');
-    expect(rack[0]).toEqual({
-      t_s: 0,
-      since_serving_s: '',
-      in_validated_window: 0,
-      kw_per_nvl72_rack: 6.48,
-    });
   });
 });

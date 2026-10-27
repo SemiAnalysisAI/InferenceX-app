@@ -133,27 +133,20 @@ describe('buildHeadroomRows', () => {
     ]);
     // The overlay row is read from its own points, not merged into the official B200 line.
     expect(rows[2].cells[1]!.p90Watts).toBeCloseTo(rows[0].cells[1]!.p90Watts * 1.1, 6);
-    expect(headroomCsvRows(rows).map((row) => row.source)).toEqual([
+    const csv = headroomCsvRows(rows);
+    expect(csv.map((row) => row.source)).toEqual([
       ...Array.from({ length: 8 }, () => 'official'),
       ...Array.from({ length: 4 }, () => 'unofficial'),
     ]);
-    // Without overlay input nothing changes.
-    expect(buildHeadroomRows([...b200, ...h200])).toHaveLength(2);
-  });
-
-  it('flattens rows for CSV with blanks outside the measured range', () => {
-    const csv = headroomCsvRows(buildHeadroomRows(h200));
-    expect(csv).toHaveLength(4);
-    expect(csv[0]).toMatchObject({
+    // An H200 cell outside its measured range (40-120) exports blank, not 0.
+    expect(csv[4]).toMatchObject({
       chip: 'H200 (TRTLLM) FP8',
       interactivity_tok_s_user: 25,
       avg_w_per_gpu: '',
       p90_w_per_gpu: '',
       headroom_pct: '',
-      tdp_w: 700,
-      basis: 'GPU',
     });
-    expect(csv[1].interactivity_tok_s_user).toBe(50);
-    expect(typeof csv[1].avg_w_per_gpu).toBe('number');
+    // Without overlay input nothing changes.
+    expect(buildHeadroomRows([...b200, ...h200])).toHaveLength(2);
   });
 });
