@@ -243,6 +243,28 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
   });
 
+  it('draws the best library per token count for each SKU in the Best by SKU view', () => {
+    const twoLibraries = buildDataset({
+      shards: [makeRawShard(), makeRawShard({ backend: 'nccl-ep', implName: 'nccl-ep' })],
+    });
+    installRuns([twoLibraries]);
+    installRun(twoLibraries);
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+    showView('Best by SKU');
+    cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-range-note"]').should('contain.text', 'best value');
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', 'Best:')
+      .and('contain.text', '2 libraries at this point');
+    cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
+    showView('Range by SKU');
+    cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
+  });
+
   it('selects normal and low-latency kernel modes by default', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],

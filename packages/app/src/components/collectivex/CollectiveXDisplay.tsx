@@ -127,9 +127,12 @@ const STRINGS = {
     sku: 'SKU',
     backend: 'Backend',
     viewControl: 'View',
-    viewAria: 'Show each series, or one range per SKU across every library',
+    viewAria: 'Show each series, or one range or best line per SKU across every library',
     viewSeries: 'Series',
     viewRange: 'Range by SKU',
+    viewBest: 'Best by SKU',
+    bestNote:
+      'Each line is the best value (lowest latency, highest rate) across every library and selected mode at that token count; the tooltip names the winner.',
     rangeNote:
       'Each band spans the lowest to the highest value across every library and selected mode at that token count; the line is their median.',
     yAxisControl: 'Y axis',
@@ -204,9 +207,12 @@ const STRINGS = {
     sku: 'SKU',
     backend: '后端',
     viewControl: '视图',
-    viewAria: '显示每条序列，或按 SKU 显示所有集合通信库的范围',
+    viewAria: '显示每条序列，或按 SKU 显示所有集合通信库的范围或最佳值',
     viewSeries: '序列',
     viewRange: '按 SKU 显示范围',
+    viewBest: '按 SKU 显示最佳',
+    bestNote:
+      '每条线为该 token 数下所有集合通信库与所选模式中的最佳值（延迟最低、速率最高），提示框会标明最佳的集合通信库。',
     rangeNote: '每个色带覆盖该 token 数下所有集合通信库与所选模式的最低值到最高值，线为其中位数。',
     yAxisControl: 'Y 轴',
     tokenRateOption: '延迟分位点对应的 token 速率',
@@ -303,7 +309,7 @@ export default function CollectiveXDisplay() {
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
-  const [view, setView] = useState<'series' | 'range'>('range');
+  const [view, setView] = useState<'series' | 'range' | 'best'>('range');
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
@@ -443,8 +449,8 @@ export default function CollectiveXDisplay() {
     () => phaseSeries.filter((item) => activeSeriesIds.has(item.series_id)),
     [activeSeriesIds, phaseSeries],
   );
-  // The range view combines every library, so it only applies while Backend is All.
-  const rangeView = view === 'range' && backend === 'all';
+  // The range and best views combine every library, so they only apply while Backend is All.
+  const rangeView = view !== 'series' && backend === 'all';
   // Built whenever Backend is All (not only in the range view), so legend-hidden bands survive a
   // visit to the series view.
   const rangeBands = useMemo(
@@ -826,6 +832,7 @@ export default function CollectiveXDisplay() {
                         options={[
                           { value: 'series', label: t.viewSeries },
                           { value: 'range', label: t.viewRange },
+                          { value: 'best', label: t.viewBest },
                         ]}
                         onValueChange={(next) => {
                           setView(next);
@@ -862,6 +869,7 @@ export default function CollectiveXDisplay() {
                   testId="collectivex-explorer-chart"
                   series={rangeView ? [] : activeSeries}
                   ranges={rangeView ? shownRangeBands : undefined}
+                  rangeMode={view === 'best' ? 'best' : 'range'}
                   colors={colors}
                   operation={operation}
                   percentile={percentile}
@@ -933,7 +941,7 @@ export default function CollectiveXDisplay() {
                     className="mt-2 text-xs text-muted-foreground"
                     data-testid="collectivex-range-note"
                   >
-                    {t.rangeNote}
+                    {view === 'best' ? t.bestNote : t.rangeNote}
                   </p>
                 )}
                 {yAxis === 'activation-rate' && (
