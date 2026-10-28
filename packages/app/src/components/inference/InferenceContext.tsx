@@ -80,7 +80,12 @@ import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
+import {
+  getHardwareConfig,
+  getModelSortIndex,
+  hardwareKeyMatchesBase,
+  isKnownGpu,
+} from '@/lib/catalog/constants';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   getOpenRouterModelId,
@@ -120,6 +125,8 @@ import {
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
+import { powerXViewFor } from './powerx/powerx-views';
+import { usePowerXSurface } from './ui/powerx-surface';
 import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
 import {
   EMPTY_QUICK_FILTERS,
@@ -1305,6 +1312,19 @@ export function InferenceProvider({
   }`;
   const lastHwResetKeyRef = useRef('');
   const lastHwResetModelRef = useRef(selectedModel);
+  // PowerX Energy per token opens without H200: its joules per token flatten every other chip.
+  const powerXSurface = usePowerXSurface();
+  const hideH200 = powerXSurface && powerXViewFor(selectedYAxisMetric, powerCompare) === 'energy';
+  const lastHideH200Ref = useRef(hideH200);
+  const automaticHardware = useCallback(
+    (hardware: Set<string>) => {
+      const defaults = defaultInferenceHardware(selectedModel, hardware);
+      if (!hideH200) return defaults;
+      const shown = new Set([...defaults].filter((key) => !hardwareKeyMatchesBase(key, 'h200')));
+      return shown.size > 0 ? shown : defaults;
+    },
+    [selectedModel, hideH200],
+  );
 
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
@@ -1352,7 +1372,10 @@ export function InferenceProvider({
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
     const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
-    if (!scopeChanged && !bestPerSku && !presetFilter) return;
+    // Re-apply the default when the H200 rule flips, unless the reader picked hardware.
+    const hideH200Changed = !hardwareDefaultsOverridden && lastHideH200Ref.current !== hideH200;
+    if (!scopeChanged && !bestPerSku && !presetFilter && !hideH200Changed) return;
+    lastHideH200Ref.current = hideH200;
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
@@ -1369,7 +1392,7 @@ export function InferenceProvider({
     const candidates = bestPerSku ? bestHwTypes : selectableHwTypes;
     const automaticSelection =
       activeTab === 'inference' && !hardwareDefaultsOverridden
-        ? defaultInferenceHardware(selectedModel, candidates)
+        ? automaticHardware(candidates)
         : candidates;
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
@@ -1396,6 +1419,7 @@ export function InferenceProvider({
     resolveHwSelection,
     activeTab,
     hardwareDefaultsOverridden,
+    automaticHardware,
   ]);
 
   useEffect(() => {
@@ -1490,7 +1514,7 @@ export function InferenceProvider({
     if (activeHwTypes.size === 0) return '';
     const defaultSelection = (items: Set<string>) =>
       activeTab === 'inference' && !initialActiveHwTypes?.length && !autoSelectAllGpus
-        ? defaultInferenceHardware(selectedModel, items)
+        ? automaticHardware(items)
         : items;
     const defaultBest = defaultSelection(bestHwTypes);
     const defaultAll = defaultSelection(selectableHwTypes);
@@ -1521,7 +1545,7 @@ export function InferenceProvider({
     bestHwTypes,
     bestPerSku,
     activeTab,
-    selectedModel,
+    automaticHardware,
     initialActiveHwTypes,
     autoSelectAllGpus,
   ]);
