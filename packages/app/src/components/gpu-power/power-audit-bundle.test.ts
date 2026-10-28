@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-
 import {
   BUNDLE_MANIFEST_ENTRY,
   BUNDLE_SAMPLES_ENTRY,
   BUNDLE_WINDOW_PAD_SECONDS,
-  cutPowerAuditBundle,
-  parsePowerCsvData,
-} from './power-audit-bundle';
+} from '@semianalysisai/inferencex-db/power-series/power-audit-cut';
+
+import { cutPowerAuditBundle, parsePowerCsvData } from './power-audit-bundle';
 
 const ARTIFACT = 'power_audit_qwen3.5_8k1k_fp8_dynamo-sglang_x';
 const RESULT = 'qwen3.5_8k1k_fp8_dynamo-sglang_x_sa-bench_isl_8192_osl_1024';

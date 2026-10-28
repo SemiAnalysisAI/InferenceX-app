@@ -1,9 +1,9 @@
+import { isRecord } from '../lib/records';
 import type { GpuMetricSeries } from '../queries/gpu-metrics';
 
 import {
   cutPowerAuditSamples,
   cutPowerAuditCsvs,
-  isRecord,
   type PowerAuditDevice,
   type PowerAuditSample,
 } from './power-audit-cut';

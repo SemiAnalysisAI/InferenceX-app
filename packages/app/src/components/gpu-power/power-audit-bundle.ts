@@ -31,18 +31,6 @@ import type { GpuPowerSeries } from '@semianalysisai/inferencex-db/power-series/
 
 import { parseCsvData, type GpuMetricRow } from './types';
 
-export {
-  BUNDLE_MANIFEST_ENTRY,
-  BUNDLE_SAMPLES_ENTRY,
-  BUNDLE_WINDOW_PAD_SECONDS,
-  cutPowerAuditCsvs,
-  cutPowerAuditSamples,
-  isPowerAuditBundleEntry,
-  isRecord,
-  type PowerAuditDevice,
-  type PowerAuditSample,
-} from '@semianalysisai/inferencex-db/power-series/power-audit-cut';
-
 /**
  * Normalize NVIDIA's unzoned wall-clock timestamps to ISO UTC, matching the ingest
  * parser: the adjacent collector context supplies the offset and missing or UTC

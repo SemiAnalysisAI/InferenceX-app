@@ -1,7 +1,7 @@
 /**
  * Precompute PowerX timeline series (`gpu_power_series`) for stored runs.
  *
- *   bun run db:backfill-power-series            # preview runs whose rows are missing or stale
+ *   bun run db:backfill-power-series            # count runs with stored telemetry
  *   bun run db:backfill-power-series --yes      # write them
  *   bun run db:backfill-power-series --run-id <github run id> [--force] --yes
  *

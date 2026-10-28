@@ -15,6 +15,7 @@
  * (`cutPowerAuditBundle`) and the stored-series transform both use it.
  */
 import { isPowerAuditValidationEntry } from '../etl/power-audit-validations';
+import { isRecord } from '../lib/records';
 
 import {
   bucketPowerSeries,
@@ -125,10 +126,6 @@ export function parseSamples(csv: string): ParsedSamples {
 
 function asRole(value: unknown): GpuPowerRole | undefined {
   return value === 'prefill' || value === 'decode' ? value : undefined;
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseJsonObject(text: string | undefined): Record<string, unknown> | null {

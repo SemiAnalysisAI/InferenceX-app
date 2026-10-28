@@ -107,7 +107,6 @@ export interface GpuMetricsRunSelection {
 // 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
 export const SAMPLE_PAGE_SIZE = 50_000;
 
-/** @internal Shared with `gpu-power-series.ts`. */
 export interface RawSeriesRow {
   id: number | string;
   artifact_name: string;
@@ -154,11 +153,10 @@ export class TelemetrySnapshotChangedError extends Error {
 
 const MAX_SNAPSHOT_ATTEMPTS = 3;
 
-/** @internal Changes whenever `upsertGpuMetricSeries` replaces the series. */
+/** Changes whenever `upsertGpuMetricSeries` replaces the series. */
 export const seriesVersionKey = (row: RawSeriesVersionRow): string =>
   `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
 
-/** @internal */
 export async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
@@ -192,7 +190,7 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   };
 }
 
-/** @internal Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
+/** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
 export async function readSeriesRows(
   sql: DbClient,
   scope:
@@ -241,7 +239,6 @@ export async function readSeriesRows(
   `) as unknown as RawSeriesRow[];
 }
 
-/** @internal */
 export async function loadSeriesDetails(
   sql: DbClient,
   seriesRows: readonly RawSeriesRow[],
@@ -333,7 +330,7 @@ export async function loadSeriesDetails(
   });
 }
 
-/** @internal Latest attempt of a GitHub run, with whether it stores any telemetry. */
+/** Latest attempt of a GitHub run, with whether it stores any telemetry. */
 export async function readLatestRun(sql: DbClient, githubRunId: number) {
   const rows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
@@ -361,7 +358,6 @@ export async function readLatestRun(sql: DbClient, githubRunId: number) {
   return rows[0];
 }
 
-/** @internal */
 export function toWorkflowRun(
   run: NonNullable<Awaited<ReturnType<typeof readLatestRun>>>,
 ): GpuMetricsRunPayload['workflowRun'] {

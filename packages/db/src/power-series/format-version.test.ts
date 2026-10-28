@@ -17,7 +17,7 @@ const TRANSFORM_FILES = [
 /** Update together with `POWER_SERIES_FORMAT_VERSION` when the transform changes. */
 const TRANSFORM_FINGERPRINT = {
   version: 1,
-  sha256: '2cbec1d115f8329c6b7b859ec4cd40933b043117c1368fbe5127a24096b1c152',
+  sha256: 'ace8e0084568126b22924e8bd5be24b5de7029255b6b1838ef775f1485302b03',
 };
 
 describe('POWER_SERIES_FORMAT_VERSION', () => {

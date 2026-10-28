@@ -51,13 +51,13 @@ import {
   type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { getPrecomputedPowerSeries } from '@semianalysisai/inferencex-db/queries/gpu-power-series';
-
-import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
-import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   storedPowerSeries,
   StoredTelemetryIncompleteError,
-} from '@/components/gpu-power/stored-power-series';
+} from '@semianalysisai/inferencex-db/power-series/stored-power-series';
+
+import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
+import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import { ARTIFACT_PREFIX } from './artifact-selection';
 import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
@@ -136,9 +136,12 @@ function sourceCoverage(series: GpuPowerSeries[], sources: string[] | null) {
 function powerSeriesResponse(
   source: GpuMetricsSource,
   runInfo: GpuPowerRunInfo,
-  series: GpuPowerSeries[],
+  allSeries: GpuPowerSeries[],
   sources: string[] | null,
 ) {
+  const series = allSeries.filter(
+    (entry) => sources === null || sources.includes(seriesSource(entry) ?? ''),
+  );
   return NextResponse.json(
     { source, runInfo, series, sourceCoverage: sourceCoverage(series, sources) },
     { headers: { 'Cache-Control': 'no-store' } },
@@ -171,9 +174,7 @@ async function fetchPrecomputedPowerSeries(
     return powerSeriesResponse(
       'database',
       storedRunInfo(stored.workflowRun),
-      stored.series.filter(
-        (entry) => sources === null || sources.includes(seriesSource(entry) ?? ''),
-      ),
+      stored.series,
       sources,
     );
   } catch (error) {
@@ -305,7 +306,7 @@ async function readGpuMetrics(
         stored.artifacts.flatMap((artifact) =>
           artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
         ),
-      ).filter((entry) => sources === null || sources.includes(seriesSource(entry) ?? ''));
+      );
       return powerSeriesResponse('database', stored.runInfo, storedSeries, sources);
     }
     if (series === 'power') {
@@ -322,7 +323,6 @@ async function readGpuMetrics(
       const liveSeries: GpuPowerSeries[] = [];
       for (const entry of [...powerSeries, ...bundleSeries]) {
         const source = seriesSource(entry);
-        if (sources !== null && !sources.includes(source ?? '')) continue;
         if (source !== null && seenSources.has(source)) continue;
         liveSeries.push(entry);
         if (source !== null) seenSources.add(source);
