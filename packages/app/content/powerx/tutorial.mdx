@@ -20,7 +20,7 @@ PowerX measures what each accelerator draws while it serves a benchmark and mode
 
 - **Sampled.** `dcgm-exporter` on NVIDIA nodes and `device-metrics-exporter` on AMD nodes report every GPU once a second; the head node scrapes every node on one clock.
 - **Windowed.** Each concurrency point has one serving window, from the end of warmup to the last request. Only samples inside it count.
-- **Integrated.** Energy per GPU is the trapezoid integral of its samples over the window; energy per token divides the deployment's GPU energy by the tokens the client counted.
+- **Integrated.** Energy per GPU is the trapezoid integral of its samples over the window; energy per token divides the deployment's GPU energy by every token the client counted, input plus output.
 - **Modeled.** The `power_model` package takes the measured watts and an operating state (fixed sequence, agentic, agentic with KV offload), adds CPUs, memory, NICs, switches, storage, fans and PSU loss to reach IT power, then applies PUE (1.3 for an air-cooled chassis, 1.1 for a liquid-cooled NVL72 rack) for facility power.
 
 <Callout kind="note">
@@ -49,6 +49,8 @@ Fans and PSU loss track the GPU; CPUs, memory, NICs and switches hold their leve
 ## Methodology
 
 Average, P75 and P90 power are time-weighted over the window across every GPU in the deployment; prefill and decode roles are averaged over the same window. Planners read **P90**, because dynamic power steering reacts to peaks; chip comparisons read **energy per token**.
+
+Energy is charged to every token, input plus output. Aggregated serving runs prefill and decode on the same GPUs, so their joules cannot be split by phase, and joules per output token would bill the prompt to the output. Disaggregated runs keep separate prefill and decode pools, and the **Where the power goes** view splits their energy by role.
 
 A point is **Validated** only when the offline validator, re-run from the raw samples, passes all five checks. Anything else is **Historical**: throughput stays, energy and modeled power are dropped, and the audit record names the failing check.
 

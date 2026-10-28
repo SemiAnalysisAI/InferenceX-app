@@ -88,7 +88,10 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
   Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
   Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
-  on the views they apply to, and the Rated boundaries toggle where rated lines exist, all as
+  on the views they apply to (the Energy view opens on Per: All tokens, J per input + output
+  token, because aggregated serving shares GPUs between prefill and decode and cannot split
+  their energy by phase; only All tokens and Output carry the IT, Facility and rated
+  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Rated boundaries toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
   Compare history fieldsets fold into "More chart controls" exactly as on `/inference`. Under `md`
@@ -165,7 +168,7 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
   `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
-  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per output token)
+  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per token or per output token)
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
