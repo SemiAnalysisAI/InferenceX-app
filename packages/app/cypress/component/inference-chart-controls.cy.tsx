@@ -12,11 +12,11 @@ describe('Inference ChartControls', () => {
   });
 
   afterEach(() => {
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
   });
 
   it('offers no measured power or energy metrics; they live on the PowerX tab', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('Throughput').should('exist');

@@ -48,7 +48,7 @@ function suppressNudges(win: Cypress.AUTWindow): void {
 
 function unlockPowerGate(win: Cypress.AUTWindow): void {
   suppressNudges(win);
-  win.localStorage.setItem('inferencex-feature-gate', '1');
+  win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
 }
 
 const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
@@ -227,18 +227,20 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
       onBeforeLoad: (win) => {
         suppressNudges(win);
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
     chart().find('text.revenue-label').should('have.length', 4);
     cy.get('#profit-power').should('not.exist');
     cy.get('[data-testid="profit-power-note"]').should('not.exist');
     cy.then(() => expect(rawRequests).to.equal(0));
-    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
+    cy.get('body').type(
+      '{uparrow}{uparrow}{downarrow}{downarrow}{leftarrow}{rightarrow}{leftarrow}{rightarrow}BA',
+    );
     cy.get('#profit-power').should('contain', 'Compare both');
     chart().find('text.revenue-label').should('have.length', 7);
     cy.window().then((win) => {
-      win.localStorage.removeItem('inferencex-feature-gate');
+      win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
     });
     cy.get('#profit-power').should('not.exist');

@@ -60,6 +60,13 @@ describe('PowerXFeatureGate', () => {
     expect(rendered()).toBe(true);
   });
 
+  it.each(['en', 'zh'] as const)('rejects a legacy unlock on the %s page', (locale) => {
+    localStorage.setItem('inferencex-feature-gate', '1');
+    renderGate(locale);
+    expect(replace).toHaveBeenCalledWith(locale === 'zh' ? '/zh' : '/');
+    expect(rendered()).toBe(false);
+  });
+
   it('leaves PowerX when the gate is relocked on the page', () => {
     localStorage.setItem(FEATURE_GATE_KEY, '1');
     renderGate('en');

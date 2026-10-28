@@ -121,7 +121,7 @@ function visitModel(model: string, extra = '', path = '/inference') {
     {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     },
   );

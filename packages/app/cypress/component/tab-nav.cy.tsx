@@ -226,12 +226,12 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   afterEach(() => {
     cy.window().then((win) => {
       win.history.replaceState(null, '', '/');
-      win.localStorage.removeItem('inferencex-feature-gate');
+      win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
     });
   });
 
   it('omits the Hidden trigger and gated links when the feature gate is locked', () => {
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-inference"]').should('exist');
     cy.get('[data-testid="tab-trigger-submissions"]').should('exist');
@@ -245,7 +245,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
 
   it('shows every primary chart as a one-tap mobile pill with the current one marked', () => {
     cy.viewport(390, 844);
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
     mountTabNav({ pathname: '/evaluation' });
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
     for (const key of [
@@ -273,7 +273,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
 
   it('still names the current gated page in the locked mobile selector', () => {
     cy.viewport(390, 844);
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
     mountTabNav({ pathname: '/zh/ai-chart' });
     cy.get('[data-testid="mobile-chart-select"]')
       .should('be.visible')
@@ -281,7 +281,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   });
 
   it('renders the Hidden trigger when unlocked; popover reveals gated links', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({});
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible').and('contain.text', 'Hidden');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
@@ -301,7 +301,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   });
 
   it('forwards the unofficialruns param onto every gated link in the popover', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ search: '?unofficialruns=42' });
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.get('[data-testid="tab-trigger-feedback"]').should(
@@ -317,19 +317,19 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   });
 
   it('highlights the Hidden trigger when the current path is one of the gated tabs', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/feedback' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
   });
 
   it('highlights the Hidden trigger on /collectivex, which is now gated', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/collectivex' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
   });
 
   it('does NOT highlight the Hidden trigger on a non-gated path', () => {
-    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+    cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/inference' });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-secondary');
   });

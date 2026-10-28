@@ -82,15 +82,22 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
-  it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
+  it('keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type('{leftArrow}{rightArrow}{leftArrow}{rightArrow}ba');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
       const active = $indicator
@@ -103,7 +110,9 @@ describe('Chart Section Tabs — E2E', () => {
       expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
       expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
     });
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.reload();
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
   });
 
   for (const [path, landing] of [
@@ -116,7 +125,8 @@ describe('Chart Section Tabs — E2E', () => {
       cy.visit(path, {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.localStorage.removeItem('inferencex-feature-gate');
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+          win.localStorage.setItem('inferencex-feature-gate', '1');
         },
       });
       cy.location('pathname').should('eq', landing);
@@ -127,7 +137,7 @@ describe('Chart Section Tabs — E2E', () => {
     cy.visit('/powerx', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.setItem('inferencex-feature-gate', '1');
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
     cy.get('[data-testid="inference-chart-display"]').should('exist');
@@ -456,13 +466,15 @@ describe('H3 video artifact viewer', () => {
     cy.viewport(1440, 1000);
     cy.visit('/video', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
     cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');

@@ -42,7 +42,7 @@ function setup() {
 }
 
 function unlock(win: Cypress.AUTWindow) {
-  win.localStorage.setItem('inferencex-feature-gate', '1');
+  win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
 }

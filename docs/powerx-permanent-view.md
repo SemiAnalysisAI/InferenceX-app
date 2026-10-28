@@ -2,7 +2,7 @@
 
 How the PowerX article's power-boundary figures live inside `/inference` instead of a
 separate page. The measured-power UI, the four power boundaries, and their share links all
-sit in the existing ↑↑↓↓-gated **Measured Energy** metric group.
+sit in the existing ↑↑↓↓←→←→BA-gated **Measured Energy** metric group.
 
 ## Purpose
 
@@ -82,7 +82,11 @@ chrome as `/inference`, so the two tabs read as one dashboard. Nothing in the da
 changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
 `?unofficialrun=` overlays and the views API are untouched.
 
-PowerX sits behind the ↑↑↓↓ feature gate: `/powerx` is a `feature-gated` route, so it is
+PowerX sits behind the ↑↑↓↓←→←→BA feature gate (uppercase `B` and `A`, no Enter):
+the letters are case-sensitive; use Caps Lock or Shift. Previously saved four-arrow
+unlocks are invalid when the updated app loads, so those visitors must enter the full
+code again. This is a client-side visibility flag, not authentication.
+`/powerx` is a `feature-gated` route, so it is
 listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
 PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/powerx`,
 `/zh/powerx` and both tutorial pages, renders nothing until it reads the gate on the client,

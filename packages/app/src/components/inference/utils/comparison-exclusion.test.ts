@@ -19,7 +19,7 @@ describe('isEngineGuardLifted', () => {
     expect(isEngineGuardLifted(true, false)).toBe(true);
   });
 
-  it('lifts the guard when the ↑↑↓↓ feature gate is unlocked', () => {
+  it('lifts the guard when the ↑↑↓↓←→←→BA feature gate is unlocked', () => {
     expect(isEngineGuardLifted(false, true)).toBe(true);
     expect(comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, true)).toBeNull();
     expect(comparisonDefaultGroup(Sequence.AgenticTraces, true)).toBeNull();
