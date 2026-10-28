@@ -18,6 +18,7 @@ import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import DOMPurify from 'dompurify';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -481,7 +482,19 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
           chart.radarData.length > 0;
         return (
           <figure key={i} className="relative rounded-lg">
-            <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
+            <ChartButtons
+              chartId={chartId}
+              analyticsPrefix="ai_chart"
+              analyticsContext={selectionAnalyticsContext({
+                model: chart.spec.model,
+                sequence: chart.spec.sequence,
+                precisions: chart.spec.precisions,
+                // No hardware keys means every GPU, so the count is unknown.
+                gpuCount:
+                  chart.spec.hardwareKeys.length > 0 ? chart.spec.hardwareKeys.length : undefined,
+              })}
+              hideZoomReset={!hasZoom}
+            />
             <Card id={`${chartId}-export`}>
               <CardHeader>
                 <CardTitle>{chart.spec.title}</CardTitle>

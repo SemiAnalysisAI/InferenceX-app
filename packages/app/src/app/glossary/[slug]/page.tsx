@@ -15,6 +15,7 @@ import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
 import { socialMetadata } from '@/lib/seo/social-metadata';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -111,7 +112,7 @@ export default async function GlossaryTermPage({ params }: Props) {
   };
 
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('glossary')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">

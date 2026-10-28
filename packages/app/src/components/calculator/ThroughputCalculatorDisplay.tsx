@@ -3,6 +3,7 @@
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
@@ -1206,6 +1207,12 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
             <ChartButtons
               chartId="calculator-chart"
               analyticsPrefix="calculator"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_calculator-chart"
               onExportCsv={handleExportCsv}
               setIsLegendExpanded={setIsLegendExpanded}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 
 export interface SupporterOrg {
   label: string;
@@ -25,7 +26,12 @@ export function SupportersStrip({ orgs, moreHref, moreLabel }: SupportersStripPr
             href={org.href}
             prefetch={false}
             className="text-xs font-semibold tracking-wide uppercase text-[#808488] transition-colors duration-200 hover:text-foreground hover:underline"
-            onClick={() => track('supporters_strip_org_clicked', { org: org.label })}
+            onClick={(event) =>
+              track('supporters_strip_org_clicked', {
+                org: org.label,
+                placement: placementFor(event.currentTarget),
+              })
+            }
           >
             {org.label}
           </Link>
@@ -37,7 +43,11 @@ export function SupportersStrip({ orgs, moreHref, moreLabel }: SupportersStripPr
           href={moreHref}
           prefetch={false}
           className="text-xs font-bold text-brand hover:underline"
-          onClick={() => track('quote_carousel_see_more_clicked')}
+          onClick={(event) =>
+            track('quote_carousel_see_more_clicked', {
+              placement: placementFor(event.currentTarget),
+            })
+          }
         >
           {moreLabel ?? 'See full quotes & more supporters →'}
         </Link>

@@ -36,6 +36,7 @@ import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-me
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
 import { availableOverlaySources } from './overlay-sources';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -131,6 +132,7 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
 
 export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled = true }: Props) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const query = useGpuMetricsPoint(id, enabled);
   const seriesList = query.data?.series ?? [];
@@ -295,7 +297,11 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <Select
                 value={String(selectedSeries.id)}
                 onValueChange={(value) => {
-                  track('inference_agentic_power_series_selected', { id, seriesId: Number(value) });
+                  track('inference_agentic_power_series_selected', {
+                    ...analyticsContext,
+                    id,
+                    seriesId: Number(value),
+                  });
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
               >

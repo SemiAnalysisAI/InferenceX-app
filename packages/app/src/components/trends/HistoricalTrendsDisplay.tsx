@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
@@ -434,6 +435,12 @@ export default function HistoricalTrendsDisplay() {
                 </div>
               }
               analyticsPrefix="historical"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: activeHwTypes.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
               exportFileName={`InferenceX_historical_${selectedModel}`}

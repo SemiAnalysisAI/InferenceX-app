@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
+import type { SelectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
@@ -24,6 +25,10 @@ interface ChartButtonsProps {
   leadingControls?: ReactNode;
   className?: string;
   mobileVisible?: boolean;
+  /** The `chart` property of export and zoom-reset events. Defaults to `chartId`. */
+  analyticsChart?: string;
+  /** Dashboard state sent with every export, CSV, MP4 and zoom-reset event, next to `chart`. */
+  analyticsContext?: SelectionAnalyticsContext;
 }
 
 export function ChartButtons({
@@ -40,6 +45,8 @@ export function ChartButtons({
   leadingControls,
   className,
   mobileVisible = true,
+  analyticsChart = chartId,
+  analyticsContext,
 }: ChartButtonsProps) {
   const locale = useLocale();
   const t =
@@ -68,23 +75,24 @@ export function ChartButtons({
   });
   const [popoverOpen, setPopoverOpen] = useState(false);
   const resetEventName = zoomResetEvent || `${analyticsPrefix}_zoom_reset_${chartId}`;
+  const eventProperties = { chart: analyticsChart, ...analyticsContext };
 
   const handleExportPng = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_chart_exported`);
+    track(`${analyticsPrefix}_chart_exported`, eventProperties);
     exportToImage();
   };
 
   const handleExportCsv = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_csv_exported`);
+    track(`${analyticsPrefix}_csv_exported`, eventProperties);
     onExportCsv?.();
     window.dispatchEvent(new CustomEvent('inferencex:action'));
   };
 
   const handleExportMp4 = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_mp4_preview_opened`);
+    track(`${analyticsPrefix}_mp4_preview_opened`, eventProperties);
     onExportMp4?.();
   };
 
@@ -106,7 +114,7 @@ export function ChartButtons({
         <Popover
           open={popoverOpen}
           onOpenChange={(open) => {
-            if (open) track(`${analyticsPrefix}_export_menu_opened`, { chart: chartId });
+            if (open) track(`${analyticsPrefix}_export_menu_opened`, eventProperties);
             setPopoverOpen(open);
           }}
         >
@@ -187,7 +195,7 @@ export function ChartButtons({
           disabled={hideImageExport}
           aria-label={t.reset}
           onClick={() => {
-            track(`${analyticsPrefix}_zoom_reset_button`);
+            track(`${analyticsPrefix}_zoom_reset_button`, eventProperties);
             window.dispatchEvent(new CustomEvent(resetEventName));
           }}
         >

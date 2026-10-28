@@ -4,6 +4,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { createMockRouter } from '../support/mock-router';
 
@@ -86,6 +87,24 @@ describe('Header', () => {
         cy.tick(5000);
         cy.wrap(mockRouter.push).should('have.been.calledOnce');
       });
+  });
+
+  it('reports whether a nav link was clicked in the desktop nav or the mobile menu', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.viewport(1440, 900);
+    cy.get('[data-testid="nav-link-overview"]').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_overview_clicked', {
+      placement: 'header_desktop',
+    });
+    cy.viewport(375, 812);
+    cy.get('[data-testid="mobile-menu-toggle"]').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_mobile_menu_toggled', {
+      placement: 'header',
+    });
+    cy.get('[data-testid="mobile-menu"]').contains('a', 'Dashboard').click();
+    cy.get('@capture').should('have.been.calledWith', 'header_dashboard_clicked', {
+      placement: 'header_mobile',
+    });
   });
 
   it('makes a click on the tab already showing a no-op', () => {

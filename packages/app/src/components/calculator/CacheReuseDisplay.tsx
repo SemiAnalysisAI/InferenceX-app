@@ -39,6 +39,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -666,6 +667,11 @@ function CacheReuseInner() {
             <ChartButtons
               chartId="cache-reuse"
               analyticsPrefix="cache_reuse"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+              })}
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_cache_reuse_${selectedModel}`}

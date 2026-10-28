@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 import { navigateInApp } from '@/lib/routing/client-navigation';
 
 export function LandingPageAnalytics() {
@@ -37,7 +38,7 @@ export function LandingTrackedLink({
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
-        track(analyticsEvent);
+        track(analyticsEvent, { placement: placementFor(event.currentTarget) });
         if (appNavigation) navigateInApp(event, router, href);
       }}
     />

@@ -45,11 +45,13 @@ export function D3ChartCard<T>({
       zoom={{ enabled: false, ...chart.zoom, resetEventName: `d3chart_zoom_reset_${chartId}` }}
     />
   );
+  const exportFileName = filename?.replace(/\.png$/iu, '') ?? title;
   const actions = (chartId: string, canExpand: boolean) => (
     <ChartButtons
       chartId={chartId}
       analyticsPrefix={analyticsPrefix}
-      exportFileName={filename?.replace(/\.png$/iu, '') ?? title}
+      analyticsChart={exportFileName}
+      exportFileName={exportFileName}
       zoomResetEvent={`d3chart_zoom_reset_${chartId}`}
       hideZoomReset={!chart.zoom?.enabled}
       leadingControls={

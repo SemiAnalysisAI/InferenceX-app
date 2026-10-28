@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
@@ -100,6 +101,7 @@ export default function EvaluationChartDisplay() {
     chartData,
     unofficialChartData,
     selectedPrecisions,
+    enabledHardware,
     isError,
     isAvailabilityError,
     isEvaluationDataError,
@@ -189,6 +191,11 @@ export default function EvaluationChartDisplay() {
         chartId={CHART_ID}
         mobileActions
         analyticsPrefix="evaluation"
+        analyticsContext={selectionAnalyticsContext({
+          model: selectedModel,
+          precisions: selectedPrecisions,
+          gpuCount: enabledHardware.size,
+        })}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}
         exportFileName={`InferenceX_evaluation_${selectedModel}_${selectedBenchmark}`}

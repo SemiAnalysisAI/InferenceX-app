@@ -6,14 +6,20 @@
 export const ANALYTICS_PLACEMENT_ATTRIBUTE = 'data-analytics-placement';
 
 export type AnalyticsPlacement =
+  /** Header bar controls shown at every width (logo, star, search, language, menu toggle). */
+  | 'header'
+  /** Header nav links, shown on wide screens. */
   | 'header_desktop'
+  /** The header's mobile menu. */
   | 'header_mobile'
   | 'footer'
   | 'landing_hero'
-  | 'landing'
+  /** Landing page sections below the hero. */
+  | 'landing_section'
   | 'blog_article'
   | 'glossary'
-  | 'compare';
+  | 'compare'
+  | 'chips';
 
 /** Spread onto an element: `<nav {...analyticsPlacement('footer')}>`. */
 export function analyticsPlacement(placement: AnalyticsPlacement): {

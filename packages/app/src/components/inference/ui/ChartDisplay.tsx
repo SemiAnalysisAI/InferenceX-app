@@ -1,6 +1,7 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { BarChart3, Table2 } from 'lucide-react';
@@ -981,6 +982,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     return (
       <ChartButtons
         chartId={`chart-${graphIndex}`}
+        analyticsContext={selectionAnalyticsContext({
+          model: selectedModel,
+          sequence: selectedSequence,
+          precisions: selectedPrecisions,
+          gpuCount: selectedOfficialHwTypes.size,
+        })}
         mobileVisible
         analyticsPrefix={
           isTimelineMode

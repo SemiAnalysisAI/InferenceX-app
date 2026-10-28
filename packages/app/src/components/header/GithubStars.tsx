@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useGitHubStarCount } from '@/lib/github/github-star-count';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/github/star-storage';
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 
 interface GitHubStarsProps {
   owner: string;
@@ -32,10 +33,10 @@ export function GitHubStars({ owner, repo }: GitHubStarsProps) {
       target="_blank"
       rel="noopener noreferrer"
       data-testid="header-star-button"
-      onClick={() => {
+      onClick={(event) => {
         saveStarred();
         setHasStarred(true);
-        track('header_star_starred');
+        track('header_star_starred', { placement: placementFor(event.currentTarget) });
       }}
       className={`${hasStarred ? '' : 'star-button-glow hover:border-primary/50 dark:hover:border-primary/50 '}flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-400 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors`}
     >

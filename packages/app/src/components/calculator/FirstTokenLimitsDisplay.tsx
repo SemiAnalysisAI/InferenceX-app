@@ -51,6 +51,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -905,6 +906,12 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
             <ChartButtons
               chartId="first-token-limits"
               analyticsPrefix="first_token"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_first_token_limits_${selectedModel}`}

@@ -70,6 +70,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -1801,6 +1802,12 @@ function ProfitEstimatorInner({
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
+                analyticsContext={selectionAnalyticsContext({
+                  model: selectedModel,
+                  sequence: selectedSequence,
+                  precisions: selectedPrecisions,
+                  gpuCount: selectedGPUs.length,
+                })}
                 className="absolute top-0 right-0 z-10 mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}

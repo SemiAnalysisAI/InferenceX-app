@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -179,6 +180,7 @@ export default function PowerChipCompare({
   onTargetChange?: () => void;
 }) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   // PowerX phones: 44 px legend and chip rows, a 28 px slider thumb (globals.css).
@@ -460,7 +462,7 @@ export default function PowerChipCompare({
                       return;
                     }
                     onSelectKey(entry.key);
-                    track('inference_power_compare_chip_selected');
+                    track('inference_power_compare_chip_selected', { ...analyticsContext });
                   }}
                   aria-pressed={active}
                   aria-expanded={expanded}

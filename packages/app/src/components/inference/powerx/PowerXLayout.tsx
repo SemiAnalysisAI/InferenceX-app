@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
@@ -219,6 +220,7 @@ export function PowerXViewTabs({
   onSelectionChange: (next: PowerXSelection) => void;
 }) {
   const t = usePowerXStrings();
+  const analyticsContext = useInferenceAnalyticsContext();
   const view = powerXViewFor(selection.metric, selection.compare);
   return (
     <div
@@ -239,7 +241,7 @@ export function PowerXViewTabs({
             data-testid={`powerx-tab-${value}`}
             onClick={() => {
               if (selected) return;
-              track('inference_powerx_tab_selected', { tab: value });
+              track('inference_powerx_tab_selected', { ...analyticsContext, tab: value });
               onSelectionChange(selectPowerXView(value, selection));
             }}
             className={cn(
@@ -294,6 +296,7 @@ export function PowerXCountControls({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const analyticsContext = useInferenceAnalyticsContext();
   // Phones get one native select per group, with each segment's hint in its option.
   const variant = useIsMobileViewport() ? 'select' : 'segments';
   const view = powerXViewFor(selection.metric, selection.compare);
@@ -316,7 +319,7 @@ export function PowerXCountControls({
           className={CELL_TOGGLE_CLASS}
           buttonClassName={CELL_SEGMENT_CLASS}
           onValueChange={(next) => {
-            track('inference_powerx_boundary_selected', { boundary: next });
+            track('inference_powerx_boundary_selected', { ...analyticsContext, boundary: next });
             onSelectionChange(selectPowerXCount(next, selection));
           }}
           options={[
@@ -354,7 +357,7 @@ export function PowerXCountControls({
             className={CELL_TOGGLE_CLASS}
             buttonClassName={CELL_SEGMENT_CLASS}
             onValueChange={(next) => {
-              track('inference_powerx_energy_per_selected', { per: next });
+              track('inference_powerx_energy_per_selected', { ...analyticsContext, per: next });
               onSelectionChange(selectPowerXPer(next, selection));
             }}
             options={(['total', 'output', 'input', 'query'] as const).map((value) => ({
@@ -423,6 +426,7 @@ export function PowerXChartConfig({
   slots?: PowerXChartConfigSlots;
 }) {
   const t = usePowerXStrings();
+  const analyticsContext = useInferenceAnalyticsContext();
   const phone = useIsMobileViewport();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreId = useId();
@@ -437,6 +441,7 @@ export function PowerXChartConfig({
       metric={selection.metric}
       onChange={(metric) => {
         track('inference_powerx_measured_metric_selected', {
+          ...analyticsContext,
           metric,
           previous_metric: selection.metric,
         });

@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
+import { analyticsPlacement, placementFor } from '@/lib/analytics/placement';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { ModeToggle } from '@/components/ui/mode-toggle';
@@ -107,7 +108,10 @@ function LanguageToggle({
       hrefLang={isZh ? 'en' : 'zh-CN'}
       className={cn(HEADER_ACTION_STYLE, 'min-h-11 px-2 text-sm font-medium whitespace-nowrap')}
       onClick={(event) => {
-        track('header_language_toggled', { to: isZh ? 'en' : 'zh' });
+        track('header_language_toggled', {
+          to: isZh ? 'en' : 'zh',
+          placement: placementFor(event.currentTarget),
+        });
         if (!isOverview) navigateInApp(event, router, target + search);
       }}
     >
@@ -162,7 +166,7 @@ export const Header = () => {
 
   const toggleMenu = useCallback(() => {
     setMobileMenuOpen((prev) => !prev);
-    track('header_mobile_menu_toggled');
+    track('header_mobile_menu_toggled', { placement: 'header' });
   }, []);
 
   if (isEmbedPathname(pathname)) return null;
@@ -170,6 +174,7 @@ export const Header = () => {
   return (
     <header
       data-testid="header"
+      {...analyticsPlacement('header')}
       className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
     >
       <div className="container mx-auto px-4 lg:px-8">
@@ -192,7 +197,10 @@ export const Header = () => {
             </span>
           </IntentPrefetchLink>
 
-          <nav className="hidden items-center gap-1 xl:flex">
+          <nav
+            className="hidden items-center gap-1 xl:flex"
+            {...analyticsPlacement('header_desktop')}
+          >
             {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
               <IntentPrefetchLink
                 key={href}
@@ -207,7 +215,7 @@ export const Header = () => {
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                 )}
                 onClick={(e) => {
-                  track(event);
+                  track(event, { placement: placementFor(e.currentTarget) });
                   if (isCurrentPage(pathname, displayHref)) {
                     e.preventDefault();
                     return;
@@ -303,6 +311,7 @@ export const Header = () => {
               {mobileMenuOpen && (
                 <div
                   data-testid="mobile-menu"
+                  {...analyticsPlacement('header_mobile')}
                   className="motion-pop-in fixed inset-x-3 top-[3.75rem] z-50 flex max-h-[calc(100dvh-4.5rem)] flex-col overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:min-w-40 sm:rounded-lg"
                 >
                   {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
@@ -318,7 +327,7 @@ export const Header = () => {
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                       )}
                       onClick={(e) => {
-                        track(event);
+                        track(event, { placement: placementFor(e.currentTarget) });
                         if (isCurrentPage(pathname, displayHref)) {
                           e.preventDefault();
                           return;

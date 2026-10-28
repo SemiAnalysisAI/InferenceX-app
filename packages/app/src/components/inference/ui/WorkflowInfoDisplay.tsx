@@ -21,6 +21,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceData,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
@@ -138,6 +139,7 @@ export default function WorkflowInfoDisplay() {
   const { selectedRunDate, selectedRunId } = useInferenceFilters();
   const { availableDates, availableRuns, isCheckingAvailableDates } = useInferenceData();
   const { setSelectedRunDate, setSelectedRunId } = useInferenceActions();
+  const analyticsContext = useInferenceAnalyticsContext();
 
   const { effectivePrecisions } = useGlobalFilterSelection();
 
@@ -150,7 +152,7 @@ export default function WorkflowInfoDisplay() {
 
   const selectRun = (runId: string | undefined, source: string) => {
     if (!runId) return;
-    track('inference_run_selected', { run: runId, source });
+    track('inference_run_selected', { ...analyticsContext, run: runId, source });
     setSelectedRunId(runId);
   };
 
