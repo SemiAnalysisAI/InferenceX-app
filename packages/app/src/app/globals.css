@@ -741,16 +741,15 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 /*
  * PowerX on phones (ChartDisplay sets data-powerx-surface): 44 px touch targets on
  * the shared chart chrome without changing the glyphs or the row rhythm, a 28 px
- * slider thumb, and a 12 px floor on tick labels. Nothing here applies from md up.
+ * slider thumb, and a 12 px floor on tick labels. Negative margins keep each target's
+ * layout box at the shared ChartLegend size, so legend rows, switches and the header
+ * line up with every other chart. Nothing here applies from md up.
  */
 @media (max-width: 767px) {
   [data-powerx-surface] [data-slot='info-help'][data-variant='inline'] {
     width: 2.75rem;
     height: 2.75rem;
-    margin: -0.625rem;
-  }
-  [data-powerx-surface] .legend-container label[for^='checkbox-'] {
-    min-height: 2.75rem;
+    margin: -0.875rem -0.625rem;
   }
   [data-powerx-surface] .legend-container [data-testid^='legend-points-'] {
     display: inline-flex;
@@ -765,6 +764,7 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   [data-powerx-surface] [data-testid='legend-open-button'] {
     width: 2.75rem;
     height: 2.75rem;
+    margin: -0.375rem;
   }
   [data-powerx-surface] .chart-root .tick text {
     font-size: 12px;

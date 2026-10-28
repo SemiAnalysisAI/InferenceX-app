@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import type { GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { InferenceData } from '../types';
 import {
@@ -94,6 +95,18 @@ export default function PowerTimelineSummary({
       })),
     [traces],
   );
+  const isPhone = useIsMobileViewport();
+  if (isPhone) {
+    return (
+      <PowerTimelineSummaryCards
+        rows={rows}
+        responses={responses}
+        colorOf={colorOf}
+        hardwareLabel={hardwareLabel}
+        isOverlay={isOverlay}
+      />
+    );
+  }
   return (
     <section className="min-w-0 space-y-2 px-1" data-testid="power-timeline-summary">
       <h3 className="text-sm font-medium">{t.title}</h3>
@@ -184,6 +197,117 @@ export default function PowerTimelineSummary({
           })}
         </table>
       </div>
+    </section>
+  );
+}
+
+interface SummaryRow {
+  trace: PowerTimelineTrace;
+  summary: ReturnType<typeof summarizeTraceWindow>;
+}
+
+/**
+ * Phone layout: a seven-column table cannot fit, so each trace is a card with its provenance on
+ * top and one three-value row per GPU pool.
+ */
+function PowerTimelineSummaryCards({
+  rows,
+  responses,
+  colorOf,
+  hardwareLabel,
+  isOverlay,
+}: {
+  rows: readonly SummaryRow[];
+  responses: ReadonlyMap<string, GpuPowerSeriesResponse>;
+  colorOf: (trace: PowerTimelineTrace) => string;
+  hardwareLabel: (point: InferenceData) => string;
+  isOverlay: (point: InferenceData) => boolean;
+}) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  return (
+    <section className="min-w-0 space-y-2 px-1" data-testid="power-timeline-summary">
+      <h3 className="text-sm font-medium">{t.title}</h3>
+      <ul className="space-y-2" data-testid="power-timeline-summary-cards">
+        {rows.map(({ trace, summary }) => {
+          const { point } = trace;
+          const attempt = runAttemptFromUrl(point.run_url);
+          const name = telemetryNameForPoint(point);
+          const source = responses.get(trace.runId)?.source;
+          const tdp = HW_REGISTRY[point.hwKey.split('_')[0]]?.tdp ?? 0;
+          return (
+            <li
+              key={trace.key}
+              className="min-w-0 rounded-lg border border-border/60 p-3 text-xs"
+              data-testid="power-timeline-summary-trace"
+              data-trace={trace.key}
+            >
+              <p className="text-sm">
+                <span style={{ color: colorOf(trace) }}>● </span>
+                {hardwareLabel(point)}
+              </p>
+              <p className="text-muted-foreground">
+                {traceConfigLabel(point)}
+                {isOverlay(point) ? ` · ${t.unofficial}` : ''}
+              </p>
+              <p className="mt-1">
+                <a
+                  href={point.run_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-dotted"
+                >
+                  {`run ${trace.runId}`}
+                </a>
+                {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
+              </p>
+              <p className="whitespace-nowrap">
+                {t.window}:{' '}
+                {summary.windowSeconds === null ? t.noWindow : seconds(summary.windowSeconds)}
+              </p>
+              <p
+                className="truncate text-muted-foreground"
+                title={name ? `power_validation_${name}.json` : undefined}
+              >
+                {source ? `${t.source[source]} · ` : ''}
+                {name ? `power_validation_${name}.json` : '—'}
+              </p>
+              {summary.pools.map((pool) => {
+                const validated = validatedWatts(point, pool.role);
+                return (
+                  <div
+                    key={pool.role}
+                    className="mt-2 border-t border-border/60 pt-2"
+                    data-testid={`power-timeline-summary-${pool.role}`}
+                  >
+                    <p className="font-medium">
+                      {t.pools[pool.role]} · {pool.gpuCount}
+                    </p>
+                    <dl className="mt-1 grid grid-cols-3 gap-x-3 tabular-nums">
+                      {[
+                        { key: 'validated', label: t.validated, value: validated },
+                        { key: 'peak', label: t.peak, value: pool.peakWatts },
+                        {
+                          key: 'tdp',
+                          label: t.poolTdp,
+                          value: tdp > 0 ? tdp * pool.gpuCount : null,
+                        },
+                      ].map((cell) => (
+                        <div key={cell.key} className="flex min-w-0 flex-col justify-between">
+                          <dt className="text-muted-foreground">{cell.label}</dt>
+                          <dd className="font-medium whitespace-nowrap">
+                            {cell.value === null ? '—' : watts(cell.value)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                );
+              })}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }

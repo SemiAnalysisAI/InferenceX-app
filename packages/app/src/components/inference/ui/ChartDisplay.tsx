@@ -1413,11 +1413,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                   overlayDataByChartType,
                                 ) ?? undefined
                               }
-                              yLabel={metricLabel(
-                                graph.chartDefinition,
-                                selectedYAxisMetric,
-                                locale,
-                              )}
                               caption={chartCaption}
                               comparison={Boolean(isGpuComparison)}
                               runNumbering={runNumbering}
