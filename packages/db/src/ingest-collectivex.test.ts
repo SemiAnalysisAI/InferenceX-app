@@ -132,6 +132,20 @@ describe('ingestCommits', () => {
     expect(outcome.stored).toEqual(commits.slice(1));
   });
 
+  it('skips a commit that deleted its results without counting it as missing', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      commit.sha === commits[0].sha
+        ? Promise.reject(new CommittedResultsError('absent', 'deleted'))
+        : Promise.resolve(runFor(commit.sha)),
+    );
+    mocks.upsert.mockResolvedValue('inserted');
+    const outcome = await ingestCommits(sql, commits, undefined);
+    expect(outcome.skipped).toEqual([commits[0]]);
+    expect(outcome.missing).toEqual([]);
+    expect(outcome.stored).toEqual(commits.slice(1));
+  });
+
   it('stops at invalid results and at a run id held by a different commit', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     mocks.loadCommittedRun.mockRejectedValueOnce(new CommittedResultsError('invalid', 'bad'));

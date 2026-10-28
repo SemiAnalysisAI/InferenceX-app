@@ -86,10 +86,11 @@ export interface CommittedResults extends ResultsCommit {
 
 /**
  * `invalid`: the committed files break the results contract. `not-found`: the ref,
- * the results directory, or a main-history results commit does not exist.
+ * the results directory, or a main-history results commit does not exist. `absent`: the
+ * commit is readable and has no results directory (it deleted them), so there is no run.
  * `unavailable`: GitHub could not be read.
  */
-export type CommittedResultsErrorKind = 'invalid' | 'not-found' | 'unavailable';
+export type CommittedResultsErrorKind = 'invalid' | 'not-found' | 'absent' | 'unavailable';
 
 export class CommittedResultsError extends Error {
   readonly kind: CommittedResultsErrorKind;
@@ -276,8 +277,18 @@ export async function fetchResultsSource(
     )) as typeof tree;
   } catch (error) {
     if (error instanceof CommittedResultsError && error.kind === 'not-found') {
+      // A 404 alone can be a GitHub miss; only a readable parent tree without results/ proves
+      // the commit removed them.
+      const parent = RESULTS_DIR.slice(0, RESULTS_DIR.lastIndexOf('/'));
+      const leaf = RESULTS_DIR.slice(RESULTS_DIR.lastIndexOf('/') + 1);
+      const listing = (await getJson(
+        `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/trees/${commit.sha}:${parent}`,
+        options,
+      ).catch(() => null)) as { tree?: TreeEntry[] } | null;
+      const absent =
+        Array.isArray(listing?.tree) && !listing.tree.some((entry) => entry.path === leaf);
       throw new CommittedResultsError(
-        'not-found',
+        absent ? 'absent' : 'not-found',
         `${RESULTS_DIR} does not exist at ${commit.sha}`,
         {
           cause: error,

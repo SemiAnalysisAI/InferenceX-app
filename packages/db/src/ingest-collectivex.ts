@@ -107,6 +107,11 @@ export async function ingestCommits(
     try {
       loaded = await loadCommittedRun(commit, { token, blobCache });
     } catch (error) {
+      if (error instanceof CommittedResultsError && error.kind === 'absent') {
+        console.log(`  skipped ${label}: ${error.message}`);
+        outcome.skipped.push(commit);
+        continue;
+      }
       if (skipMissing && error instanceof CommittedResultsError && error.kind === 'not-found') {
         console.log(`  skipped ${label}: ${error.message}`);
         outcome.skipped.push(commit);

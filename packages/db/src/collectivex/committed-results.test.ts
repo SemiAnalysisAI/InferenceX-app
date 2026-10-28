@@ -369,6 +369,20 @@ describe('GitHub reads', () => {
     expect(blobCache.has('b1')).toBe(true);
   });
 
+  it('reports a commit that deleted the results directory as absent', async () => {
+    const fetch = vi.fn((url: string) =>
+      url.includes(':collectivex/results')
+        ? new Response('', { status: 404 })
+        : jsonResponse({ tree: [{ path: 'bench', type: 'tree', sha: 't1' }] }),
+    );
+    await expect(
+      fetchResultsSource(
+        { sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS },
+        { fetch: fetch as unknown as typeof globalThis.fetch },
+      ),
+    ).rejects.toMatchObject({ kind: 'absent' });
+  });
+
   it('retries a listed raw file that 404s and reports it unavailable, not missing', async () => {
     vi.useFakeTimers();
     const fetch = vi.fn((url: string) =>
