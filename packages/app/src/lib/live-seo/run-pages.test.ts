@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { META_TITLE_MAX } from '@/lib/seo/meta-text';
+
 import {
   fmtCostPerMtok,
   fmtGpuHour,
@@ -60,6 +62,15 @@ describe('run pages copy', () => {
     for (const entry of getAllRunPageEntries()) {
       expect(runPageTitle(entry)).toContain(entry.model.seoName);
       expect(runPageTitle(entry)).toContain(entry.chip.label);
+    }
+  });
+
+  it('keeps every title within the meta title budget in both locales', () => {
+    for (const entry of getAllRunPageEntries()) {
+      expect(runPageTitle(entry).length, runPageTitle(entry)).toBeLessThanOrEqual(META_TITLE_MAX);
+      expect(runPageTitleZh(entry).length, runPageTitleZh(entry)).toBeLessThanOrEqual(
+        META_TITLE_MAX,
+      );
     }
   });
 });

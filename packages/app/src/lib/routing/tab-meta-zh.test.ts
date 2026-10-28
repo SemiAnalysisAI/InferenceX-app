@@ -34,9 +34,9 @@ describe('isZhTab', () => {
 });
 
 describe('tabMetadataZh', () => {
-  it('canonicalizes the inference tab to the zh homepage, mirroring English', () => {
+  it('canonicalizes the inference tab to its own zh URL, not the zh landing page', () => {
     const meta = tabMetadataZh('inference');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/inference`);
   });
 
   it('canonicalizes other tabs to their own zh URL with bidirectional hreflang', () => {

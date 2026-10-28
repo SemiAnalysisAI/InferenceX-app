@@ -501,7 +501,7 @@ export function GlobalFilterProvider({
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
     const pathnameRewrite = modelRoutePathnameRewrite(window.location.pathname, selectedModel);
-    if (pathnameRewrite) replaceClientPathname(pathnameRewrite);
+    if (pathnameRewrite) replaceClientPathname(pathnameRewrite, [], { pageview: true });
   }, [
     selectedModel,
     requestedRunDate,

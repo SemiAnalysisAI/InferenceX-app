@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,12 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, operatorXColors, sortHardware } from './compare/hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  sortHardware,
+  toggleHardwareSelection,
+} from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
@@ -66,60 +71,62 @@ function ControlGroup({
   );
 }
 
-function VizCard({
-  model,
-  viz,
-  wide,
-  eager,
-}: {
-  model: ComparisonModel;
-  viz: VizDefinition;
-  wide: boolean;
-  eager: boolean;
-}) {
-  const [mounted, setMounted] = useState(eager);
-  const card = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (mounted) return;
-    if (eager || typeof IntersectionObserver === 'undefined') {
-      setMounted(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setMounted(true);
-        }
-      },
-      { rootMargin: '300px' },
+const VizCard = memo(
+  ({
+    model,
+    viz,
+    wide,
+    eager,
+  }: {
+    model: ComparisonModel;
+    viz: VizDefinition;
+    wide: boolean;
+    eager: boolean;
+  }) => {
+    const [mounted, setMounted] = useState(eager);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (mounted) return;
+      if (eager || typeof IntersectionObserver === 'undefined') {
+        setMounted(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setMounted(true);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+      if (card.current) observer.observe(card.current);
+      return () => observer.disconnect();
+    }, [eager, mounted]);
+    return (
+      <Card
+        ref={card}
+        data-testid={`operatorx-viz-${viz.id}`}
+        aria-busy={!mounted}
+        aria-labelledby={`operatorx-title-${viz.id}`}
+        tabIndex={mounted ? undefined : 0}
+        onFocus={() => setMounted(true)}
+        className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+      >
+        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
+          {viz.title}
+        </Heading>
+        {mounted ? (
+          <viz.Component model={model} />
+        ) : (
+          <Skeleton
+            aria-hidden="true"
+            className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
+          />
+        )}
+      </Card>
     );
-    if (card.current) observer.observe(card.current);
-    return () => observer.disconnect();
-  }, [eager, mounted]);
-  return (
-    <Card
-      ref={card}
-      data-testid={`operatorx-viz-${viz.id}`}
-      aria-busy={!mounted}
-      aria-labelledby={`operatorx-title-${viz.id}`}
-      tabIndex={mounted ? undefined : 0}
-      onFocus={() => setMounted(true)}
-      className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
-    >
-      <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-        {viz.title}
-      </Heading>
-      {mounted ? (
-        <viz.Component model={model} />
-      ) : (
-        <Skeleton
-          aria-hidden="true"
-          className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
-        />
-      )}
-    </Card>
-  );
-}
+  },
+);
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
@@ -148,23 +155,61 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     [picked, available],
   );
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
+  // Controls update urgently; the charts rebuild from one deferred snapshot so a GPU, metric,
+  // baseline or workload change paints before every visualization re-renders, and the charts
+  // never mix a new view with old selections.
+  const chartInputs = useMemo(
+    () => ({ view, hardware, metric, baseline }),
+    [view, hardware, metric, baseline],
+  );
+  const {
+    view: chartView,
+    hardware: chartHardware,
+    metric: chartMetric,
+    baseline: chartBaseline,
+  } = useDeferredValue(chartInputs);
+  const chartWorkload = chartView?.workloads.find((w) => w.id === chartView.workload);
+  const chartAvailable = useMemo(
+    () => sortHardware(chartWorkload?.hardware ?? []),
+    [chartWorkload],
+  );
+  const chartColors = useMemo(
+    () => operatorXColors(chartView?.hardware.map((h) => h.id) ?? [], theme),
+    [chartView, theme],
+  );
   const model = useMemo(() => {
-    if (!view) return null;
-    const toggle = (hw: string) => {
-      const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) setPicked(next);
-    };
+    if (!chartView) return null;
+    const toggle = (hw: string) =>
+      setPicked((previous) => {
+        const current = previous ? available.filter((h) => previous.includes(h)) : available;
+        const next = toggleHardwareSelection(current, hw);
+        return next === current ? previous : next;
+      });
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
         queryClient,
         op,
-        caseRefs(view, hardware, i).map((r) => r.ref),
+        caseRefs(chartView, chartHardware, i).map((r) => r.ref),
       );
-    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
-      inspect: setInspected,
-      preview,
-    });
-  }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
+    return buildModel(
+      chartView,
+      chartMetric,
+      { hardware: chartHardware, available: chartAvailable, toggle },
+      chartColors,
+      chartBaseline,
+      { inspect: setInspected, preview },
+    );
+  }, [
+    chartView,
+    chartMetric,
+    chartHardware,
+    chartAvailable,
+    available,
+    chartColors,
+    chartBaseline,
+    queryClient,
+    op,
+  ]);
 
   if (error)
     return (
@@ -177,7 +222,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     );
   if (isLoading || !view || !model)
     return (
-      <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
+      <Card data-testid="operatorx-loading" className="min-h-svh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>
@@ -260,7 +305,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
         <div className="grid gap-4 lg:grid-cols-2">
           {layout(
-            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
+            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (chartBaseline || !v.needsBaseline)),
           ).map(({ viz, wide }, index) => (
             <VizCard key={viz.id} model={model} viz={viz} wide={wide} eager={index === 0} />
           ))}

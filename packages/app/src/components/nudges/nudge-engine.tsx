@@ -300,6 +300,24 @@ function setupTrigger(
     return null;
   }
 
+  if (trigger.type === 'idle') {
+    let idleId: number | undefined;
+    let timer: number | undefined;
+    const show = () => showNudge(def);
+    const schedule = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(show, { timeout: 2000 });
+      } else timer = window.setTimeout(show, 0);
+    };
+    if (document.readyState === 'complete') schedule();
+    else window.addEventListener('load', schedule, { once: true });
+    return () => {
+      window.removeEventListener('load', schedule);
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }
+
   if (trigger.type === 'timer') {
     const timer = window.setTimeout(() => showNudge(def), trigger.delayMs);
     return () => window.clearTimeout(timer);

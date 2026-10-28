@@ -13,7 +13,7 @@ describe('ubenchX hub and test routes', () => {
     cy.visit('/ubenchx', dismissModal);
     cy.url().should('include', '/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
-    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
     cy.contains('h2', 'HBM Bandwidth').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');

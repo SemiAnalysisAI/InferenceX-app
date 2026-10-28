@@ -9,14 +9,10 @@ import {
   type ChipVsPage,
 } from '@/lib/catalog/chip-pages';
 import { getZhChipTranslation } from '@/lib/catalog/chip-pages-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { chipMetaDescription, chipVsMetaDescription } from '@/lib/seo/chip-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -26,10 +22,6 @@ export const dynamicParams = false;
 
 export function generateStaticParams() {
   return getAllChipRouteSlugs().map((slug) => ({ slug }));
-}
-
-function vsDescriptionZh(page: ChipVsPage): string {
-  return `${page.a.title} 对比 ${page.b.title}：显存容量、显存带宽、FP8/FP4 算力、TDP 与云端价格并列呈现，并附相同工作负载上持续测量的 LLM 推理基准测试。${SUPPORTERS_LINE_ZH}`;
 }
 
 function vsKeywordsZh(page: ChipVsPage): string[] {
@@ -54,8 +46,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (entry) {
     const translation = getZhChipTranslation(entry.slug);
     if (!translation) return {};
-    const title = `${entry.title} 规格、价格与 AI 推理基准测试`;
-    const description = `${translation.summary}${SUPPORTERS_LINE_ZH}`;
+    const title = `${entry.title} 规格、价格与功耗`;
+    const description = chipMetaDescription(entry, 'zh');
     const url = `${SITE_URL}/zh/chips/${entry.slug}`;
     return {
       title,
@@ -63,26 +55,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       keywords: [...translation.keywords],
       authors: [{ name: AUTHOR_NAME }],
       alternates: zhAlternates(`/chips/${entry.slug}`),
-      openGraph: {
+      ...socialMetadata({
         title: `${title} | ${SITE_NAME}`,
         description,
         url,
-        locale: ZH_OG_LOCALE,
+        locale: 'zh',
         type: 'article',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: `${title} | ${SITE_NAME}`,
-        description,
-        creator: AUTHOR_HANDLE,
-      },
+      }),
     };
   }
 
   const vsPage = getChipVsPage(slug);
   if (!vsPage) return {};
-  const title = `${vsPage.a.label} vs ${vsPage.b.label}：规格、功耗与 AI 推理对比`;
-  const description = vsDescriptionZh(vsPage);
+  const title = `${vsPage.a.label} vs ${vsPage.b.label}：规格、价格与功耗`;
+  const description = chipVsMetaDescription(vsPage, 'zh');
   const url = `${SITE_URL}/zh/chips/${vsPage.slug}`;
   return {
     title,
@@ -90,19 +76,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: vsKeywordsZh(vsPage),
     authors: [{ name: AUTHOR_NAME }],
     alternates: zhAlternates(`/chips/${vsPage.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      locale: ZH_OG_LOCALE,
+      locale: 'zh',
       type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      creator: AUTHOR_HANDLE,
-    },
+    }),
   };
 }
 

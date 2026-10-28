@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
 }));

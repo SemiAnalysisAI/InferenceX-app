@@ -12,16 +12,18 @@ interface CachedReadRouteOptions<T> {
 }
 
 /** Build the standard parameterless, public, cached database-read handler. */
-export function cachedReadRoute<T>(options: CachedReadRouteOptions<T>): () => Promise<Response> {
+export function cachedReadRoute<T>(
+  options: CachedReadRouteOptions<T>,
+): (request: Request) => Promise<Response> {
   const getCached = cachedQuery(options.fetch, options.cacheKey, {
     blobOnly: options.blobOnly,
   });
 
-  return async () => {
-    if (FIXTURES_MODE && options.fixture) return cachedJson(options.fixture());
+  return async (request: Request) => {
+    if (FIXTURES_MODE && options.fixture) return cachedJson(request, options.fixture());
 
     try {
-      return cachedJson(await getCached());
+      return cachedJson(request, await getCached());
     } catch (error) {
       console.error(`Error fetching ${options.logLabel}:`, error);
       return publicApiError(PUBLIC_API_ERRORS.internal, 500);

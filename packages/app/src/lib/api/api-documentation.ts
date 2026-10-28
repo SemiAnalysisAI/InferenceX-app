@@ -2427,8 +2427,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/request-timeline',
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
-      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved; legacy timelines retain the same response shape.',
-      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录；旧版时间线的响应结构不变。',
+      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved (decompressed for clients whose Accept-Encoding excludes gzip, and without an ETag); legacy timelines retain the same response shape.',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录（若客户端的 Accept-Encoding 不含 gzip，则解压后返回，且不带 ETag）；旧版时间线的响应结构不变。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3245,8 +3245,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. CollectiveX uses short refresh windows, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。CollectiveX 使用较短的刷新窗口，框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX uses short refresh windows, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 使用较短的刷新窗口，框架版本使用一小时共享缓存。',
       ),
     },
     {

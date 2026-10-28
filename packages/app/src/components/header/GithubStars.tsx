@@ -3,17 +3,17 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+import { useGitHubStarCount } from '@/lib/github/github-star-count';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/github/star-storage';
 import { track } from '@/lib/analytics/analytics';
 
 interface GitHubStarsProps {
   owner: string;
   repo: string;
-  starCount?: number | null;
 }
 
-export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
-  const stars = starCount ?? null;
+export function GitHubStars({ owner, repo }: GitHubStarsProps) {
+  const stars = useGitHubStarCount();
   const [hasStarred, setHasStarred] = useState(false);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function GitHubStars({ owner, repo, starCount }: GitHubStarsProps) {
         />
       </svg>
       <span className="text-sm font-medium">Star</span>
-      <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 self-center min-w-[2ch]">
+      <span className="text-xs font-semibold text-gray-600 dark:text-gray-400 self-center min-w-[5ch] tabular-nums">
         {stars === null ? '\u00A0' : stars.toLocaleString()}
       </span>
     </Link>

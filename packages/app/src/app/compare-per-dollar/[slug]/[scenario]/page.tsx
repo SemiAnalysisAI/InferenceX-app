@@ -8,11 +8,14 @@ import {
 
 import { buildPerDollarMetadata, renderPerDollarPage } from '../page';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { scenario: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string; scenario: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 function assertScenario(scenario: string): ScenarioSegment {
@@ -25,9 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildPerDollarMetadata(slug, { scenarioSegment: assertScenario(scenario) });
 }
 
-export default async function PerDollarScenarioPage({ params, searchParams }: Props) {
+export default async function PerDollarScenarioPage({ params }: Props) {
   const { slug, scenario } = await params;
-  return renderPerDollarPage(slug, await searchParams, {
-    scenarioSegment: assertScenario(scenario),
-  });
+  return renderPerDollarPage(slug, { scenarioSegment: assertScenario(scenario) });
 }

@@ -20,7 +20,7 @@ export interface AgenticAggregate {
 
 export type AgenticAggregateMap = Record<number, AgenticAggregate>;
 
-const fetchAgenticAggregates = bulkIdsFetcher<AgenticAggregate>('agentic-aggregates');
+const fetchAgenticAggregates = bulkIdsFetcher<AgenticAggregate>('agentic-aggregates', 200);
 
 export function useAgenticAggregates(ids: number[], enabled = true) {
   return useBulkIdsQuery('agentic-aggregates', ids, enabled, fetchAgenticAggregates);

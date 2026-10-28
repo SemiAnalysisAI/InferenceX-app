@@ -27,7 +27,9 @@ vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
 vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
-vi.mock('@/lib/cache/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
+}));
 const req = (view: string, query = '') =>
   new NextRequest(`https://example.test/api/v1/views/${view}?${query}`);
 

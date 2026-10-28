@@ -3,10 +3,12 @@ if (!process.env.INVALIDATE_SECRET) {
   process.exit(1);
 }
 
-const rawUrl = process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'http://localhost:3000';
+const cliArgs = process.argv.filter((a) => a !== '--').slice(2);
+const immediate = cliArgs.includes('--immediate');
+const rawUrl = cliArgs.find((a) => !a.startsWith('--')) ?? 'http://localhost:3000';
 
 const parsed = new URL(rawUrl);
-const endpoint = `${parsed.origin}/api/v1/invalidate`;
+const endpoint = `${parsed.origin}/api/v1/invalidate${immediate ? '?immediate=true' : ''}`;
 
 console.log(`Invalidating: ${endpoint}`);
 

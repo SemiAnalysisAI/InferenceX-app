@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 
 import { ChipsIndexContent } from '@/components/chips/chip-page-sections';
 import { enAlternates } from '@/lib/i18n/i18n';
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AI Chips for LLM Inference: Specs, Pricing & Benchmarks';
-const DESCRIPTION = `Specs, cloud pricing and continuously measured LLM inference benchmarks for NVIDIA Hopper and Blackwell (H100, H200, B200, B300, GB200 NVL72, GB300 NVL72) and AMD Instinct (MI300X, MI325X, MI355X) chips. ${SUPPORTERS_LINE}`;
+const DESCRIPTION =
+  'Specs, cloud pricing and measured LLM inference benchmarks for NVIDIA H100, H200, B200, B300, GB200 NVL72, GB300 NVL72 and AMD MI300X, MI325X, MI355X.';
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -21,17 +23,12 @@ export const metadata: Metadata = {
     'AI accelerator comparison',
   ],
   alternates: enAlternates('/chips'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/chips`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `${TITLE} | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 export default function ChipsIndexPage() {

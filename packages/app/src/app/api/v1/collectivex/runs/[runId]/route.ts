@@ -44,8 +44,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     const latest = loadFixture<CollectiveXDataset>('collectivex-latest');
-    if (latest.run.run_id === runId) return cachedJson(latest);
-    return cachedJson(loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
+    if (latest.run.run_id === runId) return cachedJson(request, latest);
+    return cachedJson(request, loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
   }
 
   let ensureError: unknown = null;
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
     }
     // Short window like the sibling routes: a GitHub re-run of failed shards
     // refreshes this run's stored contents, and deletion must not linger.
-    return cachedJson(collectiveXDatasetFromRow(row), {
+    return cachedJson(request, collectiveXDatasetFromRow(row), {
       tag: collectiveXCacheTag(),
       cacheControl: COLLECTIVEX_CACHE_CONTROL,
     });
@@ -117,7 +117,7 @@ export async function DELETE(
     if (!deleted) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
-    purgeCollectiveX();
+    purgeCollectiveX({ immediate: true });
     return NextResponse.json({ deleted: true, runId });
   } catch (error) {
     console.error('Error deleting CollectiveX run:', error);

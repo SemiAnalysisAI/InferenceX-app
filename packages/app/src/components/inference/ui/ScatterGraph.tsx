@@ -145,6 +145,7 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
@@ -533,6 +534,7 @@ const ScatterGraph = React.memo(
     const {
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedPrecisions,
       selectedRunId,
       selectedSequence,
@@ -4201,33 +4203,42 @@ const ScatterGraph = React.memo(
                   .toSorted(
                     ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                   )
-                  .map(([key, hwConfig]: [string, any]) => ({
-                    name: hwConfig.name,
-                    label: getDisplayLabel(hwConfig),
-                    color: resolveColor(key),
-                    title: hwConfig.gpu,
-                    isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                    hw: key,
-                    isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
-                    onClick: showAllHardwareTypes
-                      ? () => {}
-                      : () => {
-                          handleToggleHwType(key);
-                          track('latency_hw_type_toggled', { hw: key });
-                        },
-                    onShowPoints: () => {
-                      setPointsTableTarget({ kind: 'official', hwKey: key });
-                      track('inference_legend_points_table_opened', {
-                        hw: key,
-                        framework: hwConfig.framework ?? '',
-                      });
-                    },
-                    tooltip: legendChangelogs.has(key)
-                      ? formatChangelogDescription(
-                          legendChangelogs.get(key)!.entries.map((entry) => entry.description),
-                        )
-                      : null,
-                  })),
+                  .map(([key, hwConfig]: [string, any]) => {
+                    const isActive = showAllHardwareTypes
+                      ? true
+                      : effectiveOfficialHwTypes.has(key);
+                    const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                    return {
+                      name: hwConfig.name,
+                      label: getDisplayLabel(hwConfig),
+                      color: resolveColor(key),
+                      title: hwConfig.gpu,
+                      isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                      hw: key,
+                      isActive,
+                      blockedReason: blocked
+                        ? describeEngineComparisonConflict({ kind: 'blocked', ...blocked }, locale)
+                        : undefined,
+                      onClick: showAllHardwareTypes
+                        ? () => {}
+                        : () => {
+                            handleToggleHwType(key);
+                            track('latency_hw_type_toggled', { hw: key });
+                          },
+                      onShowPoints: () => {
+                        setPointsTableTarget({ kind: 'official', hwKey: key });
+                        track('inference_legend_points_table_opened', {
+                          hw: key,
+                          framework: hwConfig.framework ?? '',
+                        });
+                      },
+                      tooltip: legendChangelogs.has(key)
+                        ? formatChangelogDescription(
+                            legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                          )
+                        : null,
+                    };
+                  }),
                 ...powerVariantLegendItems,
               ]}
               disableActiveSort={false}

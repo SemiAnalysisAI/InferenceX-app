@@ -1,11 +1,10 @@
 import { NextRequest } from 'next/server';
-import { gzipSync } from 'node:zlib';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
 vi.mock('../benchmarks/route', () => ({ GET: raw }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 import { GET } from './route';
 import { PUBLIC_API_ERRORS } from '@/lib/api/public-api-errors';
@@ -17,7 +16,7 @@ const request = (suffix = '') =>
 beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/v1/pareto', () => {
-  it('decodes the raw handler gzip stream before calculating boundaries', async () => {
+  it('calls the raw handler without Accept-Encoding so its JSON needs no decoding', async () => {
     const rows = [
       {
         id: 1,
@@ -36,12 +35,15 @@ describe('GET /api/v1/pareto', () => {
         metrics: { x: 3, y: 4 },
       },
     ];
-    raw.mockResolvedValue(
-      new Response(gzipSync(JSON.stringify(rows)), {
-        headers: { 'Content-Encoding': 'gzip', 'Content-Type': 'application/json' },
+    raw.mockImplementation((inner: NextRequest) => {
+      expect(inner.headers.get('Accept-Encoding')).toBeNull();
+      return Promise.resolve(Response.json(rows));
+    });
+    const response = await GET(
+      new NextRequest(`https://example.test/api/v1/pareto?${query}`, {
+        headers: { 'Accept-Encoding': 'br, gzip' },
       }),
     );
-    const response = await GET(request());
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.frontier[0].observations).toEqual([rows[1]]);

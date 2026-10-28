@@ -3,14 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 import type { InterpolatedResult } from '@/components/calculator/types';
 
+import { META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
+
 import { COMPARE_MODEL_SLUGS } from './compare-slug';
 import {
   compareMetaDescription,
   computeCompareImageRows,
   computeCompareTableData,
-  KNOWN_MODELS,
-  KNOWN_SEQUENCES,
-  META_DESCRIPTION_MAX,
   compareTableNarrative,
   type SsrInterpolatedRow,
 } from './compare-ssr';
@@ -22,16 +21,6 @@ import {
 } from './compare-ssr-zh';
 
 let nextStubId = 1;
-
-describe('compare URL validators', () => {
-  it('accepts GLM-5.2 as a model override', () => {
-    expect(KNOWN_MODELS.has('GLM-5.2')).toBe(true);
-  });
-
-  it('accepts AgentX as a comparison scenario override', () => {
-    expect(KNOWN_SEQUENCES.has('agentic-traces')).toBe(true);
-  });
-});
 
 describe('Chinese compare formatting', () => {
   it('formats model lists with Chinese delimiters', () => {
@@ -271,7 +260,7 @@ describe('compareMetaDescription', () => {
     expect(desc).toBe(
       'B200 delivers 34% more tok/s/chip than B300 on GLM-5; B300 is 12% more cost-efficient than B200. Verified open-source InferenceX benchmarks.',
     );
-    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.en);
     expect(desc.startsWith('B200 delivers 34% more tok/s/chip than B300 on GLM-5')).toBe(true);
   });
 
@@ -280,7 +269,7 @@ describe('compareMetaDescription', () => {
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
     expect(desc.includes('34% more tok/s/chip')).toBe(true);
     expect(desc.includes('cheaper per token')).toBe(false);
-    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.en);
   });
 
   it('emits only the cost clause (with "than") when throughput is tied', () => {
@@ -288,14 +277,14 @@ describe('compareMetaDescription', () => {
     const desc = compareMetaDescription(GLM, 'b200', 'b300', ssr);
     expect(desc).toContain('B300 is 50% more cost-efficient than B200 on GLM-5');
     expect(desc.includes('more tok/s/chip')).toBe(false);
-    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.en);
   });
 
   it('falls back to boilerplate when there is no comparable data', () => {
     const empty = compareMetaDescription(GLM, 'b200', 'b300', []);
     expect(empty.startsWith('B200 vs B300 inference benchmark on GLM-5')).toBe(true);
     expect(empty.includes('tok/s/chip')).toBe(false);
-    expect(empty.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(empty.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.en);
 
     const oneSided = compareMetaDescription(
       GLM,
@@ -335,7 +324,7 @@ describe('compareMetaDescription', () => {
   it('stays ≤155 chars even with long GPU labels, model name, and huge ratios', () => {
     const ssr = makeSsrRows([[40, ir(9999, 99.9), ir(10, 0.5)]]);
     const desc = compareMetaDescription(DSV4, 'gb200', 'gb300', ssr);
-    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(desc.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.en);
     expect(desc.includes('tok/s/chip') || desc.includes('cheaper per token')).toBe(true);
   });
 });
@@ -356,7 +345,7 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     expect(zh).toContain('12%');
     expect(zh).toContain('单芯片吞吐量');
     expect(zh).toContain('成本效率');
-    expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(zh.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.zh);
   });
 
   it('is stat-led exactly when the English version is (and boilerplate otherwise)', () => {
@@ -369,13 +358,13 @@ describe('compareMetaDescriptionZh — structural 1:1 port', () => {
     const zhFb = compareMetaDescriptionZh(GLM, 'b200', 'b300', []);
     expect(enFb.includes('inference benchmark')).toBe(true);
     expect(zhFb.includes('推理基准测试')).toBe(true);
-    expect(zhFb.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX);
+    expect(zhFb.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX.zh);
   });
 
-  it('stays ≤155 chars with long labels + huge ratios', () => {
+  it('stays ≤120 chars with long labels + huge ratios', () => {
     const big = makeSsrRows([[40, ir(9999, 99.9), ir(10, 0.5)]]);
     expect(compareMetaDescriptionZh(DSV4, 'gb200', 'gb300', big).length).toBeLessThanOrEqual(
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.zh,
     );
   });
 });

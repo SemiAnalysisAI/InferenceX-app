@@ -256,7 +256,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'tpuv7-agentx-launch-modal',
     type: 'modal',
-    trigger: { type: 'immediate' },
+    trigger: { type: 'idle' },
     dismissal: { type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 },
     storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
     priority: 50,

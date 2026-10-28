@@ -333,7 +333,7 @@ export function GET(request: NextRequest) {
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'historical',
       apiVersion: 'v1',
       params: resolvedParams,

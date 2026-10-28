@@ -24,14 +24,16 @@ database is a durable cache of GitHub Actions, populated by the API routes thems
 ## How it works
 
 `packages/app/src/lib/collectivex/collectivex-lazy-ingest.ts` exposes three `ensure*` functions the
-routes call before reading the DB (`packages/db/src/queries/collectivex.ts`):
+routes call around their DB reads (`packages/db/src/queries/collectivex.ts`):
 
 - `ensureLatestCollectiveXRun` — walk GitHub's completed sweep runs newest-first; stop at
   the first live requested-version run; persist it if absent.
 - `ensureCollectiveXRunsList` — progressively backfill every requested-version run whose
-  14-day artifacts may still be downloaded. Each request changes at most eight rows; an
-  incomplete response is uncached and the client refetches until the workflow history is
-  exhausted. Known rows do not consume the batch, so discovery advances past the newest runs.
+  14-day artifacts may still be downloaded. Each pass changes at most eight rows. When runs
+  are already stored, `/api/v1/collectivex/runs` answers from the DB at once and runs the
+  pass after the response (`after()`), so a cold origin no longer waits 3-4 s on GitHub. An
+  empty DB still waits for the first pass. Known rows do not consume the batch, so discovery
+  advances past the newest runs.
   GitHub discovery is limited to runs created within the last 44 days: the 30-day workflow
   rerun window plus 14-day artifact retention, covering the oldest rerun whose artifacts can
   still exist without rescanning permanent workflow history on every cold-origin request.
@@ -60,14 +62,19 @@ Key invariants:
 - **GitHub being down never takes the page down**: routes serve whatever the DB holds and
   only surface an error when there is no stored fallback.
 - **Run-list completeness is progressive**: `/api/v1/collectivex/runs` returns
-  `discovery_complete: false` while another bounded ingest pass is required. Those responses
-  use `private, no-store`; the client polls once per second until the field becomes `true`.
-  Stored runs remain visible indefinitely, while never-ingested runs disappear with their
-  upstream artifacts and can no longer be reconstructed.
+  `discovery_complete: false` until a pass on that instance finishes the history, so a fresh
+  instance with no pass yet, or one whose last pass needed another bounded pass or failed,
+  reads as incomplete (`lastCollectiveXRunsListOutcome`). Those responses use
+  `private, no-store`; the client polls once per second, each poll starts the next pass, and
+  the field becomes `true` once a pass finishes the history. Runs a background pass persists
+  appear on the next CDN refresh. Stored runs remain visible indefinitely, while
+  never-ingested runs disappear with their upstream artifacts and can no longer be
+  reconstructed.
 - **Caching**: responses carry the `collectivex` CDN tag with a 60s
-  `s-maxage` (freshness bound for lazy discovery). Run deletion and
-  `POST /api/v1/invalidate?scope=collectivex` purge only that tag; the main dashboard's
-  blob cache is untouched by CollectiveX operations.
+  `s-maxage` (freshness bound for lazy discovery) and `max-age=0`, so browsers revalidate
+  with the ETag on every load. `POST /api/v1/invalidate?scope=collectivex` marks that tag
+  stale (served once more while the CDN refreshes); run deletion drops it immediately. The
+  main dashboard's blob cache is untouched by CollectiveX operations.
 - **Env**: `DATABASE_COLLECTIVEX_WRITE_URL` is the primary used by lazy persistence, all
   route reads, deletion, and migrations via `bun run admin:db:migrate:collectivex`.
   `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.

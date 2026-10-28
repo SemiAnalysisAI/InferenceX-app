@@ -113,6 +113,7 @@ import {
 } from './hooks/useChartData';
 import { buildActiveComparisonIds, resolveComparisonEntries } from './utils/comparisonEntry';
 import {
+  blockedComparisonToggles,
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
@@ -121,6 +122,7 @@ import {
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
 import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import { resolveBenchmarkSeed } from './utils/benchmark-seed';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -237,6 +239,7 @@ export function InferenceProvider({
   benchmarkQueryScope,
   initialBenchmarkModel,
   initialBenchmarkRows,
+  initialBenchmarkSequence,
   initialYAxisMetric,
   autoSelectAllGpus = false,
   lockedFrameworks,
@@ -250,6 +253,8 @@ export function InferenceProvider({
   benchmarkQueryScope?: string;
   initialBenchmarkModel?: string;
   initialBenchmarkRows?: BenchmarkRow[];
+  /** Sequence the seed rows cover; omit when they cover every sequence. */
+  initialBenchmarkSequence?: string;
   initialYAxisMetric?: string;
   autoSelectAllGpus?: boolean;
   lockedFrameworks?: readonly string[];
@@ -670,6 +675,14 @@ export function InferenceProvider({
     effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
       ? String(effectiveSelectedRunId)
       : undefined;
+  const { rows: seedRows, scope: chartQueryScope } = resolveBenchmarkSeed({
+    scope: benchmarkQueryScope,
+    seedRows: initialBenchmarkRows,
+    seedModel: initialBenchmarkModel,
+    seedSequence: initialBenchmarkSequence,
+    selectedModel,
+    selectedSequence: effectiveSequence,
+  });
 
   const {
     graphs,
@@ -703,8 +716,8 @@ export function InferenceProvider({
     asOfRunId,
     dataQuickFilters,
     overviewHistoryPair,
-    benchmarkQueryScope,
-    selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
+    chartQueryScope,
+    seedRows,
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
@@ -714,6 +727,7 @@ export function InferenceProvider({
     powerCompare,
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
+    isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
   );
 
   const dbModelKeys = useMemo<string[]>(
@@ -1132,6 +1146,16 @@ export function InferenceProvider({
   const hwTypesWithData = useMemo(
     () => new Set(hwFilteredPoints.map(extractHwKey)),
     [hwFilteredPoints, extractHwKey],
+  );
+  const blockedHwToggles = useMemo(
+    () =>
+      blockedComparisonToggles(
+        activeHwTypes,
+        selectableHwTypes,
+        comparisonExclusion,
+        consentSupported,
+      ),
+    [activeHwTypes, selectableHwTypes, comparisonExclusion, consentSupported],
   );
 
   const bestHwTypes = useMemo(() => {
@@ -1756,6 +1780,7 @@ export function InferenceProvider({
     () => ({
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
       selectedPrecisions: effectivePrecisions,
@@ -1777,6 +1802,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,

@@ -188,7 +188,7 @@ async function handle(request: NextRequest): Promise<Response> {
     }
     const body = buildLoadSwingResponse(id, payload, scale as LoadSwingScale);
     if (!body) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
-    return cachedJson(body);
+    return cachedJson(request, body);
   } catch (error) {
     console.error('Error computing gpu metrics point load-swing stats:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

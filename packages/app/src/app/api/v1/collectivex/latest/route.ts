@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (!version) {
     return NextResponse.json({ error: 'Unknown version' }, { status: 400 });
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-latest'));
+  if (FIXTURES_MODE) return cachedJson(request, loadFixture('collectivex-latest'));
 
   // Discovery failures must not take the page down — serve whatever the DB
   // already holds and only surface the error when there is no fallback.
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     if (row !== null) {
       if (ensureError)
         console.error('CollectiveX discovery failed; serving stored run:', ensureError);
-      return cachedJson(collectiveXDatasetFromRow(row), {
+      return cachedJson(request, collectiveXDatasetFromRow(row), {
         tag: collectiveXCacheTag(),
         cacheControl: COLLECTIVEX_CACHE_CONTROL,
       });

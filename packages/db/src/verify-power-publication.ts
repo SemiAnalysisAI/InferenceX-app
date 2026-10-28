@@ -25,7 +25,12 @@ if (
 const origin = process.argv[3] ?? process.env.INFERENCEX_APP_URL;
 if (!origin) throw new Error('Pass an origin argument or set INFERENCEX_APP_URL');
 const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
-const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
+// Ingest purges only mark CDN responses stale. `Pragma: no-cache` makes the CDN
+// revalidate a stale entry before answering, so this check reads the new data.
+const headers: Record<string, string> = {
+  Pragma: 'no-cache',
+  ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+};
 const sql = createAdminSql();
 try {
   const rows = await sql`

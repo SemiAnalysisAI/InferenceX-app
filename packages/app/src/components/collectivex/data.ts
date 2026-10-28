@@ -224,6 +224,25 @@ export function fitAlphaBeta(
   return { alphaUs, betaGbps: 1e-3 / slopeUsPerByte, pointCount: bytesPerGpu.length };
 }
 
+const COLLECTIVEX_LATENCY_PERCENTILES = ['p50', 'p90', 'p95', 'p99'] as const;
+
+/**
+ * Sweep artifacts emit null for percentiles a shard sampled too few times to
+ * estimate, so each value is formatted independently.
+ */
+export function formatCollectiveXLatencyPercentiles(
+  component: CollectiveXComponent | null,
+  unavailable: string,
+): string {
+  if (component === null) return unavailable;
+  const latency: Partial<Record<CollectiveXPercentile, number | null>> = component.latency_us;
+  const values = COLLECTIVEX_LATENCY_PERCENTILES.map((percentile) => {
+    const value = latency[percentile];
+    return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '-';
+  });
+  return `${values.join(' / ')} µs`;
+}
+
 export function chartPoints(
   series: CollectiveXSeries[],
   operation: CollectiveXOperation,

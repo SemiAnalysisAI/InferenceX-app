@@ -369,6 +369,7 @@ export default function ChartLegend({
         asFragment
         isLegendExpanded={itemsExpanded}
         sidebarMode={isSidebar}
+        blockedReason={item.blockedReason}
       />
     );
 
@@ -443,6 +444,7 @@ export default function ChartLegend({
                     showPointsAriaLabel={t.showPoints(item.label)}
                     isLegendExpanded={itemsExpanded}
                     sidebarMode={isSidebar}
+                    blockedReason={item.blockedReason}
                     asFragment
                   />
                 </li>

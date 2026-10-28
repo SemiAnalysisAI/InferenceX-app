@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 import { rankingPageHeadingZh } from '@/lib/live-seo/rankings-zh';
@@ -16,7 +17,7 @@ const description =
 
 export const metadata: Metadata = {
   title,
-  description: `${description}${SUPPORTERS_LINE_ZH}`,
+  description,
   keywords: [
     'LLM 推理最快 GPU',
     'LLM 推理最便宜 GPU',
@@ -28,14 +29,12 @@ export const metadata: Metadata = {
     'GPU 推理排名',
   ],
   alternates: zhAlternates('/rankings'),
-  openGraph: {
+  ...socialMetadata({
     title: `${title} | ${SITE_NAME}`,
     description,
     url: `${SITE_URL}/zh/rankings`,
-    locale: ZH_OG_LOCALE,
-    type: 'website',
-  },
-  twitter: { card: 'summary_large_image', title, description },
+    locale: 'zh',
+  }),
 };
 
 export default function ZhRankingsIndexPage() {

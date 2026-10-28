@@ -308,6 +308,7 @@ While the user reviews in the browser, you can:
 
 - Run `bun run lint && bun run typecheck` against the working tree to catch any MDX errors that would block the pre-commit hook later.
 - Save the chart image into `packages/app/public/images/{slug}/benchmark-light.png` (and `benchmark-dark.png` if the user provided both) so the `<Figure>` placeholder in the preview shows a real path.
+- After the figure images are final, run `bun run blog:figure-dimensions` from `packages/app` and commit the updated `src/lib/blog/figure-dimensions.json`. Figures render through `next/image` at those sizes, and `figure-dimensions.test.ts` fails for a figure with no recorded size.
 
 **Concurrent-edit collision warning.** The browser editor auto-saves the user's textarea ~800 ms after their last keystroke. If you re-edit a paragraph the user has open in CodeMirror, your `Edit` call writes to disk first, then the editor's debounced save overwrites your change with the user's stale buffer the next time they type or the timer fires. Failure mode: user asks you to expand a paragraph, you expand it on disk, user types one more character in the browser, the one-liner comes back. When you need to edit a section the user is actively working on, **tell the user explicitly to either close the browser tab or hit the "↻ Reload from disk" button before resuming editing**. Don't rely on them noticing the collision — it looks like nothing happened from their side.
 

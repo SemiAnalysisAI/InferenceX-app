@@ -110,6 +110,7 @@ interface DiscoveryOutcome {
 }
 
 const discoveryCooldown = new Map<string, DiscoveryOutcome>();
+const runsListOutcome = new Map<CollectiveXVersion, boolean>();
 
 function throttled(key: string, work: () => Promise<void>): () => Promise<void> {
   return async () => {
@@ -130,6 +131,7 @@ function throttled(key: string, work: () => Promise<void>): () => Promise<void> 
 
 export function resetCollectiveXDiscoveryCooldown(): void {
   discoveryCooldown.clear();
+  runsListOutcome.clear();
 }
 
 function githubHeaders(token: string) {
@@ -562,36 +564,55 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
   );
 }
 
+/**
+ * Whether the last finished runs-list pass in this instance was complete.
+ * Undefined until one finishes; a pass that throws counts as incomplete.
+ */
+export function lastCollectiveXRunsListOutcome(version: CollectiveXVersion): boolean | undefined {
+  return runsListOutcome.get(version);
+}
+
 export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<boolean> {
   const key = `list:${version}`;
   return dedupe(key, async () => {
-    // A source repository that recently failed to list keeps the pass incomplete
-    // without walking every repository again on each poll.
-    const settled = discoveryCooldown.get(key);
-    if (settled && Date.now() < settled.until) return false;
-    const token = requireToken();
-    let changed = 0;
-    const listing: SweepListing = { failure: undefined };
-    for await (const run of sweepRuns(token, listing)) {
-      if (!artifactsMayBeAvailable(run)) continue;
-      let result: CandidateResult;
-      try {
-        result = await considerCandidate(run, version, token);
-      } catch (error) {
-        const code = collectiveXSweepErrorCode(error);
-        if (code === 'invalid' || code === 'not-found') continue;
-        throw error;
-      }
-      if (result === 'changed-match' || result === 'changed-other') changed += 1;
-      if (changed >= MAX_CHANGED_RUNS_PER_PASS) return false;
+    try {
+      const complete = await runsListPass(version, key);
+      runsListOutcome.set(version, complete);
+      return complete;
+    } catch (error) {
+      runsListOutcome.set(version, false);
+      throw error;
     }
-    if (listing.failure === undefined) return true;
-    discoveryCooldown.set(key, {
-      until: Date.now() + DISCOVERY_FAILURE_COOLDOWN_MS,
-      error: listing.failure,
-    });
-    return false;
   });
+}
+
+async function runsListPass(version: CollectiveXVersion, key: string): Promise<boolean> {
+  // A source repository that recently failed to list keeps the pass incomplete
+  // without walking every repository again on each poll.
+  const settled = discoveryCooldown.get(key);
+  if (settled && Date.now() < settled.until) return false;
+  const token = requireToken();
+  let changed = 0;
+  const listing: SweepListing = { failure: undefined };
+  for await (const run of sweepRuns(token, listing)) {
+    if (!artifactsMayBeAvailable(run)) continue;
+    let result: CandidateResult;
+    try {
+      result = await considerCandidate(run, version, token);
+    } catch (error) {
+      const code = collectiveXSweepErrorCode(error);
+      if (code === 'invalid' || code === 'not-found') continue;
+      throw error;
+    }
+    if (result === 'changed-match' || result === 'changed-other') changed += 1;
+    if (changed >= MAX_CHANGED_RUNS_PER_PASS) return false;
+  }
+  if (listing.failure === undefined) return true;
+  discoveryCooldown.set(key, {
+    until: Date.now() + DISCOVERY_FAILURE_COOLDOWN_MS,
+    error: listing.failure,
+  });
+  return false;
 }
 
 export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string): Promise<void> {

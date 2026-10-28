@@ -29,6 +29,7 @@ import {
   ensureCollectiveXRun,
   ensureCollectiveXRunsList,
   ensureLatestCollectiveXRun,
+  lastCollectiveXRunsListOutcome,
   resetCollectiveXDiscoveryCooldown,
 } from './collectivex-lazy-ingest';
 
@@ -371,6 +372,21 @@ describe('ensureCollectiveXRunsList', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('remembers the last finished pass so the route can report completeness', async () => {
+    expect(lastCollectiveXRunsListOutcome(1)).toBeUndefined();
+    mockFetch.mockResolvedValueOnce(runListing());
+
+    await ensureCollectiveXRunsList(1);
+    expect(lastCollectiveXRunsListOutcome(1)).toBe(true);
+
+    delete process.env.GITHUB_TOKEN;
+    await expect(ensureCollectiveXRunsList(1)).rejects.toThrow();
+    expect(lastCollectiveXRunsListOutcome(1)).toBe(false);
+
+    resetCollectiveXDiscoveryCooldown();
+    expect(lastCollectiveXRunsListOutcome(1)).toBeUndefined();
   });
 
   it('does not probe artifacts for unknown runs beyond the retention window', async () => {

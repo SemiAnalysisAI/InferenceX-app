@@ -37,7 +37,7 @@ vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
 vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   collectiveXCacheTag: () => 'collectivex',
   purgeCollectiveX: mockPurge,
 }));
@@ -151,7 +151,8 @@ describe('DELETE /api/v1/collectivex/runs/[runId]', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ deleted: true, runId });
     expect(mockDelete).toHaveBeenCalledWith('mock-write-sql', runId);
-    expect(mockPurge).toHaveBeenCalledTimes(1);
+    // The deleting admin refetches right away, so the CDN must not serve the run once more.
+    expect(mockPurge).toHaveBeenCalledExactlyOnceWith({ immediate: true });
   });
 
   it('returns 404 without purging when the run does not exist', async () => {

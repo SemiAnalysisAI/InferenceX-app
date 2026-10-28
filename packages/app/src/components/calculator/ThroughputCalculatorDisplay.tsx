@@ -1073,6 +1073,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                       />
                     </div>
                   </div>
+                  {loading && <div aria-hidden="true" className="h-17" />}
                   {!loading && hasAnyData && (
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -1173,6 +1174,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
         </Card>
       </section>
 
+      {loading && (
+        <section aria-hidden="true">
+          <Card className="h-56 lg:h-55">
+            <Skeleton className="size-full" />
+          </Card>
+        </section>
+      )}
       {!loading && hasData && (
         <CostTargetPanel
           gpuDataByGroupKey={gpuDataByGroupKey}

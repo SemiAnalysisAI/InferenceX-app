@@ -83,3 +83,39 @@ describe('getTabTitle', () => {
     expect(title.length).toBeGreaterThan(0);
   });
 });
+
+describe('dashboard SEO metadata', () => {
+  it('canonicalizes /inference to itself rather than the landing page', () => {
+    expect(tabMetadata('inference').alternates?.canonical).toBe(
+      'https://inferencex.semianalysis.com/inference',
+    );
+  });
+
+  it.each(DASHBOARD_ROUTE_KEYS)('keeps og:image and the large card for "%s"', (tab) => {
+    const meta = tabMetadata(tab);
+    expect(meta.openGraph?.images).toBeDefined();
+    expect(meta.twitter).toMatchObject({ card: 'summary_large_image' });
+  });
+
+  it('keeps og:image and the large card on per-model tab pages', () => {
+    const deepseek = MODEL_ROUTES.find((route) => route.model === Model.DeepSeek_V4_Pro)!;
+    const meta = modelTabMetadata('calculator', deepseek);
+    expect(meta.openGraph?.images).toBeDefined();
+    expect(meta.twitter).toMatchObject({ card: 'summary_large_image' });
+  });
+
+  it.each(DASHBOARD_ROUTE_KEYS)('fits the "%s" description in a search snippet', (tab) => {
+    expect(TAB_META[tab].description.length).toBeLessThanOrEqual(155);
+  });
+
+  it('fits every per-model description and keeps the model name in it', () => {
+    for (const route of MODEL_ROUTES) {
+      for (const meta of Object.values(MODEL_TAB_META)) {
+        const description = meta.description(route.seoName);
+        expect(description.length).toBeLessThanOrEqual(155);
+        expect(description).toContain(route.seoName);
+        expect(meta.intro(route.seoName)).toContain(route.seoName);
+      }
+    }
+  });
+});

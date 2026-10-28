@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/ui/share-buttons';
 import { track } from '@/lib/analytics/analytics';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
@@ -94,7 +94,7 @@ const STRINGS = {
   },
 } as const;
 
-export const Footer = ({ starCount }: { starCount?: number | null }) => {
+export const Footer = () => {
   const locale = useLocale();
   const pathname = usePathname();
   const t = STRINGS[locale];
@@ -108,7 +108,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
       <div className="container mx-auto border-t border-border/50 px-4 py-10 lg:px-8">
         <div className="mb-8 grid gap-8 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-x-10">
           <div data-testid="footer-brand" className="flex min-w-0 flex-col items-start gap-3">
-            <Link
+            <IntentPrefetchLink
               data-testid="footer-brand-link"
               target="_blank"
               href="https://semianalysis.com/"
@@ -121,7 +121,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 alt="SemiAnalysis logo"
                 className="h-auto"
               />
-            </Link>
+            </IntentPrefetchLink>
             <p
               data-testid="footer-brand-description"
               className="max-w-prose text-sm leading-relaxed text-muted-foreground lg:max-w-xs"
@@ -166,13 +166,13 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             </div>
             <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.legal}</h2>
-              <Link
+              <IntentPrefetchLink
                 data-testid="footer-link-land-acknowledgement"
                 href={`${prefix}/land-acknowledgement`}
                 className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
               >
                 {t.landAcknowledgement}
-              </Link>
+              </IntentPrefetchLink>
               <a
                 data-testid="footer-link-privacy"
                 href="https://semianalysis.com/privacy-policy/"
@@ -228,166 +228,166 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
             >
               <h2 className="mb-1 text-sm font-semibold text-foreground">{t.more}</h2>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                <Link
+                <IntentPrefetchLink
                   data-testid="footer-link-supporters"
                   href={`${prefix}/quotes`}
                   onClick={() => track('footer_supporters_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.supporters}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-agentx"
                   href={`${prefix}/agentx`}
                   onClick={() => track('footer_agentx_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.agentx}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-telemetry"
                   href={`${prefix}/inference/agentic`}
                   onClick={() => track('footer_telemetry_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.telemetry}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-compare"
                   href={`${prefix}/compare`}
                   onClick={() => track('footer_compare_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.comparisons}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-articles"
                   href={`${prefix}/blog`}
                   onClick={() => track('footer_articles_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.articles}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-hardware"
                   href={`${prefix}/hardware`}
                   onClick={() => track('footer_hardware_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.hardwareResults}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-whitepapers"
                   href={`${prefix}/whitepaper`}
                   onClick={() => track('footer_whitepapers_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.whitepapers}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-api"
                   href={`${prefix}/api`}
                   onClick={() => track('footer_api_clicked')}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.apiReference}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-historical"
                   href={`${prefix}/historical`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_historical_clicked')}
                 >
                   {t.historicalTrends}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-calculator"
                   href={`${prefix}/calculator`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_calculator_clicked')}
                 >
                   {t.tcoCalculator}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-fleet"
                   href={`${prefix}/fleet`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_fleet_clicked')}
                 >
                   {t.fleetLifecycle}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-first-token"
                   href={`${prefix}/first-token`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_first_token_clicked')}
                 >
                   {t.firstTokenLimits}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-cache-reuse"
                   href={`${prefix}/cache-reuse`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_cache_reuse_clicked')}
                 >
                   {t.cacheReuse}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-reliability"
                   href={`${prefix}/reliability`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.gpuReliability}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-gpu-specs"
                   href={`${prefix}/gpu-specs`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.gpuSpecsDashboard}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-compare-per-dollar"
                   href={`${prefix}/compare-per-dollar`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.perfPerDollar}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-model-architectures"
                   href={`${prefix}/model`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.modelArchitectures}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-glossary"
                   href={`${prefix}/glossary`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.glossary}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-chips"
                   href={`${prefix}/chips`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.chipSpecs}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-rankings"
                   href={`${prefix}/rankings`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.rankings}
-                </Link>
-                <Link
+                </IntentPrefetchLink>
+                <IntentPrefetchLink
                   data-testid="footer-link-run"
                   href={`${prefix}/run`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.runPages}
-                </Link>
+                </IntentPrefetchLink>
               </div>
             </div>
           </div>
@@ -398,7 +398,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
           >
             <div data-testid="footer-social-buttons" className="flex items-center gap-1.5">
               <div className="rounded-md bg-background/80 w-fit">
-                <StarButton starCount={starCount} />
+                <StarButton />
               </div>
               <div className="rounded-md bg-background/80 w-fit">
                 <ShareTwitterButton />

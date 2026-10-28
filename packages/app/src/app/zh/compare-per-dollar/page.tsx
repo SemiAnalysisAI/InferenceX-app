@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -20,28 +15,24 @@ import {
 } from '@/lib/compare/compare-slug';
 import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `哪款芯片的每美元推理性能更高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型按 Hyperscaler TCO 归一化后的每百万 token 成本。`;
+const DESCRIPTION =
+  '哪款芯片的每美元推理性能更高？对比 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型按 Hyperscaler TCO 归一化后的每百万 token 成本，数据来自 InferenceX 开源基准测试。';
 
 export const metadata: Metadata = {
   title: '芯片每美元性能',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare-per-dollar'),
-  openGraph: {
+  ...socialMetadata({
     title: `芯片每美元性能 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare-per-dollar`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `芯片每美元性能 | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 interface VendorGroup {
@@ -175,7 +166,7 @@ export default async function ComparePerDollarIndexPageZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('zh', slug, model, 'compare-per-dollar')}
+                          href={comparisonPairHref('zh', slug, 'compare-per-dollar')}
                           slug={slug}
                           label={`${aMeta?.label ?? a.toUpperCase()} 与 ${bMeta?.label ?? b.toUpperCase()}`}
                           archLine={archLine}

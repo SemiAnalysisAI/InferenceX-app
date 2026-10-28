@@ -14,6 +14,7 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { type VariantBoth, type VariantCompareKind } from '@/lib/compare/compare-variant-ssr';
 
 function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
@@ -255,16 +256,16 @@ export function buildVariantJsonLdZh(
           { name: `${bDisplayLabel}：并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的${kindLabel}`,
+        description: `${model.label} 在 ${gpuDisplayLabel} 上、${row.target} tok/s/user 交互性下 ${aDisplayLabel} 与 ${bDisplayLabel} 的吞吐量、每百万 token 成本、tok/s/MW 与并发数，由 InferenceX CI 实测。`,
         inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   const keywords = [

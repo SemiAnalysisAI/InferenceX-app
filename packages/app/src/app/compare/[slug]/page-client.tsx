@@ -120,6 +120,7 @@ export default function ComparePageClient({
         benchmarkQueryScope={benchmarkQueryScope}
         initialBenchmarkModel={initialModel}
         initialBenchmarkRows={initialBenchmarkRows}
+        initialBenchmarkSequence={defaultSequence ?? undefined}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-3">

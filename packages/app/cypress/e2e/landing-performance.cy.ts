@@ -83,6 +83,10 @@ describe('Landing page performance', () => {
       'contain.text',
       'See full quotes & more supporters',
     );
+    cy.get('[data-testid="compare-agentx-primary"]')
+      .should('be.visible')
+      .closest('[data-reveal]')
+      .should('not.exist');
     cy.get('[data-testid="supporters-more-row"]')
       .should('have.class', 'justify-end')
       .find('a')
@@ -164,6 +168,7 @@ describe('Landing page performance', () => {
 
       expect([...fonts]).to.have.length(1);
       expect([...logos]).to.have.length(0);
+      expect(body.match(/<link\b[^>]*left-pattern-full\.svg[^>]*>/gu) ?? []).to.have.length(0);
     });
   });
 });

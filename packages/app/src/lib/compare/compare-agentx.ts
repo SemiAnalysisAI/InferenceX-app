@@ -1,4 +1,3 @@
-import { scenarioSegmentForSequence } from '@/lib/compare/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/inference-model-slug';
 
@@ -63,10 +62,7 @@ export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonS
 export function comparisonPairHref(
   locale: 'en' | 'zh',
   slug: string,
-  model: CompareModelSlug,
   family: 'compare' | 'compare-per-dollar' = 'compare',
 ): string {
-  const path = locale === 'zh' ? `/zh/${family}/${slug}` : `/${family}/${slug}`;
-  const segment = scenarioSegmentForSequence(comparisonScenarioForModel(model).sequence);
-  return segment ? `${path}/${segment}` : path;
+  return locale === 'zh' ? `/zh/${family}/${slug}` : `/${family}/${slug}`;
 }

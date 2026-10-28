@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { trackVirtualPageview } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
@@ -155,9 +155,7 @@ export function OverviewNavigationProvider({
           }
           setData(nextData);
           setNavigationError(false);
-          track('$pageview', {
-            $current_url: new URL(settledHref, window.location.origin).href,
-          });
+          trackVirtualPageview(settledHref, 'overview_control');
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
@@ -187,7 +185,9 @@ export function OverviewNavigationProvider({
     setPendingHref(href);
     setData(initialData);
     setNavigationError(false);
-  }, [initialData, initialHref]);
+    // The page is prerendered with the default controls, so a shared URL's controls load here.
+    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false);
+  }, [commit, initialData, initialHref]);
 
   useEffect(() => {
     const handlePopState = () => {

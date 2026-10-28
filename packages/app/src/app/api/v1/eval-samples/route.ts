@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       sampleOffset === null ? offset : Math.floor(sampleOffset / limit) * limit;
     const resolvedFilter = docId === null ? filter : 'all';
     const result = await getCachedEvalSamples(evalResultId, resolvedFilter, resolvedOffset, limit);
-    return cachedJson({
+    return cachedJson(request, {
       samples: result.samples.map((s) => ({
         docId: s.doc_id,
         prompt: s.prompt,

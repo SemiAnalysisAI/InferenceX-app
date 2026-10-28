@@ -1,45 +1,36 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { getPrecisionPairsByModelSlug } from '@/lib/compare/compare-variant-availability';
 import {
   canonicalPrecisionCompareSlug,
   precisionDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `数值精度如何影响芯片推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}在同一芯片上直接对比 FP4、FP8、BF16、INT4 等不同精度格式，观察它们对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型推理性能的影响。`;
+const DESCRIPTION =
+  '数值精度如何影响芯片推理性能？在同一芯片上直接对比 FP4、FP8、BF16、INT4 等精度格式在 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型上的推理表现。';
 
 export const metadata: Metadata = {
   title: '芯片精度对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare-precision'),
-  openGraph: {
+  ...socialMetadata({
     title: `芯片精度对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare-precision`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `芯片精度对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 const jsonLd = {

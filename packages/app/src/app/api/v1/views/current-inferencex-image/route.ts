@@ -31,7 +31,7 @@ import {
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
-import { readResponse } from '@/lib/views-api/source';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
 const readHistory = cachedQuery(
@@ -59,8 +59,10 @@ export function GET(request: NextRequest) {
       parseEnumParam(s.get('includeHistory'), 'includeHistory', ['true', 'false'], 'false') ===
       'true';
     const [raw, releaseData] = await Promise.all([
-      readResponse<LatestImageRow[]>(await images()),
-      readResponse<FrameworkReleases>(await releases()),
+      readResponse<LatestImageRow[]>(await images(sourceRequest(request, '/api/v1/latest-images'))),
+      readResponse<FrameworkReleases>(
+        await releases(sourceRequest(request, '/api/v1/framework-releases')),
+      ),
     ]);
     const active = raw.filter(isActiveImageRow);
     // The image catalog also exposes new model names before they enter the registry.
@@ -91,7 +93,7 @@ export function GET(request: NextRequest) {
       });
     const observations = includeHistory ? await readHistory(asOf) : [];
     const history = includeHistory ? imageAgeHistory(rows, observations, asOf) : undefined;
-    return cachedJson({
+    return cachedJson(request, {
       apiVersion: 'v1',
       view: 'current-inferencex-image',
       params: { ...filters, asOf, includeHistory },

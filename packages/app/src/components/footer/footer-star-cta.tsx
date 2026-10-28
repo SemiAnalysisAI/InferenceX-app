@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { useGitHubStarCount } from '@/lib/github/github-star-count';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/github/star-storage';
 import { track } from '@/lib/analytics/analytics';
 import { Star } from 'lucide-react';
 
 const GITHUB_REPO_URL = 'https://github.com/SemiAnalysisAI/InferenceX';
 
-export function StarButton({ starCount }: { starCount?: number | null }) {
-  const stars = starCount ?? null;
+export function StarButton() {
+  const stars = useGitHubStarCount();
   const [hasStarred, setHasStarred] = useState(false);
 
   useEffect(() => {

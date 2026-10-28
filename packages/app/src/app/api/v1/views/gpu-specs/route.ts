@@ -105,7 +105,7 @@ export function GET(request: NextRequest) {
     }
 
     return Promise.resolve(
-      cachedJson({
+      cachedJson(request, {
         view: 'gpu-specs',
         apiVersion: 'v1',
         params: { metric: metric?.key ?? null, format },

@@ -79,6 +79,54 @@ describe('ChartLegend in an enclosing controls panel', () => {
   });
 });
 
+describe('ChartLegend blocked items', () => {
+  const reason =
+    "vLLM and SGLang use engine-specific benchmark implementations, so their numbers aren't directly comparable in this view. Remove the SGLang configs first to switch.";
+
+  it('explains why an inactive item cannot be enabled and still reports the click', () => {
+    const onHardware = cy.stub().as('hardwareChange');
+    cy.mount(
+      <ChartLegend
+        legendItems={[
+          { ...MOCK_ITEMS[0], onClick: onHardware },
+          {
+            ...MOCK_ITEMS[1],
+            isActive: false,
+            blockedReason: reason,
+            onClick: onHardware,
+          },
+        ]}
+        variant="sidebar"
+        isLegendExpanded
+        onExpandedChange={() => {}}
+      />,
+    );
+    cy.contains('label', 'NVIDIA H200 SXM')
+      .should('have.attr', 'title', reason)
+      .and('have.attr', 'aria-disabled', 'true')
+      .and('have.class', 'cursor-not-allowed')
+      .click();
+    cy.get('@hardwareChange').should('have.been.calledWith', 'h200-sxm');
+    cy.contains('label', 'NVIDIA H100 SXM')
+      .should('not.have.attr', 'aria-disabled')
+      .and('have.class', 'cursor-pointer');
+  });
+
+  it('ignores the blocked reason once the item is active', () => {
+    cy.mount(
+      <ChartLegend
+        legendItems={[{ ...MOCK_ITEMS[1], isActive: true, blockedReason: reason }]}
+        variant="sidebar"
+        isLegendExpanded
+        onExpandedChange={() => {}}
+      />,
+    );
+    cy.contains('label', 'NVIDIA H200 SXM')
+      .should('not.have.attr', 'aria-disabled')
+      .and('not.have.attr', 'title', reason);
+  });
+});
+
 function ChartLegendWrapper({
   items = MOCK_ITEMS,
   inChart = false,

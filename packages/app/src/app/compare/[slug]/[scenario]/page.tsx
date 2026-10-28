@@ -8,11 +8,14 @@ import {
 
 import { buildCompareMetadata, renderComparePage } from '../page';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { scenario: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string; scenario: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 function assertScenario(scenario: string): ScenarioSegment {
@@ -25,9 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildCompareMetadata(slug, { scenarioSegment: assertScenario(scenario) });
 }
 
-export default async function CompareScenarioPage({ params, searchParams }: Props) {
+export default async function CompareScenarioPage({ params }: Props) {
   const { slug, scenario } = await params;
-  return renderComparePage(slug, await searchParams, {
-    scenarioSegment: assertScenario(scenario),
-  });
+  return renderComparePage(slug, { scenarioSegment: assertScenario(scenario) });
 }

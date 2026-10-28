@@ -12,6 +12,7 @@ import {
   collectiveXSkuLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
+  formatCollectiveXLatencyPercentiles,
   metricValue,
   normalizeCollectiveXSku,
   seriesMatchesSelection,
@@ -315,6 +316,33 @@ describe('fitAlphaBeta', () => {
 
   it('returns null when the byte axis has no variance across the ladder', () => {
     expect(fitAlphaBeta(makeCollectiveXSeries(), 'dispatch')).toBeNull();
+  });
+});
+
+describe('formatCollectiveXLatencyPercentiles', () => {
+  const component = scaleUp.points[0].components.dispatch!;
+
+  it('formats all four latency percentiles', () => {
+    const latency = { p50: 12.34, p90: 15, p95: 18.06, p99: 120.4 };
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('12.3 / 15.0 / 18.1 / 120.4 µs');
+  });
+
+  it('renders a placeholder for percentiles the artifact left null', () => {
+    const latency = {
+      p50: 9.5,
+      p90: null,
+      p95: null,
+      p99: null,
+    } as unknown as CollectiveXPercentiles;
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('9.5 / - / - / - µs');
+  });
+
+  it('uses the unavailable label when the component was not measured', () => {
+    expect(formatCollectiveXLatencyPercentiles(null, '不可用')).toBe('不可用');
   });
 });
 

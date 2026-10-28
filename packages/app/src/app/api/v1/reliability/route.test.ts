@@ -16,7 +16,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/reliability', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { GET } from './route';
@@ -32,7 +32,7 @@ describe('GET /api/v1/reliability', () => {
     ];
     mockGetReliabilityStats.mockResolvedValueOnce(mockRows);
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/reliability'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockRows);
@@ -42,7 +42,7 @@ describe('GET /api/v1/reliability', () => {
   it('returns empty array when no data', async () => {
     mockGetReliabilityStats.mockResolvedValueOnce([]);
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/reliability'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([]);
@@ -51,7 +51,7 @@ describe('GET /api/v1/reliability', () => {
   it('returns 500 when query throws', async () => {
     mockGetReliabilityStats.mockRejectedValueOnce(new Error('DB unreachable'));
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/reliability'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');

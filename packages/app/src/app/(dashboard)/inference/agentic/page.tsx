@@ -6,6 +6,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AgentX Telemetry';
 const DESCRIPTION =
@@ -15,12 +16,12 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: enAlternates('/inference/agentic'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/inference/agentic`,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 export const dynamic = 'force-dynamic';

@@ -7,6 +7,8 @@ import { SearchableSelect, type SearchableSelectGroup } from '@/components/ui/se
 
 const route = vi.hoisted(() => ({ pathname: '/inference' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));
+const trackMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/analytics/analytics', () => ({ track: trackMock }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -119,6 +121,16 @@ describe('SearchableSelect', () => {
     openMenu();
     const items = document.body.querySelectorAll('[data-slot="select-item"]');
     expect(items).toHaveLength(3);
+  });
+
+  it('reports search length and result count, never the typed text', () => {
+    trackMock.mockClear();
+    render({ trackPrefix: 'yaxis' });
+    openMenu();
+    setSearchValue('input token');
+    openMenu();
+    expect(trackMock).toHaveBeenCalledWith('yaxis_searched', { query_length: 11, results: 1 });
+    expect(JSON.stringify(trackMock.mock.calls)).not.toContain('input token');
   });
 
   it('filters options across groups by the search query (option label match)', () => {

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveExclusionGroups, resolveExclusionToggle } from '@/lib/benchmarks/exclusion';
+import {
+  buildExclusion,
+  resolveExclusionGroups,
+  resolveExclusionToggle,
+} from '@/lib/benchmarks/exclusion';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
+  blockedComparisonToggles,
   comparisonDefaultGroup,
   comparisonExclusion,
   comparisonExclusionPolicy,
@@ -544,5 +549,60 @@ describe('comparisonExclusion', () => {
 
   it('disables the engine-family guard for unofficial previews', () => {
     expect(comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, true)).toBeNull();
+  });
+});
+
+describe('blockedComparisonToggles', () => {
+  const exclusion = buildExclusion([
+    {
+      suffix: '_mtp',
+      stripPrefixes: ['dynamo-', 'mori-'],
+      groupAliases: { atom: 'sglang' },
+    },
+    {
+      suffix: null,
+      stripPrefixes: ['dynamo-', 'mori-'],
+      groupAliases: { atom: 'sglang' },
+      scope: 'hardware',
+    },
+  ]);
+
+  it('reports the conflict for an inactive config on the same SKU as another engine', () => {
+    const blocked = blockedComparisonToggles(
+      new Set(['b300_sglang']),
+      new Set(['b300_sglang', 'b300_vllm', 'b200_vllm']),
+      exclusion,
+      false,
+    );
+    expect([...blocked]).toEqual([['b300_vllm', { attempted: 'vllm', existing: 'sglang' }]]);
+  });
+
+  it('leaves vLLM/SGLang pairs unblocked where the consent dialog handles the click', () => {
+    expect(
+      blockedComparisonToggles(
+        new Set(['b300_sglang']),
+        new Set(['b300_sglang', 'b300_vllm']),
+        exclusion,
+        true,
+      ).size,
+    ).toBe(0);
+  });
+
+  it('still blocks conflicts the consent dialog does not cover', () => {
+    const blocked = blockedComparisonToggles(
+      new Set(['mi355x_atom_mtp']),
+      new Set(['mi355x_atom_mtp', 'mi355x_vllm_mtp']),
+      exclusion,
+      true,
+    );
+    expect(blocked.get('mi355x_vllm_mtp')).toEqual({ attempted: 'vllm', existing: 'atom' });
+  });
+
+  it('never marks active configs and reports nothing without an exclusion', () => {
+    const candidates = new Set(['b300_sglang', 'b300_vllm']);
+    expect(blockedComparisonToggles(candidates, candidates, exclusion, false).size).toBe(0);
+    expect(blockedComparisonToggles(new Set(['b300_sglang']), candidates, null, false).size).toBe(
+      0,
+    );
   });
 });

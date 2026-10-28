@@ -92,7 +92,7 @@ export function GET(request: NextRequest) {
       return csvResponse(hardware.map((row) => ({ range, ...row })));
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'reliability',
       apiVersion: 'v1',
       params: { range, format, gpus, asOf: asOf ?? null },
