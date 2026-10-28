@@ -30,7 +30,6 @@ const incompleteDataset = buildDataset({
   meta: {
     run_id: '161',
     generated_at: '2026-07-09T12:20:00Z',
-    conclusion: 'failure',
   },
 });
 const kvDataset = buildDataset({
@@ -72,7 +71,6 @@ const kvOnlyDataset = buildDataset({
   kv: [{}],
   meta: { run_id: '163', generated_at: '2026-08-08T12:20:00Z', source_sha: 'f'.repeat(40) },
 });
-const ADMIN_TOKEN_KEY = 'collectivex-admin-token';
 
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
   cy.intercept('GET', '/api/v1/collectivex/runs?*', {
@@ -103,9 +101,8 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('shows the run header, coverage stats, and revision-pinned source links', () => {
-    cy.get('[data-testid="collectivex-run-conclusion"]')
-      .should('contain.text', `#${runId}`)
-      .and('contain.text', 'success');
+    cy.get('[data-testid="collectivex-run-conclusion"]').should('not.exist');
+    cy.get('[data-testid^="collectivex-delete"]').should('not.exist');
     cy.get('[data-testid="collectivex-display"]')
       .should('contain.text', `${dataset.run.measured_cases}/${dataset.run.requested_cases}`)
       .and('contain.text', String(dataset.series.length));
@@ -114,19 +111,24 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-source-link"]').should(
       'have.attr',
       'href',
-      `https://github.com/SemiAnalysisAI/InferenceX/tree/${SOURCE_SHA}/experimental/CollectiveX`,
+      `https://github.com/SemiAnalysisAI/InferenceX/tree/${SOURCE_SHA}/collectivex`,
     );
     cy.get('[data-testid="collectivex-methodology-link"]')
       .should('contain.text', 'Methodology')
       .and(
         'have.attr',
         'href',
-        `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
+        `https://github.com/SemiAnalysisAI/InferenceX/blob/${SOURCE_SHA}/collectivex/docs/methodology.md`,
+      );
+    cy.get(`[data-testid="collectivex-run-source-${runId}"]`)
+      .should('contain.text', `#${runId}`)
+      .and(
+        'have.attr',
+        'href',
+        `https://github.com/SemiAnalysisAI/InferenceX/tree/${SOURCE_SHA}/collectivex/results`,
       );
     cy.get(`[data-testid="collectivex-run-row-${runId}"] a[href*="/actions/runs/"]`).should(
-      'have.attr',
-      'href',
-      `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`,
+      'not.exist',
     );
 
     installRuns();
@@ -135,32 +137,6 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
     cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
     cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
-  });
-
-  it('keeps loading bounded discovery batches until every run is listed', () => {
-    let requests = 0;
-    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
-      requests += 1;
-      request.reply({
-        body: {
-          version: 1,
-          runs: (requests === 1 ? [] : [dataset, comparisonDataset]).map(buildRunSummary),
-          discovery_complete: requests > 1,
-        },
-      });
-    }).as('progressiveRuns');
-
-    cy.reload();
-    cy.wait('@progressiveRuns');
-    cy.wait('@progressiveRuns');
-    cy.wait('@run');
-
-    cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
-      'be.visible',
-    );
-    cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-    cy.then(() => expect(requests).to.be.gte(2));
   });
 
   it('selects the EP16 series through the identity controls', () => {
@@ -369,9 +345,10 @@ describe('CollectiveX neutral run view', () => {
       });
 
     cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).uncheck();
-    cy.get('[data-testid="collectivex-run-conclusion"]').should(
-      'contain.text',
-      `#${comparisonDataset.run.run_id}`,
+    cy.get('[data-testid="collectivex-source-link"]').should(
+      'have.attr',
+      'href',
+      `https://github.com/SemiAnalysisAI/InferenceX/tree/${'d'.repeat(40)}/collectivex`,
     );
     cy.get(`[data-testid="collectivex-run-line-style-${runId}"]`).should('not.exist');
     cy.get(
@@ -442,7 +419,10 @@ describe('CollectiveX neutral run view', () => {
       'not.be.checked',
     );
     cy.get(`[data-testid="collectivex-run-visible-${runId}"]`).should('be.checked');
-    cy.get('[data-testid="collectivex-run-conclusion"]').should('contain.text', `#${runId}`);
+    cy.get(`[data-testid="collectivex-run-source-${runId}"]`).should('be.visible');
+    cy.get(`[data-testid="collectivex-run-source-${incompleteDataset.run.run_id}"]`).should(
+      'not.exist',
+    );
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
 
@@ -546,9 +526,11 @@ describe('CollectiveX neutral run view', () => {
     cy.wait('@runs');
     cy.wait('@run');
 
-    cy.get('[data-testid="collectivex-run-conclusion"]')
-      .should('contain.text', `#${runId}`)
-      .and('contain.text', '成功');
+    cy.get(`[data-testid="collectivex-run-source-${runId}"]`).should(
+      'have.attr',
+      'aria-label',
+      `打开运行 #${runId} 对应的已提交结果`,
+    );
     cy.get('[data-testid="collectivex-runs"]')
       .should('contain.text', '运行记录')
       .and('contain.text', '终态数据点');
@@ -566,21 +548,6 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
-
-    const cancelled = buildDataset({
-      shards: [makeRawShard()],
-      meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },
-    });
-    installRuns([cancelled]);
-    installRun(cancelled, 'cancelledRun');
-    cy.visit('/zh/collectivex');
-    cy.wait('@runs');
-    cy.wait('@cancelledRun');
-
-    cy.get('[data-testid="collectivex-run-conclusion"]')
-      .should('contain.text', '已取消')
-      .and('not.contain.text', '待处理')
-      .and('not.contain.text', 'cancelled');
   });
 
   it('keeps the Chinese explorer and runs table reachable at 375px', () => {
@@ -594,121 +561,6 @@ describe('CollectiveX neutral run view', () => {
     cy.document().then((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.lte(doc.documentElement.clientWidth);
     });
-  });
-});
-
-describe('CollectiveX run deletion', () => {
-  beforeEach(() => {
-    installRuns();
-    installRun();
-    openCollectiveX();
-  });
-
-  it('deletes a table row after confirm + token prompt and remembers the token', () => {
-    let deleted = false;
-    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
-      request.reply({
-        body: {
-          version: 1,
-          runs: deleted ? [] : [buildRunSummary(dataset)],
-        },
-      });
-    }).as('runsAfterDelete');
-    cy.intercept('DELETE', `/api/v1/collectivex/runs/${runId}`, (request) => {
-      expect(request.headers.authorization).to.eq('Bearer test-token');
-      deleted = true;
-      request.reply({ deleted: true, runId });
-    }).as('deleteRun');
-    cy.window().then((win) => {
-      win.localStorage.removeItem(ADMIN_TOKEN_KEY);
-      cy.stub(win, 'confirm').returns(true);
-      cy.stub(win, 'prompt').returns('test-token');
-    });
-
-    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
-    cy.wait('@deleteRun');
-    cy.wait('@runsAfterDelete');
-    cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('not.exist');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem(ADMIN_TOKEN_KEY)).to.eq('test-token');
-    });
-  });
-
-  it('deletes every shown run with one confirmation and one token prompt', () => {
-    const deletedRunIds = new Set<string>();
-    cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
-      request.reply({
-        body: {
-          version: 1,
-          runs: [dataset, comparisonDataset]
-            .filter((item) => !deletedRunIds.has(item.run.run_id))
-            .map(buildRunSummary),
-          discovery_complete: true,
-        },
-      });
-    }).as('runsAfterBulkDelete');
-    installRun(comparisonDataset, 'comparisonRunForDelete');
-    cy.intercept('DELETE', '/api/v1/collectivex/runs/*', (request) => {
-      expect(request.headers.authorization).to.eq('Bearer bulk-test-token');
-      deletedRunIds.add(request.url.split('/').at(-1) ?? '');
-      request.reply({ deleted: true });
-    }).as('deleteShownRun');
-
-    cy.reload();
-    cy.wait('@runsAfterBulkDelete');
-    cy.wait('@run');
-    cy.get(`[data-testid="collectivex-run-visible-${comparisonDataset.run.run_id}"]`).check();
-    cy.wait('@comparisonRunForDelete');
-    cy.window().then((win) => {
-      win.localStorage.removeItem(ADMIN_TOKEN_KEY);
-      cy.stub(win, 'confirm').as('bulkDeleteConfirm').returns(true);
-      cy.stub(win, 'prompt').as('bulkDeletePrompt').returns('bulk-test-token');
-    });
-
-    cy.get('[data-testid="collectivex-delete-shown-runs"]').click();
-    cy.wait('@deleteShownRun');
-    cy.wait('@deleteShownRun');
-    cy.get(`[data-testid="collectivex-run-row-${runId}"]`).should('not.exist');
-    cy.get(`[data-testid="collectivex-run-row-${comparisonDataset.run.run_id}"]`).should(
-      'not.exist',
-    );
-    cy.get('@bulkDeleteConfirm').should('have.been.calledOnce');
-    cy.get('@bulkDeletePrompt').should('have.been.calledOnce');
-    cy.then(() => {
-      expect(deletedRunIds).to.deep.eq(new Set([runId, comparisonDataset.run.run_id]));
-    });
-  });
-
-  it('clears a stale stored token and reports unauthorized on 401', () => {
-    cy.intercept('DELETE', `/api/v1/collectivex/runs/${runId}`, { statusCode: 401 }).as(
-      'delete401',
-    );
-    cy.window().then((win) => {
-      win.localStorage.setItem(ADMIN_TOKEN_KEY, 'stale-token');
-      cy.stub(win, 'confirm').returns(true);
-      cy.stub(win, 'alert').as('unauthorizedAlert');
-    });
-
-    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
-    cy.wait('@delete401');
-    cy.get('@unauthorizedAlert').should('have.been.calledWith', 'Invalid admin token.');
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem(ADMIN_TOKEN_KEY)).to.eq(null);
-    });
-  });
-
-  it('does nothing when the confirmation is declined', () => {
-    let deleteRequests = 0;
-    cy.intercept('DELETE', `/api/v1/collectivex/runs/${runId}`, () => {
-      deleteRequests += 1;
-    });
-    cy.window().then((win) => {
-      cy.stub(win, 'confirm').returns(false);
-    });
-
-    cy.get(`[data-testid="collectivex-delete-run-${runId}"]`).click();
-    cy.get('[data-testid="collectivex-display"]').should('be.visible');
-    cy.then(() => expect(deleteRequests).to.eq(0));
   });
 });
 
@@ -815,17 +667,17 @@ describe('CollectiveX source repository links', () => {
     cy.get('[data-testid="collectivex-source-link"]').should(
       'have.attr',
       'href',
-      `https://github.com/ExampleOrg/ExampleBench/tree/${SOURCE_SHA}/experimental/CollectiveX`,
+      `https://github.com/ExampleOrg/ExampleBench/tree/${SOURCE_SHA}/collectivex`,
     );
     cy.get('[data-testid="collectivex-methodology-link"]').should(
       'have.attr',
       'href',
-      `https://github.com/ExampleOrg/ExampleBench/blob/${SOURCE_SHA}/experimental/CollectiveX/docs/methodology.md`,
+      `https://github.com/ExampleOrg/ExampleBench/blob/${SOURCE_SHA}/collectivex/docs/methodology.md`,
     );
-    cy.get('[data-testid="collectivex-run-row-166"] a[href*="/actions/runs/"]').should(
+    cy.get('[data-testid="collectivex-run-source-166"]').should(
       'have.attr',
       'href',
-      'https://github.com/ExampleOrg/ExampleBench/actions/runs/166',
+      `https://github.com/ExampleOrg/ExampleBench/tree/${SOURCE_SHA}/collectivex/results`,
     );
   });
 });

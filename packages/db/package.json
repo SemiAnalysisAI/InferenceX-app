@@ -17,7 +17,7 @@
   "scripts": {
     "db:prepare:ci": "bun src/prepare-ci-artifacts.ts",
     "db:ingest:ci": "bun src/ingest-ci-run.ts",
-    "db:ingest:collectivex": "bun --env-file=../../.env src/ingest-collectivex.ts --download",
+    "db:ingest:collectivex": "bun --env-file=../../.env src/ingest-collectivex.ts",
     "db:ingest:run": "bun --env-file=../../.env src/ingest-ci-run.ts --download",
     "db:ingest:gcs": "bun --env-file=../../.env src/ingest-gcs-backup.ts",
     "db:ingest:supplemental": "bun --env-file=../../.env src/ingest-supplemental.ts",

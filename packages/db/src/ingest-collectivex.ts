@@ -1,164 +1,183 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import { parseArgs } from 'node:util';
 
-import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
-
-import { hasNoSslFlag, requireIngestRepo } from './cli-utils';
-import { createAdminSql } from './etl/db-utils';
+import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
+import { createAdminSql, type Sql } from './etl/db-utils';
 import {
-  downloadArtifact,
-  fetchRunMeta,
-  listRunArtifacts,
-  type RunMeta,
-} from './lib/github-artifacts';
-import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts';
-import { matrixArtifactName, selectShardArtifactNames } from './collectivex/artifact-selection';
+  CommittedResultsError,
+  listResultsCommits,
+  loadCommittedRun,
+  MAX_COMMITTED_RUN_ID,
+  RESULTS_BRANCH,
+  RESULTS_DIR,
+  resolveResultsCommit,
+  type ResultsCommit,
+} from './collectivex/committed-results';
 import {
-  buildDatasetFromNeutral,
-  buildRunSummary,
-  isMatrixDoc,
-  matrixVersion,
-  type CollectiveXNeutralRunMeta,
-} from './collectivex/reader';
+  deleteCollectiveXRun,
+  pruneCollectiveXRuns,
+  upsertCollectiveXRun,
+} from './queries/collectivex';
 
-const SWEEP_WORKFLOW_PATH = '.github/workflows/collectivex-sweep.yml';
-const DOCS_INSERT_CHUNK = 200;
+const USAGE =
+  'Usage: bun run admin:db:ingest:collectivex ' +
+  '[--sha <sha> | --ref <ref> | --backfill [--prune] | --delete-run <run_id>] [--yes] [--no-ssl]';
 
-const isDownloadMode = process.argv[2] === '--download';
+export type IngestCollectiveXArgs =
+  | { mode: 'commit'; ref: string }
+  | { mode: 'backfill'; prune: boolean }
+  | { mode: 'delete'; runId: string };
 
-let artifactsDir: string;
-let runIdStr: string;
-let REPO: string;
-let tempDir: string | null = null;
-
-if (isDownloadMode) {
-  const args = process.argv.slice(3).filter((a) => !a.startsWith('--'));
-  const input = args[0];
-  if (!input) {
-    console.error('Usage: bun run admin:db:ingest:collectivex <run-url-or-id> [repo]');
-    process.exit(1);
+/**
+ * --sha and --ref name one commit (default: main); --backfill walks every results
+ * commit on main, and with --prune then deletes stored runs it did not store;
+ * --delete-run removes one stored run.
+ */
+export function parseIngestArgs(argv: string[]): IngestCollectiveXArgs {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      sha: { type: 'string' },
+      ref: { type: 'string' },
+      backfill: { type: 'boolean', default: false },
+      prune: { type: 'boolean', default: false },
+      'delete-run': { type: 'string' },
+      yes: { type: 'boolean', short: 'y', default: false },
+      'no-ssl': { type: 'boolean', default: false },
+    },
+    strict: true,
+    allowPositionals: false,
+  });
+  const deleteRun = values['delete-run'];
+  if (values.sha !== undefined && values.ref !== undefined) {
+    throw new Error(`--sha and --ref are mutually exclusive\n${USAGE}`);
   }
-  const match = input.match(/\/runs\/(?<runId>\d+)/u);
-  const parsedId = match ? match.groups!.runId : /^\d+$/u.test(input) ? input : null;
-  if (!parsedId) {
-    console.error(`Could not parse run ID from: ${input}`);
-    process.exit(1);
+  if (values.backfill && (values.sha !== undefined || values.ref !== undefined)) {
+    throw new Error(`--backfill reads every commit on ${RESULTS_BRANCH}\n${USAGE}`);
   }
-  runIdStr = parsedId;
-  REPO = args[1] ?? repositoryFromRunUrl(input) ?? requireIngestRepo();
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cx-ingest-'));
-  artifactsDir = tempDir;
-} else {
-  const runId = process.env.INGEST_RUN_ID;
-  const artifactsPath = process.env.INGEST_ARTIFACTS_PATH;
-  if (!runId || !artifactsPath) {
-    console.error('INGEST_RUN_ID and INGEST_ARTIFACTS_PATH are required without --download');
-    process.exit(1);
+  if (values.prune && !values.backfill) {
+    throw new Error(
+      `--prune needs --backfill: it keeps exactly the runs a backfill stores\n${USAGE}`,
+    );
   }
-  runIdStr = runId;
-  REPO = requireIngestRepo();
-  artifactsDir = artifactsPath;
+  if (
+    deleteRun !== undefined &&
+    (values.backfill || values.sha !== undefined || values.ref !== undefined)
+  ) {
+    throw new Error(`--delete-run takes no other target\n${USAGE}`);
+  }
+  if (values.sha !== undefined && !/^[0-9a-f]{7,40}$/u.test(values.sha)) {
+    throw new Error(`Invalid commit sha: ${values.sha}`);
+  }
+  if (deleteRun !== undefined) {
+    if (!/^[1-9]\d{0,9}$/u.test(deleteRun) || Number(deleteRun) >= MAX_COMMITTED_RUN_ID) {
+      throw new Error(`Invalid run id: ${deleteRun}`);
+    }
+    return { mode: 'delete', runId: deleteRun };
+  }
+  if (values.backfill) return { mode: 'backfill', prune: values.prune };
+  return { mode: 'commit', ref: values.sha ?? values.ref ?? RESULTS_BRANCH };
 }
 
-if (!/^[\w.-]+\/[\w.-]+$/u.test(REPO)) {
-  console.error(`Invalid repo slug: ${REPO}`);
-  process.exit(1);
-}
-if (!/^\d+$/u.test(runIdStr)) {
-  console.error(`Invalid run id: ${runIdStr}`);
-  process.exit(1);
+export interface IngestOutcome {
+  /** Commits whose run is stored (inserted or replaced). */
+  stored: ResultsCommit[];
+  /** Commits not stored: no results tree or file at them, or nothing measured. */
+  skipped: ResultsCommit[];
+  /** The skipped commits GitHub answered 404 for: a prune must not trust this walk. */
+  missing: ResultsCommit[];
 }
 
-function readDocsDir(dir: string): unknown[] {
-  const docs: unknown[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      docs.push(...readDocsDir(full));
+/**
+ * Ingest each commit in order. A commit with no measured result (for example one
+ * that only changed cases.json) is skipped, never stored as an empty run. With
+ * `skipMissing` (the backfill), a commit GitHub answers 404 for is skipped too;
+ * any other failure stops the walk before later commits.
+ */
+export async function ingestCommits(
+  sql: Sql,
+  commits: readonly ResultsCommit[],
+  token: string | undefined,
+  { skipMissing = false }: { skipMissing?: boolean } = {},
+): Promise<IngestOutcome> {
+  const blobCache = new Map<string, Uint8Array>();
+  const outcome: IngestOutcome = { stored: [], skipped: [], missing: [] };
+  for (const commit of commits) {
+    const label = `${commit.sha.slice(0, 12)} (${commit.committedAt})`;
+    let loaded: Awaited<ReturnType<typeof loadCommittedRun>>;
+    try {
+      loaded = await loadCommittedRun(commit, { token, blobCache });
+    } catch (error) {
+      if (error instanceof CommittedResultsError && error.kind === 'absent') {
+        console.log(`  skipped ${label}: ${error.message}`);
+        outcome.skipped.push(commit);
+        continue;
+      }
+      if (skipMissing && error instanceof CommittedResultsError && error.kind === 'not-found') {
+        console.log(`  skipped ${label}: ${error.message}`);
+        outcome.skipped.push(commit);
+        outcome.missing.push(commit);
+        continue;
+      }
+      throw error;
+    }
+    const { run, docs } = loaded;
+    if (run.summary.measured_cases === 0) {
+      console.log(
+        `  skipped ${label}: nothing measured (${run.summary.requested_cases} cases requested)`,
+      );
+      outcome.skipped.push(commit);
       continue;
     }
-    if (!entry.name.endsWith('.json')) continue;
-    docs.push(JSON.parse(fs.readFileSync(full, 'utf8')));
+    const result = await upsertCollectiveXRun(sql, run, docs);
+    if (result === 'conflict') {
+      throw new Error(`run ${run.run_id} already holds a different commit than ${commit.sha}`);
+    }
+    console.log(
+      `  ${result} run ${run.run_id} @ ${label}: ` +
+        `${run.summary.measured_cases}/${run.summary.requested_cases} cases measured, ${docs.length} docs`,
+    );
+    outcome.stored.push(commit);
   }
-  return docs;
+  return outcome;
 }
 
-function runGeneratedAt(run: RunMeta): string {
-  return run.updated_at || run.run_started_at || run.created_at || '';
+function describePlan(args: IngestCollectiveXArgs, commits: readonly ResultsCommit[]): string {
+  if (args.mode === 'delete') {
+    return `This will delete stored run ${args.runId} and its documents.\n`;
+  }
+  if (args.mode === 'commit') {
+    return (
+      `This will store ${RESULTS_DIR} at ${commits[0].sha} (resolved from ${args.ref}) as run ` +
+      `${commits[0].runId}, replacing any run already stored for that commit.\n`
+    );
+  }
+  const then = args.prune ? ', then DELETE every stored run it did not store' : '';
+  return `This will store ${commits.length} ${RESULTS_DIR} commits from ${RESULTS_BRANCH}, oldest first, replacing any run already stored for the same commit${then}.\n`;
 }
 
 async function main(): Promise<void> {
-  console.log(`=== db:ingest:collectivex — run ${runIdStr} (${REPO}) ===`);
+  const args = parseIngestArgs(process.argv.slice(2));
+  const token = process.env.GITHUB_TOKEN || undefined;
+  console.log('=== db:ingest:collectivex ===');
 
-  const run = fetchRunMeta(REPO, runIdStr);
-  if (run.path !== SWEEP_WORKFLOW_PATH) {
-    throw new Error(`run ${runIdStr} is not a CollectiveX sweep (workflow: ${run.path})`);
-  }
-  const generatedAt = runGeneratedAt(run);
-  if (!generatedAt) throw new Error(`run ${runIdStr} is missing a timestamp`);
-  console.log(
-    `  workflow: ${run.name}  branch: ${run.head_branch ?? '?'}  attempt: ${run.run_attempt}  conclusion: ${run.conclusion ?? 'in-progress'}`,
-  );
-
-  const matrixDirName = matrixArtifactName(runIdStr);
-
-  if (isDownloadMode) {
-    const artifacts = listRunArtifacts(REPO, runIdStr);
-    const byName = new Map<string, (typeof artifacts)[number]>();
-    for (const artifact of artifacts) {
-      const existing = byName.get(artifact.name);
-      if (!existing || artifact.created_at > existing.created_at) {
-        byName.set(artifact.name, artifact);
-      }
+  let commits: ResultsCommit[] = [];
+  if (args.mode === 'backfill') {
+    commits = await listResultsCommits(RESULTS_BRANCH, { token });
+    if (commits.length === 0 && !args.prune) {
+      console.log(`No commit on ${RESULTS_BRANCH} touched ${RESULTS_DIR}.`);
+      return;
     }
-    const wanted = [
-      matrixDirName,
-      ...selectShardArtifactNames([...byName.keys()], runIdStr, run.run_attempt),
-    ];
-    for (const name of wanted) {
-      const artifact = byName.get(name);
-      if (!artifact) continue;
-      console.log(`  downloading ${name}`);
-      downloadArtifact(artifact, artifactsDir);
+  } else if (args.mode === 'commit') {
+    commits = [await resolveResultsCommit(args.ref, { token })];
+  }
+  console.log(describePlan(args, commits));
+  if (!hasYesFlag()) {
+    const ok = await confirm('Continue? (y/N) ');
+    if (!ok) {
+      console.log('Aborted.');
+      return;
     }
   }
-
-  const availableDirs = fs
-    .readdirSync(artifactsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name);
-
-  if (!availableDirs.includes(matrixDirName)) {
-    throw new Error(`run ${runIdStr} has no ${matrixDirName} artifact`);
-  }
-  const matrixDocs = readDocsDir(path.join(artifactsDir, matrixDirName)).filter((doc) =>
-    isMatrixDoc(doc),
-  );
-  if (matrixDocs.length !== 1) {
-    throw new Error(`expected exactly one matrix document, found ${matrixDocs.length}`);
-  }
-  const matrix = matrixDocs[0];
-  const version = matrixVersion(matrix);
-  if (version === null) throw new Error('matrix document has no valid version tag');
-
-  const shardDirs = selectShardArtifactNames(availableDirs, runIdStr, run.run_attempt);
-  console.log(`  matrix version: ${version}  shard artifacts: ${shardDirs.length}`);
-  const docs = shardDirs.flatMap((dir) => readDocsDir(path.join(artifactsDir, dir)));
-
-  const meta: CollectiveXNeutralRunMeta = {
-    run_id: runIdStr,
-    run_attempt: run.run_attempt,
-    generated_at: generatedAt,
-    conclusion: run.conclusion,
-    source_sha: run.head_sha,
-    ...(REPO.toLowerCase() === GITHUB_REPO_FULL.toLowerCase() ? {} : { source_repository: REPO }),
-  };
-  const dataset = buildDatasetFromNeutral(matrix, docs, meta);
-  const summary = buildRunSummary(dataset);
-  console.log(
-    `  assembled: ${summary.requested_cases} cases (${summary.measured_cases} measured), ${summary.requested_points} points`,
-  );
 
   const sql = createAdminSql({
     envVar: 'DATABASE_COLLECTIVEX_WRITE_URL',
@@ -167,37 +186,45 @@ async function main(): Promise<void> {
     onnotice: () => {},
   });
   try {
-    await sql.begin(async (tx) => {
-      await tx`DELETE FROM cx_runs WHERE run_id = ${runIdStr}`;
-      await tx`
-        INSERT INTO cx_runs
-          (run_id, run_attempt, version, generated_at, source_sha, source_branch, conclusion, matrix, summary)
-        VALUES
-          (${runIdStr}, ${run.run_attempt}, ${version}, ${generatedAt}, ${run.head_sha},
-           ${run.head_branch}, ${run.conclusion}, ${matrix as never}::jsonb,
-           ${summary as never}::jsonb)
-      `;
-      for (let i = 0; i < docs.length; i += DOCS_INSERT_CHUNK) {
-        const chunk = docs.slice(i, i + DOCS_INSERT_CHUNK).map((doc) => JSON.stringify(doc));
-        await tx`
-          INSERT INTO cx_run_docs (run_id, run_attempt, doc)
-          SELECT ${runIdStr}, ${run.run_attempt}, unnest(${tx.array(chunk)}::jsonb[])
-        `;
+    if (args.mode === 'delete') {
+      const removed = await deleteCollectiveXRun(sql, args.runId);
+      console.log(
+        removed
+          ? `  deleted run ${removed.run_id} @ ${removed.source_sha.slice(0, 12)}`
+          : `  no stored run ${args.runId}`,
+      );
+    } else {
+      const { stored, skipped, missing } = await ingestCommits(sql, commits, token, {
+        skipMissing: args.mode === 'backfill',
+      });
+      console.log(`  ${stored.length} stored, ${skipped.length} skipped`);
+      if (args.mode === 'backfill' && args.prune && missing.length > 0) {
+        // A 404 can be a transient GitHub miss; pruning after it would delete a good run.
+        throw new Error(
+          `not pruning: ${missing.length} commit(s) could not be read ` +
+            `(${missing.map((commit) => commit.sha.slice(0, 12)).join(', ')}); rerun the backfill`,
+        );
       }
-    });
-    console.log(`  stored run ${runIdStr} (version ${version}, ${docs.length} docs)`);
+      if (args.mode === 'backfill' && args.prune) {
+        const removed = await pruneCollectiveXRuns(
+          sql,
+          stored.map((commit) => commit.sha),
+        );
+        for (const run of removed) {
+          console.log(`  pruned run ${run.run_id} @ ${run.source_sha.slice(0, 12)}`);
+        }
+        console.log(`  ${removed.length} pruned`);
+      }
+    }
   } finally {
     await sql.end();
   }
-
   console.log('=== db:ingest:collectivex complete ===');
 }
 
-main()
-  .catch((error) => {
+if (import.meta.main) {
+  main().catch((error: unknown) => {
     console.error('db:ingest:collectivex failed:', error);
     process.exitCode = 1;
-  })
-  .finally(() => {
-    if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   });
+}

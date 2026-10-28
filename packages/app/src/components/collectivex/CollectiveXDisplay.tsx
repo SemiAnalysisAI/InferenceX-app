@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, ExternalLink, Loader2, RefreshCw, Trash2 } from 'lucide-react';
+import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
@@ -19,11 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  useCollectiveXRunDatasets,
-  useCollectiveXRuns,
-  useDeleteCollectiveXRun,
-} from '@/hooks/api/use-collectivex';
+import { useCollectiveXRunDatasets, useCollectiveXRuns } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -34,7 +30,6 @@ import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
-  collectiveXConclusionLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
@@ -118,7 +113,6 @@ const STRINGS = {
     suiteAria: 'Filter CollectiveX runs by suite',
     allSuites: 'All',
     noSuiteRuns: 'No runs contain the selected suite.',
-    shownRunCount: (count: number) => `${count} runs shown`,
     selectRuns: 'Select one or more runs from the table to show their data.',
     selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
@@ -146,18 +140,6 @@ const STRINGS = {
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
     payloadBandwidthNote:
       'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per chip — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-chip bandwidth term, α = fixed overhead).',
-    deleteRun: 'Delete run',
-    deleteShownRuns: 'Delete shown runs',
-    deletingShownRuns: 'Deleting shown runs…',
-    deleteConfirm: (id: string) =>
-      `Delete run #${id} from the dashboard database? This cannot be undone.`,
-    deleteShownConfirm: (ids: readonly string[]) =>
-      `Delete ${ids.length} shown ${ids.length === 1 ? 'run' : 'runs'} from the dashboard database? This cannot be undone.\n\n${ids.map((id) => `#${id}`).join('\n')}`,
-    deleteTokenPrompt: 'Admin token required to delete runs:',
-    deleteUnauthorized: 'Invalid admin token.',
-    deleteFailed: 'Deleting the run failed. Try again.',
-    deleteShownFailed: (deleted: number, total: number) =>
-      `Deleted ${deleted} of ${total} shown runs before the operation failed. Try again.`,
     atLatency: (percentile: string) => `at ${percentile} latency`,
     chartControlsHeading: 'Chart filters',
     chartControlsDescription:
@@ -203,7 +185,6 @@ const STRINGS = {
     runsHeading: '运行记录',
     runsDescription: '该基准测试版本下保存的全部运行记录。勾选一条或多条记录，即可在图表中对比。',
     runsShown: '已显示运行',
-    shownRunCount: (count: number) => `已显示 ${count} 个运行`,
     suiteControl: '测试套件',
     suiteAria: '按测试套件筛选 CollectiveX 运行',
     allSuites: '全部',
@@ -234,29 +215,11 @@ const STRINGS = {
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
       '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
-    deleteRun: '删除运行',
-    deleteShownRuns: '删除已显示的运行',
-    deletingShownRuns: '正在删除已显示的运行……',
-    deleteConfirm: (id: string) => `从仪表板数据库中删除运行 #${id}？此操作无法撤销。`,
-    deleteShownConfirm: (ids: readonly string[]) =>
-      `从仪表板数据库中删除当前显示的 ${ids.length} 个运行？此操作无法撤销。\n\n${ids.map((id) => `#${id}`).join('\n')}`,
-    deleteTokenPrompt: '删除运行需要管理员令牌：',
-    deleteUnauthorized: '管理员令牌无效。',
-    deleteFailed: '删除运行失败，请重试。',
-    deleteShownFailed: (deleted: number, total: number) =>
-      `操作失败前已删除 ${total} 个已显示运行中的 ${deleted} 个，请重试。`,
     atLatency: (percentile: string) => `${percentile} 延迟分位点`,
     chartControlsHeading: '图表筛选',
     chartControlsDescription: '选择下方图表要展示的测量切片和指标。',
   },
 } as const;
-const CONCLUSION_CLASSES: Record<string, string> = {
-  success: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  failure: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
-};
-const CONCLUSION_FALLBACK_CLASS =
-  'border-amber-600/40 bg-amber-500/10 text-amber-700 dark:text-amber-300';
-const ADMIN_TOKEN_STORAGE_KEY = 'collectivex-admin-token';
 
 function ControlGroup({
   label,
@@ -292,7 +255,6 @@ export default function CollectiveXDisplay() {
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
   const [suiteFilter, setSuiteFilter] = useState<CollectiveXSuiteFilter>('all');
   const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
-  const [bulkDeletingRunIds, setBulkDeletingRunIds] = useState<Set<string>>(new Set());
   const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
   const runList = runsQuery.data?.runs ?? [];
@@ -373,7 +335,6 @@ export default function CollectiveXDisplay() {
 
   useEffect(() => {
     if (!runsQuery.data || initializedVersionRef.current === version) return;
-    if (runsQuery.data.runs.length === 0 && !runsQuery.data.discovery_complete) return;
     const initial =
       runsQuery.data.runs.find((run) => run.measured_cases > 0) ?? runsQuery.data.runs[0];
     setVisibleRunIds(initial ? new Set([initial.run_id]) : new Set());
@@ -554,12 +515,6 @@ export default function CollectiveXDisplay() {
     void runsQuery.refetch();
     for (const query of runQueries) void query.refetch();
   }, [runQueries, runsQuery]);
-  const deleteRun = useDeleteCollectiveXRun();
-  const deletingRunIds = useMemo(() => {
-    if (bulkDeletingRunIds.size > 0) return bulkDeletingRunIds;
-    const runId = deleteRun.isPending ? deleteRun.variables?.runId : undefined;
-    return new Set(runId ? [runId] : []);
-  }, [bulkDeletingRunIds, deleteRun.isPending, deleteRun.variables?.runId]);
   const handleVisibleRunChange = useCallback((runIds: string[], visible: boolean) => {
     setVisibleRunIds((previous) => {
       const next = new Set(previous);
@@ -570,82 +525,6 @@ export default function CollectiveXDisplay() {
       return next;
     });
   }, []);
-  const handleDeleteRun = useCallback(
-    async (runId: string) => {
-      track('collectivex_run_delete_prompted', { run: runId });
-      if (!window.confirm(t.deleteConfirm(runId))) return;
-      const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
-      const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
-      if (!token) return;
-      try {
-        const deleted = await deleteRun.mutateAsync({ runId, token });
-        if (!deleted) {
-          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-          track('collectivex_run_delete_failed', { run: runId, reason: 'unauthorized' });
-          window.alert(t.deleteUnauthorized);
-          return;
-        }
-        localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
-        setVisibleRunIds((previous) => {
-          const next = new Set(previous);
-          next.delete(runId);
-          return next;
-        });
-        track('collectivex_run_delete_confirmed', { run: runId });
-      } catch {
-        track('collectivex_run_delete_failed', { run: runId, reason: 'error' });
-        window.alert(t.deleteFailed);
-      }
-    },
-    [deleteRun, t],
-  );
-  const handleDeleteShownRuns = useCallback(async () => {
-    const runIds = [...orderedVisibleRunIds];
-    if (runIds.length === 0) return;
-    track('collectivex_shown_runs_delete_prompted', { count: runIds.length, runs: runIds });
-    if (!window.confirm(t.deleteShownConfirm(runIds))) return;
-    const stored = localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '';
-    const token = stored || (window.prompt(t.deleteTokenPrompt)?.trim() ?? '');
-    if (!token) return;
-
-    setBulkDeletingRunIds(new Set(runIds));
-    let deletedCount = 0;
-    try {
-      for (const runId of runIds) {
-        const deleted = await deleteRun.mutateAsync({ runId, token });
-        if (!deleted) {
-          localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-          track('collectivex_shown_runs_delete_failed', {
-            count: runIds.length,
-            deleted: deletedCount,
-            reason: 'unauthorized',
-          });
-          window.alert(t.deleteUnauthorized);
-          return;
-        }
-        deletedCount += 1;
-        setVisibleRunIds((previous) => {
-          const next = new Set(previous);
-          next.delete(runId);
-          return next;
-        });
-      }
-      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
-      track('collectivex_shown_runs_delete_confirmed', {
-        count: runIds.length,
-        runs: runIds,
-      });
-    } catch {
-      track('collectivex_shown_runs_delete_failed', {
-        count: runIds.length,
-        deleted: deletedCount,
-        reason: 'error',
-      });
-      window.alert(t.deleteShownFailed(deletedCount, runIds.length));
-    } finally {
-      setBulkDeletingRunIds(new Set());
-    }
-  }, [deleteRun, orderedVisibleRunIds, t]);
 
   if (runsQuery.isLoading) {
     return (
@@ -701,30 +580,18 @@ export default function CollectiveXDisplay() {
       ),
     0,
   );
-  const singleConclusionClass =
-    (singleDataset?.run.conclusion && CONCLUSION_CLASSES[singleDataset.run.conclusion]) ??
-    CONCLUSION_FALLBACK_CLASS;
+  const sourceShaByRunId = new Map(
+    datasets.map((dataset) => [dataset.run.run_id, dataset.run.source_sha]),
+  );
 
   return (
     <section data-testid="collectivex-display" className="flex flex-col gap-4">
       <Card>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Heading as="h1" level="card">
-                CollectiveX
-              </Heading>
-              <span
-                data-testid="collectivex-run-conclusion"
-                className={`rounded-md border px-2 py-0.5 text-2xs font-medium ${
-                  singleDataset ? singleConclusionClass : CONCLUSION_FALLBACK_CLASS
-                }`}
-              >
-                {singleDataset
-                  ? `#${singleDataset.run.run_id} · ${collectiveXConclusionLabel(singleDataset.run.conclusion, locale)}`
-                  : t.shownRunCount(datasets.length)}
-              </span>
-            </div>
+            <Heading as="h1" level="card">
+              CollectiveX
+            </Heading>
             <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -732,7 +599,7 @@ export default function CollectiveXDisplay() {
               <>
                 <a
                   data-testid="collectivex-source-link"
-                  href={`https://github.com/${sourceRepository}/tree/${singleDataset.run.source_sha}/experimental/CollectiveX`}
+                  href={`https://github.com/${sourceRepository}/tree/${singleDataset.run.source_sha}/collectivex`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -746,7 +613,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/experimental/CollectiveX/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -804,21 +671,6 @@ export default function CollectiveXDisplay() {
                 testId="collectivex-suite-filter"
               />
             </ControlGroup>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              data-testid="collectivex-delete-shown-runs"
-              disabled={visibleRunIds.size === 0 || deletingRunIds.size > 0}
-              onClick={() => void handleDeleteShownRuns()}
-            >
-              {bulkDeletingRunIds.size > 0 ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4" />
-              )}
-              {bulkDeletingRunIds.size > 0 ? t.deletingShownRuns : t.deleteShownRuns}
-            </Button>
             <div className="w-full sm:w-44">
               <SelectControl
                 label={t.version}
@@ -838,9 +690,8 @@ export default function CollectiveXDisplay() {
           selectedRunIndexById={selectedRunIndexById}
           visibleRunIds={visibleRunIds}
           loadingRunIds={loadingRunIds}
-          deletingRunIds={deletingRunIds}
+          sourceShaByRunId={sourceShaByRunId}
           onVisibleChange={handleVisibleRunChange}
-          onDelete={(runId) => void handleDeleteRun(runId)}
           emptyMessage={suiteFilter === 'all' ? undefined : t.noSuiteRuns}
         />
       </Card>

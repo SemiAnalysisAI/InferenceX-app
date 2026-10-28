@@ -6,9 +6,11 @@ import { blobGet, blobPurge, blobSet } from './blob-cache';
 /**
  * CollectiveX data lives in its own database and gets its own cache scope:
  * every CollectiveX response carries this CDN/unstable_cache tag (via
- * `cachedJson(..., { tag })`), so run deletion can purge the CollectiveX
+ * `cachedJson(..., { tag })`), so a CollectiveX ingest can purge the CollectiveX
  * cache without dropping the main dashboard's. CollectiveX routes read their
- * DB directly — no blob layer, so the tag is the entire scope.
+ * DB directly — no blob layer, so the tag is the entire scope. Responses stay
+ * cached until the CollectiveX ingest workflow purges it
+ * (`/api/v1/invalidate?scope=collectivex`).
  */
 export const COLLECTIVEX_CACHE_SCOPE = 'collectivex';
 
@@ -24,14 +26,6 @@ export function collectiveXCacheTag(): string {
   const namespace = cacheNamespace();
   return namespace ? `${COLLECTIVEX_CACHE_SCOPE}:${namespace}` : COLLECTIVEX_CACHE_SCOPE;
 }
-
-/**
- * Short CDN window shared by the CollectiveX latest/runs routes: new sweep
- * runs are discovered lazily at the origin, so freshness is bounded by this
- * TTL rather than by an ingest-time purge.
- */
-export const COLLECTIVEX_CACHE_CONTROL =
-  'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
 
 /**
  * OperatorX reads its own database and has its own scope, like CollectiveX: its
@@ -202,8 +196,7 @@ export async function purgeAll(): Promise<number> {
   const deleted = await blobPurge('', [`${OPERATORX_CACHE_SCOPE}/`]);
   revalidateTag(cacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
-  // a full purge must drop that tag explicitly — this line is the sole
-  // mechanism that clears CollectiveX from the CDN.
+  // a full purge must drop that tag explicitly.
   purgeCollectiveX();
   return deleted;
 }
@@ -219,8 +212,8 @@ export function purgeCollectiveX(): void {
 
 /**
  * 1 day unless overridden. Purged on demand via revalidateTag with the matching
- * tag. `tag` defaults to the environment-scoped database tag; CollectiveX routes
- * pass their own scope (and a shorter cacheControl).
+ * tag. `tag` defaults to the environment-scoped database tag; CollectiveX and
+ * OperatorX routes pass their own scope.
  */
 function cdnHeaders(tag: string = cacheTag(), cacheControl?: string): Record<string, string> {
   return {

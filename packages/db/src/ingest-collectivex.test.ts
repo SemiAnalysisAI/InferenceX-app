@@ -1,124 +1,165 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type * as CommittedResults from './collectivex/committed-results';
+import { CommittedResultsError } from './collectivex/committed-results';
+
 const mocks = vi.hoisted(() => ({
-  fetchRunMeta: vi.fn(),
-  buildDataset: vi.fn(),
-  begin: vi.fn(),
+  loadCommittedRun: vi.fn(),
+  upsert: vi.fn(),
 }));
-vi.mock('./lib/github-artifacts', () => ({
-  fetchRunMeta: mocks.fetchRunMeta,
-  listRunArtifacts: () => [],
-  downloadArtifact: () => {},
+vi.mock('./collectivex/committed-results', async (importOriginal) => ({
+  ...(await importOriginal<typeof CommittedResults>()),
+  loadCommittedRun: mocks.loadCommittedRun,
 }));
-vi.mock('./collectivex/reader', () => ({
-  isMatrixDoc: () => true,
-  matrixVersion: () => 1,
-  buildDatasetFromNeutral: mocks.buildDataset,
-  buildRunSummary: () => ({ requested_cases: 0, measured_cases: 0, requested_points: 0 }),
-}));
-vi.mock('./etl/db-utils', () => ({
-  createAdminSql: () => ({ begin: mocks.begin, end: () => Promise.resolve() }),
+vi.mock('./queries/collectivex', () => ({
+  upsertCollectiveXRun: mocks.upsert,
+  pruneCollectiveXRuns: vi.fn(),
+  deleteCollectiveXRun: vi.fn(),
 }));
 
-const RUN_ID = '170';
-const originalArgv = process.argv;
-const originalExitCode = process.exitCode;
+import { ingestCommits, parseIngestArgs } from './ingest-collectivex';
+import type { Sql } from './etl/db-utils';
+
+const sql = (() => Promise.resolve([])) as unknown as Sql;
 
 afterEach(() => {
-  process.argv = originalArgv;
-  process.exitCode = originalExitCode;
-  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   vi.clearAllMocks();
-  vi.resetModules();
 });
 
-// The script runs main() on import, so it must load after argv and the environment are set.
-async function runCli(argv: string[]): Promise<void> {
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
-  process.argv = ['bun', 'ingest-collectivex.ts', ...argv];
-  await import('./ingest-collectivex');
+describe('parseIngestArgs', () => {
+  it('defaults to main', () => {
+    expect(parseIngestArgs([])).toEqual({ mode: 'commit', ref: 'main' });
+  });
+
+  it('takes one commit from --sha or --ref', () => {
+    expect(parseIngestArgs(['--sha', 'a'.repeat(40)])).toEqual({
+      mode: 'commit',
+      ref: 'a'.repeat(40),
+    });
+    expect(parseIngestArgs(['--ref', 'v1.2', '--yes'])).toEqual({ mode: 'commit', ref: 'v1.2' });
+  });
+
+  it('walks main for --backfill, optionally pruning', () => {
+    expect(parseIngestArgs(['--backfill', '-y', '--no-ssl'])).toEqual({
+      mode: 'backfill',
+      prune: false,
+    });
+    expect(parseIngestArgs(['--backfill', '--prune'])).toEqual({ mode: 'backfill', prune: true });
+  });
+
+  it('deletes one named run', () => {
+    expect(parseIngestArgs(['--delete-run', '1792039236'])).toEqual({
+      mode: 'delete',
+      runId: '1792039236',
+    });
+  });
+
+  it('rejects conflicting, malformed, and unknown arguments', () => {
+    expect(() => parseIngestArgs(['--sha', 'a'.repeat(40), '--ref', 'main'])).toThrow(
+      /mutually exclusive/u,
+    );
+    expect(() => parseIngestArgs(['--backfill', '--ref', 'main'])).toThrow(/--backfill/u);
+    expect(() => parseIngestArgs(['--prune'])).toThrow(/--prune needs --backfill/u);
+    expect(() => parseIngestArgs(['--delete-run', '5', '--backfill'])).toThrow(/--delete-run/u);
+    expect(() => parseIngestArgs(['--delete-run', '37459990486'])).toThrow(/Invalid run id/u);
+    expect(() => parseIngestArgs(['--delete-run', '0'])).toThrow(/Invalid run id/u);
+    expect(() => parseIngestArgs(['--sha', 'not-a-sha'])).toThrow(/Invalid commit sha/u);
+    expect(() => parseIngestArgs(['12345'])).toThrow();
+  });
+});
+
+function runFor(sha: string, measured = 1) {
+  return {
+    run: { run_id: sha.slice(0, 3), summary: { measured_cases: measured, requested_cases: 2 } },
+    docs: measured > 0 ? [{}] : [],
+  };
 }
 
-describe('download-mode repository selection', () => {
-  // A non-sweep workflow path stops the run right after the repository lookup.
-  const otherWorkflow = { path: '.github/workflows/other.yml' };
+describe('ingestCommits', () => {
+  const commits = [
+    { sha: 'a'.repeat(40), committedAt: '2026-10-15T00:00:00Z', runId: '1760486400' },
+    { sha: 'b'.repeat(40), committedAt: '2026-10-16T00:00:00Z', runId: '1760572800' },
+    { sha: 'c'.repeat(40), committedAt: '2026-10-17T00:00:00Z', runId: '1760659200' },
+  ];
 
-  it.each([
-    {
-      name: 'the [repo] argument',
-      argv: [
-        '--download',
-        `https://github.com/example-org/url-repo/actions/runs/${RUN_ID}`,
-        'example-org/arg-repo',
-      ],
-      expected: 'example-org/arg-repo',
-    },
-    {
-      name: 'a full run URL',
-      argv: ['--download', `https://github.com/example-org/url-repo/actions/runs/${RUN_ID}`],
-      expected: 'example-org/url-repo',
-    },
-    { name: 'INGEST_REPO', argv: ['--download', RUN_ID], expected: 'example-org/env-repo' },
-  ])('prefers $name', async ({ argv, expected }) => {
-    vi.stubEnv('INGEST_REPO', 'example-org/env-repo');
-    mocks.fetchRunMeta.mockReturnValue(otherWorkflow);
+  it('stores commits in order and shares one blob cache across them', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      Promise.resolve(runFor(commit.sha)),
+    );
+    mocks.upsert.mockResolvedValue('inserted');
 
-    await runCli(argv);
+    const outcome = await ingestCommits(sql, commits, 'token');
 
-    await vi.waitFor(() => expect(mocks.fetchRunMeta).toHaveBeenCalledWith(expected, RUN_ID));
+    expect(mocks.loadCommittedRun.mock.calls.map(([commit]) => commit.sha)).toEqual(
+      commits.map((commit) => commit.sha),
+    );
+    const [first, second] = mocks.loadCommittedRun.mock.calls.map(([, options]) => options);
+    expect(first.token).toBe('token');
+    expect(first.blobCache).toBe(second.blobCache);
+    expect(mocks.upsert).toHaveBeenCalledTimes(3);
+    expect(outcome).toEqual({ stored: commits, skipped: [], missing: [] });
   });
 
-  it('exits when no argument, run URL, or INGEST_REPO names the repository', async () => {
-    vi.stubEnv('INGEST_REPO', '');
-    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit');
-    });
+  it('skips a commit with nothing measured instead of storing an empty run', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      Promise.resolve(runFor(commit.sha, commit.sha === commits[1].sha ? 0 : 1)),
+    );
+    mocks.upsert.mockResolvedValue('inserted');
 
-    await expect(runCli(['--download', RUN_ID])).rejects.toThrow('process.exit');
+    const outcome = await ingestCommits(sql, commits, undefined);
 
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(console.error).toHaveBeenCalledWith('INGEST_REPO is not set');
-    expect(mocks.fetchRunMeta).not.toHaveBeenCalled();
+    expect(mocks.upsert).toHaveBeenCalledTimes(2);
+    expect(outcome.skipped).toEqual([commits[1]]);
+    expect(outcome.stored).toEqual([commits[0], commits[2]]);
   });
-});
 
-describe('recorded source repository', () => {
-  it.each([
-    { repo: 'example-org/bench', recorded: 'example-org/bench' },
-    { repo: 'semianalysisai/inferencex', recorded: undefined },
-  ])('records $repo as $recorded', async ({ repo, recorded }) => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cx-ingest-test-'));
-    try {
-      fs.mkdirSync(path.join(dir, `cxsweep-matrix-${RUN_ID}`));
-      fs.writeFileSync(path.join(dir, `cxsweep-matrix-${RUN_ID}`, 'matrix.json'), '{}');
-      vi.stubEnv('INGEST_RUN_ID', RUN_ID);
-      vi.stubEnv('INGEST_ARTIFACTS_PATH', dir);
-      vi.stubEnv('INGEST_REPO', repo);
-      mocks.fetchRunMeta.mockReturnValue({
-        path: '.github/workflows/collectivex-sweep.yml',
-        name: 'CollectiveX sweep',
-        run_attempt: 1,
-        head_sha: 'abc',
-        head_branch: 'main',
-        conclusion: 'success',
-        created_at: '2026-08-01T00:00:00Z',
-      });
-      mocks.buildDataset.mockReturnValue({});
-      mocks.begin.mockResolvedValue(undefined);
+  it('skips commits GitHub answers 404 for only when asked to', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      commit.sha === commits[0].sha
+        ? Promise.reject(new CommittedResultsError('not-found', 'gone'))
+        : Promise.resolve(runFor(commit.sha)),
+    );
+    mocks.upsert.mockResolvedValue('inserted');
 
-      await runCli([]);
+    await expect(ingestCommits(sql, commits, undefined)).rejects.toThrow('gone');
+    const outcome = await ingestCommits(sql, commits, undefined, { skipMissing: true });
+    expect(outcome.skipped).toEqual([commits[0]]);
+    expect(outcome.missing).toEqual([commits[0]]);
+    expect(outcome.stored).toEqual(commits.slice(1));
+  });
 
-      await vi.waitFor(() => expect(mocks.begin).toHaveBeenCalled());
-      const meta = mocks.buildDataset.mock.calls[0][2] as Record<string, unknown>;
-      expect(meta.source_repository).toBe(recorded);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+  it('skips a commit that deleted its results without counting it as missing', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      commit.sha === commits[0].sha
+        ? Promise.reject(new CommittedResultsError('absent', 'deleted'))
+        : Promise.resolve(runFor(commit.sha)),
+    );
+    mocks.upsert.mockResolvedValue('inserted');
+    const outcome = await ingestCommits(sql, commits, undefined);
+    expect(outcome.skipped).toEqual([commits[0]]);
+    expect(outcome.missing).toEqual([]);
+    expect(outcome.stored).toEqual(commits.slice(1));
+  });
+
+  it('stops at invalid results and at a run id held by a different commit', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mocks.loadCommittedRun.mockRejectedValueOnce(new CommittedResultsError('invalid', 'bad'));
+    await expect(ingestCommits(sql, commits, undefined, { skipMissing: true })).rejects.toThrow(
+      'bad',
+    );
+
+    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
+      Promise.resolve(runFor(commit.sha)),
+    );
+    mocks.upsert.mockResolvedValue('conflict');
+    await expect(ingestCommits(sql, commits, undefined)).rejects.toThrow(
+      /already holds a different commit/u,
+    );
+    expect(mocks.loadCommittedRun).toHaveBeenCalledTimes(2);
   });
 });

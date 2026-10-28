@@ -100,6 +100,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
   const phase = options.phase === 'prefill' ? 'prefill' : 'decode';
   return {
     case_id: caseId,
+    suite: 'ep-core',
     backend: options.backend ?? 'deepep-v2',
     ep: options.ep ?? 8,
     gpus_per_node: options.gpusPerNode ?? 8,
@@ -171,10 +172,10 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
+/** The shape of the benchmark repo's committed `collectivex/results/cases.json`. */
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
     version,
-    include: [],
     requested_cases: requested.map((entry) => ({
       case: entry.case,
       sku: entry.sku,
