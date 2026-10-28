@@ -60,13 +60,15 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
-  // PostHog endpoints end in a slash (`/ingest/e/`); the redirect below keeps stripping it elsewhere.
+  // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
   skipTrailingSlashRedirect: true,
   redirects() {
     return Promise.resolve([
+      // Two rules: Vercel compiles an empty `:rest*` to a trailing slash, which loops.
+      { source: '/:first((?!ingest/)[^/]+)/', destination: '/:first', permanent: true },
       {
-        source: '/:first((?!ingest/)[^/]+)/:rest*/',
-        destination: '/:first/:rest*',
+        source: '/:first((?!ingest/)[^/]+)/:rest+/',
+        destination: '/:first/:rest+',
         permanent: true,
       },
       ...SEO_REDIRECTS,
