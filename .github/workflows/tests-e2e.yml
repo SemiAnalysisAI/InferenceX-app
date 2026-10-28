@@ -12,6 +12,7 @@ on:
       - 'packages/db/**'
       - 'bunfig.toml'
       - 'bun.lock'
+      - 'patches/**'
       - 'tsconfig.json'
       - 'tsconfig.base.json'
 

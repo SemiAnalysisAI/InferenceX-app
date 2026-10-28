@@ -64,6 +64,15 @@ The Vercel project's Root Directory is `packages/app`. Vercel reads `vercel.json
 from the Root Directory, so the project configuration lives in `packages/app/vercel.json`,
 and the repository root `.vercelignore` assumes that layout.
 
+`patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
+used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked
+request that reuses the browser's socket. When the browser cancels that image (a navigation, or a
+new `srcset` pick after a resize), the source read is dropped and the optimization never
+finishes. Next shares one optimization per image URL, width and format, so every later request
+for that variant hangs until the server restarts, and pages using it never fire `load`.
+`src/lib/runtime/next-image-optimizer-patch.test.ts` fails if a Next upgrade drops the patch;
+re-create it with `bun patch next` unless the new release fixes `fetchInternalImage`.
+
 `NEXT_PUBLIC_*` values, such as `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`,
 are inlined into the client bundle at build time. After changing one in the Vercel
 project, redeploy for the new value to take effect.
