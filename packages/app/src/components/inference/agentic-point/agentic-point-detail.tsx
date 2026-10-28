@@ -148,6 +148,22 @@ export function agenticDetailViewOptions(
   ];
 }
 
+/**
+ * Whether the per-point view shows the metric-source / phase toolbar. Both inputs arrive
+ * from client queries, so the page keeps a same-height slot whenever this is false (while
+ * loading and after). Releasing the slot once the queries settle would shift the cards up.
+ * Almost every production point has a warmup phase, so the toolbar is the usual outcome.
+ */
+export function showMetricSourceToolbar({
+  sourceCount,
+  hasWarmup,
+}: {
+  sourceCount: number;
+  hasWarmup: boolean;
+}): boolean {
+  return sourceCount > 1 || hasWarmup;
+}
+
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
 );
@@ -334,21 +350,20 @@ export function AgenticPointDetail({ id }: Props) {
         )}
       </div>
 
-      {view === 'point' && (metricSources.length > 1 || hasWarmup) && (
-        <MetricSourceToolbar
-          hasWarmup={hasWarmup}
-          phase={phase}
-          onPhaseChange={setPhase}
-          metricSources={metricSources}
-          selectedSource={selectedMetricSource}
-          onSourceChange={setMetricSourceId}
-          fallbackAdapter={metrics?.meta.framework}
-        />
-      )}
       {view === 'point' &&
-        (metricsQuery.isLoading || requestChartQuery.isLoading) &&
-        metricSources.length <= 1 &&
-        !hasWarmup && <div aria-hidden="true" className="h-[50px]" />}
+        (showMetricSourceToolbar({ sourceCount: metricSources.length, hasWarmup }) ? (
+          <MetricSourceToolbar
+            hasWarmup={hasWarmup}
+            phase={phase}
+            onPhaseChange={setPhase}
+            metricSources={metricSources}
+            selectedSource={selectedMetricSource}
+            onSourceChange={setMetricSourceId}
+            fallbackAdapter={metrics?.meta.framework}
+          />
+        ) : (
+          <div aria-hidden="true" className="h-[50px]" />
+        ))}
 
       <div className={view === 'point' ? 'contents' : 'min-h-svh'}>
         {view === 'logs' ? (
