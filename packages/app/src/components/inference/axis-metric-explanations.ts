@@ -210,6 +210,23 @@ function measuredPower(phase: MeasuredPhase): MetricExplanation {
   };
 }
 
+/** Why PowerX charges energy to every token: aggregated serving cannot split it by phase. */
+const PHASE_NOTE_EN: Record<TokenType, string> = {
+  total:
+    ' This is the PowerX default: aggregated serving runs prefill and decode on the same GPUs, so their energy cannot be split by phase and every token carries its share.',
+  output:
+    ' On aggregated serving the same GPUs run prefill and decode, so this also charges prompt processing to output tokens. On disaggregated runs, the Decode GPUs scope isolates decode energy.',
+  input: '',
+};
+
+const PHASE_NOTE_ZH: Record<TokenType, string> = {
+  total:
+    '这是 PowerX 的默认能耗指标：聚合式部署中预填充与解码共用同一批 GPU，能耗无法按阶段拆分，因此由全部 token 分摊。',
+  output:
+    '聚合式部署中预填充与解码共用同一批 GPU，因此这一指标也会把提示词处理的能耗计入输出 token。分离式部署可选择“解码 GPU”范围，单独查看解码能耗。',
+  input: '',
+};
+
 function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -217,10 +234,10 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
         `Measured accelerator energy consumed per ${
           tokenType === 'total' ? 'token (including prompt tokens)' : `${tokenType} token`
         }, from runner power telemetry integrated over the run. Lower means the system converts ` +
-        `electricity into tokens more efficiently.${MEASURED_TIER_NOTE_EN}`,
+        `electricity into tokens more efficiently.${PHASE_NOTE_EN[tokenType]}${MEASURED_TIER_NOTE_EN}`,
       zh:
         `每个${TOKEN_TYPE_ZH[tokenType]}消耗的加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。` +
-        `数值越低，说明系统把电能转化为 token 的效率越高。${MEASURED_TIER_NOTE_ZH}`,
+        `数值越低，说明系统把电能转化为 token 的效率越高。${PHASE_NOTE_ZH[tokenType]}${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: `J/tok = measured accelerator energy over the run ÷ ${TOKEN_TYPE_EN[tokenType]} processed`,

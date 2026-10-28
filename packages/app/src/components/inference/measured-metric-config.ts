@@ -39,7 +39,7 @@ export type MeasuredMetricConfigChange = Partial<{
 
 export const MEASURED_METRIC_DEFAULTS = {
   power: 'y_measuredAvgPower',
-  energy: 'y_measuredJPerOutputToken',
+  energy: 'y_measuredJPerTotalToken',
 } as const satisfies Record<MeasuredMetricFamily, MetricConfigKey>;
 
 const measured = { basis: 'gpu-measured' } as const;

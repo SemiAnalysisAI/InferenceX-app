@@ -65,12 +65,12 @@ describe('measured metric configuration', () => {
     expect(resolveMetricConfigKey('y_utilityProvisionedWatts')).toBe('y_measuredAvgPower');
   });
 
-  it('starts newly selected families at whole-deployment average power or output energy', () => {
+  it('starts newly selected families at whole-deployment average power or total-token energy', () => {
     expect(changeMeasuredMetricConfig('y_tokensPerDollarH', { family: 'power' })).toBe(
       MEASURED_METRIC_DEFAULTS.power,
     );
     expect(changeMeasuredMetricConfig('y_measuredP90Power', { family: 'energy' })).toBe(
-      'y_measuredJPerOutputToken',
+      'y_measuredJPerTotalToken',
     );
     expect(changeMeasuredMetricConfig('y_measuredWhPerSuccessfulQuery', { family: 'power' })).toBe(
       'y_measuredAvgPower',
