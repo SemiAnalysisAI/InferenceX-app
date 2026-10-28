@@ -1641,7 +1641,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '03c00a746ff4fc59cf9b3b01e5f69eee6c936d3d6d11887beeace7ce978a1624',
+    sourceSha256: '1d440ffaafa1573e260bcd2282647cdd2ca83e4ebedc44a5f4e7c212e646ab71',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1693,7 +1693,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: '3108c08a60ff154577fb93b52d6008f21f5597090ab5e8de289e6977dc73c517',
+    sourceSha256: '9179277cfddf32aedff859f598ac1af68e25ef46abbce3b0748ac48414bf5905',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -1736,7 +1736,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: 'd330c47acd94331d815515287990a5e25ab76a0f0d49c57d47dea0852604c3cd',
+    sourceSha256: 'c268a38a78ac9f11b8cf65bf14a7a69eba9b94b5cfa2f94f47cc34475a60b5c1',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',

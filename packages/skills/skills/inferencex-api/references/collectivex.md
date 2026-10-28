@@ -2,9 +2,9 @@
 
 Use this cookbook to discover public communication sweeps, compare two returned
 runs, and export the evidence. These are existing observations; no new benchmark
-is run. Each run is one SemiAnalysisAI/InferenceX commit on main that changed
-`collectivex/results/`; the service ingests it when it lands, never on read. No
-database credentials, admin operations, or launch tools are needed.
+is run. Each run is one uploaded CollectiveX results directory laid over the
+previous latest run; the service stores it when an operator uploads it, never on
+read. No database credentials, admin operations, or launch tools are needed.
 
 For a replayable contract 1 comparison:
 
@@ -44,10 +44,10 @@ node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
 Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
-bounded example selection, not a representative sample. The run ID is the results
-commit time in epoch seconds (raised past the previous results commit on a same-second
-tie) and the dataset's `run.source_sha` is that commit; the conclusion remains in the
-export. EP tail percentiles (`p90`, `p95`, `p99`) of latencies and derived rates can be
+bounded example selection, not a representative sample. The run ID is the upload
+time in epoch seconds (raised past the newest stored run when needed) and the dataset's
+`run.source_sha` is the `collectivex/` commit the uploaded results were measured with;
+the conclusion remains in the export. EP tail percentiles (`p90`, `p95`, `p99`) of latencies and derived rates can be
 `null` where the harness withheld them; `p50` is always a number. Report a `null` tail as
 unavailable, never as zero.
 
@@ -90,10 +90,10 @@ fewer than two measured summaries were returned, the helper exports
 needed, should have an explicit small request budget and retain each response.
 
 Even `discovery_complete=true` does **not** prove complete history: the stored runs
-are whatever results commits the service has ingested. The export therefore always
-sets `history_complete=false`. Compare each detail's returned `run_attempt` with its
-summary; equal attempt numbers do not prove identical snapshots, because re-ingesting
-a commit replaces its contents under the same run ID and attempt.
+are whatever uploads the service still holds (an operator can delete a run). The export
+therefore always sets `history_complete=false`. Compare each detail's returned
+`run_attempt` with its summary; equal attempt numbers do not prove identical snapshots,
+because a stored run's contents can be rewritten under the same run ID and attempt.
 
 ## 2. Check comparability before interpreting differences
 

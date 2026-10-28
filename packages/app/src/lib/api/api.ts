@@ -265,7 +265,7 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
-/** Stored CollectiveX run summaries, one per results commit; `discovery_complete` is always true. */
+/** Stored CollectiveX run summaries, one per results upload; `discovery_complete` is always true. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,

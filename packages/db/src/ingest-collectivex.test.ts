@@ -1,51 +1,45 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type * as CommittedResults from './collectivex/committed-results';
-import { CommittedResultsError } from './collectivex/committed-results';
+import type * as Queries from './queries/collectivex';
+import type * as ResultsUpload from './collectivex/results-upload';
 
-const mocks = vi.hoisted(() => ({
-  loadCommittedRun: vi.fn(),
-  upsert: vi.fn(),
+const reads: string[] = [];
+vi.mock('./queries/collectivex', async (importOriginal) => ({
+  ...(await importOriginal<typeof Queries>()),
+  getMaxCollectiveXRunId: vi.fn(() => {
+    reads.push('max');
+    return Promise.resolve('200');
+  }),
+  getLatestCollectiveXRun: vi.fn(() => {
+    reads.push('latest');
+    return Promise.resolve(null);
+  }),
 }));
-vi.mock('./collectivex/committed-results', async (importOriginal) => ({
-  ...(await importOriginal<typeof CommittedResults>()),
-  loadCommittedRun: mocks.loadCommittedRun,
-}));
-vi.mock('./queries/collectivex', () => ({
-  upsertCollectiveXRun: mocks.upsert,
-  pruneCollectiveXRuns: vi.fn(),
-  deleteCollectiveXRun: vi.fn(),
+vi.mock('./collectivex/results-upload', async (importOriginal) => ({
+  ...(await importOriginal<typeof ResultsUpload>()),
+  readResultsDir: vi.fn(() => ({ files: new Map() })),
+  validateResults: vi.fn(() => ({ version: 1 })),
+  buildUploadedRun: vi.fn(() => ({ run: {}, docs: [], plan: {} })),
 }));
 
-import { ingestCommits, parseIngestArgs } from './ingest-collectivex';
-import type { Sql } from './etl/db-utils';
-
-const sql = (() => Promise.resolve([])) as unknown as Sql;
+import {
+  describeUpload,
+  invalidateCollectiveXCache,
+  parseIngestArgs,
+  planUpload,
+} from './ingest-collectivex';
 
 afterEach(() => {
   vi.restoreAllMocks();
-  vi.clearAllMocks();
 });
 
 describe('parseIngestArgs', () => {
-  it('defaults to main', () => {
-    expect(parseIngestArgs([])).toEqual({ mode: 'commit', ref: 'main' });
-  });
-
-  it('takes one commit from --sha or --ref', () => {
-    expect(parseIngestArgs(['--sha', 'a'.repeat(40)])).toEqual({
-      mode: 'commit',
-      ref: 'a'.repeat(40),
+  it('uploads a results directory', () => {
+    expect(parseIngestArgs(['--dir', '/tmp/results', '--yes', '--no-ssl'])).toEqual({
+      mode: 'upload',
+      dir: '/tmp/results',
     });
-    expect(parseIngestArgs(['--ref', 'v1.2', '--yes'])).toEqual({ mode: 'commit', ref: 'v1.2' });
-  });
-
-  it('walks main for --backfill, optionally pruning', () => {
-    expect(parseIngestArgs(['--backfill', '-y', '--no-ssl'])).toEqual({
-      mode: 'backfill',
-      prune: false,
-    });
-    expect(parseIngestArgs(['--backfill', '--prune'])).toEqual({ mode: 'backfill', prune: true });
+    expect(parseIngestArgs(['--dir=results', '-y'])).toEqual({ mode: 'upload', dir: 'results' });
   });
 
   it('deletes one named run', () => {
@@ -55,111 +49,112 @@ describe('parseIngestArgs', () => {
     });
   });
 
-  it('rejects conflicting, malformed, and unknown arguments', () => {
-    expect(() => parseIngestArgs(['--sha', 'a'.repeat(40), '--ref', 'main'])).toThrow(
-      /mutually exclusive/u,
+  it('needs exactly one of --dir and --delete-run', () => {
+    expect(() => parseIngestArgs([])).toThrow(/exactly one of --dir or --delete-run/u);
+    expect(() => parseIngestArgs(['--dir', 'r', '--delete-run', '5'])).toThrow(
+      /exactly one of --dir or --delete-run/u,
     );
-    expect(() => parseIngestArgs(['--backfill', '--ref', 'main'])).toThrow(/--backfill/u);
-    expect(() => parseIngestArgs(['--prune'])).toThrow(/--prune needs --backfill/u);
-    expect(() => parseIngestArgs(['--delete-run', '5', '--backfill'])).toThrow(/--delete-run/u);
+    expect(() => parseIngestArgs(['--dir', ''])).toThrow(/--dir needs a path/u);
+  });
+
+  it('rejects malformed run ids', () => {
     expect(() => parseIngestArgs(['--delete-run', '37459990486'])).toThrow(/Invalid run id/u);
     expect(() => parseIngestArgs(['--delete-run', '0'])).toThrow(/Invalid run id/u);
-    expect(() => parseIngestArgs(['--sha', 'not-a-sha'])).toThrow(/Invalid commit sha/u);
-    expect(() => parseIngestArgs(['12345'])).toThrow();
+    expect(() => parseIngestArgs(['--delete-run', '12a'])).toThrow(/Invalid run id/u);
+  });
+
+  it('rejects the removed GitHub-source flags and positionals', () => {
+    for (const argv of [
+      ['--sha', 'a'.repeat(40)],
+      ['--ref', 'main'],
+      ['--backfill'],
+      ['--backfill', '--prune'],
+      ['--prune'],
+      ['--dir', 'r', '--backfill'],
+      ['results'],
+    ]) {
+      expect(() => parseIngestArgs(argv)).toThrow();
+    }
   });
 });
 
-function runFor(sha: string, measured = 1) {
-  return {
-    run: { run_id: sha.slice(0, 3), summary: { measured_cases: measured, requested_cases: 2 } },
-    docs: measured > 0 ? [{}] : [],
-  };
-}
+describe('describeUpload', () => {
+  it('states the run, the source, and each dropped case', () => {
+    const text = describeUpload({
+      run: {
+        run_id: '1800000000',
+        run_attempt: 1,
+        version: 1,
+        generated_at: '2027-01-15T08:00:00Z',
+        source_sha: 'e'.repeat(40),
+        source_branch: null,
+        conclusion: 'success',
+        matrix: {},
+        summary: { measured_cases: 3, requested_cases: 4 } as never,
+      },
+      docs: [{}, {}, {}],
+      plan: {
+        baseRunId: '1799999999',
+        uploaded: 2,
+        replaced: 1,
+        kept: 1,
+        dropped: [{ sku: 'mi300x', caseId: 'old-case', reason: 'not runnable' }],
+      },
+    });
+    expect(text).toContain(
+      `run 1800000000 (version 1, source ${'e'.repeat(40)}) over latest run 1799999999`,
+    );
+    expect(text).toContain('2 uploaded (1 replacing a stored case), 1 kept, 1 dropped');
+    expect(text).toContain('3/4 cases measured, 3 docs');
+    expect(text).toContain('drop mi300x/old-case: not runnable');
+  });
+});
 
-describe('ingestCommits', () => {
-  const commits = [
-    { sha: 'a'.repeat(40), committedAt: '2026-10-15T00:00:00Z', runId: '1760486400' },
-    { sha: 'b'.repeat(40), committedAt: '2026-10-16T00:00:00Z', runId: '1760572800' },
-    { sha: 'c'.repeat(40), committedAt: '2026-10-17T00:00:00Z', runId: '1760659200' },
-  ];
-
-  it('stores commits in order and shares one blob cache across them', async () => {
+describe('invalidateCollectiveXCache', () => {
+  it('purges the collectivex scope with bearer auth and the protection bypass', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
-      Promise.resolve(runFor(commit.sha)),
+    const fetch = vi.fn(() => Promise.resolve(new Response('{}')));
+    await expect(
+      invalidateCollectiveXCache(
+        {
+          APP_URL: 'https://app.example/',
+          VERCEL_INVALIDATE_SECRET: 'secret',
+          VERCEL_PROTECTION_BYPASS_SECRET: 'bypass',
+        },
+        fetch as unknown as typeof globalThis.fetch,
+      ),
+    ).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://app.example/api/v1/invalidate?scope=collectivex',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer secret', 'x-vercel-protection-bypass': 'bypass' },
+      }),
     );
-    mocks.upsert.mockResolvedValue('inserted');
-
-    const outcome = await ingestCommits(sql, commits, 'token');
-
-    expect(mocks.loadCommittedRun.mock.calls.map(([commit]) => commit.sha)).toEqual(
-      commits.map((commit) => commit.sha),
-    );
-    const [first, second] = mocks.loadCommittedRun.mock.calls.map(([, options]) => options);
-    expect(first.token).toBe('token');
-    expect(first.blobCache).toBe(second.blobCache);
-    expect(mocks.upsert).toHaveBeenCalledTimes(3);
-    expect(outcome).toEqual({ stored: commits, skipped: [], missing: [] });
   });
 
-  it('skips a commit with nothing measured instead of storing an empty run', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
-      Promise.resolve(runFor(commit.sha, commit.sha === commits[1].sha ? 0 : 1)),
-    );
-    mocks.upsert.mockResolvedValue('inserted');
-
-    const outcome = await ingestCommits(sql, commits, undefined);
-
-    expect(mocks.upsert).toHaveBeenCalledTimes(2);
-    expect(outcome.skipped).toEqual([commits[1]]);
-    expect(outcome.stored).toEqual([commits[0], commits[2]]);
+  it('skips without APP_URL or the secret, and fails on an HTTP error', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const fetch = vi.fn(() => Promise.resolve(new Response('', { status: 401 })));
+    await expect(
+      invalidateCollectiveXCache({ APP_URL: 'https://app.example' }, fetch as never),
+    ).resolves.toBe(false);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(log.mock.calls.flat().join('\n')).toMatch(/cache expires/u);
+    await expect(
+      invalidateCollectiveXCache(
+        { APP_URL: 'https://app.example', VERCEL_INVALIDATE_SECRET: 'secret' },
+        fetch as never,
+      ),
+    ).rejects.toThrow(/HTTP 401/u);
   });
+});
 
-  it('skips commits GitHub answers 404 for only when asked to', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
-      commit.sha === commits[0].sha
-        ? Promise.reject(new CommittedResultsError('not-found', 'gone'))
-        : Promise.resolve(runFor(commit.sha)),
-    );
-    mocks.upsert.mockResolvedValue('inserted');
-
-    await expect(ingestCommits(sql, commits, undefined)).rejects.toThrow('gone');
-    const outcome = await ingestCommits(sql, commits, undefined, { skipMissing: true });
-    expect(outcome.skipped).toEqual([commits[0]]);
-    expect(outcome.missing).toEqual([commits[0]]);
-    expect(outcome.stored).toEqual(commits.slice(1));
-  });
-
-  it('skips a commit that deleted its results without counting it as missing', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
-      commit.sha === commits[0].sha
-        ? Promise.reject(new CommittedResultsError('absent', 'deleted'))
-        : Promise.resolve(runFor(commit.sha)),
-    );
-    mocks.upsert.mockResolvedValue('inserted');
-    const outcome = await ingestCommits(sql, commits, undefined);
-    expect(outcome.skipped).toEqual([commits[0]]);
-    expect(outcome.missing).toEqual([]);
-    expect(outcome.stored).toEqual(commits.slice(1));
-  });
-
-  it('stops at invalid results and at a run id held by a different commit', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    mocks.loadCommittedRun.mockRejectedValueOnce(new CommittedResultsError('invalid', 'bad'));
-    await expect(ingestCommits(sql, commits, undefined, { skipMissing: true })).rejects.toThrow(
-      'bad',
-    );
-
-    mocks.loadCommittedRun.mockImplementation((commit: { sha: string }) =>
-      Promise.resolve(runFor(commit.sha)),
-    );
-    mocks.upsert.mockResolvedValue('conflict');
-    await expect(ingestCommits(sql, commits, undefined)).rejects.toThrow(
-      /already holds a different commit/u,
-    );
-    expect(mocks.loadCommittedRun).toHaveBeenCalledTimes(2);
+describe('planUpload', () => {
+  it('reads the highest run_id before the merge base, so a run landing between them is caught', async () => {
+    reads.length = 0;
+    const plan = await planUpload({} as never, '/unused');
+    expect(reads).toEqual(['max', 'latest']);
+    expect(plan.maxStoredRunId).toBe('200');
   });
 });

@@ -172,7 +172,7 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
-/** The shape of the benchmark repo's committed `collectivex/results/cases.json`. */
+/** The shape of a CollectiveX results directory's `cases.json`. */
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
     version,

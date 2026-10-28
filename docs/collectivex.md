@@ -1,39 +1,49 @@
 # CollectiveX
 
 Design rationale for the CollectiveX tab's data pipeline. CollectiveX keeps its own Neon
-database, filled from the benchmark results that `SemiAnalysisAI/InferenceX` commits under
-`collectivex/results/`: `cases.json` (the requested cases, with the contract `version`) plus
-one `<sku>/<case_id>.json` per measured case. The API routes only read that database.
+database, filled by uploading the benchmark results that `collectivex/run.sh` writes on a
+cluster: a `results/` directory holding `cases.json` (the requested cases, with the contract
+`version`) plus one `<sku>/<case_id>.json` per measured case. The results are not stored in
+`SemiAnalysisAI/InferenceX` or any other git repository; the database is their only store.
+The API routes only read that database.
 
-## One run per results commit
+## One run per upload
 
-Each InferenceX commit on `main` that changed `collectivex/results/` and holds at least one
-measured result is one stored run. A commit with nothing measured (for example one that only
-changed `cases.json` before any result landed) is skipped, never stored as an empty run, and
-the read queries hide any row whose summary measures nothing.
+Each upload is one new stored run: the latest stored run of the same `version` with the
+uploaded files laid over it, keyed by `(sku, case_id)`.
 
-- `run_id` is the commit's committer time in epoch seconds, raised to one past the previous
-  results commit's id when it would not exceed it (two commits in the same second, or a
-  committer clock behind history). It is computed from `main`'s results history alone, so
-  every ingest gives a commit the same id, ids are unique, and "latest" still means
-  `ORDER BY run_id DESC`. A stored id that belongs to another commit only happens if `main`'s
-  history was rewritten; the CLI then fails rather than overwrite it (there is no HTTP ingest
-  endpoint, so no HTTP status is involved). Ids are below 10^10, which migration
-  `005_remove_lazy_ingest_runs.sql` enforces with a CHECK after deleting the retired lazy
-  ingest's rows (keyed by GitHub Actions run id, so they would otherwise outrank every
-  committed run).
-- `run_attempt` is always 1, `source_sha` is the results commit, `source_branch` is `main`,
-  `conclusion` is `success`, `matrix` is `cases.json` and `summary` is the shared reader's
-  `buildRunSummary`. `cx_run_docs` holds the commit's result documents verbatim.
-- Re-ingesting a commit is idempotent: one transaction takes a fixed advisory lock
-  (`pg_advisory_xact_lock`, shared by every CollectiveX write) and then one statement upserts
-  the row and replaces its documents, so a reader sees the old contents or the new ones,
-  never a mix, and two concurrent ingests of the same commit cannot both insert its
-  documents.
-- A ref resolves to the newest results commit at or before it, and that commit must be in
-  `main`'s results history. Ingesting `main` after an unrelated merge therefore refreshes
-  the run already published for those files instead of creating a duplicate, and results
-  that never landed on `main` are never published.
+- An uploaded file replaces that case's stored document; every other stored document is kept.
+- The upload's `cases.json` is the new run's matrix. A stored document that is not runnable in
+  it, or whose `version` differs, is dropped, and the plan names each dropped `sku/case_id`.
+  A case the new `cases.json` still requests but nobody has measured yet stays `pending`.
+- The merged set is validated as a whole before anything is written (below), so a kept
+  stored document that no longer passes the checks stops the upload.
+- When nothing is stored yet, the run is just the upload.
+- A run with nothing measured is refused, never stored as an empty run, and the read
+  queries hide any row whose summary measures nothing.
+
+The stored row:
+
+- `run_id` is the upload time in epoch seconds, raised to one past the highest `run_id`
+  stored in any version when it would not exceed it (a clock behind the newest run, or two
+  uploads in one second), so "latest" is still `ORDER BY run_id DESC`. Ids stay below 10^10,
+  which migration `005_remove_lazy_ingest_runs.sql` enforces with a CHECK after deleting the
+  retired lazy ingest's rows (keyed by GitHub Actions run id, so they would otherwise outrank
+  every later run); the bound is `RUN_ID_LIMIT` in `results-upload.ts`.
+- `source_sha` is the one `collectivex/` commit every uploaded document was measured from
+  (`provenance.source_sha` on EP results, `runtime.source_sha` on swap_blocks results). An
+  upload whose documents name different commits is refused with the files of each sha
+  listed; upload them separately. Kept stored documents keep their own `source_sha`.
+- `run_attempt` is 1, `source_branch` is null, `conclusion` is `success`, `generated_at` is
+  the upload time (UTC, whole seconds), `matrix` is the uploaded `cases.json` and `summary`
+  is the shared reader's `buildRunSummary`. `cx_run_docs` holds the merged documents
+  verbatim.
+- One transaction takes a fixed advisory lock (`pg_advisory_xact_lock`, shared by every
+  CollectiveX write) and then one statement inserts the row and its documents, so a reader
+  sees the old latest run or the new one, never a mix. Under the lock the write first checks
+  that the highest stored `run_id` is still the one the upload merged against; if another
+  run landed in between, nothing is written and the CLI asks for a rerun, so two concurrent
+  uploads cannot drop each other's cases.
 
 The DB stores raw documents; the shared reader (`packages/db/src/collectivex/reader.ts`)
 assembles the dataset at read time, so a reader fix applies to stored runs without
@@ -42,93 +52,82 @@ re-ingesting. A contract change is a reader change plus a bump of the numeric `v
 
 ## Ingest
 
-`packages/db/src/collectivex/committed-results.ts` is shared by both entry points. It reads
-exactly `collectivex/results/**` at the pinned commit: the git trees API lists the files and
-each blob comes from `raw.githubusercontent.com`, which does not count against the REST rate
-limit. It then checks every file the way the benchmark repo's own test does: the path is
-`<sku>/<case_id>.json` matching the document's identity (EP case attempts by
-`identity.case_id` and `identity.case_factors.sku`; swap_blocks results by
-`schema: collectivex-swap-blocks-v1`, `case_id` and `runtime.sku`), the case is runnable in
-`cases.json`, the result was measured from committed code (`source_dirty: false` and a 40-hex
-`source_sha`), an EP result carries exactly the `cases.json` version, and no string holds an
-IPv4 address and no key names a machine (`host`, `hosts`, `hostname`, `nodelist`,
-`slurm_nodelist`, `master_addr`, case-insensitive). Each document is then assembled alone, so
-every failure names its file. Files above 4 MiB, or a tree above 256 MiB, are rejected.
+`packages/db/src/collectivex/results-upload.ts` reads the directory: `cases.json` and every
+`*.json` exactly one level down (`<sku>/<file>.json`). Other files, dot entries such as
+`.shards`, and deeper directories are ignored; a symlink anywhere on that path is rejected.
+Files above 4 MiB, or results above 256 MiB in total, are rejected. It then checks every
+file the way the benchmark repo's own test does: the path is `<sku>/<case_id>.json` matching
+the document's identity (EP case attempts by `identity.case_id` and
+`identity.case_factors.sku`; swap_blocks results by `schema: collectivex-swap-blocks-v1`,
+`case_id` and `runtime.sku`), the case is runnable in `cases.json`, the result was measured
+from committed code (`source_dirty: false` and a 40-hex `source_sha`), an EP result carries
+exactly the `cases.json` version, and no string holds an IPv4 address and no key names a
+machine (`host`, `hosts`, `hostname`, `nodelist`, `slurm_nodelist`, `master_addr`,
+case-insensitive). Each document is then assembled alone, so every failure names its file.
 
-- **Workflow**: `.github/workflows/ingest-collectivex.yml` runs on `repository_dispatch`
-  type `ingest-collectivex` with `client_payload: {"sha": "<40 hex>"}`, which the InferenceX
-  workflow sends on pushes to `main` that touch `collectivex/results/`, and on
-  `workflow_dispatch` with exactly one of `sha` (40 hex), `ref`, `backfill` (optionally with
-  `prune`), or `delete_run`. Every run shares one concurrency group that queues rather than
-  cancels; GitHub keeps only one pending run per group, so a burst of dispatches can
-  supersede a pending ingest, which the next backfill makes up. It runs
-  `migrate-collectivex.ts --yes`, then the ingest CLI with `--sha`, `--ref`, `--backfill
-[--prune]` or `--delete-run` and `--yes` against the `DATABASE_COLLECTIVEX_WRITE_URL` secret (GitHub reads use
-  `INFX_MAIN_PAT`), then purges the cache with `POST /api/v1/invalidate?scope=collectivex`
-  (`VERCEL_INVALIDATE_SECRET`). It alerts Slack on failure, like `ingest-operatorx`.
-- **CLI**: `bun run admin:db:ingest:collectivex [--sha <sha> | --ref <ref> | --backfill
-[--prune] | --delete-run <run_id>] [--yes] [--no-ssl]` ingests one commit (default: `main`),
-  or with `--backfill` every results commit on `main`, oldest first, reusing unchanged files
-  between commits. A backfill skips commits GitHub answers 404 for (for example one that
-  deleted `collectivex/results/`) and commits with nothing measured; any other failure, such
-  as a file that breaks the results contract, stops it. `--prune` then deletes every stored
-  run the backfill did not store: runs whose commit left `main`, no longer validates, or
-  measures nothing. `--delete-run <run_id>` deletes one stored run at once. It asks for
-  confirmation unless `--yes` is given. `GITHUB_TOKEN` is optional but raises GitHub's API
-  rate limit.
+- **CLI**: `bun run admin:db:ingest:collectivex (--dir <results-dir> | --delete-run <run_id>)
+[--yes] [--no-ssl]`. `--dir` reads and validates the directory, merges it over the latest
+  stored run, prints the plan (run_id, source sha, how many uploaded, replaced, kept and
+  dropped, each dropped case) and asks for confirmation unless `--yes` is given. It writes
+  through `DATABASE_COLLECTIVEX_WRITE_URL` and never prints that URL. `--delete-run` deletes
+  one stored run and its documents. After a write, when `APP_URL` and
+  `VERCEL_INVALIDATE_SECRET` are set, it purges the cache with
+  `POST ${APP_URL}/api/v1/invalidate?scope=collectivex` (Bearer auth, plus
+  `x-vercel-protection-bypass` when `VERCEL_PROTECTION_BYPASS_SECRET` is set); otherwise it
+  says the dashboard updates when its cache expires or after the workflow below runs.
+- **Workflow**: `.github/workflows/ingest-collectivex.yml` (`Ingest CollectiveX Results`) runs
+  only on `workflow_dispatch`. With no input it applies pending migrations
+  (`migrate-collectivex.ts --yes`) and purges the CollectiveX cache, for example after an
+  upload made without the purge variables. With `delete_run` it also deletes that run before
+  purging. Every run shares one concurrency group that queues rather than cancels, and it
+  alerts Slack on failure, like `ingest-operatorx`. It reads no GitHub repository.
+
+There is no backfill and no prune: the results exist only in the database, so nothing can
+rebuild a deleted run.
 
 ## Operator runbook
 
-**Cut over from the lazy ingest** (once, after this lands):
+**Upload results** from a cluster checkout after `collectivex/run.sh` finishes:
 
-1. **Archive** the current contents:
-   `pg_dump --table=cx_runs --table=cx_run_docs "$DATABASE_COLLECTIVEX_WRITE_URL" > cx-archive.sql`
-2. **Backfill**: run the `Ingest CollectiveX Results` workflow with `backfill` and `prune`
-   checked. Its migration step applies `004_committed_results.sql` (drops the `deleted_at`
-   tombstone) and `005_remove_lazy_ingest_runs.sql` (deletes every lazy-ingest run and adds
-   the run_id CHECK), so no manual `TRUNCATE` is needed; the backfill then stores every
-   measured results commit on `main` and the cache is purged. Until a measured results
-   commit lands on `main`, `/api/v1/collectivex/latest` returns 404 and the run list is empty.
-   Do not use `ref=main` for this: it stores only the newest results commit, not the history.
+1. Apply migrations once per schema change: `bun run admin:db:migrate:collectivex` (or run
+   the workflow with no input).
+2. `bun run admin:db:ingest:collectivex --dir <path/to/collectivex/results>`, read the plan,
+   and confirm. Upload one `source_sha` at a time.
+3. If the CLI could not purge the cache, run the `Ingest CollectiveX Results` workflow with no
+   input.
 
-**Day to day** nothing is manual: each push to `main` that touches `collectivex/results/`
-dispatches an ingest of that commit. Use `sha` or `ref` to re-ingest one commit (for
-example after its dispatched ingest failed) and `backfill` to make up any missed one.
+**Retract a bad run** at once with `--delete-run <run_id>` (or the workflow's `delete_run`).
+The previous run becomes the latest again, and the next upload merges over it. To fix one
+case instead, upload its corrected result: the new run replaces that case and keeps the rest.
 
-**Retract a bad run**: the durable fix is a commit to the benchmark repo that removes or
-corrects the result files, followed by a `backfill` with `prune` (the run's own commit is
-still on `main`, so a backfill without `prune` would keep it). To take a run down at once,
-run the workflow with `delete_run` set to its `run_id`; a later backfill re-adds it while its
-commit still holds measured results, so follow up with the benchmark-repo fix.
-
-Locally, the same steps are `bun run admin:db:migrate:collectivex` and
-`bun run admin:db:ingest:collectivex --backfill --prune` (or `--delete-run <run_id>`), then
-`POST /api/v1/invalidate?scope=collectivex` (the CLI does not reach the CDN).
+**Archive** before destructive maintenance, because the database is the only copy:
+`pg_dump --table=cx_runs --table=cx_run_docs "$DATABASE_COLLECTIVEX_WRITE_URL" > cx-archive.sql`
 
 ## Serving
 
 - **Reads use the primary**: every route reads through `DATABASE_COLLECTIVEX_WRITE_URL`, so a
-  response cached right after an ingest's purge never comes from a lagging replica.
+  response cached right after an upload's purge never comes from a lagging replica.
   `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.
 - **Caching**: responses carry the `collectivex` CDN tag with the default one-day `s-maxage`.
-  The ingest workflow purges only that tag through `POST /api/v1/invalidate?scope=collectivex`; the
+  The ingest CLI and workflow purge only that tag through `POST /api/v1/invalidate?scope=collectivex`; the
   main dashboard's blob cache is untouched by CollectiveX operations.
-- **Partial results**: a commit may hold results for only some pools (the first committed
-  results cover only `mi300x` and `mi325x`). Every runnable case in `cases.json` without a
-  result file stays in `coverage` with outcome `pending` (requested, not run), counts toward
+- **Partial results**: a run may hold results for only some pools (for example a first
+  upload covering only `mi300x` and `mi325x`). Every runnable case in `cases.json` without a
+  result stays in `coverage` with outcome `pending` (requested, not run), counts toward
   `requested_cases` but not `measured_cases`, and adds no series, so the SKU controls list
-  only measured pools. A later commit that adds pools is a new run with a later `run_id`,
-  so it becomes the latest run while the earlier one stays listed in the API.
+  only measured pools. A later upload of other pools is a new run with a later `run_id` that
+  also keeps the earlier pools' results, so it becomes the latest run (a superset) while the
+  earlier one stays listed in the API.
 - **One run on the page**: `/collectivex` shows only the newest stored run with at least one
   measured case; there is no run table or multi-run overlay. The header's Suites control picks
   the one section shown: `EP` (the default) shows the EP chart controls and chart, `KV` the
   kv-transfer section, and `swap_blocks` the swap_blocks section. KV and swap_blocks are offered
-  only when the shown run carries them.
+  only when the shown run carries them, and a run without EP series opens on its first suite.
 - **Run list**: `/api/v1/collectivex/runs` always reports `discovery_complete: true`; the
   field stays for existing clients.
 - **No deletion or ingest in the app**: the app exposes no CollectiveX mutation. Runs are
-  added by the ingest workflow or CLI and removed by a `backfill` with `prune` after the
-  committed results change, or at once with `delete_run` (see the runbook).
+  added by the ingest CLI and removed with `--delete-run` or the workflow's `delete_run`
+  (see the runbook).
 - **Covered pools**: a run summary's `covered_skus` lists only pools with at least one
   measured result (EP, KV or swap_blocks); pools that are requested but have no result yet
   are not listed.
@@ -143,7 +142,8 @@ Locally, the same steps are `bun run admin:db:migrate:collectivex` and
   `components.*.payload_data_rate_gbps_at_latency_percentile` and
   `roundtrip_token_rate_at_latency_percentile` may now carry `null` for `p90`, `p95` and
   `p99`; the API documentation says so.
-- **Links**: a run links to `collectivex/results/` and the methodology at its `source_sha`.
+- **Links**: a run links to the `collectivex/` code and the methodology at its `source_sha`;
+  the results themselves are not in the repository.
 
 ## Known-support matrix
 
