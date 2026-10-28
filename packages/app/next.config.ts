@@ -120,7 +120,7 @@ const nextConfig: NextConfig = {
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
-    formats: ['image/avif', 'image/webp'],
+    formats: ['image/webp'],
     minimumCacheTTL: 86400,
     qualities: [75, 100],
     remotePatterns: [

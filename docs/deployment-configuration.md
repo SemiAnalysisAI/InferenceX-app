@@ -76,7 +76,8 @@ and the repository root `.vercelignore` assumes that layout. It defines no cron 
 `/logos`, `/decorative`, `/whitepaper`, favicons and `og-image.png`):
 `public, max-age=86400, stale-while-revalidate=604800`. File names there are reused across
 deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
-AVIF or WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API routes,
+WebP with a one-day `minimumCacheTTL`. AVIF is off because its encoder can stall a shared
+optimization request. `src/proxy.ts` runs only for API routes,
 embed pages, legacy Inference power links, and compare share links with query state; its
 `config.matcher` must stay a static literal.
 

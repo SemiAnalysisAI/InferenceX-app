@@ -35,7 +35,7 @@ Heading ID deduplication: if two headings share a slug, the second gets prefixed
 links in a caption are turned into real anchors by `renderCaption` in `mdx-components.tsx`;
 other markdown (bold, code) still renders literally.
 
-`<Figure>` images render through `next/image` (AVIF/WebP, responsive `srcset`, fixed width and
+`<Figure>` images render through `next/image` (WebP, responsive `srcset`, fixed width and
 height) using the pixel sizes recorded in `src/lib/blog/figure-dimensions.json`. After adding or
 replacing a figure, run `bun run blog:figure-dimensions` from `packages/app` and commit the
 updated file. `figure-dimensions.test.ts` fails when a figure has no recorded size. Only the

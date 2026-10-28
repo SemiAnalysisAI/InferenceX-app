@@ -1,5 +1,9 @@
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
-import { OVERLAY_RUN_ID, interceptOverlayRun } from '../support/overlay-fixtures';
+import {
+  OVERLAY_RUN_BRANCH,
+  OVERLAY_RUN_ID,
+  interceptOverlayRun,
+} from '../support/overlay-fixtures';
 
 const STORAGE_KEY = 'inferencex-agentic-point-coach-mark-dismissed';
 const COACH_MARK = '[data-testid="agentic-point-coach-mark"]';
@@ -60,6 +64,15 @@ describe('Agentic chart without the retired point callout', () => {
     });
     cy.wait('@unofficialRun');
     cy.get('[data-testid="scatter-graph"]').scrollIntoView();
+    // Official rows can draw before the overlay run lands. Its legend row then widens the sidebar
+    // and the chart redraws at the narrower width, which dismisses a pinned tooltip, so pin one
+    // only after the overlay is listed and the chart is drawn at its container's settled width.
+    cy.contains('[data-testid="scatter-graph"] li', OVERLAY_RUN_BRANCH).should('be.visible');
+    cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').should(($svg) => {
+      const drawnWidth = Number($svg.attr('width'));
+      const availableWidth = $svg.parent()[0].getBoundingClientRect().width;
+      expect(Math.abs(drawnWidth - availableWidth)).to.be.lessThan(1);
+    });
     cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt')
       .should('have.length.greaterThan', 0)
       .first()
