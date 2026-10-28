@@ -588,6 +588,25 @@ describe('PowerTimeline', () => {
       );
     });
 
+    it('offers the shared Reset filter legend action only while hardware is filtered out', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+        body: { ...response, series: [series('b200', 16, 700), series('h100', 16, 500)] },
+      }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('h100', 16, 500)], {
+        activeHwTypes: ['b200'],
+      });
+      cy.wait('@series');
+      cy.get('[data-testid="chart-legend"]').contains('button', 'Reset filter').click();
+      cy.get('@selectAllHwTypes').should('have.been.calledOnce');
+    });
+
+    it('leaves the legend header without actions when every hardware type is shown', () => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700)]);
+      cy.wait('@series');
+      cy.get('[data-testid="chart-legend"]').should('not.contain.text', 'Reset filter');
+    });
+
     it('keeps the end-of-line labels in the gutter on desktop', () => {
       cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
       mountTimeline([measuredPoint('b200', 16, 700)]);

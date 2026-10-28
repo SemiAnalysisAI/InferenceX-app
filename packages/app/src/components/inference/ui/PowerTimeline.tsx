@@ -110,6 +110,7 @@ const STRINGS = {
       'The selected trace is unavailable for these filters or has no retained telemetry.',
     xWall: 'Time (UTC)',
     xElapsed: 'Time since telemetry start (m:ss)',
+    resetFilter: 'Reset filter',
     perGpu: 'One line per GPU',
     perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
     raw: 'Raw 1-s samples',
@@ -185,6 +186,7 @@ const STRINGS = {
     missingFocus: '所选曲线不符合当前筛选条件，或没有保留的遥测数据。',
     xWall: '时间（UTC）',
     xElapsed: '距遥测开始的时间（分:秒）',
+    resetFilter: '重置筛选',
     perGpu: '每个 GPU 一条线',
     perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
     raw: '原始 1 秒采样',
@@ -888,7 +890,7 @@ export default function PowerTimeline({
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
   const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
-  const { setBestPerSku, toggleHwType, setIsLegendExpanded, toggleActiveDate } =
+  const { setBestPerSku, toggleHwType, selectAllHwTypes, setIsLegendExpanded, toggleActiveDate } =
     useInferenceActions();
   const { allGraphs: comparisonSeries, runNumbering } = useComparisonSeries(providedRunNumbering);
   const {
@@ -1651,6 +1653,21 @@ export default function PowerTimeline({
     },
   );
 
+  const hwFiltered =
+    !comparison &&
+    hwKeysInData.some(
+      (key) => hwTypesWithData.has(key) && hardwareConfig[key] && !officialHwTypes.has(key),
+    );
+  const resetHwFilter = () => {
+    if (overlayData) {
+      setBestPerSku(false, { applySelection: false });
+      setUnifiedOverlaySelection(new Set(hwTypesWithData), activeOverlayHwTypes);
+    } else {
+      selectAllHwTypes();
+    }
+    track('inference_power_timeline_filter_reset');
+  };
+
   const legendElement = (
     <ChartLegend
       variant="sidebar"
@@ -1666,6 +1683,11 @@ export default function PowerTimeline({
       onItemHoverEnd={() => setHighlight(null)}
       hideAtomFootnote
       switches={switches}
+      actions={
+        hwFiltered
+          ? [{ id: 'power-timeline-reset-filter', label: t.resetFilter, onClick: resetHwFilter }]
+          : undefined
+      }
     />
   );
 
