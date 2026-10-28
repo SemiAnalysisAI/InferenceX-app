@@ -1653,17 +1653,20 @@ export default function PowerTimeline({
     },
   );
 
+  const overlayHwInScope = new Set(overlayPoints.map((point) => String(point.hwKey)));
   const hwFiltered =
     !comparison &&
-    hwKeysInData.some(
+    (hwKeysInData.some(
       (key) => hwTypesWithData.has(key) && hardwareConfig[key] && !officialHwTypes.has(key),
-    );
+    ) ||
+      [...overlayHwInScope].some((key) => !activeOverlayHwTypes.has(key)));
   const resetHwFilter = () => {
+    selectAllHwTypes();
     if (overlayData) {
-      setBestPerSku(false, { applySelection: false });
-      setUnifiedOverlaySelection(new Set(hwTypesWithData), activeOverlayHwTypes);
-    } else {
-      selectAllHwTypes();
+      setUnifiedOverlaySelection(
+        new Set(hwTypesWithData),
+        new Set([...activeOverlayHwTypes, ...overlayHwInScope]),
+      );
     }
     track('inference_power_timeline_filter_reset');
   };

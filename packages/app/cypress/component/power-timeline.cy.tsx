@@ -600,6 +600,30 @@ describe('PowerTimeline', () => {
       cy.get('@selectAllHwTypes').should('have.been.calledOnce');
     });
 
+    it('restores hidden overlay hardware and the page selection on Reset filter', () => {
+      const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+      cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+        body: overlayResponse([series('h200', 16, 500)]),
+      }).as('overlay');
+      mountTimeline([measuredPoint('b200', 16, 700)], {
+        overlay: overlayData([overlayPoint]),
+        unofficial: { ...overlayRun('h200'), activeOverlayHwTypes: new Set<string>() },
+      });
+      cy.wait('@official');
+      cy.get('[data-testid="chart-legend"]').contains('button', 'Reset filter').click();
+      cy.get('@selectAllHwTypes').should('have.been.calledOnce');
+      cy.get('@setUnifiedOverlaySelection').should('have.been.calledOnce');
+      cy.get('@setUnifiedOverlaySelection').then((stub) => {
+        const [official, overlay] = (stub as unknown as sinon.SinonStub).firstCall.args as [
+          Set<string>,
+          Set<string>,
+        ];
+        expect([...official]).to.include('b200');
+        expect([...overlay]).to.deep.equal(['h200']);
+      });
+    });
+
     it('leaves the legend header without actions when every hardware type is shown', () => {
       cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('series');
       mountTimeline([measuredPoint('b200', 16, 700)]);
