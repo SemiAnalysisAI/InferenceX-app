@@ -65,7 +65,13 @@ Pageviews are manual. `PageViewTracker` records one per Next pathname or search 
 
 `inference_chart_rendered` fires once per navigation when the first chart has data points. `ms_since_navigation` counts from the latest navigation start (`lib/analytics/navigation-timing.ts`: document load, or the pathname change for soft navigations) and `soft_navigation` tells the two apart. Every pageview carries and registers `route_template` (for example `/inference/[model]`, shared by `/zh`) and `locale`, so pageviews and web vitals group by template. Add new dynamic routes to `lib/analytics/route-template.ts`.
 
-A delegated click listener sends `outbound_link_clicked` (`host`, `path`, `is_newsletter`, `is_semianalysis`) for links to other hosts. 404 pages send `not_found_page_shown`. Search events send `query_length` and result counts, never the typed text.
+A delegated click listener sends `outbound_link_clicked` (`host`, `path`, `is_newsletter`, `is_semianalysis`, `placement`) for links to other hosts. `placement` comes from the nearest `data-analytics-placement` ancestor. Use `analyticsPlacement()` from `lib/analytics/placement.ts` to set it. The header, mobile menu, footer, landing hero and sections, blog article body, glossary, compare and chips pages carry one. In-app CTA events read the same attribute through `placementFor(event.currentTarget)`. 404 pages send `not_found_page_shown`. Search events send `query_length` and result counts, never the typed text.
+
+Mount-time events use `trackOncePerPageview` (once per page view, so remounts and StrictMode don't double count) or `trackOncePerSession` (sessionStorage). A failed React Query request sends `data_query_failed` (`endpoint`, `status`, `query_key`, `route_template`) once per query key per page view. Queries that throw to an error boundary are reported by `error_page_shown` instead.
+
+Use the shared hooks instead of hand-rolled effects. `useSearchTracking` sends `<section>_searched` with `query_length` after typing pauses. `useDialogCloseTracking` sends `<section>_closed` with `duration_ms` whenever a tracked dialog, drawer or popover closes. Chart export, CSV, MP4 and zoom-reset events from `ChartButtons` send `chart` plus the dashboard selection. Pass `analyticsContext={selectionAnalyticsContext(...)}` (`model`, `sequence`, `precision`, `gpu_count`). `inference_*_selected` events spread `useInferenceAnalyticsContext()`.
+
+Property keys are snake_case with one name per concept. Use `gpu` (or `gpus` for a list), `gpu_count`, `metric`, `sort_key` + `sort_dir`, `file_name`, `query_length`, and `enabled` for boolean toggle state. `lib/analytics/event-property-keys.test.ts` rejects camelCase and legacy keys (`hw`, `hwKey`, `expanded`, …) in tracking calls. Server events (`trackServer`/`captureServer`) always send `$process_person_profile: false` and should pass `route_template` when the route is known.
 
 ## Server-Side Caching
 
