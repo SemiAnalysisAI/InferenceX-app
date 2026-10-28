@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { CoreMemoryProfilesLazy } from '@/components/ubenchx/CoreMemoryProfilesLazy';
+import { CoreMemoryProfilesContent } from '@/components/ubenchx/CoreMemoryProfilesContent';
 import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
@@ -29,7 +29,7 @@ export default function UbenchxCoreMemoryProfilesPageZh() {
       <div className="container mx-auto px-4 pb-8 lg:px-8">
         <div className="space-y-8">
           <UbenchxHub current="core-memory-profiles" />
-          <CoreMemoryProfilesLazy />
+          <CoreMemoryProfilesContent />
         </div>
       </div>
     </main>
