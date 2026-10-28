@@ -154,6 +154,7 @@ describe('precomputed PowerX series', () => {
   });
 
   it('returns null for runs without stored telemetry', async () => {
-    expect(await getPrecomputedPowerSeries(sql, 1)).toBeNull();
+    await db.exec('DELETE FROM gpu_metric_series');
+    expect(await getPrecomputedPowerSeries(sql, RUN)).toBeNull();
   });
 });

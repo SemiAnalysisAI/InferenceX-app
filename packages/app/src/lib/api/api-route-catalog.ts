@@ -1300,7 +1300,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/gpu-power-series.ts',
-    sourceSha256: '300c43562f19c3f54f18b28ed4616ef08539d33ddae16101fd88539a90661321',
+    sourceSha256: '9054bc94179937e9c2cf3c9f0692f5a7ddfb053237a118dbf22d8e6fff5442dc',
     reviewArea: {
       en: 'Precomputed PowerX timeline series: per-artifact rows keyed by series identity, linked point audits and transform version; any mismatch or incomplete artifact falls back to the stored samples.',
       zh: '预计算 PowerX 时间线序列：按产物存储，键值包含序列身份、关联数据点的功耗审计和转换版本；任一不匹配或产物不完整时回退到已存样本。',

@@ -11,9 +11,7 @@ export {
   bucketPowerSeries,
   bucketTimeMs,
   meanPowerAt,
-  parseTelemetryTimestampUtc,
   sumPowerAt,
-  type GpuPowerDevice,
   type GpuPowerRole,
   type GpuPowerSeries,
 } from '@semianalysisai/inferencex-db/power-series/power-series';

@@ -54,7 +54,7 @@ export interface MaterializePowerSeriesResult {
 }
 
 /** Hash of everything `storedPowerSeries` reads for one artifact besides the samples themselves. */
-export function powerSeriesInputKey(rows: readonly RawSeriesRow[]): string {
+function powerSeriesInputKey(rows: readonly RawSeriesRow[]): string {
   const parts = [...rows]
     .sort((a, b) => Number(a.id) - Number(b.id))
     .map((row) => [seriesVersionKey(row), row.power_audits ?? []]);

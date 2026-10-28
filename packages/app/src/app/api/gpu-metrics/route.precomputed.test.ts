@@ -74,16 +74,12 @@ function stored(name: string, power = 100): GpuMetricSeries {
   };
 }
 
-function request(body: unknown, prefix = 'dsr1_', raw = false): NextRequest {
-  const params = new URLSearchParams({
-    runId: RUN_ID,
-    series: 'power',
-    prefix,
-  });
+function request(body: unknown): NextRequest {
+  const params = new URLSearchParams({ runId: RUN_ID, series: 'power', prefix: 'dsr1_' });
   return new NextRequest(`http://localhost/api/gpu-metrics?${params}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: raw ? String(body) : JSON.stringify(body),
+    body: JSON.stringify(body),
   });
 }
 
