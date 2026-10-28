@@ -297,6 +297,21 @@ describe('buildInferenceSeries', () => {
     expect(result.tableRows).toMatchObject([{ id: row.id, x: null, y: null }]);
   });
 
+  it('plots unofficial overlay rows at their run-reported normalized interactivity', () => {
+    const row = makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: metrics({ p75_e2e_norm_intvty: 40, p90_e2e_norm_intvty: 30 }),
+    });
+    Reflect.deleteProperty(row, 'id');
+    const result = buildInferenceSeries([row], {
+      ...BASE_OPTIONS,
+      sequence: Sequence.AgenticTraces,
+      xmode: 'e2e-normalized-interactivity',
+      derivedMetrics: {},
+    });
+    expect(result.series.flatMap((entry) => entry.points.map((point) => point.x))).toEqual([30]);
+  });
+
   it('assembles one series per hardware config with x-sorted points', () => {
     const result = buildInferenceSeries(fixtureRows(), BASE_OPTIONS);
 

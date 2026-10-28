@@ -6,25 +6,7 @@ import {
   partitionChartDataByLimits,
   processOverlayChartData,
   processOverlayChartDataWithClipping,
-  selectUnofficialOverlayForMode,
 } from '@/components/inference/utils';
-
-describe('selectUnofficialOverlayForMode', () => {
-  const overlays = { e2e: { id: 'e2e' }, interactivity: { id: 'interactivity' } };
-
-  it('suppresses raw unofficial E2E data for E2E Normalized Interactivity mode', () => {
-    expect(
-      selectUnofficialOverlayForMode('e2e-normalized-interactivity', 'e2e', overlays),
-    ).toBeNull();
-  });
-
-  it('preserves matching unofficial overlays for supported modes', () => {
-    expect(selectUnofficialOverlayForMode('e2e', 'e2e', overlays)).toBe(overlays.e2e);
-    expect(selectUnofficialOverlayForMode('interactivity', 'interactivity', overlays)).toBe(
-      overlays.interactivity,
-    );
-  });
-});
 
 describe('All in Measured table coverage', () => {
   it('retains GPU-valid overlay rows with missing all-in power without plotting a fallback', () => {
@@ -54,6 +36,36 @@ describe('All in Measured table coverage', () => {
     expect(result.tableData?.map((point) => [point.id, point.y])).toEqual([
       [1, 700],
       [2, NaN],
+    ]);
+  });
+});
+
+describe('unofficial overlays in E2E Normalized Interactivity mode', () => {
+  const rows = [
+    pt({ conc: 4, p90_e2el: 10, p75_e2e_norm_intvty: 40, p90_e2e_norm_intvty: 30 }),
+    pt({ conc: 8, p90_e2el: 20 }),
+  ];
+  const run = (
+    selectedXAxisMode: 'e2e' | 'e2e-normalized-interactivity',
+    selectedPercentile = 'p90',
+  ) =>
+    processOverlayChartDataWithClipping(rows, 'e2e', 'y_tpPerGpu', null, {
+      isAgentic: true,
+      selectedPercentile,
+      selectedXAxisMode,
+    });
+
+  it('plots the selected run-reported percentile and drops rows without one', () => {
+    expect(run('e2e-normalized-interactivity').data.map((p) => [p.conc, p.x])).toEqual([[4, 30]]);
+    expect(run('e2e-normalized-interactivity', 'p75').data.map((p) => [p.conc, p.x])).toEqual([
+      [4, 40],
+    ]);
+  });
+
+  it('keeps latency x values outside the normalized mode', () => {
+    expect(run('e2e').data.map((p) => [p.conc, p.x])).toEqual([
+      [4, 10],
+      [8, 20],
     ]);
   });
 });
