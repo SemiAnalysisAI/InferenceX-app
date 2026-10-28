@@ -35,6 +35,15 @@ Heading ID deduplication: if two headings share a slug, the second gets prefixed
 links in a caption are turned into real anchors by `renderCaption` in `mdx-components.tsx`;
 other markdown (bold, code) still renders literally.
 
+`<Figure>` images render through `next/image` (WebP, responsive `srcset`, fixed width and
+height) using the pixel sizes recorded in `src/lib/blog/figure-dimensions.json`. After adding or
+replacing a figure, run `bun run blog:figure-dimensions` from `packages/app` and commit the
+updated file. `figure-dimensions.test.ts` fails when a figure has no recorded size. Only the
+first figure on a page loads eagerly with high fetch priority; the rest are lazy.
+
+`HardwareChart` is loaded with `next/dynamic`, so pages that never render it do not download the
+dashboard bundle.
+
 ### Scheduled Publishing (`publishDate`)
 
 Posts without `publishDate` are hidden in production — this field is required for a post to be visible. If `publishDate` is set to a future date, the post is hidden until that date arrives. In development, all posts are visible regardless. This allows articles to be merged to `master` via PR and go live automatically when the date arrives. All downstream consumers (sitemap, RSS, llms.txt) automatically respect the filter since they call `getAllPosts()`. `getPostBySlug()` still returns the post regardless of `publishDate` (for direct URL preview).

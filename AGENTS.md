@@ -195,7 +195,7 @@ Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src
 
 ### Add a new blog post
 
-Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically.
+Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically. After adding or replacing `<Figure>` images, run `bun run blog:figure-dimensions` in `packages/app` and commit the updated `src/lib/blog/figure-dimensions.json`.
 
 ### Add a hardware results page
 

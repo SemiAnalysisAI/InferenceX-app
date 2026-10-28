@@ -21,6 +21,8 @@ describe('next.config custom routes', () => {
     ['/zh/datasets', '/zh/agentx'],
     ['/xvideo', '/video'],
     ['/zh/xxvideo', '/zh/video'],
+    ['/ubenchx', '/ubenchx/mem-bw'],
+    ['/zh/ubenchx', '/zh/ubenchx/mem-bw'],
     ['/run/glm-5-2-on-b200', '/run/glm-5-3-on-b200'],
     ['/zh/run/glm-5-2-on-mi355x', '/zh/run/glm-5-3-on-mi355x'],
     ['/zh/rankings/cheapest-gpu-for-glm-5-2', '/zh/rankings/cheapest-gpu-for-glm-5-3'],
@@ -39,6 +41,35 @@ describe('next.config custom routes', () => {
     const response = await respond(from);
     expect(response.status).toBe(308);
     expect(getRedirectUrl(response)).toBe(`https://inferencex.semianalysis.com${to}`);
+  });
+
+  it.each([
+    '/images/post/figure.png',
+    '/brand/left-pattern-full.svg',
+    '/logos/nvidia.svg',
+    '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/cover.webp',
+    '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/pdf/summary.pdf',
+    '/favicon.ico',
+    '/og-image.png',
+  ])('lets browsers reuse %s for a day and revalidate in the background', async (path) => {
+    const response = await respond(path);
+    expect(response.headers.get('cache-control')).toBe(
+      'public, max-age=86400, stale-while-revalidate=604800',
+    );
+  });
+
+  it('leaves pages and API responses on their own cache headers', async () => {
+    for (const path of [
+      '/',
+      '/inference',
+      '/api/v1/availability',
+      '/whitepaper',
+      '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3',
+      '/zh/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3',
+    ]) {
+      const response = await respond(path);
+      expect(response.headers.get('cache-control')).toBeNull();
+    }
   });
 
   it.each([

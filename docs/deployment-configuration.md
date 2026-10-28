@@ -26,7 +26,10 @@ scripts.
 | `BLOB_CACHE_PREFIX`, `BLOB_READ_WRITE_TOKEN`          | optional                                                                                            | Vercel Blob storage. The blob response cache runs only when both are set. A full invalidation deletes every blob under the prefix, so deployments that share a Blob store need distinct prefixes. H3 video storage needs only `BLOB_READ_WRITE_TOKEN`. Both features turn themselves off when their variables are unset. |
 | `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST` | optional                                                                                            | PostHog project key and host for browser analytics and server-side events. Without the key, analytics is off. Without the host, `https://us.i.posthog.com` is used. Both are inlined at build time (see [Vercel project](#vercel-project)).                                                                              |
 | `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID`      | optional, at build time, set together                                                               | Production builds upload source maps to PostHog only when both are set.                                                                                                                                                                                                                                                  |
-| `GITHUB_TOKEN`                                        | yes, for GitHub-backed features                                                                     | Reads Actions runs and artifacts. Without it, `/api/unofficial-run`, `/api/gpu-metrics` live telemetry, and `/api/v1/eval-samples-live` return 500, the CollectiveX ingest reads GitHub unauthenticated, and framework release and GitHub star requests go out unauthenticated.                                          |
+| `GITHUB_TOKEN`                                        | yes, for GitHub-backed features                                                                     | Reads Actions runs and artifacts. Without it, `/api/unofficial-run`, `/api/gpu-metrics` live telemetry, and `/api/v1/eval-samples-live` return 500, and framework release requests go out unauthenticated. The header and footer star count is fetched by the browser and never uses the token.                          |
+| `INFERENCEX_REQUEST_ANALYTICS`                        | optional                                                                                            | `0` turns off the proxy's server-side count of `inferencex-cli` and skill API requests. Counting runs only on Vercel production and preview deployments with `NEXT_PUBLIC_POSTHOG_KEY` set.                                                                                                                              |
+| `NEXT_PUBLIC_ROUTE_VIEW_TRANSITIONS`                  | optional, at build time                                                                             | `1` wraps page content in React `ViewTransition` for route transitions. Any other value leaves it off.                                                                                                                                                                                                                   |
+| `SERVER_LOG_MAX_FILE_BYTES`                           | optional, ingest and backfill scripts                                                               | Per-file cap on stored server log text (default 128 MiB). See [Data pipeline](./data-pipeline.md).                                                                                                                                                                                                                       |
 | `OPERATORX_SOURCE`                                    | optional                                                                                            | `database`, the behavior when unset, reads `DATABASE_OPERATORX_READONLY_URL`. `local` reads `OPERATORX_LOCAL_ARTIFACT_DIR` and works only in development. Any other value makes `/api/v1/operatorx/*` return 503.                                                                                                        |
 
 `GITHUB_TOKEN` must be able to read Actions runs and artifacts in every listed source
@@ -62,7 +65,15 @@ A copy of this repository should replace the owner in `.github/CODEOWNERS` with 
 
 The Vercel project's Root Directory is `packages/app`. Vercel reads `vercel.json` only
 from the Root Directory, so the project configuration lives in `packages/app/vercel.json`,
-and the repository root `.vercelignore` assumes that layout.
+and the repository root `.vercelignore` assumes that layout. It defines no cron jobs.
+
+`next.config.ts` sets the caching headers for files in `public/` (`/images`, `/brand`,
+`/logos`, `/decorative`, `/whitepaper`, favicons and `og-image.png`):
+`public, max-age=86400, stale-while-revalidate=604800`. File names there are reused across
+deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
+WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API routes,
+embed pages, legacy Inference power links, and compare share links with query state; its
+`config.matcher` must stay a static literal.
 
 `patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
 used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked

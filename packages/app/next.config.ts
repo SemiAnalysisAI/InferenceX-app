@@ -4,6 +4,19 @@ import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins'
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
+// Public files keep stable names across deploys, so they revalidate daily instead of being immutable.
+// Each source must match files only. `/whitepaper` and `/whitepaper/<slug>` are pages, while every
+// file in public/whitepaper sits in a per-paper folder, so that source requires two segments.
+const PUBLIC_ASSET_CACHE_CONTROL = 'public, max-age=86400, stale-while-revalidate=604800';
+const PUBLIC_ASSET_SOURCES = [
+  '/images/:path+',
+  '/brand/:path+',
+  '/logos/:path+',
+  '/decorative/:path+',
+  '/whitepaper/:paper/:file+',
+  String.raw`/:file(favicon\.ico|favicon-32\.webp|favicon-192\.webp|apple-touch-icon\.webp|og-image\.png|promo-poster\.webp)`,
+];
+
 const LOCALE_PREFIXES = ['', '/zh'] as const;
 
 const SEO_REDIRECTS = [
@@ -12,6 +25,7 @@ const SEO_REDIRECTS = [
   ...LOCALE_PREFIXES.flatMap((prefix) => [
     { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
     { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
+    { source: `${prefix}/ubenchx`, destination: `${prefix}/ubenchx/mem-bw` },
     { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
     {
       source: `${prefix}/rankings/fastest-gpu-for-glm-5-2`,
@@ -67,6 +81,10 @@ const nextConfig: NextConfig = {
   },
   headers() {
     return Promise.resolve([
+      ...PUBLIC_ASSET_SOURCES.map((source) => ({
+        source,
+        headers: [{ key: 'Cache-Control', value: PUBLIC_ASSET_CACHE_CONTROL }],
+      })),
       {
         source: '/:path((?!zh(?:/|$)).*)',
         headers: [{ key: 'Content-Language', value: 'en' }],
@@ -80,6 +98,8 @@ const nextConfig: NextConfig = {
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
+    formats: ['image/webp'],
+    minimumCacheTTL: 86400,
     qualities: [75, 100],
     remotePatterns: [
       { hostname: 'placehold.co' },

@@ -2,6 +2,7 @@
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
@@ -53,10 +54,7 @@ import {
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
-import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import PowerTimeline from '@/components/inference/ui/PowerTimeline';
-import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import { formatMetricValue } from '@/components/inference/utils/tooltipUtils';
 import {
   PowerXChartConfig,
@@ -142,11 +140,24 @@ import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
 import CustomPowers from './CustomPowers';
-import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
 
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 import { hasRoleTelemetry } from '../utils/power-chip-coverage';
+
+// Off by default (table view, GPU-over-time, power timeline and PowerX Where panels), so they
+// load on first use instead of shipping with every dashboard, compare page and blog chart.
+const chartViewSkeleton = () => <Skeleton className="h-[600px] w-full" />;
+const InferenceTable = dynamic(() => import('@/components/inference/ui/InferenceTable'), {
+  loading: chartViewSkeleton,
+});
+const GPUGraph = dynamic(() => import('./GPUGraph'), { loading: chartViewSkeleton });
+const PowerTimeline = dynamic(() => import('@/components/inference/ui/PowerTimeline'), {
+  loading: chartViewSkeleton,
+});
+const PowerAnalysisPanels = dynamic(() => import('@/components/inference/ui/PowerAnalysisPanels'), {
+  loading: chartViewSkeleton,
+});
 
 type InferenceViewMode = 'chart' | 'table';
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   type ReactNode,
@@ -25,6 +24,7 @@ import { localePath } from '@/lib/i18n/i18n';
 import { TAB_LABELS_ZH } from '@/lib/routing/tab-meta-zh';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Card } from '@/components/ui/card';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
@@ -179,7 +179,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
             className="relative flex items-center justify-evenly min-w-0"
           >
             {PRIMARY_TABS.map((route) => (
-              <Link
+              <IntentPrefetchLink
                 key={route.key}
                 href={tabHref(localePath(route.path, locale))}
                 data-testid={`tab-trigger-${route.key}`}
@@ -193,7 +193,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
                 )}
               >
                 {tabLabel(route)}
-              </Link>
+              </IntentPrefetchLink>
             ))}
             {indicator && (
               <span
@@ -258,7 +258,7 @@ function HiddenTabsPopover({
             const isActive = current === route.key;
             return (
               <li key={route.key}>
-                <Link
+                <IntentPrefetchLink
                   href={tabHref(route.path)}
                   data-testid={`tab-trigger-${route.key}`}
                   data-ph-capture-attribute-tab={route.key}
@@ -275,7 +275,7 @@ function HiddenTabsPopover({
                   )}
                 >
                   {tabLabel(route)}
-                </Link>
+                </IntentPrefetchLink>
               </li>
             );
           })}
@@ -339,7 +339,7 @@ function MobileTabStrip({
   const renderPill = (route: DashboardRoute) => {
     const active = current === route.key;
     return (
-      <Link
+      <IntentPrefetchLink
         key={route.key}
         href={tabHref(route.path)}
         aria-current={active ? 'page' : undefined}
@@ -361,7 +361,7 @@ function MobileTabStrip({
         )}
       >
         {tabLabel(route)}
-      </Link>
+      </IntentPrefetchLink>
     );
   };
 
