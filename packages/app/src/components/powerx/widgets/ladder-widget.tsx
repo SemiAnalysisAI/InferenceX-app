@@ -14,6 +14,7 @@ import {
   ladderLabel,
 } from '@/lib/powerx/ladder';
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
+import { cn } from '@/lib/shared/utils';
 
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
@@ -89,6 +90,7 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
   const ladder = useMemo(() => buildLadder(hardware, gpuWatts), [hardware, gpuWatts]);
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
+  const loading = view.status === 'loading';
 
   return (
     <WidgetFrame name="ladder" alt={alt}>
@@ -107,23 +109,35 @@ export function LadderWidget({ locale, alt }: WidgetProps) {
             title: t.chipTitles[key],
           }))}
         />
-        <p
-          className="font-mono text-xs text-muted-foreground"
-          title={point ? t.measuredTitle : t.exampleTitle}
-          data-testid="powerx-ladder-source"
-        >
-          {view.status === 'loading'
-            ? t.loading
-            : point
-              ? t.measured(point.x, point.concurrency, point.date)
-              : t.example}
+        {/* The hidden widest readout holds the box, so the measured text lands without a shift. */}
+        <p className="grid font-mono text-xs text-muted-foreground">
+          <span aria-hidden className="invisible [grid-area:1/1]">
+            {t.measured(888, 888, '0000-00-00')}
+          </span>
+          <span
+            className="[grid-area:1/1]"
+            title={point ? t.measuredTitle : t.exampleTitle}
+            data-testid="powerx-ladder-source"
+          >
+            {loading
+              ? t.loading
+              : point
+                ? t.measured(point.x, point.concurrency, point.date)
+                : t.example}
+          </span>
         </p>
       </div>
-      <div className="mt-5 min-h-28">
-        {view.status !== 'loading' && ladder && (
-          <PowerLadder ladder={ladder} color={color} locale={locale} build />
-        )}
-      </div>
+      {/* While the point loads, the example ladder holds the measured ladder's space unseen. */}
+      {ladder && (
+        <PowerLadder
+          key={loading ? 'placeholder' : 'measured'}
+          ladder={ladder}
+          color={color}
+          locale={locale}
+          build={!loading}
+          className={cn('mt-5', loading && 'invisible')}
+        />
+      )}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
         <p
           className="max-w-[64ch] text-sm leading-6 text-muted-foreground"

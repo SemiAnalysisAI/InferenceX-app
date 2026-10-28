@@ -2548,6 +2548,44 @@
       "duration": 4000
     },
     {
+      "spec": "cypress/component/powerx-tutorial-layout.cy.tsx",
+      "duration": 6900,
+      "tests": [
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "keeps every widget box in place while the views API loads"
+          ],
+          "duration": 4761,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "reserves the same box for any GPU draw, at most one label row taller than drawn"
+          ],
+          "duration": 1630,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "holds the flow diagram and caption still while hovering at 390px"
+          ],
+          "duration": 189,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "holds the flow diagram and caption still while hovering at 1280px"
+          ],
+          "duration": 188,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/profit-estimator-chart.cy.tsx",
       "duration": 2333,
       "tests": [

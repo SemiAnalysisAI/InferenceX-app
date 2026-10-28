@@ -1,9 +1,17 @@
 'use client';
 
+import { type CSSProperties, useMemo } from 'react';
+
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
-import { type Ladder, type StaggerLabel, staggerLabels } from '@/lib/powerx/ladder';
+import {
+  buildLadder,
+  type Ladder,
+  type LadderHardware,
+  type StaggerLabel,
+  staggerLabels,
+} from '@/lib/powerx/ladder';
 import { cn } from '@/lib/shared/utils';
 import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
@@ -141,6 +149,89 @@ function ladderLabels(
   return { top, bottom, gpuText, px, xOf };
 }
 
+/**
+ * Container widths the label rows snap to. A band lays its rows out at its lower edge, so the
+ * ladder is one height across the band and container queries can reserve that height before the
+ * width is measured: in the server render, while the point loads, and on the first client frame.
+ */
+const BANDS = [
+  { min: 240, reserve: 'min-h-(--ladder-band-0)' },
+  { min: 448, reserve: '@min-[448px]:min-h-(--ladder-band-1)' },
+  { min: 576, reserve: '@min-[576px]:min-h-(--ladder-band-2)' },
+  { min: 896, reserve: '@min-[896px]:min-h-(--ladder-band-3)' },
+] as const;
+const RESERVE = BANDS.map((band) => band.reserve).join(' ');
+
+/**
+ * Label rows, bar position and height for a ladder `width` px wide. Rows and the GPU label's
+ * placement come from the final numbers so labels never hop mid-ease.
+ */
+function ladderLayout(ladder: Ladder, locale: Locale, width: number, compact: boolean) {
+  const t = STRINGS[locale];
+  const bandWidth = BANDS.findLast((band) => width >= band.min)?.min ?? BANDS[0].min;
+  const scaleMax = Math.max(ladder.facilityWatts, ladder.allInWatts) * 1.03;
+  const px = (bandWidth - 2 * PAD) / scaleMax;
+  const gpuInline = ladder.gpuWatts * px >= textWidth(t.gpu(formatWatts(ladder.gpuWatts))) + 24;
+  const labels = ladderLabels(
+    t,
+    '',
+    bandWidth,
+    {
+      gpu: ladder.gpuWatts,
+      it: ladder.itWatts,
+      facility: ladder.facilityWatts,
+      tdp: ladder.tdpWatts,
+      allIn: ladder.allInWatts,
+      board: ladder.board?.watts ?? null,
+      scaleMax,
+    },
+    ladder.pue,
+    gpuInline,
+  );
+  const topRows = staggerLabels(labels.top);
+  const bottomRows = staggerLabels(labels.bottom);
+  const topRowCount = Math.max(0, ...topRows.values()) + 1;
+  const bottomRowCount = Math.max(0, ...bottomRows.values()) + 1;
+  const barH = compact ? 26 : 34;
+  // The board bracket sits between the top labels and the bar.
+  const barY = topRowCount * ROW + (ladder.board ? 9 : 4);
+  const tickY = barY + barH;
+  return {
+    gpuInline,
+    topRows,
+    bottomRows,
+    barH,
+    barY,
+    tickY,
+    height: tickY + 10 + bottomRowCount * ROW + 2,
+  };
+}
+
+/** GPU draws the reserve covers, as fractions of TDP: where measured serving points sit. */
+const RESERVE_DRAWS = Array.from({ length: 16 }, (_, index) => 0.3 + index * 0.05);
+
+/**
+ * Each band's tallest height across the GPU draws a point can take, as the custom properties the
+ * reserve classes read. Label rows shift with the numbers, so the reserve follows the hardware
+ * rather than the point: the loading placeholder and the measured ladder hold the same box.
+ */
+function bandHeights(
+  hardware: LadderHardware,
+  tdpWatts: number,
+  locale: Locale,
+  compact: boolean,
+): CSSProperties {
+  const ladders = RESERVE_DRAWS.map((draw) => buildLadder(hardware, tdpWatts * draw)).filter(
+    (ladder) => ladder !== null,
+  );
+  return Object.fromEntries(
+    BANDS.map((band, index) => [
+      `--ladder-band-${index}`,
+      `${Math.max(...ladders.map((ladder) => ladderLayout(ladder, locale, band.min, compact).height))}px`,
+    ]),
+  );
+}
+
 export interface PowerLadderProps {
   ladder: Ladder;
   color: string;
@@ -209,35 +300,16 @@ export function PowerLadder({
     facility: extension,
   };
 
-  const barH = compact ? 26 : 34;
-  // Rows and the GPU label's placement come from the final numbers so labels never hop mid-ease.
-  const finalPx = (width - 2 * PAD) / targets.scaleMax;
-  const gpuInline =
-    ladder.gpuWatts * finalPx >= textWidth(t.gpu(formatWatts(ladder.gpuWatts))) + 24;
-  const final = ladderLabels(
-    t,
-    titles.gpu,
-    width,
-    {
-      gpu: ladder.gpuWatts,
-      it: ladder.itWatts,
-      facility: ladder.facilityWatts,
-      tdp: ladder.tdpWatts,
-      allIn: ladder.allInWatts,
-      board: ladder.board?.watts ?? null,
-      scaleMax: targets.scaleMax,
-    },
-    ladder.pue,
-    gpuInline,
+  const reserve = useMemo(
+    () => bandHeights(ladder.hardware, ladder.tdpWatts, locale, compact),
+    [ladder.hardware, ladder.tdpWatts, locale, compact],
   );
-  const topRows = staggerLabels(final.top);
-  const bottomRows = staggerLabels(final.bottom);
-  const topRowCount = Math.max(0, ...topRows.values()) + 1;
-  const bottomRowCount = Math.max(0, ...bottomRows.values()) + 1;
-  // The board bracket sits between the top labels and the bar.
-  const barY = topRowCount * ROW + (ladder.board ? 9 : 4);
-  const tickY = barY + barH;
-  const height = tickY + 10 + bottomRowCount * ROW + 2;
+  const { gpuInline, topRows, bottomRows, barH, barY, tickY, height } = ladderLayout(
+    ladder,
+    locale,
+    width,
+    compact,
+  );
 
   const live = ladderLabels(
     t,
@@ -270,161 +342,166 @@ export function PowerLadder({
   const boardEnd = xOf(boardShown) - GAP;
 
   return (
-    <div ref={setContainerRef} className={cn('min-w-0', className)}>
-      <svg
-        ref={buildRef}
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={t.summary(
-          formatWatts(ladder.gpuWatts),
-          formatWatts(ladder.itWatts),
-          formatWatts(ladder.facilityWatts),
-        )}
-        className="block overflow-visible select-none"
-        fontSize={CHART_TYPE.axisLabel}
-        fill="var(--muted-foreground)"
-      >
-        {live.top.map((label) => (
-          <text
-            key={label.key}
-            x={label.x}
-            y={(topRows.get(label.key) ?? 0) * ROW + 11}
-            textAnchor={label.anchor}
-            fill="var(--foreground)"
-            fontWeight={label.key === 'it' ? 600 : 500}
-            opacity={labelOpacity[label.key]}
-            className="tabular-nums"
-          >
-            <title>{label.title}</title>
-            {label.text}
-          </text>
-        ))}
-
-        {ladder.board && (
-          <path
-            data-board="bianca"
-            d={`M${PAD},${barY - 2} V${barY - 6} H${boardEnd} V${barY - 2}`}
-            fill="none"
-            stroke="var(--foreground)"
-            strokeWidth={1}
-            opacity={ticks}
-          >
-            <title>{t.boardTitle}</title>
-          </path>
-        )}
-
-        {/* PUE extension: the assumed multiplier from IT to facility. */}
-        <rect
-          x={itX + GAP}
-          y={barY}
-          width={Math.max(0, facilityX - itX - GAP)}
-          height={barH}
-          fill="none"
-          stroke={RATED}
-          strokeWidth={1}
-          strokeDasharray="4 3"
-        >
-          <title>{t.facilityTitle}</title>
-        </rect>
-
-        {segments.map((segment) => (
-          <g key={segment.category} data-segment={segment.category}>
-            <title>{`${names[segment.category]} · ${formatWatts(segment.watts)} W · ${t.share(segment.share)} — ${titles[segment.category]}`}</title>
-            {segment.kind === 'measured' ? (
-              <rect x={segment.x0} y={barY} width={segment.w} height={barH} fill={color} />
-            ) : (
-              <rect
-                x={segment.x0 + 0.625}
-                y={barY + 0.625}
-                width={Math.max(0, segment.w - 1.25)}
-                height={barH - 1.25}
-                fill={color}
-                fillOpacity={0.14}
-                stroke={color}
-                strokeWidth={1.25}
-              />
+    <div ref={setContainerRef} className={cn('@container min-w-0', className)}>
+      <div style={reserve} className={RESERVE}>
+        {dimensions.width > 0 && (
+          <svg
+            ref={buildRef}
+            width={width}
+            height={height}
+            viewBox={`0 0 ${width} ${height}`}
+            role="img"
+            aria-label={t.summary(
+              formatWatts(ladder.gpuWatts),
+              formatWatts(ladder.itWatts),
+              formatWatts(ladder.facilityWatts),
             )}
-          </g>
-        ))}
-        {gpuInline && (
-          <text
-            x={PAD + 8}
-            y={barY + barH / 2 + 4}
-            fill="var(--primary-foreground)"
-            fontWeight={600}
-            pointerEvents="none"
-            opacity={gpuLabel}
-            className="tabular-nums"
+            className="block overflow-visible select-none"
+            fontSize={CHART_TYPE.axisLabel}
+            fill="var(--muted-foreground)"
           >
-            {live.gpuText}
-          </text>
-        )}
+            {live.top.map((label) => (
+              <text
+                key={label.key}
+                x={label.x}
+                y={(topRows.get(label.key) ?? 0) * ROW + 11}
+                textAnchor={label.anchor}
+                fill="var(--foreground)"
+                fontWeight={label.key === 'it' ? 600 : 500}
+                opacity={labelOpacity[label.key]}
+                className="tabular-nums"
+              >
+                <title>{label.title}</title>
+                {label.text}
+              </text>
+            ))}
 
-        {/* IT boundary and the rated ticks. */}
-        <line
-          x1={itX}
-          x2={itX}
-          y1={barY - 3}
-          y2={tickY}
-          stroke="var(--foreground)"
-          strokeWidth={1.5}
-        />
-        {(['tdp', 'allIn'] as const).map((key) => {
-          const x = xOf(key === 'tdp' ? shown.tdp : shown.allIn);
-          return (
+            {ladder.board && (
+              <path
+                data-board="bianca"
+                d={`M${PAD},${barY - 2} V${barY - 6} H${boardEnd} V${barY - 2}`}
+                fill="none"
+                stroke="var(--foreground)"
+                strokeWidth={1}
+                opacity={ticks}
+              >
+                <title>{t.boardTitle}</title>
+              </path>
+            )}
+
+            {/* PUE extension: the assumed multiplier from IT to facility. */}
+            <rect
+              x={itX + GAP}
+              y={barY}
+              width={Math.max(0, facilityX - itX - GAP)}
+              height={barH}
+              fill="none"
+              stroke={RATED}
+              strokeWidth={1}
+              strokeDasharray="4 3"
+            >
+              <title>{t.facilityTitle}</title>
+            </rect>
+
+            {segments.map((segment) => (
+              <g key={segment.category} data-segment={segment.category}>
+                <title>{`${names[segment.category]} · ${formatWatts(segment.watts)} W · ${t.share(segment.share)} — ${titles[segment.category]}`}</title>
+                {segment.kind === 'measured' ? (
+                  <rect x={segment.x0} y={barY} width={segment.w} height={barH} fill={color} />
+                ) : (
+                  <rect
+                    x={segment.x0 + 0.625}
+                    y={barY + 0.625}
+                    width={Math.max(0, segment.w - 1.25)}
+                    height={barH - 1.25}
+                    fill={color}
+                    fillOpacity={0.14}
+                    stroke={color}
+                    strokeWidth={1.25}
+                  />
+                )}
+              </g>
+            ))}
+            {gpuInline && (
+              <text
+                x={PAD + 8}
+                y={barY + barH / 2 + 4}
+                fill="var(--primary-foreground)"
+                fontWeight={600}
+                pointerEvents="none"
+                opacity={gpuLabel}
+                className="tabular-nums"
+              >
+                {live.gpuText}
+              </text>
+            )}
+
+            {/* IT boundary and the rated ticks. */}
             <line
-              key={key}
-              x1={x}
-              x2={x}
-              y1={barY - 2}
+              x1={itX}
+              x2={itX}
+              y1={barY - 3}
+              y2={tickY}
+              stroke="var(--foreground)"
+              strokeWidth={1.5}
+            />
+            {(['tdp', 'allIn'] as const).map((key) => {
+              const x = xOf(key === 'tdp' ? shown.tdp : shown.allIn);
+              return (
+                <line
+                  key={key}
+                  x1={x}
+                  x2={x}
+                  y1={barY - 2}
+                  y2={tickY + 8}
+                  stroke={RATED}
+                  strokeWidth={1.25}
+                  strokeDasharray="3 2"
+                  opacity={ticks}
+                />
+              );
+            })}
+            <line
+              x1={facilityX}
+              x2={facilityX}
+              y1={tickY}
               y2={tickY + 8}
               stroke={RATED}
-              strokeWidth={1.25}
-              strokeDasharray="3 2"
-              opacity={ticks}
+              strokeWidth={1}
+              opacity={extension}
             />
-          );
-        })}
-        <line
-          x1={facilityX}
-          x2={facilityX}
-          y1={tickY}
-          y2={tickY + 8}
-          stroke={RATED}
-          strokeWidth={1}
-          opacity={extension}
-        />
 
-        {live.bottom.map((label) => (
-          <text
-            key={label.key}
-            x={label.x}
-            y={tickY + 10 + (bottomRows.get(label.key) ?? 0) * ROW + 9}
-            textAnchor={label.anchor}
-            opacity={labelOpacity[label.key]}
-            className="tabular-nums"
-          >
-            <title>{label.title}</title>
-            {label.text}
-          </text>
-        ))}
-      </svg>
+            {live.bottom.map((label) => (
+              <text
+                key={label.key}
+                x={label.x}
+                y={tickY + 10 + (bottomRows.get(label.key) ?? 0) * ROW + 9}
+                textAnchor={label.anchor}
+                opacity={labelOpacity[label.key]}
+                className="tabular-nums"
+              >
+                <title>{label.title}</title>
+                {label.text}
+              </text>
+            ))}
+          </svg>
+        )}
+      </div>
 
       {!compact && (
-        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+        <ul className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
           {segments.map((segment) => (
             <li
               key={segment.category}
               title={`${t.share(segment.share)} — ${titles[segment.category]}`}
-              className="flex items-center gap-1.5"
+              className="flex items-center gap-1.5 whitespace-nowrap"
             >
               <GrammarSwatch kind={segment.kind} color={color} />
               <span className={segment.kind === 'measured' ? 'text-foreground' : undefined}>
                 {names[segment.category]}
               </span>
-              <span className="font-mono tabular-nums">{formatWatts(segment.watts)} W</span>
+              {/* One text node, so the unit does not slide as the number counts up. */}
+              <span className="font-mono tabular-nums">{`${formatWatts(segment.watts)} W`}</span>
             </li>
           ))}
         </ul>
