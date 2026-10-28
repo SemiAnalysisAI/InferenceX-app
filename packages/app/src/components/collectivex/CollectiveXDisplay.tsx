@@ -1,7 +1,7 @@
 'use client';
 
 import { BookOpen, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
@@ -242,14 +242,14 @@ export default function CollectiveXDisplay() {
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
   const [suite, setSuite] = useState<CollectiveXSuite>('ep');
-  const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
-  const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
-  const runList = runsQuery.data?.runs ?? [];
+  // The page shows the latest run: the newest with a measured case, else the newest. It is
+  // derived from the current list, so a refresh or a removed run moves it without extra state.
   const orderedVisibleRunIds = useMemo(() => {
-    const liveRunIds = new Set(runList.map((run) => run.run_id));
-    return [...visibleRunIds].filter((runId) => liveRunIds.has(runId));
-  }, [runList, visibleRunIds]);
+    const runs = runsQuery.data?.runs ?? [];
+    const latest = runs.find((run) => run.measured_cases > 0) ?? runs[0];
+    return latest ? [latest.run_id] : [];
+  }, [runsQuery.data]);
   const runQueries = useCollectiveXRunDatasets(version, orderedVisibleRunIds);
   const datasets = useMemo(
     () => runQueries.flatMap((query) => (query.data ? [query.data] : [])),
@@ -302,28 +302,6 @@ export default function CollectiveXDisplay() {
     value,
     label: collectiveXVersionLabel(value),
   }));
-
-  useEffect(() => {
-    initializedVersionRef.current = null;
-    setVisibleRunIds(new Set());
-  }, [version]);
-
-  useEffect(() => {
-    if (!runsQuery.data || initializedVersionRef.current === version) return;
-    const initial =
-      runsQuery.data.runs.find((run) => run.measured_cases > 0) ?? runsQuery.data.runs[0];
-    setVisibleRunIds(initial ? new Set([initial.run_id]) : new Set());
-    initializedVersionRef.current = version;
-  }, [runsQuery.data, version]);
-
-  useEffect(() => {
-    if (!runsQuery.data || initializedVersionRef.current !== version) return;
-    const liveIds = new Set(runsQuery.data.runs.map((run) => run.run_id));
-    setVisibleRunIds((previous) => {
-      const next = new Set([...previous].filter((runId) => liveIds.has(runId)));
-      return next.size === previous.size ? previous : next;
-    });
-  }, [runsQuery.data, version]);
 
   const availableEpSizes = useMemo(
     () => [...new Set(combinedSeries.map((item) => item.system.ep_size))].toSorted((a, b) => a - b),
@@ -636,12 +614,12 @@ export default function CollectiveXDisplay() {
         )}
       </Card>
 
-      {visibleRunIds.size === 0 && (
+      {orderedVisibleRunIds.length === 0 && (
         <Card data-testid="collectivex-no-runs-selected" className="py-6 text-center">
           <p className="text-sm text-muted-foreground">{t.selectRuns}</p>
         </Card>
       )}
-      {visibleRunIds.size > 0 && datasets.length === 0 && loadingRunIds.size > 0 && (
+      {orderedVisibleRunIds.length > 0 && datasets.length === 0 && loadingRunIds.size > 0 && (
         <Card
           data-testid="collectivex-selected-runs-loading"
           className="min-h-40 items-center justify-center"
