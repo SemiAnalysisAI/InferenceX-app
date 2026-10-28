@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api/api';
 import { buildShareUrl } from '@/lib/routing/url-state';
@@ -105,6 +106,7 @@ export default function EvalSamplesDrawer({
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   useSearchTracking('evaluation_samples_searched', search);
+  useDialogCloseTracking(open, 'evaluation_samples_closed');
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [requestedDocId, setRequestedDocId] = useState<number | null>(initialDocId);
   const [copiedTarget, setCopiedTarget] = useState<number | 'drawer' | null>(null);

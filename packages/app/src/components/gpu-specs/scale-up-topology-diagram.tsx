@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isUnofficialHostname } from '@/lib/runtime/unofficial-domain';
 
 import {
@@ -75,6 +76,7 @@ export const ScaleUpTopologyDiagram = forwardRef<
   const t = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
+  useDialogCloseTracking(open, 'gpu_specs_scaleup_topology_closed', { gpu: spec.name });
   const displayedIndexRef = useRef(0);
   displayedIndexRef.current = displayedIndex;
 

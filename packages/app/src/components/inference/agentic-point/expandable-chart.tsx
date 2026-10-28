@@ -5,6 +5,7 @@ import { Maximize2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 export function ExpandableChart({
@@ -19,6 +20,7 @@ export function ExpandableChart({
   testId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'agentic_chart_closed', { title });
   const locale = useLocale();
 
   return (
