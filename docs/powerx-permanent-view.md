@@ -82,6 +82,12 @@ chrome as `/inference`, so the two tabs read as one dashboard. Nothing in the da
 changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
 `?unofficialrun=` overlays and the views API are untouched.
 
+PowerX sits behind the ↑↑↓↓ feature gate: `/powerx` is a `feature-gated` route, so it is
+listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
+PowerX view on the same condition. Direct and shared links (`/powerx`, `/zh/powerx`,
+`?view=power`) still open for locked visitors, and the read-only API is unchanged; the gate
+controls discovery, not data access.
+
 - Header card (`DashboardSectionHeader` + `ChartControls`, as on `/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
   draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +

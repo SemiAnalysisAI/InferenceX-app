@@ -240,6 +240,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-feedback"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
+    cy.get('[data-testid="tab-trigger-powerx"]').should('not.exist');
   });
 
   it('shows every primary chart as a one-tap mobile pill with the current one marked', () => {
@@ -260,6 +261,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
       .should('have.attr', 'aria-current', 'page')
       .and('have.attr', 'href', '/evaluation');
     cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
+    cy.get('[data-testid="mobile-tab-powerx"]').should('not.exist');
     cy.get('[data-testid="mobile-tab-evaluation"]').should(($pill) => {
       const bounds = $pill[0]!.getBoundingClientRect();
       expect(bounds.height, 'mobile touch target').to.be.at.least(40);
@@ -289,6 +291,9 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/collectivex');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
+    cy.get('[data-testid="tab-hidden-popover"]')
+      .find('[data-testid="tab-trigger-powerx"]')
+      .should('have.attr', 'href', '/powerx');
     cy.get('[data-testid="tab-hidden-popover"]')
       .find('[data-testid="tab-trigger-submissions"]')
       .should('not.exist');
