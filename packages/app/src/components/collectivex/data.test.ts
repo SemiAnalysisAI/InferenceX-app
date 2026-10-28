@@ -23,6 +23,8 @@ import {
   type CollectiveXKvRunCase,
   collectiveXKvCell,
   collectiveXKvPageValues,
+  collectiveXRangeBands,
+  collectiveXRangeColorKey,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
@@ -312,6 +314,93 @@ describe('chartPoints', () => {
   it('keeps roundtrip token-rate points', () => {
     const points = chartPoints([scaleUp], 'roundtrip', 'p50', 'tokens-per-second');
     expect(points).toHaveLength(scaleUp.points.length);
+  });
+});
+
+describe('collectiveXRangeBands', () => {
+  // Same SKU and EP size, three libraries at scaled latencies, plus another EP size.
+  const scaled = (backend: string, factor: number, tokens?: number[]) => {
+    const base = collectiveXSeriesForRun([scaleUp], '7')[0];
+    return {
+      ...base,
+      series_id: `7:${backend}`,
+      backend,
+      points: base.points
+        .filter((point) => !tokens || tokens.includes(point.tokens_per_rank))
+        .map((point) => ({
+          ...point,
+          components: {
+            ...point.components,
+            dispatch: point.components.dispatch && {
+              ...point.components.dispatch,
+              latency_us: {
+                ...point.components.dispatch.latency_us,
+                p50: (point.components.dispatch.latency_us.p50 ?? 0) * factor,
+              },
+            },
+          },
+        })),
+    };
+  };
+  const first = scaleUp.points[0].tokens_per_rank;
+  const base = scaleUp.points[0].components.dispatch!.latency_us.p50!;
+
+  it('spans the lowest to the highest library with the median as its line', () => {
+    const bands = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 2), scaled('c', 4)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(bands).toHaveLength(1);
+    expect(bands[0].colorKey).toBe(collectiveXRangeColorKey(scaleUp));
+    expect(bands[0].label).toBe('H200 · EP8');
+    const point = bands[0].points[0];
+    expect(point.x).toBe(first);
+    expect([point.lo, point.mid, point.hi]).toEqual([base, base * 2, base * 4]);
+    expect(point.members.map((member) => member.label)).toEqual([
+      'a · normal',
+      'b · normal',
+      'c · normal',
+    ]);
+  });
+
+  it('averages the middle two for an even count and orders rates best-first', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].mid).toBe(base * 2);
+    const [rate] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'roundtrip',
+      'p50',
+      'tokens-per-second',
+    );
+    const ys = rate.points[0].members.map((member) => member.y);
+    expect(ys).toEqual(ys.toSorted((a, b) => b - a));
+  });
+
+  it('covers every token count any library measured', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1, [first]), scaled('b', 2)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points).toHaveLength(scaleUp.points.length);
+    expect(band.points[0].members).toHaveLength(2);
+    expect(band.points.at(-1)!.members).toHaveLength(1);
+    const last = band.points.at(-1)!;
+    expect(last.lo).toBe(last.hi);
+  });
+
+  it('keeps SKUs and EP sizes apart', () => {
+    const other = collectiveXSeriesForRun([scaleOut], '7')[0];
+    const bands = collectiveXRangeBands([scaled('a', 1), other], 'dispatch', 'p50', 'latency');
+    expect(bands.map((band) => band.label)).toEqual(['H200 · EP8', 'MI355X · EP16']);
   });
 });
 

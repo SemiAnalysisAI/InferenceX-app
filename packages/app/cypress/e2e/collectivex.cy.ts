@@ -165,6 +165,32 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'Payload rate is derived');
   });
 
+  it('shows one range band per SKU across libraries while Backend is All', () => {
+    cy.get('[data-testid="collectivex-view-toggle"] [role="tab"][aria-selected="true"]').should(
+      'have.text',
+      'Series',
+    );
+    cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
+    cy.get('[data-testid="collectivex-view-toggle"]')
+      .contains('[role="tab"]', 'Range by SKU')
+      .click();
+    cy.get('[data-testid="collectivex-explorer-chart"] [data-testid="collectivex-range-band"]')
+      .should('have.length', 1)
+      .and('have.attr', 'd');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-range-note"]').should('be.visible');
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', 'Range across libraries')
+      .and('contain.text', 'Median')
+      .and('contain.text', '1 library at this point');
+
+    cy.get('[data-testid="collectivex-backend-select"]').click();
+    cy.get('[role="option"]').not(':contains("All")').first().click();
+    cy.get('[data-testid="collectivex-view-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
+  });
+
   it('selects normal and low-latency kernel modes by default', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],

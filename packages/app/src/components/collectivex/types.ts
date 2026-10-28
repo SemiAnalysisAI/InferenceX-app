@@ -44,6 +44,12 @@ export interface CollectiveXChartPoint {
   x: number;
   y: number;
   point: CollectiveXPoint;
+  /** Set on a SKU-range median point: the band's extent and every contributing series. */
+  range?: {
+    lo: number;
+    hi: number;
+    members: { label: string; y: number }[];
+  };
 }
 
 export type CollectiveXRunSeries = CollectiveXSeries & {

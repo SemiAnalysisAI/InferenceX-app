@@ -215,6 +215,106 @@ export function chartPoints(
   );
 }
 
+/** One library-and-mode value inside a SKU range at one token count. */
+export interface CollectiveXRangeMember {
+  seriesId: string;
+  label: string;
+  y: number;
+  point: CollectiveXPoint;
+}
+
+/** A SKU range at one token count: the lowest, median and highest value across its series. */
+export interface CollectiveXRangePoint {
+  x: number;
+  lo: number;
+  mid: number;
+  hi: number;
+  /** Every contributing series, best first for the y-axis (lowest latency, highest rate). */
+  members: CollectiveXRangeMember[];
+}
+
+/** Every library and selected mode of one SKU, EP size and run, combined into one band. */
+export interface CollectiveXRangeBand {
+  id: string;
+  label: string;
+  colorKey: string;
+  runIndex: number;
+  points: CollectiveXRangePoint[];
+}
+
+export function collectiveXRangeColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
+  return `${series.system.vendor}_${normalizeCollectiveXSku(series.system.sku)}_ep${series.system.ep_size}_range`;
+}
+
+function rangeMemberLabel(series: CollectiveXSeries, locale: Locale): string {
+  const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
+  return `${series.backend} · ${mode}`;
+}
+
+/**
+ * Combine the given series into one band per (run, SKU, EP size): at each token count with any
+ * value, the band spans the lowest to the highest value across every library and mode, and its
+ * line is their median. A token count only one series measured is a point band (lo = mid = hi).
+ */
+export function collectiveXRangeBands(
+  series: readonly CollectiveXRunSeries[],
+  operation: CollectiveXOperation,
+  percentile: CollectiveXPercentile,
+  yAxis: CollectiveXYAxis,
+  locale: Locale = 'en',
+): CollectiveXRangeBand[] {
+  const higherIsBetter = yAxis !== 'latency';
+  const bands = new Map<
+    string,
+    { band: Omit<CollectiveXRangeBand, 'points'>; byX: Map<number, CollectiveXRangeMember[]> }
+  >();
+  for (const item of series) {
+    const id = `${item.run_id}:${collectiveXRangeColorKey(item)}`;
+    let entry = bands.get(id);
+    if (!entry) {
+      const runPrefix = item.run_index > 0 ? `#${item.run_id} · ` : '';
+      entry = {
+        band: {
+          id,
+          label: `${runPrefix}${collectiveXSkuLabel(item.system.sku)} · EP${item.system.ep_size}`,
+          colorKey: collectiveXRangeColorKey(item),
+          runIndex: item.run_index,
+        },
+        byX: new Map(),
+      };
+      bands.set(id, entry);
+    }
+    for (const point of item.points) {
+      const x = point.tokens_per_rank;
+      const y = metricValue(point, operation, percentile, yAxis);
+      if (!Number.isFinite(x) || x <= 0 || y === null || y <= 0 || !Number.isFinite(y)) continue;
+      const members = entry.byX.get(x) ?? [];
+      members.push({ seriesId: item.series_id, label: rangeMemberLabel(item, locale), y, point });
+      entry.byX.set(x, members);
+    }
+  }
+  return [...bands.values()]
+    .map(({ band, byX }) => ({
+      ...band,
+      points: [...byX]
+        .map(([x, members]) => {
+          const ys = members.map((member) => member.y).toSorted((a, b) => a - b);
+          const middle = Math.floor(ys.length / 2);
+          const mid = ys.length % 2 === 1 ? ys[middle] : (ys[middle - 1] + ys[middle]) / 2;
+          return {
+            x,
+            lo: ys[0],
+            mid,
+            hi: ys.at(-1)!,
+            members: members.toSorted((a, b) => (higherIsBetter ? b.y - a.y : a.y - b.y)),
+          };
+        })
+        .toSorted((a, b) => a.x - b.x),
+    }))
+    .filter((band) => band.points.length > 0)
+    .toSorted((a, b) => a.label.localeCompare(b.label));
+}
+
 export function collectiveXKvCell(
   rows: CollectiveXKvRow[],
   kind: CollectiveXKvRow['kind'],
