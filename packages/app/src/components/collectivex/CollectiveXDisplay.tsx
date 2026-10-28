@@ -545,17 +545,20 @@ export default function CollectiveXDisplay() {
       ),
     0,
   );
-  // EP is always offered; KV and swap_blocks only when the shown run carries them.
+  // Offer only the suites the shown run carries; EP leads and is the default. A run with no
+  // other suite still offers EP, so its empty state stays reachable.
+  const hasKv = datasets.some((dataset) => dataset.kv?.length);
+  const hasSwap = datasets.some((dataset) => dataset.swap_blocks?.length);
   const suiteOptions: SegmentedToggleOption<CollectiveXSuite>[] = [
-    { value: 'ep', label: 'EP' },
-    ...(datasets.some((dataset) => dataset.kv?.length)
-      ? [{ value: 'kv' as const, label: 'KV' }]
+    ...(combinedSeries.length > 0 || (!hasKv && !hasSwap)
+      ? [{ value: 'ep' as const, label: 'EP' }]
       : []),
-    ...(datasets.some((dataset) => dataset.swap_blocks?.length)
-      ? [{ value: 'swap' as const, label: 'swap_blocks' }]
-      : []),
+    ...(hasKv ? [{ value: 'kv' as const, label: 'KV' }] : []),
+    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks' }] : []),
   ];
-  const shownSuite = suiteOptions.some((option) => option.value === suite) ? suite : 'ep';
+  const shownSuite = suiteOptions.some((option) => option.value === suite)
+    ? suite
+    : suiteOptions[0].value;
 
   return (
     <section data-testid="collectivex-display" className="flex flex-col gap-4">

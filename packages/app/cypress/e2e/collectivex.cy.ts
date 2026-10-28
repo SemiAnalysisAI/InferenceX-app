@@ -750,20 +750,13 @@ describe('CollectiveX swap_blocks', () => {
   it('shows a swap-only run, byte units and linear bandwidth, then switches latency and direction', () => {
     openCollectiveX();
     suiteTabs().then(($tabs) => {
-      expect([...$tabs].map((tab) => tab.textContent?.trim())).to.deep.equal(['EP', 'swap_blocks']);
+      expect([...$tabs].map((tab) => tab.textContent?.trim())).to.deep.equal(['swap_blocks']);
     });
     cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]').should(
       'have.text',
-      'EP',
+      'swap_blocks',
     );
-    cy.get('[data-testid="collectivex-empty-state"]').should('be.visible');
-    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('not.exist');
-    cy.get('[data-testid="collectivex-swap-chart"]').should('not.exist');
-    cy.get('[data-testid="collectivex-methodology-link"]')
-      .should('have.attr', 'href')
-      .and('match', /\/collectivex\/docs\/methodology\.md$/u);
-
-    showSuite('swap_blocks');
+    cy.get('[data-testid="collectivex-empty-state"]').should('not.exist');
     cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
     cy.get('[data-testid="collectivex-methodology-link"]')
       .should('have.attr', 'href')
@@ -794,10 +787,6 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('body').should('contain.text', '8.000 µs').and('contain.text', 'Copied payload: 4 KiB');
     cy.get('[data-testid="swap-metric"]').contains('Bandwidth').click();
     cy.get('@swapChart').should('contain.text', 'GB/s').and('not.contain.text', 'µs, log');
-    showSuite('EP');
-    cy.get('[data-testid="collectivex-swap-chart"]').should('not.exist');
-    showSuite('swap_blocks');
-    cy.get('[data-testid="collectivex-swap-chart"]').should('be.visible');
   });
   it('renders the translated controls and tooltip on the Chinese route', () => {
     cy.visit('/zh/collectivex');
